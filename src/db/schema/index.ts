@@ -10,3 +10,4 @@ export * from "./attendance";
 export * from "./admissions";
 export * from "./documents";
 export * from "./journey-definitions";
+export * from "./calendar";
