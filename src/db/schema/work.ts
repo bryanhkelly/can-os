@@ -20,6 +20,7 @@ import {
 import { people } from "./identity";
 import { organizations, programs, sites } from "./organizations";
 import { sections } from "./academics";
+import { journeyDefinitions } from "./journey-definitions";
 
 export const actions = pgTable(
   "actions",
@@ -91,6 +92,9 @@ export const journeys = pgTable(
     ownerPersonId: uuid("owner_person_id").references(() => people.id, {
       onDelete: "restrict",
     }),
+    journeyDefinitionId: uuid("journey_definition_id")
+      .notNull()
+      .references(() => journeyDefinitions.id, { onDelete: "restrict" }),
     definitionVersion: text("definition_version").notNull(),
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
