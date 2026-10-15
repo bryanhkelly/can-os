@@ -1,9 +1,7 @@
 name: Migration Preview
 
 on:
-  push:
-    branches:
-      - "db/**"
+  workflow_dispatch:
 
 permissions:
   contents: write
