@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Card,
   CardContent,
@@ -25,6 +25,12 @@ function HomePage() {
           </p>
         </header>
 
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6">
+          <div><p className="text-[10px] font-bold uppercase tracking-[.17em] text-muted-foreground">Student experience · S1–S4</p>
+          <h2 className="mt-2 font-serif text-3xl">A better way to learn every day.</h2>
+          <p className="mt-2 max-w-lg text-sm text-muted-foreground">Explore Today, your courses, recovery, feedback, and clear submission confirmations in an interactive demonstration.</p></div>
+          <Link to="/student" className="rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background">Explore Student Today →</Link>
+        </div>
         <section className="mt-8 grid gap-4 md:grid-cols-2">
           <FlowCard
             label="Academic"
