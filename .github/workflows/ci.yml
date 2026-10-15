@@ -34,12 +34,12 @@ jobs:
         run: |
           npm run db:generate
           echo "Drizzle migration generation succeeded from committed history."
-          if [ -n "$(git status --porcelain -- drizzle/)" ] && { [ "${{ github.head_ref }}" = "feat/profiles-evidence-school-configuration" ] || [ "${{ github.ref_name }}" = "feat/profiles-evidence-school-configuration" ]; }; then
+          if [ -n "$(git status --porcelain -- drizzle/)" ] && { [ "${{ github.head_ref }}" = "feat/profiles-evidence-school-configuration" ] || [ "${{ github.ref_name }}" = "feat/profiles-evidence-school-configuration" ] || [ "${{ github.head_ref }}" = "feat/admissions-offer-persistence" ]; }; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add drizzle/
-            git commit -m "db: commit generated PR32 Drizzle migration"
-            git push origin HEAD:feat/profiles-evidence-school-configuration
+            git commit -m "db: commit generated Drizzle migration and snapshot"
+            git push origin HEAD:${{ github.head_ref }}
             echo "::notice::Committed generated Drizzle migration; rerun CI on updated head"
             exit 1
           fi
