@@ -98,6 +98,7 @@ export async function bookConference(
 ): Promise<string> {
   assertCapability(context, "conference.book");
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [slot] = await tx
@@ -135,7 +136,7 @@ export async function bookConference(
       .from(guardianRelationships)
       .where(
         and(
-          eq(guardianRelationships.guardianPersonId, context.actorPersonId),
+          eq(guardianRelationships.guardianPersonId, actorPersonId),
           eq(guardianRelationships.studentPersonId, student.personId),
         ),
       )
@@ -156,7 +157,7 @@ export async function bookConference(
       .values({
         conferenceSlotId: input.conferenceSlotId,
         studentProfileId: input.studentProfileId,
-        guardianPersonId: context.actorPersonId,
+        guardianPersonId: actorPersonId,
         status: "booked",
       })
       .returning({ id: conferenceBookings.id });
@@ -174,7 +175,7 @@ export async function bookConference(
         siteId: slot.siteId,
         sourceType: "conference_booking",
         sourceId: booking.id,
-        createdByPersonId: context.actorPersonId,
+        createdByPersonId: actorPersonId,
       })
       .returning({ id: calendarEvents.id });
 
@@ -190,7 +191,7 @@ export async function bookConference(
       {
         calendarEventId: event.id,
         participantType: "person",
-        participantId: context.actorPersonId,
+        participantId: actorPersonId,
         role: "guardian",
       },
       {
@@ -219,7 +220,7 @@ export async function bookConference(
       eventType: EventTypes.ConferenceBooked,
       aggregateType: "conference_booking",
       aggregateId: booking.id,
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       payload: {
         studentProfileId: input.studentProfileId,
         slotId: input.conferenceSlotId,
@@ -228,7 +229,7 @@ export async function bookConference(
     });
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       action: "conference.book",
       resourceType: "conference_booking",
       resourceId: booking.id,
