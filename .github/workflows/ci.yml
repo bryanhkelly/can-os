@@ -30,6 +30,11 @@ jobs:
         run: |
           npm run db:generate
           echo "Drizzle migration generation succeeded from committed history."
+          if [ -n "$(git status --porcelain -- drizzle/)" ]; then
+            echo "::error::Drizzle generated uncommitted migration changes. Commit generated SQL and snapshots before merging."
+            git status --short -- drizzle/
+            exit 1
+          fi
 
       - name: Test
         run: npm test
