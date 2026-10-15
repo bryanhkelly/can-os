@@ -56,3 +56,11 @@ New normalized structures:
 **Important migration blockers:** The earlier `person_credentials`, `education_history`, `compliance_requirements`, and `compliance_evidence` remain in the schema for compatibility but are now overlapping legacy concepts. Before production deployment, choose explicit backfill + compatibility views, migrate consumers, and retire overlapping writes. Framework policies currently use a JSON expression field; server-side Zod parsing and immutable published-version enforcement must precede accepting user-authored policies. Append-only rules need database-level immutability (privilege/trigger), not merely application conventions. Role membership and target relationship verification must occur server-side; the pure eligibility check is **not** authorization. Existing program configuration has versioned rows, but transactional reconciliation to the responsibility assignment rows is still required.
 
 CI, Drizzle migration generation, Neon application, live CRUD, and end-to-end acceptance testing have not been executed in this session. The PR remains unmerged pending these gates.
+
+## Verified CI and migration application boundary (October 15, 2026)
+
+- GitHub Actions workflow 38789300065 completed successfully with build/typecheck, Drizzle migration generation, and unit tests.
+- The CI migration step currently generates SQL within the runner but does **not** assert that the generated migration files have been committed. It does not apply migrations to Neon.
+- `scripts/sql/qualification-verification-immutability.sql` introduces an UPDATE/DELETE-blocking database trigger. It is a **reviewed migration input**, not automatically applied by Drizzle. Include its statements in the committed migration following table creation, then run database integration tests on an isolated Neon branch.
+- The qualification review service writes decision, domain event, and audit in a single Drizzle transaction, but must still be exercised against actual Neon. Its scoped reviewer membership behavior needs adversarial integration tests and should not be treated as complete authorization coverage.
+- No migration or fixture has been applied through this PR; no changes were made to the primary Neon branch.
