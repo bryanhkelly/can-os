@@ -5,6 +5,7 @@ type Role=typeof roles[number];
 const links=[
  {to:"/operations",label:"Needs You"},
  {to:"/admissions",label:"Admissions"},
+ {to:"/admissions/families",label:"Family Readiness"},
  {to:"/teacher/missing-work",label:"Missing Work"},
  {to:"/calendar-export",label:"Calendar Export"},
  {to:"/readiness",label:"Launch"},
