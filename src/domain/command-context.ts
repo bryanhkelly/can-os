@@ -14,20 +14,55 @@ export type CommandContext = {
 
 export class AuthorizationError extends Error {
   constructor(capability: string) {
-    super(`Missing required capability: ${capability}`);
+    super(`Missing required capability or scope: ${capability}`);
     this.name = "AuthorizationError";
   }
 }
 
-export function assertCapability(context: CommandContext, capability: string): void {
+export function assertCapability(
+  context: CommandContext,
+  capability: string,
+): void {
   if (!context.capabilities.has(capability)) {
     throw new AuthorizationError(capability);
   }
 }
 
-export function assertSectionScope(context: CommandContext, sectionId: string): void {
-  const allowed = context.scope.sectionIds;
-  if (allowed && allowed.length > 0 && !allowed.includes(sectionId)) {
-    throw new AuthorizationError(`section scope: ${sectionId}`);
+function assertScopedId(
+  allowed: string[] | undefined,
+  id: string | null | undefined,
+  label: string,
+): void {
+  if (!id) return;
+  if (allowed && allowed.length > 0 && !allowed.includes(id)) {
+    throw new AuthorizationError(`${label}: ${id}`);
   }
+}
+
+export function assertOrganizationScope(
+  context: CommandContext,
+  organizationId: string | null | undefined,
+): void {
+  assertScopedId(context.scope.organizationIds, organizationId, "organization scope");
+}
+
+export function assertSiteScope(
+  context: CommandContext,
+  siteId: string | null | undefined,
+): void {
+  assertScopedId(context.scope.siteIds, siteId, "site scope");
+}
+
+export function assertProgramScope(
+  context: CommandContext,
+  programId: string | null | undefined,
+): void {
+  assertScopedId(context.scope.programIds, programId, "program scope");
+}
+
+export function assertSectionScope(
+  context: CommandContext,
+  sectionId: string | null | undefined,
+): void {
+  assertScopedId(context.scope.sectionIds, sectionId, "section scope");
 }
