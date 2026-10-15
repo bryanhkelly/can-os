@@ -48,7 +48,7 @@ export const getStudyGroupDetail=createServerFn({method:"GET"}).validator((x:{gr
  const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.siteId,SITE))).limit(1);
  if(!group)throw new Error("Group unavailable");
  const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,STUDENT))).limit(1);
- const permitted=canAccessGroup(membership?.status as "pending"|"approved"|"declined"|"left"|null??null,"student");
+ const permitted=canAccessGroup((membership?.status??null) as "pending"|"approved"|"declined"|"left"|null,"student");
  if(!permitted)return {group,memberStatus:membership?.status??null,posts:[],sessions:[]};
  const [posts,sessions]=await Promise.all([
  db.select({id:s.studyGroupPosts.id,body:s.studyGroupPosts.body,createdAt:s.studyGroupPosts.createdAt,parentPostId:s.studyGroupPosts.parentPostId}).from(s.studyGroupPosts).where(and(eq(s.studyGroupPosts.groupId,data.groupId),eq(s.studyGroupPosts.hidden,false))).orderBy(desc(s.studyGroupPosts.createdAt)).limit(100),
@@ -75,4 +75,31 @@ export const reportStudyGroupPost=createServerFn({method:"POST"}).validator((x:{
  const [post]=await db.select().from(s.studyGroupPosts).where(and(eq(s.studyGroupPosts.groupId,data.groupId),eq(s.studyGroupPosts.id,data.postId))).limit(1);
  if(!member||!post)throw new Error("Cannot report this content");
  await db.insert(s.studyGroupReports).values({groupId:data.groupId,postId:data.postId,reporterPersonId:STUDENT,reason:data.reason.trim()});return {ok:true};
+});
+
+export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(async()=>{
+ const {db,s}=await context();
+ return db.select({groupId:s.studyGroups.id,groupTitle:s.studyGroups.title,personId:s.studyGroupMemberships.personId,personName:s.people.legalFirstName,status:s.studyGroupMemberships.status})
+ .from(s.studyGroupMemberships)
+ .innerJoin(s.studyGroups,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE)))
+ .innerJoin(s.people,eq(s.studyGroupMemberships.personId,s.people.id))
+ .where(eq(s.studyGroupMemberships.status,"pending")).limit(100);
+});
+export const listStudyGroupReports=createServerFn({method:"GET"}).handler(async()=>{
+ const {db,s}=await context();
+ return db.select({id:s.studyGroupReports.id,groupId:s.studyGroupReports.groupId,reason:s.studyGroupReports.reason,status:s.studyGroupReports.status,postId:s.studyGroupReports.postId})
+ .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE)))
+ .where(eq(s.studyGroupReports.status,"open")).limit(100);
+});
+export const resolveStudyGroupReport=createServerFn({method:"POST"}).validator((x:{reportId:string;hidePost:boolean})=>x).handler(async({data})=>{
+ assertSyntheticMutation("teacher");const {db,s}=await context();
+ return db.transaction(async tx=>{
+ const [report]=await tx.select({id:s.studyGroupReports.id,postId:s.studyGroupReports.postId,groupId:s.studyGroupReports.groupId})
+ .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupReports.groupId),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE)))
+ .where(and(eq(s.studyGroupReports.id,data.reportId),eq(s.studyGroupReports.status,"open"))).limit(1);
+ if(!report)throw new Error("Open report not found");
+ if(data.hidePost&&report.postId)await tx.update(s.studyGroupPosts).set({hidden:true,updatedAt:new Date()}).where(and(eq(s.studyGroupPosts.id,report.postId),eq(s.studyGroupPosts.groupId,report.groupId)));
+ await tx.update(s.studyGroupReports).set({status:"resolved"}).where(eq(s.studyGroupReports.id,report.id));
+ return {ok:true};
+ });
 });
