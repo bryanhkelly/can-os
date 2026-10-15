@@ -212,5 +212,14 @@ integration("GF36 co-curriculars and athletics", () => {
     expect(event.siteId).toBe(site.id);
     expect(event.timezone).toBe("America/New_York");
     expect(event.sourceType).toBe("activity_season");
+
+    await expect(activities.withdrawActivityRegistration({ ...guardianContext, actorPersonId: coach.id }, { registrationId }))
+      .rejects.toThrow(/authorized guardian/);
+    await activities.withdrawActivityRegistration(guardianContext, { registrationId });
+    await activities.withdrawActivityRegistration(guardianContext, { registrationId }); // idempotent
+    const [withdrawn] = await db.select().from(schema.activityRegistrations)
+      .where(eq(schema.activityRegistrations.id, registrationId));
+    expect(withdrawn.status).toBe("withdrawn");
+    expect(withdrawn.rosterStatus).toBe("not_rostered");
   });
 });
