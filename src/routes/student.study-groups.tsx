@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
 import {createStudyGroup,listStudyGroups,requestStudyGroupMembership,leaveStudyGroup,getStudyGroupDetail,postStudyGroupMessage,reportStudyGroupPost,scheduleStudyGroupSession,listStudyGroupReviewQueue,decideStudyGroupMembership,listStudyGroupReports,resolveStudyGroupReport} from "@/modules/student-experience/study-groups.functions";
-export const Route=createFileRoute("/student/study-groups")({loader:async()=>({groups:await listStudyGroups(),queue:await listStudyGroupReviewQueue(),reports:await listStudyGroupReports()}),component:StudyGroups});
+export const Route=createFileRoute("/student/study-groups")({loader:async()=>({groups:await listStudyGroups(),queue:await listStudyGroupReviewQueue().catch(()=>[]),reports:await listStudyGroupReports().catch(()=>[])}),component:StudyGroups});
 function StudyGroups(){
  const {groups,queue,reports}=Route.useLoaderData();const router=useRouter();
  const [selected,setSelected]=useState<string|null>(null),[detail,setDetail]=useState<Awaited<ReturnType<typeof getStudyGroupDetail>>|null>(null),[notice,setNotice]=useState("");

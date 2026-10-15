@@ -78,6 +78,7 @@ export const reportStudyGroupPost=createServerFn({method:"POST"}).validator((x:{
 });
 
 export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(async()=>{
+ assertSyntheticMutation("teacher");
  const {db,s}=await context();
  return db.select({groupId:s.studyGroups.id,groupTitle:s.studyGroups.title,personId:s.studyGroupMemberships.personId,personName:s.people.legalFirstName,status:s.studyGroupMemberships.status})
  .from(s.studyGroupMemberships)
@@ -86,6 +87,7 @@ export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(as
  .where(eq(s.studyGroupMemberships.status,"pending")).limit(100);
 });
 export const listStudyGroupReports=createServerFn({method:"GET"}).handler(async()=>{
+ assertSyntheticMutation("teacher");
  const {db,s}=await context();
  return db.select({id:s.studyGroupReports.id,groupId:s.studyGroupReports.groupId,reason:s.studyGroupReports.reason,status:s.studyGroupReports.status,postId:s.studyGroupReports.postId})
  .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE)))
