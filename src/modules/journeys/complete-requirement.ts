@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import {
   assertCapability,
+  assertProgramScope,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -36,6 +37,7 @@ export async function completeJourneyRequirement(
       .limit(1);
 
     if (!current) throw new Error("Journey requirement not found");
+    assertProgramScope(context, current.programId);
 
     const completedAt = new Date();
 
