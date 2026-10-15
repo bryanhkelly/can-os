@@ -1,13 +1,16 @@
 name: Migration Preview
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - "db/bootstrap-neon"
 
 permissions:
   contents: write
 
 jobs:
   migration:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -34,6 +37,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No migration changes to commit."
           else
-            git commit -m "Generate initial Drizzle migration"
+            git commit -m "Regenerate initial Drizzle migration with GF23"
             git push
           fi
