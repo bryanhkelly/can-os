@@ -25,6 +25,7 @@ export const attendanceEvents = pgTable(
       .references(() => programs.id, { onDelete: "restrict" }),
     siteId: uuid("site_id").references(() => sites.id, { onDelete: "restrict" }),
     sectionId: uuid("section_id").references(() => sections.id, { onDelete: "restrict" }),
+    occurrenceKey: text("occurrence_key").notNull(),
     status: attendanceStatus("status").notNull(),
     expectedAt: timestamp("expected_at", { withTimezone: true }).notNull(),
     recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
@@ -39,6 +40,7 @@ export const attendanceEvents = pgTable(
   },
   (table) => [
     index("attendance_student_time_idx").on(table.studentProfileId, table.expectedAt),
+    index("attendance_occurrence_idx").on(table.occurrenceKey),
     index("attendance_program_time_idx").on(table.programId, table.expectedAt),
     uniqueIndex("attendance_source_key_uq").on(table.sourceKey),
     index("attendance_supersedes_idx").on(table.supersedesAttendanceEventId),
