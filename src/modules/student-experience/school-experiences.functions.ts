@@ -1,3 +1,4 @@
+import { assertSyntheticMutation } from "./demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, asc } from "drizzle-orm";
 const PERSON = "f1000000-0000-4000-8000-000000000005";
@@ -24,6 +25,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
 export const setSyntheticCalendarStatus=createServerFn({method:"POST"})
   .validator((value:{eventId:string;status:"scheduled"|"moved"|"cancelled"})=>value)
   .handler(async({data})=>{
+  assertSyntheticMutation("registrar");
     if(!EVENT_IDS.includes(data.eventId)) throw new Error("Event is outside synthetic fixture");
     const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     const [current]=await db.select({metadata:schema.calendarEvents.metadata}).from(schema.calendarEvents).where(and(eq(schema.calendarEvents.id,data.eventId),eq(schema.calendarEvents.siteId,SITE))).limit(1);
@@ -34,6 +36,7 @@ export const setSyntheticCalendarStatus=createServerFn({method:"POST"})
 export const acknowledgeSyntheticNotice=createServerFn({method:"POST"})
   .validator((value:{noticeId:string})=>value)
   .handler(async({data})=>{
+  assertSyntheticMutation("student");
     if(!NOTICE_IDS.includes(data.noticeId)) throw new Error("Notice outside synthetic fixture");
     const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     await db.update(schema.notifications).set({status:"read",readAt:new Date(),updatedAt:new Date()}).where(and(eq(schema.notifications.id,data.noticeId),eq(schema.notifications.recipientPersonId,PERSON)));
@@ -42,6 +45,7 @@ export const acknowledgeSyntheticNotice=createServerFn({method:"POST"})
 export const bookSyntheticOfficeHour=createServerFn({method:"POST"})
   .validator((value:{slotId:string})=>value)
   .handler(async({data})=>{
+  assertSyntheticMutation("guardian");
     if(!SLOT_IDS.includes(data.slotId)) throw new Error("Slot outside synthetic fixture");
     const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
