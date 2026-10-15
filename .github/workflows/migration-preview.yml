@@ -1,16 +1,13 @@
 name: Migration Preview
 
 on:
-  push:
-    branches:
-      - "school-operations-foundation"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   migration:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
