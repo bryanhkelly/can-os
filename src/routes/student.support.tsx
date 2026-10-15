@@ -30,6 +30,7 @@ function SupportPage(){
  const [area,setArea]=useState<"academic"|"learning"|"counselor"|"planning">("academic");
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
  const chosen=referrals.find(r=>r.id===selected);
+ useEffect(()=>{const params=new URLSearchParams(window.location.search);const referral=params.get("referral");const assessment=params.get("assessment");if(referral&&referrals.some(r=>r.id===referral))setSelected(referral);if(assessment){setCategory("academic");setObservations("Academic support requested after review of assignment "+assessment+". Please review the assessment evidence and plan targeted assistance.");setIncludeEvidence(true);}},[referrals]);
  async function execute(work:()=>Promise<unknown>,success:string) {
   setBusy(true);setError("");setMessage("");
   try{await work();await router.invalidate();setMessage(success);setNote("");}
