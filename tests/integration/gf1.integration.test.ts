@@ -11,6 +11,8 @@ integration("GF1 academic intervention", () => {
       learning,
       worker,
       actionModule,
+      communication,
+      actionResolution,
     ] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
@@ -18,6 +20,8 @@ integration("GF1 academic intervention", () => {
       import("@/modules/learning/gf1-service"),
       import("@/workers/domain-event-worker"),
       import("@/modules/actions/create-action-from-insight"),
+      import("@/modules/communication/gf1-thread-service"),
+      import("@/modules/actions/resolve-action"),
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);
@@ -187,6 +191,8 @@ integration("GF1 academic intervention", () => {
         "assessment.publish",
         "submission.grade",
         "action.create",
+        "action.resolve",
+        "communication.send",
       ]),
       scope: { sectionIds: [section.id] },
       requestId: `gf1-teacher-${suffix}`,
@@ -261,6 +267,38 @@ integration("GF1 academic intervention", () => {
 
     expect(actionId).toBeTruthy();
 
+    const guardianContext = {
+      actorPersonId: guardian.id,
+      capabilities: new Set(["communication.send"]),
+      scope: { sectionIds: [section.id] },
+      requestId: `gf1-guardian-${suffix}`,
+    };
+
+    const familyThreadId = await communication.sendAcademicInterventionMessage(
+      guardianContext,
+      {
+        submissionId: submission.id,
+        body: "We saw the missing assignment and will make sure Sam completes it today.",
+      },
+    );
+
+    const teacherThreadId = await communication.sendAcademicInterventionMessage(
+      teacherContext,
+      {
+        submissionId: submission.id,
+        body: "Thank you. I can review it once it is submitted.",
+      },
+    );
+
+    expect(teacherThreadId).toBe(familyThreadId);
+
+    const threadMessages = await db
+      .select()
+      .from(schema.communicationMessages)
+      .where(eq(schema.communicationMessages.threadId, familyThreadId));
+
+    expect(threadMessages).toHaveLength(2);
+
     const studentContext = {
       actorPersonId: studentPerson.id,
       capabilities: new Set(["submission.submit"]),
@@ -307,5 +345,31 @@ integration("GF1 academic intervention", () => {
       );
 
     expect(gradeEvents).toHaveLength(1);
+
+    await actionResolution.resolveAction(teacherContext, {
+      actionId,
+      resolutionNote:
+        "Student submitted the missing work, teacher graded it, and follow-up is complete.",
+    });
+
+    const [resolvedAction] = await db
+      .select()
+      .from(schema.actions)
+      .where(eq(schema.actions.id, actionId));
+
+    expect(resolvedAction.status).toBe("resolved");
+    expect(resolvedAction.resolutionNote).toContain("follow-up is complete");
+
+    const resolvedEvents = await db
+      .select()
+      .from(schema.domainEvents)
+      .where(
+        and(
+          eq(schema.domainEvents.eventType, "ActionResolved"),
+          eq(schema.domainEvents.aggregateId, actionId),
+        ),
+      );
+
+    expect(resolvedEvents).toHaveLength(1);
   });
 });
