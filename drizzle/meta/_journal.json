@@ -31,10 +31,10 @@
       "breakpoints": true
     },
     {
-      "idx": 3,
+      "idx": 4,
       "version": "7",
-      "when": 1792092000000,
-      "tag": "0003_extended_learning_capacity",
+      "when": 1792100500000,
+      "tag": "0004_extended_learning_capacity",
       "breakpoints": true
     }
   ]
