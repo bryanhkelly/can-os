@@ -9,7 +9,7 @@ const people = [
 const asOf = new Date("2026-10-15T12:00:00Z");
 export function SyntheticProfileExplorer(){
  const [selected,setSelected]=useState(0);
- const person=people[selected];
+ const person=people[selected] ?? people[0]!;
  const required = person.role==="Student" ? [] : [{code:"Safety readiness",requiredCredentialTypes:["cpr"],mandatory:true}];
  const statuses=evaluatePersonRequirements(required,person.credentials.map(c=>({...c})),asOf);
  return <main className="mx-auto max-w-6xl px-5 py-10">
