@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -143,7 +144,7 @@ export const domainEvents = pgTable(
     occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
     status: domainEventStatus("status").default("pending").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
-    attempts: text("attempts").default("0").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
     lastError: text("last_error"),
     processedAt: timestamp("processed_at", { withTimezone: true }),
     createdAt: createdAt(),
