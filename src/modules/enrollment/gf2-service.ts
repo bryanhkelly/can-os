@@ -56,8 +56,8 @@ export async function startFamilyApplication(
   journeyId: string;
 }> {
   assertCapability(context, "enrollment.apply");
-  if (!actorPersonId) throw new Error("Guardian identity is required");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [existing] = await tx
