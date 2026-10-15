@@ -19,3 +19,4 @@ export * from "./field-trips";
 export * from "./activities";
 export * from "./conferences";
 export * from "./profiles-compliance";
+export * from "./admissions-offers";
