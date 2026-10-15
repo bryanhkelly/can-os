@@ -36,5 +36,13 @@ jobs:
             exit 1
           fi
 
+      - name: Upload generated migration for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drizzle-migration-review
+          path: drizzle/
+          retention-days: 7
+
       - name: Test
         run: npm test
