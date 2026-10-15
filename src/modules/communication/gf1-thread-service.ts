@@ -2,9 +2,11 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   assessments,
+  auditEvents,
   communicationMessages,
   communicationParticipants,
   communicationThreads,
+  domainEvents,
   guardianRelationships,
   people,
   sectionTeachers,
@@ -16,6 +18,7 @@ import {
   assertSectionScope,
   type CommandContext,
 } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
 
 export async function sendAcademicInterventionMessage(
   context: CommandContext,
@@ -136,10 +139,36 @@ export async function sendAcademicInterventionMessage(
       body: input.body,
     });
 
+    const sentAt = new Date();
+
     await tx
       .update(communicationThreads)
-      .set({ lastMessageAt: new Date(), updatedAt: new Date() })
+      .set({ lastMessageAt: sentAt, updatedAt: sentAt })
       .where(eq(communicationThreads.id, threadId));
+
+    await tx.insert(domainEvents).values({
+      eventType: EventTypes.CommunicationMessageSent,
+      aggregateType: "communication_thread",
+      aggregateId: threadId,
+      actorPersonId: context.actorPersonId,
+      payload: {
+        submissionId: record.submissionId,
+        sectionId: record.sectionId,
+      },
+    });
+
+    await tx.insert(auditEvents).values({
+      actorPersonId: context.actorPersonId,
+      action: "communication.message_send",
+      resourceType: "communication_thread",
+      resourceId: threadId,
+      scope: { sectionId: record.sectionId },
+      after: { sent: true },
+      context: {
+        requestId: context.requestId ?? null,
+        submissionId: record.submissionId,
+      },
+    });
 
     return threadId;
   });
