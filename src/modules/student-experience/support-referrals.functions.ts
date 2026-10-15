@@ -1,3 +1,4 @@
+import { assertSyntheticMutation } from "./demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -49,6 +50,7 @@ export const getSupportReferrals=createServerFn({method:"GET"}).handler(async()=
 export const createSupportReferral=createServerFn({method:"POST"})
  .validator((v:{category:Category;priority:"normal"|"high";observations:string;includeEvidence:boolean})=>v)
  .handler(async({data})=>{
+  assertSyntheticMutation("teacher");
   if(!categories.includes(data.category))throw new Error("Invalid referral category");
   const observations=safeNote(data.observations);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -68,6 +70,7 @@ export const createSupportReferral=createServerFn({method:"POST"})
 export const advanceSupportReferral=createServerFn({method:"POST"})
  .validator((v:{referralId:string;nextStage:Stage;note:string;area?:Area;nextReview?:string})=>v)
  .handler(async({data})=>{
+  assertSyntheticMutation("specialist");
   if(!stages.includes(data.nextStage))throw new Error("Invalid referral stage");
   const note=safeNote(data.note);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -107,6 +110,7 @@ export const advanceSupportReferral=createServerFn({method:"POST"})
 export const saveSyntheticSupportPlan=createServerFn({method:"POST"})
  .validator((v:{referralId:string;goal:string;intervention:string;targetDate:string})=>v)
  .handler(async({data})=>{
+  assertSyntheticMutation("specialist");
   const goal=safeNote(data.goal,500),intervention=safeNote(data.intervention,1000);
   const date=new Date(data.targetDate);if(Number.isNaN(date.getTime()))throw new Error("Invalid review date");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -123,6 +127,7 @@ export const saveSyntheticSupportPlan=createServerFn({method:"POST"})
 export const scheduleSyntheticSupportService=createServerFn({method:"POST"})
  .validator((v:{referralId:string;kind:"tutoring"|"coaching"|"planning"|"learning_support";scheduledAt:string})=>v)
  .handler(async({data})=>{
+  assertSyntheticMutation("specialist");
   const when=new Date(data.scheduledAt);if(Number.isNaN(when.getTime()))throw new Error("Invalid appointment date");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
@@ -138,6 +143,7 @@ export const scheduleSyntheticSupportService=createServerFn({method:"POST"})
 export const completeSyntheticSupportService=createServerFn({method:"POST"})
  .validator((v:{referralId:string;serviceId:string;outcome:string})=>v)
  .handler(async({data})=>{
+  assertSyntheticMutation("specialist");
   const outcome=safeNote(data.outcome,600);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{

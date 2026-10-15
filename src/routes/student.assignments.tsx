@@ -14,6 +14,7 @@ function AssignmentsPage(){
  const [filter,setFilter]=useState("all"),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[error,setError]=useState("");
  const [draftState,setDraftState]=useState<"idle"|"saving"|"saved"|"error">("idle");
  const chosen=assignments.find(x=>x.assessmentId===selected);
+ useEffect(()=>{const value=new URLSearchParams(window.location.search).get("assessment");if(value&&assignments.some(x=>x.assessmentId===value))setSelected(value);},[assignments]);
  const sections=[...new Map(assignments.map(x=>[x.sectionId,{id:x.sectionId,course:x.course}])).values()];
  const items=assignments.filter(x=>filter==="all"||(filter==="todo"&&(!x.status||x.status==="assigned"||x.status==="returned"))||(filter==="submitted"&&x.status==="submitted")||(filter==="feedback"&&x.status==="graded"));
  async function perform(fn:()=>Promise<unknown>,success:string) {
@@ -74,7 +75,7 @@ function AssignmentsPage(){
     {typeof chosen.metadata?.rubric==="string"&&chosen.metadata.rubric&&<div className="mt-4 rounded-xl bg-stone-warm p-4 text-sm"><strong>Rubric:</strong> {chosen.metadata.rubric}</div>}
     {chosen.attempts.length>1&&<div className="mt-4 rounded-xl border border-border p-4"><p className="text-xs font-bold">Revision history</p>{[...chosen.attempts].sort((a,b)=>b.attempt-a.attempt).map(attempt=><p key={attempt.attempt} className="mt-2 text-xs">Attempt {attempt.attempt} · {attempt.status}{attempt.score!==null?` · ${attempt.score} points`:""}{attempt.feedback?` · ${attempt.feedback}`:""}</p>)}</div>}
     {chosen.rubricResult&&<div className="mt-4 rounded-xl border border-border p-4"><p className="font-semibold text-sm">Criterion results</p><pre className="mt-2 overflow-auto text-xs">{JSON.stringify(chosen.rubricResult,null,2)}</pre></div>}
-    {role==="teacher"&&<Link to="/student/support" className="mt-4 block rounded-xl border border-border bg-stone-warm p-4 text-sm font-semibold hover:border-foreground/40">Refer this student for academic support →</Link>}
+    {role==="teacher"&&<a href={`/student/support?assessment=${encodeURIComponent(chosen.assessmentId)}&persona=teacher`} className="mt-4 block rounded-xl border border-border bg-stone-warm p-4 text-sm font-semibold hover:border-foreground/40">Refer this student for academic support →</a>}
     {chosen.feedbackText&&<div className="mt-5 rounded-xl bg-stone-warm p-4"><p className="text-xs font-bold">Teacher feedback</p><p className="mt-2 text-sm">{chosen.feedbackText}</p></div>}
     {role==="student"&&chosen.assessmentStatus==="published"&&(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")&&<div className="mt-6">
      <label className="text-sm font-semibold">Your response</label><textarea rows={7} maxLength={20000} value={draft} onChange={e=>setDraft(e.target.value)} className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm" placeholder="Write your response…"/>

@@ -1,3 +1,4 @@
+import { assertSyntheticMutation } from "./demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, inArray } from "drizzle-orm";
 
@@ -55,6 +56,7 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
 export const requestCourseChange = createServerFn({ method:"POST" })
   .validator((value:{sectionId:string;operation:"add"|"drop"|"withdraw"})=>value)
   .handler(async({data})=>{
+  assertSyntheticMutation("student");
     if (!process.env.DATABASE_URL) throw new Error("Neon not configured");
     const [{ db },s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
@@ -88,29 +90,34 @@ export const requestCourseChange = createServerFn({ method:"POST" })
 export const decideCourseChange = createServerFn({method:"POST"})
   .validator((value:{requestId:string;approve:boolean})=>value)
   .handler(async({data})=>{
+  assertSyntheticMutation("registrar");
     if(!process.env.DATABASE_URL)throw new Error("Neon not configured");
     const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
       const [request]=await tx.select().from(s.actions).where(and(
         eq(s.actions.id,data.requestId),eq(s.actions.type,"course_registration_request"),
-        eq(s.actions.ownerPersonId,PERSON),eq(s.actions.status,"open"))).limit(1);
+        eq(s.actions.ownerPersonId,PERSON),eq(s.actions.status,"open"))).limit(1).for("update");
       if(!request||request.metadata.synthetic!==true||request.metadata.fixture!=="gf40")throw new Error("Pending synthetic request not found");
       const operation=request.metadata.operation;
       const sectionId=request.subjectId;
       if(!sectionId||!["add","drop","withdraw"].includes(String(operation)))throw new Error("Invalid request");
       if(data.approve){
-        const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata}).from(s.sections).where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,SITE),eq(s.sections.programId,PROGRAM))).limit(1);
+        const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata}).from(s.sections).where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,SITE),eq(s.sections.programId,PROGRAM),eq(s.sections.active,true))).limit(1).for("update");
         if(!section)throw new Error("Section unavailable");
+        const policyAtApproval=registrationPolicy(section.metadata);
+        const today=new Date().toISOString().slice(0,10);
+        if(operation==="add" && today>policyAtApproval.addDropEndsOn)throw new Error("Registration window closed before approval");
+        if(operation==="drop" && today>policyAtApproval.addDropEndsOn)throw new Error("Drop deadline passed; submit withdrawal request");
+        if(operation==="withdraw" && today>policyAtApproval.withdrawalEndsOn)throw new Error("Withdrawal deadline passed");
         if(operation==="add"){
           const policy=registrationPolicy(section.metadata);
           const roster=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active")));
           if(roster.length>=policy.capacity)throw new Error("Class is full");
-          const current=await tx.select({code:s.sections.code,metadata:s.sections.metadata})
+          const current=await tx.select({code:s.sections.code,metadata:s.sections.metadata,status:s.enrollments.status})
             .from(s.enrollments).innerJoin(s.sections,eq(s.enrollments.sectionId,s.sections.id))
             .where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active")));
-          const codes=new Set(current.map(x=>x.code));
-          if(policy.prerequisites.some(code=>!codes.has(code)))throw new Error("Prerequisite not met");
-          if(policy.meetingKey && current.some(x=>registrationPolicy(x.metadata).meetingKey===policy.meetingKey))throw new Error("Schedule conflict");
+          if(policy.prerequisites.length)throw new Error("Prerequisite completion cannot yet be verified automatically; registrar verification required");
+          if(policy.meetingKey && current.some(x=>x.status==="active"&&registrationPolicy(x.metadata).meetingKey===policy.meetingKey))throw new Error("Schedule conflict");
           const existing=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active")));
           if(existing.length)throw new Error("Already enrolled");
           await tx.insert(s.enrollments).values({studentProfileId:STUDENT,kind:"section",status:"active",organizationId:ORG,programId:PROGRAM,schoolYearId:YEAR,sectionId,startedAt:new Date(),metadata:{synthetic:true,source:"gf40"}});

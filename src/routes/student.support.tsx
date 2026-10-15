@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { advanceSupportReferral, createSupportReferral, getSupportReferrals, saveSyntheticSupportPlan, scheduleSyntheticSupportService, completeSyntheticSupportService } from "@/modules/student-experience/support-referrals.functions";
 
@@ -30,6 +30,7 @@ function SupportPage(){
  const [area,setArea]=useState<"academic"|"learning"|"counselor"|"planning">("academic");
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
  const chosen=referrals.find(r=>r.id===selected);
+ useEffect(()=>{const params=new URLSearchParams(window.location.search);const referral=params.get("referral");const assessment=params.get("assessment");if(referral&&referrals.some(r=>r.id===referral))setSelected(referral);if(assessment){setCategory("academic");setObservations("Academic support requested after review of assignment "+assessment+". Please review the assessment evidence and plan targeted assistance.");setIncludeEvidence(true);}},[referrals]);
  async function execute(work:()=>Promise<unknown>,success:string) {
   setBusy(true);setError("");setMessage("");
   try{await work();await router.invalidate();setMessage(success);setNote("");}

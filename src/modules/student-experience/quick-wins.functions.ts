@@ -1,3 +1,4 @@
+import { assertSyntheticMutation } from "./demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, desc } from "drizzle-orm";
 
@@ -26,6 +27,7 @@ export const getQuickWinActions = createServerFn({ method: "GET" }).handler(asyn
 export const finishQuickWinAction = createServerFn({ method: "POST" })
   .validator((value: { actionId: string }) => value)
   .handler(async ({ data }) => {
+  assertSyntheticMutation("student");
     if (!process.env.DATABASE_URL) throw new Error("Neon is not configured");
     const [{ db }, { actions }] = await Promise.all([
       import("@/db/client"), import("@/db/schema"),
@@ -46,6 +48,7 @@ export const finishQuickWinAction = createServerFn({ method: "POST" })
 export const requestQuickWinHelp = createServerFn({ method: "POST" })
   .validator((value: { message: string }) => value)
   .handler(async ({ data }) => {
+  assertSyntheticMutation("student");
     if (!process.env.DATABASE_URL) throw new Error("Neon is not configured");
     const message = data.message.trim();
     if (message.length < 3 || message.length > 1000) {
