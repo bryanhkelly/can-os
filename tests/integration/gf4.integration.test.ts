@@ -118,12 +118,15 @@ integration("GF4 attendance + parent excuse", () => {
       requestId: `gf4-site-${suffix}`,
     };
 
+    const occurrenceKey = `student-${student.id}:2027-09-14:morning-checkin`;
     const sourceKey = `device-write-${suffix}`;
 
     const absentId = await attendance.recordAttendance(siteContext, {
       studentProfileId: student.id,
       programId: program.id,
       siteId: site.id,
+      occurrenceKey,
+      occurrenceKey,
       status: "absent",
       expectedAt: new Date("2027-09-14T15:30:00.000Z"),
       sourceKey,
