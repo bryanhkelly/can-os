@@ -4,9 +4,17 @@ const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
 integration("GF1 academic intervention", () => {
   it("preserves lifecycle and timeliness while propagating missing work into an Insight and Action", async () => {
-    const [{ db }, schema, learning, worker, actionModule] = await Promise.all([
+    const [
+      { db },
+      schema,
+      { eq, and },
+      learning,
+      worker,
+      actionModule,
+    ] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
+      import("drizzle-orm"),
       import("@/modules/learning/gf1-service"),
       import("@/workers/domain-event-worker"),
       import("@/modules/actions/create-action-from-insight"),
@@ -94,8 +102,9 @@ integration("GF1 academic intervention", () => {
       ])
       .returning();
 
-    const [teacher, studentPerson, guardian] = insertedPeople;
-    expect(teacher && studentPerson && guardian).toBeTruthy();
+    const teacher = insertedPeople[0]!;
+    const studentPerson = insertedPeople[1]!;
+    const guardian = insertedPeople[2]!;
 
     const [student] = await db
       .insert(schema.studentProfiles)
@@ -174,7 +183,11 @@ integration("GF1 academic intervention", () => {
 
     const teacherContext = {
       actorPersonId: teacher.id,
-      capabilities: new Set(["assessment.publish", "submission.grade", "action.create"]),
+      capabilities: new Set([
+        "assessment.publish",
+        "submission.grade",
+        "action.create",
+      ]),
       scope: { sectionIds: [section.id] },
       requestId: `gf1-teacher-${suffix}`,
     };
@@ -184,9 +197,115 @@ integration("GF1 academic intervention", () => {
     let [submission] = await db
       .select()
       .from(schema.submissions)
-      .where(schema.eq(schema.submissions.assessmentId, assessment.id));
+      .where(eq(schema.submissions.assessmentId, assessment.id));
 
-    // eq is not re-exported by the schema; use drizzle dynamically below.
-    expect(submission).toBeDefined();
+    expect(submission.status).toBe("assigned");
+    expect(submission.timeliness).toBe("on_time");
+
+    const changed = await learning.markOverdueSubmissionsMissing(
+      new Date("2026-10-11T08:00:00.000Z"),
+    );
+    expect(changed).toBeGreaterThanOrEqual(1);
+
+    [submission] = await db
+      .select()
+      .from(schema.submissions)
+      .where(eq(schema.submissions.id, submission.id));
+
+    expect(submission.status).toBe("assigned");
+    expect(submission.timeliness).toBe("missing");
+
+    await worker.processPendingDomainEvents();
+
+    const [insight] = await db
+      .select()
+      .from(schema.insights)
+      .where(
+        and(
+          eq(schema.insights.subjectType, "student_profile"),
+          eq(schema.insights.subjectId, student.id),
+        ),
+      )
+      .orderBy(schema.insights.createdAt)
+      .limit(1);
+
+    expect(insight).toBeDefined();
+    expect(insight.type).toBe("missing_assignment");
+
+    const notifications = await db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.eventId, (
+        await db
+          .select({ id: schema.domainEvents.id })
+          .from(schema.domainEvents)
+          .where(
+            and(
+              eq(schema.domainEvents.eventType, "AssignmentBecameMissing"),
+              eq(schema.domainEvents.aggregateId, submission.id),
+            ),
+          )
+          .limit(1)
+      )[0]!.id));
+
+    expect(notifications.length).toBeGreaterThanOrEqual(3);
+
+    const actionId = await actionModule.createActionFromInsight(
+      teacherContext,
+      {
+        insightId: insight.id,
+        title: "Support Sam with Problem Set 7",
+        ownerPersonId: teacher.id,
+      },
+    );
+
+    expect(actionId).toBeTruthy();
+
+    const studentContext = {
+      actorPersonId: studentPerson.id,
+      capabilities: new Set(["submission.submit"]),
+      scope: { sectionIds: [section.id] },
+      requestId: `gf1-student-${suffix}`,
+    };
+
+    await learning.submitAssessment(
+      studentContext,
+      submission.id,
+      { text: "Completed work" },
+      new Date("2026-10-11T12:00:00.000Z"),
+    );
+
+    [submission] = await db
+      .select()
+      .from(schema.submissions)
+      .where(eq(schema.submissions.id, submission.id));
+
+    expect(submission.status).toBe("submitted");
+    expect(submission.timeliness).toBe("late");
+
+    await learning.gradeSubmission(teacherContext, submission.id, {
+      score: "88",
+      feedback: { comment: "Good recovery." },
+    });
+
+    [submission] = await db
+      .select()
+      .from(schema.submissions)
+      .where(eq(schema.submissions.id, submission.id));
+
+    expect(submission.status).toBe("graded");
+    expect(submission.timeliness).toBe("late");
+
+    const gradeEvents = await db
+      .select()
+      .from(schema.domainEvents)
+      .where(
+        and(
+          eq(schema.domainEvents.eventType, "GradePosted"),
+          eq(schema.domainEvents.aggregateId, submission.id),
+        ),
+      );
+
+    expect(gradeEvents).toHaveLength(1);
   });
 });
