@@ -16,7 +16,7 @@ import {
   instructionalDayType,
   schoolYearStatus,
 } from "./enums";
-import { organizations, programs } from "./organizations";
+import { organizations, programs, sites } from "./organizations";
 
 export const gradeScales = pgTable(
   "grade_scales",
@@ -67,6 +67,9 @@ export const schoolYears = pgTable(
     programId: uuid("program_id").references(() => programs.id, {
       onDelete: "restrict",
     }),
+    siteId: uuid("site_id")
+      .notNull()
+      .references(() => sites.id, { onDelete: "restrict" }),
     key: text("key").notNull(),
     name: text("name").notNull(),
     status: schoolYearStatus("status").default("draft").notNull(),
@@ -84,6 +87,7 @@ export const schoolYears = pgTable(
     uniqueIndex("school_year_scope_key_uq").on(
       table.organizationId,
       table.programId,
+      table.siteId,
       table.key,
     ),
     index("school_year_org_status_idx").on(
@@ -92,6 +96,10 @@ export const schoolYears = pgTable(
     ),
     index("school_year_program_status_idx").on(
       table.programId,
+      table.status,
+    ),
+    index("school_year_site_status_idx").on(
+      table.siteId,
       table.status,
     ),
   ],
@@ -160,6 +168,9 @@ export const academicCalendars = pgTable(
     schoolYearId: uuid("school_year_id")
       .notNull()
       .references(() => schoolYears.id, { onDelete: "cascade" }),
+    siteId: uuid("site_id")
+      .notNull()
+      .references(() => sites.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     version: integer("version").default(1).notNull(),
     active: boolean("active").default(true).notNull(),
@@ -168,12 +179,17 @@ export const academicCalendars = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex("academic_calendar_year_version_uq").on(
+    uniqueIndex("academic_calendar_year_site_version_uq").on(
       table.schoolYearId,
+      table.siteId,
       table.version,
     ),
     index("academic_calendar_year_active_idx").on(
       table.schoolYearId,
+      table.active,
+    ),
+    index("academic_calendar_site_active_idx").on(
+      table.siteId,
       table.active,
     ),
   ],
@@ -214,6 +230,9 @@ export const scheduleTemplates = pgTable(
     programId: uuid("program_id").references(() => programs.id, {
       onDelete: "restrict",
     }),
+    siteId: uuid("site_id")
+      .notNull()
+      .references(() => sites.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     active: boolean("active").default(true).notNull(),
     effectiveFrom: date("effective_from").notNull(),
@@ -226,6 +245,10 @@ export const scheduleTemplates = pgTable(
     index("schedule_template_year_idx").on(table.schoolYearId),
     index("schedule_template_program_active_idx").on(
       table.programId,
+      table.active,
+    ),
+    index("schedule_template_site_active_idx").on(
+      table.siteId,
       table.active,
     ),
   ],

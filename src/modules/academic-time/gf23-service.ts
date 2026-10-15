@@ -17,6 +17,7 @@ import {
   assertCapability,
   assertOrganizationScope,
   assertProgramScope,
+  assertSiteScope,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -41,6 +42,7 @@ export async function createSchoolYear(
   input: {
     organizationId: string;
     programId?: string;
+    siteId: string;
     key: string;
     name: string;
     startsOn: string;
@@ -52,6 +54,7 @@ export async function createSchoolYear(
   assertCapability(context, "academic_year.manage");
   assertOrganizationScope(context, input.organizationId);
   assertProgramScope(context, input.programId);
+  assertSiteScope(context, input.siteId);
   assertDateRange(input.startsOn, input.endsOn, "SchoolYear");
 
   return db.transaction(async (tx) => {
@@ -81,6 +84,7 @@ export async function createSchoolYear(
       .values({
         organizationId: input.organizationId,
         programId: input.programId,
+        siteId: input.siteId,
         key: input.key,
         name: input.name,
         status: "draft",
@@ -101,6 +105,7 @@ export async function createSchoolYear(
       payload: {
         organizationId: input.organizationId,
         programId: input.programId ?? null,
+        siteId: input.siteId,
       },
     });
 
@@ -112,6 +117,7 @@ export async function createSchoolYear(
       scope: {
         organizationId: input.organizationId,
         programId: input.programId ?? null,
+        siteId: input.siteId,
       },
       after: {
         key: input.key,
@@ -150,6 +156,7 @@ export async function createTerm(
     if (!year) throw new Error("SchoolYear not found");
     assertOrganizationScope(context, year.organizationId);
     assertProgramScope(context, year.programId);
+    assertSiteScope(context, year.siteId);
 
     if (input.startsOn < year.startsOn || input.endsOn > year.endsOn) {
       throw new Error("Term must fit within SchoolYear");
@@ -212,6 +219,7 @@ export async function createGradingPeriod(
         termEndsOn: terms.endsOn,
         organizationId: schoolYears.organizationId,
         programId: schoolYears.programId,
+        siteId: schoolYears.siteId,
       })
       .from(terms)
       .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
@@ -221,6 +229,7 @@ export async function createGradingPeriod(
     if (!record) throw new Error("Term not found");
     assertOrganizationScope(context, record.organizationId);
     assertProgramScope(context, record.programId);
+    assertSiteScope(context, record.siteId);
 
     if (
       input.startsOn < record.termStartsOn ||
@@ -272,6 +281,7 @@ export async function createAcademicCalendar(
       .insert(academicCalendars)
       .values({
         schoolYearId: input.schoolYearId,
+        siteId: year.siteId,
         name: input.name,
         version: 1,
         active: true,
@@ -304,6 +314,7 @@ export async function setAcademicCalendarDay(
         endsOn: schoolYears.endsOn,
         organizationId: schoolYears.organizationId,
         programId: schoolYears.programId,
+        siteId: schoolYears.siteId,
       })
       .from(academicCalendars)
       .innerJoin(
@@ -316,6 +327,7 @@ export async function setAcademicCalendarDay(
     if (!record) throw new Error("AcademicCalendar not found");
     assertOrganizationScope(context, record.organizationId);
     assertProgramScope(context, record.programId);
+    assertSiteScope(context, record.siteId);
 
     if (
       input.calendarDate < record.startsOn ||
@@ -427,6 +439,7 @@ export async function createScheduleTemplate(
       .values({
         schoolYearId: input.schoolYearId,
         programId: input.programId ?? year.programId,
+        siteId: year.siteId,
         name: input.name,
         active: true,
         effectiveFrom: input.effectiveFrom,
@@ -470,6 +483,7 @@ export async function activateSchoolYear(
     if (!year) throw new Error("SchoolYear not found");
     assertOrganizationScope(context, year.organizationId);
     assertProgramScope(context, year.programId);
+    assertSiteScope(context, year.siteId);
 
     if (year.status === "active") return;
 
@@ -499,6 +513,7 @@ export async function activateSchoolYear(
       .where(
         and(
           eq(academicCalendars.schoolYearId, schoolYearId),
+          eq(academicCalendars.siteId, year.siteId),
           eq(academicCalendars.active, true),
         ),
       )
@@ -526,6 +541,7 @@ export async function activateSchoolYear(
           .where(
             and(
               eq(scheduleTemplates.schoolYearId, schoolYearId),
+              eq(scheduleTemplates.siteId, year.siteId),
               eq(scheduleTemplates.active, true),
             ),
           )
@@ -554,6 +570,7 @@ export async function activateSchoolYear(
       payload: {
         organizationId: year.organizationId,
         programId: year.programId ?? null,
+        siteId: year.siteId,
       },
     });
 
@@ -565,6 +582,7 @@ export async function activateSchoolYear(
       scope: {
         organizationId: year.organizationId,
         programId: year.programId ?? null,
+        siteId: year.siteId,
       },
       before: { status: year.status },
       after: { status: "active" },

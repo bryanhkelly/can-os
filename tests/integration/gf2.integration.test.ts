@@ -75,6 +75,7 @@ integration("GF2 new family enrollment", () => {
     const academicTime = await createAcademicTimeFixture({
       organizationId: hostOrg.id,
       programId: program.id,
+      siteId: site.id,
       suffix,
     });
 

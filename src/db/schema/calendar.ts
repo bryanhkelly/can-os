@@ -38,3 +38,27 @@ export const calendarEvents = pgTable(
     index("calendar_source_idx").on(table.sourceType, table.sourceId),
   ],
 );
+
+
+export const calendarEventParticipants = pgTable(
+  "calendar_event_participants",
+  {
+    id: id(),
+    calendarEventId: uuid("calendar_event_id")
+      .notNull()
+      .references(() => calendarEvents.id, { onDelete: "cascade" }),
+    participantType: text("participant_type").notNull(),
+    participantId: uuid("participant_id").notNull(),
+    role: text("role"),
+    responseStatus: text("response_status").default("none").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("calendar_participant_event_idx").on(table.calendarEventId),
+    index("calendar_participant_subject_idx").on(
+      table.participantType,
+      table.participantId,
+    ),
+  ],
+);

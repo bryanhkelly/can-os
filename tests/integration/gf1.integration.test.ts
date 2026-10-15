@@ -148,6 +148,7 @@ integration("GF1 academic intervention", () => {
     const academicTime = await createAcademicTimeFixture({
       organizationId: hostOrg.id,
       programId: program.id,
+      siteId: site.id,
       suffix,
     });
 
