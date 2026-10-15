@@ -28,7 +28,6 @@ export async function publishAssessment(
         sectionId: assessments.sectionId,
         status: assessments.status,
         dueAt: assessments.dueAt,
-        studentPersonId: studentProfiles.personId,
       })
       .from(assessments)
       .where(eq(assessments.id, assessmentId))
@@ -180,6 +179,7 @@ export async function submitAssessment(
         studentProfileId: submissions.studentProfileId,
         sectionId: assessments.sectionId,
         dueAt: assessments.dueAt,
+        studentPersonId: studentProfiles.personId,
       })
       .from(submissions)
       .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
