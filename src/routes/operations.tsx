@@ -1,12 +1,14 @@
 import {createFileRoute,Link} from "@tanstack/react-router";
+import {getReleaseHealth} from "@/modules/operations/release-health.functions";
 import {getOperationsPreview} from "@/modules/operations/operations.functions";
-export const Route=createFileRoute("/operations")({loader:()=>getOperationsPreview(),component:OperationsPage});
+export const Route=createFileRoute("/operations")({loader:async()=>({operations:await getOperationsPreview(),health:await getReleaseHealth()}),component:OperationsPage});
 function OperationsPage(){
- const data=Route.useLoaderData();
+ const {operations:data,health}=Route.useLoaderData();
  return <main className="mx-auto max-w-6xl px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Synthetic operations preview</p>
   <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
   <p className="mt-3 max-w-2xl text-sm text-muted-foreground">One starting place for school operations. These records are synthetic; no public user is authorized to perform production mutations.</p>
+  <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p>
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
   {[["Open items",data.summary.total],["Urgent",data.summary.urgent],["Needs response",data.summary.needsResponse]].map(([label,num])=><div key={label} className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 font-serif text-3xl">{num}</p></div>)}
   </div>
