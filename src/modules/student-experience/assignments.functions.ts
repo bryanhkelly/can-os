@@ -22,11 +22,11 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   timeliness:s.submissions.timeliness,submittedAt:s.submissions.submittedAt,
   gradedAt:s.submissions.gradedAt,score:s.submissions.score,
   response:s.submissions.response,feedback:s.submissions.feedback,
-  course:s.sections.title,attemptNumber:s.submissions.attemptNumber,metadata:s.assessments.metadata,
+  course:s.sections.title,attemptNumber:s.submissions.attemptNumber,metadata:s.assessments.metadata,assessmentStatus:s.assessments.status,
  }).from(s.assessments)
  .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
  .leftJoin(s.submissions,and(eq(s.submissions.assessmentId,s.assessments.id),eq(s.submissions.studentProfileId,STUDENT)))
- .where(and(inArray(s.assessments.sectionId,ids),eq(s.assessments.status,"published")))
+ .where(and(inArray(s.assessments.sectionId,ids),inArray(s.assessments.status,["published","closed"])))
  .orderBy(desc(s.assessments.dueAt));
  const newest=new Map<string,(typeof rows)[number]>();
  for(const row of rows){const existing=newest.get(row.assessmentId);if(!existing||(row.attemptNumber??0)>(existing.attemptNumber??0))newest.set(row.assessmentId,row);}
@@ -34,7 +34,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   attempts:rows.filter(item=>item.assessmentId===row.assessmentId).map(item=>({attempt:item.attemptNumber??1,status:item.status??"assigned",score:item.score,submittedAt:item.submittedAt?.toISOString()??null,feedback:typeof item.feedback?.comment==="string"?item.feedback.comment:""})),
   dueAt:row.dueAt?.toISOString()??null,submittedAt:row.submittedAt?.toISOString()??null,
   gradedAt:row.gradedAt?.toISOString()??null,
-  metadata:{rubric:typeof row.metadata.rubric==="string"?row.metadata.rubric:""},
+  metadata:{rubric:typeof row.metadata.rubric==="string"?row.metadata.rubric:"",synthetic:row.metadata.synthetic===true},
   responseText:typeof row.response?.text==="string"?row.response.text:"",
   feedbackText:typeof row.feedback?.comment==="string"?row.feedback.comment:"",
   response:undefined,feedback:undefined,
