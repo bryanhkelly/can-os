@@ -4,6 +4,8 @@ const roles=["student","teacher","guardian","registrar","specialist"] as const;
 type Role=typeof roles[number];
 const links=[
  {to:"/operations",label:"Needs You"},
+ {to:"/teacher/missing-work",label:"Missing Work"},
+ {to:"/calendar-export",label:"Calendar Export"},
  {to:"/readiness",label:"Launch"},
  {to:"/profiles",label:"Profiles"},
  {to:"/student",label:"Today"},
