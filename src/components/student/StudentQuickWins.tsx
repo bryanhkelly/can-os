@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight, Bell, BookOpen, CalendarDays, CheckCircle2, ChevronRight,
@@ -37,7 +37,7 @@ const tabs: {id:Tab;label:string}[] = [
   {id:"support",label:"Support"}, {id:"portfolio",label:"Growth"},
   {id:"community",label:"Community"},
 ];
-function MiniButton({children,onClick}:{children:React.ReactNode;onClick:()=>void}) {
+function MiniButton({children,onClick}:{children:ReactNode;onClick:()=>void}) {
   return <button onClick={onClick} className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold hover:bg-accent">{children}</button>;
 }
 export function StudentQuickWins() {
