@@ -142,3 +142,53 @@ export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
    text:typeof row.response.text==="string"?row.response.text:"",
    feedback:typeof row.feedback.comment==="string"?row.feedback.comment:""}));
  });
+
+/** Drafts remain in the existing response JSON on an assigned attempt. */
+export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
+ .validator((value:{assessmentId:string;text:string})=>value)
+ .handler(async({data})=>{
+  if(data.text.length>20000)throw new Error("Draft too long");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId})
+    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+    .where(and(eq(s.assessments.id,data.assessmentId),eq(s.sections.siteId,SITE),eq(s.assessments.status,"published"))).limit(1);
+   if(!assessment)throw new Error("Assignment not available");
+   const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
+    .where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
+   if(!enrollment)throw new Error("Student not enrolled");
+   const [latest]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT))).orderBy(desc(s.submissions.attemptNumber)).limit(1);
+   if(latest && !["assigned","returned"].includes(latest.status))throw new Error("Submitted work cannot be overwritten");
+   if(latest?.status==="returned"){
+    const [draft]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,attemptNumber:latest.attemptNumber+1,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing().returning({id:s.submissions.id});
+    if(draft)return {saved:true};
+    const [existing]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT),eq(s.submissions.attemptNumber,latest.attemptNumber+1))).limit(1);
+    if(!existing||existing.status!=="assigned")throw new Error("Revision already submitted");
+    await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(eq(s.submissions.id,existing.id));
+    return {saved:true};
+   }
+   if(latest){
+    await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,latest.id),eq(s.submissions.status,"assigned")));
+   }else{
+    await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing();
+   }
+   return {saved:true};
+  });
+ });
+
+export const manageSyntheticAssignment=createServerFn({method:"POST"})
+ .validator((value:{assessmentId:string;action:"close"|"reopen"|"reschedule";dueAt?:string})=>value)
+ .handler(async({data})=>{
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const [assessment]=await db.select({id:s.assessments.id,metadata:s.assessments.metadata})
+   .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+   .where(and(eq(s.assessments.id,data.assessmentId),eq(s.sections.siteId,SITE))).limit(1);
+  if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Only synthetic assignments can be managed");
+  const due=data.action==="reschedule"?new Date(data.dueAt??""):undefined;
+  if(due&&Number.isNaN(due.getTime()))throw new Error("Invalid due date");
+  await db.update(s.assessments).set({
+   ...(data.action==="close"?{status:"closed" as const}:data.action==="reopen"?{status:"published" as const}:{}),
+   ...(due?{dueAt:due}:{}),updatedAt:new Date(),
+  }).where(eq(s.assessments.id,assessment.id));
+  return {saved:true};
+ });
