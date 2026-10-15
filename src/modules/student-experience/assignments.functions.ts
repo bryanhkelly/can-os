@@ -1,3 +1,4 @@
+import { assertSyntheticMutation } from "./demo-write-gate";
 import { readRubric, scoreRubric, type CriterionGrade } from "./rubric";
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, inArray, desc } from "drizzle-orm";
@@ -46,6 +47,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
 export const saveAssignmentResponse=createServerFn({method:"POST"})
  .validator((value:{assessmentId:string;text:string})=>value)
  .handler(async({data})=>{
+  assertSyntheticMutation("student");
   const text=data.text.trim();
   if(text.length<3||text.length>20000)throw new Error("Response must be 3–20,000 characters");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -79,6 +81,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
 export const gradeSyntheticAssignment=createServerFn({method:"POST"})
  .validator((value:{submissionId:string;score:number;comment:string})=>value)
  .handler(async({data})=>{
+  assertSyntheticMutation("teacher");
   if(!Number.isFinite(data.score)||data.score<0||data.score>100)throw new Error("Score must be from 0 to 100");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   const [record]=await db.select({id:s.submissions.id,points:s.assessments.pointsPossible})
@@ -97,6 +100,7 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
 export const returnSyntheticAssignment=createServerFn({method:"POST"})
  .validator((value:{submissionId:string})=>value)
  .handler(async({data})=>{
+  assertSyntheticMutation("teacher");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   const [updated]=await db.update(s.submissions).set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
    .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.studentProfileId,STUDENT),eq(s.submissions.status,"graded"))).returning({id:s.submissions.id});
@@ -108,6 +112,7 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
 export const createSyntheticAssignment=createServerFn({method:"POST"})
  .validator((value:{sectionId:string;title:string;instructions:string;dueAt:string;pointsPossible:number;rubric:string})=>value)
  .handler(async({data})=>{
+  assertSyntheticMutation("teacher");
   if(data.title.trim().length<3||data.title.length>180)throw new Error("Title must be 3–180 characters");
   if(!Number.isFinite(data.pointsPossible)||data.pointsPossible<=0||data.pointsPossible>1000)throw new Error("Invalid point value");
   const dueAt=new Date(data.dueAt);
@@ -149,6 +154,7 @@ export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
 export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
  .validator((value:{assessmentId:string;text:string})=>value)
  .handler(async({data})=>{
+  assertSyntheticMutation("student");
   if(data.text.length>20000)throw new Error("Draft too long");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
@@ -181,6 +187,7 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
 export const manageSyntheticAssignment=createServerFn({method:"POST"})
  .validator((value:{assessmentId:string;action:"close"|"reopen"|"reschedule";dueAt?:string})=>value)
  .handler(async({data})=>{
+  assertSyntheticMutation("teacher");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   const [assessment]=await db.select({id:s.assessments.id,metadata:s.assessments.metadata})
    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
@@ -199,6 +206,7 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
 export const gradeSyntheticRubric=createServerFn({method:"POST"})
  .validator((value:{submissionId:string;grades:CriterionGrade[];comment:string})=>value)
  .handler(async({data})=>{
+  assertSyntheticMutation("teacher");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
    const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,metadata:s.assessments.metadata})
