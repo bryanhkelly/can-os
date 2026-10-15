@@ -21,11 +21,16 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install schema tooling
-        run: npm install --no-save --package-lock=false drizzle-kit@0.31.11 drizzle-orm@0.45.4 typescript@5.8.3 tsx@4.20.0
+      - name: Install migration tooling only
+        run: |
+          mkdir -p /tmp/can-migration-tools
+          cd /tmp/can-migration-tools
+          npm init -y
+          npm install drizzle-kit@0.31.11 drizzle-orm@0.45.4 typescript@5.8.3 tsx@4.20.0
+          ln -s /tmp/can-migration-tools/node_modules "$GITHUB_WORKSPACE/node_modules"
 
       - name: Generate incremental migration SQL
-        run: npx drizzle-kit generate
+        run: /tmp/can-migration-tools/node_modules/.bin/drizzle-kit generate
 
       - name: Commit generated migration
         run: |
