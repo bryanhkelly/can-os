@@ -23,6 +23,7 @@ export const postSyntheticDiscussionMessage=createServerFn({method:"POST"})
    if(!parent)throw new Error("Reply target must belong to this discussion");
   }
   const [created]=await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:STUDENT_PERSON,body:data.body.trim(),metadata:{synthetic:true,...(data.parentMessageId?{parentMessageId:data.parentMessageId}:{})}}).returning({id:s.communicationMessages.id});
+  if(!created)throw new Error("Unable to create discussion response");
   await tx.update(s.communicationThreads).set({lastMessageAt:new Date(),updatedAt:new Date()}).where(eq(s.communicationThreads.id,thread.id));
   return {id:created.id};
  });
