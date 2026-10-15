@@ -28,6 +28,8 @@ export async function sendAcademicInterventionMessage(
   },
 ): Promise<string> {
   assertCapability(context, "communication.send");
+  if (!actorPersonId) throw new Error("A human actor is required to send a message");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [record] = await tx
@@ -76,7 +78,7 @@ export async function sendAcademicInterventionMessage(
           contextType: "submission",
           contextId: record.submissionId,
           createdByPersonId:
-            context.actorPersonId ?? record.studentPersonId,
+            actorPersonId ?? record.studentPersonId,
         })
         .returning({ id: communicationThreads.id });
 
@@ -104,17 +106,14 @@ export async function sendAcademicInterventionMessage(
         ...teachers.map((row) => row.personId),
       ]);
 
+      const createdThreadId = threadId;
       await tx.insert(communicationParticipants).values(
         [...participantIds].map((participantId) => ({
-          threadId,
+          threadId: createdThreadId,
           participantType: "person" as const,
           participantId,
         })),
       );
-    }
-
-    if (!context.actorPersonId) {
-      throw new Error("A human actor is required to send a message");
     }
 
     const [participant] = await tx
@@ -124,7 +123,7 @@ export async function sendAcademicInterventionMessage(
         and(
           eq(communicationParticipants.threadId, threadId),
           eq(communicationParticipants.participantType, "person"),
-          eq(communicationParticipants.participantId, context.actorPersonId),
+          eq(communicationParticipants.participantId, actorPersonId),
         ),
       )
       .limit(1);
@@ -135,7 +134,7 @@ export async function sendAcademicInterventionMessage(
 
     await tx.insert(communicationMessages).values({
       threadId,
-      senderPersonId: context.actorPersonId,
+      senderPersonId: actorPersonId,
       body: input.body,
     });
 
@@ -150,7 +149,7 @@ export async function sendAcademicInterventionMessage(
       eventType: EventTypes.CommunicationMessageSent,
       aggregateType: "communication_thread",
       aggregateId: threadId,
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       payload: {
         submissionId: record.submissionId,
         sectionId: record.sectionId,
@@ -158,7 +157,7 @@ export async function sendAcademicInterventionMessage(
     });
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       action: "communication.message_send",
       resourceType: "communication_thread",
       resourceId: threadId,
