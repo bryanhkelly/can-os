@@ -56,7 +56,8 @@ export async function startFamilyApplication(
   journeyId: string;
 }> {
   assertCapability(context, "enrollment.apply");
-  if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  if (!actorPersonId) throw new Error("Guardian identity is required");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [existing] = await tx
@@ -111,7 +112,7 @@ export async function startFamilyApplication(
         .where(
           and(
             eq(householdMemberships.householdId, householdId),
-            eq(householdMemberships.personId, context.actorPersonId),
+            eq(householdMemberships.personId, actorPersonId),
           ),
         )
         .limit(1);
@@ -134,7 +135,7 @@ export async function startFamilyApplication(
 
       await tx.insert(householdMemberships).values({
         householdId,
-        personId: context.actorPersonId,
+        personId: actorPersonId,
         relationshipLabel: "guardian",
         isPrimaryContact: true,
       });
@@ -159,7 +160,7 @@ export async function startFamilyApplication(
     });
 
     await tx.insert(guardianRelationships).values({
-      guardianPersonId: context.actorPersonId,
+      guardianPersonId: actorPersonId,
       studentPersonId: studentPerson.id,
       relationshipLabel: input.guardianRelationshipLabel ?? "parent",
     });
@@ -182,7 +183,7 @@ export async function startFamilyApplication(
         programId: input.programId,
         stage: "application",
         idempotencyKey: input.idempotencyKey,
-        submittedByPersonId: context.actorPersonId,
+        submittedByPersonId: actorPersonId,
         submittedAt: new Date(),
       })
       .returning({ id: applications.id });
@@ -216,7 +217,7 @@ export async function startFamilyApplication(
         participantId: application.id,
         organizationId: program.organizationId,
         programId: input.programId,
-        ownerPersonId: context.actorPersonId,
+        ownerPersonId: actorPersonId,
         journeyDefinitionId: definition.id,
         definitionVersion: definition.version,
         startedAt: new Date(),
@@ -250,7 +251,7 @@ export async function startFamilyApplication(
       eventType: EventTypes.ApplicationStarted,
       aggregateType: "application",
       aggregateId: application.id,
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       payload: {
         householdId,
         studentProfileId: studentProfile.id,
@@ -260,7 +261,7 @@ export async function startFamilyApplication(
     });
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       action: "application.start",
       resourceType: "application",
       resourceId: application.id,
@@ -322,7 +323,7 @@ export async function acceptApplication(
       eventType: EventTypes.ApplicationAccepted,
       aggregateType: "application",
       aggregateId: applicationId,
-      actorPersonId: context.actorPersonId,
+      context.actorPersonId: context.actorPersonId,
       payload: {
         studentProfileId: current.studentProfileId,
         programId: current.programId,
@@ -330,7 +331,7 @@ export async function acceptApplication(
     });
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      context.actorPersonId: context.actorPersonId,
       action: "application.accept",
       resourceType: "application",
       resourceId: applicationId,
@@ -434,7 +435,7 @@ export async function activateEnrollmentFromApplication(
       eventType: EventTypes.EnrollmentActivated,
       aggregateType: "enrollment",
       aggregateId: enrollment.id,
-      actorPersonId: context.actorPersonId,
+      context.actorPersonId: context.actorPersonId,
       payload: {
         applicationId,
         studentProfileId: application.studentProfileId,
@@ -444,7 +445,7 @@ export async function activateEnrollmentFromApplication(
     });
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      context.actorPersonId: context.actorPersonId,
       action: "enrollment.activate",
       resourceType: "enrollment",
       resourceId: enrollment.id,
