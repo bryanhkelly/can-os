@@ -46,8 +46,8 @@ export async function fileIncident(
   assertCapability(context, "incident.file");
   assertSiteScope(context, input.siteId);
   assertProgramScope(context, input.programId);
-  if (!actorPersonId) throw new Error("Incident reporter is required");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("Incident reporter is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [incident] = await tx
