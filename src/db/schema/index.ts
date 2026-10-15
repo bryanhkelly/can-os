@@ -4,5 +4,6 @@ export * from "./identity";
 export * from "./organizations";
 export * from "./academics";
 export * from "./work";
+export * from "./insights";
 export * from "./communication";
 export * from "./attendance";
