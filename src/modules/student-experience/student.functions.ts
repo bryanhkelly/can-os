@@ -15,7 +15,7 @@ export const getStudentWorkspace = createServerFn({ method: "GET" })
       const { db } = await import("@/db/client");
       const { studentProfiles } = await import("@/db/schema");
       const { sql } = await import("drizzle-orm");
-      const [{ total }] = await db
+      const [{ total } = { total: 0 }] = await db
         .select({ total: sql<number>`count(*)::int` })
         .from(studentProfiles);
       return {
@@ -27,7 +27,8 @@ export const getStudentWorkspace = createServerFn({ method: "GET" })
     const { getStudentToday } = await import("./student-today.server");
     try {
       const data = await getStudentToday(studentId);
-      return { mode: "live" as const, data };
+      const safeData = { ...data, coursework: data.coursework.map(({ feedback, response, ...item }) => ({ ...item, feedback: { comment: typeof feedback?.comment === "string" ? feedback.comment : "" }, response: null })) };
+      return { mode: "live" as const, data: safeData };
     } catch (error) {
       if (error instanceof Error && error.message === "Student not found") {
         return { mode: "preview_profile_missing" as const, data: null };
