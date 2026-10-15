@@ -215,6 +215,7 @@ export async function startFamilyApplication(
         organizationId: program.organizationId,
         programId: input.programId,
         ownerPersonId: context.actorPersonId,
+        journeyDefinitionId: definition.id,
         definitionVersion: definition.version,
         startedAt: new Date(),
       })
