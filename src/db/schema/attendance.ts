@@ -4,6 +4,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
@@ -31,6 +32,7 @@ export const attendanceEvents = pgTable(
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
     sourceKey: text("source_key"),
+    supersedesAttendanceEventId: uuid("supersedes_attendance_event_id"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -38,6 +40,8 @@ export const attendanceEvents = pgTable(
   (table) => [
     index("attendance_student_time_idx").on(table.studentProfileId, table.expectedAt),
     index("attendance_program_time_idx").on(table.programId, table.expectedAt),
+    uniqueIndex("attendance_source_key_uq").on(table.sourceKey),
+    index("attendance_supersedes_idx").on(table.supersedesAttendanceEventId),
   ],
 );
 
