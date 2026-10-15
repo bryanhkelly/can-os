@@ -99,3 +99,44 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
   if(!updated)throw new Error("Graded synthetic submission not found");
   return {submissionId:updated.id};
  });
+
+/** Create and publish a synthetic class assignment using the existing model. */
+export const createSyntheticAssignment=createServerFn({method:"POST"})
+ .validator((value:{sectionId:string;title:string;instructions:string;dueAt:string;pointsPossible:number;rubric:string})=>value)
+ .handler(async({data})=>{
+  if(data.title.trim().length<3||data.title.length>180)throw new Error("Title must be 3–180 characters");
+  if(!Number.isFinite(data.pointsPossible)||data.pointsPossible<=0||data.pointsPossible>1000)throw new Error("Invalid point value");
+  const dueAt=new Date(data.dueAt);
+  if(Number.isNaN(dueAt.getTime()))throw new Error("Invalid due date");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [section]=await tx.select({id:s.sections.id}).from(s.sections).where(and(eq(s.sections.id,data.sectionId),eq(s.sections.siteId,SITE))).limit(1);
+   if(!section)throw new Error("Section not found at synthetic Site");
+   const [assessment]=await tx.insert(s.assessments).values({
+    sectionId:section.id,title:data.title.trim(),instructions:data.instructions.trim(),
+    status:"published",pointsPossible:String(data.pointsPossible),dueAt,availableAt:new Date(),
+    createdByPersonId:TEACHER,metadata:{synthetic:true,fixture:"gf1-v2",rubric:data.rubric.trim()},
+   }).returning({id:s.assessments.id});
+   if(!assessment)throw new Error("Assessment could not be created");
+   const enrolled=await tx.select({studentProfileId:s.enrollments.studentProfileId}).from(s.enrollments).where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.sectionId,section.id),eq(s.enrollments.status,"active")));
+   if(enrolled.length)await tx.insert(s.submissions).values(enrolled.map(row=>({assessmentId:assessment.id,studentProfileId:row.studentProfileId,status:"assigned" as const,timeliness:"on_time" as const})));
+   return {assessmentId:assessment.id};
+  });
+ });
+
+export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
+ .validator((value:{assessmentId:string})=>value)
+ .handler(async({data})=>{
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const rows=await db.select({attempt:s.submissions.attemptNumber,status:s.submissions.status,
+   submittedAt:s.submissions.submittedAt,score:s.submissions.score,
+   response:s.submissions.response,feedback:s.submissions.feedback})
+   .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
+   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+   .where(and(eq(s.submissions.assessmentId,data.assessmentId),eq(s.submissions.studentProfileId,STUDENT),eq(s.sections.siteId,SITE)))
+   .orderBy(desc(s.submissions.attemptNumber));
+  return rows.map(row=>({attempt:row.attempt,status:row.status,
+   submittedAt:row.submittedAt?.toISOString()??null,score:row.score,
+   text:typeof row.response.text==="string"?row.response.text:"",
+   feedback:typeof row.feedback.comment==="string"?row.feedback.comment:""}));
+ });
