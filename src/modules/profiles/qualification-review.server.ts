@@ -38,12 +38,11 @@ export async function reviewQualification(
 ) {
  const [claim]=await db.select().from(qualificationClaims).where(eq(qualificationClaims.id,input.claimId)).limit(1);
  if(!claim)throw new Error("Qualification claim not found");
- await assertScopedQualificationReviewer(context,claim.personId);
- if(!context.actorPersonId)throw new AuthorizationError("authenticated reviewer");
+ if(input.decision==="submit") {\n   if(context.actorPersonId!==claim.personId || !context.capabilities.has("profiles.credentials.submit")) throw new AuthorizationError("self qualification submission");\n } else await assertScopedQualificationReviewer(context,claim.personId);\n if(!context.actorPersonId)throw new AuthorizationError("authenticated reviewer");
  return db.transaction(async tx=>{
    // Serialize reviews against a claim by locking the parent row.
    await tx.execute(sql`SELECT id FROM qualification_claims WHERE id = ${input.claimId}::uuid FOR UPDATE`);
-   await assertScopedQualificationReviewer(context,claim.personId); // Recheck before mutation after parent lock.\n   const [latest]=await tx.select().from(qualificationVerificationEvents).where(eq(qualificationVerificationEvents.claimId,input.claimId)).orderBy(desc(qualificationVerificationEvents.sequence)).limit(1);
+   if(input.decision!=="submit") await assertScopedQualificationReviewer(context,claim.personId); // Reviewer recheck.\n   const [latest]=await tx.select().from(qualificationVerificationEvents).where(eq(qualificationVerificationEvents.claimId,input.claimId)).orderBy(desc(qualificationVerificationEvents.sequence)).limit(1);
    const current:VerificationStatus=latest?.decision==="approve"?"verified":latest?.decision==="reject"?"rejected":latest?.decision==="revoke"?"revoked":latest?.decision==="submit"?"pending":"unverified";
    const evidenceId=input.evidenceDocumentId??latest?.evidenceDocumentId??null;
    if(evidenceId){
