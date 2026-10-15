@@ -14,6 +14,7 @@ const links=[
  {to:"/student/experiences",label:"Calendar"},
  {to:"/student/support",label:"Support"},
  {to:"/student/notifications",label:"Notifications"},
+ {to:"/student/settings",label:"Settings"},
 ] as const;
 export function DemoNavigation(){
  const [role,setRole]=useState<Role>("student");
