@@ -1,6 +1,6 @@
 # Admissions offers: persistence foundation
 
-Migration 0003 adds program-and-school-year seat pool rows and durable admissions offers. A seat pool has nonnegative capacity and a unique (program, school year) boundary. Offers record actor IDs, issue/response timestamps, expiry, and an idempotency key. The partial unique index prevents multiple simultaneously active offers for the same application and school year.
+Migration 0003 adds program-and-school-year seat pool rows and durable admissions offers. A seat pool has a unique (program, school year) boundary. Offers record actor IDs, issue/response timestamps, expiry, and an idempotency key. The generated migration does **not yet** enforce nonnegative capacity, offer status values, or one active offer per application. These database invariants must be added and tested before offer writes are enabled.
 
 **This migration is not yet applied automatically to production.** It must be applied through the project's controlled deployment process before using the new tables.
 
