@@ -31,6 +31,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
  const newest=new Map<string,(typeof rows)[number]>();
  for(const row of rows){const existing=newest.get(row.assessmentId);if(!existing||(row.attemptNumber??0)>(existing.attemptNumber??0))newest.set(row.assessmentId,row);}
  return {connected:true,assignments:[...newest.values()].map(row=>({...row,
+  attempts:rows.filter(item=>item.assessmentId===row.assessmentId).map(item=>({attempt:item.attemptNumber??1,status:item.status??"assigned",score:item.score,submittedAt:item.submittedAt?.toISOString()??null,feedback:typeof item.feedback?.comment==="string"?item.feedback.comment:""})),
   dueAt:row.dueAt?.toISOString()??null,submittedAt:row.submittedAt?.toISOString()??null,
   gradedAt:row.gradedAt?.toISOString()??null,
   responseText:typeof row.response?.text==="string"?row.response.text:"",
