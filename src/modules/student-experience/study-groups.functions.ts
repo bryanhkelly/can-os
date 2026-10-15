@@ -7,6 +7,7 @@ const TEACHER="f1000000-0000-4000-8000-000000000006";
 const SITE="f1000000-0000-4000-8000-000000000003";
 async function context(){const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);return {db,s};}
 export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
+ assertSyntheticMutation("student");
  const {db,s}=await context();
  const rows=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,capacity:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,facilitator:s.studyGroups.facilitatorPersonId,status:s.studyGroups.status,membership:s.studyGroupMemberships.status}).from(s.studyGroups)
  .leftJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroupMemberships.personId,STUDENT)))
@@ -44,6 +45,7 @@ export const leaveStudyGroup=createServerFn({method:"POST"}).validator((x:{group
  await db.update(s.studyGroupMemberships).set({status:"left",updatedAt:new Date()}).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,STUDENT)));return {ok:true};
 });
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
+ assertSyntheticMutation("student");
  const {db,s}=await context();
  const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.siteId,SITE))).limit(1);
  if(!group)throw new Error("Group unavailable");
