@@ -23,6 +23,7 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { assertSeasonRegistrationOpen } from "./registration-policy";
 
 export async function createActivity(
   context: CommandContext,
@@ -121,6 +122,11 @@ export async function registerForActivity(
     const [record] = await tx
       .select({
         seasonId: activitySeasons.id,
+        seasonStatus: activitySeasons.status,
+        registrationOpensAt: activitySeasons.registrationOpensAt,
+        registrationClosesAt: activitySeasons.registrationClosesAt,
+        startsOn: activitySeasons.startsOn,
+        endsOn: activitySeasons.endsOn,
         feeAmountCents: activitySeasons.feeAmountCents,
         activityName: activities.name,
         siteId: activities.siteId,
@@ -132,6 +138,7 @@ export async function registerForActivity(
       .limit(1);
 
     if (!record) throw new Error("Activity season not found");
+    assertSeasonRegistrationOpen(record, new Date());
 
     const [student] = await tx
       .select({ personId: studentProfiles.personId })
