@@ -29,6 +29,16 @@ export const programStatus = pgEnum("program_status", [
   "closed",
 ]);
 
+export const applicationStage = pgEnum("application_stage", [
+  "lead",
+  "inquiry",
+  "application",
+  "eligibility",
+  "accepted",
+  "declined",
+  "withdrawn",
+]);
+
 export const enrollmentKind = pgEnum("enrollment_kind", [
   "program",
   "school_year",
