@@ -90,7 +90,7 @@ export async function setHealthCompliance(
           dueOn: input.dueOn,
           expiresOn: input.expiresOn,
           documentId: input.documentId,
-          reviewedByPersonId: reviewedAt ? context.actorPersonId : null,
+          reviewedByPersonId: reviewedAt ? actorPersonId : null,
           reviewedAt,
           notes: input.notes,
           updatedAt: new Date(),
@@ -160,7 +160,8 @@ export async function administerMedication(
 ): Promise<string> {
   assertCapability(context, "medication.administer");
   assertSiteScope(context, input.siteId);
-  if (!context.actorPersonId) throw new Error("Medication administrator is required");
+  if (!actorPersonId) throw new Error("Medication administrator is required");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [authorization] = await tx
@@ -192,7 +193,7 @@ export async function administerMedication(
       .values({
         authorizationId: input.authorizationId,
         siteId: input.siteId,
-        administeredByPersonId: context.actorPersonId,
+        administeredByPersonId: actorPersonId,
         administeredAt,
         dose: input.dose,
         result: input.result ?? "administered",
@@ -206,7 +207,7 @@ export async function administerMedication(
       eventType: EventTypes.MedicationAdministered,
       aggregateType: "medication_administration",
       aggregateId: record.id,
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       payload: {
         authorizationId: input.authorizationId,
         studentProfileId: authorization.studentProfileId,
@@ -216,7 +217,7 @@ export async function administerMedication(
     });
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       action: "medication.administer",
       resourceType: "medication_administration",
       resourceId: record.id,
@@ -252,7 +253,8 @@ export async function recordHealthOfficeVisit(
 }> {
   assertCapability(context, "health.visit.manage");
   assertSiteScope(context, input.siteId);
-  if (!context.actorPersonId) throw new Error("Health office actor is required");
+  if (!actorPersonId) throw new Error("Health office actor is required");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [visit] = await tx
@@ -263,7 +265,7 @@ export async function recordHealthOfficeVisit(
         reason: input.reason,
         disposition: input.disposition,
         sentHome: input.sentHome ?? false,
-        handledByPersonId: context.actorPersonId,
+        handledByPersonId: actorPersonId,
         notes: input.notes,
         checkedOutAt: input.sentHome ? new Date() : undefined,
       })
@@ -306,7 +308,7 @@ export async function recordHealthOfficeVisit(
         eventType: EventTypes.StudentSentHomeIll,
         aggregateType: "health_office_visit",
         aggregateId: visit.id,
-        actorPersonId: context.actorPersonId,
+        actorPersonId: actorPersonId,
         payload: {
           studentProfileId: input.studentProfileId,
           siteId: input.siteId,
@@ -330,7 +332,7 @@ export async function recordHealthOfficeVisit(
     }
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       action: "health.visit.record",
       resourceType: "health_office_visit",
       resourceId: visit.id,
