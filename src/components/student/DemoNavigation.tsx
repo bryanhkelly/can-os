@@ -11,6 +11,7 @@ const links=[
  {to:"/student",label:"Today"},
  {to:"/student/courses",label:"Classes"},
  {to:"/student/assignments",label:"Assignments"},
+ {to:"/student/discussions",label:"Discussions"},
  {to:"/student/experiences",label:"Calendar"},
  {to:"/student/support",label:"Support"},
  {to:"/student/notifications",label:"Notifications"},
