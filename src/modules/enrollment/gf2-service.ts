@@ -21,6 +21,7 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import {assertApplicationAcceptance,assertApplicationRetryOwnership} from "@/domain/admissions-transitions";
 
 type EnrollmentRequirementDefinition = {
   key: string;
@@ -65,12 +66,15 @@ export async function startFamilyApplication(
         applicationId: applications.id,
         householdId: applications.householdId,
         studentProfileId: applications.studentProfileId,
+        submittedByPersonId: applications.submittedByPersonId,
+        programId: applications.programId,
       })
       .from(applications)
       .where(eq(applications.idempotencyKey, input.idempotencyKey))
       .limit(1);
 
     if (existing) {
+      assertApplicationRetryOwnership(existing,actorPersonId,input.programId);
       const [existingJourney] = await tx
         .select({ id: journeys.id })
         .from(journeys)
@@ -306,6 +310,7 @@ export async function acceptApplication(
     if (!current) throw new Error("Application not found");
     assertProgramScope(context, current.programId);
     if (current.stage === "accepted") return;
+    assertApplicationAcceptance(current.stage);
 
     const decidedAt = new Date();
 
