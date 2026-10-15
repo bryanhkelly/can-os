@@ -39,6 +39,8 @@ export const getSupportReferrals=createServerFn({method:"GET"}).handler(async()=
    notes:typeof meta.notes==="string"?meta.notes:"",
    academicRecommendation:typeof meta.academicRecommendation==="string"?meta.academicRecommendation:"",
    nextReview:typeof meta.nextReview==="string"?meta.nextReview:"",
+   plan: meta.plan && typeof meta.plan==="object" && !Array.isArray(meta.plan) ? {goal:String((meta.plan as Record<string,unknown>).goal??""),intervention:String((meta.plan as Record<string,unknown>).intervention??""),targetDate:String((meta.plan as Record<string,unknown>).targetDate??"")} : null,
+   services:Array.isArray(meta.services)?meta.services.filter(x=>x&&typeof x==="object").map(x=>({id:String((x as Record<string,unknown>).id??""),kind:String((x as Record<string,unknown>).kind??""),scheduledAt:String((x as Record<string,unknown>).scheduledAt??""),status:String((x as Record<string,unknown>).status??""),outcome:String((x as Record<string,unknown>).outcome??"")})):[],
    assignedTo:row.ownerPersonId?names.get(row.ownerPersonId)??"Unassigned":"Unassigned",
    ownerPersonId:row.ownerPersonId,createdAt:row.createdAt.toISOString()};
  });
@@ -73,6 +75,7 @@ export const advanceSupportReferral=createServerFn({method:"POST"})
    const [record]=await tx.select().from(s.actions).where(and(eq(s.actions.id,data.referralId),eq(s.actions.type,"support_referral"),eq(s.actions.siteId,SITE),eq(s.actions.subjectId,STUDENT))).for("update").limit(1);
    if(!record||!isReferral(record.metadata))throw new Error("Synthetic referral not found");
    const previous=record.metadata.stage as Stage;
+   if(data.nextStage==="review"){const services=Array.isArray(record.metadata.services)?record.metadata.services as Record<string,unknown>[]:[];if(!services.length||services.some(service=>service.status!=="completed"))throw new Error("Complete the scheduled support services before review");}
    if(data.nextStage==="closed"&&previous!=="review")throw new Error("Referral must be reviewed before closure");
    if(data.nextStage!=="closed"&&stagePriority(data.nextStage)!==stagePriority(previous)+1)throw new Error("Invalid lifecycle transition");
    const area=data.area??(record.metadata.requestedArea as Area);
@@ -98,5 +101,51 @@ export const advanceSupportReferral=createServerFn({method:"POST"})
      resourceType:"action",resourceId:record.id});
    }
    return {stage:data.nextStage};
+  });
+ });
+
+export const saveSyntheticSupportPlan=createServerFn({method:"POST"})
+ .validator((v:{referralId:string;goal:string;intervention:string;targetDate:string})=>v)
+ .handler(async({data})=>{
+  const goal=safeNote(data.goal,500),intervention=safeNote(data.intervention,1000);
+  const date=new Date(data.targetDate);if(Number.isNaN(date.getTime()))throw new Error("Invalid review date");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [record]=await tx.select().from(s.actions).where(and(eq(s.actions.id,data.referralId),eq(s.actions.siteId,SITE),eq(s.actions.subjectId,STUDENT),eq(s.actions.type,"support_referral"))).for("update").limit(1);
+   if(!record||!isReferral(record.metadata)||!["accepted","plan_created","in_service"].includes(String(record.metadata.stage)))throw new Error("Referral must be accepted before planning");
+   await tx.update(s.actions).set({status:"in_progress",ownerPersonId:record.ownerPersonId,
+    metadata:{...record.metadata,stage:"plan_created",plan:{goal,intervention,targetDate:date.toISOString()},nextReview:date.toISOString()},
+    updatedAt:new Date()}).where(eq(s.actions.id,record.id));
+   return {saved:true};
+  });
+ });
+
+export const scheduleSyntheticSupportService=createServerFn({method:"POST"})
+ .validator((v:{referralId:string;kind:"tutoring"|"coaching"|"planning"|"learning_support";scheduledAt:string})=>v)
+ .handler(async({data})=>{
+  const when=new Date(data.scheduledAt);if(Number.isNaN(when.getTime()))throw new Error("Invalid appointment date");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [record]=await tx.select().from(s.actions).where(and(eq(s.actions.id,data.referralId),eq(s.actions.siteId,SITE),eq(s.actions.subjectId,STUDENT),eq(s.actions.type,"support_referral"))).for("update").limit(1);
+   if(!record||!isReferral(record.metadata)||!["plan_created","in_service"].includes(String(record.metadata.stage)))throw new Error("A support plan must be created first");
+   const services=Array.isArray(record.metadata.services)?record.metadata.services:[];
+   const id=crypto.randomUUID();
+   await tx.update(s.actions).set({metadata:{...record.metadata,stage:"in_service",services:[...services,{id,kind:data.kind,scheduledAt:when.toISOString(),status:"scheduled",outcome:""}]},updatedAt:new Date()}).where(eq(s.actions.id,record.id));
+   return {id};
+  });
+ });
+
+export const completeSyntheticSupportService=createServerFn({method:"POST"})
+ .validator((v:{referralId:string;serviceId:string;outcome:string})=>v)
+ .handler(async({data})=>{
+  const outcome=safeNote(data.outcome,600);
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [record]=await tx.select().from(s.actions).where(and(eq(s.actions.id,data.referralId),eq(s.actions.siteId,SITE),eq(s.actions.subjectId,STUDENT),eq(s.actions.type,"support_referral"))).for("update").limit(1);
+   if(!record||!isReferral(record.metadata))throw new Error("Referral not found");
+   const services=Array.isArray(record.metadata.services)?record.metadata.services as Record<string,unknown>[]:[];
+   if(!services.some(x=>x.id===data.serviceId&&x.status==="scheduled"))throw new Error("Scheduled service not found");
+   await tx.update(s.actions).set({metadata:{...record.metadata,services:services.map(x=>x.id===data.serviceId?{...x,status:"completed",outcome}:x)},updatedAt:new Date()}).where(eq(s.actions.id,record.id));
+   return {saved:true};
   });
  });
