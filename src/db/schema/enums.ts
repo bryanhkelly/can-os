@@ -29,6 +29,21 @@ export const programStatus = pgEnum("program_status", [
   "closed",
 ]);
 
+export const schoolYearStatus = pgEnum("school_year_status", [
+  "draft",
+  "ready",
+  "active",
+  "closed",
+]);
+
+export const instructionalDayType = pgEnum("instructional_day_type", [
+  "instructional",
+  "holiday",
+  "closure",
+  "special",
+  "makeup",
+]);
+
 export const applicationStage = pgEnum("application_stage", [
   "lead",
   "inquiry",

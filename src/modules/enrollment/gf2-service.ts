@@ -351,7 +351,7 @@ export { completeJourneyRequirement } from "@/modules/journeys/complete-requirem
 export async function activateEnrollmentFromApplication(
   context: CommandContext,
   applicationId: string,
-  schoolYear: string,
+  schoolYearId: string,
 ): Promise<string> {
   assertCapability(context, "enrollment.activate");
 
@@ -391,7 +391,7 @@ export async function activateEnrollmentFromApplication(
           eq(enrollments.studentProfileId, application.studentProfileId),
           eq(enrollments.kind, "program"),
           eq(enrollments.programId, application.programId),
-          eq(enrollments.schoolYear, schoolYear),
+          eq(enrollments.schoolYearId, schoolYearId),
           eq(enrollments.status, "active"),
         ),
       )
@@ -413,7 +413,7 @@ export async function activateEnrollmentFromApplication(
             .limit(1)
         )[0]!.organizationId,
         programId: application.programId,
-        schoolYear,
+        schoolYearId,
         startedAt: new Date(),
       })
       .returning({ id: enrollments.id });
@@ -440,7 +440,7 @@ export async function activateEnrollmentFromApplication(
         applicationId,
         studentProfileId: application.studentProfileId,
         programId: application.programId,
-        schoolYear,
+        schoolYearId,
       },
     });
 
@@ -453,7 +453,7 @@ export async function activateEnrollmentFromApplication(
       after: {
         status: "active",
         kind: "program",
-        schoolYear,
+        schoolYearId,
       },
       context: {
         requestId: context.requestId ?? null,

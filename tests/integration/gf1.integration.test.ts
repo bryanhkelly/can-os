@@ -25,6 +25,7 @@ integration("GF1 academic intervention", () => {
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);
+    const { createAcademicTimeFixture } = await import("./helpers/academic-time");
 
     const [jurisdiction] = await db
       .insert(schema.jurisdictions)
@@ -144,6 +145,12 @@ integration("GF1 academic intervention", () => {
       })
       .returning();
 
+    const academicTime = await createAcademicTimeFixture({
+      organizationId: hostOrg.id,
+      programId: program.id,
+      suffix,
+    });
+
     const [section] = await db
       .insert(schema.sections)
       .values({
@@ -152,7 +159,8 @@ integration("GF1 academic intervention", () => {
         courseTemplateVersionId: version.id,
         code: `LOGIC-2-${suffix}`,
         title: "Logic II",
-        termKey: `2026-fall-${suffix}`,
+        termId: academicTime.term.id,
+        scheduleTemplateId: academicTime.scheduleTemplate.id,
       })
       .returning();
 
@@ -168,7 +176,7 @@ integration("GF1 academic intervention", () => {
       organizationId: hostOrg.id,
       programId: program.id,
       sectionId: section.id,
-      schoolYear: "2026-2027",
+      schoolYearId: academicTime.schoolYear.id,
     });
 
     const dueAt = new Date("2026-10-10T23:59:00.000Z");
