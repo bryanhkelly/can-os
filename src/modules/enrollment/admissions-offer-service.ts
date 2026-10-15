@@ -3,7 +3,7 @@ import {db} from "@/db/client";
 import {admissionOffers,admissionSeatPools,applications,auditEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles} from "@/db/schema";
 import {assertCapability,assertProgramScope,type CommandContext} from "@/domain/command-context";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
-import {transitionAdmissionsOffer,type OfferAction,type OfferRecord,type OfferStatus} from "@/domain/admissions-offer-lifecycle";
+import {transitionAdmissionsOffer,type OfferStatus} from "@/domain/admissions-offer-lifecycle";
 
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
 const guarded=(role:"registrar"|"guardian")=>assertSyntheticMutation(role);
@@ -91,9 +91,9 @@ export async function activateSyntheticOfferedEnrollment(context:CommandContext,
   if(offer!.status!=="accepted")throw new Error("Guardian must accept offer first");
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
   if(!app||app.programId!==offer!.programId||app.stage!=="accepted")throw new Error("Application not accepted for this offer");
-  const journey=await ready(tx,app.id);
   const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(eq(enrollments.studentProfileId,app.studentProfileId),eq(enrollments.programId,offer!.programId),eq(enrollments.schoolYearId,offer!.schoolYearId),eq(enrollments.status,"active"),eq(enrollments.kind,"program"))).limit(1);
   if(existing)return existing.id;
+  const journey=await ready(tx,app.id);
   if(await occupancy(tx,offer!.programId,offer!.schoolYearId,new Date())>pool.capacity)throw new Error("Seat pool capacity exceeded");
   const [enrollment]=await tx.insert(enrollments).values({studentProfileId:app.studentProfileId,kind:"program",status:"active",organizationId,programId:offer!.programId,schoolYearId:offer!.schoolYearId,startedAt:new Date()}).returning({id:enrollments.id});
   if(!enrollment)throw new Error("Enrollment activation failed");
