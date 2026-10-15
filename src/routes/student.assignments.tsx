@@ -1,3 +1,4 @@
+import { RubricGrader } from "@/components/student/RubricGrader";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getAssignments, saveAssignmentResponse, gradeSyntheticAssignment, returnSyntheticAssignment, createSyntheticAssignment, getSyntheticAssignmentHistory, saveSyntheticAssignmentDraft, manageSyntheticAssignment } from "@/modules/student-experience/assignments.functions";
@@ -72,6 +73,7 @@ function AssignmentsPage(){
     <p className="mt-3 text-xs text-muted-foreground">Due: {date(chosen.dueAt)} · {chosen.assessmentStatus}</p>
     {typeof chosen.metadata?.rubric==="string"&&chosen.metadata.rubric&&<div className="mt-4 rounded-xl bg-stone-warm p-4 text-sm"><strong>Rubric:</strong> {chosen.metadata.rubric}</div>}
     {chosen.attempts.length>1&&<div className="mt-4 rounded-xl border border-border p-4"><p className="text-xs font-bold">Revision history</p>{[...chosen.attempts].sort((a,b)=>b.attempt-a.attempt).map(attempt=><p key={attempt.attempt} className="mt-2 text-xs">Attempt {attempt.attempt} · {attempt.status}{attempt.score!==null?` · ${attempt.score} points`:""}{attempt.feedback?` · ${attempt.feedback}`:""}</p>)}</div>}
+    {chosen.rubricResult&&<div className="mt-4 rounded-xl border border-border p-4"><p className="font-semibold text-sm">Criterion results</p><pre className="mt-2 overflow-auto text-xs">{JSON.stringify(chosen.rubricResult,null,2)}</pre></div>}
     {chosen.feedbackText&&<div className="mt-5 rounded-xl bg-stone-warm p-4"><p className="text-xs font-bold">Teacher feedback</p><p className="mt-2 text-sm">{chosen.feedbackText}</p></div>}
     {role==="student"&&chosen.assessmentStatus==="published"&&(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")&&<div className="mt-6">
      <label className="text-sm font-semibold">Your response</label><textarea rows={7} maxLength={20000} value={draft} onChange={e=>setDraft(e.target.value)} className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm" placeholder="Write your response…"/>
@@ -79,7 +81,8 @@ function AssignmentsPage(){
      <button disabled={busy||draft.trim().length<3} onClick={()=>perform(()=>saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}}),"Your work has been submitted to Neon.")} className="mt-3 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit work</button>
     </div>}
     {role==="student"&&chosen.status==="submitted"&&<p className="mt-5 rounded-xl bg-stone-warm p-4 text-sm">Submitted successfully. Your teacher can review your work.</p>}
-    {role==="teacher"&&chosen.status==="submitted"&&chosen.submissionId&&<div className="mt-5 space-y-3">
+    {role==="teacher"&&chosen.status==="submitted"&&chosen.submissionId&&chosen.metadata.criteria.length>0&&<RubricGrader submissionId={chosen.submissionId} criteria={chosen.metadata.criteria} onSaved={()=>router.invalidate()}/>}
+    {role==="teacher"&&chosen.status==="submitted"&&chosen.submissionId&&chosen.metadata.criteria.length===0&&<div className="mt-5 space-y-3">
      <p className="text-xs font-bold uppercase tracking-wider">Student response</p><p className="rounded-xl bg-stone-warm p-4 text-sm">{chosen.responseText}</p>
      <label className="block text-sm">Score (%) <input type="number" min={0} max={100} value={score} onChange={e=>setScore(Number(e.target.value))} className="ml-3 w-20 rounded-lg border border-border bg-background p-2"/></label>
      <textarea value={feedback} onChange={e=>setFeedback(e.target.value)} rows={3} className="w-full rounded-lg border border-border bg-background p-3 text-sm" placeholder="Useful feedback and next steps…"/>
