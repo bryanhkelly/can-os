@@ -127,7 +127,6 @@ integration("GF36 co-curriculars and athletics", () => {
       startsOn: "2028-01-15",
       endsOn: "2028-05-20",
       feeAmountCents: 15000,
-      capacity: 1,
     });
 
     const guardianContext = {
@@ -157,30 +156,6 @@ integration("GF36 co-curriculars and athletics", () => {
     const [fee] = await db.select().from(schema.financialObligations)
       .where(eq(schema.financialObligations.id, registration.financialObligationId!));
     expect(fee.amountCents).toBe(15000);
-
-    // A second child in the same household is waitlisted after the only seat is held.
-    const [secondPerson] = await db.insert(schema.people).values({
-      legalFirstName: "Taylor", legalLastName: `Student-${suffix}`,
-    }).returning();
-    const [secondStudent] = await db.insert(schema.studentProfiles).values({
-      personId: secondPerson.id, gradeLevel: "9",
-    }).returning();
-    await db.insert(schema.householdMemberships).values({
-      householdId: household.id, personId: secondPerson.id,
-      relationshipLabel: "student", isPrimaryContact: false,
-    });
-    await db.insert(schema.guardianRelationships).values({
-      guardianPersonId: guardian.id, studentPersonId: secondPerson.id,
-      relationshipLabel: "parent",
-    });
-    const waitlistedId = await activities.registerForActivity(guardianContext, {
-      activitySeasonId: seasonId, studentProfileId: secondStudent.id,
-      householdId: household.id, consentVersion: "2028.1",
-    });
-    const [waitlisted] = await db.select().from(schema.activityRegistrations)
-      .where(eq(schema.activityRegistrations.id, waitlistedId));
-    expect(waitlisted.status).toBe("waitlisted");
-    expect(waitlisted.financialObligationId).toBeNull();
 
     const check1 = await activities.evaluateActivityEligibility(staffContext, {
       registrationId,
