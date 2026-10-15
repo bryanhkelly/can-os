@@ -147,6 +147,64 @@ export async function setHealthCompliance(
   });
 }
 
+export async function createMedicationAuthorization(
+  context: CommandContext,
+  input: {
+    studentProfileId: string;
+    medicationName: string;
+    instructions: string;
+    startsOn: string;
+    expiresOn?: string;
+    authorizationDocumentId?: string;
+    guardianConsentDocumentId?: string;
+    emergencyOnly?: boolean;
+  },
+): Promise<string> {
+  assertCapability(context, "medication.authorization.manage");
+  if (input.expiresOn && input.expiresOn < input.startsOn) {
+    throw new Error("Medication authorization expiry must be after start");
+  }
+
+  const [authorization] = await db
+    .insert(medicationAuthorizations)
+    .values({
+      studentProfileId: input.studentProfileId,
+      medicationName: input.medicationName,
+      instructions: input.instructions,
+      status: "active",
+      startsOn: input.startsOn,
+      expiresOn: input.expiresOn,
+      authorizationDocumentId: input.authorizationDocumentId,
+      guardianConsentDocumentId: input.guardianConsentDocumentId,
+      emergencyOnly: input.emergencyOnly ?? false,
+    })
+    .returning({ id: medicationAuthorizations.id });
+
+  if (!authorization) {
+    throw new Error("Failed to create medication authorization");
+  }
+
+  await db.insert(auditEvents).values({
+    actorPersonId: context.actorPersonId,
+    action: "medication.authorization.create",
+    resourceType: "medication_authorization",
+    resourceId: authorization.id,
+    scope: {},
+    after: {
+      studentProfileId: input.studentProfileId,
+      medicationName: input.medicationName,
+      startsOn: input.startsOn,
+      expiresOn: input.expiresOn ?? null,
+    },
+    context: {
+      requestId: context.requestId ?? null,
+      classification: "medical",
+    },
+  });
+
+  return authorization.id;
+}
+
 export async function administerMedication(
   context: CommandContext,
   input: {
