@@ -17,7 +17,7 @@ export async function assertScopedQualificationReviewer(context: CommandContext,
     if(a.organizationId && !context.scope.organizationIds?.includes(a.organizationId))return false;
     if(a.siteId && !context.scope.siteIds?.includes(a.siteId))return false;
     if(a.programId && !context.scope.programIds?.includes(a.programId))return false;
-    if(!a.organizationId && !a.siteId && !a.programId)return false;
+    if(!a.organizationId)return false; // Reviewer must belong to an explicit accountable organization.
     const actorBelongs=Boolean(a.organizationId && actorMemberships.some(m=>m.organizationId===a.organizationId));
     if(!actorBelongs)return false;
     return subjectRoles.some(s=>
@@ -43,7 +43,7 @@ export async function reviewQualification(
  return db.transaction(async tx=>{
    // Serialize reviews against a claim by locking the parent row.
    await tx.execute(sql`SELECT id FROM qualification_claims WHERE id = ${input.claimId}::uuid FOR UPDATE`);
-   const [latest]=await tx.select().from(qualificationVerificationEvents).where(eq(qualificationVerificationEvents.claimId,input.claimId)).orderBy(desc(qualificationVerificationEvents.sequence)).limit(1);
+   await assertScopedQualificationReviewer(context,claim.personId); // Recheck before mutation after parent lock.\n   const [latest]=await tx.select().from(qualificationVerificationEvents).where(eq(qualificationVerificationEvents.claimId,input.claimId)).orderBy(desc(qualificationVerificationEvents.sequence)).limit(1);
    const current:VerificationStatus=latest?.decision==="approve"?"verified":latest?.decision==="reject"?"rejected":latest?.decision==="revoke"?"revoked":latest?.decision==="submit"?"pending":"unverified";
    const evidenceId=input.evidenceDocumentId??latest?.evidenceDocumentId??null;
    if(evidenceId){
