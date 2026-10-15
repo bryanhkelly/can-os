@@ -1,3 +1,4 @@
+import { DemoNavigation } from "@/components/student/DemoNavigation";
 import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -60,6 +61,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <DemoNavigation />
       <Outlet />
     </QueryClientProvider>
   );
