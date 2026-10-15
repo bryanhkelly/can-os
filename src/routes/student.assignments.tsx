@@ -23,7 +23,7 @@ function AssignmentsPage(){
  }
  function open(id:string,text:string){setSelected(id);setDraft(text);setDraftState("idle");setNotice("");setError("");}
  useEffect(()=>{
-  if(!chosen||role!=="student"||!(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")||draft===chosen.responseText)return;
+  if(!chosen||role!=="student"||!(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")||chosen.assessmentStatus!=="published"||draft===chosen.responseText)return;
   const timer=setTimeout(()=>{
    setDraftState("saving");
    saveSyntheticAssignmentDraft({data:{assessmentId:chosen.assessmentId,text:draft}})
@@ -69,11 +69,11 @@ function AssignmentsPage(){
    <div className="min-w-0">{chosen?<div className="rounded-2xl border border-border bg-card p-6">
     <p className="text-xs text-muted-foreground">{chosen.course}</p><h2 className="mt-2 font-serif text-3xl">{chosen.title}</h2>
     <p className="mt-3 text-sm leading-7 text-muted-foreground">{chosen.instructions??"Follow the course instructions."}</p>
-    <p className="mt-3 text-xs text-muted-foreground">Due: {date(chosen.dueAt)}</p>
+    <p className="mt-3 text-xs text-muted-foreground">Due: {date(chosen.dueAt)} · {chosen.assessmentStatus}</p>
     {typeof chosen.metadata?.rubric==="string"&&chosen.metadata.rubric&&<div className="mt-4 rounded-xl bg-stone-warm p-4 text-sm"><strong>Rubric:</strong> {chosen.metadata.rubric}</div>}
     {chosen.attempts.length>1&&<div className="mt-4 rounded-xl border border-border p-4"><p className="text-xs font-bold">Revision history</p>{[...chosen.attempts].sort((a,b)=>b.attempt-a.attempt).map(attempt=><p key={attempt.attempt} className="mt-2 text-xs">Attempt {attempt.attempt} · {attempt.status}{attempt.score!==null?` · ${attempt.score} points`:""}{attempt.feedback?` · ${attempt.feedback}`:""}</p>)}</div>}
     {chosen.feedbackText&&<div className="mt-5 rounded-xl bg-stone-warm p-4"><p className="text-xs font-bold">Teacher feedback</p><p className="mt-2 text-sm">{chosen.feedbackText}</p></div>}
-    {role==="student"&&(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")&&<div className="mt-6">
+    {role==="student"&&chosen.assessmentStatus==="published"&&(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")&&<div className="mt-6">
      <label className="text-sm font-semibold">Your response</label><textarea rows={7} maxLength={20000} value={draft} onChange={e=>setDraft(e.target.value)} className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm" placeholder="Write your response…"/>
      <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">Draft: {draftState==="saving"?"Saving…":draftState==="saved"?"Saved to Neon":draftState==="error"?"Could not autosave":"Ready"}</p>
      <button disabled={busy||draft.trim().length<3} onClick={()=>perform(()=>saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}}),"Your work has been submitted to Neon.")} className="mt-3 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit work</button>
