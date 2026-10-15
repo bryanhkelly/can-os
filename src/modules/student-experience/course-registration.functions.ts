@@ -7,6 +7,17 @@ const SITE = "f1000000-0000-4000-8000-000000000003";
 const PROGRAM = "f1000000-0000-4000-8000-000000000004";
 const ORG = "f1000000-0000-4000-8000-000000000002";
 const YEAR = "f1000000-0000-4000-8000-000000000009";
+function registrationPolicy(meta: Record<string, unknown>) {
+ const raw=meta.registrationPolicy;
+ const p=raw && typeof raw==="object" && !Array.isArray(raw) ? raw as Record<string,unknown> : {};
+ return {
+  capacity: typeof p.capacity==="number" ? p.capacity : 30,
+  prerequisites: Array.isArray(p.prerequisites) ? p.prerequisites.filter((v):v is string=>typeof v==="string") : [],
+  addDropEndsOn:typeof p.addDropEndsOn==="string" ? p.addDropEndsOn : "2026-10-31",
+  withdrawalEndsOn:typeof p.withdrawalEndsOn==="string" ? p.withdrawalEndsOn : "2026-12-15",
+  meetingKey:typeof p.meetingKey==="string" ? p.meetingKey : null,
+ };
+}
 
 /** Student/guardian course registration prototype for the synthetic tenant only. */
 export const getCourseRegistration = createServerFn({ method: "GET" }).handler(async () => {
@@ -32,6 +43,7 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
       id:c.id,title:c.title,code:c.code,subject:c.subject,description:c.description,
       credits:typeof c.metadata.credits==="number"?c.metadata.credits:1,
       mode:typeof c.metadata.deliveryMode==="string"?c.metadata.deliveryMode:"hybrid",
+      policy:registrationPolicy(c.metadata),
       enrollmentId:latest.get(c.id)?.id??null,
       enrollmentStatus:latest.get(c.id)?.status??null,
       withdrawalNotation:latest.get(c.id)?.metadata.withdrawalNotation??null,
@@ -46,9 +58,14 @@ export const requestCourseChange = createServerFn({ method:"POST" })
     if (!process.env.DATABASE_URL) throw new Error("Neon not configured");
     const [{ db },s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
-      const [section]=await tx.select({id:s.sections.id,title:s.sections.title}).from(s.sections).where(and(
+      const [section]=await tx.select({id:s.sections.id,title:s.sections.title,metadata:s.sections.metadata}).from(s.sections).where(and(
         eq(s.sections.id,data.sectionId),eq(s.sections.siteId,SITE),eq(s.sections.programId,PROGRAM),eq(s.sections.active,true))).limit(1);
       if(!section) throw new Error("Section not offered at this Site");
+      const policy=registrationPolicy(section.metadata);
+      const today=new Date().toISOString().slice(0,10);
+      if(data.operation==="drop" && today>policy.addDropEndsOn) throw new Error("Add/drop window has closed. Request withdrawal instead.");
+      if(data.operation==="withdraw" && today>policy.withdrawalEndsOn) throw new Error("Withdrawal window has closed.");
+      if(data.operation==="add" && today>policy.addDropEndsOn) throw new Error("Registration window has closed.");
       const [membership]=await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.sectionId,section.id),eq(s.enrollments.status,"active"))).limit(1);
       if(data.operation==="add" && membership) throw new Error("Already enrolled in this class");
       if(data.operation!=="add" && !membership) throw new Error("Not currently enrolled in this class");
@@ -82,9 +99,18 @@ export const decideCourseChange = createServerFn({method:"POST"})
       const sectionId=request.subjectId;
       if(!sectionId||!["add","drop","withdraw"].includes(String(operation)))throw new Error("Invalid request");
       if(data.approve){
-        const [section]=await tx.select({id:s.sections.id}).from(s.sections).where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,SITE),eq(s.sections.programId,PROGRAM))).limit(1);
+        const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata}).from(s.sections).where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,SITE),eq(s.sections.programId,PROGRAM))).limit(1);
         if(!section)throw new Error("Section unavailable");
         if(operation==="add"){
+          const policy=registrationPolicy(section.metadata);
+          const roster=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active")));
+          if(roster.length>=policy.capacity)throw new Error("Class is full");
+          const current=await tx.select({code:s.sections.code,metadata:s.sections.metadata})
+            .from(s.enrollments).innerJoin(s.sections,eq(s.enrollments.sectionId,s.sections.id))
+            .where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active")));
+          const codes=new Set(current.map(x=>x.code));
+          if(policy.prerequisites.some(code=>!codes.has(code)))throw new Error("Prerequisite not met");
+          if(policy.meetingKey && current.some(x=>registrationPolicy(x.metadata).meetingKey===policy.meetingKey))throw new Error("Schedule conflict");
           const existing=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active")));
           if(existing.length)throw new Error("Already enrolled");
           await tx.insert(s.enrollments).values({studentProfileId:STUDENT,kind:"section",status:"active",organizationId:ORG,programId:PROGRAM,schoolYearId:YEAR,sectionId,startedAt:new Date(),metadata:{synthetic:true,source:"gf40"}});
