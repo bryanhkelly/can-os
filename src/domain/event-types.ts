@@ -22,6 +22,21 @@ export const EventTypes = {
   AttendanceExcuseSubmitted: "AttendanceExcuseSubmitted",
   AttendanceExcuseApproved: "AttendanceExcuseApproved",
   AttendanceExcuseRejected: "AttendanceExcuseRejected",
+  IncidentFiled: "IncidentFiled",
+  IncidentAmended: "IncidentAmended",
+  IncidentReviewCompleted: "IncidentReviewCompleted",
+  IncidentNotificationQueued: "IncidentNotificationQueued",
+  IncidentClosed: "IncidentClosed",
+  HealthComplianceUpdated: "HealthComplianceUpdated",
+  MedicationAdministered: "MedicationAdministered",
+  StudentSentHomeIll: "StudentSentHomeIll",
+  ReturnToSchoolCleared: "ReturnToSchoolCleared",
+  FieldTripApproved: "FieldTripApproved",
+  FieldTripPermissionSigned: "FieldTripPermissionSigned",
+  FieldTripAttendanceRecorded: "FieldTripAttendanceRecorded",
+  ActivityEligibilityChecked: "ActivityEligibilityChecked",
+  ConferenceBooked: "ConferenceBooked",
+  ConferenceHeld: "ConferenceHeld",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
