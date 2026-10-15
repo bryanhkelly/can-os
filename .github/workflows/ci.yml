@@ -26,13 +26,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Generate migration
+      - name: Validate incremental migration generation
         run: |
-          rm -rf drizzle
           npm run db:generate
-          echo "=== CAN_OS_GENERATED_MIGRATION ==="
-          cat drizzle/*.sql
-          echo "=== END_CAN_OS_GENERATED_MIGRATION ==="
+          echo "Drizzle migration generation succeeded from committed history."
 
       - name: Test
         run: npm test
