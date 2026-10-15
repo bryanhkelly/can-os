@@ -22,13 +22,15 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   timeliness:s.submissions.timeliness,submittedAt:s.submissions.submittedAt,
   gradedAt:s.submissions.gradedAt,score:s.submissions.score,
   response:s.submissions.response,feedback:s.submissions.feedback,
-  course:s.sections.title,
+  course:s.sections.title,attemptNumber:s.submissions.attemptNumber,metadata:s.assessments.metadata,
  }).from(s.assessments)
  .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
- .leftJoin(s.submissions,and(eq(s.submissions.assessmentId,s.assessments.id),eq(s.submissions.studentProfileId,STUDENT),eq(s.submissions.attemptNumber,1)))
+ .leftJoin(s.submissions,and(eq(s.submissions.assessmentId,s.assessments.id),eq(s.submissions.studentProfileId,STUDENT)))
  .where(and(inArray(s.assessments.sectionId,ids),eq(s.assessments.status,"published")))
  .orderBy(desc(s.assessments.dueAt));
- return {connected:true,assignments:rows.map(row=>({...row,
+ const newest=new Map<string,(typeof rows)[number]>();
+ for(const row of rows){const existing=newest.get(row.assessmentId);if(!existing||(row.attemptNumber??0)>(existing.attemptNumber??0))newest.set(row.assessmentId,row);}
+ return {connected:true,assignments:[...newest.values()].map(row=>({...row,
   dueAt:row.dueAt?.toISOString()??null,submittedAt:row.submittedAt?.toISOString()??null,
   gradedAt:row.gradedAt?.toISOString()??null,
   responseText:typeof row.response?.text==="string"?row.response.text:"",
@@ -51,9 +53,15 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(
     eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
    if(!enrollment)throw new Error("Student is not enrolled");
-   const [prior]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT),eq(s.submissions.attemptNumber,1))).limit(1);
+   const priorRows=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT))).orderBy(desc(s.submissions.attemptNumber)).limit(1);
+   const prior=priorRows[0];
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
+   if(prior?.status==="returned"){
+    const [revision]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,attemptNumber:prior.attemptNumber+1,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
+    if(!revision)throw new Error("Unable to save revision");
+    return {submissionId:revision.id};
+   }
    if(prior){
     await tx.update(s.submissions).set({status:"submitted",response:{text},timeliness,submittedAt:now,updatedAt:now}).where(eq(s.submissions.id,prior.id));
     return {submissionId:prior.id};
@@ -78,6 +86,7 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
   const [updated]=await db.update(s.submissions).set({status:"graded",score:String(data.score*points/100),feedback:{comment:data.comment.slice(0,4000)},graderPersonId:TEACHER,gradedAt:new Date(),updatedAt:new Date()})
   .where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"submitted"))).returning({id:s.submissions.id});
   if(!updated)throw new Error("Submission already graded");
+  await db.insert(s.notifications).values({recipientPersonId:STUDENT_PERSON,type:"assignment_feedback",status:"unread",title:"New feedback on your work",body:data.comment.slice(0,500)||"Your teacher posted a grade.",resourceType:"submission",resourceId:updated.id});
   return {submissionId:updated.id};
  });
 
