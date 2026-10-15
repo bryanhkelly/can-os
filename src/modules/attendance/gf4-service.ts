@@ -35,8 +35,8 @@ export async function recordAttendance(
   assertCapability(context, "attendance.write");
   assertProgramScope(context, input.programId);
   assertSiteScope(context, input.siteId);
-  if (!actorPersonId) throw new Error("Attendance actor is required");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("Attendance actor is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [existing] = await tx
@@ -141,8 +141,8 @@ export async function submitAttendanceExcuse(
   },
 ): Promise<string> {
   assertCapability(context, "attendance.excuse.submit");
-  if (!actorPersonId) throw new Error("Guardian identity is required");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [attendance] = await tx
@@ -238,8 +238,8 @@ export async function reviewAttendanceExcuse(
   },
 ): Promise<{ excuseId: string; correctionAttendanceEventId?: string }> {
   assertCapability(context, "attendance.excuse.review");
-  if (!actorPersonId) throw new Error("Reviewer identity is required");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("Reviewer identity is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [record] = await tx
