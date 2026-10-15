@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -40,7 +41,7 @@ export const fieldTrips = pgTable(
     departsAt: timestamp("departs_at", { withTimezone: true }).notNull(),
     returnsAt: timestamp("returns_at", { withTimezone: true }).notNull(),
     permissionDueAt: timestamp("permission_due_at", { withTimezone: true }),
-    feeAmountCents: text("fee_amount_cents"),
+    feeAmountCents: integer("fee_amount_cents"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

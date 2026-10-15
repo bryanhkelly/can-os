@@ -1,6 +1,7 @@
 import {
   date,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -52,7 +53,7 @@ export const activitySeasons = pgTable(
     endsOn: date("ends_on").notNull(),
     registrationOpensAt: timestamp("registration_opens_at", { withTimezone: true }),
     registrationClosesAt: timestamp("registration_closes_at", { withTimezone: true }),
-    feeAmountCents: text("fee_amount_cents"),
+    feeAmountCents: integer("fee_amount_cents"),
     status: text("status").default("registration").notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

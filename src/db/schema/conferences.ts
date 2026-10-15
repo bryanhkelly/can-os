@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -31,7 +32,7 @@ export const conferenceSeries = pgTable(
     title: text("title").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
-    slotMinutes: text("slot_minutes").default("20").notNull(),
+    slotMinutes: integer("slot_minutes").default(20).notNull(),
     status: text("status").default("draft").notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: createdAt(),

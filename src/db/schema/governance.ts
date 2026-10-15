@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -86,7 +87,7 @@ export const financialObligations = pgTable(
     subjectId: uuid("subject_id").notNull(),
     type: text("type").notNull(),
     description: text("description").notNull(),
-    amountCents: text("amount_cents").notNull(),
+    amountCents: integer("amount_cents").notNull(),
     currency: text("currency").default("USD").notNull(),
     status: text("status").default("due").notNull(),
     dueAt: timestamp("due_at", { withTimezone: true }),
