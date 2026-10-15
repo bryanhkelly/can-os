@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   assessments,
@@ -6,6 +6,7 @@ import {
   domainEvents,
   enrollments,
   submissions,
+  studentProfiles,
 } from "@/db/schema";
 import {
   assertCapability,
@@ -27,6 +28,7 @@ export async function publishAssessment(
         sectionId: assessments.sectionId,
         status: assessments.status,
         dueAt: assessments.dueAt,
+        studentPersonId: studentProfiles.personId,
       })
       .from(assessments)
       .where(eq(assessments.id, assessmentId))
@@ -111,7 +113,7 @@ export async function markOverdueSubmissionsMissing(
           eq(assessments.status, "published"),
           lt(assessments.dueAt, now),
           eq(submissions.status, "assigned"),
-          inArray(submissions.timeliness, ["on_time", "missing"]),
+          eq(submissions.timeliness, "on_time"),
         ),
       );
 
@@ -181,12 +183,16 @@ export async function submitAssessment(
       })
       .from(submissions)
       .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
+      .innerJoin(studentProfiles, eq(studentProfiles.id, submissions.studentProfileId))
       .where(eq(submissions.id, submissionId))
       .limit(1);
 
     if (!current) throw new Error("Submission not found");
 
     assertSectionScope(context, current.sectionId);
+    if (!context.actorPersonId || current.studentPersonId !== context.actorPersonId) {
+      throw new Error("Submission actor must be the enrolled student");
+    }
 
     const timeliness =
       current.dueAt && submittedAt > current.dueAt ? "late" : "on_time";
