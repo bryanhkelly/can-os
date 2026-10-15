@@ -12,5 +12,5 @@ export const getSyntheticCourseDiscussions=createServerFn({method:"GET"}).handle
  const allowed=rows.filter(x=>x.metadata.synthetic===true&&x.metadata.kind==="course_discussion");
  if(!allowed.length)return [];
  const messages=await db.select({id:s.communicationMessages.id,threadId:s.communicationMessages.threadId,body:s.communicationMessages.body,sentAt:s.communicationMessages.sentAt,metadata:s.communicationMessages.metadata}).from(s.communicationMessages).where(inArray(s.communicationMessages.threadId,allowed.map(x=>x.id))).orderBy(s.communicationMessages.sentAt).limit(250);
- return allowed.map(thread=>({id:thread.id,subject:thread.subject,sectionId:thread.contextId,messages:discussionTree(messages.filter(m=>m.threadId===thread.id).map(m=>({id:m.id,body:m.body,createdAt:m.sentAt.toISOString(),authorLabel:"Demo participant",parentMessageId:typeof m.metadata.parentMessageId==="string"?m.metadata.parentMessageId:null})))}));
+ return allowed.map(thread=>({id:thread.id,subject:thread.subject,sectionId:thread.contextId,messages:discussionTree(messages.filter(m=>m.threadId===thread.id&&m.metadata.synthetic===true).map(m=>({id:m.id,body:m.body,createdAt:m.sentAt.toISOString(),authorLabel:"Demo participant",parentMessageId:typeof m.metadata.parentMessageId==="string"?m.metadata.parentMessageId:null})))}));
 });
