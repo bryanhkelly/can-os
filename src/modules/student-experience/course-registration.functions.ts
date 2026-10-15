@@ -115,9 +115,8 @@ export const decideCourseChange = createServerFn({method:"POST"})
           if(roster.length>=policy.capacity)throw new Error("Class is full");
           const current=await tx.select({code:s.sections.code,metadata:s.sections.metadata,status:s.enrollments.status})
             .from(s.enrollments).innerJoin(s.sections,eq(s.enrollments.sectionId,s.sections.id))
-            .where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.kind,"section"),inArray(s.enrollments.status,["active","completed"])));
-          const codes=new Set(current.filter(x=>x.status==="completed").map(x=>x.code));
-          if(policy.prerequisites.some(code=>!codes.has(code)))throw new Error("Prerequisite not met");
+            .where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active")));
+          if(policy.prerequisites.length)throw new Error("Prerequisite completion cannot yet be verified automatically; registrar verification required");
           if(policy.meetingKey && current.some(x=>x.status==="active"&&registrationPolicy(x.metadata).meetingKey===policy.meetingKey))throw new Error("Schedule conflict");
           const existing=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active")));
           if(existing.length)throw new Error("Already enrolled");
