@@ -34,3 +34,10 @@ Suggested operating models: church_hosted, school_extension, microschool, consor
 3. Synthetic high-school extension configures Grade 9–12, two onsite days and asynchronous/online learning; supervisory and safety owners must be assigned.
 4. Site produces a requirement-specific accreditation evidence package containing provenance and reviewer signoff. Authorized network operators see only their scoped schools.
 5. All changes produce DomainEvents/AuditEvents, synthetic Neon fixtures, role isolation and Playwright golden-flow coverage before use with real people.
+
+## Profile explorer slice
+
+- The `/profiles` route is a **synthetic, non-persistent** role/profile explorer. It intentionally exposes no real identity or credential documents.
+- `profile-access.ts` provides defense-in-depth preconditions for future server-side readers and verification services. **This is not sufficient resource authorization by itself**: each service must validate actual actor membership and target person's relationship to the scoped organization/site/program before returning any private field.
+- Existing data schema changes remain un-migrated until Drizzle migrations are generated, reviewed and executed against the synthetic Neon environment.
+- Next: implement authenticated server-side profile reads/writes and verification audit events, ensure person/role scoping, then connect school configuration readiness to evidence-backed qualifications.
