@@ -1,4 +1,4 @@
-import { and, eq, desc, or } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { auditEvents, domainEvents, memberships, qualificationClaims, qualificationVerificationEvents, roleAssignments, documents } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
@@ -42,7 +42,7 @@ export async function reviewQualification(
  if(!context.actorPersonId)throw new AuthorizationError("authenticated reviewer");
  return db.transaction(async tx=>{
    // Serialize reviews against a claim by locking the parent row.
-   await tx.execute({sql:`SELECT id FROM qualification_claims WHERE id = $1 FOR UPDATE`,params:[input.claimId]});
+   await tx.execute(sql`SELECT id FROM qualification_claims WHERE id = ${input.claimId}::uuid FOR UPDATE`);
    const [latest]=await tx.select().from(qualificationVerificationEvents).where(eq(qualificationVerificationEvents.claimId,input.claimId)).orderBy(desc(qualificationVerificationEvents.occurredAt),desc(qualificationVerificationEvents.id)).limit(1);
    const current:VerificationStatus=latest?.decision==="approve"?"verified":latest?.decision==="reject"?"rejected":latest?.decision==="revoke"?"revoked":latest?.decision==="submit"?"pending":"unverified";
    const evidenceId=input.evidenceDocumentId??latest?.evidenceDocumentId??null;
