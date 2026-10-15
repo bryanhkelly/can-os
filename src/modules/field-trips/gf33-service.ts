@@ -16,6 +16,7 @@ import {
   householdMemberships,
   people,
   sensitiveAccessGrants,
+  sites,
   studentProfiles,
 } from "@/db/schema";
 import {
@@ -89,6 +90,14 @@ export async function approveFieldTrip(
       return trip.calendarEventId;
     }
 
+    const [site] = await tx
+      .select({ timezone: sites.timezone })
+      .from(sites)
+      .where(eq(sites.id, trip.siteId))
+      .limit(1);
+
+    if (!site) throw new Error("Site not found");
+
     const [event] = await tx
       .insert(calendarEvents)
       .values({
@@ -97,7 +106,7 @@ export async function approveFieldTrip(
         description: trip.destination,
         startsAt: trip.departsAt,
         endsAt: trip.returnsAt,
-        timezone: "America/Los_Angeles",
+        timezone: site.timezone,
         siteId: trip.siteId,
         programId: trip.programId,
         sourceType: "field_trip",
