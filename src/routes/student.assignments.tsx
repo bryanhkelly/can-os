@@ -61,6 +61,7 @@ function AssignmentsPage(){
     <p className="mt-3 text-sm leading-7 text-muted-foreground">{chosen.instructions??"Follow the course instructions."}</p>
     <p className="mt-3 text-xs text-muted-foreground">Due: {date(chosen.dueAt)}</p>
     {typeof chosen.metadata?.rubric==="string"&&chosen.metadata.rubric&&<div className="mt-4 rounded-xl bg-stone-warm p-4 text-sm"><strong>Rubric:</strong> {chosen.metadata.rubric}</div>}
+    {chosen.attempts.length>1&&<div className="mt-4 rounded-xl border border-border p-4"><p className="text-xs font-bold">Revision history</p>{[...chosen.attempts].sort((a,b)=>b.attempt-a.attempt).map(attempt=><p key={attempt.attempt} className="mt-2 text-xs">Attempt {attempt.attempt} · {attempt.status}{attempt.score!==null?` · ${attempt.score} points`:""}{attempt.feedback?` · ${attempt.feedback}`:""}</p>)}</div>}
     {chosen.feedbackText&&<div className="mt-5 rounded-xl bg-stone-warm p-4"><p className="text-xs font-bold">Teacher feedback</p><p className="mt-2 text-sm">{chosen.feedbackText}</p></div>}
     {role==="student"&&(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")&&<div className="mt-6">
      <label className="text-sm font-semibold">Your response</label><textarea rows={7} maxLength={20000} value={draft} onChange={e=>setDraft(e.target.value)} className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm" placeholder="Write your response…"/>
