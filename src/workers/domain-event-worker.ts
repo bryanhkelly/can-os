@@ -21,10 +21,7 @@ export async function processPendingDomainEvents(limit = 100): Promise<number> {
           await handleAcademicInterventionEvent(event.id);
           break;
         default:
-          await db
-            .update(domainEvents)
-            .set({ status: "processed", processedAt: new Date() })
-            .where(eq(domainEvents.id, event.id));
+          continue;
       }
       processed += 1;
     } catch (error) {
