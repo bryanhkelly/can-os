@@ -5,11 +5,12 @@ import {
   LayoutDashboard, Lightbulb, MessageCircle, Play, RotateCcw, Send, Sparkles,
   Target, Video, X,
 } from "lucide-react";
-import { demoStudent, type StudentWork } from "@/modules/student-experience/demo-data";
+import { demoStudent, type StudentWork, type StudentMoment } from "@/modules/student-experience/demo-data";
+import type { StudentTodayData } from "@/modules/student-experience/student-today.server";
 
 type Area = "today" | "courses" | "progress";
 type WorkState = StudentWork & { submittedText?: string };
-const initialWork = demoStudent.work;
+
 
 const timeLabel = (time: string) => {
   const [h, m] = time.split(":").map(Number);
@@ -19,9 +20,48 @@ const momentIcon = (kind: string) =>
   kind === "live" ? Video : kind === "formation" ? HeartHandshake :
   kind === "mentor" ? MessageCircle : BookOpen;
 
-export function StudentExperience() {
+function projectLiveStudent(snapshot: StudentTodayData) {
+  const sections = new Map(snapshot.sections.map(row => [row.sectionId, row.sectionTitle]));
+  const work: StudentWork[] = snapshot.coursework.map(item => {
+    const points = item.pointsPossible ? Number(item.pointsPossible) : 0;
+    const grade = item.score !== null && points > 0 ? Math.round(Number(item.score) / points * 100) : undefined;
+    const comment = typeof item.feedback?.["comment"] === "string" ? item.feedback["comment"] : undefined;
+    return {
+      id: item.submissionId,
+      course: sections.get(item.sectionId) ?? "Course",
+      courseCode: "",
+      title: item.assessmentTitle,
+      detail: item.instructions ?? "Review your course instructions.",
+      due: item.dueAt?.toISOString() ?? "",
+      dueLabel: item.dueAt ? new Intl.DateTimeFormat("en-US", {dateStyle:"medium",timeStyle:"short"}).format(new Date(item.dueAt)) : "No due date",
+      duration: 20,
+      status: item.timeliness === "missing" && item.status === "assigned" ? "missing"
+        : item.status === "graded" ? "graded" : item.status === "submitted" ? "submitted" : "assigned",
+      grade,
+      feedback: comment,
+      nextStep: comment ? "Review this feedback and ask your teacher about your next step." : undefined,
+      kind: item.timeliness === "missing" ? "revision" : "assignment",
+    };
+  });
+  const moments: StudentMoment[] = snapshot.events.map(event => ({
+    id: event.id,
+    time: new Date(event.startsAt).toLocaleTimeString("en-US", {hour:"2-digit",minute:"2-digit",hour12:false,timeZone:event.timezone}),
+    title: event.title,
+    subtitle: event.description ?? "Your local site calendar",
+    kind: event.type.includes("chapel") || event.type.includes("formation") ? "formation"
+      : event.type.includes("live") ? "live"
+      : event.type.includes("mentor") ? "mentor" : "class",
+  }));
+  const courseCount = snapshot.sections.length;
+  const attention = new Set(work.filter(item => item.status === "missing").map(item => item.course));
+  return { displayName: snapshot.student.preferredName ?? snapshot.student.firstName,
+    site: "CAN Academy · Live Neon data", onTrack: Math.max(0, courseCount - attention.size), courseCount, work, moments };
+}
+
+export function StudentExperience({ liveData }: { liveData?: StudentTodayData }) {
+  const studentData = useMemo(() => liveData ? projectLiveStudent(liveData) : demoStudent, [liveData]);
   const [area, setArea] = useState<Area>("today");
-  const [work, setWork] = useState<WorkState[]>(initialWork);
+  const [work, setWork] = useState<WorkState[]>(studentData.work);
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [confirmation, setConfirmation] = useState<string | null>(null);
@@ -34,7 +74,7 @@ export function StudentExperience() {
   const completed = work.filter((item) => item.status === "submitted" || item.status === "graded");
   const courses = [...new Set(work.map((item) => item.course))];
   const recovery = work.filter((item) => item.status === "missing" || (item.grade !== undefined && item.grade < 80));
-  const day = demoStudent.moments;
+  const day = studentData.moments;
 
   const filtered = useMemo(() =>
     work.filter((item) => courseFilter === "all" || item.course === courseFilter),
@@ -53,7 +93,7 @@ export function StudentExperience() {
     setConfirmation(`Submitted successfully. Your work for “${focused.title}” is saved.`);
   }
   function reset() {
-    setWork(initialWork);
+    setWork(studentData.work);
     setDoneRecovery([]);
     setSelected(null);
     setConfirmation(null);
@@ -70,7 +110,7 @@ export function StudentExperience() {
             <div><p className="text-[10px] font-bold uppercase tracking-[.22em] text-muted-foreground">CAN Academy</p><p className="text-sm font-semibold">Student workspace</p></div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground">INTERACTIVE DEMO · NO LIVE DATA</span>
+            <span className="rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground">{liveData ? "LIVE NEON · READ ONLY" : "INTERACTIVE DEMO · NO LIVE DATA"}</span>
             <button onClick={reset} className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium hover:bg-accent" title="Reset demonstration"><RotateCcw size={14}/></button>
           </div>
         </div>
@@ -127,6 +167,11 @@ export function StudentExperience() {
                       </div>
                     ) : focused.status === "submitted" ? (
                       <div className="rounded-2xl border border-border bg-card p-6"><CheckCircle2 className="text-emerald-700"/><h2 className="mt-3 font-semibold">Work submitted</h2><p className="mt-1 text-sm text-muted-foreground">Your submission is saved in this demonstration.</p>{focused.submittedText && <p className="mt-4 border-t pt-4 text-sm">{focused.submittedText}</p>}</div>
+                    ) : liveData ? (
+                      <div className="rounded-2xl border border-border bg-card p-6">
+                        <h2 className="text-sm font-bold">Assignment from Neon</h2>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">This live student view is read-only until a verified student session can authorize submissions. Nothing entered here will change your records.</p>
+                      </div>
                     ) : (
                       <div className="rounded-2xl border border-border bg-card p-6">
                         <h2 className="text-sm font-bold">{focused.status === "missing" ? "Your revision" : "Your response"}</h2>
@@ -143,9 +188,9 @@ export function StudentExperience() {
               </section>
             ) : area === "today" ? (
               <section className="animate-fade-up">
-                <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-[.18em] text-muted-foreground">Thursday · October 15</p><h1 className="mt-2 font-serif text-5xl sm:text-6xl">Good morning, {demoStudent.displayName}.</h1><p className="mt-3 text-sm text-muted-foreground">A clear day starts here. Here's what matters.</p></div><div className="rounded-full bg-card px-3 py-2 text-xs text-muted-foreground"><CalendarDays size={14} className="mr-2 inline"/> {demoStudent.site}</div></div>
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-[.18em] text-muted-foreground">Thursday · October 15</p><h1 className="mt-2 font-serif text-5xl sm:text-6xl">Good morning, {studentData.displayName}.</h1><p className="mt-3 text-sm text-muted-foreground">A clear day starts here. Here's what matters.</p></div><div className="rounded-full bg-card px-3 py-2 text-xs text-muted-foreground"><CalendarDays size={14} className="mr-2 inline"/> {studentData.site}</div></div>
                 <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl bg-foreground p-5 text-background sm:col-span-2"><p className="text-[10px] font-bold uppercase tracking-widest opacity-65">Your learning pulse</p><p className="mt-3 font-serif text-3xl">{demoStudent.onTrack} of {demoStudent.courseCount} courses on track</p><p className="mt-2 text-xs opacity-70">One course needs a little attention. You have a path forward.</p></div>
+                  <div className="rounded-2xl bg-foreground p-5 text-background sm:col-span-2"><p className="text-[10px] font-bold uppercase tracking-widest opacity-65">Your learning pulse</p><p className="mt-3 font-serif text-3xl">{studentData.onTrack} of {studentData.courseCount} courses on track</p><p className="mt-2 text-xs opacity-70">One course needs a little attention. You have a path forward.</p></div>
                   <div className="rounded-2xl border border-border bg-card p-5"><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Worth your attention</p><p className="mt-3 font-serif text-4xl">{due.length + missing.length}</p><p className="mt-1 text-xs text-muted-foreground">Open tasks · {missing.length} to recover</p></div>
                 </div>
                 <div className="mt-10 grid gap-10 xl:grid-cols-[minmax(0,1fr)_290px]">
@@ -181,7 +226,7 @@ export function StudentExperience() {
               </section>
             ) : (
               <section className="animate-fade-up"><p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your growth</p><h1 className="mt-2 font-serif text-5xl">My progress</h1><p className="mt-3 text-sm text-muted-foreground">Progress means knowing what you've learned—and what you can improve next.</p>
-                <div className="mt-8 grid gap-4 sm:grid-cols-3"><Stat label="Courses on track" value={`${demoStudent.onTrack}/${demoStudent.courseCount}`}/><Stat label="Completed work" value={String(completed.length)}/><Stat label="Needs a next step" value={String(recovery.length)}/></div>
+                <div className="mt-8 grid gap-4 sm:grid-cols-3"><Stat label="Courses on track" value={`${studentData.onTrack}/${studentData.courseCount}`}/><Stat label="Completed work" value={String(completed.length)}/><Stat label="Needs a next step" value={String(recovery.length)}/></div>
                 <h2 className="mt-10 font-serif text-3xl">Learn from feedback</h2>
                 <div className="mt-4 space-y-3">{work.filter(item=>item.feedback).map(item=><button key={item.id} onClick={()=>openWork(item)} className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-5 text-left hover:border-foreground/30"><div className="font-serif text-4xl">{item.grade}%</div><div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{item.course}</p><p className="mt-1 text-sm font-semibold">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.nextStep}</p></div><ChevronRight size={18}/></button>)}</div>
                 <h2 className="mt-10 font-serif text-3xl">Recovery steps</h2>
