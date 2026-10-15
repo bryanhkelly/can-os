@@ -28,8 +28,8 @@ export async function sendAcademicInterventionMessage(
   },
 ): Promise<string> {
   assertCapability(context, "communication.send");
-  if (!actorPersonId) throw new Error("A human actor is required to send a message");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("A human actor is required to send a message");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [record] = await tx
@@ -77,8 +77,7 @@ export async function sendAcademicInterventionMessage(
           subject: `${studentName} · ${record.assessmentTitle}`,
           contextType: "submission",
           contextId: record.submissionId,
-          createdByPersonId:
-            actorPersonId ?? record.studentPersonId,
+          createdByPersonId: actorPersonId,
         })
         .returning({ id: communicationThreads.id });
 
