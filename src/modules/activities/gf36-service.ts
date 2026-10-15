@@ -241,6 +241,60 @@ export async function registerForActivity(
   });
 }
 
+/**
+ * Guardian cancellation is serialized with registration to keep seats consistent.
+ * Waitlist promotion remains a separate, staff-approved operation.
+ */
+export async function withdrawActivityRegistration(
+  context: CommandContext,
+  input: { registrationId: string },
+): Promise<void> {
+  assertCapability(context, "activity.register");
+  if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  await db.transaction(async (tx) => {
+    const [target] = await tx.select({
+      seasonId: activityRegistrations.activitySeasonId,
+      studentProfileId: activityRegistrations.studentProfileId,
+    }).from(activityRegistrations).where(eq(activityRegistrations.id, input.registrationId)).limit(1);
+    if (!target) throw new Error("Activity registration not found");
+
+    // Same lock used by concurrent registration; re-read after taking the lock.
+    await tx.select({ id: activitySeasons.id }).from(activitySeasons)
+      .where(eq(activitySeasons.id, target.seasonId)).for("update");
+    const [registration] = await tx.select().from(activityRegistrations)
+      .where(eq(activityRegistrations.id, input.registrationId)).limit(1);
+    if (!registration) throw new Error("Activity registration not found");
+    const [student] = await tx.select({ personId: studentProfiles.personId })
+      .from(studentProfiles).where(eq(studentProfiles.id, registration.studentProfileId)).limit(1);
+    if (!student) throw new Error("Student not found");
+    const [guardian] = await tx.select({ id: guardianRelationships.id })
+      .from(guardianRelationships).where(and(
+        eq(guardianRelationships.guardianPersonId, context.actorPersonId!),
+        eq(guardianRelationships.studentPersonId, student.personId),
+      )).limit(1);
+    if (!guardian) throw new Error("Actor is not an authorized guardian");
+    if (registration.status === "withdrawn") return;
+    if (!["pending", "eligible", "conditional", "waitlisted"].includes(registration.status)) {
+      throw new Error("Registration cannot be withdrawn in current state");
+    }
+    await tx.update(activityRegistrations).set({
+      status: "withdrawn", rosterStatus: "not_rostered", updatedAt: new Date(),
+    }).where(eq(activityRegistrations.id, input.registrationId));
+
+    // Do not silently refund or void payments; financial review is required.
+    await tx.insert(auditEvents).values({
+      actorPersonId: context.actorPersonId,
+      action: "activity.registration.withdraw",
+      resourceType: "activity_registration",
+      resourceId: input.registrationId,
+      scope: {},
+      before: { status: registration.status },
+      after: { status: "withdrawn" },
+      context: { requestId: context.requestId ?? null, financialReviewRequired: !!registration.financialObligationId },
+    });
+  });
+}
+
 export async function evaluateActivityEligibility(
   context: CommandContext,
   input: {
