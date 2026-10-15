@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   activities,
@@ -65,9 +65,13 @@ export async function createActivitySeason(
     registrationOpensAt?: Date;
     registrationClosesAt?: Date;
     feeAmountCents?: number;
+    capacity?: number;
   },
 ): Promise<string> {
   assertCapability(context, "activity.manage");
+  if (input.capacity !== undefined && (!Number.isSafeInteger(input.capacity) || input.capacity <= 0)) {
+    throw new Error("Capacity must be a positive integer");
+  }
   if (input.endsOn < input.startsOn) {
     throw new Error("Activity season end must be after start");
   }
@@ -93,6 +97,7 @@ export async function createActivitySeason(
         registrationOpensAt: input.registrationOpensAt,
         registrationClosesAt: input.registrationClosesAt,
         feeAmountCents: input.feeAmountCents,
+        capacity: input.capacity,
         status: "registration",
       })
       .returning({ id: activitySeasons.id });
@@ -128,6 +133,7 @@ export async function registerForActivity(
         startsOn: activitySeasons.startsOn,
         endsOn: activitySeasons.endsOn,
         feeAmountCents: activitySeasons.feeAmountCents,
+        capacity: activitySeasons.capacity,
         activityName: activities.name,
         siteId: activities.siteId,
         programId: activities.programId,
@@ -135,7 +141,8 @@ export async function registerForActivity(
       .from(activitySeasons)
       .innerJoin(activities, eq(activities.id, activitySeasons.activityId))
       .where(eq(activitySeasons.id, input.activitySeasonId))
-      .limit(1);
+      .limit(1)
+      .for("update", { of: activitySeasons });
 
     if (!record) throw new Error("Activity season not found");
     assertSeasonRegistrationOpen(record, new Date());
@@ -174,6 +181,12 @@ export async function registerForActivity(
 
     if (!householdMember) throw new Error("Guardian is not in supplied Household");
 
+    // Serialize all seat allocations through the same season row lock.
+    const [occupied] = await tx.select({ total: count() }).from(activityRegistrations)
+      .where(and(eq(activityRegistrations.activitySeasonId, input.activitySeasonId),
+        inArray(activityRegistrations.status, ["pending", "eligible", "conditional"])));
+    const waitlisted = record.capacity !== null && (occupied?.total ?? 0) >= record.capacity;
+
     const [consent] = await tx
       .insert(consentRecords)
       .values({
@@ -190,7 +203,7 @@ export async function registerForActivity(
     if (!consent) throw new Error("Failed to create activity consent");
 
     let obligationId: string | undefined;
-    if (record.feeAmountCents && record.feeAmountCents > 0) {
+    if (!waitlisted && record.feeAmountCents && record.feeAmountCents > 0) {
       const [obligation] = await tx
         .insert(financialObligations)
         .values({
@@ -213,7 +226,7 @@ export async function registerForActivity(
       .values({
         activitySeasonId: input.activitySeasonId,
         studentProfileId: input.studentProfileId,
-        status: "pending",
+        status: waitlisted ? "waitlisted" : "pending",
         consentRecordId: consent.id,
         physicalDocumentId: input.physicalDocumentId,
         physicalExpiresOn: input.physicalExpiresOn,
