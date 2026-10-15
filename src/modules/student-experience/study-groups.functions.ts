@@ -66,7 +66,19 @@ export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator
  const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,TEACHER))).limit(1);
  if(!group)throw new Error("Facilitator required");
  if(data.title.trim().length<3||data.title.length>120||data.agenda.length>2000)throw new Error("Invalid session details");
- const [session]=await db.insert(s.studyGroupSessions).values({groupId:data.groupId,title:data.title.trim(),agenda:data.agenda,startsAt:start,endsAt:end}).returning({id:s.studyGroupSessions.id});return session;
+ return db.transaction(async tx=>{
+ const [session]=await tx.insert(s.studyGroupSessions).values({groupId:data.groupId,title:data.title.trim(),agenda:data.agenda,startsAt:start,endsAt:end}).returning({id:s.studyGroupSessions.id});
+ const [site]=await tx.select({organizationId:s.sites.organizationId,timezone:s.sites.timezone}).from(s.sites).where(eq(s.sites.id,group.siteId!)).limit(1);
+ if(!site)throw new Error("Group site missing");
+ await tx.insert(s.calendarEvents).values({
+ type:"study_group",title:data.title.trim(),description:data.agenda,
+ startsAt:start,endsAt:end,timezone:site.timezone,
+ organizationId:site.organizationId,siteId:group.siteId,programId:group.programId,sectionId:group.sectionId,
+ sourceType:"study_group_session",sourceId:session.id,createdByPersonId:TEACHER,
+ metadata:{synthetic:true,fixture:"gf26",groupId:group.id}
+ });
+ return session;
+ });
 });
 export const reportStudyGroupPost=createServerFn({method:"POST"}).validator((x:{groupId:string;postId:string;reason:string})=>x).handler(async({data})=>{
  assertSyntheticMutation("student");const {db,s}=await context();
