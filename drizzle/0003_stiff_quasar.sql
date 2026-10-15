@@ -35,3 +35,11 @@ CREATE UNIQUE INDEX "admission_offer_idempotency_uq" ON "admission_offers" USING
 CREATE INDEX "admission_offer_pool_status_idx" ON "admission_offers" USING btree ("program_id","school_year_id","status");--> statement-breakpoint
 CREATE INDEX "admission_offer_application_idx" ON "admission_offers" USING btree ("application_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "admission_seat_pool_scope_uq" ON "admission_seat_pools" USING btree ("program_id","school_year_id");
+--> statement-breakpoint
+ALTER TABLE "admission_seat_pools" ADD CONSTRAINT "admission_seat_pool_nonnegative_capacity" CHECK ("capacity" >= 0);
+--> statement-breakpoint
+ALTER TABLE "admission_seat_pools" ADD CONSTRAINT "admission_seat_pool_waitlist_flag" CHECK ("waitlist_enabled" IN (0, 1));
+--> statement-breakpoint
+ALTER TABLE "admission_offers" ADD CONSTRAINT "admission_offer_valid_status" CHECK ("status" IN ('draft','issued','accepted','declined','expired','revoked'));
+--> statement-breakpoint
+CREATE UNIQUE INDEX "admission_offer_one_active_per_application_uq" ON "admission_offers" ("application_id","school_year_id") WHERE "status" IN ('draft','issued','accepted');
