@@ -102,7 +102,7 @@ export const schoolConfigurationVersions = pgTable("school_configuration_version
   config: jsonb("config").$type<{
     grades: { min: string; max: string };
     delivery: { onsite: boolean; asynchronous: boolean; liveOnline: boolean; onsiteDaysPerWeek?: number };
-    responsibilities: Record<string, "host" | "can" | "partner">;
+    /** Responsibility owners are rows in programResponsibilityAssignments. */
     services: string[];
     fundingModel?: string;
   }>().notNull(),
