@@ -6,7 +6,7 @@ import {
 
 type Action = {
   id: string; title: string; description: string | null;
-  status: "open" | "in_progress" | "blocked" | "resolved" | "cancelled";
+  status: "open" | "in_progress" | "waiting" | "resolved" | "cancelled";
   priority: string; dueAt: Date | string | null;
   metadata: Record<string, unknown>; type: string;
 };
