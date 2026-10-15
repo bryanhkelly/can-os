@@ -58,12 +58,13 @@ export const qualificationClaims = pgTable("qualification_claims", {
 /** Append-only decisions: effective status is derived from the latest valid sequence, never directly overwritten. */
 export const qualificationVerificationEvents=pgTable("qualification_verification_events",{
  id:id(),claimId:uuid("claim_id").notNull().references(()=>qualificationClaims.id,{onDelete:"restrict"}),
+ sequence:integer("sequence").notNull(),
  decision:text("decision").notNull(),actorPersonId:uuid("actor_person_id").notNull().references(()=>people.id,{onDelete:"restrict"}),
  evidenceDocumentId:uuid("evidence_document_id").references(()=>documents.id,{onDelete:"restrict"}),
  sourceProvider:text("source_provider"),sourceReference:text("source_reference"),
  reason:text("reason"),occurredAt:timestamp("occurred_at",{withTimezone:true}).defaultNow().notNull(),
  createdAt:createdAt(),
-},t=>[index("qualification_verification_claim_time_idx").on(t.claimId,t.occurredAt)]);
+},t=>[uniqueIndex("qualification_verification_claim_sequence_uq").on(t.claimId,t.sequence),index("qualification_verification_claim_time_idx").on(t.claimId,t.occurredAt)]);
 
 /** Framework definitions are reused across locations, with immutable authored versions. */
 export const complianceFrameworks=pgTable("compliance_frameworks",{
