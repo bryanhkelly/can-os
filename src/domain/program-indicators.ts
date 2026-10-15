@@ -7,5 +7,5 @@ export function programIndicators(counts:ProgramIndicators):Indicator[]{
   {key:"enrollments",label:"Student enrollments",count:counts.enrollments},
   {key:"teachers",label:"Teaching assignments",count:counts.teachers},
   {key:"calendar",label:"Calendar days",count:counts.calendarDays},
- ].map(x=>({...x,state:x.count>0?"evidence_present" as const:"not_configured" as const}));
+ ].map(x=>({...x,state:x.count>0?"evidence_present" as const:"not_configured" as const})) as Indicator[];
 }
