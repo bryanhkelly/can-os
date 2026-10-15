@@ -1,0 +1,1 @@
+ALTER TABLE "activity_seasons" ADD COLUMN "capacity" integer;
