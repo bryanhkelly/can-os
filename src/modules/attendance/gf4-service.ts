@@ -35,7 +35,8 @@ export async function recordAttendance(
   assertCapability(context, "attendance.write");
   assertProgramScope(context, input.programId);
   assertSiteScope(context, input.siteId);
-  if (!context.actorPersonId) throw new Error("Attendance actor is required");
+  if (!actorPersonId) throw new Error("Attendance actor is required");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [existing] = await tx
@@ -56,7 +57,7 @@ export async function recordAttendance(
         occurrenceKey: input.occurrenceKey,
         status: input.status,
         expectedAt: input.expectedAt,
-        recordedByPersonId: context.actorPersonId,
+        recordedByPersonId: actorPersonId,
         sourceKey: input.sourceKey,
         metadata: input.metadata ?? {},
       })
@@ -82,7 +83,7 @@ export async function recordAttendance(
         eventType: EventTypes.StudentMarkedAbsent,
         aggregateType: "attendance_event",
         aggregateId: event.id,
-        actorPersonId: context.actorPersonId,
+        actorPersonId: actorPersonId,
         payload: {
           studentProfileId: input.studentProfileId,
           programId: input.programId,
@@ -107,7 +108,7 @@ export async function recordAttendance(
     }
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       action: "attendance.record",
       resourceType: "attendance_event",
       resourceId: event.id,
@@ -140,7 +141,8 @@ export async function submitAttendanceExcuse(
   },
 ): Promise<string> {
   assertCapability(context, "attendance.excuse.submit");
-  if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  if (!actorPersonId) throw new Error("Guardian identity is required");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [attendance] = await tx
@@ -171,7 +173,7 @@ export async function submitAttendanceExcuse(
       .from(guardianRelationships)
       .where(
         and(
-          eq(guardianRelationships.guardianPersonId, context.actorPersonId),
+          eq(guardianRelationships.guardianPersonId, actorPersonId),
           eq(guardianRelationships.studentPersonId, student.personId),
           eq(guardianRelationships.canSubmitAttendanceExcuse, true),
         ),
@@ -194,7 +196,7 @@ export async function submitAttendanceExcuse(
       .insert(attendanceExcuses)
       .values({
         attendanceEventId: input.attendanceEventId,
-        submittedByPersonId: context.actorPersonId,
+        submittedByPersonId: actorPersonId,
         reason: input.reason,
         documentIds: input.documentIds ?? [],
       })
@@ -206,12 +208,12 @@ export async function submitAttendanceExcuse(
       eventType: EventTypes.AttendanceExcuseSubmitted,
       aggregateType: "attendance_excuse",
       aggregateId: excuse.id,
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       payload: { attendanceEventId: input.attendanceEventId },
     });
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       action: "attendance.excuse.submit",
       resourceType: "attendance_excuse",
       resourceId: excuse.id,
@@ -236,7 +238,8 @@ export async function reviewAttendanceExcuse(
   },
 ): Promise<{ excuseId: string; correctionAttendanceEventId?: string }> {
   assertCapability(context, "attendance.excuse.review");
-  if (!context.actorPersonId) throw new Error("Reviewer identity is required");
+  if (!actorPersonId) throw new Error("Reviewer identity is required");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [record] = await tx
@@ -277,10 +280,12 @@ export async function reviewAttendanceExcuse(
         )
         .limit(1);
 
-      return {
-        excuseId: record.excuseId,
-        correctionAttendanceEventId: existingCorrection?.id,
-      };
+      return existingCorrection
+        ? {
+            excuseId: record.excuseId,
+            correctionAttendanceEventId: existingCorrection.id,
+          }
+        : { excuseId: record.excuseId };
     }
 
     const reviewedAt = new Date();
@@ -289,7 +294,7 @@ export async function reviewAttendanceExcuse(
       .update(attendanceExcuses)
       .set({
         status: input.decision,
-        reviewedByPersonId: context.actorPersonId,
+        reviewedByPersonId: actorPersonId,
         reviewedAt,
         reviewNote: input.reviewNote,
         updatedAt: reviewedAt,
@@ -316,7 +321,7 @@ export async function reviewAttendanceExcuse(
           status: "excused",
           expectedAt: record.expectedAt,
           recordedAt: reviewedAt,
-          recordedByPersonId: context.actorPersonId,
+          recordedByPersonId: actorPersonId,
           sourceKey: `attendance-excuse:${record.excuseId}`,
           supersedesAttendanceEventId: record.attendanceEventId,
           metadata: {
@@ -337,7 +342,7 @@ export async function reviewAttendanceExcuse(
           : EventTypes.AttendanceExcuseRejected,
       aggregateType: "attendance_excuse",
       aggregateId: record.excuseId,
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       payload: {
         attendanceEventId: record.attendanceEventId,
         correctionAttendanceEventId: correctionAttendanceEventId ?? null,
@@ -345,7 +350,7 @@ export async function reviewAttendanceExcuse(
     });
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       action: `attendance.excuse.${input.decision}`,
       resourceType: "attendance_excuse",
       resourceId: record.excuseId,
@@ -365,9 +370,8 @@ export async function reviewAttendanceExcuse(
       },
     });
 
-    return {
-      excuseId: record.excuseId,
-      correctionAttendanceEventId,
-    };
+    return correctionAttendanceEventId
+      ? { excuseId: record.excuseId, correctionAttendanceEventId }
+      : { excuseId: record.excuseId };
   });
 }
