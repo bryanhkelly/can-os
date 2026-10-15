@@ -12,6 +12,8 @@ export const EventTypes = {
   ActionCreated: "ActionCreated",
   ActionResolved: "ActionResolved",
   EnrollmentActivated: "EnrollmentActivated",
+  ProgramLaunchStarted: "ProgramLaunchStarted",
+  CalendarEventCreated: "CalendarEventCreated",
   ProgramActivated: "ProgramActivated",
   StudentMarkedAbsent: "StudentMarkedAbsent",
   AttendanceExcuseSubmitted: "AttendanceExcuseSubmitted",
