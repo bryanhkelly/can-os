@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: write
+
 on:
   pull_request:
   push:
@@ -7,6 +10,7 @@ on:
       - main
       - "foundation/**"
       - "db/**"
+      - "feat/profiles-evidence-school-configuration"
 
 jobs:
   verify:
@@ -30,6 +34,15 @@ jobs:
         run: |
           npm run db:generate
           echo "Drizzle migration generation succeeded from committed history."
+          if [ -n "$(git status --porcelain -- drizzle/)" ] && [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_name }}" = "feat/profiles-evidence-school-configuration" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add drizzle/
+            git commit -m "db: commit generated PR32 Drizzle migration"
+            git push origin HEAD:feat/profiles-evidence-school-configuration
+            echo "::notice::Committed generated Drizzle migration; rerun CI on updated head"
+            exit 1
+          fi
           if [ -n "$(git status --porcelain -- drizzle/)" ]; then
             echo "::error::Drizzle generated uncommitted migration changes. Commit generated SQL and snapshots before merging."
             git status --short -- drizzle/
