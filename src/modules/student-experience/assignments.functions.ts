@@ -59,7 +59,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(
     eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
    if(!enrollment)throw new Error("Student is not enrolled");
-   const priorRows=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT))).orderBy(desc(s.submissions.attemptNumber)).limit(1);
+   const priorRows=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
    const prior=priorRows[0];
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
@@ -69,8 +69,9 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
     return {submissionId:revision.id};
    }
    if(prior){
-    await tx.update(s.submissions).set({status:"submitted",response:{text},timeliness,submittedAt:now,updatedAt:now}).where(eq(s.submissions.id,prior.id));
-    return {submissionId:prior.id};
+    const [submitted]=await tx.update(s.submissions).set({status:"submitted",response:{text},timeliness,submittedAt:now,updatedAt:now}).where(and(eq(s.submissions.id,prior.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
+    if(!submitted)throw new Error("Assignment was submitted or changed in another tab");
+    return {submissionId:submitted.id};
    }
    const [created]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
    if(!created)throw new Error("Unable to submit");
@@ -165,18 +166,20 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
    const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
     .where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
    if(!enrollment)throw new Error("Student not enrolled");
-   const [latest]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT))).orderBy(desc(s.submissions.attemptNumber)).limit(1);
+   const [latest]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
    if(latest && !["assigned","returned"].includes(latest.status))throw new Error("Submitted work cannot be overwritten");
    if(latest?.status==="returned"){
     const [draft]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,attemptNumber:latest.attemptNumber+1,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing().returning({id:s.submissions.id});
     if(draft)return {saved:true};
     const [existing]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT),eq(s.submissions.attemptNumber,latest.attemptNumber+1))).limit(1);
     if(!existing||existing.status!=="assigned")throw new Error("Revision already submitted");
-    await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(eq(s.submissions.id,existing.id));
+    const [saved]=await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,existing.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
+    if(!saved)throw new Error("Draft already submitted");
     return {saved:true};
    }
    if(latest){
-    await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,latest.id),eq(s.submissions.status,"assigned")));
+    const [saved]=await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,latest.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
+    if(!saved)throw new Error("Draft already submitted");
    }else{
     await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing();
    }
