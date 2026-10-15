@@ -34,6 +34,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   attempts:rows.filter(item=>item.assessmentId===row.assessmentId).map(item=>({attempt:item.attemptNumber??1,status:item.status??"assigned",score:item.score,submittedAt:item.submittedAt?.toISOString()??null,feedback:typeof item.feedback?.comment==="string"?item.feedback.comment:""})),
   dueAt:row.dueAt?.toISOString()??null,submittedAt:row.submittedAt?.toISOString()??null,
   gradedAt:row.gradedAt?.toISOString()??null,
+  metadata:{rubric:typeof row.metadata.rubric==="string"?row.metadata.rubric:""},
   responseText:typeof row.response?.text==="string"?row.response.text:"",
   feedbackText:typeof row.feedback?.comment==="string"?row.feedback.comment:"",
   response:undefined,feedback:undefined,
