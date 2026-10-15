@@ -75,6 +75,7 @@ export const advanceSupportReferral=createServerFn({method:"POST"})
    const [record]=await tx.select().from(s.actions).where(and(eq(s.actions.id,data.referralId),eq(s.actions.type,"support_referral"),eq(s.actions.siteId,SITE),eq(s.actions.subjectId,STUDENT))).for("update").limit(1);
    if(!record||!isReferral(record.metadata))throw new Error("Synthetic referral not found");
    const previous=record.metadata.stage as Stage;
+   if(data.nextStage==="review"){const services=Array.isArray(record.metadata.services)?record.metadata.services as Record<string,unknown>[]:[];if(!services.length||services.some(service=>service.status!=="completed"))throw new Error("Complete the scheduled support services before review");}
    if(data.nextStage==="closed"&&previous!=="review")throw new Error("Referral must be reviewed before closure");
    if(data.nextStage!=="closed"&&stagePriority(data.nextStage)!==stagePriority(previous)+1)throw new Error("Invalid lifecycle transition");
    const area=data.area??(record.metadata.requestedArea as Area);
