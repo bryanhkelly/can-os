@@ -2,6 +2,7 @@ import { eq, desc, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { auditEvents, domainEvents, memberships, qualificationClaims, qualificationVerificationEvents, roleAssignments, documents } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { reviewerCanVerify } from "@/domain/reviewer-authorization";
 import { decideCredentialReview, type VerificationDecision, type VerificationStatus } from "@/domain/credential-workflow";
 
 /** Database-backed authorization: caller scope alone is never sufficient. */
@@ -12,20 +13,7 @@ export async function assertScopedQualificationReviewer(context: CommandContext,
   const subjectRoles = await db.select().from(roleAssignments).where(eq(roleAssignments.personId, subjectPersonId));
   const actorMemberships = await db.select().from(memberships).where(eq(memberships.personId, context.actorPersonId));
   const subjectMemberships = await db.select().from(memberships).where(eq(memberships.personId, subjectPersonId));
-  const authorized=actorRoles.some(a=>{
-    if(!a.capabilities.includes("profiles.credentials.verify")) return false;
-    if(a.organizationId && !context.scope.organizationIds?.includes(a.organizationId))return false;
-    if(a.siteId && !context.scope.siteIds?.includes(a.siteId))return false;
-    if(a.programId && !context.scope.programIds?.includes(a.programId))return false;
-    if(!a.organizationId)return false; // Reviewer must belong to an explicit accountable organization.
-    const actorBelongs=Boolean(a.organizationId && actorMemberships.some(m=>m.organizationId===a.organizationId));
-    if(!actorBelongs)return false;
-    return subjectRoles.some(s=>
-      Boolean(a.organizationId && s.organizationId===a.organizationId) ||
-      Boolean(a.siteId && s.siteId===a.siteId) ||
-      Boolean(a.programId && s.programId===a.programId)
-    ) || Boolean(a.organizationId && subjectMemberships.some(m=>m.organizationId===a.organizationId));
-  });
+  const authorized=reviewerCanVerify({context,subjectPersonId,actorRoles,subjectRoles,actorMemberships,subjectMemberships});
   if(!authorized)throw new AuthorizationError("subject affiliation and reviewer scope");
 }
 
