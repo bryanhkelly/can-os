@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, CheckCircle2,
   ChevronRight, CircleAlert, Clock3, Compass, GraduationCap, HeartHandshake,
@@ -139,6 +140,7 @@ export function StudentExperience({ liveData }: { liveData?: StudentTodayData })
           </aside>
 
           <main className="min-w-0">
+            <Link to="/student/experiences" className="mb-6 flex items-center justify-between rounded-2xl border border-border bg-card p-4 text-sm font-semibold hover:border-foreground/30"><span>Explore more: Needs You, calendar, support, activities & growth</span><ArrowRight size={17}/></Link>
             {focused ? (
               <section className="animate-fade-up">
                 <button onClick={() => {setSelected(null);setConfirmation(null)}} className="mb-7 inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground"><ArrowLeft size={15}/> Back to {area === "courses" ? "courses" : "Today"}</button>
