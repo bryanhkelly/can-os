@@ -1,13 +1,16 @@
 name: Migration Preview
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - "school-operations-foundation"
 
 permissions:
   contents: write
 
 jobs:
   migration:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,10 +24,8 @@ jobs:
       - name: Install schema tooling
         run: npm install --no-save --package-lock=false drizzle-kit@0.31.11 drizzle-orm@0.45.4 typescript@5.8.3 tsx@4.20.0
 
-      - name: Generate migration SQL
-        run: |
-          rm -rf drizzle
-          npx drizzle-kit generate
+      - name: Generate incremental migration SQL
+        run: npx drizzle-kit generate
 
       - name: Commit generated migration
         run: |
@@ -34,6 +35,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No migration changes to commit."
           else
-            git commit -m "Generate Drizzle migration"
+            git commit -m "Generate whole-school operations migration"
             git push
           fi
