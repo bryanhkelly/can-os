@@ -1,3 +1,4 @@
+import { readRubric, scoreRubric, type CriterionGrade } from "./rubric";
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, inArray, desc } from "drizzle-orm";
 const STUDENT="f1000000-0000-4000-8000-000000000007";
@@ -34,7 +35,8 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   attempts:rows.filter(item=>item.assessmentId===row.assessmentId).map(item=>({attempt:item.attemptNumber??1,status:item.status??"assigned",score:item.score,submittedAt:item.submittedAt?.toISOString()??null,feedback:typeof item.feedback?.comment==="string"?item.feedback.comment:""})),
   dueAt:row.dueAt?.toISOString()??null,submittedAt:row.submittedAt?.toISOString()??null,
   gradedAt:row.gradedAt?.toISOString()??null,
-  metadata:{rubric:typeof row.metadata.rubric==="string"?row.metadata.rubric:"",synthetic:row.metadata.synthetic===true},
+  metadata:{rubric:typeof row.metadata.rubric==="string"?row.metadata.rubric:"",criteria:readRubric(row.metadata.rubricCriteria),synthetic:row.metadata.synthetic===true},
+  rubricResult:row.feedback?.rubricResult??null,
   responseText:typeof row.response?.text==="string"?row.response.text:"",
   feedbackText:typeof row.feedback?.comment==="string"?row.feedback.comment:"",
   response:undefined,feedback:undefined,
@@ -191,4 +193,34 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
    ...(due?{dueAt:due}:{}),updatedAt:new Date(),
   }).where(eq(s.assessments.id,assessment.id));
   return {saved:true};
+ });
+
+/** Teacher grades a submitted synthetic attempt against the published rubric. */
+export const gradeSyntheticRubric=createServerFn({method:"POST"})
+ .validator((value:{submissionId:string;grades:CriterionGrade[];comment:string})=>value)
+ .handler(async({data})=>{
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,metadata:s.assessments.metadata})
+    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
+    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+    .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.studentProfileId,STUDENT),
+       eq(s.sections.siteId,SITE),eq(s.submissions.status,"submitted"))).limit(1);
+   if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic submitted assignment not found");
+   const criteria=readRubric(record.metadata.rubricCriteria);
+   const result=scoreRubric(criteria,data.grades);
+   const possible=Number(record.points??100);
+   const [updated]=await tx.update(s.submissions).set({
+    status:"graded",score:String(Math.round(result.percentage*possible)/100),
+    feedback:{comment:data.comment.slice(0,4000),rubricResult:{...result,grades:data.grades,criteria}},
+    graderPersonId:TEACHER,gradedAt:new Date(),updatedAt:new Date()
+   }).where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"submitted")))
+     .returning({id:s.submissions.id});
+   if(!updated)throw new Error("Submission already graded");
+   await tx.insert(s.notifications).values({recipientPersonId:STUDENT_PERSON,
+    type:"assignment_feedback",status:"unread",title:"Your rubric feedback is ready",
+    body:data.comment.slice(0,500)||"Your teacher scored your assignment rubric.",
+    resourceType:"submission",resourceId:updated.id});
+   return {submissionId:updated.id,...result};
+  });
  });
