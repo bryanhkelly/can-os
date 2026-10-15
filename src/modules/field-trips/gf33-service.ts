@@ -216,8 +216,8 @@ export async function signFieldTripPermission(
   },
 ): Promise<string> {
   assertCapability(context, "field_trip.permission.sign");
-  if (!actorPersonId) throw new Error("Guardian identity is required");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [record] = await tx
@@ -383,8 +383,8 @@ export async function getFieldTripSafetyPacket(
   now = new Date(),
 ) {
   assertCapability(context, "field_trip.safety_packet.read");
-  if (!actorPersonId) throw new Error("Chaperone identity is required");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("Chaperone identity is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [chaperone] = await tx
@@ -538,8 +538,8 @@ export async function recordFieldTripAttendance(
   },
 ): Promise<string> {
   assertCapability(context, "field_trip.attendance.write");
-  if (!actorPersonId) throw new Error("Attendance actor is required");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("Attendance actor is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [existing] = await tx
