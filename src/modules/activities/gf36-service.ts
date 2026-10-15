@@ -115,6 +115,7 @@ export async function registerForActivity(
 ): Promise<string> {
   assertCapability(context, "activity.register");
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [record] = await tx
@@ -145,7 +146,7 @@ export async function registerForActivity(
       .from(guardianRelationships)
       .where(
         and(
-          eq(guardianRelationships.guardianPersonId, context.actorPersonId),
+          eq(guardianRelationships.guardianPersonId, actorPersonId),
           eq(guardianRelationships.studentPersonId, student.personId),
         ),
       )
@@ -159,7 +160,7 @@ export async function registerForActivity(
       .where(
         and(
           eq(householdMemberships.householdId, input.householdId),
-          eq(householdMemberships.personId, context.actorPersonId),
+          eq(householdMemberships.personId, actorPersonId),
         ),
       )
       .limit(1);
@@ -173,7 +174,7 @@ export async function registerForActivity(
         subjectType: "activity_season",
         subjectId: input.activitySeasonId,
         consentType: "activity_participation",
-        signerPersonId: context.actorPersonId,
+        signerPersonId: actorPersonId,
         documentId: input.consentDocumentId,
         version: input.consentVersion,
       })
