@@ -2,7 +2,7 @@ import {createServerFn} from "@tanstack/react-start";
 import {and,eq,desc,sql} from "drizzle-orm";
 import {assertSyntheticMutation} from "./demo-write-gate";
 import {canAccessGroup,validateGroupInput,validateGroupPost,validateSession} from "@/domain/study-groups";
-const STUDENT="f1000000-0000-4000-8000-000000000007";
+const STUDENT="f1000000-0000-4000-8000-000000000005";
 const TEACHER="f1000000-0000-4000-8000-000000000006";
 const SITE="f1000000-0000-4000-8000-000000000003";
 async function context(){const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);return {db,s};}
