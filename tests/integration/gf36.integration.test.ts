@@ -127,6 +127,7 @@ integration("GF36 co-curriculars and athletics", () => {
       startsOn: "2028-01-15",
       endsOn: "2028-05-20",
       feeAmountCents: 15000,
+      capacity: 1,
     });
 
     const guardianContext = {
@@ -156,6 +157,16 @@ integration("GF36 co-curriculars and athletics", () => {
     const [fee] = await db.select().from(schema.financialObligations)
       .where(eq(schema.financialObligations.id, registration.financialObligationId!));
     expect(fee.amountCents).toBe(15000);
+
+    const [siblingPerson] = await db.insert(schema.people).values({ legalFirstName: "Jordan", legalLastName: `Student-${suffix}` }).returning();
+    const [sibling] = await db.insert(schema.studentProfiles).values({ personId: siblingPerson.id, gradeLevel: "9" }).returning();
+    await db.insert(schema.guardianRelationships).values({ guardianPersonId: guardian.id, studentPersonId: siblingPerson.id, relationshipLabel: "parent" });
+    const siblingRegistrationId = await activities.registerForActivity(guardianContext, {
+      activitySeasonId: seasonId, studentProfileId: sibling.id, householdId: household.id, consentVersion: "2028.1",
+    });
+    const [waitlist] = await db.select().from(schema.activityRegistrations).where(eq(schema.activityRegistrations.id, siblingRegistrationId));
+    expect(waitlist.status).toBe("waitlisted");
+    expect(waitlist.financialObligationId).toBeNull();
 
     const check1 = await activities.evaluateActivityEligibility(staffContext, {
       registrationId,
