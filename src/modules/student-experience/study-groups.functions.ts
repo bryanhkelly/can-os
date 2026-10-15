@@ -16,7 +16,7 @@ export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
 export const createStudyGroup=createServerFn({method:"POST"}).validator((x:{title:string;description:string;kind:"course"|"interest";maxMembers:number})=>x).handler(async({data})=>{
  assertSyntheticMutation("teacher");const valid=validateGroupInput(data);const {db,s}=await context();
  const [group]=await db.insert(s.studyGroups).values({...valid,siteId:SITE,facilitatorPersonId:TEACHER,requiresApproval:true,visibility:"site"}).returning({id:s.studyGroups.id});
- return {id:group.id};
+ if(!group)throw new Error('Group creation failed');return {id:group.id};
 });
 export const requestStudyGroupMembership=createServerFn({method:"POST"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
  assertSyntheticMutation("student");const {db,s}=await context();
@@ -33,7 +33,7 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
  if(!member)throw new Error("Pending membership not found");
  if(data.approve){
  const [count]=await tx.select({total:sql<number>`count(*)::int`}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.status,"approved")));
- if(count.total>=group.maxMembers)throw new Error("Study group is full");
+ if((count?.total??0)>=group.maxMembers)throw new Error("Study group is full");
  }
  await tx.update(s.studyGroupMemberships).set({status:data.approve?"approved":"declined",reviewedByPersonId:TEACHER,joinedAt:data.approve?new Date():null,updatedAt:new Date()}).where(eq(s.studyGroupMemberships.id,member.id));
  return {ok:true};
@@ -45,7 +45,7 @@ export const leaveStudyGroup=createServerFn({method:"POST"}).validator((x:{group
 });
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
  const {db,s}=await context();
- const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.siteId,SITE))).limit(1);
+ const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.siteId,SITE))).limit(1);
  if(!group)throw new Error("Group unavailable");
  const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,STUDENT))).limit(1);
  const permitted=canAccessGroup((membership?.status??null) as "pending"|"approved"|"declined"|"left"|null,"student");
@@ -59,7 +59,7 @@ export const postStudyGroupMessage=createServerFn({method:"POST"}).validator((x:
  assertSyntheticMutation("student");const body=validateGroupPost(data.body);const {db,s}=await context();
  const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,STUDENT),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
  if(!membership)throw new Error("Approved membership required");
- const [post]=await db.insert(s.studyGroupPosts).values({groupId:data.groupId,body,authorPersonId:STUDENT}).returning({id:s.studyGroupPosts.id});return {id:post.id};
+ const [post]=await db.insert(s.studyGroupPosts).values({groupId:data.groupId,body,authorPersonId:STUDENT}).returning({id:s.studyGroupPosts.id});if(!post)throw new Error('Post creation failed');return {id:post.id};
 });
 export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator((x:{groupId:string;title:string;agenda:string;startsAt:string;endsAt:string})=>x).handler(async({data})=>{
  assertSyntheticMutation("teacher");const {start,end}=validateSession(data.startsAt,data.endsAt);const {db,s}=await context();
@@ -68,6 +68,7 @@ export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator
  if(data.title.trim().length<3||data.title.length>120||data.agenda.length>2000)throw new Error("Invalid session details");
  return db.transaction(async tx=>{
  const [session]=await tx.insert(s.studyGroupSessions).values({groupId:data.groupId,title:data.title.trim(),agenda:data.agenda,startsAt:start,endsAt:end}).returning({id:s.studyGroupSessions.id});
+ if(!session)throw new Error('Session creation failed');
  const [site]=await tx.select({organizationId:s.sites.organizationId,timezone:s.sites.timezone}).from(s.sites).where(eq(s.sites.id,group.siteId!)).limit(1);
  if(!site)throw new Error("Group site missing");
  await tx.insert(s.calendarEvents).values({
