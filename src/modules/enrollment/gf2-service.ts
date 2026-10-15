@@ -13,6 +13,7 @@ import {
   journeys,
   people,
   programs,
+  schoolYears,
   studentProfiles,
 } from "@/db/schema";
 import {
@@ -371,6 +372,20 @@ export async function activateEnrollmentFromApplication(
     assertProgramScope(context, application.programId);
     if (application.stage !== "accepted") {
       throw new Error("Application must be accepted before activation");
+    }
+
+    const [programForYear] = await tx.select({
+      id: programs.id,
+      organizationId: programs.organizationId,
+    }).from(programs).where(eq(programs.id, application.programId)).limit(1);
+    const [schoolYear] = await tx.select({
+      id: schoolYears.id,
+      organizationId: schoolYears.organizationId,
+      programId: schoolYears.programId,
+    }).from(schoolYears).where(eq(schoolYears.id, schoolYearId)).limit(1);
+    if (!programForYear || !schoolYear || schoolYear.programId !== application.programId ||
+        schoolYear.organizationId !== programForYear.organizationId) {
+      throw new Error("School year must belong to the application's program and organization");
     }
 
     const [journey] = await tx
