@@ -20,6 +20,7 @@ import {
 } from "./enums";
 import { people, studentProfiles } from "./identity";
 import { organizations, programs, sites } from "./organizations";
+import { schoolYears, scheduleTemplates, terms } from "./academic-time";
 
 export const courseTemplates = pgTable(
   "course_templates",
@@ -79,7 +80,13 @@ export const sections = pgTable(
       .references(() => courseTemplateVersions.id, { onDelete: "restrict" }),
     code: text("code").notNull(),
     title: text("title").notNull(),
-    termKey: text("term_key").notNull(),
+    termId: uuid("term_id")
+      .notNull()
+      .references(() => terms.id, { onDelete: "restrict" }),
+    scheduleTemplateId: uuid("schedule_template_id").references(
+      () => scheduleTemplates.id,
+      { onDelete: "restrict" },
+    ),
     startsAt: timestamp("starts_at", { withTimezone: true }),
     endsAt: timestamp("ends_at", { withTimezone: true }),
     active: boolean("active").default(true).notNull(),
@@ -90,10 +97,11 @@ export const sections = pgTable(
   (table) => [
     uniqueIndex("section_program_term_code_uq").on(
       table.programId,
-      table.termKey,
+      table.termId,
       table.code,
     ),
     index("section_program_idx").on(table.programId),
+    index("section_term_idx").on(table.termId),
   ],
 );
 
@@ -131,7 +139,9 @@ export const enrollments = pgTable(
       .references(() => organizations.id, { onDelete: "restrict" }),
     programId: uuid("program_id").references(() => programs.id, { onDelete: "restrict" }),
     sectionId: uuid("section_id").references(() => sections.id, { onDelete: "restrict" }),
-    schoolYear: text("school_year"),
+    schoolYearId: uuid("school_year_id").references(() => schoolYears.id, {
+      onDelete: "restrict",
+    }),
     startedAt: timestamp("started_at", { withTimezone: true }),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
@@ -143,6 +153,7 @@ export const enrollments = pgTable(
     index("enrollment_program_idx").on(table.programId),
     index("enrollment_section_idx").on(table.sectionId),
     index("enrollment_status_idx").on(table.status),
+    index("enrollment_school_year_idx").on(table.schoolYearId),
   ],
 );
 
