@@ -20,11 +20,11 @@ export const getQuickWinActions = createServerFn({ method: "GET" }).handler(asyn
     eq(actions.ownerPersonId, PERSON),
     eq(actions.siteId, SITE),
   )).orderBy(desc(actions.createdAt)).limit(100);
-  return { connected: true as const, actions: rows.filter(row => row.metadata.synthetic === true) };
+  return { connected: true as const, actions: rows.filter(row => row.metadata.synthetic === true).map(row => ({ ...row, dueAt: row.dueAt?.toISOString() ?? null })) };
 });
 
 export const finishQuickWinAction = createServerFn({ method: "POST" })
-  .inputValidator((value: { actionId: string }) => value)
+  .validator((value: { actionId: string }) => value)
   .handler(async ({ data }) => {
     if (!process.env.DATABASE_URL) throw new Error("Neon is not configured");
     const [{ db }, { actions }] = await Promise.all([
