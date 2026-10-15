@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   applications,
@@ -104,9 +104,9 @@ export async function getEnrollmentCase(
       .select({ id: guardianRelationships.id })
       .from(guardianRelationships)
       .where(
-        eq(
-          guardianRelationships.guardianPersonId,
-          context.actorPersonId,
+        and(
+          eq(guardianRelationships.guardianPersonId, context.actorPersonId),
+          eq(guardianRelationships.studentPersonId, record.studentPersonId),
         ),
       )
       .limit(1);
@@ -130,7 +130,12 @@ export async function getEnrollmentCase(
       status: journeys.status,
     })
     .from(journeys)
-    .where(eq(journeys.participantId, record.applicationId))
+    .where(
+      and(
+        eq(journeys.participantType, "application"),
+        eq(journeys.participantId, record.applicationId),
+      ),
+    )
     .limit(1);
 
   if (!journey) {
