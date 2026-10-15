@@ -14,6 +14,7 @@ function AssignmentsPage(){
  const [filter,setFilter]=useState("all"),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[error,setError]=useState("");
  const [draftState,setDraftState]=useState<"idle"|"saving"|"saved"|"error">("idle");
  const chosen=assignments.find(x=>x.assessmentId===selected);
+ useEffect(()=>{const value=new URLSearchParams(window.location.search).get("assessment");if(value&&assignments.some(x=>x.assessmentId===value))setSelected(value);},[assignments]);
  const sections=[...new Map(assignments.map(x=>[x.sectionId,{id:x.sectionId,course:x.course}])).values()];
  const items=assignments.filter(x=>filter==="all"||(filter==="todo"&&(!x.status||x.status==="assigned"||x.status==="returned"))||(filter==="submitted"&&x.status==="submitted")||(filter==="feedback"&&x.status==="graded"));
  async function perform(fn:()=>Promise<unknown>,success:string) {
