@@ -38,7 +38,7 @@ function AssignmentsPage(){
   </div>
   <div className="mt-8 flex flex-wrap gap-2">{[["all","All work"],["todo","To do / revise"],["submitted","Submitted"],["feedback","Feedback"]].map(([id,label])=><button key={id} onClick={()=>setFilter(id)} className={`rounded-full border px-4 py-2 text-xs font-semibold ${filter===id?"bg-foreground text-background":"border-border bg-card"}`}>{label}</button>)}</div>
   <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-   <div className="space-y-3">{items.map(item=><button key={item.assessmentId} onClick={()=>open(item.assessmentId,item.responseText)} className={`w-full rounded-xl border bg-card p-5 text-left hover:border-foreground/40 ${selected===item.assessmentId?"border-foreground":"border-border"}`}>
+   <div className="space-y-3">{items.map(item=><button key={item.assessmentId} onClick={()=>open(item.assessmentId,item.responseText ?? "")} className={`w-full rounded-xl border bg-card p-5 text-left hover:border-foreground/40 ${selected===item.assessmentId?"border-foreground":"border-border"}`}>
     <p className="text-xs text-muted-foreground">{item.course} · {item.status??"not started"}</p><h3 className="mt-2 font-semibold">{item.title}</h3><p className="mt-2 text-xs text-muted-foreground">Due {date(item.dueAt)}</p>
     {item.score!==null&&item.score!==undefined&&<p className="mt-1 text-xs font-semibold">Score: {item.score} / {item.pointsPossible??100}</p>}
    </button>)}{!items.length&&<p className="rounded-xl border border-border p-5 text-sm text-muted-foreground">No assignments in this view.</p>}</div>
