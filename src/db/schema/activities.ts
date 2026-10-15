@@ -54,7 +54,6 @@ export const activitySeasons = pgTable(
     registrationOpensAt: timestamp("registration_opens_at", { withTimezone: true }),
     registrationClosesAt: timestamp("registration_closes_at", { withTimezone: true }),
     feeAmountCents: integer("fee_amount_cents"),
-    capacity: integer("capacity"),
     status: text("status").default("registration").notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
