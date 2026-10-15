@@ -139,7 +139,7 @@ export function StudentExperience({ liveData }: { liveData?: StudentTodayData })
             </div>
           </aside>
 
-          <main className="min-w-0">
+          <main className="min-w-0">\n            <Link to="/student/courses" className="mb-4 flex items-center justify-between rounded-2xl border border-border bg-card p-4 text-sm font-semibold hover:border-foreground/30"><span>Choose classes · Add, drop & withdrawal</span><ArrowRight size={17}/></Link>
             <Link to="/student/experiences" className="mb-6 flex items-center justify-between rounded-2xl border border-border bg-card p-4 text-sm font-semibold hover:border-foreground/30"><span>Explore more: Needs You, calendar, support, activities & growth</span><ArrowRight size={17}/></Link>
             {focused ? (
               <section className="animate-fade-up">
