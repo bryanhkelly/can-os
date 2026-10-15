@@ -93,7 +93,7 @@ Instructional unit/activity in a template or section.
 Catalog-level course identity where needed.
 
 ### SchoolYear
-Authoritative academic-year container for a defined Organization/Program scope.
+Authoritative **Site-scoped** academic-year container. Program/network configuration may provide defaults, but the Site owns the effective operational year because start/end dates, closures, and schedules vary locally.
 
 ### Term
 Semester, trimester, quarter, or other academic period inside one SchoolYear.
@@ -105,10 +105,10 @@ Grade-posting window inside exactly one Term.
 Versioned grading interpretation (letters, percentages, GPA points, pass/fail, etc.). Historical results retain the version used when finalized.
 
 ### ScheduleTemplate
-Reusable bell/meeting pattern for onsite, hybrid, or live-online delivery.
+Site-scoped reusable bell/meeting pattern for onsite, hybrid, or live-online delivery. Program/network templates may seed it, but the Site-effective schedule is authoritative.
 
 ### AcademicCalendar
-Canonical instructional calendar including school days, holidays, closures, exceptions, and make-up days. Program overlays may specialize the calendar without creating competing shadow calendars.
+Site-scoped canonical instructional calendar including school days, holidays, closures, exceptions, and make-up days. Florida and Washington Sites in the same Program may have different effective calendars without forking the Program.
 
 ### Section
 A delivered instance for a specific Term, roster, teachers, Program, and schedule context.
@@ -186,6 +186,63 @@ System-generated observation with evidence, uncertainty, and recommended Actions
 Proactive AI enters the product as Insights, not unsolicited chat.
 
 ## Operations
+
+### ConsentRecord
+Versioned e-sign/consent fact tied to a Household, signer, subject, document version, timestamp, and signature evidence.
+
+### SensitiveAccessGrant
+Temporary, purpose-bound, field-scoped permission for exceptional sensitive access. Used for cases such as a field-trip chaperone receiving only the emergency fields needed for the trip. Grants have explicit validity windows and revocation.
+
+### FinancialObligation
+Minimal money-due contract tied to a Household and business subject (trip, activity, etc.). This is not the full accounting ledger.
+
+### Incident
+First-class governed legal/safety record. Filing creates a durable record; corrections are IncidentAmendments rather than destructive edits. Reviews, notifications, evidence, follow-up Actions, closure, and sensitive reads are auditable.
+
+### HealthProfile
+Medical-tier student context. Detailed health data is never implied by ordinary student-read access.
+
+### HealthComplianceItem
+Explicit compliance state for immunization or other health requirements, including document evidence, review, and expiry.
+
+### MedicationAuthorization
+Time-bounded authority to administer a medication, with instructions and supporting authorization/consent documents.
+
+### MedicationAdministration
+Immutable fact that a medication was administered, refused, held, or missed at a Site by an authorized person.
+
+### HealthOfficeVisit
+Medical-tier operational visit with disposition, send-home state, and optional return-to-school requirement.
+
+### ReturnToSchoolClearance
+Explicit state that prevents a send-home/illness workflow from being silently forgotten.
+
+### FieldTrip
+Site-scoped off-campus event with proposal/approval, household permission, fees, chaperones, trip-specific attendance, safety access, and Incident linkage.
+
+### Activity
+Site co-curricular or athletic program.
+
+### ActivitySeason
+Time-bounded instance of an Activity with registration, fee, eligibility, roster, and calendar lifecycle.
+
+### ActivityRegistration
+Student participation request with consent, physical/document expiry, eligibility state, financial obligation, and roster state.
+
+### ActivityEligibilityCheck
+Versioned eligibility decision with evidence and validity window. Do not hard-code one national GPA rule into the schema.
+
+### ConferenceSeries
+Teacher/Site-defined availability window for parent-teacher conferences.
+
+### ConferenceSlot
+Bookable interval within a ConferenceSeries.
+
+### ConferenceBooking
+Guardian-to-student booking for a specific slot; produces a canonical CalendarEvent and communication/reminder context.
+
+### ConferenceNote
+Conference note with explicit visibility, separating family-visible summaries from staff-private notes.
 
 ### AttendanceEvent
 Expected/present/absent/tardy/excused operational attendance fact.
