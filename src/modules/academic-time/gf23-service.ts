@@ -8,6 +8,7 @@ import {
   gradeScales,
   gradingPeriods,
   programs,
+  scheduleTemplatePeriods,
   scheduleTemplates,
   schoolYears,
   terms,
@@ -380,6 +381,76 @@ export async function setAcademicCalendarDay(
     });
 
     return dayId;
+  });
+}
+
+export async function createScheduleTemplate(
+  context: CommandContext,
+  input: {
+    schoolYearId: string;
+    programId?: string;
+    name: string;
+    effectiveFrom: string;
+    effectiveThrough?: string;
+    periods: Array<{
+      dayOfWeek: number;
+      sequence: number;
+      label: string;
+      startsAtLocal: string;
+      endsAtLocal: string;
+      type?: string;
+    }>;
+  },
+): Promise<string> {
+  assertCapability(context, "academic_year.manage");
+
+  return db.transaction(async (tx) => {
+    const [year] = await tx
+      .select()
+      .from(schoolYears)
+      .where(eq(schoolYears.id, input.schoolYearId))
+      .limit(1);
+
+    if (!year) throw new Error("SchoolYear not found");
+    assertOrganizationScope(context, year.organizationId);
+    assertProgramScope(context, input.programId ?? year.programId);
+
+    if (
+      input.effectiveFrom < year.startsOn ||
+      (input.effectiveThrough && input.effectiveThrough > year.endsOn)
+    ) {
+      throw new Error("ScheduleTemplate must fit within SchoolYear");
+    }
+
+    const [template] = await tx
+      .insert(scheduleTemplates)
+      .values({
+        schoolYearId: input.schoolYearId,
+        programId: input.programId ?? year.programId,
+        name: input.name,
+        active: true,
+        effectiveFrom: input.effectiveFrom,
+        effectiveThrough: input.effectiveThrough,
+      })
+      .returning({ id: scheduleTemplates.id });
+
+    if (!template) throw new Error("Failed to create ScheduleTemplate");
+
+    if (input.periods.length > 0) {
+      await tx.insert(scheduleTemplatePeriods).values(
+        input.periods.map((period) => ({
+          scheduleTemplateId: template.id,
+          dayOfWeek: period.dayOfWeek,
+          sequence: period.sequence,
+          label: period.label,
+          startsAtLocal: period.startsAtLocal,
+          endsAtLocal: period.endsAtLocal,
+          type: period.type ?? "instruction",
+        })),
+      );
+    }
+
+    return template.id;
   });
 }
 
