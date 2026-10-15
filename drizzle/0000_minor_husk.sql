@@ -8,12 +8,14 @@ CREATE TYPE "public"."domain_event_status" AS ENUM('pending', 'processing', 'pro
 CREATE TYPE "public"."enrollment_kind" AS ENUM('program', 'school_year', 'section');--> statement-breakpoint
 CREATE TYPE "public"."enrollment_status" AS ENUM('applicant', 'accepted', 'active', 'transferred', 'withdrawn', 'graduated', 'cancelled');--> statement-breakpoint
 CREATE TYPE "public"."attendance_excuse_status" AS ENUM('submitted', 'approved', 'rejected', 'withdrawn');--> statement-breakpoint
+CREATE TYPE "public"."instructional_day_type" AS ENUM('instructional', 'holiday', 'closure', 'special', 'makeup');--> statement-breakpoint
 CREATE TYPE "public"."journey_requirement_status" AS ENUM('needs_you', 'needs_can', 'waiting_third_party', 'blocked', 'complete');--> statement-breakpoint
 CREATE TYPE "public"."journey_status" AS ENUM('not_started', 'in_progress', 'blocked', 'ready', 'active', 'complete', 'cancelled');--> statement-breakpoint
 CREATE TYPE "public"."notification_status" AS ENUM('unread', 'read', 'dismissed');--> statement-breakpoint
 CREATE TYPE "public"."organization_type" AS ENUM('can_network', 'denomination', 'church', 'christian_school', 'microschool_operator', 'consortium', 'other_partner');--> statement-breakpoint
 CREATE TYPE "public"."program_status" AS ENUM('draft', 'launching', 'ready', 'active', 'paused', 'closed');--> statement-breakpoint
 CREATE TYPE "public"."program_type" AS ENUM('church_hosted_academy', 'high_school_extension', 'full_school', 'microschool', 'hybrid_program', 'homeschool_cohort', 'summer_enrichment');--> statement-breakpoint
+CREATE TYPE "public"."school_year_status" AS ENUM('draft', 'ready', 'active', 'closed');--> statement-breakpoint
 CREATE TYPE "public"."submission_status" AS ENUM('assigned', 'submitted', 'graded', 'returned');--> statement-breakpoint
 CREATE TYPE "public"."submission_timeliness" AS ENUM('on_time', 'late', 'missing', 'excused');--> statement-breakpoint
 CREATE TABLE "auth_identities" (
@@ -160,6 +162,112 @@ CREATE TABLE "sites" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "academic_calendar_days" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"academic_calendar_id" uuid NOT NULL,
+	"calendar_date" date NOT NULL,
+	"type" "instructional_day_type" NOT NULL,
+	"title" text,
+	"instructional_minutes" integer,
+	"notes" text,
+	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "academic_calendars" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"school_year_id" uuid NOT NULL,
+	"name" text NOT NULL,
+	"version" integer DEFAULT 1 NOT NULL,
+	"active" boolean DEFAULT true NOT NULL,
+	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "grade_scales" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"owning_organization_id" uuid NOT NULL,
+	"name" text NOT NULL,
+	"version" integer NOT NULL,
+	"active" boolean DEFAULT true NOT NULL,
+	"configuration" jsonb NOT NULL,
+	"effective_from" date,
+	"effective_through" date,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "grading_periods" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"term_id" uuid NOT NULL,
+	"key" text NOT NULL,
+	"name" text NOT NULL,
+	"sequence" integer NOT NULL,
+	"starts_on" date NOT NULL,
+	"ends_on" date NOT NULL,
+	"grade_posting_opens_at" timestamp with time zone,
+	"grade_posting_closes_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "schedule_template_periods" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"schedule_template_id" uuid NOT NULL,
+	"day_of_week" integer NOT NULL,
+	"sequence" integer NOT NULL,
+	"label" text NOT NULL,
+	"starts_at_local" time NOT NULL,
+	"ends_at_local" time NOT NULL,
+	"type" text DEFAULT 'instruction' NOT NULL,
+	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "schedule_templates" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"school_year_id" uuid NOT NULL,
+	"program_id" uuid,
+	"name" text NOT NULL,
+	"active" boolean DEFAULT true NOT NULL,
+	"effective_from" date NOT NULL,
+	"effective_through" date,
+	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "school_years" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organization_id" uuid NOT NULL,
+	"program_id" uuid,
+	"key" text NOT NULL,
+	"name" text NOT NULL,
+	"status" "school_year_status" DEFAULT 'draft' NOT NULL,
+	"starts_on" date NOT NULL,
+	"ends_on" date NOT NULL,
+	"grade_scale_id" uuid NOT NULL,
+	"timezone" text DEFAULT 'America/Los_Angeles' NOT NULL,
+	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "terms" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"school_year_id" uuid NOT NULL,
+	"key" text NOT NULL,
+	"name" text NOT NULL,
+	"sequence" integer NOT NULL,
+	"starts_on" date NOT NULL,
+	"ends_on" date NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "assessments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"section_id" uuid NOT NULL,
@@ -207,7 +315,7 @@ CREATE TABLE "enrollments" (
 	"organization_id" uuid NOT NULL,
 	"program_id" uuid,
 	"section_id" uuid,
-	"school_year" text,
+	"school_year_id" uuid,
 	"started_at" timestamp with time zone,
 	"ended_at" timestamp with time zone,
 	"metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -231,7 +339,8 @@ CREATE TABLE "sections" (
 	"course_template_version_id" uuid NOT NULL,
 	"code" text NOT NULL,
 	"title" text NOT NULL,
-	"term_key" text NOT NULL,
+	"term_id" uuid NOT NULL,
+	"schedule_template_id" uuid,
 	"starts_at" timestamp with time zone,
 	"ends_at" timestamp with time zone,
 	"active" boolean DEFAULT true NOT NULL,
@@ -535,6 +644,17 @@ ALTER TABLE "role_assignments" ADD CONSTRAINT "role_assignments_organization_id_
 ALTER TABLE "role_assignments" ADD CONSTRAINT "role_assignments_site_id_sites_id_fk" FOREIGN KEY ("site_id") REFERENCES "public"."sites"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_assignments" ADD CONSTRAINT "role_assignments_program_id_programs_id_fk" FOREIGN KEY ("program_id") REFERENCES "public"."programs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sites" ADD CONSTRAINT "sites_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "academic_calendar_days" ADD CONSTRAINT "academic_calendar_days_academic_calendar_id_academic_calendars_id_fk" FOREIGN KEY ("academic_calendar_id") REFERENCES "public"."academic_calendars"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "academic_calendars" ADD CONSTRAINT "academic_calendars_school_year_id_school_years_id_fk" FOREIGN KEY ("school_year_id") REFERENCES "public"."school_years"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "grade_scales" ADD CONSTRAINT "grade_scales_owning_organization_id_organizations_id_fk" FOREIGN KEY ("owning_organization_id") REFERENCES "public"."organizations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "grading_periods" ADD CONSTRAINT "grading_periods_term_id_terms_id_fk" FOREIGN KEY ("term_id") REFERENCES "public"."terms"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "schedule_template_periods" ADD CONSTRAINT "schedule_template_periods_schedule_template_id_schedule_templates_id_fk" FOREIGN KEY ("schedule_template_id") REFERENCES "public"."schedule_templates"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "schedule_templates" ADD CONSTRAINT "schedule_templates_school_year_id_school_years_id_fk" FOREIGN KEY ("school_year_id") REFERENCES "public"."school_years"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "schedule_templates" ADD CONSTRAINT "schedule_templates_program_id_programs_id_fk" FOREIGN KEY ("program_id") REFERENCES "public"."programs"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "school_years" ADD CONSTRAINT "school_years_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "school_years" ADD CONSTRAINT "school_years_program_id_programs_id_fk" FOREIGN KEY ("program_id") REFERENCES "public"."programs"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "school_years" ADD CONSTRAINT "school_years_grade_scale_id_grade_scales_id_fk" FOREIGN KEY ("grade_scale_id") REFERENCES "public"."grade_scales"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "terms" ADD CONSTRAINT "terms_school_year_id_school_years_id_fk" FOREIGN KEY ("school_year_id") REFERENCES "public"."school_years"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "assessments" ADD CONSTRAINT "assessments_section_id_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."sections"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "assessments" ADD CONSTRAINT "assessments_created_by_person_id_people_id_fk" FOREIGN KEY ("created_by_person_id") REFERENCES "public"."people"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "course_template_versions" ADD CONSTRAINT "course_template_versions_course_template_id_course_templates_id_fk" FOREIGN KEY ("course_template_id") REFERENCES "public"."course_templates"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -543,11 +663,14 @@ ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_student_profile_id_student
 ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_program_id_programs_id_fk" FOREIGN KEY ("program_id") REFERENCES "public"."programs"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_section_id_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."sections"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_school_year_id_school_years_id_fk" FOREIGN KEY ("school_year_id") REFERENCES "public"."school_years"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "section_teachers" ADD CONSTRAINT "section_teachers_section_id_sections_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."sections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "section_teachers" ADD CONSTRAINT "section_teachers_person_id_people_id_fk" FOREIGN KEY ("person_id") REFERENCES "public"."people"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sections" ADD CONSTRAINT "sections_program_id_programs_id_fk" FOREIGN KEY ("program_id") REFERENCES "public"."programs"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sections" ADD CONSTRAINT "sections_site_id_sites_id_fk" FOREIGN KEY ("site_id") REFERENCES "public"."sites"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sections" ADD CONSTRAINT "sections_course_template_version_id_course_template_versions_id_fk" FOREIGN KEY ("course_template_version_id") REFERENCES "public"."course_template_versions"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sections" ADD CONSTRAINT "sections_term_id_terms_id_fk" FOREIGN KEY ("term_id") REFERENCES "public"."terms"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sections" ADD CONSTRAINT "sections_schedule_template_id_schedule_templates_id_fk" FOREIGN KEY ("schedule_template_id") REFERENCES "public"."schedule_templates"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "submissions" ADD CONSTRAINT "submissions_assessment_id_assessments_id_fk" FOREIGN KEY ("assessment_id") REFERENCES "public"."assessments"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "submissions" ADD CONSTRAINT "submissions_student_profile_id_student_profiles_id_fk" FOREIGN KEY ("student_profile_id") REFERENCES "public"."student_profiles"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "submissions" ADD CONSTRAINT "submissions_grader_person_id_people_id_fk" FOREIGN KEY ("grader_person_id") REFERENCES "public"."people"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -623,6 +746,25 @@ CREATE INDEX "role_assignment_site_idx" ON "role_assignments" USING btree ("site
 CREATE INDEX "role_assignment_program_idx" ON "role_assignments" USING btree ("program_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "site_org_slug_uq" ON "sites" USING btree ("organization_id","slug");--> statement-breakpoint
 CREATE INDEX "site_org_idx" ON "sites" USING btree ("organization_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "academic_calendar_day_uq" ON "academic_calendar_days" USING btree ("academic_calendar_id","calendar_date");--> statement-breakpoint
+CREATE INDEX "academic_calendar_day_date_idx" ON "academic_calendar_days" USING btree ("calendar_date");--> statement-breakpoint
+CREATE UNIQUE INDEX "academic_calendar_year_version_uq" ON "academic_calendars" USING btree ("school_year_id","version");--> statement-breakpoint
+CREATE INDEX "academic_calendar_year_active_idx" ON "academic_calendars" USING btree ("school_year_id","active");--> statement-breakpoint
+CREATE UNIQUE INDEX "grade_scale_org_name_version_uq" ON "grade_scales" USING btree ("owning_organization_id","name","version");--> statement-breakpoint
+CREATE INDEX "grade_scale_org_active_idx" ON "grade_scales" USING btree ("owning_organization_id","active");--> statement-breakpoint
+CREATE UNIQUE INDEX "grading_period_term_key_uq" ON "grading_periods" USING btree ("term_id","key");--> statement-breakpoint
+CREATE UNIQUE INDEX "grading_period_term_sequence_uq" ON "grading_periods" USING btree ("term_id","sequence");--> statement-breakpoint
+CREATE INDEX "grading_period_term_idx" ON "grading_periods" USING btree ("term_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "schedule_period_template_day_sequence_uq" ON "schedule_template_periods" USING btree ("schedule_template_id","day_of_week","sequence");--> statement-breakpoint
+CREATE INDEX "schedule_period_template_idx" ON "schedule_template_periods" USING btree ("schedule_template_id");--> statement-breakpoint
+CREATE INDEX "schedule_template_year_idx" ON "schedule_templates" USING btree ("school_year_id");--> statement-breakpoint
+CREATE INDEX "schedule_template_program_active_idx" ON "schedule_templates" USING btree ("program_id","active");--> statement-breakpoint
+CREATE UNIQUE INDEX "school_year_scope_key_uq" ON "school_years" USING btree ("organization_id","program_id","key");--> statement-breakpoint
+CREATE INDEX "school_year_org_status_idx" ON "school_years" USING btree ("organization_id","status");--> statement-breakpoint
+CREATE INDEX "school_year_program_status_idx" ON "school_years" USING btree ("program_id","status");--> statement-breakpoint
+CREATE UNIQUE INDEX "term_year_key_uq" ON "terms" USING btree ("school_year_id","key");--> statement-breakpoint
+CREATE UNIQUE INDEX "term_year_sequence_uq" ON "terms" USING btree ("school_year_id","sequence");--> statement-breakpoint
+CREATE INDEX "term_year_idx" ON "terms" USING btree ("school_year_id");--> statement-breakpoint
 CREATE INDEX "assessment_section_idx" ON "assessments" USING btree ("section_id");--> statement-breakpoint
 CREATE INDEX "assessment_due_idx" ON "assessments" USING btree ("due_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "course_template_version_uq" ON "course_template_versions" USING btree ("course_template_id","version");--> statement-breakpoint
@@ -631,10 +773,12 @@ CREATE INDEX "enrollment_student_idx" ON "enrollments" USING btree ("student_pro
 CREATE INDEX "enrollment_program_idx" ON "enrollments" USING btree ("program_id");--> statement-breakpoint
 CREATE INDEX "enrollment_section_idx" ON "enrollments" USING btree ("section_id");--> statement-breakpoint
 CREATE INDEX "enrollment_status_idx" ON "enrollments" USING btree ("status");--> statement-breakpoint
+CREATE INDEX "enrollment_school_year_idx" ON "enrollments" USING btree ("school_year_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "section_teacher_uq" ON "section_teachers" USING btree ("section_id","person_id");--> statement-breakpoint
 CREATE INDEX "section_teacher_person_idx" ON "section_teachers" USING btree ("person_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "section_program_term_code_uq" ON "sections" USING btree ("program_id","term_key","code");--> statement-breakpoint
+CREATE UNIQUE INDEX "section_program_term_code_uq" ON "sections" USING btree ("program_id","term_id","code");--> statement-breakpoint
 CREATE INDEX "section_program_idx" ON "sections" USING btree ("program_id");--> statement-breakpoint
+CREATE INDEX "section_term_idx" ON "sections" USING btree ("term_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "submission_attempt_uq" ON "submissions" USING btree ("assessment_id","student_profile_id","attempt_number");--> statement-breakpoint
 CREATE INDEX "submission_student_idx" ON "submissions" USING btree ("student_profile_id");--> statement-breakpoint
 CREATE INDEX "submission_assessment_idx" ON "submissions" USING btree ("assessment_id");--> statement-breakpoint
