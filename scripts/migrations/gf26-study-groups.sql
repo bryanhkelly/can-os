@@ -50,4 +50,15 @@ CREATE TABLE IF NOT EXISTS study_group_reports (
  created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS study_group_report_idx ON study_group_reports(group_id,status);
+-- Attendance extension (safe to re-run)
+CREATE TABLE IF NOT EXISTS study_group_session_attendance (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ session_id uuid NOT NULL REFERENCES study_group_sessions(id) ON DELETE CASCADE,
+ person_id uuid NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
+ rsvp text NOT NULL DEFAULT 'going' CHECK(rsvp IN ('going','maybe','declined')),
+ attended boolean,
+ recorded_by_person_id uuid REFERENCES people(id) ON DELETE RESTRICT,
+ created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT study_group_session_person_uq UNIQUE(session_id,person_id)
+);
 COMMIT;

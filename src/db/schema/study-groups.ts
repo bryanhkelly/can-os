@@ -44,3 +44,11 @@ export const studyGroupReports=pgTable("study_group_reports",{
  reason:text("reason").notNull(),status:text("status").default("open").notNull(),
  createdAt:createdAt(),updatedAt:updatedAt(),
 },t=>[index("study_group_report_idx").on(t.groupId,t.status)]);
+
+export const studyGroupSessionAttendance=pgTable("study_group_session_attendance",{
+ id:id(),sessionId:uuid("session_id").notNull().references(()=>studyGroupSessions.id,{onDelete:"cascade"}),
+ personId:uuid("person_id").notNull().references(()=>people.id,{onDelete:"restrict"}),
+ rsvp:text("rsvp").notNull().default("going"),
+ attended:boolean("attended"),recordedByPersonId:uuid("recorded_by_person_id").references(()=>people.id,{onDelete:"restrict"}),
+ createdAt:createdAt(),updatedAt:updatedAt(),
+},t=>[uniqueIndex("study_group_session_person_uq").on(t.sessionId,t.personId)]);

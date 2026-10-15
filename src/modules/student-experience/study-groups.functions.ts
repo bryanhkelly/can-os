@@ -117,3 +117,43 @@ export const resolveStudyGroupReport=createServerFn({method:"POST"}).validator((
  return {ok:true};
  });
 });
+
+export const rsvpStudyGroupSession=createServerFn({method:"POST"})
+.validator((x:{sessionId:string;rsvp:"going"|"maybe"|"declined"})=>x).handler(async({data})=>{
+ assertSyntheticMutation("student");
+ if(!["going","maybe","declined"].includes(data.rsvp))throw new Error("Invalid RSVP");
+ const {db,s}=await context();
+ const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId})
+ .from(s.studyGroupSessions).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.status,"active")))
+ .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
+ if(!session)throw new Error("Session not found");
+ const [member]=await db.select({id:s.studyGroupMemberships.id}).from(s.studyGroupMemberships)
+ .where(and(eq(s.studyGroupMemberships.groupId,session.groupId),eq(s.studyGroupMemberships.personId,STUDENT),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
+ if(!member)throw new Error("Approved membership required");
+ await db.insert(s.studyGroupSessionAttendance).values({sessionId:session.id,personId:STUDENT,rsvp:data.rsvp})
+ .onConflictDoUpdate({target:[s.studyGroupSessionAttendance.sessionId,s.studyGroupSessionAttendance.personId],set:{rsvp:data.rsvp,updatedAt:new Date()}});
+ return {ok:true};
+});
+export const recordStudyGroupAttendance=createServerFn({method:"POST"})
+.validator((x:{sessionId:string;personId:string;attended:boolean})=>x).handler(async({data})=>{
+ assertSyntheticMutation("teacher");const {db,s}=await context();
+ const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions)
+ .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE)))
+ .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
+ if(!session)throw new Error("Not authorized for this session");
+ const [member]=await db.select({id:s.studyGroupMemberships.id}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,session.groupId),eq(s.studyGroupMemberships.personId,data.personId),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
+ if(!member)throw new Error("Attendance requires approved member");
+ await db.insert(s.studyGroupSessionAttendance).values({sessionId:data.sessionId,personId:data.personId,rsvp:"going",attended:data.attended,recordedByPersonId:TEACHER})
+ .onConflictDoUpdate({target:[s.studyGroupSessionAttendance.sessionId,s.studyGroupSessionAttendance.personId],set:{attended:data.attended,recordedByPersonId:TEACHER,updatedAt:new Date()}});
+ return {ok:true};
+});
+export const listStudyGroupAttendance=createServerFn({method:"GET"})
+.validator((x:{sessionId:string})=>x).handler(async({data})=>{
+ assertSyntheticMutation("teacher");const {db,s}=await context();
+ const [session]=await db.select({id:s.studyGroupSessions.id}).from(s.studyGroupSessions)
+ .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.facilitatorPersonId,TEACHER)))
+ .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
+ if(!session)throw new Error("Access denied");
+ return db.select({personId:s.studyGroupSessionAttendance.personId,rsvp:s.studyGroupSessionAttendance.rsvp,attended:s.studyGroupSessionAttendance.attended})
+ .from(s.studyGroupSessionAttendance).where(eq(s.studyGroupSessionAttendance.sessionId,data.sessionId));
+});
