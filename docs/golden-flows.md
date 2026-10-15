@@ -147,13 +147,13 @@ Prove that CAN can define one authoritative academic year structure that every d
 This is a platform prerequisite, not a back-office convenience. GF1, GF4, Student Today, grading, report cards, transcripts, attendance expectations, and scheduling all depend on it.
 
 ### Flow
-1. Authorized academic operator creates a SchoolYear for an Organization/Program scope.
+1. Authorized academic operator creates a **Site-scoped** SchoolYear. Program/network configuration may seed defaults, but the Site owns the effective operational calendar.
 2. Terms/semesters/trimesters are defined with non-overlapping start/end dates.
 3. Grading periods are defined within Terms.
 4. Grade scale and grade-posting rules are selected/versioned.
 5. Instructional calendar is created with school days, holidays, closures, special days, and make-up days.
 6. Bell/schedule templates are created for onsite and hybrid delivery patterns.
-7. Program-specific calendar overlays are applied without duplicating the canonical year.
+7. Site-specific calendar/schedule configuration is authoritative. Program/network templates may seed Site calendars but never override local effective dates implicitly.
 8. Sections are assigned to the correct Term and schedule pattern.
 9. Effective dates make future changes explicit rather than silently rewriting history.
 10. SchoolYear moves from Draft → Ready → Active only after blocking validation passes.
@@ -161,7 +161,8 @@ This is a platform prerequisite, not a back-office convenience. GF1, GF4, Studen
 12. A mid-year calendar change emits events and updates downstream views without corrupting previously completed records.
 
 ### Required invariants
-- no overlapping Terms within the same SchoolYear scope;
+- no overlapping Terms within the same Site-scoped SchoolYear;
+- two Sites in the same Program may have different first/last instructional days and holidays;
 - every GradingPeriod belongs to exactly one Term;
 - grade scales are versioned and historically stable;
 - calendar exceptions override templates rather than mutating them;
@@ -280,6 +281,117 @@ Prove that distributed CAN students can form durable, safe academic peer connect
 
 ### Proves
 peer-group domain model, membership, moderation/safety, calendar integration, academic context, distributed-network community.
+
+---
+
+## GF33 — Field Trip End-to-End
+
+### Goal
+Prove that CAN can coordinate a real off-campus event across approval, Household consent, fees, medical safety, offline chaperone access, attendance, and incidents without granting broad student-record access.
+
+### Flow
+1. Staff proposes a FieldTrip at a Site.
+2. Authorized approver approves it and one canonical CalendarEvent is created.
+3. Students are added to the trip roster.
+4. Household receives permission action and guardian e-signs a versioned ConsentRecord.
+5. Any fee becomes a Household FinancialObligation.
+6. Chaperones are assigned.
+7. Each chaperone receives a time-limited SensitiveAccessGrant for the trip only.
+8. Trip Safety Packet contains only required student identity, emergency contacts, relevant medical alerts, and trip attendance fields.
+9. Safety packet is available offline for the trip window and automatically becomes unauthorized after expiry/revocation.
+10. Departure/boarded/return attendance is recorded idempotently and separately from school attendance.
+11. If an incident occurs, GF35 is filed and linked to the FieldTrip.
+12. Audit reconstructs consent, sensitive access, attendance, and incident linkage.
+
+### Proves
+ConsentRecord, FinancialObligation, least-privilege medical access, offline-safe scoped data, Calendar fusion, trip attendance, and Incident composition.
+
+---
+
+## GF34 — Health Office
+
+### Goal
+Prove medical-tier data can be operated safely without leaking into ordinary academic views.
+
+### Flow
+1. HealthProfile exists for the student.
+2. Immunization/health compliance items track missing, pending review, compliant, waived, and expired states.
+3. Supporting Documents carry medical sensitivity, verification, expiry, and retention metadata.
+4. MedicationAuthorization is created with instructions, start/expiry, and supporting authorization/guardian consent.
+5. Each MedicationAdministration is an immutable fact.
+6. Student visits health office.
+7. If student is sent home, guardians are notified in context.
+8. If required, a ReturnToSchoolClearance is created automatically.
+9. Authorized health staff clears return with evidence.
+10. Every medical read/write is audited; ordinary teacher/student read capabilities do not imply medical access.
+
+### Proves
+medical-tier authorization, compliance states, document expiry/verification, immutable administration logs, guardian notification, clearance lifecycle, and sensitive-read audit.
+
+---
+
+## GF35 — Safety Incident Lifecycle
+
+### Goal
+Treat incidents as governed legal records rather than free-form notes.
+
+### Flow
+1. Authorized reporter files Incident with type, severity, site, timestamp, people, location, summary, and immediate actions.
+2. Filing emits a durable event and audit record.
+3. Later factual corrections create IncidentAmendments preserving prior/new value and reason.
+4. Required Site/network/legal reviews are assigned explicitly.
+5. Parent, leadership, network, or authority notification requirements become explicit IncidentNotifications.
+6. Evidence/Documents are attached without mutating the original narrative history.
+7. Follow-up work becomes Actions linked to the Incident.
+8. Restricted reads are themselves audited.
+9. Closure is blocked until assigned reviews are complete.
+10. Closure records who closed it and why; historical amendments/reviews/notifications remain immutable.
+
+### Proves
+legal-record governance, review chain, notification/escalation policy, evidence lineage, restricted visibility, read/write audit, and non-destructive correction history.
+
+---
+
+## GF36 — Co-Curriculars & Athletics
+
+### Goal
+Prove that activities beyond classes compose with Household consent, physical/document expiry, eligibility logic, fees, and the same Site calendar.
+
+### Flow
+1. Site creates Activity and ActivitySeason.
+2. Guardian registers student and signs versioned consent.
+3. Physical/document status and expiry are tracked.
+4. Fee becomes a Household FinancialObligation when applicable.
+5. Eligibility is evaluated using a versioned rule and evidence.
+6. Eligibility decision is stored as ActivityEligibilityCheck with valid-through date.
+7. Grade/other changes can trigger a new eligibility check without rewriting prior decisions.
+8. Eligible student may move to roster.
+9. Practices/games/meetings are canonical CalendarEvents at the Site.
+10. Parent/Student calendar reads the same events as academic/formation events.
+
+### Proves
+registration, consent, expiring documents, configurable eligibility, re-evaluation history, minimal fee contract, roster state, and calendar fusion.
+
+---
+
+## GF39 — Parent-Teacher Conferences
+
+### Goal
+Prove Calendar, Household relationships, reminders, communication, notes, and follow-up Actions compose in a universal school workflow.
+
+### Flow
+1. Teacher creates ConferenceSeries availability at a Site.
+2. System generates bookable ConferenceSlots.
+3. Authorized guardian books a slot for their student.
+4. Booking atomically reserves the slot and creates one canonical CalendarEvent with teacher, guardian, and student participants.
+5. Confirmation/reminder notifications deep-link to the booking.
+6. Conference is marked held/no-show/cancelled.
+7. Teacher may write a family-visible summary and/or staff-private note.
+8. Follow-up work becomes a canonical Action tied to the student.
+9. Appropriate conference context remains attached to the canonical student record without exposing staff-private notes to families.
+
+### Proves
+calendar participants, conflict-safe booking, guardian authorization, reminders, note visibility, and Action composition.
 
 ---
 
