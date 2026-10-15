@@ -3,11 +3,11 @@
  * Server-side composition only; not exported through a public route or called
  * from the demo UI until a real student session exists.
  */
-import { and, asc, eq, gte, inArray, lt, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   actions, assessments, calendarEvents, enrollments, people, sections,
-  sites, studentProfiles, submissions,
+  studentProfiles, submissions,
 } from "@/db/schema";
 
 export type StudentTodayData = Awaited<ReturnType<typeof getStudentToday>>;
@@ -52,8 +52,6 @@ export async function getStudentToday(studentProfileId: string, at = new Date())
   startOfDay.setUTCHours(0, 0, 0, 0);
   const endOfDay = new Date(startOfDay);
   endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
-  const workHorizon = new Date(startOfDay);
-  workHorizon.setUTCDate(workHorizon.getUTCDate() + 14);
 
   // Site calendar is the source of truth for operations/formation;
   // a separate timezone-aware day boundary resolver will be required for
@@ -79,7 +77,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date())
       or(
         ...[
           ...sectionIds.map(id => eq(calendarEvents.sectionId, id)),
-          eq(calendarEvents.sectionId, null as never),
+          isNull(calendarEvents.sectionId),
         ],
       ),
     ))
