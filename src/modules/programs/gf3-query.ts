@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   calendarEvents,
@@ -54,7 +54,12 @@ export async function getProgramLaunchCase(
   const [journey] = await db
     .select({ id: journeys.id, status: journeys.status })
     .from(journeys)
-    .where(eq(journeys.participantId, program.id))
+    .where(
+      and(
+        eq(journeys.participantType, "program"),
+        eq(journeys.participantId, program.id),
+      ),
+    )
     .limit(1);
 
   const requirements = journey
