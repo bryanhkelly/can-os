@@ -17,6 +17,7 @@ import {
 } from "@/db/schema";
 import {
   assertCapability,
+  assertProgramScope,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -99,6 +100,7 @@ export async function startFamilyApplication(
       .limit(1);
 
     if (!program) throw new Error("Program not found");
+    assertProgramScope(context, input.programId);
 
     let householdId = input.householdId;
 
@@ -301,6 +303,7 @@ export async function acceptApplication(
       .limit(1);
 
     if (!current) throw new Error("Application not found");
+    assertProgramScope(context, current.programId);
     if (current.stage === "accepted") return;
 
     const decidedAt = new Date();
@@ -359,6 +362,7 @@ export async function activateEnrollmentFromApplication(
       .limit(1);
 
     if (!application) throw new Error("Application not found");
+    assertProgramScope(context, application.programId);
     if (application.stage !== "accepted") {
       throw new Error("Application must be accepted before activation");
     }
