@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { getAssignments, saveAssignmentResponse, gradeSyntheticAssignment, returnSyntheticAssignment, createSyntheticAssignment, getSyntheticAssignmentHistory } from "@/modules/student-experience/assignments.functions";
+import { getAssignments, saveAssignmentResponse, gradeSyntheticAssignment, returnSyntheticAssignment, createSyntheticAssignment, getSyntheticAssignmentHistory, saveSyntheticAssignmentDraft, manageSyntheticAssignment } from "@/modules/student-experience/assignments.functions";
 
 export const Route=createFileRoute("/student/assignments")({loader:()=>getAssignments(),component:AssignmentsPage});
 function AssignmentsPage(){
@@ -11,6 +11,7 @@ function AssignmentsPage(){
  const [newTitle,setNewTitle]=useState(""),[newInstructions,setNewInstructions]=useState(""),[newRubric,setNewRubric]=useState(""),[newSection,setNewSection]=useState(""),[newDue,setNewDue]=useState("2026-11-15T16:00"),[newPoints,setNewPoints]=useState(100);
  const [draft,setDraft]=useState(""),[score,setScore]=useState(85),[feedback,setFeedback]=useState("");
  const [filter,setFilter]=useState("all"),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[error,setError]=useState("");
+ const [draftState,setDraftState]=useState<"idle"|"saving"|"saved"|"error">("idle");
  const chosen=assignments.find(x=>x.assessmentId===selected);
  const sections=[...new Map(assignments.map(x=>[x.sectionId,{id:x.sectionId,course:x.course}])).values()];
  const items=assignments.filter(x=>filter==="all"||(filter==="todo"&&(!x.status||x.status==="assigned"||x.status==="returned"))||(filter==="submitted"&&x.status==="submitted")||(filter==="feedback"&&x.status==="graded"));
@@ -20,7 +21,16 @@ function AssignmentsPage(){
   catch(err){setError(err instanceof Error?err.message:"Unable to save");}
   finally{setBusy(false);}
  }
- function open(id:string,text:string){setSelected(id);setDraft(text);setNotice("");setError("");}
+ function open(id:string,text:string){setSelected(id);setDraft(text);setDraftState("idle");setNotice("");setError("");}
+ useEffect(()=>{
+  if(!chosen||role!=="student"||!(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")||draft===chosen.responseText)return;
+  const timer=setTimeout(()=>{
+   setDraftState("saving");
+   saveSyntheticAssignmentDraft({data:{assessmentId:chosen.assessmentId,text:draft}})
+    .then(()=>setDraftState("saved")).catch(()=>setDraftState("error"));
+  },900);
+  return ()=>clearTimeout(timer);
+ },[chosen?.assessmentId,chosen?.status,chosen?.responseText,role,draft]);
  const date=(value:string|null)=>value?new Intl.DateTimeFormat("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(value)):"No deadline";
  return <main className="mx-auto max-w-5xl px-5 py-9 pb-20">
   <Link to="/student" className="text-xs text-muted-foreground hover:underline">← Student Today</Link>
@@ -65,6 +75,7 @@ function AssignmentsPage(){
     {chosen.feedbackText&&<div className="mt-5 rounded-xl bg-stone-warm p-4"><p className="text-xs font-bold">Teacher feedback</p><p className="mt-2 text-sm">{chosen.feedbackText}</p></div>}
     {role==="student"&&(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")&&<div className="mt-6">
      <label className="text-sm font-semibold">Your response</label><textarea rows={7} maxLength={20000} value={draft} onChange={e=>setDraft(e.target.value)} className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm" placeholder="Write your response…"/>
+     <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">Draft: {draftState==="saving"?"Saving…":draftState==="saved"?"Saved to Neon":draftState==="error"?"Could not autosave":"Ready"}</p>
      <button disabled={busy||draft.trim().length<3} onClick={()=>perform(()=>saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}}),"Your work has been submitted to Neon.")} className="mt-3 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit work</button>
     </div>}
     {role==="student"&&chosen.status==="submitted"&&<p className="mt-5 rounded-xl bg-stone-warm p-4 text-sm">Submitted successfully. Your teacher can review your work.</p>}
@@ -74,6 +85,7 @@ function AssignmentsPage(){
      <textarea value={feedback} onChange={e=>setFeedback(e.target.value)} rows={3} className="w-full rounded-lg border border-border bg-background p-3 text-sm" placeholder="Useful feedback and next steps…"/>
      <button disabled={busy} onClick={()=>perform(()=>gradeSyntheticAssignment({data:{submissionId:chosen.submissionId!,score,comment:feedback}}),"Teacher grade and feedback saved.")} className="rounded-lg bg-foreground px-4 py-3 text-sm font-semibold text-background">Post grade</button>
     </div>}
+    {role==="teacher"&&chosen.metadata?.synthetic===true&&<div className="mt-5 flex flex-wrap gap-2"><button onClick={()=>perform(()=>manageSyntheticAssignment({data:{assessmentId:chosen.assessmentId,action:"close"}}),"Assignment closed.")} className="rounded-lg border border-border px-3 py-2 text-xs">Close</button><button onClick={()=>perform(()=>manageSyntheticAssignment({data:{assessmentId:chosen.assessmentId,action:"reopen"}}),"Assignment reopened.")} className="rounded-lg border border-border px-3 py-2 text-xs">Reopen</button></div>}
     {role==="teacher"&&chosen.status==="graded"&&chosen.submissionId&&<button disabled={busy} onClick={()=>perform(()=>returnSyntheticAssignment({data:{submissionId:chosen.submissionId!}}),"Assignment returned for revision.")} className="mt-5 rounded-lg bg-foreground px-4 py-3 text-sm font-semibold text-background">Return for revision</button>}
    </div>:<div className="rounded-2xl border border-border bg-card p-7"><h2 className="font-serif text-2xl">Select an assignment</h2><p className="mt-3 text-sm text-muted-foreground">Open work on the left to see instructions, progress, feedback and available actions.</p></div>}</div>
   </div>
