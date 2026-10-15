@@ -23,7 +23,7 @@ export function DemoNavigation(){
    <div className="flex flex-1 flex-wrap gap-x-4 gap-y-2">{links.map(x=><Link key={x.to} to={x.to} className="text-xs font-semibold text-muted-foreground hover:text-foreground">{x.label}</Link>)}</div>
    <label className="flex items-center gap-2 text-xs text-muted-foreground">Demo persona
     <select aria-label="Demo persona" value={role} onChange={event=>{const next=event.target.value as Role;setRole(next);window.history.replaceState(null,"",window.location.pathname+`?persona=${next}`);}} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
-     {roles.map(r=><option key={r} value={r}>{r[0].toUpperCase()+r.slice(1)}</option>)}
+     {roles.map(r=><option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>)}
     </select>
    </label>
   </div>
