@@ -55,6 +55,7 @@ export async function reviewQualification(
      claimId:claim.id,sequence:(latest?.sequence??0)+1,decision:input.decision,actorPersonId:context.actorPersonId!,
      evidenceDocumentId:evidenceId,reason:input.reason??null,
    }).returning({id:qualificationVerificationEvents.id});
+   if(!event) throw new Error("Verification event insertion failed");
    await tx.insert(domainEvents).values({eventType:"QualificationVerificationDecided",aggregateType:"QualificationClaim",aggregateId:claim.id,actorPersonId:context.actorPersonId!,payload:{verificationEventId:event.id,decision:input.decision}});
    await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId!,action:"qualification.verification.decided",resourceType:"QualificationClaim",resourceId:claim.id,before:{status:current},after:{status:decision.status,verificationEventId:event.id},context:{requestId:context.requestId??null}});
    return {claimId:claim.id,verificationEventId:event.id,status:decision.status};
