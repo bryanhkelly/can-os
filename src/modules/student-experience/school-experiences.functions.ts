@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { and, eq, asc } from "drizzle-orm";
 const PERSON = "f1000000-0000-4000-8000-000000000005";
 const STUDENT = "f1000000-0000-4000-8000-000000000007";
+const GUARDIAN = "f3000000-0000-4000-8000-000000000007";
 const SITE = "f1000000-0000-4000-8000-000000000003";
 const EVENT_IDS = ["f1000000-0000-4000-8000-000000000080","f1000000-0000-4000-8000-000000000081","f1000000-0000-4000-8000-000000000082"];
 const NOTICE_IDS = ["f3000000-0000-4000-8000-000000000001","f3000000-0000-4000-8000-000000000002"];
@@ -46,7 +47,7 @@ export const bookSyntheticOfficeHour=createServerFn({method:"POST"})
     return db.transaction(async tx=>{
       const [slot]=await tx.update(schema.conferenceSlots).set({status:"booked",updatedAt:new Date()}).where(and(eq(schema.conferenceSlots.id,data.slotId),eq(schema.conferenceSlots.status,"available"))).returning({id:schema.conferenceSlots.id});
       if(!slot) throw new Error("Office-hour slot already taken");
-      const [booking]=await tx.insert(schema.conferenceBookings).values({conferenceSlotId:slot.id,studentProfileId:STUDENT,guardianPersonId:PERSON,status:"booked"}).returning({id:schema.conferenceBookings.id});
+      const [booking]=await tx.insert(schema.conferenceBookings).values({conferenceSlotId:slot.id,studentProfileId:STUDENT,guardianPersonId:GUARDIAN,status:"booked"}).returning({id:schema.conferenceBookings.id});
       return {bookingId:booking!.id};
     });
   });
