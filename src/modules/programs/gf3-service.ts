@@ -132,6 +132,7 @@ export async function startProgramLaunch(
         siteId: input.siteId,
         programId: program.id,
         ownerPersonId: context.actorPersonId,
+        journeyDefinitionId: definition.id,
         definitionVersion: definition.version,
         startedAt: new Date(),
       })
