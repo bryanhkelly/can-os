@@ -1,0 +1,29 @@
+name: GF26 generate migrations
+on:
+  push:
+    branches: [feature/gf26-release]
+    paths:
+      - 'src/db/schema/**'
+      - 'drizzle/**'
+      - '.github/workflows/gf26-migration-sync.yml'
+permissions:
+  contents: write
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run db:generate
+      - name: Commit generated migrations
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add drizzle/
+          if ! git diff --staged --quiet; then
+            git commit -m "chore(gf26): synchronize migrations on current main"
+            git push origin HEAD:feature/gf26-release
+          fi
