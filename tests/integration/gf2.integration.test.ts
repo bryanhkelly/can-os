@@ -12,6 +12,7 @@ integration("GF2 new family enrollment", () => {
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);
+    const { createAcademicTimeFixture } = await import("./helpers/academic-time");
 
     const [jurisdiction] = await db
       .insert(schema.jurisdictions)
@@ -70,6 +71,12 @@ integration("GF2 new family enrollment", () => {
         creditIssuingOrganizationId: canOrg.id,
       })
       .returning();
+
+    const academicTime = await createAcademicTimeFixture({
+      organizationId: hostOrg.id,
+      programId: program.id,
+      suffix,
+    });
 
     await db.insert(schema.journeyDefinitions).values({
       key: "family-enrollment",
@@ -167,7 +174,7 @@ integration("GF2 new family enrollment", () => {
       enrollment.activateEnrollmentFromApplication(
         admissionContext,
         first.applicationId,
-        "2027-2028",
+        academicTime.schoolYear.id,
       ),
     ).rejects.toThrow("accepted");
 
@@ -181,7 +188,7 @@ integration("GF2 new family enrollment", () => {
       enrollment.activateEnrollmentFromApplication(
         admissionContext,
         first.applicationId,
-        "2027-2028",
+        academicTime.schoolYear.id,
       ),
     ).rejects.toThrow("ready");
 
@@ -218,14 +225,14 @@ integration("GF2 new family enrollment", () => {
     const enrollmentId = await enrollment.activateEnrollmentFromApplication(
       admissionContext,
       first.applicationId,
-      "2027-2028",
+      academicTime.schoolYear.id,
     );
 
     const retryEnrollmentId =
       await enrollment.activateEnrollmentFromApplication(
         admissionContext,
         first.applicationId,
-        "2027-2028",
+        academicTime.schoolYear.id,
       );
 
     expect(retryEnrollmentId).toBe(enrollmentId);
