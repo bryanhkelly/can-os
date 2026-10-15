@@ -13,6 +13,9 @@ import {
 } from "@/db/schema";
 import {
   assertCapability,
+  assertOrganizationScope,
+  assertProgramScope,
+  assertSiteScope,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -67,6 +70,7 @@ export async function startProgramLaunch(
       .limit(1);
 
     if (!host) throw new Error("Host Organization not found");
+    assertOrganizationScope(context, input.hostOrganizationId);
 
     if (input.siteId) {
       const [site] = await tx
@@ -76,6 +80,7 @@ export async function startProgramLaunch(
         .limit(1);
 
       if (!site) throw new Error("Site not found");
+      assertSiteScope(context, input.siteId);
       if (site.organizationId !== input.hostOrganizationId) {
         throw new Error("Site must belong to the host Organization");
       }
@@ -220,6 +225,7 @@ export async function createProgramOrientation(
       .limit(1);
 
     if (!program) throw new Error("Program not found");
+    assertProgramScope(context, input.programId);
 
     const [existing] = await tx
       .select({ id: calendarEvents.id })
@@ -282,6 +288,7 @@ export async function activateProgram(
       .limit(1);
 
     if (!program) throw new Error("Program not found");
+    assertProgramScope(context, programId);
     if (program.status === "active") return;
 
     const [journey] = await tx
