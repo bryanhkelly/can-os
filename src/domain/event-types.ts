@@ -1,4 +1,8 @@
 export const EventTypes = {
+  ApplicationStarted: "ApplicationStarted",
+  ApplicationAccepted: "ApplicationAccepted",
+  JourneyRequirementCompleted: "JourneyRequirementCompleted",
+  JourneyReady: "JourneyReady",
   AssessmentPublished: "AssessmentPublished",
   AssignmentBecameMissing: "AssignmentBecameMissing",
   SubmissionReceived: "SubmissionReceived",
