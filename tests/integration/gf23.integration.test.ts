@@ -106,6 +106,7 @@ integration("GF23 school-year setup", () => {
       scope: {
         organizationIds: [hostOrg.id],
         programIds: [program.id],
+        siteIds: [site.id],
       },
       requestId: `gf23-${suffix}`,
     };
@@ -113,6 +114,7 @@ integration("GF23 school-year setup", () => {
     const schoolYearId = await academicTime.createSchoolYear(context, {
       organizationId: hostOrg.id,
       programId: program.id,
+      siteId: site.id,
       key: `2027-2028-${suffix}`,
       name: "2027–2028",
       startsOn: "2027-08-16",

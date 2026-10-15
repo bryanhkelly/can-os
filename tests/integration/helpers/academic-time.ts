@@ -1,6 +1,7 @@
 export async function createAcademicTimeFixture(input: {
   organizationId: string;
   programId: string;
+  siteId: string;
   suffix: string;
   startsOn?: string;
   endsOn?: string;
@@ -37,6 +38,7 @@ export async function createAcademicTimeFixture(input: {
     .values({
       organizationId: input.organizationId,
       programId: input.programId,
+      siteId: input.siteId,
       key: `2027-2028-${input.suffix}`,
       name: "2027–2028",
       status: "active",
@@ -75,6 +77,7 @@ export async function createAcademicTimeFixture(input: {
     .insert(schema.academicCalendars)
     .values({
       schoolYearId: schoolYear.id,
+      siteId: input.siteId,
       name: "Primary Academic Calendar",
       version: 1,
       active: true,
@@ -93,6 +96,7 @@ export async function createAcademicTimeFixture(input: {
     .values({
       schoolYearId: schoolYear.id,
       programId: input.programId,
+      siteId: input.siteId,
       name: "Standard Day",
       active: true,
       effectiveFrom: startsOn,
