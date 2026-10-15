@@ -25,6 +25,7 @@ export async function recordAttendance(
     programId: string;
     siteId?: string;
     sectionId?: string;
+    occurrenceKey: string;
     status: "expected" | "present" | "absent" | "tardy" | "excused";
     expectedAt: Date;
     sourceKey: string;
@@ -52,6 +53,7 @@ export async function recordAttendance(
         programId: input.programId,
         siteId: input.siteId,
         sectionId: input.sectionId,
+        occurrenceKey: input.occurrenceKey,
         status: input.status,
         expectedAt: input.expectedAt,
         recordedByPersonId: context.actorPersonId,
@@ -304,6 +306,13 @@ export async function reviewAttendanceExcuse(
           programId: record.programId,
           siteId: record.siteId,
           sectionId: record.sectionId,
+          occurrenceKey: (
+            await tx
+              .select({ occurrenceKey: attendanceEvents.occurrenceKey })
+              .from(attendanceEvents)
+              .where(eq(attendanceEvents.id, record.attendanceEventId))
+              .limit(1)
+          )[0]!.occurrenceKey,
           status: "excused",
           expectedAt: record.expectedAt,
           recordedAt: reviewedAt,
