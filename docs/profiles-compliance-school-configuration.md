@@ -41,3 +41,18 @@ Suggested operating models: church_hosted, school_extension, microschool, consor
 - `profile-access.ts` provides defense-in-depth preconditions for future server-side readers and verification services. **This is not sufficient resource authorization by itself**: each service must validate actual actor membership and target person's relationship to the scoped organization/site/program before returning any private field.
 - Existing data schema changes remain un-migrated until Drizzle migrations are generated, reviewed and executed against the synthetic Neon environment.
 - Next: implement authenticated server-side profile reads/writes and verification audit events, ensure person/role scoping, then connect school configuration readiness to evidence-backed qualifications.
+
+## Architecture scale refactor (PR #32)
+
+New normalized structures:
+- `qualification_definitions` + `qualification_claims` decouple credential/degree/training types from the actual Person.
+- `qualification_verification_events` captures append-only decisions and evidence provenance.
+- `compliance_frameworks`, `compliance_framework_versions`, `compliance_policy_rules`, and `compliance_policy_applicability` reuse framework definitions across organizations/sites/programs.
+- `compliance_policy_exceptions` records authorized, effective-dated exemptions.
+- `program_responsibility_assignments` binds responsibilities to real Organizations and optional scoped RoleAssignments.
+- `staffing_eligibility_evaluations` stores time-scoped evaluation snapshots per role assignment.
+- `qualification-policy.ts` implements composable credential and evidence expressions; `assignment-readiness.ts` calculates role-assignment eligibility and validates accountable owners.
+
+**Important migration blockers:** The earlier `person_credentials`, `education_history`, `compliance_requirements`, and `compliance_evidence` remain in the schema for compatibility but are now overlapping legacy concepts. Before production deployment, choose explicit backfill + compatibility views, migrate consumers, and retire overlapping writes. Framework policies currently use a JSON expression field; server-side Zod parsing and immutable published-version enforcement must precede accepting user-authored policies. Append-only rules need database-level immutability (privilege/trigger), not merely application conventions. Role membership and target relationship verification must occur server-side; the pure eligibility check is **not** authorization. Existing program configuration has versioned rows, but transactional reconciliation to the responsibility assignment rows is still required.
+
+CI, Drizzle migration generation, Neon application, live CRUD, and end-to-end acceptance testing have not been executed in this session. The PR remains unmerged pending these gates.
