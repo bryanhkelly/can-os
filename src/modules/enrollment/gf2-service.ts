@@ -323,7 +323,7 @@ export async function acceptApplication(
       eventType: EventTypes.ApplicationAccepted,
       aggregateType: "application",
       aggregateId: applicationId,
-      context.actorPersonId: context.actorPersonId,
+      actorPersonId: context.actorPersonId,
       payload: {
         studentProfileId: current.studentProfileId,
         programId: current.programId,
@@ -331,7 +331,7 @@ export async function acceptApplication(
     });
 
     await tx.insert(auditEvents).values({
-      context.actorPersonId: context.actorPersonId,
+      actorPersonId: context.actorPersonId,
       action: "application.accept",
       resourceType: "application",
       resourceId: applicationId,
@@ -435,7 +435,7 @@ export async function activateEnrollmentFromApplication(
       eventType: EventTypes.EnrollmentActivated,
       aggregateType: "enrollment",
       aggregateId: enrollment.id,
-      context.actorPersonId: context.actorPersonId,
+      actorPersonId: context.actorPersonId,
       payload: {
         applicationId,
         studentProfileId: application.studentProfileId,
@@ -445,7 +445,7 @@ export async function activateEnrollmentFromApplication(
     });
 
     await tx.insert(auditEvents).values({
-      context.actorPersonId: context.actorPersonId,
+      actorPersonId: context.actorPersonId,
       action: "enrollment.activate",
       resourceType: "enrollment",
       resourceId: enrollment.id,
