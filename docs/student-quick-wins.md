@@ -21,7 +21,7 @@ The release ships labeled, fictional scenario records for:
 
 ## Boundaries
 
-This is an **interactive synthetic UI release**. The suite holds ephemeral React state only; resets restore the baseline. No request, extension, acknowledgement, calendar change, milestone, or portfolio action is persisted to Neon. That is intentional: operational records need an authenticated identity and relationship-aware write commands.
+**Current environment assumption:** CAN OS Neon records are currently all synthetic development fixtures; there is no real student, parent, or school operational data in this database. This allows iterative schema, seed, and command testing against the connected Neon environment, provided fixtures remain deterministic and resettable.\n\nThis is an **interactive synthetic UI release**. The suite holds ephemeral React state only; resets restore the baseline. No request, extension, acknowledgement, calendar change, milestone, or portfolio action is persisted to Neon. That is intentional: operational records need an authenticated identity and relationship-aware write commands.
 
 Existing production tables (Actions, CalendarEvents, ConsentRecords, Communications, etc.) remain the intended source of truth. There is no schema migration in this UI iteration. The preexisting synthetic student fixture in `scripts/seeds/student-s1-s4.sql` remains intact and idempotent.
 
