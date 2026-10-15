@@ -160,8 +160,8 @@ export async function administerMedication(
 ): Promise<string> {
   assertCapability(context, "medication.administer");
   assertSiteScope(context, input.siteId);
-  if (!actorPersonId) throw new Error("Medication administrator is required");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("Medication administrator is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [authorization] = await tx
@@ -253,8 +253,8 @@ export async function recordHealthOfficeVisit(
 }> {
   assertCapability(context, "health.visit.manage");
   assertSiteScope(context, input.siteId);
-  if (!actorPersonId) throw new Error("Health office actor is required");
-  const actorPersonId = actorPersonId;
+  if (!context.actorPersonId) throw new Error("Health office actor is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [visit] = await tx
