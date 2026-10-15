@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { getAssignments, saveAssignmentResponse, gradeSyntheticAssignment, returnSyntheticAssignment } from "@/modules/student-experience/assignments.functions";
+import { getAssignments, saveAssignmentResponse, gradeSyntheticAssignment, returnSyntheticAssignment, createSyntheticAssignment, getSyntheticAssignmentHistory } from "@/modules/student-experience/assignments.functions";
 
 export const Route=createFileRoute("/student/assignments")({loader:()=>getAssignments(),component:AssignmentsPage});
 function AssignmentsPage(){
@@ -8,9 +8,11 @@ function AssignmentsPage(){
  const router=useRouter();
  const [selected,setSelected]=useState<string|null>(null);
  const [role,setRole]=useState<"student"|"teacher">("student");
+ const [newTitle,setNewTitle]=useState(""),[newInstructions,setNewInstructions]=useState(""),[newRubric,setNewRubric]=useState(""),[newSection,setNewSection]=useState(""),[newDue,setNewDue]=useState("2026-11-15T16:00"),[newPoints,setNewPoints]=useState(100);
  const [draft,setDraft]=useState(""),[score,setScore]=useState(85),[feedback,setFeedback]=useState("");
  const [filter,setFilter]=useState("all"),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[error,setError]=useState("");
  const chosen=assignments.find(x=>x.assessmentId===selected);
+ const sections=[...new Map(assignments.map(x=>[x.sectionId,{id:x.sectionId,course:x.course}])).values()];
  const items=assignments.filter(x=>filter==="all"||(filter==="todo"&&(!x.status||x.status==="assigned"||x.status==="returned"))||(filter==="submitted"&&x.status==="submitted")||(filter==="feedback"&&x.status==="graded"));
  async function perform(fn:()=>Promise<unknown>,success:string) {
   setBusy(true);setNotice("");setError("");
@@ -31,6 +33,18 @@ function AssignmentsPage(){
   </div>
   {notice&&<p role="status" className="mt-5 rounded-lg border border-emerald-300 bg-card p-3 text-sm">{notice}</p>}
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-300 bg-card p-3 text-sm">{error}</p>}
+  {role==="teacher"&&<section className="mt-7 rounded-2xl border border-border bg-card p-5">
+   <h2 className="font-serif text-2xl">Create assignment</h2>
+   <div className="mt-4 grid gap-3 sm:grid-cols-2">
+    <label className="text-sm">Course<select className="mt-1 w-full rounded-lg border border-border bg-background p-2" value={newSection} onChange={e=>setNewSection(e.target.value)}><option value="">Select course</option>{sections.map(x=><option key={x.id} value={x.id}>{x.course}</option>)}</select></label>
+    <label className="text-sm">Due date<input type="datetime-local" value={newDue} onChange={e=>setNewDue(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2"/></label>
+    <input aria-label="Assignment title" placeholder="Assignment title" value={newTitle} onChange={e=>setNewTitle(e.target.value)} className="rounded-lg border border-border bg-background p-3 text-sm"/>
+    <input aria-label="Points possible" type="number" min={1} max={1000} value={newPoints} onChange={e=>setNewPoints(Number(e.target.value))} className="rounded-lg border border-border bg-background p-3 text-sm"/>
+   </div>
+   <textarea aria-label="Instructions" rows={3} placeholder="Instructions" value={newInstructions} onChange={e=>setNewInstructions(e.target.value)} className="mt-3 w-full rounded-lg border border-border bg-background p-3 text-sm"/>
+   <textarea aria-label="Rubric" rows={2} placeholder="Rubric or grading criteria" value={newRubric} onChange={e=>setNewRubric(e.target.value)} className="mt-3 w-full rounded-lg border border-border bg-background p-3 text-sm"/>
+   <button disabled={busy||!newSection||newTitle.trim().length<3} onClick={()=>perform(()=>createSyntheticAssignment({data:{sectionId:newSection,title:newTitle,instructions:newInstructions,dueAt:new Date(newDue).toISOString(),pointsPossible:newPoints,rubric:newRubric}}),"Published and assigned to active students.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Publish assignment</button>
+  </section>}
   <div className="mt-8 grid gap-3 sm:grid-cols-3">
    <div className="rounded-xl border border-border bg-card p-5"><p className="text-xs text-muted-foreground">Assigned</p><p className="mt-2 font-serif text-4xl">{assignments.length}</p></div>
    <div className="rounded-xl border border-border bg-card p-5"><p className="text-xs text-muted-foreground">Ready for feedback</p><p className="mt-2 font-serif text-4xl">{assignments.filter(x=>x.status==="submitted").length}</p></div>
@@ -46,6 +60,8 @@ function AssignmentsPage(){
     <p className="text-xs text-muted-foreground">{chosen.course}</p><h2 className="mt-2 font-serif text-3xl">{chosen.title}</h2>
     <p className="mt-3 text-sm leading-7 text-muted-foreground">{chosen.instructions??"Follow the course instructions."}</p>
     <p className="mt-3 text-xs text-muted-foreground">Due: {date(chosen.dueAt)}</p>
+    {typeof chosen.metadata?.rubric==="string"&&chosen.metadata.rubric&&<div className="mt-4 rounded-xl bg-stone-warm p-4 text-sm"><strong>Rubric:</strong> {chosen.metadata.rubric}</div>}
+    {chosen.attempts.length>1&&<div className="mt-4 rounded-xl border border-border p-4"><p className="text-xs font-bold">Revision history</p>{[...chosen.attempts].sort((a,b)=>b.attempt-a.attempt).map(attempt=><p key={attempt.attempt} className="mt-2 text-xs">Attempt {attempt.attempt} · {attempt.status}{attempt.score!==null?` · ${attempt.score} points`:""}{attempt.feedback?` · ${attempt.feedback}`:""}</p>)}</div>}
     {chosen.feedbackText&&<div className="mt-5 rounded-xl bg-stone-warm p-4"><p className="text-xs font-bold">Teacher feedback</p><p className="mt-2 text-sm">{chosen.feedbackText}</p></div>}
     {role==="student"&&(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")&&<div className="mt-6">
      <label className="text-sm font-semibold">Your response</label><textarea rows={7} maxLength={20000} value={draft} onChange={e=>setDraft(e.target.value)} className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm" placeholder="Write your response…"/>
