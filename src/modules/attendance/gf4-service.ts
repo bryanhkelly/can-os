@@ -12,6 +12,8 @@ import {
 } from "@/db/schema";
 import {
   assertCapability,
+  assertProgramScope,
+  assertSiteScope,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -30,6 +32,8 @@ export async function recordAttendance(
   },
 ): Promise<string> {
   assertCapability(context, "attendance.write");
+  assertProgramScope(context, input.programId);
+  assertSiteScope(context, input.siteId);
   if (!context.actorPersonId) throw new Error("Attendance actor is required");
 
   return db.transaction(async (tx) => {
@@ -253,6 +257,8 @@ export async function reviewAttendanceExcuse(
       .limit(1);
 
     if (!record) throw new Error("AttendanceExcuse not found");
+    assertProgramScope(context, record.programId);
+    assertSiteScope(context, record.siteId);
 
     if (
       record.excuseStatus === "approved" ||
