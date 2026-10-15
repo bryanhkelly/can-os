@@ -6,6 +6,7 @@ const links=[
  {to:"/operations",label:"Needs You"},
  {to:"/admissions",label:"Admissions"},
  {to:"/admissions/families",label:"Family Readiness"},
+ {to:"/admissions/capacity",label:"Capacity"},
  {to:"/teacher/missing-work",label:"Missing Work"},
  {to:"/calendar-export",label:"Calendar Export"},
  {to:"/readiness",label:"Launch"},
