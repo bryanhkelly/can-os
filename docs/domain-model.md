@@ -92,8 +92,26 @@ Instructional unit/activity in a template or section.
 ### Course
 Catalog-level course identity where needed.
 
+### SchoolYear
+Authoritative academic-year container for a defined Organization/Program scope.
+
+### Term
+Semester, trimester, quarter, or other academic period inside one SchoolYear.
+
+### GradingPeriod
+Grade-posting window inside exactly one Term.
+
+### GradeScale
+Versioned grading interpretation (letters, percentages, GPA points, pass/fail, etc.). Historical results retain the version used when finalized.
+
+### ScheduleTemplate
+Reusable bell/meeting pattern for onsite, hybrid, or live-online delivery.
+
+### AcademicCalendar
+Canonical instructional calendar including school days, holidays, closures, exceptions, and make-up days. Program overlays may specialize the calendar without creating competing shadow calendars.
+
 ### Section
-A delivered instance for a specific time period, roster, teachers, and Program.
+A delivered instance for a specific Term, roster, teachers, Program, and schedule context.
 
 ### Enrollment
 Keep kinds explicit:
@@ -109,6 +127,18 @@ Definition of work to be completed/evaluated.
 Student attempt against an Assessment.
 
 Lifecycle and timeliness are separate dimensions.
+
+### SectionGrade
+Computed/finalizable academic result for a Student in a Section/GradingPeriod. Finalization is explicit and corrections are append-only/audited.
+
+### ReportCard
+Published family/student view of finalized grades for a GradingPeriod or Term.
+
+### AcademicRecord
+Canonical durable set of finalized grades, credits, and academic standing facts used to generate transcripts.
+
+### TranscriptIssuance
+An issued transcript artifact with issuer, timestamp, version/correction lineage, and issuance metadata. The issuer is the explicit CreditIssuingOrganization, never assumed to be CAN.
 
 ### Standard / Skill / Objective
 Curriculum graph entities. Publisher content, CAN content, teacher extensions, and later AI-generated extensions map into the same graph.
@@ -168,6 +198,12 @@ Canonical shared calendar object.
 
 ### CommunicationThread
 Canonical human communication record with contextual links to students, sections, sites, programs, Actions, etc.
+
+### StudyGroup
+Academic peer group tied to a Section, subject, cohort, Program, or approved learning purpose.
+
+### StudyGroupMembership
+Explicit Person-to-StudyGroup relationship with role, eligibility, approval, moderation, and lifecycle state.
 
 ### Document
 Managed artifact with ownership, purpose, sensitivity, and retention metadata.
