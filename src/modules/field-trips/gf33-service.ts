@@ -216,7 +216,8 @@ export async function signFieldTripPermission(
   },
 ): Promise<string> {
   assertCapability(context, "field_trip.permission.sign");
-  if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  if (!actorPersonId) throw new Error("Guardian identity is required");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [record] = await tx
@@ -247,7 +248,7 @@ export async function signFieldTripPermission(
       .from(guardianRelationships)
       .where(
         and(
-          eq(guardianRelationships.guardianPersonId, context.actorPersonId),
+          eq(guardianRelationships.guardianPersonId, actorPersonId),
           eq(guardianRelationships.studentPersonId, student.personId),
         ),
       )
@@ -261,7 +262,7 @@ export async function signFieldTripPermission(
       .where(
         and(
           eq(householdMemberships.householdId, input.householdId),
-          eq(householdMemberships.personId, context.actorPersonId),
+          eq(householdMemberships.personId, actorPersonId),
         ),
       )
       .limit(1);
@@ -275,7 +276,7 @@ export async function signFieldTripPermission(
         subjectType: "field_trip_participant",
         subjectId: input.participantId,
         consentType: "field_trip_permission",
-        signerPersonId: context.actorPersonId,
+        signerPersonId: actorPersonId,
         documentId: input.documentId,
         version: input.version,
         signatureEvidence: input.signatureEvidence ?? {},
@@ -297,7 +298,7 @@ export async function signFieldTripPermission(
       eventType: EventTypes.FieldTripPermissionSigned,
       aggregateType: "field_trip_participant",
       aggregateId: input.participantId,
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       payload: {
         fieldTripId: record.fieldTripId,
         studentProfileId: record.studentProfileId,
@@ -382,7 +383,8 @@ export async function getFieldTripSafetyPacket(
   now = new Date(),
 ) {
   assertCapability(context, "field_trip.safety_packet.read");
-  if (!context.actorPersonId) throw new Error("Chaperone identity is required");
+  if (!actorPersonId) throw new Error("Chaperone identity is required");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [chaperone] = await tx
@@ -400,7 +402,7 @@ export async function getFieldTripSafetyPacket(
       .where(
         and(
           eq(fieldTripChaperones.fieldTripId, fieldTripId),
-          eq(fieldTripChaperones.personId, context.actorPersonId),
+          eq(fieldTripChaperones.personId, actorPersonId),
         ),
       )
       .limit(1);
@@ -415,7 +417,7 @@ export async function getFieldTripSafetyPacket(
       .where(
         and(
           eq(sensitiveAccessGrants.id, chaperone.accessGrantId),
-          eq(sensitiveAccessGrants.granteePersonId, context.actorPersonId),
+          eq(sensitiveAccessGrants.granteePersonId, actorPersonId),
           isNull(sensitiveAccessGrants.revokedAt),
           lt(sensitiveAccessGrants.validFrom, now),
           gt(sensitiveAccessGrants.validThrough, now),
@@ -491,7 +493,7 @@ export async function getFieldTripSafetyPacket(
     }
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       action: "field_trip.safety_packet.read",
       resourceType: "field_trip",
       resourceId: fieldTripId,
@@ -536,7 +538,8 @@ export async function recordFieldTripAttendance(
   },
 ): Promise<string> {
   assertCapability(context, "field_trip.attendance.write");
-  if (!context.actorPersonId) throw new Error("Attendance actor is required");
+  if (!actorPersonId) throw new Error("Attendance actor is required");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [existing] = await tx
@@ -564,7 +567,7 @@ export async function recordFieldTripAttendance(
         studentProfileId: input.studentProfileId,
         status: input.status,
         checkpoint: input.checkpoint,
-        recordedByPersonId: context.actorPersonId,
+        recordedByPersonId: actorPersonId,
         sourceKey: input.sourceKey,
         metadata: input.metadata ?? {},
       })
@@ -576,7 +579,7 @@ export async function recordFieldTripAttendance(
       eventType: EventTypes.FieldTripAttendanceRecorded,
       aggregateType: "field_trip_attendance",
       aggregateId: record.id,
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       payload: {
         fieldTripId: input.fieldTripId,
         studentProfileId: input.studentProfileId,
