@@ -7,3 +7,6 @@ export * from "./work";
 export * from "./insights";
 export * from "./communication";
 export * from "./attendance";
+export * from "./admissions";
+export * from "./documents";
+export * from "./journey-definitions";
