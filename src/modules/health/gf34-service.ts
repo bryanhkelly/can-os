@@ -90,7 +90,7 @@ export async function setHealthCompliance(
           dueOn: input.dueOn,
           expiresOn: input.expiresOn,
           documentId: input.documentId,
-          reviewedByPersonId: reviewedAt ? actorPersonId : null,
+          reviewedByPersonId: reviewedAt ? context.actorPersonId : null,
           reviewedAt,
           notes: input.notes,
           updatedAt: new Date(),
