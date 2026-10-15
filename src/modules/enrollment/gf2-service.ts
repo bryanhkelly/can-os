@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   applications,
+  admissionSeatPools,
   auditEvents,
   domainEvents,
   enrollments,
@@ -372,6 +373,17 @@ export async function activateEnrollmentFromApplication(
     assertProgramScope(context, application.programId);
     if (application.stage !== "accepted") {
       throw new Error("Application must be accepted before activation");
+    }
+    // Fail closed: the legacy activation path does not reserve seats or validate
+    // accepted offers atomically. Configured pools require the forthcoming
+    // transactional offer-to-enrollment service.
+    const [seatPool] = await tx.select({ id: admissionSeatPools.id })
+      .from(admissionSeatPools)
+      .where(and(eq(admissionSeatPools.programId, application.programId),
+        eq(admissionSeatPools.schoolYearId, schoolYearId)))
+      .limit(1);
+    if (seatPool) {
+      throw new Error("Enrollment activation requires the seat-pool transaction workflow");
     }
 
     const [programForYear] = await tx.select({
