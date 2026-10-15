@@ -9,24 +9,24 @@ import {
 type Task = { id: string; title: string; detail: string; source: string; due: string; state: "open" | "done"; kind: "work" | "consent" | "message" | "review" };
 type Event = { id: string; title: string; when: string; category: "school" | "activity" | "meeting"; status: "scheduled" | "moved" | "cancelled" };
 type FeedItem = { id: string; title: string; detail: string; audience: "site" | "network"; acknowledged: boolean };
-const seedTasks: Task[] = [
+export const seedTasks: Task[] = [
   { id:"essay", title:"Revise English essay", detail:"Teacher feedback and the next revision are ready",source:"English Literature",due:"Today",state:"open",kind:"work" },
   { id:"permission", title:"Sign field-trip permission",detail:"Science museum • guardian signature required",source:"Household",due:"Friday",state:"open",kind:"consent" },
   { id:"math", title:"Ask for math support",detail:"Get help with completing the square",source:"Algebra II",due:"Flexible",state:"open",kind:"work" },
   { id:"conference", title:"Review conference summary",detail:"Teacher notes and one follow-up",source:"Conferences",due:"This week",state:"done",kind:"review" },
 ];
-const seedEvents: Event[] = [
+export const seedEvents: Event[] = [
   {id:"algebra",title:"Algebra II",when:"Mon • 8:30 AM",category:"school",status:"scheduled"},
   {id:"english",title:"English literature · Live",when:"Tue • 10:00 AM",category:"school",status:"scheduled"},
   {id:"chapel",title:"Chapel & service reflection",when:"Wed • 12:15 PM",category:"school",status:"scheduled"},
   {id:"office",title:"Teacher office hours",when:"Thu • 2:00 PM",category:"meeting",status:"scheduled"},
   {id:"track",title:"Track practice",when:"Fri • 3:30 PM",category:"activity",status:"scheduled"},
 ];
-const seedFeed: FeedItem[] = [
+export const seedFeed: FeedItem[] = [
   {id:"f1",title:"Campus schedule update",detail:"Check your local Site calendar for any changes",audience:"site",acknowledged:false},
   {id:"f2",title:"CAN reading challenge",detail:"Share one favorite book this month",audience:"network",acknowledged:false},
 ];
-const seedMilestones = [
+export const seedMilestones = [
   {id:"first",title:"First course submitted",detail:"A great start to the term"},
   {id:"service",title:"Service reflection completed",detail:"Making an impact in your community"},
   {id:"revision",title:"Made a revision",detail:"Growth through practice"},
