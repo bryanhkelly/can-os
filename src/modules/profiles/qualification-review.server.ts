@@ -43,7 +43,7 @@ export async function reviewQualification(
  return db.transaction(async tx=>{
    // Serialize reviews against a claim by locking the parent row.
    await tx.execute(sql`SELECT id FROM qualification_claims WHERE id = ${input.claimId}::uuid FOR UPDATE`);
-   const [latest]=await tx.select().from(qualificationVerificationEvents).where(eq(qualificationVerificationEvents.claimId,input.claimId)).orderBy(desc(qualificationVerificationEvents.occurredAt),desc(qualificationVerificationEvents.id)).limit(1);
+   const [latest]=await tx.select().from(qualificationVerificationEvents).where(eq(qualificationVerificationEvents.claimId,input.claimId)).orderBy(desc(qualificationVerificationEvents.sequence)).limit(1);
    const current:VerificationStatus=latest?.decision==="approve"?"verified":latest?.decision==="reject"?"rejected":latest?.decision==="revoke"?"revoked":latest?.decision==="submit"?"pending":"unverified";
    const evidenceId=input.evidenceDocumentId??latest?.evidenceDocumentId??null;
    if(evidenceId){
@@ -52,7 +52,7 @@ export async function reviewQualification(
    }
    const decision=decideCredentialReview({status:current,subjectPersonId:claim.personId,evidenceDocumentId:evidenceId,expiry:claim.expiresAt},input.decision,context.actorPersonId!,new Date(),input.reason);
    const [event]=await tx.insert(qualificationVerificationEvents).values({
-     claimId:claim.id,decision:input.decision,actorPersonId:context.actorPersonId!,
+     claimId:claim.id,sequence:(latest?.sequence??0)+1,decision:input.decision,actorPersonId:context.actorPersonId!,
      evidenceDocumentId:evidenceId,reason:input.reason??null,
    }).returning({id:qualificationVerificationEvents.id});
    await tx.insert(domainEvents).values({eventType:"QualificationVerificationDecided",aggregateType:"QualificationClaim",aggregateId:claim.id,actorPersonId:context.actorPersonId!,payload:{verificationEventId:event.id,decision:input.decision}});
