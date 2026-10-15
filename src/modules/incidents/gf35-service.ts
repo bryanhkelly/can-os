@@ -46,7 +46,8 @@ export async function fileIncident(
   assertCapability(context, "incident.file");
   assertSiteScope(context, input.siteId);
   assertProgramScope(context, input.programId);
-  if (!context.actorPersonId) throw new Error("Incident reporter is required");
+  if (!actorPersonId) throw new Error("Incident reporter is required");
+  const actorPersonId = actorPersonId;
 
   return db.transaction(async (tx) => {
     const [incident] = await tx
@@ -57,7 +58,7 @@ export async function fileIncident(
         severity: input.severity,
         status: "filed",
         occurredAt: input.occurredAt,
-        reporterPersonId: context.actorPersonId,
+        reporterPersonId: actorPersonId,
         siteId: input.siteId,
         programId: input.programId,
         locationText: input.locationText,
@@ -85,7 +86,7 @@ export async function fileIncident(
       eventType: EventTypes.IncidentFiled,
       aggregateType: "incident",
       aggregateId: incident.id,
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       payload: {
         incidentNumber: input.incidentNumber,
         type: input.type,
@@ -96,7 +97,7 @@ export async function fileIncident(
     });
 
     await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+      actorPersonId: actorPersonId,
       action: "incident.file",
       resourceType: "incident",
       resourceId: incident.id,
