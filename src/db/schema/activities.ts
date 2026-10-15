@@ -14,7 +14,7 @@ import { people, studentProfiles } from "./identity";
 import { programs, sites } from "./organizations";
 import { calendarEvents } from "./calendar";
 import { documents } from "./documents";
-import { financialObligations } from "./governance";
+import { consentRecords, financialObligations } from "./governance";
 
 export const activities = pgTable(
   "activities",
@@ -72,6 +72,9 @@ export const activityRegistrations = pgTable(
       .notNull()
       .references(() => studentProfiles.id, { onDelete: "restrict" }),
     status: text("status").default("pending").notNull(),
+    consentRecordId: uuid("consent_record_id").references(() => consentRecords.id, {
+      onDelete: "restrict",
+    }),
     physicalDocumentId: uuid("physical_document_id").references(() => documents.id, {
       onDelete: "restrict",
     }),
