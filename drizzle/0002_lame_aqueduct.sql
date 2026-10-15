@@ -184,3 +184,11 @@ CREATE INDEX "qualification_verification_claim_time_idx" ON "qualification_verif
 CREATE UNIQUE INDEX "school_configuration_program_version_uq" ON "school_configuration_versions" USING btree ("program_id","version");--> statement-breakpoint
 CREATE INDEX "school_configuration_status_idx" ON "school_configuration_versions" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "staffing_eligibility_assignment_idx" ON "staffing_eligibility_evaluations" USING btree ("role_assignment_id","evaluated_at");
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION forbid_qualification_verification_event_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'qualification verification history is immutable' USING ERRCODE = '55000';
+END;
+$$;
+--> statement-breakpoint
+CREATE TRIGGER qualification_verification_events_immutable BEFORE UPDATE OR DELETE ON qualification_verification_events FOR EACH ROW EXECUTE FUNCTION forbid_qualification_verification_event_mutation();
