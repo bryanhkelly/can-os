@@ -18,3 +18,4 @@ export * from "./health";
 export * from "./field-trips";
 export * from "./activities";
 export * from "./conferences";
+export * from "./profiles-compliance";
