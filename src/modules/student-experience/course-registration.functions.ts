@@ -1,3 +1,4 @@
+import { assertSyntheticMutation } from "./demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, inArray } from "drizzle-orm";
 
@@ -55,6 +56,7 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
 export const requestCourseChange = createServerFn({ method:"POST" })
   .validator((value:{sectionId:string;operation:"add"|"drop"|"withdraw"})=>value)
   .handler(async({data})=>{
+  assertSyntheticMutation("student");
     if (!process.env.DATABASE_URL) throw new Error("Neon not configured");
     const [{ db },s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
@@ -88,6 +90,7 @@ export const requestCourseChange = createServerFn({ method:"POST" })
 export const decideCourseChange = createServerFn({method:"POST"})
   .validator((value:{requestId:string;approve:boolean})=>value)
   .handler(async({data})=>{
+  assertSyntheticMutation("registrar");
     if(!process.env.DATABASE_URL)throw new Error("Neon not configured");
     const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
