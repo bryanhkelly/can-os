@@ -50,6 +50,8 @@ export async function issueSyntheticAdmissionOffer(context:CommandContext,input:
   const [retry]=await tx.select().from(admissionOffers).where(eq(admissionOffers.idempotencyKey,input.idempotencyKey)).limit(1);
   if(retry){if(retry.applicationId!==app.id||retry.schoolYearId!==input.schoolYearId)throw new Error("Idempotency key reused across applications");if(retry.status!=="issued"&&retry.status!=="accepted")throw new Error("Existing offer is no longer actionable");return retry.id;}
   if(!["application","eligibility"].includes(app.stage))throw new Error("Application stage is not eligible");
+  const existingOffers=await tx.select({id:admissionOffers.id,status:admissionOffers.status,expiresAt:admissionOffers.expiresAt}).from(admissionOffers).where(and(eq(admissionOffers.applicationId,app.id),eq(admissionOffers.schoolYearId,input.schoolYearId),inArray(admissionOffers.status,["issued","accepted"])));
+  if(existingOffers.some(o=>o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now()))))throw new Error("An active offer already exists for this application and school year");
   await ready(tx,app.id);
   const held=await occupancy(tx,app.programId,input.schoolYearId,new Date());
   if(held>=pool.capacity)throw new Error("Seat pool is full");
