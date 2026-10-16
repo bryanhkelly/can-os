@@ -9,6 +9,7 @@ async function assertDemoTeacher(){
  const context=await getCommandContext(getRequest());
  if(context.role!=="teacher"||context.actorPersonId!==TEACHER)throw new AuthorizationError("demo teacher identity required");
  assertCapability(context,"assignments:grade");
+ if(!context.scope.siteIds?.includes(SITE))throw new AuthorizationError("demo teacher site membership");
  assertSiteScope(context,SITE);
  return context;
 }
