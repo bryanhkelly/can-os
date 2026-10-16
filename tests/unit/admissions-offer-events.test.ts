@@ -61,12 +61,19 @@ beforeEach(() => {
 
 describe("transactional admissions events", () => {
   it("emits offer issuance alongside audit", async () => {
-    selectRows([application], [pool], [year], [program], [], [journey], [], [], []);
+    selectRows([application], [pool], [year], [program], [], [], [journey], [], [], []);
     await expect(issueSyntheticAdmissionOffer(context, input)).resolves.toBe("created");
     expect(values).toHaveBeenCalledWith(expect.objectContaining({
       eventType: "AdmissionOfferIssued", aggregateId: "created",
     }));
     expect(values).toHaveBeenCalledWith(expect.objectContaining({ action: "admissions.offer.issue" }));
+  });
+
+  it("rejects a second live offer with a different idempotency key", async () => {
+    selectRows([application], [pool], [year], [program], [],
+      [{id:"existing",status:"issued",expiresAt:new Date("2099-01-01T00:00:00Z")}]);
+    await expect(issueSyntheticAdmissionOffer(context, input)).rejects.toThrow("An active offer already exists");
+    expect(values).not.toHaveBeenCalled();
   });
 
   it("rejects non-synthetic applications before issuing an offer", async () => {
@@ -97,21 +104,21 @@ describe("transactional admissions events", () => {
   });
 
   it("refuses issuance when the seat pool is full", async () => {
-    selectRows([application], [{ capacity: 1 }], [year], [program], [], [journey], [],
+    selectRows([application], [{ capacity: 1 }], [year], [program], [], [], [journey], [],
       [{ studentId: "already-enrolled" }], []);
     await expect(issueSyntheticAdmissionOffer(context, input)).rejects.toThrow("Seat pool is full");
     expect(values).not.toHaveBeenCalled();
   });
 
   it("refuses issuance with an outstanding blocking requirement", async () => {
-    selectRows([application], [pool], [year], [program], [], [journey],
+    selectRows([application], [pool], [year], [program], [], [], [journey],
       [{ status: "needs_you" }]);
     await expect(issueSyntheticAdmissionOffer(context, input)).rejects.toThrow("Blocking requirements remain");
     expect(values).not.toHaveBeenCalled();
   });
 
   it("refuses issuance before the enrollment journey is ready", async () => {
-    selectRows([application], [pool], [year], [program], [], [{ ...journey, status: "in_progress" }]);
+    selectRows([application], [pool], [year], [program], [], [], [{ ...journey, status: "in_progress" }]);
     await expect(issueSyntheticAdmissionOffer(context, input)).rejects.toThrow("Enrollment Journey must be ready");
     expect(values).not.toHaveBeenCalled();
   });
