@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getSyntheticAdmissionsDashboard} from "@/modules/enrollment/admissions-dashboard.functions";
-import {getSyntheticAdmissionOfferOptions,issueSyntheticOfferFromDemo,respondSyntheticOfferFromDemo,activateSyntheticOfferFromDemo} from "@/modules/enrollment/admissions-offer-demo.functions";
+import {getSyntheticAdmissionOfferOptions,issueSyntheticOfferFromDemo,activateSyntheticOfferFromDemo} from "@/modules/enrollment/admissions-offer-demo.functions";
 import {admissionsPipelineSummary} from "@/domain/admissions-pipeline";
 import {selectActionableOffer,canIssueAnotherOffer} from "@/domain/admissions-offer-selection";
 export const Route=createFileRoute("/admissions/")({loader:async()=>({rows:await getSyntheticAdmissionsDashboard(),options:await getSyntheticAdmissionOfferOptions()}),component:Admissions});
@@ -17,7 +17,7 @@ function Admissions(){
  return <main className="mx-auto max-w-6xl px-5 py-10">
  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Synthetic admissions</p>
  <h1 className="mt-2 font-serif text-5xl">Admissions command center</h1>
- <p className="mt-3 max-w-3xl text-sm text-muted-foreground">Run the complete synthetic offer sequence: registrar issues, guardian responds, and registrar activates enrollment. Every action uses the existing transactional Neon services.</p>
+ <p className="mt-3 max-w-3xl text-sm text-muted-foreground">Registrar workspace: issue offers and activate accepted enrollments. Guardians respond from their own authenticated offer inbox.</p>
  {error&&<p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
  {notice&&<p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
  <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -38,7 +38,7 @@ function Admissions(){
  {activated&&<p className="mt-3 text-sm font-semibold">Enrollment active · Student is enrolled in this school year</p>}
  <div className="mt-4 flex flex-wrap gap-2">
  {years.filter(year=>canIssueAnotherOffer(x.stage,x.outstandingRequirements,x.offers,year.id)).map(year=><button key={year.id} disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>issueSyntheticOfferFromDemo({data:{applicationId:x.id,schoolYearId:year.id}}))}>Registrar: Issue offer · {year.name}</button>)}
- {latest?.status==="issued"&&<><button disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>respondSyntheticOfferFromDemo({data:{offerId:latest.id,decision:"accept"}}))}>Guardian: Accept</button><button disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>respondSyntheticOfferFromDemo({data:{offerId:latest.id,decision:"decline"}}))}>Guardian: Decline</button></>}
+ {latest?.status==="issued"&&<p className="text-xs text-muted-foreground">Waiting for guardian response in the guardian enrollment-offers workspace.</p>}
  {latest?.status==="accepted"&&!activated&&<button disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>activateSyntheticOfferFromDemo({data:{offerId:latest.id}}))}>Registrar: Activate enrollment</button>}
  </div>
  <Link to="/admissions/families" className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
