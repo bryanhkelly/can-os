@@ -1,0 +1,31 @@
+name: One-time identity migration sync
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/identity-migration-sync.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Generate Drizzle SQL and snapshot
+        run: npm run db:generate
+      - name: Commit deterministic generated files
+        run: |
+          git add drizzle/
+          if ! git diff --cached --quiet; then
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "chore(db): commit generated identity migration and snapshot"
+            git push origin HEAD:main
+          fi
