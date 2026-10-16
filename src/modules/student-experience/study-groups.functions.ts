@@ -1,23 +1,32 @@
 import {createServerFn} from "@tanstack/react-start";
+import {getRequest} from "@tanstack/react-start/server";
+import {getCommandContext} from "@/modules/identity/command-context.server";
+import {AuthorizationError} from "@/domain/command-context";
 import {and,eq,desc,sql} from "drizzle-orm";
 import {assertSyntheticMutation,isSyntheticAccessEnabled} from "./demo-write-gate";
 import {canAccessGroup,validateGroupInput,validateGroupPost,validateSession} from "@/domain/study-groups";
 const STUDENT="f1000000-0000-4000-8000-000000000005";
 const TEACHER="f1000000-0000-4000-8000-000000000006";
 const SITE="f1000000-0000-4000-8000-000000000003";
+async function groupActor(role:"student"|"teacher"){
+ const actor=await getCommandContext(getRequest());
+ if(actor.role!==role||!actor.actorPersonId||!actor.scope.siteIds?.includes(SITE))throw new AuthorizationError("study group "+role+" site access");
+ return actor;
+}
 async function context(){const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);return {db,s};}
 export const getStudyGroupAvailability=createServerFn({method:"GET"}).handler(async()=>({enabled:isSyntheticAccessEnabled()}));
 export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
  assertSyntheticMutation("student");
+ const actor=await groupActor("student");
  const {db,s}=await context();
  const rows=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,capacity:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,facilitator:s.studyGroups.facilitatorPersonId,status:s.studyGroups.status,membership:s.studyGroupMemberships.status}).from(s.studyGroups)
- .leftJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroupMemberships.personId,STUDENT)))
+ .leftJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroupMemberships.personId,actor.actorPersonId!)))
  .where(and(eq(s.studyGroups.status,"active"),eq(s.studyGroups.siteId,SITE))).orderBy(desc(s.studyGroups.createdAt)).limit(100);
  return rows;
 });
 export const createStudyGroup=createServerFn({method:"POST"}).validator((x:{title:string;description:string;kind:"course"|"interest";maxMembers:number})=>x).handler(async({data})=>{
- assertSyntheticMutation("teacher");const valid=validateGroupInput(data);const {db,s}=await context();
- const [group]=await db.insert(s.studyGroups).values({...valid,siteId:SITE,facilitatorPersonId:TEACHER,requiresApproval:true,visibility:"site"}).returning({id:s.studyGroups.id});
+ assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const valid=validateGroupInput(data);const {db,s}=await context();
+ const [group]=await db.insert(s.studyGroups).values({...valid,siteId:SITE,facilitatorPersonId:actor.actorPersonId!,requiresApproval:true,visibility:"site"}).returning({id:s.studyGroups.id});
  if(!group)throw new Error('Group creation failed');return {id:group.id};
 });
 export const requestStudyGroupMembership=createServerFn({method:"POST"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
