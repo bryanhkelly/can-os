@@ -10,6 +10,7 @@ export const getSyntheticFixtureHealth=createServerFn({method:"GET"}).handler(as
   {key:"journeys",name:"Synthetic enrollment journeys",route:"/admissions/families",minimum:1},
   {key:"classes",name:"Synthetic academic sections",route:"/student/courses",minimum:1},
   {key:"groups",name:"Synthetic study groups",route:"/student/study-groups",minimum:1},
+  {key:"discussions",name:"Synthetic course discussions",route:"/student/discussions",minimum:1},
   {key:"actions",name:"Synthetic action items",route:"/operations",minimum:1},
   {key:"notices",name:"Synthetic notifications",route:"/student/notifications",minimum:1}
  ] as const;
@@ -19,17 +20,18 @@ export const getSyntheticFixtureHealth=createServerFn({method:"GET"}).handler(as
  const total=async <T extends {n:number}>(query:PromiseLike<T[]>)=>(await query)[0]?.n??0;
  const syntheticApps=sql`${s.applications.metadata}->>'synthetic' = 'true'`;
  const syntheticProgram=sql`${s.programs.metadata}->>'synthetic' = 'true'`;
- const [students,apps,pools,journeys,sections,groups,actions,notifications]=await Promise.all([
+ const [students,apps,pools,journeys,sections,groups,discussions,actions,notifications]=await Promise.all([
   total(db.select({n:sql<number>`count(distinct ${s.studentProfiles.id})::int`}).from(s.studentProfiles).innerJoin(s.applications,eq(s.applications.studentProfileId,s.studentProfiles.id)).where(syntheticApps)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.applications).where(syntheticApps)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.admissionSeatPools).innerJoin(s.programs,eq(s.programs.id,s.admissionSeatPools.programId)).where(syntheticProgram)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.journeys).innerJoin(s.applications,eq(s.applications.id,s.journeys.participantId)).where(sql`${s.journeys.participantType}='application' and ${syntheticApps}`)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.sections).innerJoin(s.programs,eq(s.programs.id,s.sections.programId)).where(syntheticProgram)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.studyGroups).innerJoin(s.programs,eq(s.programs.id,s.studyGroups.programId)).where(syntheticProgram)),
+  total(db.select({n:sql<number>`count(*)::int`}).from(s.communicationThreads).where(sql`${s.communicationThreads.contextType}='section' and ${s.communicationThreads.metadata}->>'synthetic'='true' and ${s.communicationThreads.metadata}->>'kind'='course_discussion'`)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.actions).innerJoin(s.programs,eq(s.programs.id,s.actions.programId)).where(syntheticProgram)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.notifications).innerJoin(s.people,eq(s.people.id,s.notifications.recipientPersonId)).where(sql`${s.people.metadata}->>'synthetic'='true'`))
  ]);
- const counts=[students,apps,pools,journeys,sections,groups,actions,notifications];
+ const counts=[students,apps,pools,journeys,sections,groups,discussions,actions,notifications];
  const checks=categories.map((category,i)=>({...category,count:counts[i]??0,ok:(counts[i]??0)>=category.minimum}));
  const applicationRows=await db.select({id:s.applications.id,stage:s.applications.stage,studentProfileId:s.applications.studentProfileId,programId:s.applications.programId}).from(s.applications).where(syntheticApps);
  const ids=applicationRows.map(a=>a.id);
