@@ -1,11 +1,11 @@
 import {createServerFn} from "@tanstack/react-start";
-import {eq,inArray,and} from "drizzle-orm";
+import {eq,inArray,and,sql} from "drizzle-orm";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {enrollmentReadiness} from "@/domain/enrollment-readiness";
 export const getSyntheticFamilyReadiness=createServerFn({method:"GET"}).handler(async()=>{
  if(!process.env.DATABASE_URL)return [];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,metadata:s.applications.metadata,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).limit(150);
+ const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,metadata:s.applications.metadata,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).where(sql`${s.applications.metadata}->>'synthetic' = 'true'`).limit(150);
  const synthetic=apps.filter(x=>x.metadata.synthetic===true);
  if(!synthetic.length)return [];
  const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId,status:s.journeys.status}).from(s.journeys).where(inArray(s.journeys.participantId,synthetic.map(x=>x.id)));

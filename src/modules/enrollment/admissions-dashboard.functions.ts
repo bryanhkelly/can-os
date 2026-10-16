@@ -1,11 +1,11 @@
 import {createServerFn} from "@tanstack/react-start";
-import {eq,inArray} from "drizzle-orm";
+import {eq,inArray,sql} from "drizzle-orm";
 import type {AdmissionsPipelineItem} from "@/domain/admissions-pipeline";
 /** This deliberately surfaces non-PII records explicitly marked synthetic. */
 export const getSyntheticAdmissionsDashboard=createServerFn({method:"GET"}).handler(async()=>{
  if(!process.env.DATABASE_URL)return [] as (AdmissionsPipelineItem & {offers:{id:string;status:string;expiresAt:string|null;schoolYearId:string}[];enrollments:{schoolYearId:string;status:string}[]})[];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const records=await db.select({id:s.applications.id,stage:s.applications.stage,metadata:s.applications.metadata,submittedAt:s.applications.submittedAt,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.applications.programId,s.programs.id)).limit(150);
+ const records=await db.select({id:s.applications.id,stage:s.applications.stage,metadata:s.applications.metadata,submittedAt:s.applications.submittedAt,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.applications.programId,s.programs.id)).where(sql`${s.applications.metadata}->>'synthetic' = 'true'`).limit(150);
  const synthetic=records.filter(r=>r.metadata.synthetic===true);
  if(!synthetic.length)return [];
  const ids=synthetic.map(x=>x.id);

@@ -1,5 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
-import {and,eq} from "drizzle-orm";
+import {and,eq,sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,admissionOffers,admissionSeatPools,guardianRelationships,studentProfiles,schoolYears} from "@/db/schema";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
@@ -13,7 +13,8 @@ const context=(actorPersonId:string,programId:string,capability:string):CommandC
 });
 
 export const getSyntheticAdmissionOfferOptions=createServerFn({method:"GET"}).handler(async()=>{
- const apps=await db.select({id:applications.id,programId:applications.programId,metadata:applications.metadata}).from(applications).limit(150);
+ if(!process.env.DATABASE_URL)return [];
+ const apps=await db.select({id:applications.id,programId:applications.programId,metadata:applications.metadata}).from(applications).where(sql`${applications.metadata}->>'synthetic' = 'true'`).limit(150);
  const synthetic=apps.filter(a=>a.metadata.synthetic===true);
  if(!synthetic.length)return [];
  const pools=await db.select({programId:admissionSeatPools.programId,schoolYearId:admissionSeatPools.schoolYearId,capacity:admissionSeatPools.capacity,name:schoolYears.name}).from(admissionSeatPools).innerJoin(schoolYears,eq(schoolYears.id,admissionSeatPools.schoolYearId));
