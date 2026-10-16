@@ -42,6 +42,12 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.requirementId}))`);
    const [existing]=await tx.select({id:documents.id}).from(documents).where(and(eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageKey,data.key))).limit(1);
    if(existing)return {documentId:existing.id,created:false};
+   const [journey]=await tx.select({id:journeys.id,status:journeys.status}).from(journeys)
+    .where(and(eq(journeys.participantType,"application"),eq(journeys.participantId,data.applicationId))).for("update").limit(1);
+   if(!journey||["active","complete","cancelled"].includes(journey.status))throw new Error("Enrollment journey is closed");
+   const [requirement]=await tx.select({id:journeyRequirements.id,status:journeyRequirements.status,evidence:journeyRequirements.evidence}).from(journeyRequirements)
+    .where(and(eq(journeyRequirements.id,data.requirementId),eq(journeyRequirements.journeyId,journey.id))).for("update").limit(1);
+   if(!requirement)throw new Error("Requirement is outside the application");
    const versions=await tx.select({id:documents.id,metadata:documents.metadata}).from(documents)
     .where(and(eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageProvider,"cloudflare_r2")))
     .orderBy(desc(documents.createdAt)).for("update");
@@ -53,6 +59,13 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
    }
    const [document]=await tx.insert(documents).values({subjectType:"journey_requirement",subjectId:data.requirementId,category:"enrollment",fileName:data.fileName,storageProvider:"cloudflare_r2",storageKey:data.key,mimeType:data.mimeType,sensitivityTier:"restricted",uploadedByPersonId:REGISTRAR,metadata:{synthetic:true,applicationId:data.applicationId,size:data.size,reviewStatus:"received",version,isCurrent:true}}).returning({id:documents.id});
    if(!document)throw new Error("Could not record document");
+   const now=new Date();
+   await tx.update(journeyRequirements).set({status:"needs_you",completedAt:null,updatedAt:now,
+    evidence:[...requirement.evidence,{kind:"document_review",status:"received",documentId:document.id,
+     text:"New file uploaded; review required.",reviewedAt:now.toISOString(),synthetic:true}]}).where(eq(journeyRequirements.id,requirement.id));
+   await tx.update(journeys).set({status:"in_progress",completedAt:null,updatedAt:now}).where(eq(journeys.id,journey.id));
+   await tx.insert(auditEvents).values({actorPersonId:REGISTRAR,action:"synthetic.enrollment.document.resubmitted",resourceType:"journey_requirement",resourceId:requirement.id,
+    before:{status:requirement.status},after:{status:"needs_you",documentId:document.id,version},context:{synthetic:true,applicationId:data.applicationId}});
    await tx.insert(auditEvents).values({actorPersonId:REGISTRAR,action:"synthetic.enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{synthetic:true}});
    return {documentId:document.id,created:true};
   });
