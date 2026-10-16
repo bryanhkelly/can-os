@@ -44,6 +44,14 @@ integration("synthetic admissions offer concurrency",()=>{
   })).rejects.toThrow("Guardian is not a member of the supplied Household");
   const householdApplications=await db.select().from(s.applications).where(eq(s.applications.householdId,sharedHouseholdId!));
   expect(householdApplications).toHaveLength(2);
+  // Previously submitted idempotency keys must not bypass a revoked program grant.
+  const revokedFamily={...family,scope:{programIds:[]}};
+  await expect(startFamilyApplication(revokedFamily,{
+   programId:program.id,householdId:sharedHouseholdId,
+   idempotencyKey:`offer-family-${suffix}-0`,journeyDefinitionKey:journeyKey,
+   student:{legalFirstName:"Synthetic0",legalLastName:"Student",gradeLevel:"9"}
+  })).rejects.toThrow("program scope");
+  expect(await db.select().from(s.applications).where(eq(s.applications.householdId,sharedHouseholdId!))).toHaveLength(2);
   const expiry=new Date(Date.now()+7*24*60*60*1000);
   // First verify that a declined offer actually releases the sole seat for a sibling.
   const wrongProgramRegistrar={actorPersonId:registrarPerson.id,capabilities:new Set(["enrollment.decide"]),scope:{programIds:[crypto.randomUUID()]}};
