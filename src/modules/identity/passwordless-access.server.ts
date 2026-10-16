@@ -39,7 +39,7 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
   accountId:account.id,tokenHash:hash,expiresAt:new Date(now.getTime()+CHALLENGE_LIFETIME_MS),
  }).returning({id:accessChallenges.id});
  try {
-  await sender({to:email,accessUrl:accessOrigin+"/access/verify?token="+encodeURIComponent(token)});
+  await sender({to:email,accessUrl:accessOrigin+"/access/verify#token="+encodeURIComponent(token)});
  }catch(error){
   // Preserve the issued challenge and cooldown on delivery failure; a rapid retry
   // must not turn a mail-provider outage into unbounded request generation.
