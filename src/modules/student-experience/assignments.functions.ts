@@ -147,21 +147,23 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
   if(!Number.isFinite(data.score)||data.score<0||data.score>100)throw new Error("Score must be from 0 to 100");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForSubmission(data.submissionId);
-  const [record]=await db.select({id:s.submissions.id,points:s.assessments.pointsPossible,studentProfileId:s.submissions.studentProfileId})
+  return db.transaction(async tx=>{
+  const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,studentProfileId:s.submissions.studentProfileId})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .where(and(eq(s.submissions.id,data.submissionId),eq(s.sections.siteId,SITE),eq(s.submissions.status,"submitted"))).limit(1);
   if(!record)throw new Error("Submitted work not found");
-  const [student]=await db.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
+  const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
   if(!student)throw new AuthorizationError("student profile");
   const studentPersonId=student.personId;
   const points=Number(record.points??100);
-  const [updated]=await db.update(s.submissions).set({status:"graded",score:String(data.score*points/100),feedback:{comment:data.comment.slice(0,4000)},graderPersonId:context.actorPersonId,gradedAt:new Date(),updatedAt:new Date()})
+  const [updated]=await tx.update(s.submissions).set({status:"graded",score:String(data.score*points/100),feedback:{comment:data.comment.slice(0,4000)},graderPersonId:context.actorPersonId,gradedAt:new Date(),updatedAt:new Date()})
   .where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"submitted"))).returning({id:s.submissions.id});
   if(!updated)throw new Error("Submission already graded");
-  await db.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.grade",resourceType:"submission",resourceId:updated.id,before:{status:"submitted"},after:{status:"graded",score:data.score},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
-  await db.insert(s.notifications).values({recipientPersonId:studentPersonId,type:"assignment_feedback",status:"unread",title:"New feedback on your work",body:data.comment.slice(0,500)||"Your teacher posted a grade.",resourceType:"submission",resourceId:updated.id});
+  await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.grade",resourceType:"submission",resourceId:updated.id,before:{status:"submitted"},after:{status:"graded",score:data.score},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
+  await tx.insert(s.notifications).values({recipientPersonId:studentPersonId,type:"assignment_feedback",status:"unread",title:"New feedback on your work",body:data.comment.slice(0,500)||"Your teacher posted a grade.",resourceType:"submission",resourceId:updated.id});
   return {submissionId:updated.id};
+  });
  });
 
 export const returnSyntheticAssignment=createServerFn({method:"POST"})
@@ -172,11 +174,13 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
   assertSiteScope(context,SITE);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForSubmission(data.submissionId);
-  const [updated]=await db.update(s.submissions).set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
+  return db.transaction(async tx=>{
+  const [updated]=await tx.update(s.submissions).set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
    .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.status,"graded"))).returning({id:s.submissions.id});
   if(!updated)throw new Error("Graded synthetic submission not found");
-  await db.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.return",resourceType:"submission",resourceId:updated.id,before:{status:"graded"},after:{status:"returned"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
+  await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.return",resourceType:"submission",resourceId:updated.id,before:{status:"graded"},after:{status:"returned"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
   return {submissionId:updated.id};
+  });
  });
 
 /** Create and publish a synthetic class assignment using the existing model. */
