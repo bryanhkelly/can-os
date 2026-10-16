@@ -2,6 +2,16 @@
 -- Idempotent; never modifies already changed test records.
 INSERT INTO households (id,display_name) VALUES
 ('f9000000-0000-4000-8000-000000000001','GF2 Synthetic Test Family') ON CONFLICT (id) DO NOTHING;
+-- Preserve one canonical household across guardian and student workspaces.
+INSERT INTO household_memberships
+(id,household_id,person_id,relationship_label,is_primary_contact) VALUES
+('f9000000-0000-4000-8000-000000000007',
+'f9000000-0000-4000-8000-000000000001',
+'f3000000-0000-4000-8000-000000000007','Guardian',true),
+('f9000000-0000-4000-8000-000000000008',
+'f9000000-0000-4000-8000-000000000001',
+'f1000000-0000-4000-8000-000000000005','Student',false)
+ON CONFLICT (household_id,person_id) DO NOTHING;
 INSERT INTO journey_definitions (id,key,version,audience,title) VALUES
 ('f9000000-0000-4000-8000-000000000002','gf2-synthetic-enrollment',1,'family','GF2 Test Enrollment') ON CONFLICT (id) DO NOTHING;
 INSERT INTO applications (id,household_id,student_profile_id,program_id,stage,idempotency_key,submitted_by_person_id,submitted_at,metadata) VALUES
