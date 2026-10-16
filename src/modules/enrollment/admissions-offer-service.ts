@@ -38,6 +38,28 @@ async function ready(tx:Transaction,applicationId:string){
  if(blocks.some(b=>b.status!=="complete"))throw new Error("Blocking requirements remain");
  return journey;
 }
+/** Expire elapsed synthetic offers while holding the same pool lock used for issuance. */
+async function expireElapsedOffers(tx:Transaction,context:CommandContext,programId:string,schoolYearId:string,now:Date){
+ const pending=await tx.select({id:admissionOffers.id,expiresAt:admissionOffers.expiresAt,applicationId:admissionOffers.applicationId,metadata:applications.metadata}).from(admissionOffers)
+  .innerJoin(applications,eq(applications.id,admissionOffers.applicationId))
+  .where(and(eq(admissionOffers.programId,programId),eq(admissionOffers.schoolYearId,schoolYearId),eq(admissionOffers.status,"issued")));
+ let count=0;
+ for(const offer of pending){
+  if(offer.metadata.synthetic!==true||!offer.expiresAt||offer.expiresAt.getTime()>now.getTime())continue;
+  await tx.update(admissionOffers).set({status:"expired",updatedAt:now}).where(and(eq(admissionOffers.id,offer.id),eq(admissionOffers.status,"issued")));
+  await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"admissions.offer.expire",resourceType:"admission_offer",resourceId:offer.id,scope:{programId},before:{status:"issued"},after:{status:"expired"},context:{requestId:context.requestId??null}});
+  count++;
+ }
+ return count;
+}
+export async function expireSyntheticAdmissionOffers(context:CommandContext,input:{programId:string;schoolYearId:string}){
+ guarded("registrar");assertCapability(context,"enrollment.decide");assertProgramScope(context,input.programId);
+ if(!context.actorPersonId)throw new Error("Registrar identity required");
+ return db.transaction(async tx=>{
+  await lockPool(tx,input.programId,input.schoolYearId);
+  return expireElapsedOffers(tx,context,input.programId,input.schoolYearId,new Date());
+ });
+}
 export async function issueSyntheticAdmissionOffer(context:CommandContext,input:{applicationId:string;schoolYearId:string;idempotencyKey:string;expiresAt:Date}){
  guarded("registrar");assertCapability(context,"enrollment.decide");
  if(!context.actorPersonId)throw new Error("Staff identity required");
@@ -47,6 +69,7 @@ export async function issueSyntheticAdmissionOffer(context:CommandContext,input:
   if(!app||app.metadata.synthetic!==true)throw new Error("Synthetic application not found");
   assertProgramScope(context,app.programId);
   const {pool}=await lockPool(tx,app.programId,input.schoolYearId);
+  await expireElapsedOffers(tx,context,app.programId,input.schoolYearId,new Date());
   const [retry]=await tx.select().from(admissionOffers).where(eq(admissionOffers.idempotencyKey,input.idempotencyKey)).limit(1);
   if(retry){if(retry.applicationId!==app.id||retry.schoolYearId!==input.schoolYearId)throw new Error("Idempotency key reused across applications");if(retry.status!=="issued"&&retry.status!=="accepted")throw new Error("Existing offer is no longer actionable");return retry.id;}
   if(!["application","eligibility"].includes(app.stage))throw new Error("Application stage is not eligible");
