@@ -43,6 +43,8 @@ export function visibleDemoLinks(role: DemoPersona) {
 }
 export function DemoNavigation(){
  const [role,setRole]=useState<DemoPersona>("student");
+ const [memberships,setMemberships]=useState<Array<{id:string;role:string;firstName:string;lastName:string}>>([]);
+
  const location=useLocation();
  useEffect(()=>{
   const params=new URLSearchParams(window.location.search);
@@ -52,7 +54,22 @@ export function DemoNavigation(){
   setRole(next);
   window.localStorage.setItem(demoPersonaStorageKey,next);
  },[location.pathname]);
+ useEffect(()=>{let canceled=false;fetch("/access/session",{credentials:"same-origin"})
+  .then(async response=>response.ok?response.json():null)
+  .then(data=>{if(canceled||!data?.authenticated)return;
+   setMemberships(data.grants??[]);
+   const active=(data.grants??[]).find((g:{id:string})=>g.id===data.activeGrantId);
+   if(active&&demoRoles.includes(active.role)){setRole(active.role);}
+  }).catch(()=>{});return()=>{canceled=true};},[]);
  const changePersona=(next:DemoPersona)=>{
+  if(memberships.length){
+   const grant=memberships.find(x=>x.role===next);
+   if(!grant)return;
+   void fetch("/access/session",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({grantId:grant.id})})
+    .then(response=>{if(!response.ok)throw new Error("Membership unavailable");window.location.assign(demoPersonaHome[next]);})
+    .catch(()=>window.alert("Unable to switch profile"));
+   return;
+  }
   window.localStorage.setItem(demoPersonaStorageKey,next);
   setRole(next);
   // Go to a valid landing screen instead of retaining the previous persona's route.
@@ -64,7 +81,7 @@ export function DemoNavigation(){
    <div className="flex flex-1 flex-wrap gap-x-4 gap-y-2">{visibleDemoLinks(role).map(x=><Link key={x.to} to={x.to} className="text-xs font-semibold text-muted-foreground hover:text-foreground">{x.label}</Link>)}</div>
    <label className="flex items-center gap-2 text-xs text-muted-foreground">Demo persona
     <select aria-label="Demo persona" value={role} onChange={event=>changePersona(getDemoPersona(event.target.value))} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
-     {demoRoles.map(r=><option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>)}
+     {(memberships.length?demoRoles.filter(r=>memberships.some(g=>g.role===r)):demoRoles).map(r=><option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>)}
     </select>
    </label>
   </div>
