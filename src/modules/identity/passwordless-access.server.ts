@@ -40,7 +40,7 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
  return genericResult;
 }
 /** A token is atomically consumed by its hash, allowing only one successful redemption. */
-export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string}> {
+export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string}> {
  if(!/^[A-Za-z0-9_-]{40,}$/.test(rawToken))throw new Error("Invalid or expired access link");
  const hash=hashAccessSecret(rawToken,secretPepper()),now=new Date();
  return db.transaction(async tx=>{
@@ -52,7 +52,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   const [account]=await tx.select({id:accessAccounts.id}).from(accessAccounts)
    .where(and(eq(accessAccounts.id,claimed.accountId),eq(accessAccounts.disabled,false))).limit(1);
   if(!account)throw new Error("Account unavailable");
-  const grants=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants)
+  const grants=await tx.select({id:accountPersonGrants.id,role:accountPersonGrants.role}).from(accountPersonGrants)
    .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true))).limit(1);
   if(!grants.length)throw new Error("No active CAN OS membership");
   const secret=issueOpaqueSecret();
@@ -61,7 +61,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    activeGrantId:grants[0]!.id,expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
   });
   await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
-  return {accountId:account.id,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
+  return {accountId:account.id,role:grants[0]!.role,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
 export async function revokeAccessSession(sessionId:string,accountId:string):Promise<string> {
