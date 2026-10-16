@@ -19,6 +19,13 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
  const sessionIds=rows.filter(n=>n.resourceType==="study_group_session"&&n.resourceId).map(n=>n.resourceId as string);
  const sessions=sessionIds.length?await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions).innerJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroupSessions.groupId),eq(s.studyGroupMemberships.personId,personId),eq(s.studyGroupMemberships.status,"approved"))).where(inArray(s.studyGroupSessions.id,sessionIds)):[];
  const groupBySession=new Map(sessions.map(s=>[s.id,s.groupId]));
+ const groupIds=rows.filter(n=>n.resourceType==="study_group"&&n.resourceId).map(n=>n.resourceId as string);
+ const groupRows=groupIds.length?await db.select({id:s.studyGroups.id,facilitator:s.studyGroups.facilitatorPersonId})
+  .from(s.studyGroups).where(inArray(s.studyGroups.id,groupIds)):[];
+ const memberRows=groupIds.length?await db.select({groupId:s.studyGroupMemberships.groupId})
+  .from(s.studyGroupMemberships).where(and(inArray(s.studyGroupMemberships.groupId,groupIds),eq(s.studyGroupMemberships.personId,personId))):[];
+ const permittedGroups=new Set(groupRows.filter(g=>g.facilitator===personId).map(g=>g.id));
+ for(const row of memberRows)permittedGroups.add(row.groupId);
  const submissionIds=rows.filter(n=>n.resourceType==="submission"&&n.resourceId).map(n=>n.resourceId as string);
  const studentProfiles=await db.select({id:s.studentProfiles.id}).from(s.studentProfiles).where(eq(s.studentProfiles.personId,personId));
  const studentIds=studentProfiles.map(p=>p.id);
@@ -39,6 +46,7 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    `/student/support?referral=${encodeURIComponent(n.resourceId)}`:
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:
+   n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(n.type==="study_group_membership_request"?"/teacher/study-groups":`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`):
    n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });
 export const readSyntheticNotification=createServerFn({method:"POST"})
