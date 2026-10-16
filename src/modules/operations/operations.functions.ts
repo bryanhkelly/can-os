@@ -33,11 +33,11 @@ export const updateSyntheticOperationsAction=createServerFn({method:"POST"})
 
 /** Assign or escalate ordinary synthetic actions; support referrals use their own workflow. */
 export const triageSyntheticOperationsAction=createServerFn({method:"POST"})
- .validator((data:{id:string;owner:"registrar"|"teacher";priority:"normal"|"high"|"urgent"})=>data)
+ .validator((data:{id:string;owner:"unassigned"|"teacher";priority:"normal"|"high"|"urgent"})=>data)
  .handler(async({data})=>{
   assertSyntheticMutation("registrar");
-  if(!["registrar","teacher"].includes(data.owner)||!["normal","high","urgent"].includes(data.priority))throw new Error("Invalid assignment or priority");
-  const ownerPersonId=data.owner==="teacher"?"f1000000-0000-4000-8000-000000000006":"f3000000-0000-4000-8000-000000000007";
+  if(!["unassigned","teacher"].includes(data.owner)||!["normal","high","urgent"].includes(data.priority))throw new Error("Invalid assignment or priority");
+  const ownerPersonId=data.owner==="teacher"?"f1000000-0000-4000-8000-000000000006":null;
   const [{db},s,{and,eq}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
   return db.transaction(async tx=>{
    const [record]=await tx.select({id:s.actions.id,type:s.actions.type,status:s.actions.status,metadata:s.actions.metadata,ownerPersonId:s.actions.ownerPersonId,priority:s.actions.priority})
