@@ -190,6 +190,11 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
    .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.status,"graded"))).returning({id:s.submissions.id});
   if(!updated)throw new Error("Graded synthetic submission not found");
   await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.return",resourceType:"submission",resourceId:updated.id,before:{status:"graded"},after:{status:"returned"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
+  const [recipient]=await tx.select({personId:s.studentProfiles.personId})
+   .from(s.submissions).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.submissions.studentProfileId))
+   .where(eq(s.submissions.id,updated.id)).limit(1);
+  if(!recipient)throw new Error("Student profile missing for returned assignment");
+  await tx.insert(s.notifications).values({recipientPersonId:recipient.personId,type:"assignment_feedback",status:"unread",title:"Assignment returned for revision",body:"Your teacher returned your work. Review the feedback and submit a revision.",resourceType:"submission",resourceId:updated.id});
   return {submissionId:updated.id};
   });
  });
