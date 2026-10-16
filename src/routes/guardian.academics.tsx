@@ -12,6 +12,7 @@ function GuardianAcademicsPage() {
  const [selected, setSelected] = useState("");
  const [assignments, setAssignments] = useState<Assignment[]>([]);
  const [loading, setLoading] = useState(true);
+ const [loadingStudents, setLoadingStudents] = useState(true);
  const [error, setError] = useState("");
 
  useEffect(() => {
@@ -20,15 +21,15 @@ function GuardianAcademicsPage() {
    if (!active) return;
    setStudents(result.students);
    setSelected(result.students[0]?.studentPersonId ?? "");
-   setLoading(false);
+   setLoadingStudents(false);
   }).catch(() => {
-   if (active) { setError("Sign in with an authorized guardian account to view academic progress."); setLoading(false); }
+   if (active) { setError("Sign in with an authorized guardian account to view academic progress."); setLoadingStudents(false); setLoading(false); }
   });
   return () => { active = false; };
  }, []);
 
  useEffect(() => {
-  if (!selected) { setAssignments([]); return; }
+  if (!selected) { setAssignments([]); setLoading(false); return; }
   let active = true;
   setLoading(true);
   setError("");
@@ -51,11 +52,11 @@ function GuardianAcademicsPage() {
      {students.map(student => <option key={student.studentPersonId} value={student.studentPersonId}>{student.firstName} {student.lastName}</option>)}
     </select>
    </label>}
-   {loading && <p className="mt-8 text-sm" role="status">Loading academic progress…</p>}
+   {(loading || loadingStudents) && <p className="mt-8 text-sm" role="status">Loading academic progress…</p>}
    {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
-   {!loading && !error && students.length === 0 && <p className="mt-8 text-sm">No students with academic-viewing permission were found at your school.</p>}
-   {!loading && !error && students.length > 0 && assignments.length === 0 && <p className="mt-8 text-sm">No published assignments found.</p>}
-   {!loading && !error && assignments.length > 0 && <div className="mt-8 grid gap-4">
+   {!loading && !loadingStudents && !error && students.length === 0 && <p className="mt-8 text-sm">No students with academic-viewing permission were found at your school.</p>}
+   {!loading && !loadingStudents && !error && students.length > 0 && assignments.length === 0 && <p className="mt-8 text-sm">No published assignments found.</p>}
+   {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid gap-4">
     {assignments.map(item => <section key={item.assessmentId} className="rounded-xl border bg-card p-5">
      <div className="flex flex-wrap items-start justify-between gap-3">
       <div><p className="text-xs text-muted-foreground">{item.course}</p><h2 className="mt-1 text-lg font-semibold">{item.title}</h2></div>
