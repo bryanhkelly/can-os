@@ -39,3 +39,18 @@ export const readAllSyntheticNotifications=createServerFn({method:"POST"}).handl
   .returning({id:s.notifications.id});
  return {saved:true,count:changed.length};
 });
+
+/** Acknowledgements stay scoped to the fixed synthetic recipient during the dev build. */
+export const setSyntheticNotificationStatus=createServerFn({method:"POST"})
+ .validator((data:{id:string;status:"unread"|"read"|"dismissed"})=>data)
+ .handler(async({data})=>{
+  assertSyntheticMutation("student");
+  if(!["unread","read","dismissed"].includes(data.status))throw new Error("Invalid notification status");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const changed=await db.update(s.notifications).set({
+   status:data.status,readAt:data.status==="unread"?null:new Date(),updatedAt:new Date()
+  }).where(and(eq(s.notifications.id,data.id),eq(s.notifications.recipientPersonId,STUDENT_PERSON)))
+  .returning({id:s.notifications.id});
+  if(!changed.length)throw new Error("Synthetic notification not found");
+  return {saved:true};
+ });
