@@ -95,6 +95,7 @@ export async function activateSyntheticOfferedEnrollment(context:CommandContext,
   const {pool,organizationId}=await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(offer!.status!=="accepted")throw new Error("Guardian must accept offer first");
+  if(!offer!.respondedAt)throw new Error("Accepted offer must record a guardian response");
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
   if(!app||app.metadata.synthetic!==true||app.programId!==offer!.programId||app.stage!=="accepted")throw new Error("Synthetic application not accepted for this offer");
   const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(eq(enrollments.studentProfileId,app.studentProfileId),eq(enrollments.programId,offer!.programId),eq(enrollments.schoolYearId,offer!.schoolYearId),eq(enrollments.status,"active"),eq(enrollments.kind,"program"))).limit(1);
