@@ -1,5 +1,4 @@
 import {createFileRoute} from "@tanstack/react-router";
-import {requestOneTimeAccess} from "@/modules/identity/passwordless-access.server";
 export const Route=createFileRoute("/access/request")({
  server:{handlers:{
   POST:async({request})=>{
@@ -9,8 +8,9 @@ export const Route=createFileRoute("/access/request")({
    const email=(payload && typeof payload==="object" && "email" in payload)?(payload as {email:unknown}).email:null;
    if(typeof email!=="string")return Response.json({error:"Invalid request"},{status:400});
    try{
+    const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
     await requestOneTimeAccess(email);
-    return Response.json({accepted:true});
+    return Response.json({accepted:true},{headers:{"Cache-Control":"no-store"}});
    }catch(error){
     if(error instanceof Error && error.message==="Invalid email address")return Response.json({error:"Invalid email"},{status:400});
     return Response.json({error:"Unable to process request"},{status:503});
