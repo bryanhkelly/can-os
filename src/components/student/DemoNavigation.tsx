@@ -46,7 +46,7 @@ export const demoNavigationLinks: ReadonlyArray<{to: string; label: string; role
  {to:"/student/discussions",label:"Discussions",roles:["student","guardian"]},
  {to:"/student/study-groups",label:"Study Groups",roles:["student"]},
  {to:"/teacher/discussions",label:"Manage Discussions",roles:["teacher"]},
- {to:"/student/experiences",label:"Calendar",roles:["student","guardian","teacher"]},
+ {to:"/student/experiences",label:"Experiences",roles:["student","guardian","teacher"]},
  {to:"/student/support",label:"Support",roles:["student","guardian","teacher","specialist"]},
  {to:"/student/notifications",label:"Notifications",roles:["student","guardian","teacher","registrar","specialist"]},
  {to:"/student/settings",label:"Settings",roles:["student","guardian"]},
