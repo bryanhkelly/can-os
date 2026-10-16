@@ -78,7 +78,7 @@ export const postStudyGroupMessage=createServerFn({method:"POST"}).validator((x:
 });
 export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator((x:{groupId:string;title:string;agenda:string;startsAt:string;endsAt:string})=>x).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {start,end}=validateSession(data.startsAt,data.endsAt);const {db,s}=await context();
- const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!))).limit(1);
+ const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.status,"active"))).limit(1);
  if(!group)throw new Error("Facilitator required");
  if(data.title.trim().length<3||data.title.length>120||data.agenda.length>2000)throw new Error("Invalid session details");
  return db.transaction(async tx=>{
