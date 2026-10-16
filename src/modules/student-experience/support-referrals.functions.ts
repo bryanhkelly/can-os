@@ -1,5 +1,8 @@
 import { assertSyntheticMutation } from "./demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { AuthorizationError, assertSiteScope } from "@/domain/command-context";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 const STUDENT = "f1000000-0000-4000-8000-000000000007";
@@ -24,7 +27,18 @@ function safeNote(input:string,max=1500){const s=input.trim();if(s.length<3||s.l
 const stagePriority=(x:Stage)=>stages.indexOf(x);
 
 export const getSupportReferrals=createServerFn({method:"GET"}).handler(async()=>{
+ const context=await getCommandContext(getRequest());
+ if(!["teacher","specialist"].includes(context.role))throw new AuthorizationError("referrals:read");
+ assertSiteScope(context,SITE);
+ setResponseHeader("Cache-Control","no-store");
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+ if(context.role==="teacher"){
+  const sectionRows=await db.select({sectionId:s.enrollments.sectionId}).from(s.enrollments)
+   .innerJoin(s.sectionTeachers,eq(s.sectionTeachers.sectionId,s.enrollments.sectionId))
+   .where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.status,"active"),
+    eq(s.sectionTeachers.personId,context.actorPersonId!)));
+  if(!sectionRows.length)throw new AuthorizationError("referral student relationship");
+ }
  const rows=await 
   db.select({id:s.actions.id,title:s.actions.title,description:s.actions.description,status:s.actions.status,
    priority:s.actions.priority,metadata:s.actions.metadata,ownerPersonId:s.actions.ownerPersonId,createdAt:s.actions.createdAt})
