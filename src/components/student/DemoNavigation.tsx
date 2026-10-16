@@ -49,13 +49,15 @@ export function DemoNavigation(){
 
  const location=useLocation();
  useEffect(()=>{
+  // Once signed in, the verified server grant—not URL or localStorage—owns navigation.
+  if(signedIn)return;
   const params=new URLSearchParams(window.location.search);
   const requested=params.get("persona");
   const stored=window.localStorage.getItem(demoPersonaStorageKey);
   const next=getDemoPersona(requested ?? stored);
   setRole(next);
   window.localStorage.setItem(demoPersonaStorageKey,next);
- },[location.pathname]);
+ },[location.pathname,signedIn]);
  useEffect(()=>{let canceled=false;fetch("/access/session",{credentials:"same-origin"})
   .then(async response=>response.ok?response.json():null)
   .then(data=>{if(canceled||!data?.authenticated)return;
