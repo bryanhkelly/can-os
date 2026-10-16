@@ -97,10 +97,10 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
   if(text.length<3||text.length>20000)throw new Error("Response must be 3–20,000 characters");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
-   const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,dueAt:s.assessments.dueAt})
+   const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,dueAt:s.assessments.dueAt,metadata:s.assessments.metadata})
    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .where(and(eq(s.assessments.id,data.assessmentId),eq(s.assessments.status,"published"),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
-   if(!assessment)throw new Error("Assessment not found");
+   if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Synthetic assessment not found");
    const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(
     eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
    if(!enrollment)throw new Error("Student is not enrolled");
@@ -255,10 +255,10 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
   if(data.text.length>20000)throw new Error("Draft too long");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
-   const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId})
+   const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,metadata:s.assessments.metadata})
     .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
     .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.assessments.status,"published"))).limit(1);
-   if(!assessment)throw new Error("Assignment not available");
+   if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Synthetic assignment not available");
    const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
     .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
    if(!enrollment)throw new Error("Student not enrolled");
