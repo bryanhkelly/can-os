@@ -33,6 +33,9 @@ const testEndpoint = endpoint(testUrl);
 if (process.env.DATABASE_URL && testEndpoint === endpoint(process.env.DATABASE_URL)) {
   fail("TEST_DATABASE_URL must not use the application database endpoint.");
 }
+if (process.env.CAN_APPLICATION_DB_HOST && testEndpoint === process.env.CAN_APPLICATION_DB_HOST.replace(/-pooler(?=\\.)/, "")) {
+  fail("TEST_DATABASE_URL must not use the configured application database host.");
+}
 
 const mode = process.argv[2];
 const targeted = mode === "gf26" || mode === "gf26-lifecycle" || mode === "admissions-offers";
