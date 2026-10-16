@@ -26,6 +26,12 @@ import {
 import { EventTypes } from "@/domain/event-types";
 import {assertApplicationAcceptance,assertApplicationRetryOwnership} from "@/domain/admissions-transitions";
 
+/** Enrollment commands must never interpret an absent program grant as global access. */
+function requireEnrollmentProgramScope(context:CommandContext,programId:string):void {
+  if (!context.scope.programIds?.includes(programId)) throw new AuthorizationError(`program scope: ${programId}`);
+  assertProgramScope(context,programId);
+}
+
 type EnrollmentRequirementDefinition = {
   key: string;
   title: string;
@@ -117,7 +123,7 @@ export async function startFamilyApplication(
       .limit(1);
 
     if (!program) throw new Error("Program not found");
-    assertProgramScope(context, input.programId);
+    requireEnrollmentProgramScope(context, input.programId);
 
     let householdId = input.householdId;
 
@@ -320,7 +326,7 @@ export async function acceptApplication(
       .limit(1);
 
     if (!current) throw new Error("Application not found");
-    assertProgramScope(context, current.programId);
+    requireEnrollmentProgramScope(context, current.programId);
     if (current.stage === "accepted") return;
     assertApplicationAcceptance(current.stage);
 
@@ -381,7 +387,7 @@ export async function activateEnrollmentFromApplication(
       .limit(1);
 
     if (!application) throw new Error("Application not found");
-    assertProgramScope(context, application.programId);
+    requireEnrollmentProgramScope(context, application.programId);
     if (application.stage !== "accepted") {
       throw new Error("Application must be accepted before activation");
     }
