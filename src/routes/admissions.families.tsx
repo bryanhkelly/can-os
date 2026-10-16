@@ -1,4 +1,5 @@
 import {useState} from "react";
+import {beginSyntheticR2DocumentUpload,finishSyntheticR2DocumentUpload} from "@/modules/enrollment/r2-document-upload.functions";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
 import {getSyntheticFamilyReadiness,setSyntheticFamilyRequirement,addSyntheticRequirementReviewNote,reviewSyntheticRequirementDocument} from "@/modules/enrollment/family-readiness.functions";
 export const Route=createFileRoute("/admissions/families")({loader:()=>getSyntheticFamilyReadiness(),component:Families});
@@ -7,6 +8,7 @@ function Families(){
  const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notes,setNotes]=useState<Record<string,string>>({});
  const families=[...new Set(apps.map(a=>a.householdId))];
+ const [files,setFiles]=useState<Record<string,File|null>>({});
  async function update(applicationId:string,requirementId:string,complete:boolean){
   setBusy(requirementId);setError("");
   try{await setSyntheticFamilyRequirement({data:{applicationId,requirementId,complete}});await router.invalidate();}
@@ -23,6 +25,19 @@ function Families(){
   setBusy(requirementId);setError("");
   try{await reviewSyntheticRequirementDocument({data:{applicationId,requirementId,status,reason:notes[requirementId]??""}});await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Document review failed");}
+  finally{setBusy(null);}
+ }
+ async function upload(applicationId:string,requirementId:string){
+  const file=files[requirementId];if(!file)return;
+  setBusy(requirementId);setError("");
+  try{
+   const request={applicationId,requirementId,fileName:file.name,mimeType:file.type,size:file.size};
+   const {uploadUrl,key}=await beginSyntheticR2DocumentUpload({data:request});
+   const response=await fetch(uploadUrl,{method:"PUT",headers:{"Content-Type":file.type},body:file});
+   if(!response.ok)throw new Error("Cloudflare R2 upload failed ("+response.status+")");
+   await finishSyntheticR2DocumentUpload({data:{...request,key}});
+   setFiles(previous=>({...previous,[requirementId]:null}));await router.invalidate();
+  }catch(e){setError(e instanceof Error?e.message:"Document upload failed");}
   finally{setBusy(null);}
  }
  return <main className="mx-auto max-w-5xl px-5 py-10">
@@ -48,6 +63,8 @@ function Families(){
       <span className="text-xs text-muted-foreground">({r.status.replaceAll("_"," ")})</span>
     </label><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="registrar_note"&&typeof e.text==="string").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Review note: {String(e.text)}</p>)}</div><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="document_review").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Document review: {e.status}{e.text?" · "+e.text:""}{e.reviewedAt?" · "+new Date(e.reviewedAt).toLocaleDateString():""}</p>)}</div>
     <div className="mt-2 flex flex-wrap gap-2">{(["requested","received","accepted","rejected"] as const).map(status=><button key={status} type="button" className="rounded border px-2 py-1 text-xs capitalize disabled:opacity-50" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onClick={()=>review(a.id,r.id,status)}>{status}</button>)}</div>
+    <div className="mt-2 flex flex-wrap items-center gap-2"><input aria-label={"Select synthetic enrollment document for "+r.title} type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" className="max-w-full text-xs" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onChange={e=>setFiles(previous=>({...previous,[r.id]:e.target.files?.[0]??null}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||!files[r.id]} onClick={()=>upload(a.id,r.id)}>Upload to private R2</button></div>
+    <p className="mt-1 text-xs text-muted-foreground">Synthetic demonstration files only. PDF, JPG or PNG, maximum 10 MB. Uploads are disabled until private R2 credentials and the explicit demo upload flag are configured.</p>
     <div className="mt-2 flex gap-2"><input className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-sm" value={notes[r.id]??""} maxLength={500} placeholder="Review note / rejection reason (no file uploaded)" onChange={e=>setNotes(previous=>({...previous,[r.id]:e.target.value}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||(notes[r.id]??"").trim().length<5} onClick={()=>addNote(a.id,r.id)}>Save note</button></div></div>)}</div>
     {!a.requirements.length&&<p className="mt-2 text-sm text-muted-foreground">No requirements configured for this application.</p>}
    </article>)}</div>
