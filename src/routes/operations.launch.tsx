@@ -39,15 +39,22 @@ const requirementStatusLabels: Record<string, string> = {
 };
 
 export const Route = createFileRoute("/operations/launch")({
-  loader: async () => ({
-    options: await listLaunchOptions(),
-    launches: await listLaunches(),
-  }),
+  loader: async () => {
+    try {
+      return {
+        options: await listLaunchOptions(),
+        launches: await listLaunches(),
+        authError: "",
+      };
+    } catch {
+      return { options: null, launches: null, authError: "Sign in with an authorized registrar account to manage program launches." };
+    }
+  },
   component: LaunchWizardPage,
 });
 
 function LaunchWizardPage() {
-  const { options, launches } = Route.useLoaderData();
+  const { options, launches, authError } = Route.useLoaderData();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -68,7 +75,7 @@ function LaunchWizardPage() {
   const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState("");
   const [siteId, setSiteId] = useState("");
 
-  const hostSites = options.sites.filter((site) => site.organizationId === hostOrganizationId);
+  const hostSites = options?.sites.filter((site) => site.organizationId === hostOrganizationId) ?? [];
 
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
@@ -134,6 +141,22 @@ function LaunchWizardPage() {
 
   const selectClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
   const inputClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
+
+  if (authError || !options || !launches) {
+    return (
+      <main className="min-h-screen bg-background px-6 py-10 text-foreground">
+        <div className="mx-auto max-w-5xl">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            CAN OS · Program launch
+          </p>
+          <h1 className="mt-2 font-serif text-4xl">Host / program launch</h1>
+          <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">
+            {authError || "Launch data is unavailable."}
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground">

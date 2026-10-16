@@ -3,13 +3,16 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getThread,
   listMyThreads,
+  listThreadContacts,
   replyToThread,
+  startThread,
 } from "@/modules/communication/messages.functions";
 
 export const Route = createFileRoute("/messages")({ component: MessagesPage });
 
 type ThreadSummary = Awaited<ReturnType<typeof listMyThreads>>["threads"][number];
 type ThreadDetail = Awaited<ReturnType<typeof getThread>>;
+type ThreadContact = Awaited<ReturnType<typeof listThreadContacts>>["contacts"][number];
 
 function relativeTime(iso: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -33,6 +36,13 @@ function MessagesPage() {
   const [sending, setSending] = useState(false);
   const [sentNotice, setSentNotice] = useState(false);
   const [error, setError] = useState("");
+  const [contacts, setContacts] = useState<ThreadContact[]>([]);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeRecipientId, setComposeRecipientId] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [composing, setComposing] = useState(false);
+  const [composeError, setComposeError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -49,6 +59,11 @@ function MessagesPage() {
           setLoading(false);
         }
       });
+    listThreadContacts()
+      .then((result) => {
+        if (active) setContacts(result.contacts);
+      })
+      .catch(() => {});
     return () => {
       active = false;
     };
@@ -90,6 +105,28 @@ function MessagesPage() {
       .finally(() => setSending(false));
   };
 
+  const sendCompose = () => {
+    const subject = composeSubject.trim();
+    const body = composeBody.trim();
+    if (!composeRecipientId || subject.length < 3 || !body || composing) return;
+    setComposing(true);
+    setComposeError("");
+    startThread({
+      data: { recipientPersonId: composeRecipientId, subject, body },
+    })
+      .then(async ({ threadId }) => {
+        setComposeOpen(false);
+        setComposeRecipientId("");
+        setComposeSubject("");
+        setComposeBody("");
+        const list = await listMyThreads();
+        setThreads(list.threads);
+        openThread(threadId);
+      })
+      .catch(() => setComposeError("Your message could not be sent. Please try again."))
+      .finally(() => setComposing(false));
+  };
+
   if (error && !threads.length) {
     return (
       <main className="min-h-screen bg-background px-6 py-10 text-foreground">
@@ -110,6 +147,101 @@ function MessagesPage() {
         <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
           Conversations connected to your students, assignments, and school.
         </p>
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => {
+              setComposeOpen((open) => !open);
+              setComposeError("");
+            }}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            New message
+          </button>
+        </div>
+        {composeOpen && (
+          <section className="mt-6 rounded-xl border bg-card p-5" aria-label="New message">
+            <h2 className="text-lg font-semibold">New message</h2>
+            {contacts.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                No one is available to message yet. Contacts appear here through your
+                student, class, and guardian relationships.
+              </p>
+            ) : (
+              <form
+                className="mt-4 grid gap-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  sendCompose();
+                }}
+              >
+                <label className="block text-sm font-semibold">
+                  To
+                  <select
+                    className="mt-2 w-full rounded-lg border bg-background p-3 text-sm"
+                    value={composeRecipientId}
+                    onChange={(event) => setComposeRecipientId(event.target.value)}
+                  >
+                    <option value="">Choose a recipient…</option>
+                    {contacts.map((contact) => (
+                      <option key={contact.personId} value={contact.personId}>
+                        {contact.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm font-semibold">
+                  Subject
+                  <input
+                    className="mt-2 w-full rounded-lg border bg-background p-3 text-sm"
+                    maxLength={120}
+                    value={composeSubject}
+                    onChange={(event) => setComposeSubject(event.target.value)}
+                    placeholder="What is this about?"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Message
+                  <textarea
+                    className="mt-2 w-full rounded-lg border bg-background p-3 text-sm"
+                    rows={4}
+                    maxLength={4000}
+                    value={composeBody}
+                    onChange={(event) => setComposeBody(event.target.value)}
+                    placeholder="Write a message…"
+                  />
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={
+                      composing ||
+                      !composeRecipientId ||
+                      composeSubject.trim().length < 3 ||
+                      !composeBody.trim()
+                    }
+                    className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                  >
+                    {composing ? "Sending…" : "Send"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComposeOpen(false);
+                      setComposeError("");
+                    }}
+                    className="rounded-lg border px-4 py-2 text-sm font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  {composeError && (
+                    <span className="text-xs" role="alert">{composeError}</span>
+                  )}
+                </div>
+              </form>
+            )}
+          </section>
+        )}
         {loading && <p className="mt-8 text-sm" role="status">Loading messages…</p>}
         {!loading && threads.length === 0 && (
           <p className="mt-8 text-sm">No conversations yet.</p>

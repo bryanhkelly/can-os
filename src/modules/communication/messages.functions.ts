@@ -20,8 +20,300 @@ import {
 
 const MAX_BODY_LENGTH = 4000;
 const SNIPPET_LENGTH = 120;
+const MAX_SUBJECT_LENGTH = 120;
 
 const threadIdSchema = z.string().uuid();
+
+type ThreadContact = { personId: string; name: string; label: string };
+
+type Db = typeof import("@/db/client").db;
+type Schema = typeof import("@/db/schema");
+
+async function fetchDisplayNames(
+  db: Db,
+  s: Schema,
+  personIds: string[],
+): Promise<Map<string, string>> {
+  if (!personIds.length) return new Map();
+  const rows = await db
+    .select({
+      id: s.people.id,
+      preferredName: s.people.preferredName,
+      legalFirstName: s.people.legalFirstName,
+      legalLastName: s.people.legalLastName,
+    })
+    .from(s.people)
+    .where(inArray(s.people.id, personIds));
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      `${row.preferredName ?? row.legalFirstName} ${row.legalLastName}`.trim(),
+    ]),
+  );
+}
+
+/**
+ * Relationship-derived contacts the actor may start a thread with.
+ * Never a directory: every entry traces to a verified guardian/student/
+ * teacher/enrollment relationship. Unknown roles fail closed to no contacts.
+ */
+async function listAllowedThreadContacts(
+  db: Db,
+  s: Schema,
+  role: string,
+  actorPersonId: string,
+): Promise<ThreadContact[]> {
+  const relationships = new Map<string, Set<string>>();
+  const add = (personId: string, relationship: string) => {
+    if (personId === actorPersonId) return;
+    const parts = relationships.get(personId) ?? new Set<string>();
+    parts.add(relationship);
+    relationships.set(personId, parts);
+  };
+
+  if (role === "guardian") {
+    const studentRows = await db
+      .select({ studentPersonId: s.guardianRelationships.studentPersonId })
+      .from(s.guardianRelationships)
+      .where(
+        and(
+          eq(s.guardianRelationships.guardianPersonId, actorPersonId),
+          eq(s.guardianRelationships.canViewAcademics, true),
+        ),
+      );
+    const studentIds = studentRows.map((row) => row.studentPersonId);
+    if (studentIds.length) {
+      const teacherRows = await db
+        .select({
+          personId: s.sectionTeachers.personId,
+          sectionTitle: s.sections.title,
+        })
+        .from(s.enrollments)
+        .innerJoin(
+          s.studentProfiles,
+          eq(s.studentProfiles.id, s.enrollments.studentProfileId),
+        )
+        .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+        .innerJoin(
+          s.sectionTeachers,
+          eq(s.sectionTeachers.sectionId, s.sections.id),
+        )
+        .where(
+          and(
+            inArray(s.studentProfiles.personId, studentIds),
+            eq(s.enrollments.status, "active"),
+          ),
+        );
+      for (const row of teacherRows) add(row.personId, `${row.sectionTitle} teacher`);
+
+      const coGuardianRows = await db
+        .select({
+          guardianPersonId: s.guardianRelationships.guardianPersonId,
+          studentPersonId: s.guardianRelationships.studentPersonId,
+        })
+        .from(s.guardianRelationships)
+        .where(inArray(s.guardianRelationships.studentPersonId, studentIds));
+      const studentNames = await fetchDisplayNames(db, s, studentIds);
+      for (const row of coGuardianRows) {
+        add(
+          row.guardianPersonId,
+          `co-guardian of ${studentNames.get(row.studentPersonId) ?? "your student"}`,
+        );
+      }
+    }
+  } else if (role === "teacher") {
+    const sectionRows = await db
+      .select({ id: s.sections.id, title: s.sections.title })
+      .from(s.sectionTeachers)
+      .innerJoin(s.sections, eq(s.sections.id, s.sectionTeachers.sectionId))
+      .where(eq(s.sectionTeachers.personId, actorPersonId));
+    const sectionIds = sectionRows.map((row) => row.id);
+    if (sectionIds.length) {
+      const titleBySection = new Map(sectionRows.map((row) => [row.id, row.title]));
+      const studentRows = await db
+        .select({
+          personId: s.studentProfiles.personId,
+          sectionId: s.enrollments.sectionId,
+        })
+        .from(s.enrollments)
+        .innerJoin(
+          s.studentProfiles,
+          eq(s.studentProfiles.id, s.enrollments.studentProfileId),
+        )
+        .where(
+          and(
+            inArray(s.enrollments.sectionId, sectionIds),
+            eq(s.enrollments.status, "active"),
+          ),
+        );
+      const studentIds = [...new Set(studentRows.map((row) => row.personId))];
+      for (const row of studentRows) {
+        add(
+          row.personId,
+          `student in ${titleBySection.get(row.sectionId ?? "") ?? "your class"}`,
+        );
+      }
+      if (studentIds.length) {
+        const guardianRows = await db
+          .select({
+            guardianPersonId: s.guardianRelationships.guardianPersonId,
+            studentPersonId: s.guardianRelationships.studentPersonId,
+          })
+          .from(s.guardianRelationships)
+          .where(
+            and(
+              inArray(s.guardianRelationships.studentPersonId, studentIds),
+              eq(s.guardianRelationships.canViewAcademics, true),
+            ),
+          );
+        const studentNames = await fetchDisplayNames(db, s, studentIds);
+        for (const row of guardianRows) {
+          add(
+            row.guardianPersonId,
+            `guardian of ${studentNames.get(row.studentPersonId) ?? "your student"}`,
+          );
+        }
+      }
+    }
+  } else if (role === "student") {
+    const teacherRows = await db
+      .select({
+        personId: s.sectionTeachers.personId,
+        sectionTitle: s.sections.title,
+      })
+      .from(s.enrollments)
+      .innerJoin(
+        s.studentProfiles,
+        and(
+          eq(s.studentProfiles.id, s.enrollments.studentProfileId),
+          eq(s.studentProfiles.personId, actorPersonId),
+        ),
+      )
+      .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+      .innerJoin(
+        s.sectionTeachers,
+        eq(s.sectionTeachers.sectionId, s.sections.id),
+      )
+      .where(eq(s.enrollments.status, "active"));
+    for (const row of teacherRows) add(row.personId, `${row.sectionTitle} teacher`);
+
+    const guardianRows = await db
+      .select({ guardianPersonId: s.guardianRelationships.guardianPersonId })
+      .from(s.guardianRelationships)
+      .where(eq(s.guardianRelationships.studentPersonId, actorPersonId));
+    for (const row of guardianRows) add(row.guardianPersonId, "guardian");
+  }
+  // registrar/specialist: no relationship-derived contacts yet
+
+  if (!relationships.size) return [];
+  const names = await fetchDisplayNames(db, s, [...relationships.keys()]);
+  return [...relationships.entries()]
+    .map(([personId, parts]) => {
+      const name = names.get(personId);
+      if (!name) return null;
+      return { personId, name, label: `${name} — ${[...parts].sort().join("; ")}` };
+    })
+    .filter((contact): contact is ThreadContact => contact !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export const listThreadContacts = createServerFn({ method: "GET" }).handler(async () => {
+  const context = await getCommandContext(getRequest());
+  setResponseHeader("Cache-Control", "private, no-store");
+  const actorPersonId = requireActorPerson(context.actorPersonId);
+  const role = context.role;
+  if (!role || !(demoAllowedRoles as readonly string[]).includes(role)) {
+    return { contacts: [] as ThreadContact[] };
+  }
+  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+  const contacts = await listAllowedThreadContacts(db, s, role, actorPersonId);
+  return { contacts };
+});
+
+export const startThread = createServerFn({ method: "POST" })
+  .validator((value: unknown) =>
+    z
+      .object({
+        recipientPersonId: z.string().uuid(),
+        subject: z
+          .string()
+          .trim()
+          .min(3, "Subject must be at least 3 characters")
+          .max(MAX_SUBJECT_LENGTH, `Subject must be ${MAX_SUBJECT_LENGTH} characters or fewer`),
+        body: z
+          .string()
+          .trim()
+          .min(1, "Message must not be empty")
+          .max(MAX_BODY_LENGTH, `Message must be ${MAX_BODY_LENGTH} characters or fewer`),
+      })
+      .parse(value),
+  )
+  .handler(async ({ data }) => {
+    const context = await getCommandContext(getRequest());
+    assertCapability(context, "communication.send");
+    const role = context.role;
+    if (!role || !(demoAllowedRoles as readonly string[]).includes(role)) {
+      throw new AuthorizationError("demo role");
+    }
+    assertSyntheticMutation(role as DemoRole);
+    const actorPersonId = requireActorPerson(context.actorPersonId);
+    const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+
+    // Re-derive the allowed contact set server-side; fail closed if the
+    // requested recipient is not reachable through a real relationship.
+    const contacts = await listAllowedThreadContacts(db, s, role, actorPersonId);
+    if (!contacts.some((contact) => contact.personId === data.recipientPersonId)) {
+      throw new AuthorizationError("communication thread recipient");
+    }
+
+    return db.transaction(async (tx) => {
+      const sentAt = new Date();
+      const [thread] = await tx
+        .insert(s.communicationThreads)
+        .values({
+          subject: data.subject,
+          contextType: null,
+          createdByPersonId: actorPersonId,
+          lastMessageAt: sentAt,
+        })
+        .returning({ id: s.communicationThreads.id });
+      if (!thread) throw new Error("Failed to create communication thread");
+
+      await tx.insert(s.communicationParticipants).values([
+        { threadId: thread.id, participantType: "person" as const, participantId: actorPersonId },
+        { threadId: thread.id, participantType: "person" as const, participantId: data.recipientPersonId },
+      ]);
+
+      const [message] = await tx
+        .insert(s.communicationMessages)
+        .values({
+          threadId: thread.id,
+          senderPersonId: actorPersonId,
+          body: data.body,
+        })
+        .returning({ id: s.communicationMessages.id });
+      if (!message) throw new Error("Failed to send message");
+
+      await tx.insert(s.domainEvents).values({
+        eventType: EventTypes.CommunicationMessageSent,
+        aggregateType: "communication_thread",
+        aggregateId: thread.id,
+        actorPersonId,
+        payload: { threadId: thread.id, messageId: message.id },
+      });
+
+      await tx.insert(s.auditEvents).values({
+        actorPersonId,
+        action: "communication.message_send",
+        resourceType: "communication_thread",
+        resourceId: thread.id,
+        after: { sent: true, messageId: message.id, threadStarted: true },
+        context: { requestId: context.requestId ?? null },
+      });
+
+      return { threadId: thread.id };
+    });
+  });
 
 function requireActorPerson(actorPersonId: string | null): string {
   if (!actorPersonId) throw new AuthorizationError("authenticated person");

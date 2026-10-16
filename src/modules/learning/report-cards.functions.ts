@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import {
   assertCapability,
@@ -179,6 +180,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
       const [section] = await tx
         .select({
           id: s.sections.id,
+          title: s.sections.title,
           siteId: s.sections.siteId,
           programId: s.sections.programId,
         })
@@ -198,6 +200,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
       const [period] = await tx
         .select({
           id: s.gradingPeriods.id,
+          name: s.gradingPeriods.name,
           termId: s.gradingPeriods.termId,
           startsOn: s.gradingPeriods.startsOn,
           endsOn: s.gradingPeriods.endsOn,
@@ -305,6 +308,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
       const now = new Date();
       let finalized = 0;
       let skipped = 0;
+      const published: { studentProfileId: string; gradeId: string; letterGrade: string }[] = [];
       for (const [studentProfileId, total] of totals) {
         const prior = existingByStudent.get(studentProfileId);
         // Finalized grades are immutable; corrections are a separate append-only flow.
@@ -387,8 +391,265 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           },
           context: { requestId: context.requestId ?? null },
         });
+        published.push({ studentProfileId, gradeId, letterGrade });
+      }
+
+      // Notify the student and academic guardians for each newly finalized
+      // grade; the deep-link context is the section_grade row itself.
+      if (published.length) {
+        const students = await tx
+          .select({
+            studentProfileId: s.studentProfiles.id,
+            personId: s.studentProfiles.personId,
+          })
+          .from(s.studentProfiles)
+          .where(
+            inArray(
+              s.studentProfiles.id,
+              published.map((row) => row.studentProfileId),
+            ),
+          );
+        const personByProfile = new Map(
+          students.map((row) => [row.studentProfileId, row.personId]),
+        );
+        const guardians = await tx
+          .select({
+            studentPersonId: s.guardianRelationships.studentPersonId,
+            guardianPersonId: s.guardianRelationships.guardianPersonId,
+          })
+          .from(s.guardianRelationships)
+          .where(
+            and(
+              inArray(s.guardianRelationships.studentPersonId, students.map((row) => row.personId)),
+              eq(s.guardianRelationships.canViewAcademics, true),
+            ),
+          );
+        const guardiansByStudent = new Map<string, string[]>();
+        for (const row of guardians) {
+          const list = guardiansByStudent.get(row.studentPersonId) ?? [];
+          list.push(row.guardianPersonId);
+          guardiansByStudent.set(row.studentPersonId, list);
+        }
+        const rows = published.flatMap((row) => {
+          const studentPersonId = personByProfile.get(row.studentProfileId);
+          if (!studentPersonId) return [];
+          const base = {
+            type: "report_card_published",
+            title: `Report card published: ${period.name}`,
+            body: `${section.title} final grade: ${row.letterGrade}. Open the report card to review ${period.name}.`,
+            resourceType: "section_grade",
+            resourceId: row.gradeId,
+          };
+          return [
+            { recipientPersonId: studentPersonId, ...base },
+            ...(guardiansByStudent.get(studentPersonId) ?? []).map((guardianPersonId) => ({
+              recipientPersonId: guardianPersonId,
+              ...base,
+            })),
+          ];
+        });
+        if (rows.length) {
+          await tx.insert(s.notifications).values(rows);
+        }
       }
       return { finalized, skipped };
+    });
+  });
+
+const correctSectionGradeSchema = z
+  .object({
+    sectionGradeId: z.string().uuid(),
+    percentage: z.number().min(0).max(100).optional(),
+    letterGrade: z.string().trim().min(1).max(10).optional(),
+    reason: z.string().trim().min(5).max(500),
+  })
+  .refine((value) => value.percentage !== undefined || value.letterGrade !== undefined, {
+    message: "A correction must provide a percentage and/or a letter grade",
+  });
+
+type GradeCorrection = {
+  correctedAt: string;
+  correctedByPersonId: string;
+  previousPercentage: string | null;
+  previousLetterGrade: string | null;
+  reason: string;
+};
+
+/**
+ * Teacher corrects a finalized grade (GF25 step 11). Because the unique index
+ * on (section, student, period) forbids sibling rows, the correction
+ * supersedes in place while preserving append-only lineage: the locked row's
+ * prior values are snapshotted into an AuditEvent and appended to a
+ * metadata.corrections array, and `correctionOfId` anchors the corrected
+ * lineage on the row itself. Issued transcript snapshots are never rewritten.
+ */
+export const correctSectionGrade = createServerFn({ method: "POST" })
+  .validator((value: unknown) => correctSectionGradeSchema.parse(value))
+  .handler(async ({ data }) => {
+    assertSyntheticMutation("teacher");
+    const context = await getCommandContext(getRequest());
+    assertCapability(context, "assignments:grade");
+    if (context.role !== "teacher" || !context.actorPersonId) {
+      throw new AuthorizationError("teacher grade correction");
+    }
+    if (!context.scope.siteIds?.length) {
+      throw new AuthorizationError("teacher site membership");
+    }
+    const { db, s } = await stores();
+    const actorPersonId = context.actorPersonId;
+    const siteIds = context.scope.siteIds;
+
+    return db.transaction(async (tx) => {
+      const [grade] = await tx
+        .select({
+          id: s.sectionGrades.id,
+          sectionId: s.sectionGrades.sectionId,
+          studentProfileId: s.sectionGrades.studentProfileId,
+          gradingPeriodId: s.sectionGrades.gradingPeriodId,
+          termId: s.sectionGrades.termId,
+          status: s.sectionGrades.status,
+          percentage: s.sectionGrades.percentage,
+          letterGrade: s.sectionGrades.letterGrade,
+          correctionOfId: s.sectionGrades.correctionOfId,
+          metadata: s.sectionGrades.metadata,
+        })
+        .from(s.sectionGrades)
+        .where(eq(s.sectionGrades.id, data.sectionGradeId))
+        .for("update")
+        .limit(1);
+      if (!grade) throw new Error("SectionGrade not found");
+      if (grade.status !== "finalized") {
+        throw new Error("Only finalized grades can be corrected");
+      }
+
+      const [section] = await tx
+        .select({
+          id: s.sections.id,
+          siteId: s.sections.siteId,
+          programId: s.sections.programId,
+          title: s.sections.title,
+        })
+        .from(s.sections)
+        .innerJoin(
+          s.sectionTeachers,
+          and(
+            eq(s.sectionTeachers.sectionId, s.sections.id),
+            eq(s.sectionTeachers.personId, actorPersonId),
+          ),
+        )
+        .where(and(eq(s.sections.id, grade.sectionId), inArray(s.sections.siteId, siteIds)))
+        .limit(1);
+      if (!section) throw new AuthorizationError("assigned teacher");
+      assertSiteScope(context, section.siteId);
+
+      const now = new Date();
+      const newPercentage =
+        data.percentage !== undefined ? String(data.percentage) : grade.percentage;
+      const newLetterGrade =
+        data.letterGrade ??
+        (data.percentage !== undefined ? letterFor(data.percentage) : grade.letterGrade);
+
+      const priorCorrections = Array.isArray(grade.metadata?.corrections)
+        ? (grade.metadata.corrections as GradeCorrection[])
+        : [];
+      const correction: GradeCorrection = {
+        correctedAt: now.toISOString(),
+        correctedByPersonId: actorPersonId,
+        previousPercentage: grade.percentage,
+        previousLetterGrade: grade.letterGrade,
+        reason: data.reason,
+      };
+      const metadata = {
+        ...(grade.metadata ?? {}),
+        corrections: [...priorCorrections, correction],
+      };
+
+      await tx
+        .update(s.sectionGrades)
+        .set({
+          percentage: newPercentage,
+          letterGrade: newLetterGrade,
+          correctionOfId: grade.correctionOfId ?? grade.id,
+          metadata,
+          updatedAt: now,
+        })
+        .where(eq(s.sectionGrades.id, grade.id));
+
+      await tx.insert(s.auditEvents).values({
+        actorPersonId,
+        action: "grade.correction",
+        resourceType: "section_grade",
+        resourceId: grade.id,
+        scope: {
+          programId: section.programId,
+          siteId: section.siteId,
+          sectionId: section.id,
+        },
+        before: {
+          status: grade.status,
+          percentage: grade.percentage,
+          letterGrade: grade.letterGrade,
+        },
+        after: {
+          status: grade.status,
+          percentage: newPercentage,
+          letterGrade: newLetterGrade,
+        },
+        context: { requestId: context.requestId ?? null, reason: data.reason },
+      });
+
+      const [gradeEvent] = await tx
+        .insert(s.domainEvents)
+        .values({
+          eventType: EventTypes.GradePosted,
+          aggregateType: "section_grade",
+          aggregateId: grade.id,
+          actorPersonId,
+          payload: {
+            correction: true,
+            reason: data.reason,
+            studentProfileId: grade.studentProfileId,
+            sectionId: section.id,
+            gradingPeriodId: grade.gradingPeriodId,
+            termId: grade.termId,
+            letterGrade: newLetterGrade,
+            percentage: newPercentage,
+          },
+        })
+        .returning({ id: s.domainEvents.id });
+      if (!gradeEvent) throw new Error("Failed to record grade correction event");
+
+      const [student] = await tx
+        .select({ personId: s.studentProfiles.personId })
+        .from(s.studentProfiles)
+        .where(eq(s.studentProfiles.id, grade.studentProfileId))
+        .limit(1);
+      if (!student) throw new Error("StudentProfile not found");
+
+      const guardians = await tx
+        .select({ personId: s.guardianRelationships.guardianPersonId })
+        .from(s.guardianRelationships)
+        .where(
+          and(
+            eq(s.guardianRelationships.studentPersonId, student.personId),
+            eq(s.guardianRelationships.canViewAcademics, true),
+          ),
+        );
+
+      const recipients = [student.personId, ...guardians.map((row) => row.personId)];
+      await tx.insert(s.notifications).values(
+        recipients.map((personId) => ({
+          recipientPersonId: personId,
+          type: "grade_corrected",
+          title: `Updated grade: ${section.title}`,
+          body: `A finalized grade was corrected. Reason: ${data.reason}`,
+          resourceType: "section_grade",
+          resourceId: grade.id,
+          eventId: gradeEvent.id,
+        })),
+      );
+
+      return { corrected: true };
     });
   });
 
