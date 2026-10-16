@@ -59,7 +59,7 @@ export const getStudyGroupDetail=createServerFn({method:"GET"}).validator((x:{gr
  if(!permitted)return {group,memberStatus:membership?.status??null,posts:[],sessions:[]};
  const [posts,sessions]=await Promise.all([
  db.select({id:s.studyGroupPosts.id,body:s.studyGroupPosts.body,createdAt:s.studyGroupPosts.createdAt,parentPostId:s.studyGroupPosts.parentPostId}).from(s.studyGroupPosts).where(and(eq(s.studyGroupPosts.groupId,data.groupId),eq(s.studyGroupPosts.hidden,false))).orderBy(desc(s.studyGroupPosts.createdAt)).limit(100),
- db.select().from(s.studyGroupSessions).where(eq(s.studyGroupSessions.groupId,data.groupId)).orderBy(s.studyGroupSessions.startsAt).limit(50)]);
+ db.select({id:s.studyGroupSessions.id,title:s.studyGroupSessions.title,agenda:s.studyGroupSessions.agenda,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt,cancelled:sql<boolean>`coalesce(\${s.calendarEvents.metadata}->>\'cancelled\',\'false\') = \'true\'`}).from(s.studyGroupSessions).leftJoin(s.calendarEvents,and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,s.studyGroupSessions.id))).where(eq(s.studyGroupSessions.groupId,data.groupId)).orderBy(s.studyGroupSessions.startsAt).limit(50)]);
  return {group,memberStatus:membership?.status??null,posts,sessions};
 });
 export const postStudyGroupMessage=createServerFn({method:"POST"}).validator((x:{groupId:string;body:string})=>x).handler(async({data})=>{
@@ -135,6 +135,8 @@ export const rsvpStudyGroupSession=createServerFn({method:"POST"})
  .from(s.studyGroupSessions).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.status,"active")))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Session not found");
+ const [calendar]=await db.select({metadata:s.calendarEvents.metadata}).from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).limit(1);
+ if(!calendar||calendar.metadata.cancelled===true)throw new Error("Session is cancelled or missing its calendar event");
  const [member]=await db.select({id:s.studyGroupMemberships.id}).from(s.studyGroupMemberships)
  .where(and(eq(s.studyGroupMemberships.groupId,session.groupId),eq(s.studyGroupMemberships.personId,STUDENT),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
  if(!member)throw new Error("Approved membership required");
