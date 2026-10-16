@@ -36,6 +36,7 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
  if(existing?.status==="approved"||existing?.status==="pending")return {ok:true};
  await tx.insert(s.studyGroupMemberships).values({groupId:group.id,personId:actor.actorPersonId!,role:"student",status:"pending"}).onConflictDoUpdate({target:[s.studyGroupMemberships.groupId,s.studyGroupMemberships.personId],set:{status:"pending",reviewedByPersonId:null,joinedAt:null,updatedAt:new Date()}});
  await tx.insert(s.notifications).values({recipientPersonId:group.facilitatorPersonId,type:"study_group_membership_request",status:"unread",title:"Study group membership request",body:"A student has requested to join "+group.title+".",resourceType:"study_group",resourceId:group.id});
+ await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"study_group.membership.request",resourceType:"study_group",resourceId:group.id,after:{personId:actor.actorPersonId!,status:"pending"},context:{synthetic:true}});
  return {ok:true};
  });
 });
