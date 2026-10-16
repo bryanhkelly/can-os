@@ -34,9 +34,10 @@ if (process.env.DATABASE_URL && testEndpoint === endpoint(process.env.DATABASE_U
   fail("TEST_DATABASE_URL must not use the application database endpoint.");
 }
 
-const gf26Only = process.argv[2] === "gf26";
-const suite = gf26Only ? ["tests/integration/gf26-fixture-integrity.test.ts"] : ["tests/integration"];
-const args = gf26Only ? process.argv.slice(3) : process.argv.slice(2);
+const mode = process.argv[2];
+const targeted = mode === "gf26" || mode === "gf26-lifecycle";
+const suite = mode === "gf26" ? ["tests/integration/gf26-fixture-integrity.test.ts"] : mode === "gf26-lifecycle" ? ["tests/integration/gf26-session-lifecycle.test.ts"] : ["tests/integration"];
+const args = targeted ? process.argv.slice(3) : process.argv.slice(2);
 const result = spawnSync(process.execPath, [
   "node_modules/vitest/vitest.mjs", "run", ...suite, ...args,
 ], {
