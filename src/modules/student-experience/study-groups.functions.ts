@@ -198,6 +198,7 @@ export const reviseStudyGroupSession=createServerFn({method:"POST"})
   const [event]=await tx.select().from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
   if(!event)throw new Error("Canonical calendar event missing");
   if(event.metadata.cancelled===true)throw new Error("Cancelled session cannot be changed");
+  if(data.action==="reschedule"&&times!.start.getTime()===session.startsAt.getTime()&&times!.end.getTime()===session.endsAt.getTime())return {ok:true};
   if(data.action==="cancel"){
    await tx.update(s.calendarEvents).set({metadata:{...event.metadata,cancelled:true,cancelledAt:new Date().toISOString()},updatedAt:new Date()}).where(eq(s.calendarEvents.id,event.id));
   } else {
