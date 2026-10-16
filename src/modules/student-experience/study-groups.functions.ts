@@ -165,3 +165,30 @@ export const listStudyGroupAttendance=createServerFn({method:"GET"})
  return db.select({personId:s.studyGroupSessionAttendance.personId,rsvp:s.studyGroupSessionAttendance.rsvp,attended:s.studyGroupSessionAttendance.attended})
  .from(s.studyGroupSessionAttendance).where(eq(s.studyGroupSessionAttendance.sessionId,data.sessionId));
 });
+
+/** Updates the session and its canonical calendar event in one transaction. */
+export const reviseStudyGroupSession=createServerFn({method:"POST"})
+.validator((x:{sessionId:string;action:"reschedule"|"cancel";startsAt?:string;endsAt?:string})=>x)
+.handler(async({data})=>{
+ assertSyntheticMutation("teacher");
+ if(data.action!=="reschedule"&&data.action!=="cancel")throw new Error("Invalid session action");
+ const {db,s}=await context();
+ const times=data.action==="reschedule"?validateSession(data.startsAt??"",data.endsAt??""):null;
+ return db.transaction(async tx=>{
+  const [session]=await tx.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt}).from(s.studyGroupSessions)
+   .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.status,"active")))
+   .where(eq(s.studyGroupSessions.id,data.sessionId)).for("update").limit(1);
+  if(!session)throw new Error("Facilitator session not found");
+  const [event]=await tx.select().from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
+  if(!event)throw new Error("Canonical calendar event missing");
+  if(event.metadata.cancelled===true)throw new Error("Cancelled session cannot be changed");
+  if(data.action==="cancel"){
+   await tx.update(s.calendarEvents).set({metadata:{...event.metadata,cancelled:true,cancelledAt:new Date().toISOString()},updatedAt:new Date()}).where(eq(s.calendarEvents.id,event.id));
+  } else {
+   await tx.update(s.studyGroupSessions).set({startsAt:times!.start,endsAt:times!.end,updatedAt:new Date()}).where(eq(s.studyGroupSessions.id,session.id));
+   await tx.update(s.calendarEvents).set({startsAt:times!.start,endsAt:times!.end,updatedAt:new Date()}).where(eq(s.calendarEvents.id,event.id));
+  }
+  await tx.insert(s.auditEvents).values({actorPersonId:TEACHER,action:data.action==="cancel"?"synthetic.study_group.session.cancel":"synthetic.study_group.session.reschedule",resourceType:"study_group_session",resourceId:session.id,before:{startsAt:session.startsAt.toISOString(),endsAt:session.endsAt.toISOString()},after:data.action==="cancel"?{cancelled:true}:{startsAt:times!.start.toISOString(),endsAt:times!.end.toISOString()},context:{synthetic:true,calendarEventId:event.id}});
+  return {ok:true};
+ });
+});
