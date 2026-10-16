@@ -28,6 +28,7 @@ export const createSyntheticCourseDiscussion=createServerFn({method:"POST"})
   const [thread]=await tx.insert(s.communicationThreads).values({subject,contextType:"section",contextId:data.sectionId,createdByPersonId:actor.actorPersonId!,metadata:{synthetic:true,kind:"course_discussion",locked:false,graded:false}}).returning({id:s.communicationThreads.id});
   if(!thread)throw new Error("Unable to create discussion");
   await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:actor.actorPersonId!,body:prompt,metadata:{synthetic:true,kind:"prompt"}});
+  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"discussion.create",resourceType:"communication_thread",resourceId:thread.id,after:{sectionId:data.sectionId,subject},context:{synthetic:true}});
   return {id:thread.id};
  });
 });
@@ -45,6 +46,7 @@ export const setSyntheticCourseDiscussionLock=createServerFn({method:"POST"})
   const [site]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId))throw new AuthorizationError("discussion section site");
   await tx.update(s.communicationThreads).set({metadata:{...thread.metadata,locked:data.locked},updatedAt:new Date()}).where(eq(s.communicationThreads.id,thread.id));
+  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"discussion.lock",resourceType:"communication_thread",resourceId:thread.id,before:{locked:thread.metadata.locked===true},after:{locked:data.locked},context:{synthetic:true}});
   return {saved:true};
  });
 });
@@ -65,6 +67,7 @@ export const moderateSyntheticDiscussionMessage=createServerFn({method:"POST"})
   const [site]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId))throw new AuthorizationError("discussion section site");
   await tx.update(s.communicationMessages).set({metadata:{...message.metadata,hidden:data.hidden,moderatedBy:actor.actorPersonId!}}).where(eq(s.communicationMessages.id,message.id));
+  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"discussion.moderate",resourceType:"communication_message",resourceId:message.id,before:{hidden:message.metadata.hidden===true},after:{hidden:data.hidden},context:{synthetic:true,threadId:message.threadId}});
   return {saved:true};
  });
 });
