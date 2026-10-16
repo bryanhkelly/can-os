@@ -5,7 +5,6 @@ import { getRequest } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, assertSiteScope, AuthorizationError } from "@/domain/command-context";
 import { and, eq, inArray, desc } from "drizzle-orm";
-const TEACHER="f1000000-0000-4000-8000-000000000006";
 const SITE="f1000000-0000-4000-8000-000000000003";
 
 /** Never accept a browser-selected actor or role for assignment authorization. */
@@ -227,7 +226,7 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
  .validator((value:{assessmentId:string;text:string})=>value)
  .handler(async({data})=>{
   assertSyntheticMutation("student");
-  const {context,studentId,studentPersonId}=await studentActor();
+  const {context,studentId}=await studentActor();
   assertSiteScope(context,SITE);
   if(data.text.length>20000)throw new Error("Draft too long");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
