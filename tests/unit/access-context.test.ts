@@ -1,0 +1,20 @@
+import {describe,it,expect} from "vitest";
+import {assertGrantSelection,resolveAccessContext,type VerifiedAccessGrant} from "@/domain/access-context";
+const grant:VerifiedAccessGrant={id:"grant-1",accountId:"account-1",personId:"person-1",role:"teacher",organizationId:"org-1",siteId:"site-1",active:true};
+describe("provider-independent authorization context",()=>{
+ it("derives the actor, capabilities and scope from verified grants",()=>{
+  const ctx=resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},[grant]);
+  expect(ctx.actorPersonId).toBe("person-1");
+  expect(ctx.capabilities.has("assignments:grade")).toBe(true);
+  expect(ctx.capabilities.has("admissions:decide")).toBe(false);
+  expect(ctx.scope.siteIds).toEqual(["site-1"]);
+ });
+ it("rejects an account trying to use another account's membership",()=>{
+  expect(()=>resolveAccessContext({accountId:"account-2",sessionId:"session-2",activeGrantId:"grant-1"},[grant])).toThrow();
+  expect(()=>assertGrantSelection("account-2","grant-1",[grant])).toThrow();
+ });
+ it("rejects inactive or arbitrary role grants",()=>{
+  expect(()=>assertGrantSelection("account-1","grant-1",[{...grant,active:false}])).toThrow();
+  expect(()=>resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},[{...grant,role:"superadmin"}])).toThrow();
+ });
+});
