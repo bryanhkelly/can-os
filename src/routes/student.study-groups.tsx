@@ -4,7 +4,11 @@ import {getStudyGroupAvailability,createStudyGroup,listStudyGroups,requestStudyG
 export const Route=createFileRoute("/student/study-groups")({validateSearch:(search:Record<string,unknown>):{group?:string;session?:string}=>({group:typeof search.group==="string"?search.group:undefined,session:typeof search.session==="string"?search.session:undefined}),loader:async()=>{
  const {enabled}=await getStudyGroupAvailability();
  if(!enabled)return {enabled,groups:[],queue:[],reports:[]};
- const [groups,queue,reports]=await Promise.all([listStudyGroups(),listStudyGroupReviewQueue(),listStudyGroupReports()]);
+ const groups=await listStudyGroups();
+ // Student pages must not require facilitator-only permissions to render.
+ const [queueResult,reportsResult]=await Promise.allSettled([listStudyGroupReviewQueue(),listStudyGroupReports()]);
+ const queue=queueResult.status==="fulfilled"?queueResult.value:[];
+ const reports=reportsResult.status==="fulfilled"?reportsResult.value:[];
  return {enabled,groups,queue,reports};
 },component:StudyGroups});
 function StudyGroups(){
