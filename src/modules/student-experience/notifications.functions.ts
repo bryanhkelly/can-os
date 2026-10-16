@@ -18,11 +18,16 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
  ]);
  const bySubmission=new Map(submissions.filter(x=>submissionIds.includes(x.id)&&x.studentProfileId==="f1000000-0000-4000-8000-000000000007").map(x=>[x.id,x.assessmentId]));
  const referralIds=new Set(referrals.filter(r=>r.metadata.synthetic===true&&r.metadata.fixture==="gf41").map(r=>r.id));
+ const missingIds=rows.filter(n=>n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId as string);
+ const followUps=missingIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions).where(and(inArray(s.actions.id,missingIds),eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectId,"f1000000-0000-4000-8000-000000000007"))):[];
+ const missingAssessmentByAction=new Map(followUps.filter(a=>a.metadata.synthetic===true&&typeof a.metadata.assessmentId==="string").map(a=>[a.id,a.metadata.assessmentId as string]));
+
  return rows.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
   date:n.createdAt.toISOString(),href:n.resourceType==="submission"&&n.resourceId&&bySubmission.has(n.resourceId)?
    `/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    `/student/support?referral=${encodeURIComponent(n.resourceId)}`:
+   n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:
    n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });
 export const readSyntheticNotification=createServerFn({method:"POST"})
