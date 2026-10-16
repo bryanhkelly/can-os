@@ -53,3 +53,13 @@ export function assertGrantSelection(accountId: string, proposedGrantId: string,
   throw new AuthorizationError("active membership");
  }
 }
+
+/** Project a verified organization/site grant onto permitted program IDs. */
+export function authorizedProgramIds(
+  programs: readonly {id:string;siteId:string|null}[],
+  organizationIds: readonly string[],
+  siteIds: readonly string[],
+):string[]{
+  if(organizationIds.length===0)return [];
+  return programs.filter(program=>siteIds.length===0||(program.siteId!==null&&siteIds.includes(program.siteId))).map(program=>program.id);
+}
