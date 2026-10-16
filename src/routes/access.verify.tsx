@@ -21,7 +21,7 @@ function VerifyAccess(){
  const [status,setStatus]=useState("Use the button to complete your sign-in.");
  const [working,setWorking]=useState(false);
  const [token,setToken]=useState<string|null>(null);
- useEffect(()=>{const value=new URLSearchParams(window.location.search).get("token");setToken(value);if(value)window.history.replaceState(null,"","/access/verify");},[]);
+ useEffect(()=>{const fragment=new URLSearchParams(window.location.hash.slice(1)).get("token");const legacy=new URLSearchParams(window.location.search).get("token");const value=fragment??legacy;setToken(value);if(value)window.history.replaceState(null,"","/access/verify");},[]);
  async function verify(){
   setWorking(true);
   try{
