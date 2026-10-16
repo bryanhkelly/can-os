@@ -89,3 +89,29 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
    };
   }) };
  });
+
+/** Child picker is derived from guardian relationships, never account-supplied IDs. */
+export const getGuardianStudents = createServerFn({ method: "GET" }).handler(async () => {
+ const context = await getCommandContext(getRequest());
+ assertCapability(context, "student:related-read");
+ if (context.role !== "guardian" || !context.actorPersonId || !context.scope.siteIds?.length)
+  throw new AuthorizationError("guardian academic membership");
+ const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+ const rows = await db.select({
+  studentPersonId: s.guardianRelationships.studentPersonId,
+  firstName: s.people.legalFirstName,
+  lastName: s.people.legalLastName,
+ }).from(s.guardianRelationships)
+  .innerJoin(s.people, eq(s.people.id, s.guardianRelationships.studentPersonId))
+  .innerJoin(s.studentProfiles, eq(s.studentProfiles.personId, s.guardianRelationships.studentPersonId))
+  .innerJoin(s.enrollments, eq(s.enrollments.studentProfileId, s.studentProfiles.id))
+  .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+  .where(and(
+   eq(s.guardianRelationships.guardianPersonId, context.actorPersonId),
+   eq(s.guardianRelationships.canViewAcademics, true),
+   eq(s.enrollments.kind, "section"),
+   eq(s.enrollments.status, "active"),
+   inArray(s.sections.siteId, context.scope.siteIds),
+  ));
+ return { students: Array.from(new Map(rows.map(row => [row.studentPersonId, row])).values()) };
+});
