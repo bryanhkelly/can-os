@@ -94,6 +94,7 @@ export const reviewSyntheticRequirementDocument=createServerFn({method:"POST"})
     const [record]=await tx.select({id:s.documents.id,metadata:s.documents.metadata}).from(s.documents)
       .where(and(eq(s.documents.id,documentId),eq(s.documents.subjectType,"journey_requirement"),eq(s.documents.subjectId,requirement.id),eq(s.documents.storageProvider,"cloudflare_r2"))).for("update").limit(1);
     if(!record||record.metadata.synthetic!==true||record.metadata.applicationId!==app.id)throw new Error("Document is outside this synthetic enrollment requirement");
+    if(record.metadata.isCurrent===false)throw new Error("Superseded documents cannot be reviewed");
     reviewedDocument=record;
    }
    const previous=[...requirement.evidence].reverse().find(e=>e.kind==="document_review");
