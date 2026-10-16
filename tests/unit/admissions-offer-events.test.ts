@@ -96,6 +96,34 @@ describe("transactional admissions events", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  it("refuses issuance when the seat pool is full", async () => {
+    selectRows([application], [{ capacity: 1 }], [year], [program], [], [journey], [],
+      [{ studentId: "already-enrolled" }], []);
+    await expect(issueSyntheticAdmissionOffer(context, input)).rejects.toThrow("Seat pool is full");
+    expect(values).not.toHaveBeenCalled();
+  });
+
+  it("refuses issuance with an outstanding blocking requirement", async () => {
+    selectRows([application], [pool], [year], [program], [], [journey],
+      [{ status: "needs_you" }]);
+    await expect(issueSyntheticAdmissionOffer(context, input)).rejects.toThrow("Blocking requirements remain");
+    expect(values).not.toHaveBeenCalled();
+  });
+
+  it("refuses issuance before the enrollment journey is ready", async () => {
+    selectRows([application], [pool], [year], [program], [], [{ ...journey, status: "in_progress" }]);
+    await expect(issueSyntheticAdmissionOffer(context, input)).rejects.toThrow("Enrollment Journey must be ready");
+    expect(values).not.toHaveBeenCalled();
+  });
+
+  it("denies guardian acceptance without a managing relationship", async () => {
+    selectRows([offer], [pool], [year], [program], [offer], [application],
+      [{ personId: "student-person" }], []);
+    await expect(respondToSyntheticAdmissionOffer(context, "offer", "accept")).rejects.toThrow("Guardian is not authorized");
+    expect(values).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("does not emit another event for an issuance retry", async () => {
     selectRows([application], [pool], [year], [program], [offer]);
     await expect(issueSyntheticAdmissionOffer(context, input)).resolves.toBe("offer");
