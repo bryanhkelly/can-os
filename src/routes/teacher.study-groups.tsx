@@ -1,20 +1,23 @@
 import {useState} from "react";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
-import {getStudyGroupAvailability,createStudyGroup,listStudyGroupReviewQueue,listStudyGroupReports,decideStudyGroupMembership,resolveStudyGroupReport} from "@/modules/student-experience/study-groups.functions";
+import {getStudyGroupAvailability,createStudyGroup,listStudyGroupReviewQueue,listStudyGroupReports,decideStudyGroupMembership,resolveStudyGroupReport,scheduleStudyGroupSession,reviseStudyGroupSession,listStudyGroupAttendance,recordStudyGroupAttendance} from "@/modules/student-experience/study-groups.functions";
 
+import {getFacilitatorStudyGroups} from "@/modules/student-experience/study-group-facilitator-query.functions";
 export const Route=createFileRoute("/teacher/study-groups")({
  loader:async()=>{
   const {enabled}=await getStudyGroupAvailability();
-  if(!enabled)return {enabled,queue:[],reports:[]};
-  const [queue,reports]=await Promise.all([listStudyGroupReviewQueue(),listStudyGroupReports()]);
-  return {enabled,queue,reports};
+  if(!enabled)return {enabled,queue:[],reports:[],groups:[]};
+  const [queue,reports,groups]=await Promise.all([listStudyGroupReviewQueue(),listStudyGroupReports(),getFacilitatorStudyGroups()]);
+  return {enabled,queue,reports,groups};
  },
  component:TeacherStudyGroups,
 });
 function TeacherStudyGroups(){
- const {enabled,queue,reports}=Route.useLoaderData(),router=useRouter();
+ const {enabled,queue,reports,groups}=Route.useLoaderData(),router=useRouter();
  const [title,setTitle]=useState(""),[description,setDescription]=useState(""),[kind,setKind]=useState<"course"|"interest">("course");
  const [error,setError]=useState(""),[busy,setBusy]=useState(false);
+ const [groupId,setGroupId]=useState(""),[sessionTitle,setSessionTitle]=useState(""),[agenda,setAgenda]=useState(""),[startsAt,setStartsAt]=useState(""),[endsAt,setEndsAt]=useState("");
+ const [attendance,setAttendance]=useState<Array<{personId:string;rsvp:string;attended:boolean|null}>>([]),[attendanceSession,setAttendanceSession]=useState("");
  async function run(operation:()=>Promise<unknown>){
   setBusy(true);setError("");
   try{await operation();await router.invalidate();}
@@ -37,6 +40,24 @@ function TeacherStudyGroups(){
     <button disabled={busy} className="rounded border px-3 py-2" onClick={()=>run(()=>resolveStudyGroupReport({data:{reportId:r.id,hidePost:false}}))}>Resolve only</button>
    </div></div>)}{reports.length===0&&<p>No open content reports.</p>}
   </section>
+  <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Sessions and attendance</h2>
+    {groups.map(group=><div key={group.id} className="space-y-2 border-b py-3"><h3 className="font-semibold">{group.title}</h3>
+      {group.sessions.map(session=><div key={session.id} className="flex flex-wrap items-center gap-2 text-sm"><span>{session.title} · {new Date(session.startsAt).toLocaleString()}{session.cancelled?" · Cancelled":""}</span>
+       {!session.cancelled&&<><button disabled={busy} className="rounded border px-2 py-1" onClick={()=>run(()=>reviseStudyGroupSession({data:{sessionId:session.id,action:"cancel"}}))}>Cancel</button>
+       <button disabled={busy} className="rounded border px-2 py-1" onClick={()=>{const start=window.prompt("New start (ISO)",session.startsAt),end=window.prompt("New end (ISO)",session.endsAt);if(start&&end)void run(()=>reviseStudyGroupSession({data:{sessionId:session.id,action:"reschedule",startsAt:start,endsAt:end}}))}}>Reschedule</button>
+       <button disabled={busy} className="rounded border px-2 py-1" onClick={async()=>{try{setAttendance(await listStudyGroupAttendance({data:{sessionId:session.id}}));setAttendanceSession(session.id)}catch(e){setError(e instanceof Error?e.message:"Attendance unavailable")}}}>Attendance</button></>}
+      </div>)}
+    </div>)}
+    {attendanceSession&&<div className="space-y-2"><h3 className="font-semibold">Attendance</h3>{attendance.map(person=><div key={person.personId} className="flex gap-2 text-xs"><span>{person.personId.slice(0,8)} · {person.rsvp} · {person.attended===null?"Unrecorded":person.attended?"Present":"Absent"}</span>
+    <button disabled={busy} className="underline" onClick={()=>run(async()=>{await recordStudyGroupAttendance({data:{sessionId:attendanceSession,personId:person.personId,attended:true}});setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}))})}>Present</button>
+    <button disabled={busy} className="underline" onClick={()=>run(async()=>{await recordStudyGroupAttendance({data:{sessionId:attendanceSession,personId:person.personId,attended:false}});setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}))})}>Absent</button></div>)}</div>}
+    <h3 className="font-semibold">Schedule a session</h3><select className="w-full rounded border p-2" aria-label="Choose study group" value={groupId} onChange={e=>setGroupId(e.target.value)}><option value="">Choose a group</option>{groups.map(g=><option key={g.id} value={g.id}>{g.title}</option>)}</select>
+    <input className="w-full rounded border p-2" placeholder="Session title" aria-label="Session title" value={sessionTitle} onChange={e=>setSessionTitle(e.target.value)}/>
+    <textarea className="w-full rounded border p-2" placeholder="Agenda" aria-label="Agenda" value={agenda} onChange={e=>setAgenda(e.target.value)}/>
+    <label className="block">Starts at<input className="ml-2 rounded border p-2" type="datetime-local" value={startsAt} onChange={e=>setStartsAt(e.target.value)}/></label>
+    <label className="block">Ends at<input className="ml-2 rounded border p-2" type="datetime-local" value={endsAt} onChange={e=>setEndsAt(e.target.value)}/></label>
+    <button disabled={busy||!groupId||!sessionTitle.trim()||!startsAt||!endsAt} className="rounded border px-3 py-2" onClick={()=>run(()=>scheduleStudyGroupSession({data:{groupId,title:sessionTitle,agenda,startsAt,endsAt}}))}>Schedule</button>
+   </section>
   <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Create a group</h2>
    <input className="w-full rounded border p-2" aria-label="Group title" placeholder="Group title" value={title} onChange={e=>setTitle(e.target.value)}/>
    <textarea className="w-full rounded border p-2" aria-label="Group description" placeholder="Purpose" value={description} onChange={e=>setDescription(e.target.value)}/>
