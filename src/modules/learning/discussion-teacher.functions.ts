@@ -62,6 +62,8 @@ export const moderateSyntheticDiscussionMessage=createServerFn({method:"POST"})
   if(!thread||thread.contextType!=="section"||!thread.contextId||thread.metadata.synthetic!==true||thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
   const [assignment]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assignment)throw new Error("Teacher is not assigned to this section");
+  const [site]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
+  if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId))throw new AuthorizationError("discussion section site");
   await tx.update(s.communicationMessages).set({metadata:{...message.metadata,hidden:data.hidden,moderatedBy:actor.actorPersonId!}}).where(eq(s.communicationMessages.id,message.id));
   return {saved:true};
  });
