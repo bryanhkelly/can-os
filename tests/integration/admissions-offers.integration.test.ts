@@ -34,6 +34,15 @@ integration("synthetic admissions offer concurrency",()=>{
   }
   expect(new Set(records.map(r=>r.householdId)).size).toBe(1);
   expect(new Set(records.map(r=>r.studentProfileId)).size).toBe(2);
+  const [outsider]=await db.insert(s.people).values({legalFirstName:"Synthetic",legalLastName:"Outsider"}).returning();
+  const outsiderContext={actorPersonId:outsider.id,capabilities:new Set(["enrollment.apply"]),scope:{programIds:[program.id]}};
+  await expect(startFamilyApplication(outsiderContext,{
+   programId:program.id,householdId:sharedHouseholdId,
+   idempotencyKey:`outsider-family-${suffix}`,journeyDefinitionKey:journeyKey,
+   student:{legalFirstName:"Unauthorized",legalLastName:"Student",gradeLevel:"9"}
+  })).rejects.toThrow("Guardian is not a member of the supplied Household");
+  const householdApplications=await db.select().from(s.applications).where(eq(s.applications.householdId,sharedHouseholdId!));
+  expect(householdApplications).toHaveLength(2);
   const expiry=new Date(Date.now()+7*24*60*60*1000);
   // First verify that a declined offer actually releases the sole seat for a sibling.
   const temporaryOffer=await svc.issueSyntheticAdmissionOffer(registrar,{
