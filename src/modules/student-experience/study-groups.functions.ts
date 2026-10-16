@@ -34,7 +34,9 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
  if(!group)throw new Error("Group unavailable");
  const [existing]=await tx.select({status:s.studyGroupMemberships.status}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,group.id),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  if(existing?.status==="approved"||existing?.status==="pending")return {ok:true};
- await tx.insert(s.studyGroupMemberships).values({groupId:group.id,personId:actor.actorPersonId!,role:"student",status:"pending"}).onConflictDoUpdate({target:[s.studyGroupMemberships.groupId,s.studyGroupMemberships.personId],set:{status:"pending",reviewedByPersonId:null,joinedAt:null,updatedAt:new Date()}});return {ok:true};
+ await tx.insert(s.studyGroupMemberships).values({groupId:group.id,personId:actor.actorPersonId!,role:"student",status:"pending"}).onConflictDoUpdate({target:[s.studyGroupMemberships.groupId,s.studyGroupMemberships.personId],set:{status:"pending",reviewedByPersonId:null,joinedAt:null,updatedAt:new Date()}});
+ await tx.insert(s.notifications).values({recipientPersonId:group.facilitatorPersonId,type:"study_group_membership_request",status:"unread",title:"Study group membership request",body:"A student has requested to join "+group.title+".",resourceType:"study_group",resourceId:group.id});
+ return {ok:true};
  });
 });
 export const decideStudyGroupMembership=createServerFn({method:"POST"}).validator((x:{groupId:string;personId:string;approve:boolean})=>x).handler(async({data})=>{
