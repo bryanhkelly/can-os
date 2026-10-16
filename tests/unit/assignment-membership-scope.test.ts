@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {assertSiteScope,AuthorizationError,type CommandContext} from "@/domain/command-context";
+import {assertCapability,assertSiteScope,AuthorizationError,type CommandContext} from "@/domain/command-context";
 import {resolveAccessContext,type VerifiedAccessGrant} from "@/domain/access-context";
 
 const grant:VerifiedAccessGrant={
@@ -11,6 +11,15 @@ describe("site-scoped assignment authorization",()=>{
   const ctx=resolveAccessContext({accountId:"account-a",sessionId:"session-a",activeGrantId:"grant-a"},[grant]);
   expect(()=>assertSiteScope(ctx,"site-a")).not.toThrow();
   expect(()=>assertSiteScope(ctx,"site-b")).toThrow(AuthorizationError);
+ });
+ it("enforces different grading and submission capabilities",()=>{
+  const teacher=resolveAccessContext({accountId:"account-a",sessionId:"session-a",activeGrantId:"grant-a"},[grant]);
+  expect(()=>assertCapability(teacher,"assignments:grade")).not.toThrow();
+  expect(()=>assertCapability(teacher,"assignments:create")).not.toThrow();
+  expect(()=>assertCapability(teacher,"assignments:submit")).toThrow(AuthorizationError);
+  const student=resolveAccessContext({accountId:"account-a",sessionId:"session-a",activeGrantId:"grant-a"},[{...grant,role:"student"}]);
+  expect(()=>assertCapability(student,"assignments:submit")).not.toThrow();
+  expect(()=>assertCapability(student,"assignments:grade")).toThrow(AuthorizationError);
  });
  it("rejects selecting a membership belonging to another account",()=>{
   expect(()=>resolveAccessContext({accountId:"account-b",sessionId:"session-b",activeGrantId:"grant-a"},[grant])).toThrow(AuthorizationError);
