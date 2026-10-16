@@ -44,8 +44,18 @@ The prototype repository `academy-union-core` remains a product and UX reference
 ## Development and release validation
 
 Use Node.js 22 and `npm ci` to install the committed dependency versions.
-Run `npm test` and `npm run typecheck` for unit tests and production build/type checking.
+Run `npm test` and `npm run typecheck` for unit tests and fast type checking (`tsc --noEmit`);
+`npm run build` runs the production Vite build separately.
 Use `npm run db:generate` to verify that schema changes have committed migrations.
+
+Golden-flow browser tests use Playwright (`npm run test:e2e`, one-time `npx playwright install chromium`).
+They require a disposable `DATABASE_URL`; see the "Running the GF1 e2e test" section of
+[Golden Flows](docs/golden-flows.md).
+
+Synthetic demo writes are disabled unless `CAN_DEMO_WRITES_ENABLED=true` (fail closed). Set it
+only for synthetic-demo deployments, and set `CAN_JOB_SECRET` so the Netlify scheduled function
+(`netlify/functions/scheduled-jobs.ts`) can invoke the authenticated `/api/jobs` maintenance
+endpoint that marks overdue submissions missing and processes the domain-event outbox.
 
 Database integration tests require a disposable `TEST_DATABASE_URL` and explicit
 fixture-write opt-in; see [Neon development](docs/neon-development.md).

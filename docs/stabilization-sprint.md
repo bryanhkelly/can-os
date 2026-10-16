@@ -2,7 +2,7 @@
 
 ## Production safety
 
-The current repository has synthetic personas but **no authenticated role identity**. All synthetic server-side mutations are now fail-closed in `NODE_ENV=production`. A private **non-production** development environment must explicitly set `CAN_DEMO_WRITES_ENABLED=true` to exercise write flows. `assertSyntheticMutation(role)` identifies which role a given operation requires; it **does not authenticate the caller**. Never enable it with real student records or on a publicly writable demonstration.
+The current repository has synthetic personas with authenticated session identity. All synthetic server-side mutations are fail-closed in every environment. A development or demo environment must explicitly set `CAN_DEMO_WRITES_ENABLED=true` to exercise write flows. `assertSyntheticMutation(role)` identifies which role a given operation requires; it **does not authenticate the caller**. Never enable it with real student records or on a publicly writable demonstration.
 
 Real role enforcement still requires sessions and an authenticated server-side person/role/Site lookup. A front-end persona selector is navigation only, not security.
 

@@ -4,6 +4,7 @@ import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertSyntheticMutation, type DemoRole } from "../student-experience/demo-write-gate";
+import { z } from "zod";
 
 /**
  * GF4 attendance loop. Actors always derive from the verified server session
@@ -129,7 +130,7 @@ async function loadScopedRoster(
 
 /** Students expected onsite for a date with their effective attendance status. */
 export const listSiteAttendanceRoster = createServerFn({ method: "GET" })
-  .validator((value: { date: string }) => value)
+  .validator((value: unknown) => z.object({ date: z.string().min(1) }).parse(value))
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.write");
     if (!datePattern.test(data.date ?? "")) throw new Error("Date must be YYYY-MM-DD");
@@ -175,7 +176,7 @@ export const listSiteAttendanceRoster = createServerFn({ method: "GET" })
 
 /** Mark a student present/absent/tardy; deterministic sourceKey keeps retries idempotent. */
 export const markAttendance = createServerFn({ method: "POST" })
-  .validator((value: { studentProfileId: string; date: string; status: AttendanceStatus }) => value)
+  .validator((value: unknown) => z.object({ studentProfileId: z.string().min(1), date: z.string().min(1), status: z.enum(["expected","present","absent","tardy","excused"]) }).parse(value))
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.write");
     assertSyntheticMutation(context.role as DemoRole);
@@ -301,7 +302,7 @@ export const listGuardianAbsences = createServerFn({ method: "GET" }).handler(as
 
 /** Guardians may excuse only events for students tied to their verified relationship. */
 export const submitExcuse = createServerFn({ method: "POST" })
-  .validator((value: { attendanceEventId: string; reason: string }) => value)
+  .validator((value: unknown) => z.object({ attendanceEventId: z.string().min(1), reason: z.string() }).parse(value))
   .handler(async ({ data }) => {
     const context = await guardianActor();
     assertSyntheticMutation("guardian");
@@ -375,7 +376,7 @@ export const listPendingExcuses = createServerFn({ method: "GET" }).handler(asyn
 
 /** Approve or reject a submitted excuse; approval writes a correcting AttendanceEvent. */
 export const reviewExcuse = createServerFn({ method: "POST" })
-  .validator((value: { excuseId: string; decision: "approved" | "rejected"; note?: string }) => value)
+  .validator((value: unknown) => z.object({ excuseId: z.string().min(1), decision: z.enum(["approved","rejected"]), note: z.string().optional() }).parse(value))
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.excuse.review");
     assertSyntheticMutation(context.role as DemoRole);

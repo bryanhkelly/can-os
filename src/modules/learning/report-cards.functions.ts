@@ -158,7 +158,7 @@ export type FinalizedGradeRow = Awaited<ReturnType<typeof finalizedGradeRows>>[n
  * skipped, making re-runs idempotent.
  */
 export const finalizeSectionGrades = createServerFn({ method: "POST" })
-  .validator((value: { sectionId: string; gradingPeriodId: string }) => value)
+  .validator((value: unknown) => z.object({ sectionId: z.string().min(1), gradingPeriodId: z.string().min(1) }).parse(value))
   .handler(async ({ data }) => {
     assertSyntheticMutation("teacher");
     const context = await getCommandContext(getRequest());
@@ -655,7 +655,7 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
 
 /** Finalized grades for one grading period (or all, grouped client-side). */
 export const getStudentReportCard = createServerFn({ method: "GET" })
-  .validator((value: { studentPersonId?: string; gradingPeriodId?: string }) => value ?? {})
+  .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1).optional(), gradingPeriodId: z.string().min(1).optional() }).parse(value ?? {}))
   .handler(async ({ data }) => {
     const { db, s } = await stores();
     if (data.gradingPeriodId && !UUID.test(data.gradingPeriodId)) {
@@ -668,7 +668,7 @@ export const getStudentReportCard = createServerFn({ method: "GET" })
 
 /** All finalized grades ordered by school year/term, with the credit issuer per program. */
 export const getStudentTranscript = createServerFn({ method: "GET" })
-  .validator((value: { studentPersonId?: string } | undefined) => value ?? {})
+  .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1).optional() }).parse(value ?? {}))
   .handler(async ({ data }) => {
     const { db, s } = await stores();
     const viewer = await resolveStudentViewer(db, s, data.studentPersonId);
@@ -704,7 +704,7 @@ async function listIssuances(db: DbClient, s: Schema, studentProfileId: string) 
  * corrections never rewrite issuance history.
  */
 export const issueTranscript = createServerFn({ method: "POST" })
-  .validator((value: { studentPersonId: string; purpose?: string }) => value)
+  .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1), purpose: z.string().optional() }).parse(value))
   .handler(async ({ data }) => {
     assertSyntheticMutation("registrar");
     const context = await getCommandContext(getRequest());

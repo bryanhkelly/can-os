@@ -308,6 +308,24 @@ ConsentRecord, FinancialObligation, least-privilege medical access, offline-safe
 
 ---
 
+## Running the GF1 e2e test
+
+A Playwright golden-flow test covers GF1 end to end (assignment becomes missing -> guardian notified -> student submits late -> teacher grades -> grade visible): `tests/e2e/gf1-missing-assignment.spec.ts`, with its self-contained Neon fixture in `tests/e2e/fixture.ts`.
+
+Prerequisites:
+
+- `npm install -D @playwright/test` and `npx playwright install chromium`
+- Add `"test:e2e": "playwright test"` to `package.json` scripts
+- Set `DATABASE_URL` to a **disposable Neon branch** (never production). The test inserts and deletes its own synthetic rows, but it is not isolated against real data.
+
+Run:
+
+```sh
+DATABASE_URL=postgres://... npm run test:e2e
+```
+
+Playwright starts `npm run dev` itself (reusing an existing server on port 3000) with `CAN_ACCESS_TOKEN_PEPPER`, `CAN_JOB_SECRET`, and `CAN_DEMO_WRITES_ENABLED=true` set to test values; override any of them via the environment. The test signs in by inserting real session rows (secret hashed with the pepper) and injecting the session cookie — there is no app backdoor. Reports land in `playwright-report/` (git-ignored).
+
 ## GF34 — Health Office
 
 ### Goal

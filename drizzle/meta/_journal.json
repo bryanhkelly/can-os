@@ -57,6 +57,13 @@
       "when": 1792179841158,
       "tag": "0007_overconfident_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792181247777,
+      "tag": "0008_chilly_arclight",
+      "breakpoints": true
     }
   ]
 }

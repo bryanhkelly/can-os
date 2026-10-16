@@ -2,6 +2,7 @@ import { assertSyntheticMutation } from "./demo-write-gate";
 import { readRubric, scoreRubric, type CriterionGrade } from "./rubric";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
+import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, assertSiteScope, AuthorizationError } from "@/domain/command-context";
 import { and, eq, inArray, desc, sql } from "drizzle-orm";
@@ -88,7 +89,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
 });
 
 export const saveAssignmentResponse=createServerFn({method:"POST"})
- .validator((value:{assessmentId:string;text:string})=>value)
+ .validator((value:unknown)=>z.object({assessmentId:z.string().min(1),text:z.string()}).parse(value))
  .handler(async({data})=>{
   assertSyntheticMutation("student");
   const {context,studentId,studentPersonId}=await studentActor();
@@ -144,7 +145,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
  });
 
 export const gradeSyntheticAssignment=createServerFn({method:"POST"})
- .validator((value:{submissionId:string;score:number;comment:string})=>value)
+ .validator((value:unknown)=>z.object({submissionId:z.string().min(1),score:z.number().finite().min(0).max(100),comment:z.string()}).parse(value))
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
@@ -174,7 +175,7 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
  });
 
 export const returnSyntheticAssignment=createServerFn({method:"POST"})
- .validator((value:{submissionId:string})=>value)
+ .validator((value:unknown)=>z.object({submissionId:z.string().min(1)}).parse(value))
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
@@ -204,7 +205,7 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
 
 /** Create and publish a synthetic class assignment using the existing model. */
 export const createSyntheticAssignment=createServerFn({method:"POST"})
- .validator((value:{sectionId:string;title:string;instructions:string;dueAt:string;pointsPossible:number;rubric:string})=>value)
+ .validator((value:unknown)=>z.object({sectionId:z.string().min(1),title:z.string(),instructions:z.string(),dueAt:z.string(),pointsPossible:z.number().finite().positive().max(1000),rubric:z.string()}).parse(value))
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
@@ -235,7 +236,7 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
  });
 
 export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
- .validator((value:{assessmentId:string})=>value)
+ .validator((value:unknown)=>z.object({assessmentId:z.string().min(1)}).parse(value))
  .handler(async({data})=>{
   const {context,studentId}=await studentActor();
   if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
@@ -255,7 +256,7 @@ export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
 
 /** Drafts remain in the existing response JSON on an assigned attempt. */
 export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
- .validator((value:{assessmentId:string;text:string})=>value)
+ .validator((value:unknown)=>z.object({assessmentId:z.string().min(1),text:z.string()}).parse(value))
  .handler(async({data})=>{
   assertSyntheticMutation("student");
   const {context,studentId}=await studentActor();
@@ -299,7 +300,7 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
  });
 
 export const manageSyntheticAssignment=createServerFn({method:"POST"})
- .validator((value:{assessmentId:string;action:"close"|"reopen"|"reschedule";dueAt?:string})=>value)
+ .validator((value:unknown)=>z.object({assessmentId:z.string().min(1),action:z.enum(["close","reopen","reschedule"]),dueAt:z.string().optional()}).parse(value))
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
@@ -337,7 +338,7 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
 
 /** Teacher grades a submitted synthetic attempt against the published rubric. */
 export const gradeSyntheticRubric=createServerFn({method:"POST"})
- .validator((value:{submissionId:string;grades:CriterionGrade[];comment:string})=>value)
+ .validator((value:unknown)=>z.object({submissionId:z.string().min(1),grades:z.array(z.object({id:z.string().min(1),points:z.number().finite().min(0),comment:z.string().optional()})),comment:z.string()}).parse(value))
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();

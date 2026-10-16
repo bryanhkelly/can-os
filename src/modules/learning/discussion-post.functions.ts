@@ -5,9 +5,10 @@ import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {and,eq} from "drizzle-orm";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {isValidDiscussionPost} from "@/domain/course-discussions";
+import { z } from "zod";
 /** Private synthetic-only write. Never infer permissions from a browser-selected persona. */
 export const postSyntheticDiscussionMessage=createServerFn({method:"POST"})
-.validator((input:{threadId:string;body:string;parentMessageId?:string|null})=>input)
+.validator((input:unknown)=>z.object({threadId:z.string().min(1),body:z.string(),parentMessageId:z.string().min(1).nullish()}).parse(input))
 .handler(async({data})=>{
  assertSyntheticMutation("student");
  const actor=await getCommandContext(getRequest());

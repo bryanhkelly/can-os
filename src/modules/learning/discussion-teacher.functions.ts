@@ -4,6 +4,7 @@ import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability, AuthorizationError} from "@/domain/command-context";
 import {and,eq} from "drizzle-orm";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import { z } from "zod";
 async function authorizedTeacher(){
  const actor=await getCommandContext(getRequest());
  if(actor.role!=="teacher"||!actor.actorPersonId)throw new AuthorizationError("demo teacher identity");
@@ -13,7 +14,7 @@ async function authorizedTeacher(){
 }
 /** Private-only creation of synthetic ungraded section discussions. */
 export const createSyntheticCourseDiscussion=createServerFn({method:"POST"})
-.validator((input:{sectionId:string;subject:string;prompt:string})=>input)
+.validator((input:unknown)=>z.object({sectionId:z.string().min(1),subject:z.string(),prompt:z.string()}).parse(input))
 .handler(async({data})=>{
  assertSyntheticMutation("teacher");
  const actor=await authorizedTeacher();
@@ -33,7 +34,7 @@ export const createSyntheticCourseDiscussion=createServerFn({method:"POST"})
  });
 });
 export const setSyntheticCourseDiscussionLock=createServerFn({method:"POST"})
-.validator((input:{threadId:string;locked:boolean})=>input)
+.validator((input:unknown)=>z.object({threadId:z.string().min(1),locked:z.boolean()}).parse(input))
 .handler(async({data})=>{
  assertSyntheticMutation("teacher");
  const actor=await authorizedTeacher();
@@ -52,7 +53,7 @@ export const setSyntheticCourseDiscussionLock=createServerFn({method:"POST"})
 });
 
 export const moderateSyntheticDiscussionMessage=createServerFn({method:"POST"})
-.validator((input:{messageId:string;hidden:boolean})=>input)
+.validator((input:unknown)=>z.object({messageId:z.string().min(1),hidden:z.boolean()}).parse(input))
 .handler(async({data})=>{
  assertSyntheticMutation("teacher");
  const actor=await authorizedTeacher();

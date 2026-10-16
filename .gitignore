@@ -8,3 +8,8 @@ src/routeTree.gen.ts
 .env.*
 !.env.example
 coverage/
+
+# Playwright e2e artifacts
+/test-results/
+/playwright-report/
+/playwright/.cache/

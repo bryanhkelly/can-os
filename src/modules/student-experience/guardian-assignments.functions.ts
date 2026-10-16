@@ -4,6 +4,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianFeedbackReleased, latestGuardianAttempts } from "@/domain/guardian-academics";
+import { z } from "zod";
 
 /**
  * Guardian academic visibility is derived from a verified session AND an active
@@ -12,7 +13,7 @@ import { guardianFeedbackReleased, latestGuardianAttempts } from "@/domain/guard
  * Unsubmitted draft contents and teacher-only grading notes are not exposed.
  */
 export const getGuardianAssignments = createServerFn({ method: "GET" })
- .validator((value: { studentPersonId: string }) => value)
+ .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1) }).parse(value))
  .handler(async ({ data }) => {
   const context = await getCommandContext(getRequest());
   assertCapability(context, "student:related-read");

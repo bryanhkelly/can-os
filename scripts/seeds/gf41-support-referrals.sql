@@ -17,3 +17,9 @@ VALUES
 'f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000004','student_profile','f1000000-0000-4000-8000-000000000007',
 '{"synthetic":true,"fixture":"gf41","stage":"review","category":"planning","requestedArea":"planning","source":"guardian","notes":"Explore course pathways","academicRecommendation":"Discuss elective options with advisor","history":[]}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
+-- Typed GF41B lifecycle state for the seeded referrals (mirrors the 0008 migration backfill).
+INSERT INTO support_referrals(action_id,stage,category,requested_area,source,include_evidence,notes,academic_recommendation) VALUES
+('f4100000-0000-4000-8000-000000000011','submitted','academic','academic','teacher',false,'Repeated difficulty forming a thesis',''),
+('f4100000-0000-4000-8000-000000000012','accepted','learning','learning','teacher',false,'Needs additional practice',''),
+('f4100000-0000-4000-8000-000000000013','review','planning','planning','guardian',false,'Explore course pathways','Discuss elective options with advisor')
+ON CONFLICT(action_id) DO NOTHING;
