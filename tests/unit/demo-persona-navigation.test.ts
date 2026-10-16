@@ -11,6 +11,9 @@ describe("synthetic demo persona navigation", () => {
   const paths=(role: Parameters<typeof visibleDemoLinks>[0])=>visibleDemoLinks(role).map(x=>x.to);
   expect(paths("student")).toContain("/student/assignments");
   expect(paths("student")).not.toContain("/admissions");
+  expect(paths("guardian")).toContain("/guardian/academics");
+  expect(paths("guardian")).not.toContain("/student/assignments");
+  expect(paths("guardian")).not.toContain("/student/courses");
   expect(paths("teacher")).toContain("/teacher/missing-work");
   expect(paths("teacher")).not.toContain("/admissions/capacity");
   expect(paths("registrar")).toContain("/admissions/capacity");
