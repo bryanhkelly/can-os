@@ -28,12 +28,13 @@ export const postSyntheticDiscussionMessage=createServerFn({method:"POST"})
   const [section]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
   if(!section?.siteId||!actor.scope.siteIds.includes(section.siteId))throw new AuthorizationError("discussion section site");
   if(data.parentMessageId){
-   const [parent]=await tx.select({id:s.communicationMessages.id}).from(s.communicationMessages).where(and(eq(s.communicationMessages.id,data.parentMessageId),eq(s.communicationMessages.threadId,thread.id))).limit(1);
-   if(!parent)throw new Error("Reply target must belong to this discussion");
+   const [parent]=await tx.select({id:s.communicationMessages.id,metadata:s.communicationMessages.metadata}).from(s.communicationMessages).where(and(eq(s.communicationMessages.id,data.parentMessageId),eq(s.communicationMessages.threadId,thread.id))).limit(1);
+   if(!parent||parent.metadata.synthetic!==true||parent.metadata.hidden===true)throw new Error("Reply target is unavailable");
   }
   const [created]=await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:actor.actorPersonId,body:data.body.trim(),metadata:{synthetic:true,...(data.parentMessageId?{parentMessageId:data.parentMessageId}:{})}}).returning({id:s.communicationMessages.id});
   if(!created)throw new Error("Unable to create discussion response");
   await tx.update(s.communicationThreads).set({lastMessageAt:new Date(),updatedAt:new Date()}).where(eq(s.communicationThreads.id,thread.id));
+  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,action:"discussion.post",resourceType:"communication_message",resourceId:created.id,after:{threadId:thread.id,parentMessageId:data.parentMessageId??null},context:{synthetic:true}});
   return {id:created.id};
  });
 });
