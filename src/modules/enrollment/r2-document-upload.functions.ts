@@ -1,5 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
-import {and,eq,desc} from "drizzle-orm";
+import {and,eq,desc,sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,journeys,journeyRequirements,documents,auditEvents} from "@/db/schema";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
@@ -39,6 +39,7 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
   const returnedType=response.headers.get("content-type");
   if(returnedType&&returnedType!==data.mimeType)throw new Error("Uploaded document type does not match");
   return db.transaction(async tx=>{
+   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.requirementId}))`);
    const [existing]=await tx.select({id:documents.id}).from(documents).where(and(eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageKey,data.key))).limit(1);
    if(existing)return {documentId:existing.id,created:false};
    const versions=await tx.select({id:documents.id,metadata:documents.metadata}).from(documents)
