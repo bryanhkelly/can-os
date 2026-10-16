@@ -34,7 +34,7 @@ function assertScopedId(
   label: string,
 ): void {
   if (!id) return;
-  if (allowed && allowed.length > 0 && !allowed.includes(id)) {
+  if (allowed && !allowed.includes(id)) {
     throw new AuthorizationError(`${label}: ${id}`);
   }
 }
