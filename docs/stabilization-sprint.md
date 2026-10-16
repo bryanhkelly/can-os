@@ -19,6 +19,6 @@ A shared application navigation and demo persona dropdown appear on all routes. 
 ## Release boundaries
 
 - The workflow tests validate relational fixture integrity only; they do not assert complete cross-role browser behavior.
-- Authenticated production writes remain intentionally disabled.
+- First-development synthetic writes stay enabled until an identity provider replaces the declared demo principals.
 - Existing mutation controls may display server rejection on deployed public sites until they are integrated with real authentication.
 - No schema migrations and no real student data.

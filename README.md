@@ -52,9 +52,10 @@ fixture-write opt-in; see [Neon development](docs/neon-development.md).
 Do not run fixture-writing tests against the deployed application's database.
 The connection belongs in ignored `.env.local`, never in `.env.example`.
 
-The current deployed application is a synthetic demonstration, not a completed
-authenticated production release. Study Groups remain disabled on production
-deployments pending authenticated principals, safeguarding policy, and isolated
-database verification; see [GF26 rollout](docs/gf26-rollout.md).
-Medical/legal workflows remain subject to the
+The current deployed application is the first development release of a new
+product. Synthetic demo workflows, including Study Groups, stay enabled on
+every deployment unless `CAN_DEMO_WRITES_ENABLED=false`. Actors are declared
+synthetic principals until an identity provider is selected; see
+[GF26 rollout](docs/gf26-rollout.md). Do not load real student, medical, or
+legal records. Field-level medical/legal controls remain documented in the
 [school operations release gates](docs/school-operations-security-gates.md).

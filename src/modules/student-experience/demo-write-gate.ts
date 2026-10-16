@@ -1,15 +1,17 @@
 /**
- * The current application has synthetic identities, not authenticated sessions.
- * Fail closed for all mutations in deployed environments; never treat a UI role as authorization.
- * This feature gate may only be enabled on a private development instance.
+ * First development release uses declared synthetic demo roles, not an identity provider.
+ * Product workflows stay available on every deployment, including production, unless an
+ * operator explicitly sets CAN_DEMO_WRITES_ENABLED=false. A UI role is still not arbitrary
+ * authorization: callers must use one of the declared demo roles, and each workflow checks
+ * its own synthetic relationship and scope.
  */
 export type DemoRole = "student" | "teacher" | "guardian" | "registrar" | "specialist";
 export function isSyntheticAccessEnabled(): boolean {
- return process.env.NODE_ENV !== "production" && process.env.CAN_DEMO_WRITES_ENABLED === "true";
+ return process.env.CAN_DEMO_WRITES_ENABLED !== "false";
 }
 export function assertSyntheticMutation(role: DemoRole): void {
  if (!isSyntheticAccessEnabled()) {
-  throw new Error("Synthetic writes are disabled. Connect authenticated roles before enabling mutations.");
+  throw new Error("Synthetic writes are disabled. Set CAN_DEMO_WRITES_ENABLED to a value other than false to enable this first-development deployment.");
  }
  if (!["student","teacher","guardian","registrar","specialist"].includes(role)) throw new Error("Unknown synthetic role");
 }

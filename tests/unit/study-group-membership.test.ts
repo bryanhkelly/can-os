@@ -76,8 +76,9 @@ describe("synthetic Study Group membership transitions", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("denies reads and writes in production before querying the database", async () => {
+  it("denies reads and writes before querying the database when explicitly disabled", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("CAN_DEMO_WRITES_ENABLED", "false");
     await expect(listStudyGroups()).rejects.toThrow("disabled");
     await expect(requestStudyGroupMembership({ data: { groupId: "group" } })).rejects.toThrow("disabled");
     expect(transaction).not.toHaveBeenCalled();

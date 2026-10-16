@@ -1,9 +1,10 @@
 # GF26 rollout and verification
 
-The GF26 implementation is intentionally behind the synthetic access gate.
-Production reads, mutations, and facilitator-private review queues remain disabled.
-The production route displays an explicit unavailable state without querying group data.
-Private development query failures surface as errors, not empty successful results.
+GF26 is enabled for this first development release, including the public demo.
+Reads, mutations, and facilitator review queues use declared synthetic identities
+and stay available unless `CAN_DEMO_WRITES_ENABLED=false`. The explicit unavailable
+state is only that operator kill switch; it does not query group data.
+Query failures surface as errors, not empty successful results.
 
 ## Apply to a private synthetic database
 
@@ -18,7 +19,7 @@ Private development query failures surface as errors, not empty successful resul
    The fixture supplies two groups, approved and pending membership, visible and
    hidden content, an open moderation report, an upcoming RSVP, completed
    attendance, and two canonical calendar entries with fixed dates and IDs.
-5. Set `CAN_DEMO_WRITES_ENABLED=true` only in private development and never in a public deployment.
+5. Leave `CAN_DEMO_WRITES_ENABLED` unset or set it to `true`. Set it to `false` only to turn the workflow off.
 6. Run `npm ci`, `npm run typecheck`, and `npm test`.
 7. Configure a disposable `TEST_DATABASE_URL` and
    `CAN_TEST_DB_WRITES_ENABLED=true` in ignored `.env.local`, then run

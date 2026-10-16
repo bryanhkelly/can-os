@@ -11,4 +11,4 @@ The initial offer-eligibility domain rule is intentionally **pure** and does not
 5. Validate school-year membership, application ownership, journey readiness, and program scope at the database boundary.
 6. Cover competing offers, expired offers, withdrawals, sibling applications, capacity reductions, and waitlist promotion in integration tests.
 
-Do not interpret the current capacity dashboard as an enforceable seat reservation system. Production synthetic writes remain disabled.
+Do not interpret the current capacity dashboard as an enforceable seat reservation system. Offer activation uses locked seat pools and the first-development synthetic principals.
