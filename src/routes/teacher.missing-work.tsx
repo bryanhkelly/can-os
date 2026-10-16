@@ -7,7 +7,7 @@ function TeacherMissingWork(){
  const studentCount=new Set(items.map(x=>x.studentProfileId)).size;
  return <main className="mx-auto max-w-5xl px-5 py-10">
   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Synthetic teacher</p>
-  <h1 className="mt-2 font-serif text-4xl">Missing work</h1>
+  <h1 className="mt-2 font-serif text-4xl">Missing work</h1><p className="mt-3 text-xs"><Link to="/teacher/notices" className="underline">Teacher notifications →</Link></p>
   <p className="mt-3 text-sm text-muted-foreground">Overdue work across active students in the demo teacher's assigned sections. Only explicitly synthetic student records are included. This is not an authenticated teacher view.</p>
   {notice&&<p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
   {!connected&&<p role="status" className="mt-4 rounded-xl border p-4">Neon is not connected. The queue cannot load.</p>}
