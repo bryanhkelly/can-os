@@ -54,6 +54,9 @@ integration("synthetic admissions offer concurrency",()=>{
   await expect(svc.respondToSyntheticAdmissionOffer(family,offerId,"accept")).resolves.toBe(offerId);
   const registrarNotices=await db.select().from(s.notifications).where(eq(s.notifications.recipientPersonId,registrarPerson.id));
   expect(registrarNotices.filter(n=>n.type==="admission_offer_accepted"&&n.resourceId===offerId)).toHaveLength(1);
+  await expect(svc.respondToSyntheticAdmissionOffer(family,offerId,"accept")).resolves.toBe(offerId);
+  const decisionNotices=await db.select().from(s.notifications).where(eq(s.notifications.recipientPersonId,registrarPerson.id));
+  expect(decisionNotices.filter(n=>n.type==="admission_offer_accepted"&&n.resourceId===offerId)).toHaveLength(1);
   const enrolled=await svc.activateSyntheticOfferedEnrollment(registrar,offerId);
   expect(await svc.activateSyntheticOfferedEnrollment(registrar,offerId)).toBe(enrolled);
   const actual=await db.select().from(s.enrollments).where(eq(s.enrollments.programId,program.id));
