@@ -1,0 +1,253 @@
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { z } from "zod";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { assertCapability, assertSiteScope, AuthorizationError } from "@/domain/command-context";
+import { assertSyntheticMutation } from "@/modules/student-experience/demo-write-gate";
+import { EventTypes } from "@/domain/event-types";
+
+/**
+ * Teacher gradebook server functions. Authorization mirrors the assignments
+ * module: the actor must hold a verified teacher grant with site membership,
+ * and section access requires a section_teachers row for the actor.
+ * Never accept a browser-selected actor or role.
+ */
+async function teacherActor(sectionId?: string) {
+ const context = await getCommandContext(getRequest());
+ if (context.role !== "teacher" || !context.actorPersonId) throw new AuthorizationError("teacher gradebook access");
+ if (!context.scope.siteIds?.length) throw new AuthorizationError("teacher site membership");
+ const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+ if (sectionId) {
+  const [section] = await db.select({ siteId: schema.sections.siteId })
+   .from(schema.sectionTeachers)
+   .innerJoin(schema.sections, eq(schema.sections.id, schema.sectionTeachers.sectionId))
+   .where(and(eq(schema.sectionTeachers.personId, context.actorPersonId), eq(schema.sectionTeachers.sectionId, sectionId)))
+   .limit(1);
+  if (!section) throw new AuthorizationError("assigned teacher");
+  assertSiteScope(context, section.siteId);
+ }
+ return context;
+}
+
+async function teacherForSubmission(submissionId: string) {
+ const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+ const [row] = await db.select({ sectionId: schema.assessments.sectionId })
+  .from(schema.submissions)
+  .innerJoin(schema.assessments, eq(schema.assessments.id, schema.submissions.assessmentId))
+  .where(eq(schema.submissions.id, submissionId))
+  .limit(1);
+ if (!row) throw new AuthorizationError("submission section");
+ return teacherActor(row.sectionId);
+}
+
+/** Sections the authenticated teacher teaches, for the gradebook section picker. */
+export const getGradebookSections = createServerFn({ method: "GET" }).handler(async () => {
+ const context = await teacherActor();
+ if (!process.env.DATABASE_URL) return { connected: false, sections: [] as { id: string; code: string; title: string }[] };
+ const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+ const sections = await db.select({ id: s.sections.id, code: s.sections.code, title: s.sections.title })
+  .from(s.sectionTeachers)
+  .innerJoin(s.sections, eq(s.sections.id, s.sectionTeachers.sectionId))
+  .where(and(
+   eq(s.sectionTeachers.personId, context.actorPersonId!),
+   inArray(s.sections.siteId, context.scope.siteIds!),
+   eq(s.sections.active, true),
+  ))
+  .orderBy(asc(s.sections.title));
+ return { connected: true, sections };
+});
+
+/** Students × assessments grid for one section the teacher teaches. */
+export const getGradebook = createServerFn({ method: "GET" })
+ .validator((value: unknown) => z.object({ sectionId: z.string().min(1) }).parse(value))
+ .handler(async ({ data }) => {
+  const context = await teacherActor(data.sectionId);
+  if (!process.env.DATABASE_URL) return { connected: false as const, section: null, students: [], assessments: [], cells: [] };
+  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+  const [section] = await db.select({ id: s.sections.id, code: s.sections.code, title: s.sections.title })
+   .from(s.sections)
+   .where(and(eq(s.sections.id, data.sectionId), inArray(s.sections.siteId, context.scope.siteIds!)))
+   .limit(1);
+  if (!section) throw new AuthorizationError("section");
+
+  const studentRows = await db.select({
+   studentProfileId: s.enrollments.studentProfileId,
+   firstName: s.people.legalFirstName,
+   lastName: s.people.legalLastName,
+   preferredName: s.people.preferredName,
+  })
+   .from(s.enrollments)
+   .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
+   .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
+   .where(and(
+    eq(s.enrollments.sectionId, data.sectionId),
+    eq(s.enrollments.kind, "section"),
+    eq(s.enrollments.status, "active"),
+   ))
+   .orderBy(asc(s.people.legalLastName), asc(s.people.legalFirstName));
+
+  const assessmentRows = await db.select({
+   id: s.assessments.id,
+   title: s.assessments.title,
+   status: s.assessments.status,
+   dueAt: s.assessments.dueAt,
+   pointsPossible: s.assessments.pointsPossible,
+  })
+   .from(s.assessments)
+   .where(and(eq(s.assessments.sectionId, data.sectionId), inArray(s.assessments.status, ["published", "closed"])))
+   .orderBy(asc(s.assessments.dueAt));
+
+  const assessmentIds = assessmentRows.map(row => row.id);
+  const submissionRows = assessmentIds.length
+   ? await db.select({
+    id: s.submissions.id,
+    assessmentId: s.submissions.assessmentId,
+    studentProfileId: s.submissions.studentProfileId,
+    status: s.submissions.status,
+    timeliness: s.submissions.timeliness,
+    attemptNumber: s.submissions.attemptNumber,
+    score: s.submissions.score,
+    submittedAt: s.submissions.submittedAt,
+    gradedAt: s.submissions.gradedAt,
+   })
+    .from(s.submissions)
+    .where(inArray(s.submissions.assessmentId, assessmentIds))
+    .orderBy(desc(s.submissions.attemptNumber))
+   : [];
+
+  // Latest attempt per (student, assessment); rows arrive newest-attempt first.
+  const latest = new Map<string, (typeof submissionRows)[number]>();
+  for (const row of submissionRows) {
+   const key = `${row.studentProfileId}:${row.assessmentId}`;
+   if (!latest.has(key)) latest.set(key, row);
+  }
+
+  return {
+   connected: true as const,
+   section,
+   students: studentRows.map(row => ({
+    studentProfileId: row.studentProfileId,
+    displayName: `${row.preferredName ?? row.firstName} ${row.lastName}`,
+   })),
+   assessments: assessmentRows.map(row => ({
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    dueAt: row.dueAt?.toISOString() ?? null,
+    pointsPossible: row.pointsPossible,
+   })),
+   cells: [...latest.values()].map(row => ({
+    submissionId: row.id,
+    assessmentId: row.assessmentId,
+    studentProfileId: row.studentProfileId,
+    status: row.status,
+    timeliness: row.timeliness,
+    score: row.score,
+    submittedAt: row.submittedAt?.toISOString() ?? null,
+    gradedAt: row.gradedAt?.toISOString() ?? null,
+   })),
+  };
+ });
+
+/** Grade a submitted attempt. Uses the GF1 grading service so audit and GradePosted events are written. */
+export const gradeSubmission = createServerFn({ method: "POST" })
+ .validator((value: unknown) => z.object({
+  submissionId: z.string().min(1),
+  score: z.number().finite(),
+  feedbackComment: z.string().max(4000).optional().default(""),
+ }).parse(value))
+ .handler(async ({ data }) => {
+  assertSyntheticMutation("teacher");
+  const context = await teacherForSubmission(data.submissionId);
+  assertCapability(context, "assignments:grade");
+  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+  const [record] = await db.select({ status: s.submissions.status, points: s.assessments.pointsPossible })
+   .from(s.submissions)
+   .innerJoin(s.assessments, eq(s.assessments.id, s.submissions.assessmentId))
+   .where(eq(s.submissions.id, data.submissionId))
+   .limit(1);
+  if (!record) throw new Error("Submission not found");
+  if (record.status !== "submitted") throw new Error("Only submitted work can be graded");
+  const points = record.points === null ? null : Number(record.points);
+  if (points === null || !Number.isFinite(points)) throw new Error("Assessment has no point value");
+  if (data.score < 0 || data.score > points) throw new Error(`Score must be from 0 to ${points}`);
+  const gf1 = await import("./gf1-service");
+  // Teacher-of-section relationship and site scope are verified above; grant the
+  // domain capability so the shared grading path runs its transaction with the
+  // immutable audit event and GradePosted domain event.
+  await gf1.gradeSubmission(
+   { ...context, capabilities: new Set([...context.capabilities, "submission.grade"]) },
+   data.submissionId,
+   { score: String(data.score), feedback: { comment: data.feedbackComment.trim() } },
+  );
+  return { submissionId: data.submissionId };
+ });
+
+/** Create an assessment for a section the teacher teaches; published when a due date is set. */
+export const createAssessment = createServerFn({ method: "POST" })
+ .validator((value: unknown) => z.object({
+  sectionId: z.string().min(1),
+  title: z.string().trim().min(3).max(200),
+  instructions: z.string().trim().max(20000).optional(),
+  pointsPossible: z.number().finite().min(1).max(1000),
+  dueAt: z.string().refine(v => !Number.isNaN(new Date(v).getTime()), "dueAt must be an ISO date").optional(),
+ }).parse(value))
+ .handler(async ({ data }) => {
+  assertSyntheticMutation("teacher");
+  const context = await teacherActor(data.sectionId);
+  assertCapability(context, "assignments:create");
+  const dueAt = data.dueAt ? new Date(data.dueAt) : null;
+  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+  return db.transaction(async tx => {
+   const status = dueAt ? "published" as const : "draft" as const;
+   const [assessment] = await tx.insert(s.assessments).values({
+    sectionId: data.sectionId,
+    title: data.title,
+    instructions: data.instructions ?? null,
+    status,
+    pointsPossible: String(data.pointsPossible),
+    dueAt,
+    availableAt: dueAt ? new Date() : null,
+    createdByPersonId: context.actorPersonId!,
+   }).returning({ id: s.assessments.id });
+   if (!assessment) throw new Error("Assessment could not be created");
+   let assignedCount = 0;
+   if (status === "published" && dueAt) {
+    // Publishing assigns the assessment to actively enrolled students, matching publishAssessment.
+    const enrolled = await tx.select({ studentProfileId: s.enrollments.studentProfileId })
+     .from(s.enrollments)
+     .where(and(
+      eq(s.enrollments.kind, "section"),
+      eq(s.enrollments.sectionId, data.sectionId),
+      eq(s.enrollments.status, "active"),
+     ));
+    assignedCount = enrolled.length;
+    if (enrolled.length) {
+     await tx.insert(s.submissions).values(enrolled.map(row => ({
+      assessmentId: assessment.id,
+      studentProfileId: row.studentProfileId,
+      status: "assigned" as const,
+      timeliness: "on_time" as const,
+     }))).onConflictDoNothing();
+    }
+    await tx.insert(s.domainEvents).values({
+     eventType: EventTypes.AssessmentPublished,
+     aggregateType: "assessment",
+     aggregateId: assessment.id,
+     actorPersonId: context.actorPersonId,
+     payload: { sectionId: data.sectionId, dueAt: dueAt.toISOString(), assignedCount },
+    });
+   }
+   await tx.insert(s.auditEvents).values({
+    actorPersonId: context.actorPersonId,
+    action: "assessment.create",
+    resourceType: "assessment",
+    resourceId: assessment.id,
+    scope: { sectionId: data.sectionId },
+    after: { status, title: data.title, pointsPossible: data.pointsPossible },
+    context: { accountId: context.accountId, sessionId: context.sessionId, requestId: context.requestId ?? null },
+   });
+   return { assessmentId: assessment.id, status };
+  });
+ });

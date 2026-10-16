@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { listGuardianAbsences, submitExcuse } from "@/modules/attendance/attendance.functions";
+import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachmentCounts } from "@/modules/learning/submission-attachments.functions";
+
+const excuseAttachmentAccept = ".pdf,.docx,.txt,.png,.jpg,.jpeg,.md";
+const excuseMimes: Record<string, string> = { pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", txt: "text/plain", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", md: "text/markdown" };
+const excuseAttachmentMime = (name: string) => excuseMimes[name.split(".").pop()?.toLowerCase() ?? ""] ?? null;
 
 export const Route = createFileRoute("/guardian/attendance")({ component: GuardianAttendancePage });
 
@@ -13,6 +18,8 @@ function GuardianAttendancePage() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [docCounts, setDocCounts] = useState<Record<string, number>>({});
+  const [excuseFiles, setExcuseFiles] = useState<Record<string, File | null>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -20,6 +27,13 @@ function GuardianAttendancePage() {
     try {
       const result = await listGuardianAbsences();
       setAbsences(result.absences);
+      const excusedIds = result.absences.filter(absence => absence.excuse).map(absence => absence.attendanceEventId);
+      if (excusedIds.length) {
+        const counts = await listExcuseAttachmentCounts({ data: { attendanceEventIds: excusedIds } });
+        setDocCounts(Object.fromEntries(counts.counts.map(count => [count.attendanceEventId, count.count])));
+      } else {
+        setDocCounts({});
+      }
     } catch {
       setAbsences([]);
       setError("Sign in with an authorized guardian account to review attendance.");
@@ -29,19 +43,8 @@ function GuardianAttendancePage() {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    listGuardianAbsences().then(result => {
-      if (!active) return;
-      setAbsences(result.absences);
-      setLoading(false);
-    }).catch(() => {
-      if (!active) return;
-      setAbsences([]);
-      setError("Sign in with an authorized guardian account to review attendance.");
-      setLoading(false);
-    });
-    return () => { active = false; };
-  }, []);
+    void load();
+  }, [load]);
 
   const submit = async (absence: Absence) => {
     setBusy(absence.attendanceEventId);
@@ -50,10 +53,35 @@ function GuardianAttendancePage() {
       await submitExcuse({
         data: { attendanceEventId: absence.attendanceEventId, reason: reasons[absence.attendanceEventId] ?? "" },
       });
-      setNotice(`Excuse submitted for ${absence.studentName}.`);
+      setNotice(`Excuse submitted for ${absence.studentName}. You can attach a supporting document below.`);
       await load();
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : "Unable to submit excuse");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const attachDocument = async (absence: Absence) => {
+    const file = excuseFiles[absence.attendanceEventId];
+    if (!file) return;
+    setBusy(`${absence.attendanceEventId}:attach`);
+    setNotice("");
+    try {
+      const contentType = excuseAttachmentMime(file.name);
+      if (!contentType) throw new Error("Unsupported file type. Use PDF, DOCX, TXT, PNG, JPG or MD.");
+      if (file.size < 1 || file.size > 10 * 1024 * 1024) throw new Error("Document must be 1 byte to 10 MB");
+      const upload = await createExcuseAttachmentUpload({
+        data: { attendanceEventId: absence.attendanceEventId, fileName: file.name, contentType, sizeBytes: file.size },
+      });
+      const put = await fetch(upload.uploadUrl, { method: "PUT", headers: { "Content-Type": contentType }, body: file });
+      if (!put.ok) throw new Error("Upload failed; please try again");
+      await attachDocumentToExcuse({ data: { attendanceEventId: absence.attendanceEventId, documentId: upload.documentId } });
+      setNotice(`Document attached for ${absence.studentName}.`);
+      setExcuseFiles(current => ({ ...current, [absence.attendanceEventId]: null }));
+      setDocCounts(current => ({ ...current, [absence.attendanceEventId]: (current[absence.attendanceEventId] ?? 0) + 1 }));
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : "Unable to attach document");
     } finally {
       setBusy("");
     }
@@ -91,9 +119,29 @@ function GuardianAttendancePage() {
             </div>
             {absence.excuse && <div className="mt-3">
               <p className="rounded-lg bg-muted p-3 text-sm">Your excuse: {absence.excuse.reason}</p>
+              <p className="mt-2 text-xs text-muted-foreground">{docCounts[absence.attendanceEventId] ?? 0} document(s) attached</p>
               {absence.excuse.status === "approved" && <p className="mt-2 text-sm">Approved — this day now counts as excused.</p>}
               {absence.excuse.status === "rejected" && <p className="mt-2 text-sm">Rejected by the school.{absence.excuse.reviewNote ? ` Note: ${absence.excuse.reviewNote}` : ""}</p>}
-              {absence.excuse.status === "submitted" && <p className="mt-2 text-sm text-muted-foreground">Waiting for the school to review.</p>}
+              {absence.excuse.status === "submitted" && <div className="mt-2">
+                <p className="text-sm text-muted-foreground">Waiting for the school to review.</p>
+                <label className="mt-3 block text-sm font-semibold">
+                  Supporting document <span className="font-normal text-muted-foreground">(optional · PDF, DOCX, TXT, PNG, JPG or MD · up to 10 MB)</span>
+                  <input
+                    key={`${absence.attendanceEventId}:${docCounts[absence.attendanceEventId] ?? 0}`}
+                    type="file"
+                    accept={excuseAttachmentAccept}
+                    disabled={busy !== ""}
+                    className="mt-2 w-full rounded-lg border bg-background p-2 text-xs"
+                    onChange={event => setExcuseFiles(current => ({ ...current, [absence.attendanceEventId]: event.target.files?.[0] ?? null }))}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={busy !== "" || !excuseFiles[absence.attendanceEventId]}
+                  className="mt-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  onClick={() => attachDocument(absence)}
+                >Attach document</button>
+              </div>}
             </div>}
             {!absence.excuse && absence.status !== "excused" && <div className="mt-3">
               <label className="block text-sm font-semibold">

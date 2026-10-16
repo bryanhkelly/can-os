@@ -2,6 +2,11 @@ import { RubricGrader } from "@/components/student/RubricGrader";
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getAssignments, saveAssignmentResponse, gradeSyntheticAssignment, returnSyntheticAssignment, createSyntheticAssignment, getSyntheticAssignmentHistory, saveSyntheticAssignmentDraft, manageSyntheticAssignment } from "@/modules/student-experience/assignments.functions";
+import { createSubmissionAttachmentUpload, attachDocumentToSubmission, listSubmissionAttachments } from "@/modules/learning/submission-attachments.functions";
+
+const attachmentAccept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.md";
+const attachmentMimes:Record<string,string>={pdf:"application/pdf",docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",txt:"text/plain",png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",md:"text/markdown"};
+function attachmentMime(name:string){return attachmentMimes[name.split(".").pop()?.toLowerCase()??""]??null;}
 
 export const Route=createFileRoute("/student/assignments")({loader:()=>getAssignments(),component:AssignmentsPage});
 function AssignmentsPage(){
@@ -13,6 +18,8 @@ function AssignmentsPage(){
  const [draft,setDraft]=useState(""),[score,setScore]=useState(85),[feedback,setFeedback]=useState("");
  const [filter,setFilter]=useState("all"),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[error,setError]=useState("");
  const [draftState,setDraftState]=useState<"idle"|"saving"|"saved"|"error">("idle");
+ const [pendingFiles,setPendingFiles]=useState<File[]>([]);
+ const [attachments,setAttachments]=useState<{documentId:string;fileName:string}[]>([]);
  const autosaveGeneration=useRef(0);
  const chosen=assignments.find(x=>x.assessmentId===selected);
  useEffect(()=>{const value=new URLSearchParams(window.location.search).get("assessment");if(value&&assignments.some(x=>x.assessmentId===value))setSelected(value);},[assignments]);
@@ -24,7 +31,30 @@ function AssignmentsPage(){
   catch(err){setError(err instanceof Error?err.message:"Unable to save");}
   finally{setBusy(false);}
  }
- function open(id:string,text:string){autosaveGeneration.current++;setSelected(id);setDraft(text);setDraftState("idle");setNotice("");setError("");}
+ function open(id:string,text:string){autosaveGeneration.current++;setSelected(id);setDraft(text);setDraftState("idle");setNotice("");setError("");setPendingFiles([]);}
+ async function submitWithAttachments(){
+  if(!chosen)return;
+  // The submit flow overwrites response text wholesale, so upload/attach after it.
+  await saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}});
+  for(const file of pendingFiles){
+   const contentType=attachmentMime(file.name);
+   if(!contentType)throw new Error("Unsupported file type: "+file.name);
+   if(file.size<1||file.size>10*1024*1024)throw new Error(file.name+" must be 1 byte to 10 MB");
+   const upload=await createSubmissionAttachmentUpload({data:{assessmentId:chosen.assessmentId,fileName:file.name,contentType,sizeBytes:file.size}});
+   const put=await fetch(upload.uploadUrl,{method:"PUT",headers:{"Content-Type":contentType},body:file});
+   if(!put.ok)throw new Error("Upload failed for "+file.name);
+   await attachDocumentToSubmission({data:{assessmentId:chosen.assessmentId,documentId:upload.documentId}});
+  }
+  const refreshed=await listSubmissionAttachments({data:{assessmentId:chosen.assessmentId}});
+  setAttachments(refreshed.attachments);
+  setPendingFiles([]);
+ }
+ useEffect(()=>{
+  if(!selected){setAttachments([]);return;}
+  let active=true;
+  listSubmissionAttachments({data:{assessmentId:selected}}).then(result=>{if(active)setAttachments(result.attachments);}).catch(()=>{if(active)setAttachments([]);});
+  return ()=>{active=false;};
+ },[selected]);
  useEffect(()=>{
   if(!chosen||role!=="student"||!(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")||chosen.assessmentStatus!=="published"||draft===chosen.responseText)return;
   const generation=++autosaveGeneration.current;
@@ -81,10 +111,16 @@ function AssignmentsPage(){
     {chosen.rubricResult&&<div className="mt-4 rounded-xl border border-border p-4"><p className="font-semibold text-sm">Criterion results</p><pre className="mt-2 overflow-auto text-xs">{JSON.stringify(chosen.rubricResult,null,2)}</pre></div>}
     {role==="teacher"&&<a href={`/student/support?assessment=${encodeURIComponent(chosen.assessmentId)}&persona=teacher`} className="mt-4 block rounded-xl border border-border bg-stone-warm p-4 text-sm font-semibold hover:border-foreground/40">Refer this student for academic support →</a>}
     {chosen.feedbackText&&<div className="mt-5 rounded-xl bg-stone-warm p-4"><p className="text-xs font-bold">Teacher feedback</p><p className="mt-2 text-sm">{chosen.feedbackText}</p></div>}
+    {attachments.length>0&&<div className="mt-4 rounded-xl border border-border p-4"><p className="text-xs font-bold">Attached files</p>{attachments.map(file=><p key={file.documentId} className="mt-1 text-xs">{file.fileName}</p>)}</div>}
     {role==="student"&&chosen.assessmentStatus==="published"&&(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")&&<div className="mt-6">
      <label className="text-sm font-semibold">Your response</label><textarea rows={7} maxLength={20000} value={draft} onChange={e=>setDraft(e.target.value)} className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-sm" placeholder="Write your response…"/>
      <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">Draft: {draftState==="saving"?"Saving…":draftState==="saved"?"Saved to Neon":draftState==="error"?"Could not autosave":"Ready"}</p>
-     <button disabled={busy||draft.trim().length<3} onClick={()=>perform(()=>saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}}),"Your work has been submitted to Neon.")} className="mt-3 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit work</button>
+     <div className="mt-3">
+      <label className="text-sm font-semibold">Attachments <span className="font-normal text-muted-foreground">(optional · PDF, DOCX, TXT, PNG, JPG or MD · up to 10 MB each)</span></label>
+      <input key={chosen.assessmentId+"-"+attachments.length} type="file" multiple accept={attachmentAccept} disabled={busy} onChange={e=>setPendingFiles(Array.from(e.target.files??[]))} className="mt-2 w-full rounded-lg border border-border bg-background p-2 text-xs"/>
+      {pendingFiles.length>0&&<p className="mt-2 text-xs text-muted-foreground">Will upload on submit: {pendingFiles.map(file=>file.name).join(", ")}</p>}
+     </div>
+     <button disabled={busy||draft.trim().length<3} onClick={()=>perform(submitWithAttachments,"Your work has been submitted to Neon.")} className="mt-3 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit work</button>
     </div>}
     {role==="student"&&chosen.status==="submitted"&&<p className="mt-5 rounded-xl bg-stone-warm p-4 text-sm">Submitted successfully. Your teacher can review your work.</p>}
     {role==="teacher"&&chosen.status==="submitted"&&chosen.submissionId&&chosen.metadata.criteria.length>0&&<RubricGrader submissionId={chosen.submissionId} criteria={chosen.metadata.criteria} onSaved={()=>router.invalidate()}/>}
