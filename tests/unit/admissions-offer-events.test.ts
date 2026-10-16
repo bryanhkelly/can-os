@@ -36,7 +36,7 @@ const context = {
   capabilities: new Set(["enrollment.decide", "enrollment.apply", "enrollment.activate"]),
   scope: { programIds: ["program"] },
 };
-const application = { id: "application", programId: "program", studentProfileId: "student", stage: "application" };
+const application = { id: "application", programId: "program", studentProfileId: "student", stage: "application", metadata: { synthetic: true } };
 const pool = { capacity: 2 };
 const year = { programId: "program", organizationId: "organization" };
 const program = { organizationId: "organization" };
@@ -67,6 +67,12 @@ describe("transactional admissions events", () => {
       eventType: "AdmissionOfferIssued", aggregateId: "created",
     }));
     expect(values).toHaveBeenCalledWith(expect.objectContaining({ action: "admissions.offer.issue" }));
+  });
+
+  it("rejects non-synthetic applications before issuing an offer", async () => {
+    selectRows([{ ...application, metadata: { synthetic: false } }]);
+    await expect(issueSyntheticAdmissionOffer(context, input)).rejects.toThrow("Synthetic application not found");
+    expect(values).not.toHaveBeenCalled();
   });
 
   it("does not emit another event for an issuance retry", async () => {
