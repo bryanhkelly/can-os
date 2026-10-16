@@ -1,6 +1,8 @@
 import {createServerFn} from "@tanstack/react-start";
-import {eq,inArray} from "drizzle-orm";
-import {assessAdmissionsCapacity,readCapacityPolicy} from "@/domain/admissions-capacity";
+import {and,eq,inArray} from "drizzle-orm";
+import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+
+/** Counts actual active enrollments and unexpired held offers by school year. */
 export const getSyntheticAdmissionsCapacity=createServerFn({method:"GET"}).handler(async()=>{
  if(!process.env.DATABASE_URL)return [];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -8,11 +10,37 @@ export const getSyntheticAdmissionsCapacity=createServerFn({method:"GET"}).handl
  const synthetic=programs.filter(p=>p.metadata.synthetic===true);
  if(!synthetic.length)return [];
  const ids=synthetic.map(p=>p.id);
- const apps=await db.select({programId:s.applications.programId,stage:s.applications.stage,metadata:s.applications.metadata}).from(s.applications).where(inArray(s.applications.programId,ids));
- const enrollments=await db.select({programId:s.enrollments.programId,studentId:s.enrollments.studentProfileId,status:s.enrollments.status,kind:s.enrollments.kind}).from(s.enrollments).where(inArray(s.enrollments.programId,ids));
- return synthetic.map(program=>{
-  const active=new Set(enrollments.filter(e=>e.programId===program.id&&e.kind==="program"&&e.status==="active").map(e=>e.studentId));
-  const offered=apps.filter(a=>a.programId===program.id&&a.metadata.synthetic===true&&a.stage==="accepted").length;
-  return {id:program.id,name:program.name,...assessAdmissionsCapacity(readCapacityPolicy(program.metadata),active.size,offered)};
+ const pools=await db.select({id:s.admissionSeatPools.id,programId:s.admissionSeatPools.programId,schoolYearId:s.admissionSeatPools.schoolYearId,capacity:s.admissionSeatPools.capacity,yearName:s.schoolYears.name}).from(s.admissionSeatPools).innerJoin(s.schoolYears,eq(s.schoolYears.id,s.admissionSeatPools.schoolYearId)).where(inArray(s.admissionSeatPools.programId,ids));
+ const enrollments=await db.select({programId:s.enrollments.programId,schoolYearId:s.enrollments.schoolYearId,studentId:s.enrollments.studentProfileId}).from(s.enrollments).where(and(inArray(s.enrollments.programId,ids),eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
+ const offers=await db.select({programId:s.admissionOffers.programId,schoolYearId:s.admissionOffers.schoolYearId,status:s.admissionOffers.status,expiresAt:s.admissionOffers.expiresAt,studentId:s.applications.studentProfileId}).from(s.admissionOffers).innerJoin(s.applications,eq(s.applications.id,s.admissionOffers.applicationId)).where(inArray(s.admissionOffers.programId,ids));
+ return pools.map(pool=>{
+  const enrolled=new Set(enrollments.filter(e=>e.programId===pool.programId&&e.schoolYearId===pool.schoolYearId).map(e=>e.studentId));
+  const reservations=offers.filter(o=>o.programId===pool.programId&&o.schoolYearId===pool.schoolYearId&&!enrolled.has(o.studentId)&&(o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now())))).length;
+  const occupied=enrolled.size+reservations;
+  return {id:pool.id,programId:pool.programId,name:synthetic.find(p=>p.id===pool.programId)?.name??"Program",yearName:pool.yearName,capacity:pool.capacity,enrolled:enrolled.size,offered:reservations,remaining:Math.max(0,pool.capacity-occupied),status:occupied>=pool.capacity?"full":"available"};
  });
 });
+
+/** Synthetic-only capacity adjustment; never reduces below occupied/held seats. */
+export const updateSyntheticAdmissionsCapacity=createServerFn({method:"POST"})
+ .validator((data:{poolId:string;capacity:number})=>data)
+ .handler(async({data})=>{
+  assertSyntheticMutation("registrar");
+  if(!Number.isSafeInteger(data.capacity)||data.capacity<1||data.capacity>100000)throw new Error("Capacity must be a positive whole number");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [pool]=await tx.select().from(s.admissionSeatPools).where(eq(s.admissionSeatPools.id,data.poolId)).for("update").limit(1);
+   if(!pool)throw new Error("Seat pool not found");
+   const [program]=await tx.select({metadata:s.programs.metadata}).from(s.programs).where(eq(s.programs.id,pool.programId)).limit(1);
+   if(!program||program.metadata.synthetic!==true)throw new Error("Only synthetic capacity can be adjusted");
+   const active=await tx.select({studentId:s.enrollments.studentProfileId}).from(s.enrollments).where(and(eq(s.enrollments.programId,pool.programId),eq(s.enrollments.schoolYearId,pool.schoolYearId),eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
+   const students=new Set(active.map(e=>e.studentId));
+   const offers=await tx.select({studentId:s.applications.studentProfileId,status:s.admissionOffers.status,expiresAt:s.admissionOffers.expiresAt}).from(s.admissionOffers).innerJoin(s.applications,eq(s.applications.id,s.admissionOffers.applicationId)).where(and(eq(s.admissionOffers.programId,pool.programId),eq(s.admissionOffers.schoolYearId,pool.schoolYearId)));
+   const reserved=offers.filter(o=>!students.has(o.studentId)&&(o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now())))).length;
+   if(data.capacity<students.size+reserved)throw new Error("Cannot reduce capacity below active enrollments and held offers");
+   if(pool.capacity===data.capacity)return {saved:true};
+   await tx.update(s.admissionSeatPools).set({capacity:data.capacity,updatedAt:new Date()}).where(eq(s.admissionSeatPools.id,pool.id));
+   await tx.insert(s.auditEvents).values({action:"synthetic.admissions.capacity",resourceType:"admission_seat_pool",resourceId:pool.id,before:{capacity:pool.capacity},after:{capacity:data.capacity},context:{synthetic:true,programId:pool.programId,schoolYearId:pool.schoolYearId}});
+   return {saved:true};
+  });
+ });
