@@ -92,6 +92,22 @@ export const reviewSyntheticRequirementDocument=createServerFn({method:"POST"})
    const all=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking}).from(s.journeyRequirements).where(eq(s.journeyRequirements.journeyId,journey.id));
    const ready=all.every(r=>!r.blocking||(r.id===requirement.id?next:r.status)==="complete");
    await tx.update(s.journeys).set({status:ready?"ready":"in_progress",updatedAt:now}).where(eq(s.journeys.id,journey.id));
+   if(data.status==="rejected"||data.status==="requested"){
+    const [profile]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles)
+     .innerJoin(s.applications,eq(s.applications.studentProfileId,s.studentProfiles.id))
+     .where(eq(s.applications.id,app.id)).limit(1);
+    if(!profile)throw new Error("Student profile missing");
+    const guardians=await tx.select({personId:s.guardianRelationships.guardianPersonId,metadata:s.people.metadata})
+     .from(s.guardianRelationships).innerJoin(s.people,eq(s.people.id,s.guardianRelationships.guardianPersonId))
+     .where(and(eq(s.guardianRelationships.studentPersonId,profile.personId),eq(s.guardianRelationships.canManageEnrollment,true)));
+    const syntheticGuardians=[...new Set(guardians.filter(g=>g.metadata.synthetic===true).map(g=>g.personId))];
+    if(syntheticGuardians.length)await tx.insert(s.notifications).values(syntheticGuardians.map(recipientPersonId=>({
+      recipientPersonId,type:"enrollment_document_"+data.status,status:"unread" as const,
+      title:data.status==="rejected"?"Enrollment document needs correction":"Enrollment document requested",
+      body:data.status==="rejected"?"Please review the enrollment checklist and resubmit the requested information. "+reason:"Please review the outstanding requirement in the enrollment checklist.",
+      resourceType:"application",resourceId:app.id
+    })));
+   }
    await tx.insert(s.auditEvents).values({action:"synthetic.enrollment.document.review",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:previous?.status??null},after:{status:data.status,reason},context:{synthetic:true,applicationId:app.id}});
    return {saved:true};
   });
