@@ -5,7 +5,7 @@ import {
   issueSyntheticAdmissionOffer,
   respondToSyntheticAdmissionOffer,
 } from "@/modules/enrollment/admissions-offer-service";
-import { activateEnrollmentFromApplication, startFamilyApplication } from "@/modules/enrollment/gf2-service";
+import { acceptApplication, activateEnrollmentFromApplication, startFamilyApplication } from "@/modules/enrollment/gf2-service";
 
 const { transaction, select, values, update } = vi.hoisted(() => ({
   transaction: vi.fn(),
