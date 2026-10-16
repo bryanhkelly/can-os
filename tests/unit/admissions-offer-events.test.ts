@@ -154,7 +154,8 @@ describe("transactional admissions events", () => {
   });
 
   it.each(["accept", "decline"] as const)("emits the %s transition", async (action) => {
-    selectRows([offer], [pool], [year], [program], [offer], [application], [{ personId: "person" }], [{ id: "relationship" }]);
+    const issuedOffer={...offer,issuedByPersonId:"registrar-person"};
+    selectRows([issuedOffer], [pool], [year], [program], [issuedOffer], [application], [{ personId: "person" }], [{ id: "relationship" }]);
     if (action === "accept") selectRows([journey], []);
     await expect(respondToSyntheticAdmissionOffer(context, "offer", action)).resolves.toBe("offer");
     expect(values).toHaveBeenCalledWith(expect.objectContaining({
@@ -166,6 +167,7 @@ describe("transactional admissions events", () => {
         eventType: "ApplicationAccepted", aggregateId: "application",
       }));
     }
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({recipientPersonId:"registrar-person",type:action==="accept"?"admission_offer_accepted":"admission_offer_declined",resourceId:"offer"}));
   });
 
   it("does not activate an accepted offer missing a guardian response timestamp", async () => {
