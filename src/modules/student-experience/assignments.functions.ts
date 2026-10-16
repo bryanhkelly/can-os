@@ -300,6 +300,12 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
   const due=data.action==="reschedule"?new Date(data.dueAt??""):undefined;
   if(due&&Number.isNaN(due.getTime()))throw new Error("Invalid due date");
   await db.transaction(async tx=>{
+   const [authorized]=await tx.select({id:s.assessments.id,metadata:s.assessments.metadata})
+    .from(s.assessments)
+    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
+    .where(and(eq(s.assessments.id,assessment.id),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
+   if(!authorized||authorized.metadata.synthetic!==true)throw new AuthorizationError("assigned synthetic assessment");
    const [updated]=await tx.update(s.assessments).set({
     ...(data.action==="close"?{status:"closed" as const}:data.action==="reopen"?{status:"published" as const}:{}),
     ...(due?{dueAt:due}:{}),updatedAt:new Date(),
