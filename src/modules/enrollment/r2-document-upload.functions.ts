@@ -7,6 +7,7 @@ import {applications,journeys,journeyRequirements,documents,auditEvents,programs
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {newDocumentKey,signR2Object,validateDocumentUpload,r2Config} from "./r2-documents.server";
 async function uploadsEnabled(applicationId:string){
+ if(process.env.CAN_R2_DEMO_UPLOADS_ENABLED!=="true")throw new Error("R2 demo uploads are disabled");
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId)throw new Error("Authenticated person required");
  const [app]=await db.select({programId:applications.programId,studentProfileId:applications.studentProfileId}).from(applications).where(eq(applications.id,applicationId)).limit(1);
@@ -22,7 +23,6 @@ async function uploadsEnabled(applicationId:string){
  }else throw new Error("Enrollment documents require registrar or guardian access");
  assertSyntheticMutation(context.role);
  return context.actorPersonId;
- if(process.env.CAN_R2_DEMO_UPLOADS_ENABLED!=="true")throw new Error("R2 demo uploads are disabled");
 }
 async function requirementScope(applicationId:string,requirementId:string){
  const [app]=await db.select({id:applications.id,metadata:applications.metadata}).from(applications).where(eq(applications.id,applicationId)).limit(1);
