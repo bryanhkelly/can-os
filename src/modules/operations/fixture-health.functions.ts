@@ -26,7 +26,7 @@ export const getSyntheticFixtureHealth=createServerFn({method:"GET"}).handler(as
   total(db.select({n:sql<number>`count(*)::int`}).from(s.admissionSeatPools).innerJoin(s.programs,eq(s.programs.id,s.admissionSeatPools.programId)).where(syntheticProgram)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.journeys).innerJoin(s.applications,eq(s.applications.id,s.journeys.participantId)).where(sql`${s.journeys.participantType}='application' and ${syntheticApps}`)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.sections).innerJoin(s.programs,eq(s.programs.id,s.sections.programId)).where(syntheticProgram)),
-  total(db.select({n:sql<number>`count(*)::int`}).from(s.studyGroups).innerJoin(s.programs,eq(s.programs.id,s.studyGroups.programId)).where(syntheticProgram)),
+  total(db.select({n:sql<number>`count(*)::int`}).from(s.studyGroups).where(sql`${s.studyGroups.metadata}->>'synthetic' = 'true'`)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.communicationThreads).where(sql`${s.communicationThreads.contextType}='section' and ${s.communicationThreads.metadata}->>'synthetic'='true' and ${s.communicationThreads.metadata}->>'kind'='course_discussion'`)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.actions).innerJoin(s.programs,eq(s.programs.id,s.actions.programId)).where(syntheticProgram)),
   total(db.select({n:sql<number>`count(*)::int`}).from(s.notifications).innerJoin(s.people,eq(s.people.id,s.notifications.recipientPersonId)).where(sql`${s.people.metadata}->>'synthetic'='true'`))
