@@ -60,10 +60,11 @@ export const leaveStudyGroup=createServerFn({method:"POST"}).validator((x:{group
 });
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
  assertSyntheticMutation("student");
+ const actor=await groupActor("student");
  const {db,s}=await context();
  const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.siteId,SITE))).limit(1);
  if(!group)throw new Error("Group unavailable");
- const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,STUDENT))).limit(1);
+ const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  const permitted=canAccessGroup((membership?.status??null) as "pending"|"approved"|"declined"|"left"|null,"student");
  if(!permitted)return {group,memberStatus:membership?.status??null,posts:[],sessions:[]};
  const [posts,sessions]=await Promise.all([
