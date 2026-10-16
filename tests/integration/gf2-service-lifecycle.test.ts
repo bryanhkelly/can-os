@@ -1,7 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {and,eq} from "drizzle-orm";
 import {db} from "@/db/client";
-import {applications,admissionOffers,enrollments,journeys,domainEvents,householdMemberships,studentProfiles,guardianRelationships} from "@/db/schema";
+import {applications,admissionOffers,enrollments,journeys,domainEvents,householdMemberships,studentProfiles,guardianRelationships,notifications} from "@/db/schema";
 import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment} from "@/modules/enrollment/admissions-offer-service";
 import type {CommandContext} from "@/domain/command-context";
 
@@ -49,6 +49,9 @@ describe("GF2 real transactional admissions lifecycle on isolated Neon",()=>{
   await respondToSyntheticAdmissionOffer(ctx(GUARDIAN,"enrollment.apply"),offerId,"accept");
   const enrollmentId=await activateSyntheticOfferedEnrollment(ctx(REGISTRAR,"enrollment.activate"),offerId);
   expect(await activateSyntheticOfferedEnrollment(ctx(REGISTRAR,"enrollment.activate"),offerId)).toBe(enrollmentId);
+  const activationNotices=await db.select().from(notifications).where(and(eq(notifications.resourceType,"enrollment"),eq(notifications.resourceId,enrollmentId),eq(notifications.type,"enrollment_activated")));
+  expect(activationNotices.map(n=>n.recipientPersonId).sort()).toEqual([GUARDIAN,student!.personId].sort());
+  expect(activationNotices).toHaveLength(2);
   const matches=await db.select().from(enrollments).where(and(eq(enrollments.studentProfileId,app!.studentProfileId),eq(enrollments.programId,PROGRAM),eq(enrollments.schoolYearId,YEAR),eq(enrollments.kind,"program"),eq(enrollments.status,"active")));
   expect(matches).toHaveLength(1);
   const [finalApp]=await db.select().from(applications).where(eq(applications.id,APP)).limit(1);
