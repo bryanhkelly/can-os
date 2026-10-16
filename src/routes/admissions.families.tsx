@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
-import {getSyntheticFamilyReadiness,setSyntheticFamilyRequirement,addSyntheticRequirementReviewNote} from "@/modules/enrollment/family-readiness.functions";
+import {getSyntheticFamilyReadiness,setSyntheticFamilyRequirement,addSyntheticRequirementReviewNote,reviewSyntheticRequirementDocument} from "@/modules/enrollment/family-readiness.functions";
 export const Route=createFileRoute("/admissions/families")({loader:()=>getSyntheticFamilyReadiness(),component:Families});
 function Families(){
  const apps=Route.useLoaderData();
@@ -17,6 +17,12 @@ function Families(){
   setBusy(requirementId);setError("");
   try{await addSyntheticRequirementReviewNote({data:{applicationId,requirementId,note:notes[requirementId]??""}});setNotes(previous=>({...previous,[requirementId]:""}));await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Review note failed");}
+  finally{setBusy(null);}
+ }
+ async function review(applicationId:string,requirementId:string,status:"requested"|"received"|"accepted"|"rejected"){
+  setBusy(requirementId);setError("");
+  try{await reviewSyntheticRequirementDocument({data:{applicationId,requirementId,status,reason:notes[requirementId]??""}});await router.invalidate();}
+  catch(e){setError(e instanceof Error?e.message:"Document review failed");}
   finally{setBusy(null);}
  }
  return <main className="mx-auto max-w-5xl px-5 py-10">
@@ -40,7 +46,9 @@ function Families(){
       <input type="checkbox" checked={r.status==="complete"} disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onChange={e=>update(a.id,r.id,e.target.checked)}/>
       <span>{r.title}{r.blocking?" · Required":""}</span>
       <span className="text-xs text-muted-foreground">({r.status.replaceAll("_"," ")})</span>
-    </label><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="registrar_note"&&typeof e.text==="string").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Review note: {String(e.text)}</p>)}</div><div className="mt-2 flex gap-2"><input className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-sm" value={notes[r.id]??""} maxLength={500} placeholder="Registrar review note (not a document upload)" onChange={e=>setNotes(previous=>({...previous,[r.id]:e.target.value}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||(notes[r.id]??"").trim().length<5} onClick={()=>addNote(a.id,r.id)}>Save note</button></div></div>)}</div>
+    </label><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="registrar_note"&&typeof e.text==="string").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Review note: {String(e.text)}</p>)}</div><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="document_review").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Document review: {e.status}{e.text?" · "+e.text:""}{e.reviewedAt?" · "+new Date(e.reviewedAt).toLocaleDateString():""}</p>)}</div>
+    <div className="mt-2 flex flex-wrap gap-2">{(["requested","received","accepted","rejected"] as const).map(status=><button key={status} type="button" className="rounded border px-2 py-1 text-xs capitalize disabled:opacity-50" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onClick={()=>review(a.id,r.id,status)}>{status}</button>)}</div>
+    <div className="mt-2 flex gap-2"><input className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-sm" value={notes[r.id]??""} maxLength={500} placeholder="Review note / rejection reason (no file uploaded)" onChange={e=>setNotes(previous=>({...previous,[r.id]:e.target.value}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||(notes[r.id]??"").trim().length<5} onClick={()=>addNote(a.id,r.id)}>Save note</button></div></div>)}</div>
     {!a.requirements.length&&<p className="mt-2 text-sm text-muted-foreground">No requirements configured for this application.</p>}
    </article>)}</div>
   </section>)}
