@@ -229,8 +229,8 @@ export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
    .orderBy(desc(s.submissions.attemptNumber));
   return rows.map(row=>({attempt:row.attempt,status:row.status,
    submittedAt:row.submittedAt?.toISOString()??null,score:row.score,
-   text:typeof row.response.text==="string"?row.response.text:"",
-   feedback:typeof row.feedback.comment==="string"?row.feedback.comment:""}));
+   text:typeof row.response?.text==="string"?row.response.text:"",
+   feedback:typeof row.feedback?.comment==="string"?row.feedback.comment:""}));
  });
 
 /** Drafts remain in the existing response JSON on an assigned attempt. */
