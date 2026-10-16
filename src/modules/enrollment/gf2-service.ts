@@ -20,6 +20,7 @@ import {
 import {
   assertCapability,
   assertProgramScope,
+  AuthorizationError,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -59,6 +60,11 @@ export async function startFamilyApplication(
   journeyId: string;
 }> {
   assertCapability(context, "enrollment.apply");
+  // Check current program authorization even on an idempotency retry. A prior
+  // submission does not preserve access after the guardian grant is revoked.
+  if (!context.scope.programIds?.includes(input.programId)) {
+    throw new AuthorizationError(`program scope: ${input.programId}`);
+  }
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
   const actorPersonId = context.actorPersonId;
 
