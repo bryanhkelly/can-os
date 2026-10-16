@@ -1,4 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
+import {matchesEnrollmentDocumentSignature} from "@/domain/enrollment-document-signature";
 import {assertR2DemoEnabled,assertR2DocumentGrant} from "@/domain/r2-document-access";
 import {getRequest} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
@@ -55,6 +56,13 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
   if(contentLength!==data.size)throw new Error("Uploaded document size does not match");
   const returnedType=response.headers.get("content-type");
   if(returnedType&&returnedType!==data.mimeType)throw new Error("Uploaded document type does not match");
+  const sample=await fetch(signR2Object("GET",data.key,undefined,30),{headers:{Range:"bytes=0-15"}});
+  if(sample.status!==206)throw new Error("R2 did not honor the bounded file-signature request");
+  const returnedRange=sample.headers.get("content-range");
+  if(!returnedRange?.startsWith("bytes 0-15/"))throw new Error("Unexpected R2 signature response");
+  const headerBytes=new Uint8Array(await sample.arrayBuffer());
+  if(headerBytes.length!==16||!matchesEnrollmentDocumentSignature(data.mimeType,headerBytes))
+   throw new Error("Uploaded document content does not match its declared type");
   return db.transaction(async tx=>{
    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.requirementId}))`);
    const [existing]=await tx.select({id:documents.id}).from(documents).where(and(eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageKey,data.key))).limit(1);
