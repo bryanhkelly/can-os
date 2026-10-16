@@ -23,7 +23,7 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
    `/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    `/student/support?referral=${encodeURIComponent(n.resourceId)}`:
-   n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}`:null}));
+   n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });
 export const readSyntheticNotification=createServerFn({method:"POST"})
  .validator((data:{id:string})=>data).handler(async({data})=>{
