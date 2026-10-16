@@ -16,7 +16,7 @@ function StudyGroups(){
  useEffect(()=>{
   if(!enabled||!search.group||!groups.some(g=>g.id===search.group))return;
   let active=true;
-  getStudyGroupDetail({data:{groupId:search.group}}).then(result=>{if(active){setSelected(search.group!);setDetail(result);if(search.session&&result.sessions.some(session=>session.id===search.session))setAttendanceSession(null);}}).catch(()=>{if(active)setNotice("Unable to open the requested study group");});
+  getStudyGroupDetail({data:{groupId:search.group}}).then(result=>{if(active){setSelected(search.group!);setDetail(result);}}).catch(()=>{if(active)setNotice("Unable to open the requested study group");});
   return ()=>{active=false};
  },[enabled,search.group,search.session,groups]);
  async function refresh(id?:string){if(id)setDetail(await getStudyGroupDetail({data:{groupId:id}}));await router.invalidate();}
