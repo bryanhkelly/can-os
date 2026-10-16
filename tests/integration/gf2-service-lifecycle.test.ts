@@ -1,7 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {and,eq} from "drizzle-orm";
 import {db} from "@/db/client";
-import {applications,admissionOffers,enrollments,journeys,domainEvents} from "@/db/schema";
+import {applications,admissionOffers,enrollments,journeys,domainEvents,householdMemberships,studentProfiles,guardianRelationships} from "@/db/schema";
 import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment} from "@/modules/enrollment/admissions-offer-service";
 import type {CommandContext} from "@/domain/command-context";
 
@@ -21,6 +21,12 @@ describe("GF2 real transactional admissions lifecycle on isolated Neon",()=>{
   const [app]=await db.select().from(applications).where(eq(applications.id,APP)).limit(1);
   expect(app?.metadata.synthetic).toBe(true);
   expect(app?.programId).toBe(PROGRAM);
+  const householdMembers=await db.select({personId:householdMemberships.personId}).from(householdMemberships).where(eq(householdMemberships.householdId,app!.householdId));
+  expect(householdMembers.map(m=>m.personId)).toContain(GUARDIAN);
+  const [student]=await db.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app!.studentProfileId)).limit(1);
+  expect(householdMembers.map(m=>m.personId)).toContain(student?.personId);
+  const authorized=await db.select().from(guardianRelationships).where(and(eq(guardianRelationships.guardianPersonId,GUARDIAN),eq(guardianRelationships.studentPersonId,student!.personId),eq(guardianRelationships.canManageEnrollment,true)));
+  expect(authorized).toHaveLength(1);
   const [prior]=await db.select().from(admissionOffers).where(eq(admissionOffers.idempotencyKey,fixtureKey)).limit(1);
   const otherOffers=await db.select().from(admissionOffers).where(eq(admissionOffers.applicationId,APP));
   expect(otherOffers,"The seeded application must not have any previously issued offers").toHaveLength(0);
