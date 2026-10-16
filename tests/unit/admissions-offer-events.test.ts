@@ -75,6 +75,27 @@ describe("transactional admissions events", () => {
     expect(values).not.toHaveBeenCalled();
   });
 
+  it("refuses to reissue a declined offer under the same idempotency key", async () => {
+    selectRows([application], [pool], [year], [program], [{ ...offer, status: "declined" }]);
+    await expect(issueSyntheticAdmissionOffer(context, input)).rejects.toThrow("no longer actionable");
+    expect(values).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-synthetic guardian responses before changing the offer", async () => {
+    selectRows([offer], [pool], [year], [program], [offer], [{ ...application, metadata: { synthetic: false } }]);
+    await expect(respondToSyntheticAdmissionOffer(context, "offer", "accept")).rejects.toThrow("Synthetic offer application mismatch");
+    expect(values).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-synthetic enrollment activation before inserting a student", async () => {
+    selectRows([offer], [pool], [year], [program], [{ ...offer, status: "accepted" }],
+      [{ ...application, metadata: { synthetic: false }, stage: "accepted" }]);
+    await expect(activateSyntheticOfferedEnrollment(context, "offer")).rejects.toThrow("Synthetic application not accepted");
+    expect(values).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("does not emit another event for an issuance retry", async () => {
     selectRows([application], [pool], [year], [program], [offer]);
     await expect(issueSyntheticAdmissionOffer(context, input)).resolves.toBe("offer");
