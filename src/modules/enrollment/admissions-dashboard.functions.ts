@@ -3,7 +3,7 @@ import {eq,inArray} from "drizzle-orm";
 import type {AdmissionsPipelineItem} from "@/domain/admissions-pipeline";
 /** This deliberately surfaces non-PII records explicitly marked synthetic. */
 export const getSyntheticAdmissionsDashboard=createServerFn({method:"GET"}).handler(async()=>{
- if(!process.env.DATABASE_URL)return [] as AdmissionsPipelineItem[];
+ if(!process.env.DATABASE_URL)return [] as (AdmissionsPipelineItem & {offers:{status:string;expiresAt:string|null;schoolYearId:string}[]})[];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const records=await db.select({id:s.applications.id,stage:s.applications.stage,metadata:s.applications.metadata,submittedAt:s.applications.submittedAt,program:s.programs.name}).from(s.applications).innerJoin(s.programs,eq(s.applications.programId,s.programs.id)).limit(150);
  const synthetic=records.filter(r=>r.metadata.synthetic===true);
