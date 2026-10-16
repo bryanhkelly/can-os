@@ -69,12 +69,13 @@ describe("transactional admissions events", () => {
   });
 
   it("emits offer issuance alongside audit", async () => {
-    selectRows([application], [pool], [year], [program], [], [], [], [journey], [], [], []);
+    selectRows([application], [pool], [year], [program], [], [], [], [journey], [], [], [], [{personId:"student-person"}], [{personId:"guardian-person"}]);
     await expect(issueSyntheticAdmissionOffer(context, input)).resolves.toBe("created");
     expect(values).toHaveBeenCalledWith(expect.objectContaining({
       eventType: "AdmissionOfferIssued", aggregateId: "created",
     }));
     expect(values).toHaveBeenCalledWith(expect.objectContaining({ action: "admissions.offer.issue" }));
+    expect(values).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({recipientPersonId:"guardian-person",type:"admission_offer_issued",resourceId:"created"})]));
   });
 
   it("rejects an expired offer on the idempotency retry path", async () => {
