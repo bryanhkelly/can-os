@@ -37,7 +37,8 @@ export const issueSyntheticOfferFromDemo=createServerFn({method:"POST"})
 .validator((data:{applicationId:string;schoolYearId:string})=>data).handler(async({data})=>{
  assertSyntheticMutation("registrar");
  const app=await syntheticApplication(data.applicationId);
- const key="synthetic-offer:"+app.id+":"+data.schoolYearId;
+ const previous=await db.select({id:admissionOffers.id,status:admissionOffers.status}).from(admissionOffers).where(and(eq(admissionOffers.applicationId,app.id),eq(admissionOffers.schoolYearId,data.schoolYearId)));
+ const key="synthetic-offer:"+app.id+":"+data.schoolYearId+":attempt-"+(previous.length+1);
  const expiresAt=new Date(Date.now()+14*24*60*60*1000);
  return {offerId:await issueSyntheticAdmissionOffer(context(DEMO_REGISTRAR,app.programId,"enrollment.decide"),{applicationId:app.id,schoolYearId:data.schoolYearId,idempotencyKey:key,expiresAt})};
 });
