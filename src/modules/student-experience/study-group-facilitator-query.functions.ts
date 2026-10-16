@@ -2,7 +2,7 @@ import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
-import {and,eq,desc} from "drizzle-orm";
+import {and,eq,desc,inArray} from "drizzle-orm";
 
 /** Facilitator-owned groups and sessions; separate from the student membership read model. */
 export const getFacilitatorStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
@@ -17,6 +17,6 @@ export const getFacilitatorStudyGroups=createServerFn({method:"GET"}).handler(as
  if(!permitted.length)return [];
  const sessions=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,title:s.studyGroupSessions.title,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt,metadata:s.calendarEvents.metadata})
   .from(s.studyGroupSessions).leftJoin(s.calendarEvents,and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,s.studyGroupSessions.id)))
-  .where(and(eq(s.studyGroupSessions.groupId,permitted[0].id))).limit(100);
+  .where(and(inArray(s.studyGroupSessions.groupId,permitted.map(g=>g.id)))).limit(100);
  return permitted.map(group=>({id:group.id,title:group.title,sessions:sessions.filter(session=>session.groupId===group.id).map(session=>({id:session.id,title:session.title,startsAt:session.startsAt.toISOString(),endsAt:session.endsAt.toISOString(),cancelled:session.metadata?.cancelled===true}))}));
 });
