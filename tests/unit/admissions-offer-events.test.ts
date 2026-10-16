@@ -77,6 +77,13 @@ describe("transactional admissions events", () => {
     expect(values).toHaveBeenCalledWith(expect.objectContaining({ action: "admissions.offer.issue" }));
   });
 
+  it("rejects an expired offer on the idempotency retry path", async () => {
+    selectRows([application], [pool], [year], [program], [],
+      [{...offer,idempotencyKey:"key",expiresAt:new Date("2020-01-01T00:00:00Z")}]);
+    await expect(issueSyntheticAdmissionOffer(context,input)).rejects.toThrow(/expired|no longer actionable/);
+    expect(values).not.toHaveBeenCalled();
+  });
+
   it("rejects a second live offer with a different idempotency key", async () => {
     selectRows([application], [pool], [year], [program], [], [],
       [{id:"existing",status:"issued",expiresAt:new Date("2099-01-01T00:00:00Z")}]);
