@@ -119,17 +119,20 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    if(prior?.status==="returned"){
     const [revision]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,attemptNumber:prior.attemptNumber+1,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
     if(!revision)throw new Error("Unable to save revision");
+    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.submit_revision",resourceType:"submission",resourceId:revision.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
     await resolveFollowUps(revision.id);
     return {submissionId:revision.id};
    }
    if(prior){
     const [submitted]=await tx.update(s.submissions).set({status:"submitted",response:{text},timeliness,submittedAt:now,updatedAt:now}).where(and(eq(s.submissions.id,prior.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!submitted)throw new Error("Assignment was submitted or changed in another tab");
+    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.submit",resourceType:"submission",resourceId:submitted.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
     await resolveFollowUps(submitted.id);
     return {submissionId:submitted.id};
    }
    const [created]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
    if(!created)throw new Error("Unable to submit");
+    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.submit",resourceType:"submission",resourceId:created.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
     await resolveFollowUps(created.id);
    return {submissionId:created.id};
   });
