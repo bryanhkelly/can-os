@@ -52,6 +52,16 @@ integration("synthetic admissions offer concurrency",()=>{
   await expect(svc.respondToSyntheticAdmissionOffer(family,temporaryOffer,"decline")).resolves.toBe(temporaryOffer);
   const [declined]=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.id,temporaryOffer));
   expect(declined.status).toBe("declined");
+  // Retrying the original idempotency key must never resurrect a declined offer.
+  await expect(svc.issueSyntheticAdmissionOffer(registrar,{
+   applicationId:records[0]!.applicationId,schoolYearId:calendar.schoolYear.id,
+   idempotencyKey:`temporary-seat-${suffix}`,expiresAt:expiry
+  })).rejects.toThrow("Existing offer is no longer actionable");
+  await expect(svc.respondToSyntheticAdmissionOffer(family,temporaryOffer,"decline")).resolves.toBe(temporaryOffer);
+  const declinedEvents=await db.select().from(s.domainEvents).where(eq(s.domainEvents.aggregateId,temporaryOffer));
+  expect(declinedEvents.filter(e=>e.eventType==="AdmissionOfferDeclined")).toHaveLength(1);
+  const declinedNotices=await db.select().from(s.notifications).where(eq(s.notifications.recipientPersonId,registrarPerson.id));
+  expect(declinedNotices.filter(n=>n.type==="admission_offer_declined"&&n.resourceId===temporaryOffer)).toHaveLength(1);
   // Both children may now compete again; exactly one should obtain the freed seat.
   const settled=await Promise.allSettled(records.map((row,i)=>svc.issueSyntheticAdmissionOffer(registrar,{applicationId:row.applicationId,schoolYearId:calendar.schoolYear.id,idempotencyKey:`synthetic-seat-${suffix}-${i}`,expiresAt:expiry})));
   const successes=settled.filter(x=>x.status==="fulfilled");
