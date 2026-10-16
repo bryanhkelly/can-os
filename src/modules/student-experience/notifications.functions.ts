@@ -46,7 +46,7 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    `/student/support?referral=${encodeURIComponent(n.resourceId)}`:
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:
-   n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(n.type==="study_group_membership_request"?"/teacher/study-groups":`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`):
+   n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?((n.type==="study_group_membership_request"||n.type==="study_group_report_submitted")?"/teacher/study-groups":`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`):
    n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });
 export const readSyntheticNotification=createServerFn({method:"POST"})
