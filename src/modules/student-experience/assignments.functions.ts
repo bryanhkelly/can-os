@@ -1,19 +1,61 @@
 import { assertSyntheticMutation } from "./demo-write-gate";
 import { readRubric, scoreRubric, type CriterionGrade } from "./rubric";
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { assertCapability, assertSiteScope, AuthorizationError } from "@/domain/command-context";
 import { and, eq, inArray, desc } from "drizzle-orm";
-const STUDENT="f1000000-0000-4000-8000-000000000007";
-const STUDENT_PERSON="f1000000-0000-4000-8000-000000000005";
 const TEACHER="f1000000-0000-4000-8000-000000000006";
 const SITE="f1000000-0000-4000-8000-000000000003";
 
+/** Never accept a browser-selected actor or role for assignment authorization. */
+async function studentActor(){
+ const context=await getCommandContext(getRequest());
+ assertCapability(context,"assignments:submit");
+ if(context.role!=="student"||!context.actorPersonId)throw new AuthorizationError("student assignment access");
+ const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+ const [profile]=await db.select({id:schema.studentProfiles.id}).from(schema.studentProfiles)
+  .where(eq(schema.studentProfiles.personId,context.actorPersonId)).limit(1);
+ if(!profile)throw new AuthorizationError("student profile");
+ return {context,studentId:profile.id,studentPersonId:context.actorPersonId};
+}
+async function teacherActor(sectionId?:string){
+ const context=await getCommandContext(getRequest());
+ if(context.role!=="teacher"||!context.actorPersonId)throw new AuthorizationError("teacher assignment access");
+ const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+ if(sectionId){
+  const [section]=await db.select({siteId:schema.sections.siteId})
+   .from(schema.sectionTeachers).innerJoin(schema.sections,eq(schema.sections.id,schema.sectionTeachers.sectionId))
+   .where(and(eq(schema.sectionTeachers.personId,context.actorPersonId),eq(schema.sectionTeachers.sectionId,sectionId))).limit(1);
+  if(!section)throw new AuthorizationError("assigned teacher");
+  assertSiteScope(context,section.siteId);
+ }
+ return context;
+}
+async function teacherForSubmission(submissionId:string){
+ const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+ const [row]=await db.select({sectionId:schema.assessments.sectionId})
+  .from(schema.submissions).innerJoin(schema.assessments,eq(schema.assessments.id,schema.submissions.assessmentId))
+  .where(eq(schema.submissions.id,submissionId)).limit(1);
+ if(!row||!row.sectionId)throw new AuthorizationError("submission section");
+ return teacherActor(row.sectionId);
+}
+async function teacherForAssessment(assessmentId:string){
+ const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+ const [row]=await db.select({sectionId:schema.assessments.sectionId})
+  .from(schema.assessments).where(eq(schema.assessments.id,assessmentId)).limit(1);
+ if(!row||!row.sectionId)throw new AuthorizationError("assessment section");
+ return teacherActor(row.sectionId);
+}
 /** Assignment flows only work on the named synthetic student and enrolled sections. */
 export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
+ const {context,studentId}=await studentActor();
+ assertSiteScope(context,SITE);
  if(!process.env.DATABASE_URL)return {connected:false,assignments:[]};
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const enrollmentRows=await db.select({sectionId:s.enrollments.sectionId})
  .from(s.enrollments).innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
- .where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.status,"active"),eq(s.enrollments.kind,"section"),eq(s.sections.siteId,SITE)));
+ .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.status,"active"),eq(s.enrollments.kind,"section"),eq(s.sections.siteId,SITE)));
  const ids=enrollmentRows.map(e=>e.sectionId).filter((id):id is string=>id!==null);
  if(!ids.length)return {connected:true,assignments:[]};
  const rows=await db.select({
@@ -27,7 +69,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   course:s.sections.title,attemptNumber:s.submissions.attemptNumber,metadata:s.assessments.metadata,assessmentStatus:s.assessments.status,
  }).from(s.assessments)
  .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
- .leftJoin(s.submissions,and(eq(s.submissions.assessmentId,s.assessments.id),eq(s.submissions.studentProfileId,STUDENT)))
+ .leftJoin(s.submissions,and(eq(s.submissions.assessmentId,s.assessments.id),eq(s.submissions.studentProfileId,studentId)))
  .where(and(inArray(s.assessments.sectionId,ids),inArray(s.assessments.status,["published","closed"])))
  .orderBy(desc(s.assessments.dueAt));
  const newest=new Map<string,(typeof rows)[number]>();
@@ -48,6 +90,8 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
  .validator((value:{assessmentId:string;text:string})=>value)
  .handler(async({data})=>{
   assertSyntheticMutation("student");
+  const {context,studentId,studentPersonId}=await studentActor();
+  assertSiteScope(context,SITE);
   const text=data.text.trim();
   if(text.length<3||text.length>20000)throw new Error("Response must be 3–20,000 characters");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -57,24 +101,24 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    .where(and(eq(s.assessments.id,data.assessmentId),eq(s.assessments.status,"published"),eq(s.sections.siteId,SITE))).limit(1);
    if(!assessment)throw new Error("Assessment not found");
    const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(
-    eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
+    eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
    if(!enrollment)throw new Error("Student is not enrolled");
-   const priorRows=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
+   const priorRows=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
    const prior=priorRows[0];
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
    const resolveFollowUps=async(submissionId:string)=>{
     const rows=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata}).from(s.actions)
-     .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,STUDENT),eq(s.actions.siteId,SITE)));
+     .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,studentId),eq(s.actions.siteId,SITE)));
     for(const action of rows){
      if(action.metadata.synthetic!==true||action.metadata.assessmentId!==assessment.id||action.status==="resolved"||action.status==="cancelled")continue;
      await tx.update(s.actions).set({status:"resolved",resolvedAt:now,resolutionNote:"Student submitted overdue assignment.",updatedAt:now}).where(eq(s.actions.id,action.id));
-     await tx.insert(s.auditEvents).values({actorPersonId:STUDENT_PERSON,action:"synthetic.missing_work.resolved_by_submission",resourceType:"action",resourceId:action.id,before:{status:action.status},after:{status:"resolved",submissionId},context:{synthetic:true,assessmentId:assessment.id}});
+     await tx.insert(s.auditEvents).values({actorPersonId:studentPersonId,action:"synthetic.missing_work.resolved_by_submission",resourceType:"action",resourceId:action.id,before:{status:action.status},after:{status:"resolved",submissionId},context:{synthetic:true,assessmentId:assessment.id}});
     }
    };
 
    if(prior?.status==="returned"){
-    const [revision]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,attemptNumber:prior.attemptNumber+1,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
+    const [revision]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,attemptNumber:prior.attemptNumber+1,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
     if(!revision)throw new Error("Unable to save revision");
     await resolveFollowUps(revision.id);
     return {submissionId:revision.id};
@@ -85,7 +129,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
     await resolveFollowUps(submitted.id);
     return {submissionId:submitted.id};
    }
-   const [created]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
+   const [created]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
    if(!created)throw new Error("Unable to submit");
     await resolveFollowUps(created.id);
    return {submissionId:created.id};
@@ -96,18 +140,24 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
  .validator((value:{submissionId:string;score:number;comment:string})=>value)
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
+  const context=await teacherActor();
+  assertSiteScope(context,SITE);
   if(!Number.isFinite(data.score)||data.score<0||data.score>100)throw new Error("Score must be from 0 to 100");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  const [record]=await db.select({id:s.submissions.id,points:s.assessments.pointsPossible})
+  await teacherForSubmission(data.submissionId);
+  const [record]=await db.select({id:s.submissions.id,points:s.assessments.pointsPossible,studentProfileId:s.submissions.studentProfileId})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.studentProfileId,STUDENT),eq(s.sections.siteId,SITE),eq(s.submissions.status,"submitted"))).limit(1);
+   .where(and(eq(s.submissions.id,data.submissionId),eq(s.sections.siteId,SITE),eq(s.submissions.status,"submitted"))).limit(1);
   if(!record)throw new Error("Submitted work not found");
+  const [student]=await db.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
+  if(!student)throw new AuthorizationError("student profile");
+  const studentPersonId=student.personId;
   const points=Number(record.points??100);
-  const [updated]=await db.update(s.submissions).set({status:"graded",score:String(data.score*points/100),feedback:{comment:data.comment.slice(0,4000)},graderPersonId:TEACHER,gradedAt:new Date(),updatedAt:new Date()})
+  const [updated]=await db.update(s.submissions).set({status:"graded",score:String(data.score*points/100),feedback:{comment:data.comment.slice(0,4000)},graderPersonId:context.actorPersonId,gradedAt:new Date(),updatedAt:new Date()})
   .where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"submitted"))).returning({id:s.submissions.id});
   if(!updated)throw new Error("Submission already graded");
-  await db.insert(s.notifications).values({recipientPersonId:STUDENT_PERSON,type:"assignment_feedback",status:"unread",title:"New feedback on your work",body:data.comment.slice(0,500)||"Your teacher posted a grade.",resourceType:"submission",resourceId:updated.id});
+  await db.insert(s.notifications).values({recipientPersonId:studentPersonId,type:"assignment_feedback",status:"unread",title:"New feedback on your work",body:data.comment.slice(0,500)||"Your teacher posted a grade.",resourceType:"submission",resourceId:updated.id});
   return {submissionId:updated.id};
  });
 
@@ -115,9 +165,12 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
  .validator((value:{submissionId:string})=>value)
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
+  const context=await teacherActor();
+  assertSiteScope(context,SITE);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  await teacherForSubmission(data.submissionId);
   const [updated]=await db.update(s.submissions).set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
-   .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.studentProfileId,STUDENT),eq(s.submissions.status,"graded"))).returning({id:s.submissions.id});
+   .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.status,"graded"))).returning({id:s.submissions.id});
   if(!updated)throw new Error("Graded synthetic submission not found");
   return {submissionId:updated.id};
  });
@@ -127,18 +180,21 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
  .validator((value:{sectionId:string;title:string;instructions:string;dueAt:string;pointsPossible:number;rubric:string})=>value)
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
+  const context=await teacherActor();
+  assertSiteScope(context,SITE);
   if(data.title.trim().length<3||data.title.length>180)throw new Error("Title must be 3–180 characters");
   if(!Number.isFinite(data.pointsPossible)||data.pointsPossible<=0||data.pointsPossible>1000)throw new Error("Invalid point value");
   const dueAt=new Date(data.dueAt);
   if(Number.isNaN(dueAt.getTime()))throw new Error("Invalid due date");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  await teacherActor(data.sectionId);
   return db.transaction(async tx=>{
    const [section]=await tx.select({id:s.sections.id}).from(s.sections).where(and(eq(s.sections.id,data.sectionId),eq(s.sections.siteId,SITE))).limit(1);
    if(!section)throw new Error("Section not found at synthetic Site");
    const [assessment]=await tx.insert(s.assessments).values({
     sectionId:section.id,title:data.title.trim(),instructions:data.instructions.trim(),
     status:"published",pointsPossible:String(data.pointsPossible),dueAt,availableAt:new Date(),
-    createdByPersonId:TEACHER,metadata:{synthetic:true,fixture:"gf1-v2",rubric:data.rubric.trim()},
+    createdByPersonId:context.actorPersonId,metadata:{synthetic:true,fixture:"gf1-v2",rubric:data.rubric.trim()},
    }).returning({id:s.assessments.id});
    if(!assessment)throw new Error("Assessment could not be created");
    const enrolled=await tx.select({studentProfileId:s.enrollments.studentProfileId}).from(s.enrollments).where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.sectionId,section.id),eq(s.enrollments.status,"active")));
@@ -150,13 +206,15 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
 export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
  .validator((value:{assessmentId:string})=>value)
  .handler(async({data})=>{
+  const {context,studentId}=await studentActor();
+  assertSiteScope(context,SITE);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   const rows=await db.select({attempt:s.submissions.attemptNumber,status:s.submissions.status,
    submittedAt:s.submissions.submittedAt,score:s.submissions.score,
    response:s.submissions.response,feedback:s.submissions.feedback})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .where(and(eq(s.submissions.assessmentId,data.assessmentId),eq(s.submissions.studentProfileId,STUDENT),eq(s.sections.siteId,SITE)))
+   .where(and(eq(s.submissions.assessmentId,data.assessmentId),eq(s.submissions.studentProfileId,studentId),eq(s.sections.siteId,SITE)))
    .orderBy(desc(s.submissions.attemptNumber));
   return rows.map(row=>({attempt:row.attempt,status:row.status,
    submittedAt:row.submittedAt?.toISOString()??null,score:row.score,
@@ -169,6 +227,8 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
  .validator((value:{assessmentId:string;text:string})=>value)
  .handler(async({data})=>{
   assertSyntheticMutation("student");
+  const {context,studentId,studentPersonId}=await studentActor();
+  assertSiteScope(context,SITE);
   if(data.text.length>20000)throw new Error("Draft too long");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
@@ -177,14 +237,14 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
     .where(and(eq(s.assessments.id,data.assessmentId),eq(s.sections.siteId,SITE),eq(s.assessments.status,"published"))).limit(1);
    if(!assessment)throw new Error("Assignment not available");
    const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
-    .where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
+    .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
    if(!enrollment)throw new Error("Student not enrolled");
-   const [latest]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
+   const [latest]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
    if(latest && !["assigned","returned"].includes(latest.status))throw new Error("Submitted work cannot be overwritten");
    if(latest?.status==="returned"){
-    const [draft]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,attemptNumber:latest.attemptNumber+1,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing().returning({id:s.submissions.id});
+    const [draft]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,attemptNumber:latest.attemptNumber+1,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing().returning({id:s.submissions.id});
     if(draft)return {saved:true};
-    const [existing]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,STUDENT),eq(s.submissions.attemptNumber,latest.attemptNumber+1))).limit(1);
+    const [existing]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId),eq(s.submissions.attemptNumber,latest.attemptNumber+1))).limit(1);
     if(!existing||existing.status!=="assigned")throw new Error("Revision already submitted");
     const [saved]=await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,existing.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!saved)throw new Error("Draft already submitted");
@@ -194,7 +254,7 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
     const [saved]=await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,latest.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!saved)throw new Error("Draft already submitted");
    }else{
-    await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing();
+    await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing();
    }
    return {saved:true};
   });
@@ -204,7 +264,10 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
  .validator((value:{assessmentId:string;action:"close"|"reopen"|"reschedule";dueAt?:string})=>value)
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
+  const context=await teacherActor();
+  assertSiteScope(context,SITE);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  await teacherForAssessment(data.assessmentId);
   const [assessment]=await db.select({id:s.assessments.id,metadata:s.assessments.metadata})
    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .where(and(eq(s.assessments.id,data.assessmentId),eq(s.sections.siteId,SITE))).limit(1);
@@ -223,25 +286,30 @@ export const gradeSyntheticRubric=createServerFn({method:"POST"})
  .validator((value:{submissionId:string;grades:CriterionGrade[];comment:string})=>value)
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
+  const context=await teacherActor();
+  assertSiteScope(context,SITE);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  await teacherForSubmission(data.submissionId);
   return db.transaction(async tx=>{
-   const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,metadata:s.assessments.metadata})
+   const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,metadata:s.assessments.metadata,studentProfileId:s.submissions.studentProfileId})
     .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
     .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-    .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.studentProfileId,STUDENT),
-       eq(s.sections.siteId,SITE),eq(s.submissions.status,"submitted"))).limit(1);
+    .where(and(eq(s.submissions.id,data.submissionId),eq(s.sections.siteId,SITE),eq(s.submissions.status,"submitted"))).limit(1);
    if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic submitted assignment not found");
+   const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
+   if(!student)throw new AuthorizationError("student profile");
+   const studentPersonId=student.personId;
    const criteria=readRubric(record.metadata.rubricCriteria);
    const result=scoreRubric(criteria,data.grades);
    const possible=Number(record.points??100);
    const [updated]=await tx.update(s.submissions).set({
     status:"graded",score:String(Math.round(result.percentage*possible)/100),
     feedback:{comment:data.comment.slice(0,4000),rubricResult:{...result,grades:data.grades,criteria}},
-    graderPersonId:TEACHER,gradedAt:new Date(),updatedAt:new Date()
+    graderPersonId:context.actorPersonId,gradedAt:new Date(),updatedAt:new Date()
    }).where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"submitted")))
      .returning({id:s.submissions.id});
    if(!updated)throw new Error("Submission already graded");
-   await tx.insert(s.notifications).values({recipientPersonId:STUDENT_PERSON,
+   await tx.insert(s.notifications).values({recipientPersonId:studentPersonId,
     type:"assignment_feedback",status:"unread",title:"Your rubric feedback is ready",
     body:data.comment.slice(0,500)||"Your teacher scored your assignment rubric.",
     resourceType:"submission",resourceId:updated.id});
