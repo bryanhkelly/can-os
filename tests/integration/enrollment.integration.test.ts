@@ -8,7 +8,7 @@ integration("GF2 new family enrollment", () => {
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
-      import("@/modules/enrollment/gf2-service"),
+      import("@/modules/enrollment/enrollment-service"),
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);

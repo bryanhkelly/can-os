@@ -17,10 +17,10 @@ integration("GF1 academic intervention", () => {
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
-      import("@/modules/learning/gf1-service"),
+      import("@/modules/learning/missing-work-service"),
       import("@/workers/domain-event-worker"),
       import("@/modules/actions/create-action-from-insight"),
-      import("@/modules/communication/gf1-thread-service"),
+      import("@/modules/communication/thread-service"),
       import("@/modules/actions/resolve-action"),
     ]);
 

@@ -54,8 +54,8 @@ if (process.argv.includes("--preflight")) {
   process.exit(0);
 }
 
-const targeted = mode === "gf26" || mode === "gf26-lifecycle" || mode === "admissions-offers";
-const suite = mode === "gf26" ? ["tests/integration/gf26-fixture-integrity.test.ts"] : mode === "gf26-lifecycle" ? ["tests/integration/gf26-session-lifecycle.test.ts"] : mode === "admissions-offers" ? ["tests/integration/admissions-offers.integration.test.ts"] : ["tests/integration"];
+const targeted = mode === "study-groups" || mode === "study-group-lifecycle" || mode === "admissions-offers";
+const suite = mode === "study-groups" ? ["tests/integration/study-group-fixture-integrity.test.ts"] : mode === "study-group-lifecycle" ? ["tests/integration/study-group-session-lifecycle.test.ts"] : mode === "admissions-offers" ? ["tests/integration/admissions-offers.integration.test.ts"] : ["tests/integration"];
 const args = targeted ? process.argv.slice(3) : process.argv.slice(2);
 const result = spawnSync(process.execPath, [
   "node_modules/vitest/vitest.mjs", "run", ...suite, ...args,

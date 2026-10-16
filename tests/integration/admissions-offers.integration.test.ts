@@ -7,7 +7,7 @@ integration("synthetic admissions offer concurrency",()=>{
   process.env.CAN_DEMO_WRITES_ENABLED="true";
   const [{db},s,{eq},svc,{startFamilyApplication}]=await Promise.all([
    import("@/db/client"),import("@/db/schema"),import("drizzle-orm"),
-   import("@/modules/enrollment/admissions-offer-service"),import("@/modules/enrollment/gf2-service")
+   import("@/modules/enrollment/admissions-offer-service"),import("@/modules/enrollment/enrollment-service")
   ]);
   const {createAcademicTimeFixture}=await import("./helpers/academic-time");
   const suffix=crypto.randomUUID().slice(0,8);

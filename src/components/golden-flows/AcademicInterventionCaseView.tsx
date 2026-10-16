@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { AcademicInterventionCase } from "@/modules/learning/gf1-query";
+import type { AcademicInterventionCase } from "@/modules/learning/missing-work-query";
 
 export function AcademicInterventionCaseView({
   data,

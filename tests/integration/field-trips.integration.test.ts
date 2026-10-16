@@ -8,8 +8,8 @@ integration("GF33 field trip end-to-end", () => {
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
-      import("@/modules/field-trips/gf33-service"),
-      import("@/modules/incidents/gf35-service"),
+      import("@/modules/field-trips/field-trip-service"),
+      import("@/modules/incidents/incident-service"),
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);

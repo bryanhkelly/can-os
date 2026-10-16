@@ -8,7 +8,7 @@ integration("GF35 safety incident lifecycle", () => {
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
-      import("@/modules/incidents/gf35-service"),
+      import("@/modules/incidents/incident-service"),
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);

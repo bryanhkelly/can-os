@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { domainEvents } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
-import { handleAcademicInterventionEvent } from "@/modules/learning/gf1-event-handler";
+import { handleAcademicInterventionEvent } from "@/modules/learning/missing-assignment-event-handler";
 
 export type DomainEventHandler = (eventId: string) => Promise<void>;
 

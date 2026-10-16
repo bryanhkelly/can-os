@@ -8,7 +8,7 @@ integration("GF36 co-curriculars and athletics", () => {
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
-      import("@/modules/activities/gf36-service"),
+      import("@/modules/activities/activity-service"),
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);

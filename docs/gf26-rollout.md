@@ -55,6 +55,6 @@ approved members. Rejoining after leaving clears the old approval metadata.
 
 ## Isolated Neon validation (2026-10-16)
 
-A fresh disposable Neon branch `gf26-integrity-20261016` was cloned from production. Read-only SQL verified two synthetic groups, one approved membership, two synthetic sessions, two calendar events, and **zero sessions missing a canonical calendar event**. No production rows were changed. To repeat the fixture integrity test, set `TEST_DATABASE_URL` to this disposable branch, `CAN_TEST_DB_WRITES_ENABLED=true` and run `npm run test:integration:gf26`; the test itself performs only reads. The full `test:integration` suite runs mutating GF2 workflows and requires separate fresh GF2 fixtures.
+A fresh disposable Neon branch `gf26-integrity-20261016` was cloned from production. Read-only SQL verified two synthetic groups, one approved membership, two synthetic sessions, two calendar events, and **zero sessions missing a canonical calendar event**. No production rows were changed. To repeat the fixture integrity test, set `TEST_DATABASE_URL` to this disposable branch, `CAN_TEST_DB_WRITES_ENABLED=true` and run `npm run test:integration:study-groups`; the test itself performs only reads. The full `test:integration` suite runs mutating GF2 workflows and requires separate fresh GF2 fixtures.
 
 This is **fixture preflight, not session creation/cancellation or UI end-to-end acceptance**. Real cross-role execution and notification emission must still be validated against a disposable branch.

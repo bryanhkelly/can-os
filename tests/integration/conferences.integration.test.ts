@@ -8,7 +8,7 @@ integration("GF39 parent-teacher conferences", () => {
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
-      import("@/modules/conferences/gf39-service"),
+      import("@/modules/conferences/conference-service"),
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);

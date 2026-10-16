@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertSyntheticMutation } from "@/modules/student-experience/demo-write-gate";
-import { startProgramLaunch, activateProgram } from "./gf3-service";
+import { startProgramLaunch, activateProgram } from "./program-launch-service";
 import { completeJourneyRequirement } from "@/modules/journeys/complete-requirement";
 
 const programTypes = [
@@ -200,7 +200,7 @@ export const completeLaunchRequirement = createServerFn({ method: "POST" })
     return { journeyRequirementId: data.journeyRequirementId, journeyStatus };
   });
 
-/** Activate a launched program; gf3-service enforces the Launch Journey ready invariant. */
+/** Activate a launched program; program-launch-service enforces the Launch Journey ready invariant. */
 export const activateLaunch = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ programId: uuid }).parse(data))
   .handler(async ({ data }) => {

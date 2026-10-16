@@ -187,7 +187,7 @@ export const markAttendance = createServerFn({ method: "POST" })
     if (!enrollment) throw new AuthorizationError("active enrollment at your site");
     const { start } = dayBounds(data.date);
     const occurrenceKey = `${data.date}:site-day`;
-    const { recordAttendance } = await import("./gf4-service");
+    const { recordAttendance } = await import("./attendance-service");
     const attendanceEventId = await recordAttendance(context, {
       studentProfileId: enrollment.studentProfileId,
       programId: enrollment.programId,
@@ -327,7 +327,7 @@ export const submitExcuse = createServerFn({ method: "POST" })
       ))
       .limit(1);
     if (!relationship) throw new AuthorizationError("guardian attendance relationship");
-    const { submitAttendanceExcuse } = await import("./gf4-service");
+    const { submitAttendanceExcuse } = await import("./attendance-service");
     const excuseId = await submitAttendanceExcuse(context, {
       attendanceEventId: data.attendanceEventId,
       reason,
@@ -384,7 +384,7 @@ export const reviewExcuse = createServerFn({ method: "POST" })
     if (data.decision !== "approved" && data.decision !== "rejected") throw new Error("Invalid review decision");
     const note = (data.note ?? "").trim();
     if (note.length > 2000) throw new Error("Review note must be under 2,000 characters");
-    const { reviewAttendanceExcuse } = await import("./gf4-service");
+    const { reviewAttendanceExcuse } = await import("./attendance-service");
     return reviewAttendanceExcuse(context, {
       excuseId: data.excuseId,
       decision: data.decision,

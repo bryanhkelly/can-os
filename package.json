@@ -13,8 +13,8 @@
     "test": "vitest run --exclude 'tests/integration/**' --exclude 'tests/e2e/**'",
     "test:integration": "node scripts/run-integration-tests.mjs",
     "typecheck": "tsc --noEmit",
-    "test:integration:gf26": "node scripts/run-integration-tests.mjs gf26",
-    "test:integration:gf26-lifecycle": "node scripts/run-integration-tests.mjs gf26-lifecycle",
+    "test:integration:study-groups": "node scripts/run-integration-tests.mjs study-groups",
+    "test:integration:study-group-lifecycle": "node scripts/run-integration-tests.mjs study-group-lifecycle",
     "test:integration:admissions": "node scripts/run-integration-tests.mjs admissions-offers",
     "test:e2e": "playwright test"
   },

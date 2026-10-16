@@ -8,7 +8,7 @@ integration("GF34 health office", () => {
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
-      import("@/modules/health/gf34-service"),
+      import("@/modules/health/health-office-service"),
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);

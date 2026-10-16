@@ -310,7 +310,7 @@ ConsentRecord, FinancialObligation, least-privilege medical access, offline-safe
 
 ## Running the GF1 e2e test
 
-A Playwright golden-flow test covers GF1 end to end (assignment becomes missing -> guardian notified -> student submits late -> teacher grades -> grade visible): `tests/e2e/gf1-missing-assignment.spec.ts`, with its self-contained Neon fixture in `tests/e2e/fixture.ts`.
+A Playwright golden-flow test covers GF1 end to end (assignment becomes missing -> guardian notified -> student submits late -> teacher grades -> grade visible): `tests/e2e/missing-assignment.spec.ts`, with its self-contained Neon fixture in `tests/e2e/fixture.ts`.
 
 Prerequisites:
 

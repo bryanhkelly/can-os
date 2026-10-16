@@ -1,4 +1,4 @@
-import { markOverdueSubmissionsMissing } from "@/modules/learning/gf1-service";
+import { markOverdueSubmissionsMissing } from "@/modules/learning/missing-work-service";
 import { processPendingDomainEvents } from "./domain-event-worker";
 
 /**

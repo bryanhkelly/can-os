@@ -9,7 +9,7 @@ integration("GF3 host / program launch", () => {
         import("@/db/client"),
         import("@/db/schema"),
         import("drizzle-orm"),
-        import("@/modules/programs/gf3-service"),
+        import("@/modules/programs/program-launch-service"),
         import("@/modules/journeys/complete-requirement"),
       ]);
 

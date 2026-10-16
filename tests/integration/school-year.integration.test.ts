@@ -7,7 +7,7 @@ integration("GF23 school-year setup", () => {
     const [{ db }, schema, academicTime] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
-      import("@/modules/academic-time/gf23-service"),
+      import("@/modules/academic-time/school-year-service"),
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);

@@ -8,7 +8,7 @@ integration("GF4 attendance + parent excuse", () => {
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
-      import("@/modules/attendance/gf4-service"),
+      import("@/modules/attendance/attendance-service"),
     ]);
 
     const suffix = crypto.randomUUID().slice(0, 8);
