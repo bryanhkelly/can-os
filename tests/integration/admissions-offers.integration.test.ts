@@ -24,12 +24,16 @@ integration("synthetic admissions offer concurrency",()=>{
   const registrar={actorPersonId:registrarPerson.id,capabilities:new Set(["enrollment.decide","enrollment.activate"]),scope:{programIds:[program.id]}};
   const family={actorPersonId:guardian.id,capabilities:new Set(["enrollment.apply"]),scope:{programIds:[program.id]}};
   const records=[];
+  let sharedHouseholdId: string | undefined;
   for(let i=0;i<2;i++){
-   const row=await startFamilyApplication(family,{programId:program.id,idempotencyKey:`offer-family-${suffix}-${i}`,journeyDefinitionKey:journeyKey,student:{legalFirstName:`Synthetic${i}`,legalLastName:"Student",gradeLevel:"9"}});
+   const row=await startFamilyApplication(family,{programId:program.id,householdId:sharedHouseholdId,idempotencyKey:`offer-family-${suffix}-${i}`,journeyDefinitionKey:journeyKey,student:{legalFirstName:`Synthetic${i}`,legalLastName:"Student",gradeLevel:"9"}});
+   sharedHouseholdId=row.householdId;
    await db.update(s.applications).set({metadata:{synthetic:true}}).where(eq(s.applications.id,row.applicationId));
    await db.update(s.journeys).set({status:"ready"}).where(eq(s.journeys.id,row.journeyId));
    records.push(row);
   }
+  expect(new Set(records.map(r=>r.householdId)).size).toBe(1);
+  expect(new Set(records.map(r=>r.studentProfileId)).size).toBe(2);
   const expiry=new Date(Date.now()+7*24*60*60*1000);
   const settled=await Promise.allSettled(records.map((row,i)=>svc.issueSyntheticAdmissionOffer(registrar,{applicationId:row.applicationId,schoolYearId:calendar.schoolYear.id,idempotencyKey:`synthetic-seat-${suffix}-${i}`,expiresAt:expiry})));
   const successes=settled.filter(x=>x.status==="fulfilled");
