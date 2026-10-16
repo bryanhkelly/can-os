@@ -33,5 +33,5 @@ export const allowedDocumentMime=new Set(["application/pdf","image/jpeg","image/
 export function validateDocumentUpload(fileName:string,mimeType:string,size:number){
  if(fileName.length<1||fileName.length>150||/[\\/\x00-\x1f]/.test(fileName))throw new Error("Invalid file name");
  if(!allowedDocumentMime.has(mimeType))throw new Error("Only PDF, JPEG and PNG files are supported");
- if(!Number.isSafeInteger(size)||size<1||size>10*1024*1024)throw new Error("Document size must be 1 byte to 10 MB");
+ if(!Number.isSafeInteger(size)||size<16||size>10*1024*1024)throw new Error("Document size must be 16 bytes to 10 MB");
 }

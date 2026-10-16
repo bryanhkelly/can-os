@@ -59,9 +59,23 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
   const sample=await fetch(signR2Object("GET",data.key,undefined,30),{headers:{Range:"bytes=0-15"}});
   if(sample.status!==206)throw new Error("R2 did not honor the bounded file-signature request");
   const returnedRange=sample.headers.get("content-range");
-  if(!returnedRange?.startsWith("bytes 0-15/"))throw new Error("Unexpected R2 signature response");
-  const headerBytes=new Uint8Array(await sample.arrayBuffer());
-  if(headerBytes.length!==16||!matchesEnrollmentDocumentSignature(data.mimeType,headerBytes))
+  if(returnedRange!==`bytes 0-15/${data.size}`)throw new Error("Unexpected R2 signature response");
+  const contentLengthHeader=sample.headers.get("content-length");
+  if(contentLengthHeader!==null&&Number(contentLengthHeader)!==16)throw new Error("Unexpected R2 signature response size");
+  // Never consume a response body of unknown size: an intermediary may ignore Range.
+  const reader=sample.body?.getReader();
+  if(!reader)throw new Error("R2 signature response has no body");
+  const headerBytes=new Uint8Array(16);
+  let offset=0;
+  try{
+   while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    if(offset+value.length>16)throw new Error("R2 signature response exceeded 16 bytes");
+    headerBytes.set(value,offset);offset+=value.length;
+   }
+  }finally{await reader.cancel().catch(()=>{});}
+  if(offset!==16||!matchesEnrollmentDocumentSignature(data.mimeType,headerBytes))
    throw new Error("Uploaded document content does not match its declared type");
   return db.transaction(async tx=>{
    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.requirementId}))`);
