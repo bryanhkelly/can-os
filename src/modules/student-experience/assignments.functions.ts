@@ -209,7 +209,9 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherActor(data.sectionId);
   return db.transaction(async tx=>{
-   const [section]=await tx.select({id:s.sections.id}).from(s.sections).where(and(eq(s.sections.id,data.sectionId),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
+   const [section]=await tx.select({id:s.sections.id}).from(s.sections)
+    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
+    .where(and(eq(s.sections.id,data.sectionId),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
    if(!section)throw new Error("Section not found at synthetic Site");
    const [assessment]=await tx.insert(s.assessments).values({
     sectionId:section.id,title:data.title.trim(),instructions:data.instructions.trim(),
