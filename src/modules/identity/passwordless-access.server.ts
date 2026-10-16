@@ -40,7 +40,9 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
  try {
   await sender({to:email,accessUrl:accessOrigin+"/access/verify?token="+encodeURIComponent(token)});
  }catch(error){
-  if(challenge[0]) await db.delete(accessChallenges).where(eq(accessChallenges.id,challenge[0].id));
+  // Preserve the issued challenge and cooldown on delivery failure; a rapid retry
+  // must not turn a mail-provider outage into unbounded request generation.
+  // The link remains unusable unless the provider actually delivered it.
   throw error;
  }
  return genericResult;
