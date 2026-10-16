@@ -1,16 +1,22 @@
 import {useState} from "react";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
-import {getSyntheticFamilyReadiness,setSyntheticFamilyRequirement} from "@/modules/enrollment/family-readiness.functions";
+import {getSyntheticFamilyReadiness,setSyntheticFamilyRequirement,addSyntheticRequirementReviewNote} from "@/modules/enrollment/family-readiness.functions";
 export const Route=createFileRoute("/admissions/families")({loader:()=>getSyntheticFamilyReadiness(),component:Families});
 function Families(){
  const apps=Route.useLoaderData();
  const router=useRouter();
- const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState("");
+ const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notes,setNotes]=useState<Record<string,string>>({});
  const families=[...new Set(apps.map(a=>a.householdId))];
  async function update(applicationId:string,requirementId:string,complete:boolean){
   setBusy(requirementId);setError("");
   try{await setSyntheticFamilyRequirement({data:{applicationId,requirementId,complete}});await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Requirement update failed");}
+  finally{setBusy(null);}
+ }
+ async function addNote(applicationId:string,requirementId:string){
+  setBusy(requirementId);setError("");
+  try{await addSyntheticRequirementReviewNote({data:{applicationId,requirementId,note:notes[requirementId]??""}});setNotes(previous=>({...previous,[requirementId]:""}));await router.invalidate();}
+  catch(e){setError(e instanceof Error?e.message:"Review note failed");}
   finally{setBusy(null);}
  }
  return <main className="mx-auto max-w-5xl px-5 py-10">
@@ -30,11 +36,11 @@ function Families(){
     <p className="mt-1 text-sm text-muted-foreground">{a.readiness.completed} of {a.readiness.total} requirements complete · {a.readiness.blockers} blocking</p>
     <Link to="/admissions" className="mt-2 inline-block text-xs font-semibold underline">Review offers and enrollment →</Link>
     {a.activeSchoolYears.length>0&&<p className="mt-2 text-xs text-muted-foreground">The admissions checklist is now a historical record. Active enrollment requirements are managed separately.</p>}
-    <div className="mt-3 space-y-2">{a.requirements.map(r=><label key={r.id} className="flex items-center gap-3 text-sm">
+    <div className="mt-3 space-y-3">{a.requirements.map(r=><div key={r.id} className="rounded-lg border p-3"><label className="flex items-center gap-3 text-sm">
       <input type="checkbox" checked={r.status==="complete"} disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onChange={e=>update(a.id,r.id,e.target.checked)}/>
       <span>{r.title}{r.blocking?" · Required":""}</span>
       <span className="text-xs text-muted-foreground">({r.status.replaceAll("_"," ")})</span>
-    </label>)}</div>
+    </label><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="registrar_note"&&typeof e.text==="string").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Review note: {String(e.text)}</p>)}</div><div className="mt-2 flex gap-2"><input className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-sm" value={notes[r.id]??""} maxLength={500} placeholder="Registrar review note (not a document upload)" onChange={e=>setNotes(previous=>({...previous,[r.id]:e.target.value}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||(notes[r.id]??"").trim().length<5} onClick={()=>addNote(a.id,r.id)}>Save note</button></div></div>)}</div>
     {!a.requirements.length&&<p className="mt-2 text-sm text-muted-foreground">No requirements configured for this application.</p>}
    </article>)}</div>
   </section>)}
