@@ -15,7 +15,7 @@ export const getSyntheticAdmissionsCapacity=createServerFn({method:"GET"}).handl
  const offers=await db.select({programId:s.admissionOffers.programId,schoolYearId:s.admissionOffers.schoolYearId,status:s.admissionOffers.status,expiresAt:s.admissionOffers.expiresAt,studentId:s.applications.studentProfileId}).from(s.admissionOffers).innerJoin(s.applications,eq(s.applications.id,s.admissionOffers.applicationId)).where(inArray(s.admissionOffers.programId,ids));
  return pools.map(pool=>{
   const enrolled=new Set(enrollments.filter(e=>e.programId===pool.programId&&e.schoolYearId===pool.schoolYearId).map(e=>e.studentId));
-  const reservations=offers.filter(o=>o.programId===pool.programId&&o.schoolYearId===pool.schoolYearId&&!enrolled.has(o.studentId)&&(o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now())))).length;
+  const reservations=new Set(offers.filter(o=>o.programId===pool.programId&&o.schoolYearId===pool.schoolYearId&&!enrolled.has(o.studentId)&&(o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now())))).map(o=>o.studentId)).size;
   const occupied=enrolled.size+reservations;
   return {id:pool.id,programId:pool.programId,name:synthetic.find(p=>p.id===pool.programId)?.name??"Program",yearName:pool.yearName,capacity:pool.capacity,enrolled:enrolled.size,offered:reservations,remaining:Math.max(0,pool.capacity-occupied),status:occupied>=pool.capacity?"full":"available"};
  });
@@ -36,7 +36,7 @@ export const updateSyntheticAdmissionsCapacity=createServerFn({method:"POST"})
    const active=await tx.select({studentId:s.enrollments.studentProfileId}).from(s.enrollments).where(and(eq(s.enrollments.programId,pool.programId),eq(s.enrollments.schoolYearId,pool.schoolYearId),eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
    const students=new Set(active.map(e=>e.studentId));
    const offers=await tx.select({studentId:s.applications.studentProfileId,status:s.admissionOffers.status,expiresAt:s.admissionOffers.expiresAt}).from(s.admissionOffers).innerJoin(s.applications,eq(s.applications.id,s.admissionOffers.applicationId)).where(and(eq(s.admissionOffers.programId,pool.programId),eq(s.admissionOffers.schoolYearId,pool.schoolYearId)));
-   const reserved=offers.filter(o=>!students.has(o.studentId)&&(o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now())))).length;
+   const reserved=new Set(offers.filter(o=>!students.has(o.studentId)&&(o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now())))).map(o=>o.studentId)).size;
    if(data.capacity<students.size+reserved)throw new Error("Cannot reduce capacity below active enrollments and held offers");
    if(pool.capacity===data.capacity)return {saved:true};
    await tx.update(s.admissionSeatPools).set({capacity:data.capacity,updatedAt:new Date()}).where(eq(s.admissionSeatPools.id,pool.id));
