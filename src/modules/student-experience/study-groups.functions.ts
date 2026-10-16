@@ -24,7 +24,7 @@ export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
 });
 export const createStudyGroup=createServerFn({method:"POST"}).validator((x:{title:string;description:string;kind:"course"|"interest";maxMembers:number})=>x).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const valid=validateGroupInput(data);const {db,s}=await context();
- const [group]=await db.insert(s.studyGroups).values({...valid,siteId:SITE,facilitatorPersonId:actor.actorPersonId!,requiresApproval:true,visibility:"site"}).returning({id:s.studyGroups.id});
+ const [group]=await db.insert(s.studyGroups).values({...valid,siteId:SITE,facilitatorPersonId:actor.actorPersonId!,requiresApproval:true,visibility:"site",metadata:{synthetic:true,fixture:"gf26",createdByPersonId:actor.actorPersonId!}}).returning({id:s.studyGroups.id});
  if(!group)throw new Error('Group creation failed');return {id:group.id};
 });
 export const requestStudyGroupMembership=createServerFn({method:"POST"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
