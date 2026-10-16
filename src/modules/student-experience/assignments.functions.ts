@@ -156,6 +156,7 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
   const [updated]=await db.update(s.submissions).set({status:"graded",score:String(data.score*points/100),feedback:{comment:data.comment.slice(0,4000)},graderPersonId:context.actorPersonId,gradedAt:new Date(),updatedAt:new Date()})
   .where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"submitted"))).returning({id:s.submissions.id});
   if(!updated)throw new Error("Submission already graded");
+  await db.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.grade",resourceType:"submission",resourceId:updated.id,before:{status:"submitted"},after:{status:"graded",score:data.score},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
   await db.insert(s.notifications).values({recipientPersonId:studentPersonId,type:"assignment_feedback",status:"unread",title:"New feedback on your work",body:data.comment.slice(0,500)||"Your teacher posted a grade.",resourceType:"submission",resourceId:updated.id});
   return {submissionId:updated.id};
  });
@@ -171,6 +172,7 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
   const [updated]=await db.update(s.submissions).set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
    .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.status,"graded"))).returning({id:s.submissions.id});
   if(!updated)throw new Error("Graded synthetic submission not found");
+  await db.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.return",resourceType:"submission",resourceId:updated.id,before:{status:"graded"},after:{status:"returned"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
   return {submissionId:updated.id};
  });
 
@@ -196,6 +198,7 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
     createdByPersonId:context.actorPersonId,metadata:{synthetic:true,fixture:"gf1-v2",rubric:data.rubric.trim()},
    }).returning({id:s.assessments.id});
    if(!assessment)throw new Error("Assessment could not be created");
+   await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.create",resourceType:"assessment",resourceId:assessment.id,after:{status:"published"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
    const enrolled=await tx.select({studentProfileId:s.enrollments.studentProfileId}).from(s.enrollments).where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.sectionId,section.id),eq(s.enrollments.status,"active")));
    if(enrolled.length)await tx.insert(s.submissions).values(enrolled.map(row=>({assessmentId:assessment.id,studentProfileId:row.studentProfileId,status:"assigned" as const,timeliness:"on_time" as const})));
    return {assessmentId:assessment.id};
@@ -308,6 +311,7 @@ export const gradeSyntheticRubric=createServerFn({method:"POST"})
    }).where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"submitted")))
      .returning({id:s.submissions.id});
    if(!updated)throw new Error("Submission already graded");
+   await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.rubric_grade",resourceType:"submission",resourceId:updated.id,before:{status:"submitted"},after:{status:"graded",score:result.percentage},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
    await tx.insert(s.notifications).values({recipientPersonId:studentPersonId,
     type:"assignment_feedback",status:"unread",title:"Your rubric feedback is ready",
     body:data.comment.slice(0,500)||"Your teacher scored your assignment rubric.",
