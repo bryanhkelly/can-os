@@ -99,6 +99,19 @@ describe("family application authorized retry", () => {
   });
 });
 
+describe("legacy enrollment scope checks", () => {
+  it("denies application acceptance without program authorization", async () => {
+    selectRows([{id:"application",programId:"program",stage:"application"}]);
+    await expect(acceptApplication({...context,scope:{}},"application")).rejects.toThrow("program scope");
+    expect(update).not.toHaveBeenCalled();
+  });
+  it("denies legacy activation without program authorization", async () => {
+    selectRows([{id:"application",programId:"program",stage:"accepted"}]);
+    await expect(activateEnrollmentFromApplication({...context,scope:{}},"application","year")).rejects.toThrow("program scope");
+    expect(values).not.toHaveBeenCalled();
+  });
+});
+
 describe("transactional admissions events", () => {
   it("expires an elapsed synthetic offer and records audit under the seat pool lock", async () => {
     selectRows([pool], [year], [program], [{id:"expired-offer",applicationId:"application",expiresAt:new Date("2020-01-01T00:00:00Z"),metadata:{synthetic:true}}]);
