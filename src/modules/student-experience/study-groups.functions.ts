@@ -147,14 +147,16 @@ export const rsvpStudyGroupSession=createServerFn({method:"POST"})
  .from(s.studyGroupSessions).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.status,"active")))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Session not found");
- const [calendar]=await db.select({metadata:s.calendarEvents.metadata}).from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).limit(1);
+ return db.transaction(async tx=>{
+ const [calendar]=await tx.select({metadata:s.calendarEvents.metadata}).from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
  if(!calendar||calendar.metadata.cancelled===true)throw new Error("Session is cancelled or missing its calendar event");
- const [member]=await db.select({id:s.studyGroupMemberships.id}).from(s.studyGroupMemberships)
+ const [member]=await tx.select({id:s.studyGroupMemberships.id}).from(s.studyGroupMemberships)
  .where(and(eq(s.studyGroupMemberships.groupId,session.groupId),eq(s.studyGroupMemberships.personId,STUDENT),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
  if(!member)throw new Error("Approved membership required");
- await db.insert(s.studyGroupSessionAttendance).values({sessionId:session.id,personId:STUDENT,rsvp:data.rsvp})
+ await tx.insert(s.studyGroupSessionAttendance).values({sessionId:session.id,personId:STUDENT,rsvp:data.rsvp})
  .onConflictDoUpdate({target:[s.studyGroupSessionAttendance.sessionId,s.studyGroupSessionAttendance.personId],set:{rsvp:data.rsvp,updatedAt:new Date()}});
  return {ok:true};
+ });
 });
 export const recordStudyGroupAttendance=createServerFn({method:"POST"})
 .validator((x:{sessionId:string;personId:string;attended:boolean})=>x).handler(async({data})=>{
