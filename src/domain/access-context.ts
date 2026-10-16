@@ -26,8 +26,8 @@ export type AccessContext = CommandContext & {
 export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Object.freeze({
  student: ["student:read","assignments:submit","study-groups:participate","notifications:manage"],
  teacher: ["teacher:read","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate"],
- guardian: ["guardian:read","notifications:manage","enrollment:manage","student:related-read"],
- registrar: ["admissions:read","notifications:manage","admissions:decide","enrollment:manage","registrations:approve"],
+ guardian: ["guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read"],
+ registrar: ["admissions:read","notifications:manage","admissions:decide","enrollment.decide","enrollment.activate","enrollment:manage","registrations:approve"],
  specialist: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage"],
 });
 
