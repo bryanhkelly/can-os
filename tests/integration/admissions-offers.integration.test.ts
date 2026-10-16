@@ -20,7 +20,8 @@ integration("synthetic admissions offer concurrency",()=>{
   const journeyKey=`synthetic-offers-${suffix}`;
   await db.insert(s.journeyDefinitions).values({key:journeyKey,version:"1",owningOrganizationId:network.id,audience:"family",title:"Synthetic Admissions",configuration:{requirements:[]}});
   const [guardian]=await db.insert(s.people).values({legalFirstName:"Synthetic",legalLastName:"Guardian"}).returning();
-  const registrar={actorPersonId:guardian.id,capabilities:new Set(["enrollment.decide","enrollment.activate"]),scope:{programIds:[program.id]}};
+  const [registrarPerson]=await db.insert(s.people).values({legalFirstName:"Synthetic",legalLastName:"Registrar"}).returning();
+  const registrar={actorPersonId:registrarPerson.id,capabilities:new Set(["enrollment.decide","enrollment.activate"]),scope:{programIds:[program.id]}};
   const family={actorPersonId:guardian.id,capabilities:new Set(["enrollment.apply"]),scope:{programIds:[program.id]}};
   const records=[];
   for(let i=0;i<2;i++){
@@ -51,6 +52,8 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(guardianNotices.filter(n=>n.type==="admission_offer_issued"&&n.resourceId===offerId)).toHaveLength(1);
 
   await expect(svc.respondToSyntheticAdmissionOffer(family,offerId,"accept")).resolves.toBe(offerId);
+  const registrarNotices=await db.select().from(s.notifications).where(eq(s.notifications.recipientPersonId,registrarPerson.id));
+  expect(registrarNotices.filter(n=>n.type==="admission_offer_accepted"&&n.resourceId===offerId)).toHaveLength(1);
   const enrolled=await svc.activateSyntheticOfferedEnrollment(registrar,offerId);
   expect(await svc.activateSyntheticOfferedEnrollment(registrar,offerId)).toBe(enrolled);
   const actual=await db.select().from(s.enrollments).where(eq(s.enrollments.programId,program.id));
@@ -63,6 +66,7 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(journeyAudits.filter(x=>x.action==="journey.activate")).toHaveLength(1);
   const confirmationNotices=await db.select().from(s.notifications).where(eq(s.notifications.resourceId,enrolled));
   expect(confirmationNotices.filter(n=>n.type==="enrollment_activated")).toHaveLength(2);
+  expect(new Set(confirmationNotices.filter(n=>n.type==="enrollment_activated").map(n=>n.recipientPersonId)).size).toBe(2);
   const finalEnrollments=await db.select().from(s.enrollments).where(eq(s.enrollments.programId,program.id));
   expect(finalEnrollments.filter(x=>x.kind==="program"&&x.status==="active")).toHaveLength(1);
 
