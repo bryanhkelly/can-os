@@ -13,7 +13,8 @@ export const Route=createFileRoute("/access/request")({
     return Response.json({accepted:true},{headers:{"Cache-Control":"no-store"}});
    }catch(error){
     if(error instanceof Error && error.message==="Invalid email address")return Response.json({error:"Invalid email"},{status:400});
-    return Response.json({error:"Unable to process request"},{status:503});
+    // Do not reveal which addresses have a CAN OS account via delivery/config errors.
+    return Response.json({accepted:true},{headers:{"Cache-Control":"no-store"}});
    }
   },
  }},
