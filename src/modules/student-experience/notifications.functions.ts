@@ -28,3 +28,14 @@ export const readSyntheticNotification=createServerFn({method:"POST"})
   await db.update(s.notifications).set({status:"read",readAt:new Date(),updatedAt:new Date()}).where(and(eq(s.notifications.id,data.id),eq(s.notifications.recipientPersonId,STUDENT_PERSON)));
   return {saved:true};
  });
+
+/** Idempotently acknowledge all unread notifications for the fixed synthetic student. */
+export const readAllSyntheticNotifications=createServerFn({method:"POST"}).handler(async()=>{
+ assertSyntheticMutation("student");
+ const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+ const changed=await db.update(s.notifications)
+  .set({status:"read",readAt:new Date(),updatedAt:new Date()})
+  .where(and(eq(s.notifications.recipientPersonId,STUDENT_PERSON),eq(s.notifications.status,"unread")))
+  .returning({id:s.notifications.id});
+ return {saved:true,count:changed.length};
+});
