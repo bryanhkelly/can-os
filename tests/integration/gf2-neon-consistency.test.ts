@@ -13,8 +13,7 @@ describe("GF2 persisted synthetic enrollment consistency (Neon)",()=>{
   const rows=await db.select({id:applications.id,metadata:applications.metadata,programId:applications.programId,studentProfileId:applications.studentProfileId}).from(applications);
   const synthetic=rows.filter(a=>a.metadata.synthetic===true);
   expect(synthetic.length,"Seed at least one synthetic application on the disposable test branch").toBeGreaterThan(0);
-  const appIds=synthetic.map(a=>a.id);
-  const offers=await db.select().from(admissionOffers).where(inArray(admissionOffers.applicationId,appIds));
+  const offers=await db.select().from(admissionOffers);
   const active=await db.select({id:enrollments.id,programId:enrollments.programId,schoolYearId:enrollments.schoolYearId,studentProfileId:enrollments.studentProfileId}).from(enrollments).where(and(eq(enrollments.kind,"program"),eq(enrollments.status,"active")));
   const unique=new Set(active.map(e=>[e.programId,e.schoolYearId,e.studentProfileId].join(":")));
   expect(unique.size,"Duplicate active enrollments exist for the same student/program/school year").toBe(active.length);
@@ -22,6 +21,7 @@ describe("GF2 persisted synthetic enrollment consistency (Neon)",()=>{
   const years=await db.select({id:schoolYears.id,programId:schoolYears.programId}).from(schoolYears);
   for(const offer of offers){
    const app=synthetic.find(a=>a.id===offer.applicationId);
+   if(!app)continue;
    expect(app?.programId,"Offer must stay with its synthetic application's program").toBe(offer.programId);
    const year=years.find(y=>y.id===offer.schoolYearId);
    expect(year?.programId,"Offer school year must belong to offer program").toBe(offer.programId);
@@ -36,7 +36,7 @@ describe("GF2 persisted synthetic enrollment consistency (Neon)",()=>{
    const enrolled=active.filter(e=>e.programId===pool.programId&&e.schoolYearId===pool.schoolYearId);
    const enrolledStudents=new Set(enrolled.map(e=>e.studentProfileId));
    const held=offers.filter(o=>o.programId===pool.programId&&o.schoolYearId===pool.schoolYearId&&(o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now())))).filter(o=>{
-    const a=synthetic.find(a=>a.id===o.applicationId);
+    const a=rows.find(a=>a.id===o.applicationId);
     return a&&!enrolledStudents.has(a.studentProfileId);
    });
    expect(enrolledStudents.size+held.length,"Active enrollments plus held offers exceed configured capacity").toBeLessThanOrEqual(pool.capacity);
