@@ -145,6 +145,7 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
+  assertCapability(context,"assignments:grade");
   if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   if(!Number.isFinite(data.score)||data.score<0||data.score>100)throw new Error("Score must be from 0 to 100");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -173,6 +174,7 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
+  assertCapability(context,"assignments:grade");
   if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForSubmission(data.submissionId);
@@ -191,6 +193,7 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
+  assertCapability(context,"assignments:create");
   if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   if(data.title.trim().length<3||data.title.length>180)throw new Error("Title must be 3–180 characters");
   if(!Number.isFinite(data.pointsPossible)||data.pointsPossible<=0||data.pointsPossible>1000)throw new Error("Invalid point value");
@@ -279,6 +282,7 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
+  assertCapability(context,"assignments:create");
   if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForAssessment(data.assessmentId);
@@ -310,6 +314,7 @@ export const gradeSyntheticRubric=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
+  assertCapability(context,"assignments:grade");
   if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForSubmission(data.submissionId);
