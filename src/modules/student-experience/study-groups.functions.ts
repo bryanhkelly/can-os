@@ -186,12 +186,16 @@ export const recordStudyGroupAttendance=createServerFn({method:"POST"})
 export const listStudyGroupAttendance=createServerFn({method:"GET"})
 .validator((x:{sessionId:string})=>x).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
- const [session]=await db.select({id:s.studyGroupSessions.id}).from(s.studyGroupSessions)
+ const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions)
  .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!)))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Access denied");
- return db.select({personId:s.studyGroupSessionAttendance.personId,rsvp:s.studyGroupSessionAttendance.rsvp,attended:s.studyGroupSessionAttendance.attended})
- .from(s.studyGroupSessionAttendance).where(eq(s.studyGroupSessionAttendance.sessionId,data.sessionId));
+ // The roster includes every approved member, even when they never RSVP'd.
+ // Attendance recording must not depend on having an existing RSVP row.
+ return db.select({personId:s.studyGroupMemberships.personId,rsvp:s.studyGroupSessionAttendance.rsvp,attended:s.studyGroupSessionAttendance.attended})
+ .from(s.studyGroupMemberships)
+ .leftJoin(s.studyGroupSessionAttendance,and(eq(s.studyGroupSessionAttendance.personId,s.studyGroupMemberships.personId),eq(s.studyGroupSessionAttendance.sessionId,data.sessionId)))
+ .where(and(eq(s.studyGroupMemberships.groupId,session.groupId),eq(s.studyGroupMemberships.status,"approved")));
 });
 
 /** Updates the session and its canonical calendar event in one transaction. */
