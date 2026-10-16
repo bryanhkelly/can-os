@@ -30,11 +30,11 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
  if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role)))return genericResult;
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
- const now=new Date();
  // Serialize concurrent requests for the same account before enforcing cooldown.
  // Without this transaction, simultaneous requests can each see zero recent challenges.
  const issued=await db.transaction(async tx=>{
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${account.id}))`);
+  const now=new Date();
   const recent=await tx.select({id:accessChallenges.id}).from(accessChallenges)
    .where(and(eq(accessChallenges.accountId,account.id),gt(accessChallenges.createdAt,new Date(now.getTime()-REQUEST_COOLDOWN_MS)))).limit(1);
   if(recent.length)return null;
