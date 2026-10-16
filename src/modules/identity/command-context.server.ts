@@ -36,9 +36,12 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  },grants);
  // Program authorization derives from the verified active organization grant, not a browser claim.
  const organizations=context.scope.organizationIds??[];
+ const sites=context.scope.siteIds??[];
+ // Fail closed for a grant without an organization; site-specific grants must not inherit all organization programs.
+ context.scope.programIds=[];
  if(organizations.length){
-  const permitted=await db.select({id:programs.id}).from(programs).where(inArray(programs.organizationId,organizations));
-  context.scope.programIds=permitted.map(p=>p.id);
+  const permitted=await db.select({id:programs.id,siteId:programs.siteId}).from(programs).where(inArray(programs.organizationId,organizations));
+  context.scope.programIds=permitted.filter(p=>sites.length===0||sites.includes(p.siteId??"")).map(p=>p.id);
  }
  return context;
 }
