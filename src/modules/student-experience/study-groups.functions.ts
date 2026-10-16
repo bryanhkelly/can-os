@@ -73,10 +73,10 @@ export const getStudyGroupDetail=createServerFn({method:"GET"}).validator((x:{gr
  return {group,memberStatus:membership?.status??null,posts,sessions};
 });
 export const postStudyGroupMessage=createServerFn({method:"POST"}).validator((x:{groupId:string;body:string})=>x).handler(async({data})=>{
- assertSyntheticMutation("student");const body=validateGroupPost(data.body);const {db,s}=await context();
- const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,STUDENT),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
+ assertSyntheticMutation("student");const actor=await groupActor("student");const body=validateGroupPost(data.body);const {db,s}=await context();
+ const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
  if(!membership)throw new Error("Approved membership required");
- const [post]=await db.insert(s.studyGroupPosts).values({groupId:data.groupId,body,authorPersonId:STUDENT}).returning({id:s.studyGroupPosts.id});if(!post)throw new Error('Post creation failed');return {id:post.id};
+ const [post]=await db.insert(s.studyGroupPosts).values({groupId:data.groupId,body,authorPersonId:actor.actorPersonId!}).returning({id:s.studyGroupPosts.id});if(!post)throw new Error('Post creation failed');return {id:post.id};
 });
 export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator((x:{groupId:string;title:string;agenda:string;startsAt:string;endsAt:string})=>x).handler(async({data})=>{
  assertSyntheticMutation("teacher");const {start,end}=validateSession(data.startsAt,data.endsAt);const {db,s}=await context();
@@ -111,12 +111,12 @@ export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator
  });
 });
 export const reportStudyGroupPost=createServerFn({method:"POST"}).validator((x:{groupId:string;postId:string;reason:string})=>x).handler(async({data})=>{
- assertSyntheticMutation("student");const {db,s}=await context();
+ assertSyntheticMutation("student");const actor=await groupActor("student");const {db,s}=await context();
  if(data.reason.trim().length<5||data.reason.length>1000)throw new Error("Please provide a reason");
- const [member]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,STUDENT),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
+ const [member]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
  const [post]=await db.select().from(s.studyGroupPosts).where(and(eq(s.studyGroupPosts.groupId,data.groupId),eq(s.studyGroupPosts.id,data.postId))).limit(1);
  if(!member||!post)throw new Error("Cannot report this content");
- await db.insert(s.studyGroupReports).values({groupId:data.groupId,postId:data.postId,reporterPersonId:STUDENT,reason:data.reason.trim()});return {ok:true};
+ await db.insert(s.studyGroupReports).values({groupId:data.groupId,postId:data.postId,reporterPersonId:actor.actorPersonId!,reason:data.reason.trim()});return {ok:true};
 });
 
 export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(async()=>{
