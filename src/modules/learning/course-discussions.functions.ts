@@ -1,5 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
-import {getRequest} from "@tanstack/react-start/server";
+import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {and,eq,inArray,desc} from "drizzle-orm";
@@ -7,6 +7,7 @@ import {discussionTree} from "@/domain/course-discussions";
 /** Read-only preview of explicitly synthetic discussions belonging to the demo student's enrolled sections. */
 export const getSyntheticCourseDiscussions=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await getCommandContext(getRequest());
+ setResponseHeader("Cache-Control","private, no-store");
  if(actor.role!=="student"||!actor.actorPersonId||!actor.scope.siteIds?.length)throw new AuthorizationError("student discussion access");
  assertCapability(actor,"assignments:submit");
  if(!process.env.DATABASE_URL)return [];
