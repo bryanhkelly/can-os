@@ -63,18 +63,31 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    const prior=priorRows[0];
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
+   const resolveFollowUps=async(submissionId:string)=>{
+    const rows=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata}).from(s.actions)
+     .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,STUDENT),eq(s.actions.siteId,SITE)));
+    for(const action of rows){
+     if(action.metadata.synthetic!==true||action.metadata.assessmentId!==assessment.id||action.status==="resolved"||action.status==="cancelled")continue;
+     await tx.update(s.actions).set({status:"resolved",resolvedAt:now,resolutionNote:"Student submitted overdue assignment.",updatedAt:now}).where(eq(s.actions.id,action.id));
+     await tx.insert(s.auditEvents).values({actorPersonId:STUDENT_PERSON,action:"synthetic.missing_work.resolved_by_submission",resourceType:"action",resourceId:action.id,before:{status:action.status},after:{status:"resolved",submissionId},context:{synthetic:true,assessmentId:assessment.id}});
+    }
+   };
+
    if(prior?.status==="returned"){
     const [revision]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,attemptNumber:prior.attemptNumber+1,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
     if(!revision)throw new Error("Unable to save revision");
+    await resolveFollowUps(revision.id);
     return {submissionId:revision.id};
    }
    if(prior){
     const [submitted]=await tx.update(s.submissions).set({status:"submitted",response:{text},timeliness,submittedAt:now,updatedAt:now}).where(and(eq(s.submissions.id,prior.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!submitted)throw new Error("Assignment was submitted or changed in another tab");
+    await resolveFollowUps(submitted.id);
     return {submissionId:submitted.id};
    }
    const [created]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:STUDENT,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
    if(!created)throw new Error("Unable to submit");
+    await resolveFollowUps(created.id);
    return {submissionId:created.id};
   });
  });
