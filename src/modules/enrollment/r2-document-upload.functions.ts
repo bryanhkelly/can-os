@@ -1,5 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
-import {and,eq} from "drizzle-orm";
+import {and,eq,desc} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,journeys,journeyRequirements,documents,auditEvents} from "@/db/schema";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
@@ -41,7 +41,16 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [existing]=await tx.select({id:documents.id}).from(documents).where(and(eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageKey,data.key))).limit(1);
    if(existing)return {documentId:existing.id,created:false};
-   const [document]=await tx.insert(documents).values({subjectType:"journey_requirement",subjectId:data.requirementId,category:"enrollment",fileName:data.fileName,storageProvider:"cloudflare_r2",storageKey:data.key,mimeType:data.mimeType,sensitivityTier:"restricted",uploadedByPersonId:REGISTRAR,metadata:{synthetic:true,applicationId:data.applicationId,size:data.size,reviewStatus:"received"}}).returning({id:documents.id});
+   const versions=await tx.select({id:documents.id,metadata:documents.metadata}).from(documents)
+    .where(and(eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageProvider,"cloudflare_r2")))
+    .orderBy(desc(documents.createdAt)).for("update");
+   const owned=versions.filter(v=>v.metadata.synthetic===true&&v.metadata.applicationId===data.applicationId);
+   const version=owned.reduce((max,v)=>Math.max(max,typeof v.metadata.version==="number"?v.metadata.version:1),0)+1;
+   for(const old of owned){
+    if(old.metadata.isCurrent===false)continue;
+    await tx.update(documents).set({metadata:{...old.metadata,isCurrent:false,supersededAt:new Date().toISOString()},updatedAt:new Date()}).where(eq(documents.id,old.id));
+   }
+   const [document]=await tx.insert(documents).values({subjectType:"journey_requirement",subjectId:data.requirementId,category:"enrollment",fileName:data.fileName,storageProvider:"cloudflare_r2",storageKey:data.key,mimeType:data.mimeType,sensitivityTier:"restricted",uploadedByPersonId:REGISTRAR,metadata:{synthetic:true,applicationId:data.applicationId,size:data.size,reviewStatus:"received",version,isCurrent:true}}).returning({id:documents.id});
    if(!document)throw new Error("Could not record document");
    await tx.insert(auditEvents).values({actorPersonId:REGISTRAR,action:"synthetic.enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{synthetic:true}});
    return {documentId:document.id,created:true};
