@@ -39,7 +39,7 @@ describe("GF2 persisted synthetic enrollment consistency (Neon)",()=>{
     const a=rows.find(a=>a.id===o.applicationId);
     return a&&!enrolledStudents.has(a.studentProfileId);
    });
-   expect(enrolledStudents.size+new Set(held.map(o=>rows.find(a=>a.id===o.applicationId)?.studentProfileId??o.applicationId)).size,"Active enrollments plus held offers exceed configured capacity").toBeLessThanOrEqual(pool.capacity);
+   expect(enrolledStudents.size+held.length,"Active enrollments plus held offers exceed configured capacity").toBeLessThanOrEqual(pool.capacity);
   }
  });
  it("does not report a ready enrollment journey with incomplete blocking requirements",async()=>{
