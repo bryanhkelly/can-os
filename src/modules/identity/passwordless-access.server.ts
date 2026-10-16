@@ -34,7 +34,7 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
  try {
   await sender({to:email,accessUrl:publicOrigin()+"/access/verify?token="+encodeURIComponent(token)});
  }catch(error){
-  await db.delete(accessChallenges).where(eq(accessChallenges.id,challenge[0].id));
+  if(challenge[0]) await db.delete(accessChallenges).where(eq(accessChallenges.id,challenge[0].id));
   throw error;
  }
  return genericResult;
@@ -58,7 +58,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   const secret=issueOpaqueSecret();
   await tx.insert(accessSessions).values({
    accountId:account.id,secretHash:hashAccessSecret(secret,secretPepper()),
-   activeGrantId:grants[0].id,expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
+   activeGrantId:grants[0]!.id,expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
   });
   await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
   return {accountId:account.id,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
