@@ -252,18 +252,21 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
    if(latest && !["assigned","returned"].includes(latest.status))throw new Error("Submitted work cannot be overwritten");
    if(latest?.status==="returned"){
     const [draft]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,attemptNumber:latest.attemptNumber+1,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing().returning({id:s.submissions.id});
-    if(draft)return {saved:true};
+    if(draft){await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.draft_revision",resourceType:"submission",resourceId:draft.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});return {saved:true};}
     const [existing]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId),eq(s.submissions.attemptNumber,latest.attemptNumber+1))).limit(1);
     if(!existing||existing.status!=="assigned")throw new Error("Revision already submitted");
     const [saved]=await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,existing.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!saved)throw new Error("Draft already submitted");
+    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:saved.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
     return {saved:true};
    }
    if(latest){
     const [saved]=await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,latest.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!saved)throw new Error("Draft already submitted");
+    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:saved.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
    }else{
-    await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing();
+    const [created]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing().returning({id:s.submissions.id});
+    if(created)await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:created.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
    }
    return {saved:true};
   });
