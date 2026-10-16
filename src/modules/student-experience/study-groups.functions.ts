@@ -85,6 +85,18 @@ export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator
  sourceType:"study_group_session",sourceId:session.id,createdByPersonId:TEACHER,
  metadata:{synthetic:true,fixture:"gf26",groupId:group.id}
  });
+ const members=await tx.select({personId:s.studyGroupMemberships.personId}).from(s.studyGroupMemberships)
+  .where(and(eq(s.studyGroupMemberships.groupId,group.id),eq(s.studyGroupMemberships.status,"approved")));
+ if(members.length){
+  await tx.insert(s.notifications).values([...new Set(members.map(m=>m.personId))].map(personId=>({
+   recipientPersonId:personId,
+   type:"study_group_session_scheduled",
+   title:"New study group session: "+data.title.trim(),
+   body:"Scheduled start: "+start.toISOString(),
+   resourceType:"study_group_session",
+   resourceId:session.id
+  })));
+ }
  return session;
  });
 });
