@@ -2,6 +2,7 @@ import {describe,it,expect} from "vitest";
 import {and,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,admissionOffers,admissionSeatPools,enrollments,journeys,journeyRequirements,schoolYears} from "@/db/schema";
+import {calculateSeatOccupancy} from "@/domain/admissions-seat-occupancy";
 
 /**
  * Run ONLY via scripts/run-integration-tests.mjs using a disposable, isolated
@@ -34,12 +35,11 @@ describe("GF2 persisted synthetic enrollment consistency (Neon)",()=>{
   for(const pool of pools){
    expect(pool.capacity,"Seat pool capacity must be positive").toBeGreaterThan(0);
    const enrolled=active.filter(e=>e.programId===pool.programId&&e.schoolYearId===pool.schoolYearId);
-   const enrolledStudents=new Set(enrolled.map(e=>e.studentProfileId));
-   const held=offers.filter(o=>o.programId===pool.programId&&o.schoolYearId===pool.schoolYearId&&(o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now())))).filter(o=>{
-    const a=rows.find(a=>a.id===o.applicationId);
-    return a&&!enrolledStudents.has(a.studentProfileId);
-   });
-   expect(enrolledStudents.size+held.length,"Active enrollments plus held offers exceed configured capacity").toBeLessThanOrEqual(pool.capacity);
+   const studentByApplication=new Map(rows.map(a=>[a.id,a.studentProfileId]));
+   const held=offers.filter(o=>o.programId===pool.programId&&o.schoolYearId===pool.schoolYearId)
+    .flatMap(o=>{const studentId=studentByApplication.get(o.applicationId);return studentId?[{studentId,status:o.status,expiresAt:o.expiresAt}]:[];});
+   const occupied=calculateSeatOccupancy(enrolled.map(e=>({studentId:e.studentProfileId})),held,new Date());
+   expect(occupied,"Unique active students plus reserved seats exceed configured capacity").toBeLessThanOrEqual(pool.capacity);
   }
  });
  it("does not report a ready enrollment journey with incomplete blocking requirements",async()=>{
