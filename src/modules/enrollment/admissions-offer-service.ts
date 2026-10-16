@@ -1,7 +1,7 @@
 import {and,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {admissionOffers,admissionSeatPools,applications,auditEvents,domainEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles,notifications} from "@/db/schema";
-import {assertCapability,assertProgramScope,type CommandContext} from "@/domain/command-context";
+import {assertCapability,assertProgramScope,AuthorizationError,type CommandContext} from "@/domain/command-context";
 import {EventTypes} from "@/domain/event-types";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {transitionAdmissionsOffer,type OfferStatus} from "@/domain/admissions-offer-lifecycle";
@@ -10,6 +10,10 @@ import {calculateSeatOccupancy} from "@/domain/admissions-seat-occupancy";
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
 const guarded=(role:"registrar"|"guardian")=>assertSyntheticMutation(role);
 type Transaction=Parameters<Parameters<typeof db.transaction>[0]>[0];
+function requireAdmissionsProgramScope(context:CommandContext,programId:string){
+ if(!context.scope.programIds?.includes(programId))throw new AuthorizationError(`program scope: ${programId}`);
+ assertProgramScope(context,programId);
+}
 async function lockPool(tx:Transaction,programId:string,schoolYearId:string){
  const [pool]=await tx.select().from(admissionSeatPools).where(and(eq(admissionSeatPools.programId,programId),eq(admissionSeatPools.schoolYearId,schoolYearId))).for("update").limit(1);
  if(!pool)throw new Error("A configured seat pool is required");
@@ -53,7 +57,7 @@ async function expireElapsedOffers(tx:Transaction,context:CommandContext,program
  return count;
 }
 export async function expireSyntheticAdmissionOffers(context:CommandContext,input:{programId:string;schoolYearId:string}){
- guarded("registrar");assertCapability(context,"enrollment.decide");assertProgramScope(context,input.programId);
+ guarded("registrar");assertCapability(context,"enrollment.decide");requireAdmissionsProgramScope(context,input.programId);
  if(!context.actorPersonId)throw new Error("Registrar identity required");
  return db.transaction(async tx=>{
   await lockPool(tx,input.programId,input.schoolYearId);
@@ -67,7 +71,7 @@ export async function issueSyntheticAdmissionOffer(context:CommandContext,input:
  return db.transaction(async tx=>{
   const [app]=await tx.select().from(applications).where(eq(applications.id,input.applicationId)).limit(1);
   if(!app||app.metadata.synthetic!==true)throw new Error("Synthetic application not found");
-  assertProgramScope(context,app.programId);
+  requireAdmissionsProgramScope(context,app.programId);
   const {pool}=await lockPool(tx,app.programId,input.schoolYearId);
   await expireElapsedOffers(tx,context,app.programId,input.schoolYearId,new Date());
   const [retry]=await tx.select().from(admissionOffers).where(eq(admissionOffers.idempotencyKey,input.idempotencyKey)).limit(1);
@@ -103,7 +107,7 @@ export async function respondToSyntheticAdmissionOffer(context:CommandContext,of
  return db.transaction(async tx=>{
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
-  assertProgramScope(context,lookup.programId);
+  requireAdmissionsProgramScope(context,lookup.programId);
   await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
@@ -133,7 +137,7 @@ export async function activateSyntheticOfferedEnrollment(context:CommandContext,
  return db.transaction(async tx=>{
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
-  assertProgramScope(context,lookup.programId);
+  requireAdmissionsProgramScope(context,lookup.programId);
   const {pool,organizationId}=await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(offer!.status!=="accepted")throw new Error("Guardian must accept offer first");
