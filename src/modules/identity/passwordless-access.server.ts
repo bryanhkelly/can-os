@@ -6,6 +6,7 @@ import {sendAccessLinkViaResend,type AccessEmailSender} from "./resend-access-ma
 import {roleCapabilities} from "@/domain/access-context";
 
 const CHALLENGE_LIFETIME_MS=10*60*1000;
+const REQUEST_COOLDOWN_MS=60*1000;
 const SESSION_LIFETIME_MS=12*60*60*1000;
 const genericResult={accepted:true} as const;
 function secretPepper():string {
@@ -31,7 +32,7 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
  const now=new Date();
  const recent=await db.select({id:accessChallenges.id}).from(accessChallenges)
-  .where(and(eq(accessChallenges.accountId,account.id),gt(accessChallenges.createdAt,new Date(now.getTime()-60_000)))).limit(1);
+  .where(and(eq(accessChallenges.accountId,account.id),gt(accessChallenges.createdAt,new Date(now.getTime()-REQUEST_COOLDOWN_MS)))).limit(1);
  if(recent.length)return genericResult;
  const token=issueOpaqueSecret(),hash=hashAccessSecret(token,secretPepper());
  const challenge=await db.insert(accessChallenges).values({
