@@ -22,6 +22,10 @@ describe("GF2 real transactional admissions lifecycle on isolated Neon",()=>{
   expect(app?.metadata.synthetic).toBe(true);
   expect(app?.programId).toBe(PROGRAM);
   const [prior]=await db.select().from(admissionOffers).where(eq(admissionOffers.idempotencyKey,fixtureKey)).limit(1);
+  const otherOffers=await db.select().from(admissionOffers).where(eq(admissionOffers.applicationId,APP));
+  expect(otherOffers,"The seeded application must not have any previously issued offers").toHaveLength(0);
+  const existing=await db.select().from(enrollments).where(and(eq(enrollments.studentProfileId,app!.studentProfileId),eq(enrollments.kind,"program"),eq(enrollments.status,"active")));
+  expect(existing,"The fixture student must not already have active program enrollment").toHaveLength(0);
   expect(prior,"GF2 service integration requires a fresh seeded test branch, not a previously executed scenario").toBeUndefined();
   {
    expect(app?.stage).toBe("application");
