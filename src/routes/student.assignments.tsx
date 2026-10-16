@@ -1,5 +1,5 @@
 import { RubricGrader } from "@/components/student/RubricGrader";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getAssignments, saveAssignmentResponse, gradeSyntheticAssignment, returnSyntheticAssignment, createSyntheticAssignment, getSyntheticAssignmentHistory, saveSyntheticAssignmentDraft, manageSyntheticAssignment } from "@/modules/student-experience/assignments.functions";
 
@@ -13,6 +13,7 @@ function AssignmentsPage(){
  const [draft,setDraft]=useState(""),[score,setScore]=useState(85),[feedback,setFeedback]=useState("");
  const [filter,setFilter]=useState("all"),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[error,setError]=useState("");
  const [draftState,setDraftState]=useState<"idle"|"saving"|"saved"|"error">("idle");
+ const autosaveGeneration=useRef(0);
  const chosen=assignments.find(x=>x.assessmentId===selected);
  useEffect(()=>{const value=new URLSearchParams(window.location.search).get("assessment");if(value&&assignments.some(x=>x.assessmentId===value))setSelected(value);},[assignments]);
  const sections=[...new Map(assignments.map(x=>[x.sectionId,{id:x.sectionId,course:x.course}])).values()];
@@ -23,15 +24,18 @@ function AssignmentsPage(){
   catch(err){setError(err instanceof Error?err.message:"Unable to save");}
   finally{setBusy(false);}
  }
- function open(id:string,text:string){setSelected(id);setDraft(text);setDraftState("idle");setNotice("");setError("");}
+ function open(id:string,text:string){autosaveGeneration.current++;setSelected(id);setDraft(text);setDraftState("idle");setNotice("");setError("");}
  useEffect(()=>{
   if(!chosen||role!=="student"||!(!chosen.status||chosen.status==="assigned"||chosen.status==="returned")||chosen.assessmentStatus!=="published"||draft===chosen.responseText)return;
+  const generation=++autosaveGeneration.current;
   const timer=setTimeout(()=>{
+   if(generation!==autosaveGeneration.current)return;
    setDraftState("saving");
    saveSyntheticAssignmentDraft({data:{assessmentId:chosen.assessmentId,text:draft}})
-    .then(()=>setDraftState("saved")).catch(()=>setDraftState("error"));
+    .then(()=>{if(generation===autosaveGeneration.current)setDraftState("saved");})
+    .catch(()=>{if(generation===autosaveGeneration.current)setDraftState("error");});
   },900);
-  return ()=>clearTimeout(timer);
+  return ()=>{clearTimeout(timer);autosaveGeneration.current++;};
  },[chosen?.assessmentId,chosen?.status,chosen?.responseText,role,draft]);
  const date=(value:string|null)=>value?new Intl.DateTimeFormat("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}).format(new Date(value)):"No deadline";
  return <main className="mx-auto max-w-5xl px-5 py-9 pb-20">
