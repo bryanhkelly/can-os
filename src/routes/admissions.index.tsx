@@ -3,6 +3,7 @@ import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getSyntheticAdmissionsDashboard} from "@/modules/enrollment/admissions-dashboard.functions";
 import {getSyntheticAdmissionOfferOptions,issueSyntheticOfferFromDemo,respondSyntheticOfferFromDemo,activateSyntheticOfferFromDemo} from "@/modules/enrollment/admissions-offer-demo.functions";
 import {admissionsPipelineSummary} from "@/domain/admissions-pipeline";
+import {selectActionableOffer,canIssueAnotherOffer} from "@/domain/admissions-offer-selection";
 export const Route=createFileRoute("/admissions/")({loader:async()=>({rows:await getSyntheticAdmissionsDashboard(),options:await getSyntheticAdmissionOfferOptions()}),component:Admissions});
 function Admissions(){
  const {rows,options}=Route.useLoaderData();const summary=admissionsPipelineSummary(rows);const router=useRouter();
@@ -28,15 +29,15 @@ function Admissions(){
  <h2 className="mt-9 font-serif text-2xl">Synthetic applications</h2>
  <div className="mt-4 space-y-3">{rows.map(x=>{
  const years=options.find(o=>o.applicationId===x.id)?.years??[];
- const latest=x.offers[0];
+ const latest=selectActionableOffer(x.offers);
  const activated=latest?x.enrollments.some(e=>e.schoolYearId===latest.schoolYearId):false;
  return <article key={x.id} className="rounded-xl border p-4">
  <p className="font-semibold">{x.program}</p>
  <p className="mt-1 text-sm capitalize text-muted-foreground">{x.stage} · {x.outstandingRequirements} outstanding blocking requirements</p>
- <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o=><span key={o.id} className="rounded-lg border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt?` · Expires ${new Date(o.expiresAt).toLocaleDateString()}`:""}</span>)}{!latest&&<span className="text-xs text-muted-foreground">No offer issued</span>}</div>
+ <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o=><span key={o.id} className="rounded-lg border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt?` · Expires ${new Date(o.expiresAt).toLocaleDateString()}`:""}</span>)}{!latest&&<span className="text-xs text-muted-foreground">No currently actionable offer</span>}</div>
  {activated&&<p className="mt-3 text-sm font-semibold">Enrollment active · Student is enrolled in this school year</p>}
  <div className="mt-4 flex flex-wrap gap-2">
- {!latest&&x.outstandingRequirements===0&&["application","eligibility"].includes(x.stage)&&years.map(year=><button key={year.id} disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>issueSyntheticOfferFromDemo({data:{applicationId:x.id,schoolYearId:year.id}}))}>Registrar: Issue offer · {year.name}</button>)}
+ {years.filter(year=>canIssueAnotherOffer(x.stage,x.outstandingRequirements,x.offers,year.id)).map(year=><button key={year.id} disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>issueSyntheticOfferFromDemo({data:{applicationId:x.id,schoolYearId:year.id}}))}>Registrar: Issue offer · {year.name}</button>)}
  {latest?.status==="issued"&&<><button disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>respondSyntheticOfferFromDemo({data:{offerId:latest.id,decision:"accept"}}))}>Guardian: Accept</button><button disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>respondSyntheticOfferFromDemo({data:{offerId:latest.id,decision:"decline"}}))}>Guardian: Decline</button></>}
  {latest?.status==="accepted"&&!activated&&<button disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>activateSyntheticOfferFromDemo({data:{offerId:latest.id}}))}>Registrar: Activate enrollment</button>}
  </div>
