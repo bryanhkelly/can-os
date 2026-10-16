@@ -37,8 +37,15 @@ if (mode === "admissions-offers" && !process.env.CAN_APPLICATION_DB_HOST && !pro
 if (process.env.DATABASE_URL && testEndpoint === endpoint(process.env.DATABASE_URL)) {
   fail("TEST_DATABASE_URL must not use the application database endpoint.");
 }
-if (process.env.CAN_APPLICATION_DB_HOST && testEndpoint === process.env.CAN_APPLICATION_DB_HOST.replace("-pooler.", ".")) {
-  fail("TEST_DATABASE_URL must not use the configured application database host.");
+if (process.env.CAN_APPLICATION_DB_HOST) {
+  const rawHost = process.env.CAN_APPLICATION_DB_HOST.trim().toLowerCase();
+  if (!/^[a-z0-9.-]+$/.test(rawHost) || rawHost.startsWith(".") || rawHost.endsWith(".")) {
+    fail("CAN_APPLICATION_DB_HOST must be a hostname, not a URL or connection string.");
+  }
+  const applicationHost = rawHost.replace(/-pooler(?=\\.)/, "");
+  if (testEndpoint.toLowerCase() === applicationHost) {
+    fail("TEST_DATABASE_URL must not use the configured application database host.");
+  }
 }
 
 if (process.argv.includes("--preflight")) {
