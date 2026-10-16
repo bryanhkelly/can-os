@@ -4,6 +4,7 @@ import { acknowledgeSyntheticNotice, bookSyntheticOfficeHour, setSyntheticCalend
 
 type Data={
  connected:boolean;
+ viewerRole:"student"|"guardian"|"registrar"|"teacher";
  events:{id:string;title:string;startsAt:string;timezone:string;status:string}[];
  notices:{id:string;title:string;body:string;acknowledged:boolean}[];
  slots:{id:string;startsAt:string;endsAt:string;status:string}[];
@@ -36,7 +37,7 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
       <p className="text-sm font-semibold">{event.title}</p>
       <p className="mt-1 text-xs text-muted-foreground">{format(event.startsAt,event.timezone)}</p>
       <label className="mt-3 block text-xs">Status
-       <select aria-label={`Change status for ${event.title}`} disabled={busy} value={event.status} onChange={e=>perform(()=>setSyntheticCalendarStatus({data:{eventId:event.id,status:e.target.value as "scheduled"|"moved"|"cancelled"}}),"Calendar change saved to Neon.")} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm">
+       <select aria-label={`Change status for ${event.title}`} disabled={busy||data.viewerRole!=="registrar"} value={event.status} onChange={e=>perform(()=>setSyntheticCalendarStatus({data:{eventId:event.id,status:e.target.value as "scheduled"|"moved"|"cancelled"}}),"Calendar change saved to Neon.")} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm">
         <option value="scheduled">Scheduled</option><option value="moved">Moved (demo status)</option><option value="cancelled">Cancelled</option>
        </select>
       </label>
@@ -58,7 +59,7 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
      <p className="text-xs text-muted-foreground">Book a slot in Neon. Once booked, it is no longer available.</p>
      {data.slots.map(slot=><div key={slot.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-4">
       <div className="flex-1"><p className="text-sm font-semibold">{format(slot.startsAt)}</p><p className="mt-1 text-xs text-muted-foreground">{slot.status}</p></div>
-      <button disabled={busy||slot.status!=="available"} onClick={()=>perform(()=>bookSyntheticOfficeHour({data:{slotId:slot.id}}),"Office-hour booking saved to Neon.")} className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">{slot.status==="available"?"Book":"Booked"}</button>
+      <button disabled={busy||slot.status!=="available"||data.viewerRole!=="guardian"} onClick={()=>perform(()=>bookSyntheticOfficeHour({data:{slotId:slot.id}}),"Office-hour booking saved to Neon.")} className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">{slot.status!=="available"?"Booked":data.viewerRole==="guardian"?"Book":"Guardians book"}</button>
      </div>)}
      {data.slots.length===0&&<p className="text-xs text-muted-foreground">No seeded office hours.</p>}
     </div>

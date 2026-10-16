@@ -17,6 +17,10 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import {
+  emailNotificationRecipients,
+  sendNotificationEmail,
+} from "@/modules/communication/notification-email.server";
 
 export async function recordAttendance(
   context: CommandContext,
@@ -240,12 +244,14 @@ export async function reviewAttendanceExcuse(
   assertCapability(context, "attendance.excuse.review");
   if (!context.actorPersonId) throw new Error("Reviewer identity is required");
   const actorPersonId = context.actorPersonId;
+  let submitterEmailNotice: { submittedByPersonId: string } | undefined;
 
   return db.transaction(async (tx) => {
     const [record] = await tx
       .select({
         excuseId: attendanceExcuses.id,
         excuseStatus: attendanceExcuses.status,
+        submittedByPersonId: attendanceExcuses.submittedByPersonId,
         attendanceEventId: attendanceExcuses.attendanceEventId,
         studentProfileId: attendanceEvents.studentProfileId,
         programId: attendanceEvents.programId,
@@ -370,8 +376,29 @@ export async function reviewAttendanceExcuse(
       },
     });
 
+    submitterEmailNotice = {
+      submittedByPersonId: record.submittedByPersonId,
+    };
+
     return correctionAttendanceEventId
       ? { excuseId: record.excuseId, correctionAttendanceEventId }
       : { excuseId: record.excuseId };
+  }).then(async (result) => {
+    if (submitterEmailNotice) {
+      const emails = await emailNotificationRecipients([
+        submitterEmailNotice.submittedByPersonId,
+      ]);
+      const to = emails.get(submitterEmailNotice.submittedByPersonId);
+      if (to) {
+        await sendNotificationEmail({
+          to,
+          subject: `Attendance excuse ${input.decision}`,
+          text: `Your attendance excuse was ${input.decision}.${
+            input.reviewNote ? ` Review note: ${input.reviewNote}` : ""
+          }`,
+        });
+      }
+    }
+    return result;
   });
 }

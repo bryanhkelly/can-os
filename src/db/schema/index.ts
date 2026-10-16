@@ -21,4 +21,5 @@ export * from "./conferences";
 export * from "./profiles-compliance";
 export * from "./admissions-offers";
 export * from "./study-groups";
+export * from "./report-cards";
 export * from "./access";

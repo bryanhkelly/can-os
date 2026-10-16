@@ -10,17 +10,25 @@ export type DemoPersona = typeof demoRoles[number];
 export const demoPersonaStorageKey = "can-os-demo-persona";
 export const demoPersonaHome: Record<DemoPersona, string> = {
  student: "/student",
- teacher: "/teacher/missing-work",
- guardian: "/guardian/academics",
+ teacher: "/teacher",
+ guardian: "/guardian",
  registrar: "/admissions",
  specialist: "/student/support",
 };
 export const demoNavigationLinks: ReadonlyArray<{to: string; label: string; roles: readonly DemoPersona[]}> = [
+ {to:"/guardian",label:"Family Home",roles:["guardian"]},
+ {to:"/teacher",label:"Today",roles:["teacher"]},
+ {to:"/messages",label:"Messages",roles:["student","teacher","guardian","registrar","specialist"]},
  {to:"/operations",label:"Needs You",roles:["teacher","registrar","specialist"]},
  {to:"/admissions",label:"Admissions",roles:["registrar"]},
  {to:"/admissions/families",label:"Family Readiness",roles:["guardian","registrar"]},
  {to:"/guardian/academics",label:"Academic Progress",roles:["guardian"]},
+ {to:"/guardian/attendance",label:"Attendance",roles:["guardian"]},
+ {to:"/staff/attendance",label:"Attendance",roles:["teacher","registrar"]},
+ {to:"/guardian/report-cards",label:"Report Cards",roles:["guardian"]},
+ {to:"/student/report-card",label:"Report Card",roles:["student"]},
  {to:"/admissions/capacity",label:"Capacity",roles:["registrar"]},
+ {to:"/operations/launch",label:"Program Launch",roles:["registrar"]},
  {to:"/teacher/missing-work",label:"Missing Work",roles:["teacher"]},
  {to:"/calendar-export",label:"Calendar Export",roles:["student","teacher","guardian"]},
  {to:"/readiness",label:"Launch",roles:["registrar"]},

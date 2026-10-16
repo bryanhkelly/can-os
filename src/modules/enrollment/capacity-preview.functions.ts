@@ -1,12 +1,17 @@
 import {createServerFn} from "@tanstack/react-start";
 import {and,eq,inArray} from "drizzle-orm";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import {z} from "zod";
+import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
 
 /** Counts actual active enrollments and unexpired held offers by school year. */
 export const getSyntheticAdmissionsCapacity=createServerFn({method:"GET"}).handler(async()=>{
+ const actor=await requireActor(["registrar"],"enrollment.decide");
+ const granted=actor.scope.programIds??[];
+ if(!granted.length)return [];
  if(!process.env.DATABASE_URL)return [];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const programs=await db.select({id:s.programs.id,name:s.programs.name,metadata:s.programs.metadata}).from(s.programs).limit(100);
+ const programs=await db.select({id:s.programs.id,name:s.programs.name,metadata:s.programs.metadata}).from(s.programs).where(inArray(s.programs.id,granted)).limit(100);
  const synthetic=programs.filter(p=>p.metadata.synthetic===true);
  if(!synthetic.length)return [];
  const ids=synthetic.map(p=>p.id);
@@ -23,14 +28,15 @@ export const getSyntheticAdmissionsCapacity=createServerFn({method:"GET"}).handl
 
 /** Synthetic-only capacity adjustment; never reduces below occupied/held seats. */
 export const updateSyntheticAdmissionsCapacity=createServerFn({method:"POST"})
- .validator((data:{poolId:string;capacity:number})=>data)
+ .validator((data:unknown)=>z.object({poolId:z.string().uuid(),capacity:z.number().int("Capacity must be a positive whole number").min(1,"Capacity must be a positive whole number").max(100000,"Capacity must be a positive whole number")}).parse(data))
  .handler(async({data})=>{
   assertSyntheticMutation("registrar");
-  if(!Number.isSafeInteger(data.capacity)||data.capacity<1||data.capacity>100000)throw new Error("Capacity must be a positive whole number");
+  const actor=await requireActor(["registrar"],"enrollment.decide");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
    const [pool]=await tx.select().from(s.admissionSeatPools).where(eq(s.admissionSeatPools.id,data.poolId)).for("update").limit(1);
    if(!pool)throw new Error("Seat pool not found");
+   assertProgramGranted(actor,pool.programId);
    const [program]=await tx.select({metadata:s.programs.metadata}).from(s.programs).where(eq(s.programs.id,pool.programId)).limit(1);
    if(!program||program.metadata.synthetic!==true)throw new Error("Only synthetic capacity can be adjusted");
    const active=await tx.select({studentId:s.enrollments.studentProfileId}).from(s.enrollments).where(and(eq(s.enrollments.programId,pool.programId),eq(s.enrollments.schoolYearId,pool.schoolYearId),eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
@@ -40,7 +46,7 @@ export const updateSyntheticAdmissionsCapacity=createServerFn({method:"POST"})
    if(data.capacity<students.size+reserved)throw new Error("Cannot reduce capacity below active enrollments and held offers");
    if(pool.capacity===data.capacity)return {saved:true};
    await tx.update(s.admissionSeatPools).set({capacity:data.capacity,updatedAt:new Date()}).where(eq(s.admissionSeatPools.id,pool.id));
-   await tx.insert(s.auditEvents).values({action:"synthetic.admissions.capacity",resourceType:"admission_seat_pool",resourceId:pool.id,before:{capacity:pool.capacity},after:{capacity:data.capacity},context:{synthetic:true,programId:pool.programId,schoolYearId:pool.schoolYearId}});
+   await recordAudit(tx,actor,{action:"admissions.capacity.update",resourceType:"admission_seat_pool",resourceId:pool.id,before:{capacity:pool.capacity},after:{capacity:data.capacity},scope:{programId:pool.programId,schoolYearId:pool.schoolYearId}});
    return {saved:true};
   });
  });

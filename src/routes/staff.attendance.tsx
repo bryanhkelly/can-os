@@ -1,0 +1,198 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useEffect, useState } from "react";
+import {
+  listPendingExcuses,
+  listSiteAttendanceRoster,
+  markAttendance,
+  reviewExcuse,
+} from "@/modules/attendance/attendance.functions";
+
+export const Route = createFileRoute("/staff/attendance")({ component: StaffAttendancePage });
+
+type RosterStudent = Awaited<ReturnType<typeof listSiteAttendanceRoster>>["students"][number];
+type PendingExcuse = Awaited<ReturnType<typeof listPendingExcuses>>["excuses"][number];
+
+const statusOptions = ["present", "absent", "tardy"] as const;
+
+function todayLocal(): string {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+function StaffAttendancePage() {
+  const [date, setDate] = useState(todayLocal);
+  const [students, setStudents] = useState<RosterStudent[]>([]);
+  const [excuses, setExcuses] = useState<PendingExcuse[]>([]);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const load = useCallback(async (targetDate: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const [roster, pending] = await Promise.all([
+        listSiteAttendanceRoster({ data: { date: targetDate } }),
+        listPendingExcuses(),
+      ]);
+      setStudents(roster.students);
+      setExcuses(pending.excuses);
+    } catch {
+      setStudents([]);
+      setExcuses([]);
+      setError("Sign in with an authorized teacher or registrar account to run attendance.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const [roster, pending] = await Promise.all([
+          listSiteAttendanceRoster({ data: { date } }),
+          listPendingExcuses(),
+        ]);
+        if (!active) return;
+        setStudents(roster.students);
+        setExcuses(pending.excuses);
+        setError("");
+      } catch {
+        if (!active) return;
+        setStudents([]);
+        setExcuses([]);
+        setError("Sign in with an authorized teacher or registrar account to run attendance.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [date]);
+
+  const mark = async (student: RosterStudent, status: (typeof statusOptions)[number]) => {
+    setBusy(`${student.studentProfileId}:${status}`);
+    setNotice("");
+    try {
+      await markAttendance({ data: { studentProfileId: student.studentProfileId, date, status } });
+      setNotice(`${student.studentName} marked ${status}.`);
+      await load(date);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : "Unable to record attendance");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const review = async (excuse: PendingExcuse, decision: "approved" | "rejected") => {
+    setBusy(`excuse:${excuse.excuseId}`);
+    setNotice("");
+    try {
+      await reviewExcuse({ data: { excuseId: excuse.excuseId, decision, note: notes[excuse.excuseId] ?? "" } });
+      setNotice(`Excuse ${decision} for ${excuse.studentName}.`);
+      await load(date);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : "Unable to review excuse");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const marked = students.filter(student => student.status !== "unmarked").length;
+
+  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
+    <div className="mx-auto max-w-5xl">
+      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Attendance</p>
+      <h1 className="mt-2 font-serif text-4xl">Daily attendance</h1>
+      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+        Mark students expected onsite at your school and review guardian-submitted excuses.
+        Approved excuses correct the attendance record without erasing history.
+      </p>
+      <label className="mt-8 block max-w-sm text-sm font-semibold">
+        Attendance date
+        <input
+          type="date"
+          className="mt-2 w-full rounded-lg border bg-background p-3"
+          value={date}
+          onChange={event => setDate(event.target.value)}
+        />
+      </label>
+      {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+      {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
+      {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance roster…</p>}
+      {!loading && !error && <>
+        <div className="mt-6 grid grid-cols-3 gap-3" aria-label="Roster summary">
+          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Expected onsite</p><p className="mt-1 text-2xl font-semibold">{students.length}</p></div>
+          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Marked</p><p className="mt-1 text-2xl font-semibold">{marked}</p></div>
+          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Pending excuses</p><p className="mt-1 text-2xl font-semibold">{excuses.length}</p></div>
+        </div>
+        {students.length === 0 && <p className="mt-8 text-sm">No actively enrolled students were found at your site.</p>}
+        {students.length > 0 && <div className="mt-8 grid gap-4">
+          {students.map(student => <section key={student.studentProfileId} className="rounded-xl border bg-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">{student.studentName}</h2>
+                <p className="text-xs text-muted-foreground">{student.sectionTitle ?? "Program enrollment"}</p>
+              </div>
+              <span className="rounded-full border px-3 py-1 text-xs capitalize">{student.status}</span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {statusOptions.map(option => <button
+                key={option}
+                type="button"
+                disabled={busy !== ""}
+                className={`rounded-lg border px-3 py-2 text-xs font-semibold capitalize disabled:opacity-50 ${student.status === option ? "bg-primary text-primary-foreground" : ""}`}
+                onClick={() => mark(student, option)}
+              >
+                {option}
+              </button>)}
+            </div>
+          </section>)}
+        </div>}
+        <h2 className="mt-10 font-serif text-2xl">Pending excuses</h2>
+        {excuses.length === 0 && <p className="mt-4 text-sm text-muted-foreground">No guardian excuses are waiting for review.</p>}
+        {excuses.length > 0 && <div className="mt-4 grid gap-4">
+          {excuses.map(excuse => <section key={excuse.excuseId} className="rounded-xl border bg-card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold">{excuse.studentName}</h3>
+                <p className="text-xs text-muted-foreground">
+                  Marked {excuse.eventStatus} on {new Date(excuse.expectedAt).toLocaleDateString()} · submitted {new Date(excuse.submittedAt).toLocaleDateString()}
+                </p>
+              </div>
+              <span className="rounded-full border px-3 py-1 text-xs">Submitted</span>
+            </div>
+            <p className="mt-3 rounded-lg bg-muted p-3 text-sm">{excuse.reason}</p>
+            <label className="mt-3 block text-sm font-semibold">
+              Review note
+              <textarea
+                className="mt-2 w-full rounded-lg border bg-background p-3 text-sm"
+                rows={2}
+                value={notes[excuse.excuseId] ?? ""}
+                onChange={event => setNotes(current => ({ ...current, [excuse.excuseId]: event.target.value }))}
+                placeholder="Optional note recorded with the decision"
+              />
+            </label>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                disabled={busy !== ""}
+                className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                onClick={() => review(excuse, "approved")}
+              >Approve excuse</button>
+              <button
+                type="button"
+                disabled={busy !== ""}
+                className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                onClick={() => review(excuse, "rejected")}
+              >Reject</button>
+            </div>
+          </section>)}
+        </div>}
+      </>}
+    </div>
+  </main>;
+}

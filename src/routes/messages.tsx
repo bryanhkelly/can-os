@@ -1,0 +1,208 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useEffect, useState } from "react";
+import {
+  getThread,
+  listMyThreads,
+  replyToThread,
+} from "@/modules/communication/messages.functions";
+
+export const Route = createFileRoute("/messages")({ component: MessagesPage });
+
+type ThreadSummary = Awaited<ReturnType<typeof listMyThreads>>["threads"][number];
+type ThreadDetail = Awaited<ReturnType<typeof getThread>>;
+
+function relativeTime(iso: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function MessagesPage() {
+  const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [detail, setDetail] = useState<ThreadDetail | null>(null);
+  const [reply, setReply] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadingThread, setLoadingThread] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sentNotice, setSentNotice] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    listMyThreads()
+      .then((result) => {
+        if (!active) return;
+        setThreads(result.threads);
+        setSelectedId(result.threads[0]?.id ?? "");
+        setLoading(false);
+      })
+      .catch(() => {
+        if (active) {
+          setError("Sign in to view messages.");
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const openThread = useCallback((threadId: string) => {
+    setSelectedId(threadId);
+    setDetail(null);
+    setReply("");
+    setSentNotice(false);
+    setLoadingThread(true);
+    getThread({ data: { threadId } })
+      .then((result) => setDetail(result))
+      .catch(() => setError("Unable to open this conversation."))
+      .finally(() => setLoadingThread(false));
+  }, []);
+
+  useEffect(() => {
+    if (selectedId) openThread(selectedId);
+  }, [selectedId, openThread]);
+
+  const sendReply = () => {
+    const body = reply.trim();
+    if (!body || !selectedId || sending) return;
+    setSending(true);
+    setSentNotice(false);
+    replyToThread({ data: { threadId: selectedId, body } })
+      .then(async () => {
+        setReply("");
+        setSentNotice(true);
+        const [updated, list] = await Promise.all([
+          getThread({ data: { threadId: selectedId } }),
+          listMyThreads(),
+        ]);
+        setDetail(updated);
+        setThreads(list.threads);
+      })
+      .catch(() => setError("Your message could not be sent. Please try again."))
+      .finally(() => setSending(false));
+  };
+
+  if (error && !threads.length) {
+    return (
+      <main className="min-h-screen bg-background px-6 py-10 text-foreground">
+        <div className="mx-auto max-w-5xl">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Messages</p>
+          <h1 className="mt-2 font-serif text-4xl">Messages</h1>
+          <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-background px-6 py-10 text-foreground">
+      <div className="mx-auto max-w-5xl">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Messages</p>
+        <h1 className="mt-2 font-serif text-4xl">Messages</h1>
+        <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+          Conversations connected to your students, assignments, and school.
+        </p>
+        {loading && <p className="mt-8 text-sm" role="status">Loading messages…</p>}
+        {!loading && threads.length === 0 && (
+          <p className="mt-8 text-sm">No conversations yet.</p>
+        )}
+        {!loading && threads.length > 0 && (
+          <div className="mt-8 grid gap-4 md:grid-cols-[300px_1fr]">
+            <nav aria-label="Conversations" className="grid content-start gap-2">
+              {threads.map((thread) => (
+                <button
+                  key={thread.id}
+                  type="button"
+                  onClick={() => openThread(thread.id)}
+                  aria-current={thread.id === selectedId}
+                  className={`rounded-xl border bg-card p-4 text-left ${
+                    thread.id === selectedId ? "ring-2 ring-primary" : ""
+                  }`}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="truncate text-sm font-semibold">{thread.subject}</p>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {relativeTime(thread.lastMessageAt)}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {thread.snippet || "No messages yet"}
+                  </p>
+                </button>
+              ))}
+            </nav>
+            <section className="rounded-xl border bg-card p-5" aria-label="Conversation">
+              {loadingThread && <p className="text-sm" role="status">Loading conversation…</p>}
+              {!loadingThread && detail && (
+                <>
+                  <h2 className="text-lg font-semibold">{detail.thread.subject}</h2>
+                  <div className="mt-4 grid max-h-[28rem] content-start gap-3 overflow-y-auto pr-1">
+                    {detail.messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={`max-w-[80%] rounded-xl border p-3 text-sm ${
+                          message.own
+                            ? "justify-self-end bg-primary text-primary-foreground"
+                            : "justify-self-start bg-muted"
+                        }`}
+                      >
+                        <p className={`text-xs ${message.own ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                          {message.own ? "You" : message.senderName} · {relativeTime(message.sentAt)}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap">{message.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <form
+                    className="mt-4"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      sendReply();
+                    }}
+                  >
+                    <label className="block text-sm font-semibold">
+                      Reply
+                      <textarea
+                        className="mt-2 w-full rounded-lg border bg-background p-3 text-sm"
+                        rows={3}
+                        maxLength={4000}
+                        value={reply}
+                        onChange={(event) => setReply(event.target.value)}
+                        placeholder="Write a message…"
+                      />
+                    </label>
+                    <div className="mt-2 flex items-center gap-3">
+                      <button
+                        type="submit"
+                        disabled={sending || !reply.trim()}
+                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                      >
+                        {sending ? "Sending…" : "Send"}
+                      </button>
+                      {sentNotice && (
+                        <span className="text-xs text-muted-foreground" role="status">
+                          Message sent.
+                        </span>
+                      )}
+                      {error && (
+                        <span className="text-xs" role="alert">{error}</span>
+                      )}
+                    </div>
+                  </form>
+                </>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}

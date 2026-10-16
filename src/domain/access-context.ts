@@ -24,11 +24,11 @@ export type AccessContext = CommandContext & {
 
 /** Capability mapping is centralized; domain-specific relationship checks are still required. */
 export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Object.freeze({
- student: ["student:read","assignments:submit","study-groups:participate","notifications:manage"],
- teacher: ["teacher:read","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate"],
- guardian: ["guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read"],
- registrar: ["admissions:read","notifications:manage","admissions:decide","enrollment.decide","enrollment.activate","enrollment:manage","registrations:approve"],
- specialist: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage"],
+ student: ["student:read","assignments:submit","study-groups:participate","notifications:manage","communication.send"],
+ teacher: ["teacher:read","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate","communication.send","attendance.write","attendance.excuse.review","action.create","action.resolve","program.read"],
+ guardian: ["guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read","communication.send","attendance.excuse.submit"],
+ registrar: ["admissions:read","notifications:manage","admissions:decide","enrollment.decide","enrollment.activate","enrollment:manage","registrations:approve","attendance.write","attendance.excuse.review","communication.send","program.read","program.launch.start","program.activate","calendar.event.create","academic_year.manage","academic_year.activate","action.resolve","journey.requirement.complete"],
+ specialist: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage","communication.send","action.resolve"],
 });
 
 /** This may be called only after authenticating a server session and fetching grants from Neon. */

@@ -1,11 +1,17 @@
 import {createServerFn} from "@tanstack/react-start";
 import {eq,inArray,and,sql} from "drizzle-orm";
+import {z} from "zod";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
 import {enrollmentReadiness} from "@/domain/enrollment-readiness";
+const registrar=()=>requireActor(["registrar"],"enrollment.decide");
+const requirementInput=z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid()});
 export const getSyntheticFamilyReadiness=createServerFn({method:"GET"}).handler(async()=>{
+ const actor=await registrar();
+ if(!actor.scope.programIds?.length)return [];
  if(!process.env.DATABASE_URL)return [];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,metadata:s.applications.metadata,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).where(sql`${s.applications.metadata}->>'synthetic' = 'true'`).limit(150);
+ const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,metadata:s.applications.metadata,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).where(and(sql`${s.applications.metadata}->>'synthetic' = 'true'`,inArray(s.applications.programId,actor.scope.programIds))).limit(150);
  const synthetic=apps.filter(x=>x.metadata.synthetic===true);
  if(!synthetic.length)return [];
  const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId,status:s.journeys.status}).from(s.journeys).where(inArray(s.journeys.participantId,synthetic.map(x=>x.id)));
@@ -20,15 +26,16 @@ export const getSyntheticFamilyReadiness=createServerFn({method:"GET"}).handler(
 
 /** Development-only family checklist. Changes persist in canonical JourneyRequirements. */
 export const setSyntheticFamilyRequirement=createServerFn({method:"POST"})
- .validator((data:{applicationId:string;requirementId:string;complete:boolean})=>data)
+ .validator((data:unknown)=>requirementInput.extend({complete:z.boolean()}).parse(data))
  .handler(async({data})=>{
   assertSyntheticMutation("registrar");
-  if(!data.applicationId||!data.requirementId)throw new Error("Application and requirement are required");
+  const actor=await registrar();
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
-   const [app]=await tx.select({id:s.applications.id,metadata:s.applications.metadata})
+   const [app]=await tx.select({id:s.applications.id,metadata:s.applications.metadata,programId:s.applications.programId})
     .from(s.applications).where(eq(s.applications.id,data.applicationId)).limit(1);
    if(!app||app.metadata.synthetic!==true)throw new Error("Synthetic application not found");
+   assertProgramGranted(actor,app.programId);
    const [journey]=await tx.select({id:s.journeys.id,status:s.journeys.status})
     .from(s.journeys).where(and(eq(s.journeys.participantType,"application"),eq(s.journeys.participantId,app.id))).for("update").limit(1);
    if(!journey||journey.status==="active"||journey.status==="complete"||journey.status==="cancelled")throw new Error("Journey cannot be edited");
@@ -41,23 +48,24 @@ export const setSyntheticFamilyRequirement=createServerFn({method:"POST"})
    const all=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking}).from(s.journeyRequirements).where(eq(s.journeyRequirements.journeyId,journey.id));
    const everyBlockingComplete=all.every(r=>!r.blocking||(r.id===requirement.id?next:r.status)==="complete");
    await tx.update(s.journeys).set({status:everyBlockingComplete?"ready":"in_progress",updatedAt:new Date()}).where(eq(s.journeys.id,journey.id));
-   await tx.insert(s.auditEvents).values({action:"synthetic.enrollment.requirement",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:requirement.status},after:{status:next},context:{synthetic:true,applicationId:app.id}});
+   await recordAudit(tx,actor,{action:"enrollment.requirement.set",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:requirement.status},after:{status:next},scope:{applicationId:app.id,programId:app.programId}});
    return {saved:true};
   });
  });
 
 /** Synthetic registrar checklist review note; not a document upload or guardian signature. */
 export const addSyntheticRequirementReviewNote=createServerFn({method:"POST"})
- .validator((data:{applicationId:string;requirementId:string;note:string})=>data)
+ .validator((data:unknown)=>requirementInput.extend({note:z.string().trim().min(5,"Review note must be 5–500 characters").max(500,"Review note must be 5–500 characters")}).parse(data))
  .handler(async({data})=>{
   assertSyntheticMutation("registrar");
-  const note=data.note.trim();
-  if(note.length<5||note.length>500)throw new Error("Review note must be 5–500 characters");
+  const actor=await registrar();
+  const note=data.note;
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
-   const [app]=await tx.select({id:s.applications.id,metadata:s.applications.metadata})
+   const [app]=await tx.select({id:s.applications.id,metadata:s.applications.metadata,programId:s.applications.programId})
     .from(s.applications).where(eq(s.applications.id,data.applicationId)).limit(1);
    if(!app||app.metadata.synthetic!==true)throw new Error("Synthetic application not found");
+   assertProgramGranted(actor,app.programId);
    const [journey]=await tx.select({id:s.journeys.id,status:s.journeys.status}).from(s.journeys)
     .where(and(eq(s.journeys.participantType,"application"),eq(s.journeys.participantId,app.id))).limit(1);
    if(!journey)throw new Error("Enrollment journey not found");
@@ -66,23 +74,23 @@ export const addSyntheticRequirementReviewNote=createServerFn({method:"POST"})
    if(!requirement)throw new Error("Requirement does not belong to this application");
    const entry={kind:"registrar_note",text:note,createdAt:new Date().toISOString(),synthetic:true};
    await tx.update(s.journeyRequirements).set({evidence:[...requirement.evidence,entry],updatedAt:new Date()}).where(eq(s.journeyRequirements.id,requirement.id));
-   await tx.insert(s.auditEvents).values({action:"synthetic.enrollment.requirement.note",resourceType:"journey_requirement",resourceId:requirement.id,after:{kind:entry.kind},context:{synthetic:true,applicationId:app.id}});
+   await recordAudit(tx,actor,{action:"enrollment.requirement.note",resourceType:"journey_requirement",resourceId:requirement.id,after:{kind:entry.kind},scope:{applicationId:app.id,programId:app.programId}});
    return {saved:true};
   });
  });
 
 /** Review state for synthetic document requirements. Does not upload or validate real files. */
 export const reviewSyntheticRequirementDocument=createServerFn({method:"POST"})
- .validator((data:{applicationId:string;requirementId:string;status:"requested"|"received"|"accepted"|"rejected";reason:string;documentId?:string})=>data)
+ .validator((data:unknown)=>requirementInput.extend({status:z.enum(["requested","received","accepted","rejected"]),reason:z.string().trim().max(400,"Rejection requires a 5–400 character reason"),documentId:z.string().uuid().optional()}).refine(v=>v.status!=="rejected"||v.reason.length>=5,"Rejection requires a 5–400 character reason").parse(data))
  .handler(async({data})=>{
   assertSyntheticMutation("registrar");
-  if(!["requested","received","accepted","rejected"].includes(data.status))throw new Error("Invalid review status");
-  const reason=data.reason.trim();
-  if(reason.length>400||(data.status==="rejected"&&reason.length<5))throw new Error("Rejection requires a 5–400 character reason");
+  const actor=await registrar();
+  const reason=data.reason;
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
-   const [app]=await tx.select({id:s.applications.id,metadata:s.applications.metadata}).from(s.applications).where(eq(s.applications.id,data.applicationId)).limit(1);
+   const [app]=await tx.select({id:s.applications.id,metadata:s.applications.metadata,programId:s.applications.programId}).from(s.applications).where(eq(s.applications.id,data.applicationId)).limit(1);
    if(!app||app.metadata.synthetic!==true)throw new Error("Synthetic application not found");
+   assertProgramGranted(actor,app.programId);
    const [journey]=await tx.select({id:s.journeys.id,status:s.journeys.status}).from(s.journeys).where(and(eq(s.journeys.participantType,"application"),eq(s.journeys.participantId,app.id))).for("update").limit(1);
    if(!journey||["active","complete","cancelled"].includes(journey.status))throw new Error("Journey cannot be edited");
    const [requirement]=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status,evidence:s.journeyRequirements.evidence}).from(s.journeyRequirements).where(and(eq(s.journeyRequirements.id,data.requirementId),eq(s.journeyRequirements.journeyId,journey.id))).for("update").limit(1);
@@ -101,7 +109,7 @@ export const reviewSyntheticRequirementDocument=createServerFn({method:"POST"})
    if(previous?.status===data.status&&previous?.text===reason&&(previous?.documentId??null)===documentId)return {saved:true};
    const now=new Date(),next=data.status==="accepted"?"complete":"needs_you";
    const entry={kind:"document_review",status:data.status,text:reason,documentId,reviewedAt:now.toISOString(),synthetic:true};
-   if(reviewedDocument)await tx.update(s.documents).set({metadata:{...reviewedDocument.metadata,reviewStatus:data.status,reviewReason:reason},verifiedAt:data.status==="accepted"?now:null,verifiedByPersonId:data.status==="accepted"?"f1000000-0000-4000-8000-000000000006":null,updatedAt:now}).where(eq(s.documents.id,reviewedDocument.id));
+   if(reviewedDocument)await tx.update(s.documents).set({metadata:{...reviewedDocument.metadata,reviewStatus:data.status,reviewReason:reason},verifiedAt:data.status==="accepted"?now:null,verifiedByPersonId:data.status==="accepted"?actor.actorPersonId:null,updatedAt:now}).where(eq(s.documents.id,reviewedDocument.id));
    await tx.update(s.journeyRequirements).set({evidence:[...requirement.evidence,entry],status:next,completedAt:next==="complete"?now:null,updatedAt:now}).where(eq(s.journeyRequirements.id,requirement.id));
    const all=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking}).from(s.journeyRequirements).where(eq(s.journeyRequirements.journeyId,journey.id));
    const ready=all.every(r=>!r.blocking||(r.id===requirement.id?next:r.status)==="complete");
@@ -122,7 +130,7 @@ export const reviewSyntheticRequirementDocument=createServerFn({method:"POST"})
       resourceType:"application",resourceId:app.id
     })));
    }
-   await tx.insert(s.auditEvents).values({action:"synthetic.enrollment.document.review",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:previous?.status??null},after:{status:data.status,reason,documentId},context:{synthetic:true,applicationId:app.id}});
+   await recordAudit(tx,actor,{action:"enrollment.document.review",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:previous?.status??null},after:{status:data.status,reason,documentId},scope:{applicationId:app.id,programId:app.programId}});
    return {saved:true};
   });
  });

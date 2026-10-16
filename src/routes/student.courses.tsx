@@ -7,10 +7,9 @@ export const Route=createFileRoute("/student/courses")({
  component:CourseRegistrationPage,
 });
 function CourseRegistrationPage(){
- const {connected,sections,requests}=Route.useLoaderData();
- const router=useRouter();
- const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
- const [role,setRole]=useState<"student"|"guardian"|"registrar">("student");
+ const {connected,sections,requests,viewerRole:role}=Route.useLoaderData();
+  const router=useRouter();
+  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  async function run(fn:()=>Promise<unknown>,message:string){
   setBusy(true);setError("");setNotice("");
   try{await fn();await router.invalidate();setNotice(message)}
@@ -25,11 +24,7 @@ function CourseRegistrationPage(){
   <h1 className="mt-2 font-serif text-5xl">Choose your classes.</h1>
   <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">Explore available courses, request additions or drops, and see how an approved decision updates official synthetic enrollment records. Withdrawal after the add/drop period is kept distinct from a drop.</p>
   <div className="mt-6 flex flex-wrap items-center gap-3">
-   <label className="text-sm">Preview as
-    <select className="ml-3 rounded-lg border border-border bg-card p-2" value={role} onChange={e=>setRole(e.target.value as typeof role)}>
-     <option value="student">Student</option><option value="guardian">Parent / Guardian</option><option value="registrar">School Registrar</option>
-    </select>
-   </label>
+   <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">Signed in as {role==="registrar"?"School Registrar":"Student"}</span>
    <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">{connected?"Connected to synthetic Neon":"Neon not connected"}</span>
   </div>
   {error&&<p role="alert" className="mt-4 rounded-lg border border-red-300 p-3 text-sm">{error}</p>}

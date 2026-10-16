@@ -12,10 +12,22 @@ import {
   submissions,
 } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
+import {
+  emailNotificationRecipients,
+  sendNotificationEmail,
+} from "@/modules/communication/notification-email.server";
 
 export async function handleAcademicInterventionEvent(
   eventId: string,
 ): Promise<void> {
+  let guardianEmailNotice:
+    | {
+        guardianPersonIds: string[];
+        studentName: string;
+        assessmentTitle: string;
+      }
+    | undefined;
+
   await db.transaction(async (tx) => {
     const [event] = await tx
       .select()
@@ -124,5 +136,31 @@ export async function handleAcademicInterventionEvent(
         processedAt: new Date(),
       })
       .where(eq(domainEvents.id, event.id));
+
+    guardianEmailNotice = {
+      guardianPersonIds: guardians.map((row) => row.personId),
+      studentName,
+      assessmentTitle: record.assessmentTitle,
+    };
   });
+
+  if (guardianEmailNotice && guardianEmailNotice.guardianPersonIds.length > 0) {
+    const { guardianPersonIds, studentName, assessmentTitle } =
+      guardianEmailNotice;
+    const emails = await emailNotificationRecipients(guardianPersonIds);
+    const origin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
+    const actionUrl = origin ? `${new URL(origin).origin}/guardian` : undefined;
+    await Promise.all(
+      guardianPersonIds.map(async (personId) => {
+        const to = emails.get(personId);
+        if (!to) return;
+        await sendNotificationEmail({
+          to,
+          subject: `${assessmentTitle} is missing`,
+          text: `${studentName} has a missing assignment: ${assessmentTitle}. Sign in to CAN OS to review it and follow up.`,
+          actionUrl,
+        });
+      }),
+    );
+  }
 }

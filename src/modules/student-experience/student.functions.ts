@@ -1,15 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
+import { eq } from "drizzle-orm";
+import { requireActor } from "@/modules/identity/actors.server";
 
-/**
- * Student preview is scoped to one server-configured profile. No arbitrary
- * student-id query parameter or public directory of student records.
- */
+/** Student Today for the signed-in student only; no caller-supplied student id. */
 export const getStudentWorkspace = createServerFn({ method: "GET" })
   .handler(async () => {
-    const studentId = "f1000000-0000-4000-8000-000000000007"; // Synthetic fixture only
+    const actor = await requireActor(["student"], "student:read");
+    setResponseHeader("Cache-Control", "private, no-store");
     if (!process.env.DATABASE_URL) {
       return { mode: "not_connected" as const, data: null };
     }
+    const [{ db }, { studentProfiles }] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+    const [profile] = await db.select({ id: studentProfiles.id }).from(studentProfiles).where(eq(studentProfiles.personId, actor.actorPersonId)).limit(1);
+    if (!profile) return { mode: "preview_profile_missing" as const, data: null };
+    const studentId = profile.id;
     const { getStudentToday } = await import("./student-today.server");
     try {
       const data = await getStudentToday(studentId);

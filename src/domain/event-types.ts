@@ -10,6 +10,7 @@ export const EventTypes = {
   AssignmentBecameMissing: "AssignmentBecameMissing",
   SubmissionReceived: "SubmissionReceived",
   GradePosted: "GradePosted",
+  TranscriptIssued: "TranscriptIssued",
   CommunicationMessageSent: "CommunicationMessageSent",
   InsightCreated: "InsightCreated",
   ActionCreated: "ActionCreated",
