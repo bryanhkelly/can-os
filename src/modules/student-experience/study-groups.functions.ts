@@ -192,6 +192,19 @@ export const reviseStudyGroupSession=createServerFn({method:"POST"})
    await tx.update(s.studyGroupSessions).set({startsAt:times!.start,endsAt:times!.end,updatedAt:new Date()}).where(eq(s.studyGroupSessions.id,session.id));
    await tx.update(s.calendarEvents).set({startsAt:times!.start,endsAt:times!.end,updatedAt:new Date()}).where(eq(s.calendarEvents.id,event.id));
   }
+  const members=await tx.select({personId:s.studyGroupMemberships.personId}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,session.groupId),eq(s.studyGroupMemberships.status,"approved")));
+  if(members.length){
+   const kind=data.action==="cancel"?"cancelled":"rescheduled";
+   const when=times?.start.toISOString()??null;
+   await tx.insert(s.notifications).values(members.map(m=>({
+    recipientPersonId:m.personId,
+    type:"study_group_session_"+kind,
+    title:"Study group session "+kind,
+    body:when?"Updated start: "+when:"The facilitator cancelled a scheduled study group session.",
+    resourceType:"study_group_session",
+    resourceId:session.id
+   })));
+  }
   await tx.insert(s.auditEvents).values({actorPersonId:TEACHER,action:data.action==="cancel"?"synthetic.study_group.session.cancel":"synthetic.study_group.session.reschedule",resourceType:"study_group_session",resourceId:session.id,before:{startsAt:session.startsAt.toISOString(),endsAt:session.endsAt.toISOString()},after:data.action==="cancel"?{cancelled:true}:{startsAt:times!.start.toISOString(),endsAt:times!.end.toISOString()},context:{synthetic:true,calendarEventId:event.id}});
   return {ok:true};
  });
