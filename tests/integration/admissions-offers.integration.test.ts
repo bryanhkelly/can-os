@@ -93,6 +93,15 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(new Set(confirmationNotices.filter(n=>n.type==="enrollment_activated").map(n=>n.recipientPersonId)).size).toBe(2);
   const finalEnrollments=await db.select().from(s.enrollments).where(eq(s.enrollments.programId,program.id));
   expect(finalEnrollments.filter(x=>x.kind==="program"&&x.status==="active")).toHaveLength(1);
+  // Converting a reserved offer into an active enrollment must not open a second seat.
+  // A fresh retry against the losing sibling must still be rejected after activation.
+  await expect(svc.issueSyntheticAdmissionOffer(registrar,{
+   applicationId:records[loserIndex]!.applicationId,schoolYearId:calendar.schoolYear.id,
+   idempotencyKey:`synthetic-after-activation-${suffix}`,expiresAt:expiry
+  })).rejects.toThrow("Seat pool is full");
+  const persistentOffers=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.schoolYearId,calendar.schoolYear.id));
+  expect(persistentOffers.filter(o=>o.status==="accepted")).toHaveLength(1);
+  expect(persistentOffers.filter(o=>o.status==="issued")).toHaveLength(0);
 
  },90000);
 });
