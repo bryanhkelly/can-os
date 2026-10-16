@@ -2,12 +2,23 @@ import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
 import {getOperationsPreview,updateSyntheticOperationsAction,triageSyntheticOperationsAction} from "@/modules/operations/operations.functions";
-export const Route=createFileRoute("/operations")({loader:async()=>({operations:await getOperationsPreview(),health:await getReleaseHealth()}),component:OperationsPage});
+export const Route=createFileRoute("/operations")({loader:async()=>{
+ try{
+  return {operations:await getOperationsPreview(),health:await getReleaseHealth(),authError:""};
+ }catch{
+  return {operations:null,health:null,authError:"Sign in with an authorized staff account to view school operations."};
+ }
+},component:OperationsPage});
 function OperationsPage(){
- const {operations:data,health}=Route.useLoaderData();
+ const {operations:data,health,authError}=Route.useLoaderData();
  const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null);
  const [error,setError]=useState("");
+ if(authError||!data||!health)return <main className="mx-auto max-w-6xl px-5 py-10">
+  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Operations</p>
+  <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
+  <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{authError||"Operations data is unavailable."}</p>
+ </main>;
  async function moveAction(id:string,status:"in_progress"|"waiting"|"resolved"){
   setBusy(id);setError("");
   try{await updateSyntheticOperationsAction({data:{id,status}});await router.invalidate();}
