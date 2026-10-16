@@ -125,6 +125,7 @@ export const reportStudyGroupPost=createServerFn({method:"POST"}).validator((x:{
  const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.status,"active"))).limit(1);
  if(!group)throw new Error("Group unavailable");
  await tx.insert(s.notifications).values({recipientPersonId:group.facilitatorPersonId,type:"study_group_report_submitted",status:"unread",title:"Study group content reported",body:"A post in "+group.title+" requires moderation.",resourceType:"study_group",resourceId:data.groupId});
+ await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"study_group.report.submit",resourceType:"study_group_post",resourceId:data.postId,after:{groupId:data.groupId},context:{synthetic:true}});
  return {ok:true,created:true};
  });
 });
