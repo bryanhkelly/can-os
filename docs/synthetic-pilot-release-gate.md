@@ -15,6 +15,16 @@ A pushed commit is not equivalent to a verified release. Record actual execution
 - [ ] Migration parity and deployment SHA match the intended release candidate; production DB is not used for integration fixture writes.
 - [ ] Release and rollback smoke checks have recorded outcomes.
 
+### Verified read-only database evidence (2026-10-16)
+
+The existing disposable Neon branch `br-aged-cherry-arl5c0lf` in project `sweet-hall-62441909` was inspected without fixture writes:
+
+- Seven rows in `drizzle.__drizzle_migrations` match the seven journal timestamps in `drizzle/meta/_journal.json`, from migration `0000` through `0006`.
+- Required admissions, journey, notification and session tables exist.
+- Unique indexes are present on application and offer idempotency keys, program/year seat pools, and active offers per application/year.
+- There are no existing fixture applications, seat pools or offers on the inspected branch.
+- This is **structural evidence only**. No passing integration execution, full SQL hash parity or production deployment parity has been verified.
+
 ### Run CI
 
 CI runs on pushes to `main` and pull requests. Inspect the **Actions** tab and link the exact successful run here. The GitHub commit status endpoint is not sufficient proof if no checks are returned.
