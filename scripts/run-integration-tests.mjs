@@ -35,8 +35,8 @@ if (process.env.DATABASE_URL && testEndpoint === endpoint(process.env.DATABASE_U
 }
 
 const mode = process.argv[2];
-const targeted = mode === "gf26" || mode === "gf26-lifecycle";
-const suite = mode === "gf26" ? ["tests/integration/gf26-fixture-integrity.test.ts"] : mode === "gf26-lifecycle" ? ["tests/integration/gf26-session-lifecycle.test.ts"] : ["tests/integration"];
+const targeted = mode === "gf26" || mode === "gf26-lifecycle" || mode === "admissions-offers";
+const suite = mode === "gf26" ? ["tests/integration/gf26-fixture-integrity.test.ts"] : mode === "gf26-lifecycle" ? ["tests/integration/gf26-session-lifecycle.test.ts"] : mode === "admissions-offers" ? ["tests/integration/admissions-offers.integration.test.ts"] : ["tests/integration"];
 const args = targeted ? process.argv.slice(3) : process.argv.slice(2);
 const result = spawnSync(process.execPath, [
   "node_modules/vitest/vitest.mjs", "run", ...suite, ...args,
