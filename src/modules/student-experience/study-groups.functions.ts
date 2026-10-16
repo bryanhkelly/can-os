@@ -85,6 +85,18 @@ export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator
  sourceType:"study_group_session",sourceId:session.id,createdByPersonId:TEACHER,
  metadata:{synthetic:true,fixture:"gf26",groupId:group.id}
  });
+ const members=await tx.select({personId:s.studyGroupMemberships.personId}).from(s.studyGroupMemberships)
+  .where(and(eq(s.studyGroupMemberships.groupId,group.id),eq(s.studyGroupMemberships.status,"approved")));
+ if(members.length){
+  await tx.insert(s.notifications).values([...new Set(members.map(m=>m.personId))].map(personId=>({
+   recipientPersonId:personId,
+   type:"study_group_session_scheduled",
+   title:"New study group session: "+data.title.trim(),
+   body:"Scheduled start: "+start.toISOString(),
+   resourceType:"study_group_session",
+   resourceId:session.id
+  })));
+ }
  return session;
  });
 });
@@ -186,6 +198,7 @@ export const reviseStudyGroupSession=createServerFn({method:"POST"})
   const [event]=await tx.select().from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
   if(!event)throw new Error("Canonical calendar event missing");
   if(event.metadata.cancelled===true)throw new Error("Cancelled session cannot be changed");
+  if(data.action==="reschedule"&&times!.start.getTime()===session.startsAt.getTime()&&times!.end.getTime()===session.endsAt.getTime())return {ok:true};
   if(data.action==="cancel"){
    await tx.update(s.calendarEvents).set({metadata:{...event.metadata,cancelled:true,cancelledAt:new Date().toISOString()},updatedAt:new Date()}).where(eq(s.calendarEvents.id,event.id));
   } else {
