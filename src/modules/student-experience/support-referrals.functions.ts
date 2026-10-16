@@ -75,6 +75,11 @@ export const createSupportReferral=createServerFn({method:"POST"})
   if(!categories.includes(data.category))throw new Error("Invalid referral category");
   const observations=safeNote(data.observations);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const assigned=await db.select({id:s.enrollments.id}).from(s.enrollments)
+   .innerJoin(s.sectionTeachers,eq(s.sectionTeachers.sectionId,s.enrollments.sectionId))
+   .where(and(eq(s.enrollments.studentProfileId,STUDENT),eq(s.enrollments.status,"active"),
+    eq(s.sectionTeachers.personId,context.actorPersonId!))).limit(1);
+  if(!assigned.length)throw new AuthorizationError("referral student relationship");
   const [created]=await db.insert(s.actions).values({
    type:"support_referral",status:"open",priority:data.priority,
    title:`Student support · ${data.category}`,description:observations,
