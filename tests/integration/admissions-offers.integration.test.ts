@@ -36,6 +36,20 @@ integration("synthetic admissions offer concurrency",()=>{
   const failures=settled.filter(x=>x.status==="rejected");
   expect(failures).toHaveLength(1);
   const offerId=(successes[0] as PromiseFulfilledResult<string>).value;
+  const winnerIndex=settled.findIndex(x=>x.status==="fulfilled");
+  const loserIndex=settled.findIndex(x=>x.status==="rejected");
+  const [activeOffer]=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.id,offerId));
+  expect(activeOffer.status).toBe("issued");
+  // The losing sibling must not receive a held seat, including after a fresh database read.
+  const competingOffers=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.schoolYearId,calendar.schoolYear.id));
+  expect(competingOffers.filter(o=>o.status==="issued"||o.status==="accepted")).toHaveLength(1);
+  await expect(svc.issueSyntheticAdmissionOffer(registrar,{
+   applicationId:records[loserIndex]!.applicationId,schoolYearId:calendar.schoolYear.id,
+   idempotencyKey:`synthetic-seat-retry-${suffix}`,expiresAt:expiry
+  })).rejects.toThrow("Seat pool is full");
+  const guardianNotices=await db.select().from(s.notifications).where(eq(s.notifications.recipientPersonId,guardian.id));
+  expect(guardianNotices.filter(n=>n.type==="admission_offer_issued"&&n.resourceId===offerId)).toHaveLength(1);
+
   await expect(svc.respondToSyntheticAdmissionOffer(family,offerId,"accept")).resolves.toBe(offerId);
   const enrolled=await svc.activateSyntheticOfferedEnrollment(registrar,offerId);
   expect(await svc.activateSyntheticOfferedEnrollment(registrar,offerId)).toBe(enrolled);
@@ -45,7 +59,12 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(offerEvents.map(x=>x.eventType).sort()).toEqual(["AdmissionOfferAccepted","AdmissionOfferIssued"]);
   const activationEvents=await db.select().from(s.domainEvents).where(eq(s.domainEvents.aggregateId,enrolled));
   expect(activationEvents.map(x=>x.eventType)).toEqual(["EnrollmentActivated"]);
-  const journeyAudits=await db.select().from(s.auditEvents).where(eq(s.auditEvents.resourceId,records[settled.findIndex(x=>x.status==="fulfilled")]!.journeyId));
+  const journeyAudits=await db.select().from(s.auditEvents).where(eq(s.auditEvents.resourceId,records[winnerIndex]!.journeyId));
   expect(journeyAudits.filter(x=>x.action==="journey.activate")).toHaveLength(1);
+  const confirmationNotices=await db.select().from(s.notifications).where(eq(s.notifications.resourceId,enrolled));
+  expect(confirmationNotices.filter(n=>n.type==="enrollment_activated")).toHaveLength(2);
+  const finalEnrollments=await db.select().from(s.enrollments).where(eq(s.enrollments.programId,program.id));
+  expect(finalEnrollments.filter(x=>x.kind==="program"&&x.status==="active")).toHaveLength(1);
+
  },90000);
 });
