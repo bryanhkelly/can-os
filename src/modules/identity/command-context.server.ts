@@ -1,6 +1,6 @@
-import {and,eq,gt,isNull} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,accountPersonGrants} from "@/db/schema";
+import {accessAccounts,accessSessions,accountPersonGrants,programs} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {resolveAccessContext,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret} from "@/domain/access-tokens";
@@ -31,9 +31,16 @@ export async function getCommandContext(request: Request): Promise<AccessContext
   role:accountPersonGrants.role,organizationId:accountPersonGrants.organizationId,
   siteId:accountPersonGrants.siteId,active:accountPersonGrants.active,
  }).from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,session.accountId),eq(accountPersonGrants.active,true)));
- return resolveAccessContext({
+ const context=resolveAccessContext({
   accountId:session.accountId,sessionId:session.id,activeGrantId:session.activeGrantId,
  },grants);
+ // Program authorization derives from the verified active organization grant, not a browser claim.
+ const organizations=context.scope.organizationIds??[];
+ if(organizations.length){
+  const permitted=await db.select({id:programs.id}).from(programs).where(inArray(programs.organizationId,organizations));
+  context.scope.programIds=permitted.map(p=>p.id);
+ }
+ return context;
 }
 
 /** Higher-level server functions may add a resource relationship guard. */
