@@ -1,12 +1,27 @@
 import {createServerFn} from "@tanstack/react-start";
+import {getRequest} from "@tanstack/react-start/server";
+import {getCommandContext} from "@/modules/identity/command-context.server";
 import {and,eq,desc,sql} from "drizzle-orm";
 import {db} from "@/db/client";
-import {applications,journeys,journeyRequirements,documents,auditEvents} from "@/db/schema";
+import {applications,journeys,journeyRequirements,documents,auditEvents,programs,guardianRelationships,studentProfiles} from "@/db/schema";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {newDocumentKey,signR2Object,validateDocumentUpload,r2Config} from "./r2-documents.server";
 const REGISTRAR="f1000000-0000-4000-8000-000000000006";
-function uploadsEnabled(){
- assertSyntheticMutation("registrar");
+async function uploadsEnabled(applicationId:string){
+ const context=await getCommandContext(getRequest());
+ if(!context.actorPersonId)throw new Error("Authenticated person required");
+ const [app]=await db.select({programId:applications.programId,studentProfileId:applications.studentProfileId}).from(applications).where(eq(applications.id,applicationId)).limit(1);
+ if(!app)throw new Error("Application not found");
+ if(context.role==="registrar"){
+  const [program]=await db.select({organizationId:programs.organizationId}).from(programs).where(eq(programs.id,app.programId)).limit(1);
+  if(!program||!context.scope.organizationIds?.includes(program.organizationId))throw new Error("Registrar has no organization grant");
+ }else if(context.role==="guardian"){
+  const [student]=await db.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
+  if(!student)throw new Error("Student missing");
+  const [relationship]=await db.select({id:guardianRelationships.id}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,student.personId),eq(guardianRelationships.guardianPersonId,context.actorPersonId),eq(guardianRelationships.canManageEnrollment,true))).limit(1);
+  if(!relationship)throw new Error("Guardian cannot manage enrollment");
+ }else throw new Error("Enrollment documents require registrar or guardian access");
+ assertSyntheticMutation(context.role);
  if(process.env.CAN_R2_DEMO_UPLOADS_ENABLED!=="true")throw new Error("R2 demo uploads are disabled");
 }
 async function requirementScope(applicationId:string,requirementId:string){
@@ -20,7 +35,7 @@ async function requirementScope(applicationId:string,requirementId:string){
 export const beginSyntheticR2DocumentUpload=createServerFn({method:"POST"})
  .validator((data:{applicationId:string;requirementId:string;fileName:string;mimeType:string;size:number})=>data)
  .handler(async({data})=>{
-  uploadsEnabled();validateDocumentUpload(data.fileName,data.mimeType,data.size);
+  await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
   await requirementScope(data.applicationId,data.requirementId);
   const key=newDocumentKey(data.applicationId,data.requirementId);
   return {key,uploadUrl:signR2Object("PUT",key,data.mimeType,180),expiresInSeconds:180};
@@ -28,7 +43,7 @@ export const beginSyntheticR2DocumentUpload=createServerFn({method:"POST"})
 export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
  .validator((data:{applicationId:string;requirementId:string;key:string;fileName:string;mimeType:string;size:number})=>data)
  .handler(async({data})=>{
-  uploadsEnabled();validateDocumentUpload(data.fileName,data.mimeType,data.size);
+  await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
   if(!data.key.startsWith("enrollment/"+data.applicationId+"/"+data.requirementId+"/"))throw new Error("Document belongs to another application");
   await requirementScope(data.applicationId,data.requirementId);
   r2Config();
@@ -75,7 +90,7 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
 export const getSyntheticR2DocumentDownload=createServerFn({method:"POST"})
  .validator((data:{applicationId:string;requirementId:string;documentId:string})=>data)
  .handler(async({data})=>{
-  uploadsEnabled();
+  await uploadsEnabled(data.applicationId);
   await requirementScope(data.applicationId,data.requirementId);
   const [record]=await db.select({id:documents.id,storageKey:documents.storageKey,metadata:documents.metadata})
    .from(documents).where(and(eq(documents.id,data.documentId),eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageProvider,"cloudflare_r2"))).limit(1);
