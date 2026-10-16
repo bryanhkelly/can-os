@@ -40,11 +40,12 @@ export const triageSyntheticOperationsAction=createServerFn({method:"POST"})
   const ownerPersonId=data.owner==="teacher"?"f1000000-0000-4000-8000-000000000006":null;
   const [{db},s,{and,eq}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
   return db.transaction(async tx=>{
-   const [record]=await tx.select({id:s.actions.id,type:s.actions.type,status:s.actions.status,metadata:s.actions.metadata,ownerPersonId:s.actions.ownerPersonId,priority:s.actions.priority})
+   const [record]=await tx.select({id:s.actions.id,type:s.actions.type,status:s.actions.status,metadata:s.actions.metadata,title:s.actions.title,ownerPersonId:s.actions.ownerPersonId,priority:s.actions.priority})
     .from(s.actions).where(and(eq(s.actions.id,data.id),eq(s.actions.siteId,"f1000000-0000-4000-8000-000000000003"))).for("update").limit(1);
    if(!record||record.metadata.synthetic!==true||record.type==="support_referral"||["resolved","cancelled"].includes(record.status))throw new Error("Open synthetic action not found");
    if(record.ownerPersonId===ownerPersonId&&record.priority===data.priority)return {saved:true};
    await tx.update(s.actions).set({ownerPersonId,priority:data.priority,updatedAt:new Date()}).where(eq(s.actions.id,record.id));
+   if(ownerPersonId&&record.ownerPersonId!==ownerPersonId)await tx.insert(s.notifications).values({recipientPersonId:ownerPersonId,type:"operations_action_assigned",status:"unread",title:"Assigned action: "+record.title,body:"An action requires your attention in school operations.",resourceType:"action",resourceId:record.id});
    await tx.insert(s.auditEvents).values({action:"synthetic.action.triage",resourceType:"action",resourceId:record.id,before:{ownerPersonId:record.ownerPersonId,priority:record.priority},after:{ownerPersonId,priority:data.priority},context:{synthetic:true}});
    return {saved:true};
   });
