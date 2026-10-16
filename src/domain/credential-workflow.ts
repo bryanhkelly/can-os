@@ -1,9 +1,20 @@
+import { defineLifecycle } from "@/platform/lifecycle";
+
 /** Side-effect-free state transition rules for credential review.
  * Persistence layer must independently authenticate reviewer, verify scope and
  * write DomainEvent + AuditEvent in the same transaction.
  */
 export type VerificationStatus = "unverified" | "pending" | "verified" | "rejected" | "revoked";
 export type VerificationDecision = "submit" | "approve" | "reject" | "revoke";
+const credentialLifecycle = defineLifecycle<VerificationStatus, VerificationDecision>({
+  states: ["unverified", "pending", "verified", "rejected", "revoked"],
+  transitions: {
+    submit: { from: ["unverified", "rejected"], to: "pending" },
+    approve: { from: ["pending"], to: "verified" },
+    reject: { from: ["pending"], to: "rejected" },
+    revoke: { from: ["verified"], to: "revoked" },
+  },
+});
 export type CredentialReview = {
   status: VerificationStatus;
   subjectPersonId: string;
@@ -26,16 +37,10 @@ export function decideCredentialReview(
   if (!actorPersonId) throw new Error("Authenticated reviewer required");
   if (decision !== "submit" && actorPersonId === record.subjectPersonId) throw new Error("Independent reviewer required");
   if (record.expiry && record.expiry <= now && decision === "approve") throw new Error("Expired credentials cannot be verified");
-  const allowed: Record<VerificationDecision, VerificationStatus[]> = {
-    submit: ["unverified", "rejected"],
-    approve: ["pending"],
-    reject: ["pending"],
-    revoke: ["verified"],
-  };
-  if (!allowed[decision].includes(record.status)) throw new Error(`Invalid credential transition: ${record.status} → ${decision}`);
+  if (!credentialLifecycle.can(record.status, decision)) throw new Error(`Invalid credential transition: ${record.status} → ${decision}`);
   if (decision === "approve" && !record.evidenceDocumentId) throw new Error("Evidence required for verification");
   if ((decision === "reject" || decision === "revoke") && !note?.trim()) throw new Error("Reviewer reason required");
-  const status: VerificationStatus = decision === "submit" ? "pending" : decision === "approve" ? "verified" : decision === "reject" ? "rejected" : "revoked";
+  const status = credentialLifecycle.apply(record.status, decision);
   return { ...record, status, reviewedByPersonId: decision === "submit" ? null : actorPersonId,
     verifiedAt: decision === "approve" ? now : null, reviewerNote: note?.trim() || null };
 }

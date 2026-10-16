@@ -1,6 +1,7 @@
+import {offerHoldsSeat} from "./admissions-policy";
 export type OfferCandidate={id:string;status:string;expiresAt:string|null;schoolYearId:string};
 export function isLiveOffer(offer:OfferCandidate,now=new Date()):boolean {
- return offer.status==="accepted"||(offer.status==="issued"&&(!offer.expiresAt||new Date(offer.expiresAt).getTime()>now.getTime()));
+ return offerHoldsSeat(offer,now);
 }
 export function selectActionableOffer<T extends OfferCandidate>(offers:T[],now=new Date()):T|undefined {
  return offers.find(offer=>isLiveOffer(offer,now));

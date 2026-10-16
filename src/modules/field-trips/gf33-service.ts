@@ -1,10 +1,8 @@
 import { and, eq, gt, isNull, lt } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  auditEvents,
   calendarEvents,
   consentRecords,
-  domainEvents,
   fieldTripAttendance,
   fieldTripChaperones,
   fieldTripIncidents,
@@ -26,6 +24,7 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { emitEvent, writeAudit } from "@/platform/mutation";
 
 export async function proposeFieldTrip(
   context: CommandContext,
@@ -129,7 +128,7 @@ export async function approveFieldTrip(
       })
       .where(eq(fieldTrips.id, fieldTripId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.FieldTripApproved,
       aggregateType: "field_trip",
       aggregateId: fieldTripId,
@@ -140,18 +139,16 @@ export async function approveFieldTrip(
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "field_trip.approve",
-      resourceType: "field_trip",
-      resourceId: fieldTripId,
+      entityType: "field_trip",
+      entityId: fieldTripId,
       scope: {
         siteId: trip.siteId,
         programId: trip.programId,
       },
       before: { status: trip.status },
       after: { status: "approved", calendarEventId: event.id },
-      context: { requestId: context.requestId ?? null },
     });
 
     return event.id;
@@ -303,7 +300,7 @@ export async function signFieldTripPermission(
       })
       .where(eq(fieldTripParticipants.id, input.participantId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.FieldTripPermissionSigned,
       aggregateType: "field_trip_participant",
       aggregateId: input.participantId,
@@ -501,17 +498,15 @@ export async function getFieldTripSafetyPacket(
       });
     }
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: actorPersonId,
+    await writeAudit(tx, context, {
       action: "field_trip.safety_packet.read",
-      resourceType: "field_trip",
-      resourceId: fieldTripId,
+      entityType: "field_trip",
+      entityId: fieldTripId,
       scope: {
         siteId: chaperone.siteId,
         programId: chaperone.programId,
       },
-      context: {
-        requestId: context.requestId ?? null,
+      contextExtras: {
         classification: "medical",
         accessGrantId: grant.id,
         allowedFields: grant.allowedFields,
@@ -584,7 +579,7 @@ export async function recordFieldTripAttendance(
 
     if (!record) throw new Error("Failed to record Field Trip attendance");
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.FieldTripAttendanceRecorded,
       aggregateType: "field_trip_attendance",
       aggregateId: record.id,

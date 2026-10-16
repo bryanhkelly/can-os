@@ -3,10 +3,7 @@ import { db } from "@/db/client";
 import {
   attendanceEvents,
   attendanceExcuses,
-  auditEvents,
-  domainEvents,
   guardianRelationships,
-  notifications,
   people,
   studentProfiles,
 } from "@/db/schema";
@@ -17,6 +14,7 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 import {
   emailNotificationRecipients,
   sendNotificationEmail,
@@ -83,7 +81,7 @@ export async function recordAttendance(
         .from(guardianRelationships)
         .where(eq(guardianRelationships.studentPersonId, student.personId));
 
-      await tx.insert(domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.StudentMarkedAbsent,
         aggregateType: "attendance_event",
         aggregateId: event.id,
@@ -98,24 +96,23 @@ export async function recordAttendance(
       });
 
       if (guardians.length > 0) {
-        await tx.insert(notifications).values(
-          guardians.map(({ personId }) => ({
+        for (const { personId } of guardians) {
+          await notify(tx, {
             recipientPersonId: personId,
             type: "student_absent",
             title: "Attendance needs your attention",
             body: "Your student was marked absent. Submit an excuse if appropriate.",
             resourceType: "attendance_event",
             resourceId: event.id,
-          })),
-        );
+          });
+        }
       }
     }
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: actorPersonId,
+    await writeAudit(tx, context, {
       action: "attendance.record",
-      resourceType: "attendance_event",
-      resourceId: event.id,
+      entityType: "attendance_event",
+      entityId: event.id,
       scope: {
         programId: input.programId,
         siteId: input.siteId ?? null,
@@ -126,8 +123,7 @@ export async function recordAttendance(
         studentProfileId: input.studentProfileId,
         expectedAt: input.expectedAt.toISOString(),
       },
-      context: {
-        requestId: context.requestId ?? null,
+      contextExtras: {
         sourceKey: input.sourceKey,
       },
     });
@@ -208,7 +204,7 @@ export async function submitAttendanceExcuse(
 
     if (!excuse) throw new Error("Failed to create AttendanceExcuse");
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.AttendanceExcuseSubmitted,
       aggregateType: "attendance_excuse",
       aggregateId: excuse.id,
@@ -216,17 +212,15 @@ export async function submitAttendanceExcuse(
       payload: { attendanceEventId: input.attendanceEventId },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: actorPersonId,
+    await writeAudit(tx, context, {
       action: "attendance.excuse.submit",
-      resourceType: "attendance_excuse",
-      resourceId: excuse.id,
+      entityType: "attendance_excuse",
+      entityId: excuse.id,
       scope: {},
       after: {
         status: "submitted",
         attendanceEventId: input.attendanceEventId,
       },
-      context: { requestId: context.requestId ?? null },
     });
 
     return excuse.id;
@@ -341,7 +335,7 @@ export async function reviewAttendanceExcuse(
       correctionAttendanceEventId = correction.id;
     }
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType:
         input.decision === "approved"
           ? EventTypes.AttendanceExcuseApproved
@@ -355,11 +349,10 @@ export async function reviewAttendanceExcuse(
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: actorPersonId,
+    await writeAudit(tx, context, {
       action: `attendance.excuse.${input.decision}`,
-      resourceType: "attendance_excuse",
-      resourceId: record.excuseId,
+      entityType: "attendance_excuse",
+      entityId: record.excuseId,
       scope: {
         programId: record.programId,
         siteId: record.siteId,
@@ -370,8 +363,7 @@ export async function reviewAttendanceExcuse(
         status: input.decision,
         correctionAttendanceEventId: correctionAttendanceEventId ?? null,
       },
-      context: {
-        requestId: context.requestId ?? null,
+      contextExtras: {
         reviewNote: input.reviewNote ?? null,
       },
     });

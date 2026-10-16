@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/student-experience/family-home.functions";
+import { WorkspaceShell, EmptyState, QueryState } from "@/components/workspace";
 
 export const Route = createFileRoute("/guardian/")({ component: FamilyHomePage });
 
@@ -26,75 +27,70 @@ function FamilyHomePage() {
   return () => { active = false; };
  }, []);
 
- return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-  <div className="mx-auto max-w-5xl">
-   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Family</p>
-   <h1 className="mt-2 font-serif text-4xl">Family home</h1>
-   <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Everything that needs your attention across your children, in one place.</p>
-
-   {loading && <p className="mt-8 text-sm" role="status">Loading your family…</p>}
-   {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
-
-   {!loading && !error && <>
-    <section aria-label="Needs you" className="mt-10">
-     <div className="flex items-baseline justify-between gap-3">
-      <h2 className="text-lg font-semibold">Needs you</h2>
-      {needs.length > 0 && <span className="rounded-full border px-3 py-1 text-xs">{needs.length} open</span>}
-     </div>
-     {needs.length === 0 && <p className="mt-4 rounded-xl border bg-card p-5 text-sm text-muted-foreground">You are all caught up. Nothing needs your attention right now.</p>}
-     {needs.length > 0 && <div className="mt-4 grid gap-3">
-      {needs.map(item => <Link key={`${item.kind}-${item.id}`} to={item.href} className="block rounded-xl border bg-card p-4 transition-colors hover:bg-muted">
-       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-         <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.type.replaceAll("_", " ")}</p>
-         <p className="mt-1 font-semibold">{item.title}</p>
-         {item.detail && <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>}
-        </div>
-        <span className="rounded-full border px-3 py-1 text-xs">
-         {item.kind === "excuse" ? "Submit excuse" : item.kind === "action" ? "Open task" : "View"}
-        </span>
+ return <WorkspaceShell
+  eyebrow="CAN OS · Family"
+  title="Family home"
+  subtitle="Everything that needs your attention across your children, in one place."
+ >
+  <QueryState loading={loading ? "Loading your family…" : ""} error={error}>
+   <section aria-label="Needs you" className="mt-10">
+    <div className="flex items-baseline justify-between gap-3">
+     <h2 className="text-lg font-semibold">Needs you</h2>
+     {needs.length > 0 && <span className="rounded-full border px-3 py-1 text-xs">{needs.length} open</span>}
+    </div>
+    {needs.length === 0 && <EmptyState className="mt-4 bg-card" title="You are all caught up. Nothing needs your attention right now." />}
+    {needs.length > 0 && <div className="mt-4 grid gap-3">
+     {needs.map(item => <Link key={`${item.kind}-${item.id}`} to={item.href} className="block rounded-xl border bg-card p-4 transition-colors hover:bg-muted">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+       <div>
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.type.replaceAll("_", " ")}</p>
+        <p className="mt-1 font-semibold">{item.title}</p>
+        {item.detail && <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>}
        </div>
-      </Link>)}
-     </div>}
-    </section>
+       <span className="rounded-full border px-3 py-1 text-xs">
+        {item.kind === "excuse" ? "Submit excuse" : item.kind === "action" ? "Open task" : "View"}
+       </span>
+      </div>
+     </Link>)}
+    </div>}
+   </section>
 
-    <section aria-label="Your children" className="mt-12">
-     <h2 className="text-lg font-semibold">Your children</h2>
-     {children.length === 0 && <p className="mt-4 text-sm text-muted-foreground">No students are connected to your account yet.</p>}
-     {children.length > 0 && <div className="mt-4 grid gap-4 sm:grid-cols-2">
-      {children.map(child => <article key={child.studentProfileId} className="rounded-xl border bg-card p-5">
-       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-         <h3 className="text-lg font-semibold">{child.displayName} {child.lastName}</h3>
-         <p className="mt-1 text-xs text-muted-foreground">{child.sectionCount} active {child.sectionCount === 1 ? "class" : "classes"}</p>
-        </div>
-        <span className={`rounded-full border px-3 py-1 text-xs ${child.status === "on_track" ? "" : "border-amber-500 text-amber-600"}`}>
-         {child.status === "on_track" ? "On track" : "Needs attention"}
-        </span>
+   <section aria-label="Your children" className="mt-12">
+    <h2 className="text-lg font-semibold">Your children</h2>
+    {children.length === 0 && <p className="mt-4 text-sm text-muted-foreground">No students are connected to your account yet.</p>}
+    {children.length > 0 && <div className="mt-4 grid gap-4 sm:grid-cols-2">
+     {children.map(child => <article key={child.studentProfileId} className="rounded-xl border bg-card p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+       <div>
+        <h3 className="text-lg font-semibold">{child.displayName} {child.lastName}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">{child.sectionCount} active {child.sectionCount === 1 ? "class" : "classes"}</p>
        </div>
-       <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground">Missing</dt><dd className="text-lg font-semibold">{child.missingCount}</dd></div>
-        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground">Absences</dt><dd className="text-lg font-semibold">{child.unexcusedAbsences}</dd></div>
-        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground">Next due</dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Date(child.nextDueAt).toLocaleDateString() : "—"}</dd></div>
-       </dl>
-       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
-        <Link to="/guardian/academics" className="rounded-full border px-3 py-1 hover:bg-muted">Academics</Link>
-        <Link to="/guardian/attendance" className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</Link>
-        <Link to="/guardian/report-cards" className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</Link>
-       </nav>
-      </article>)}
-     </div>}
-    </section>
+       <span className={`rounded-full border px-3 py-1 text-xs ${child.status === "on_track" ? "" : "border-amber-500 text-amber-600"}`}>
+        {child.status === "on_track" ? "On track" : "Needs attention"}
+       </span>
+      </div>
+      <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground">Missing</dt><dd className="text-lg font-semibold">{child.missingCount}</dd></div>
+       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground">Absences</dt><dd className="text-lg font-semibold">{child.unexcusedAbsences}</dd></div>
+       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground">Next due</dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Date(child.nextDueAt).toLocaleDateString() : "—"}</dd></div>
+      </dl>
+      <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
+       <Link to="/guardian/academics" className="rounded-full border px-3 py-1 hover:bg-muted">Academics</Link>
+       <Link to="/guardian/attendance" className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</Link>
+       <Link to="/guardian/report-cards" className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</Link>
+      </nav>
+     </article>)}
+    </div>}
+   </section>
 
-    <section aria-label="Family shortcuts" className="mt-12">
-     <h2 className="text-lg font-semibold">Family</h2>
-     <div className="mt-4 flex flex-wrap gap-3 text-sm">
-      <Link to="/guardian/admission-offers" className="rounded-full border px-4 py-2 hover:bg-muted">Admission offers</Link>
-      <Link to="/messages" className="rounded-full border px-4 py-2 hover:bg-muted">Messages</Link>
-      <Link to="/student/notifications" className="rounded-full border px-4 py-2 hover:bg-muted">Notifications</Link>
-     </div>
-    </section>
-   </>}
-  </div>
- </main>;
+   <section aria-label="Family shortcuts" className="mt-12">
+    <h2 className="text-lg font-semibold">Family</h2>
+    <div className="mt-4 flex flex-wrap gap-3 text-sm">
+     <Link to="/guardian/admission-offers" className="rounded-full border px-4 py-2 hover:bg-muted">Admission offers</Link>
+     <Link to="/messages" className="rounded-full border px-4 py-2 hover:bg-muted">Messages</Link>
+     <Link to="/student/notifications" className="rounded-full border px-4 py-2 hover:bg-muted">Notifications</Link>
+    </div>
+   </section>
+  </QueryState>
+ </WorkspaceShell>;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 import {
   inviteStaffMember,
   listAccessAccounts,
@@ -7,10 +8,30 @@ import {
   listScopedSites,
   setGrantActive,
 } from "@/modules/identity/admin.functions";
+import { WorkspaceShell, QueryState } from "@/components/workspace";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, useZodForm } from "@/components/ui/form";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/admin")({ component: AdminConsolePage });
 
 const roles = ["student", "teacher", "guardian", "registrar", "specialist"] as const;
+
+const inviteSchema = z.object({
+  email: z.string().trim().email(),
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
+  role: z.enum(roles),
+  siteId: z.string(),
+});
+
+const inviteDefaults: z.input<typeof inviteSchema> = {
+  email: "",
+  firstName: "",
+  lastName: "",
+  role: "teacher",
+  siteId: "",
+};
 
 type Site = Awaited<ReturnType<typeof listScopedSites>>["sites"][number];
 type Account = Awaited<ReturnType<typeof listAccessAccounts>>["accounts"][number];
@@ -29,11 +50,8 @@ function AdminConsolePage() {
   const [busy, setBusy] = useState(false);
 
   const [query, setQuery] = useState("");
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [role, setRole] = useState<string>("teacher");
-  const [siteId, setSiteId] = useState("");
+
+  const form = useZodForm(inviteSchema, { defaultValues: inviteDefaults });
 
   useEffect(() => {
     let active = true;
@@ -69,29 +87,24 @@ function AdminConsolePage() {
     setPeople(peopleResult.people);
   }
 
-  async function submitInvite(event: React.FormEvent) {
-    event.preventDefault();
+  async function submitInvite(values: z.output<typeof inviteSchema>) {
     setBusy(true);
     setError("");
     setNotice("");
     try {
       const result = await inviteStaffMember({
         data: {
-          email,
-          firstName,
-          lastName,
-          role,
-          ...(siteId ? { siteId } : {}),
+          email: values.email,
+          firstName: values.firstName,
+          lastName: values.lastName,
+          role: values.role,
+          ...(values.siteId ? { siteId: values.siteId } : {}),
         },
       });
       setNotice(result.created
-        ? `Invitation recorded for ${email}. Trigger the access-link flow so they receive their sign-in challenge.`
-        : `${email} already has this grant; no changes were made.`);
-      setEmail("");
-      setFirstName("");
-      setLastName("");
-      setRole("teacher");
-      setSiteId("");
+        ? `Invitation recorded for ${values.email}. Trigger the access-link flow so they receive their sign-in challenge.`
+        : `${values.email} already has this grant; no changes were made.`);
+      form.reset(inviteDefaults);
       await refresh();
     } catch {
       setError("Unable to invite this staff member. Check the details and your permissions.");
@@ -110,52 +123,80 @@ function AdminConsolePage() {
     }
   }
 
-  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Admin</p>
-      <h1 className="mt-2 font-serif text-4xl">Admin console</h1>
-      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Invite staff, manage access accounts, and browse the people directory for your organizations.</p>
-      {loading && <p className="mt-8 text-sm" role="status">Loading admin console…</p>}
-      {authError && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{authError}</p>}
-      {!loading && !authError && <>
+  const fieldClass = "mt-2 w-full rounded-lg border bg-background p-3";
+
+  return (
+    <WorkspaceShell
+      eyebrow="CAN OS · Admin"
+      title="Admin console"
+      subtitle="Invite staff, manage access accounts, and browse the people directory for your organizations."
+    >
+      <QueryState loading={loading ? "Loading admin console…" : ""} error={authError}>
         {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
         {notice && <p className="mt-8 rounded-lg border bg-muted p-4 text-sm" role="status">{notice}</p>}
 
         <section className="mt-8 rounded-xl border bg-card p-5">
           <h2 className="text-lg font-semibold">Invite staff</h2>
           <p className="mt-1 text-sm text-muted-foreground">Create a person, access account, and grant in one step. This does not send email.</p>
-          <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={submitInvite}>
-            <label className="block text-sm font-semibold">
-              Email
-              <input className="mt-2 w-full rounded-lg border bg-background p-3" type="email" required value={email} onChange={event => setEmail(event.target.value)} />
-            </label>
-            <label className="block text-sm font-semibold">
-              Role
-              <select className="mt-2 w-full rounded-lg border bg-background p-3 capitalize" value={role} onChange={event => setRole(event.target.value)}>
-                {roles.map(option => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
-            <label className="block text-sm font-semibold">
-              First name
-              <input className="mt-2 w-full rounded-lg border bg-background p-3" required maxLength={80} value={firstName} onChange={event => setFirstName(event.target.value)} />
-            </label>
-            <label className="block text-sm font-semibold">
-              Last name
-              <input className="mt-2 w-full rounded-lg border bg-background p-3" required maxLength={80} value={lastName} onChange={event => setLastName(event.target.value)} />
-            </label>
-            <label className="block text-sm font-semibold sm:col-span-2">
-              Site (optional)
-              <select className="mt-2 w-full rounded-lg border bg-background p-3" value={siteId} onChange={event => setSiteId(event.target.value)}>
-                <option value="">Organization-wide</option>
-                {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
-              </select>
-            </label>
-            <div className="sm:col-span-2">
-              <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy}>
-                {busy ? "Inviting…" : "Invite staff member"}
-              </button>
-            </div>
-          </form>
+          <Form {...form}>
+            <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={form.handleSubmit(submitInvite)}>
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-semibold">Email</FormLabel>
+                  <FormControl>
+                    <Input className={fieldClass} type="email" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="role" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-semibold">Role</FormLabel>
+                  <FormControl>
+                    <select className={`${fieldClass} capitalize`} {...field}>
+                      {roles.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="firstName" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-semibold">First name</FormLabel>
+                  <FormControl>
+                    <Input className={fieldClass} maxLength={80} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="lastName" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-semibold">Last name</FormLabel>
+                  <FormControl>
+                    <Input className={fieldClass} maxLength={80} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="siteId" render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel className="text-sm font-semibold">Site (optional)</FormLabel>
+                  <FormControl>
+                    <select className={fieldClass} {...field}>
+                      <option value="">Organization-wide</option>
+                      {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div className="sm:col-span-2">
+                <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy}>
+                  {busy ? "Inviting…" : "Invite staff member"}
+                </button>
+              </div>
+            </form>
+          </Form>
         </section>
 
         <section className="mt-8 rounded-xl border bg-card p-5">
@@ -163,34 +204,34 @@ function AdminConsolePage() {
           <p className="mt-1 text-sm text-muted-foreground">Toggle individual grants to activate or deactivate access.</p>
           {accounts.length === 0 && <p className="mt-4 text-sm">No access accounts found in your organization scope.</p>}
           {accounts.length > 0 && <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="py-2 pr-4">Email</th>
-                  <th className="py-2 pr-4">Person</th>
-                  <th className="py-2 pr-4">Role</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow className="text-xs uppercase tracking-wide">
+                  <TableHead className="pr-4">Email</TableHead>
+                  <TableHead className="pr-4">Person</TableHead>
+                  <TableHead className="pr-4">Role</TableHead>
+                  <TableHead className="pr-4">Status</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {accounts.flatMap(account => account.grants.map(grant =>
-                  <tr key={grant.grantId} className="border-b last:border-0">
-                    <td className="py-2 pr-4">{account.email}{account.disabled ? " (disabled)" : ""}</td>
-                    <td className="py-2 pr-4">{grant.personName}</td>
-                    <td className="py-2 pr-4 capitalize">{grant.role}</td>
-                    <td className="py-2 pr-4">
+                  <TableRow key={grant.grantId}>
+                    <TableCell className="pr-4">{account.email}{account.disabled ? " (disabled)" : ""}</TableCell>
+                    <TableCell className="pr-4">{grant.personName}</TableCell>
+                    <TableCell className="pr-4 capitalize">{grant.role}</TableCell>
+                    <TableCell className="pr-4">
                       <span className="rounded-full border px-3 py-1 text-xs">{grant.active ? "Active" : "Inactive"}</span>
-                    </td>
-                    <td className="py-2">
+                    </TableCell>
+                    <TableCell>
                       <button className="rounded-lg border px-3 py-1 text-xs font-semibold" type="button" onClick={() => toggleGrant(grant.grantId, grant.active)}>
                         {grant.active ? "Deactivate" : "Activate"}
                       </button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>,
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>}
         </section>
 
@@ -209,13 +250,13 @@ function AdminConsolePage() {
               </div>
               {person.grants.length > 0 && <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                 {person.grants.map(grant =>
-                  <li key={grant.grantId} className="capitalize">{grant.role} · {grant.accountEmail} · {grant.active ? "active" : "inactive"}</li>
+                  <li key={grant.grantId} className="capitalize">{grant.role} · {grant.accountEmail} · {grant.active ? "active" : "inactive"}</li>,
                 )}
               </ul>}
             </article>)}
           </div>}
         </section>
-      </>}
-    </div>
-  </main>;
+      </QueryState>
+    </WorkspaceShell>
+  );
 }
