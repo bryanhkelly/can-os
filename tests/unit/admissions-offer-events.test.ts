@@ -96,7 +96,7 @@ describe("transactional admissions events", () => {
   });
 
   it("rejects non-synthetic enrollment activation before inserting a student", async () => {
-    selectRows([offer], [pool], [year], [program], [{ ...offer, status: "accepted" }],
+    selectRows([offer], [pool], [year], [program], [{ ...offer, status: "accepted", respondedAt: new Date("2026-10-01T00:00:00Z") }],
       [{ ...application, metadata: { synthetic: false }, stage: "accepted" }]);
     await expect(activateSyntheticOfferedEnrollment(context, "offer")).rejects.toThrow("Synthetic application not accepted");
     expect(values).not.toHaveBeenCalled();
@@ -152,8 +152,14 @@ describe("transactional admissions events", () => {
     }
   });
 
+  it("does not activate an accepted offer missing a guardian response timestamp", async () => {
+    selectRows([offer], [pool], [year], [program], [{ ...offer, status: "accepted", respondedAt: null }]);
+    await expect(activateSyntheticOfferedEnrollment(context, "offer")).rejects.toThrow("Accepted offer must record a guardian response");
+    expect(values).not.toHaveBeenCalled();
+  });
+
   it("emits activation and audits the Journey transition", async () => {
-    selectRows([offer], [pool], [year], [program], [{ ...offer, status: "accepted" }],
+    selectRows([offer], [pool], [year], [program], [{ ...offer, status: "accepted", respondedAt: new Date("2026-10-01T00:00:00Z") }],
       [{ ...application, stage: "accepted" }], [], [journey], [], [], []);
     await expect(activateSyntheticOfferedEnrollment(context, "offer")).resolves.toBe("created");
     expect(values).toHaveBeenCalledWith(expect.objectContaining({
@@ -166,7 +172,7 @@ describe("transactional admissions events", () => {
   });
 
   it("keeps activation retries idempotent after the Journey becomes active", async () => {
-    selectRows([offer], [pool], [year], [program], [{ ...offer, status: "accepted" }],
+    selectRows([offer], [pool], [year], [program], [{ ...offer, status: "accepted", respondedAt: new Date("2026-10-01T00:00:00Z") }],
       [{ ...application, stage: "accepted" }], [{ id: "existing" }]);
     await expect(activateSyntheticOfferedEnrollment(context, "offer")).resolves.toBe("existing");
     expect(values).not.toHaveBeenCalled();
