@@ -25,6 +25,12 @@ const destination:Record<Category,Area>={academic:"academic",attendance:"academi
 function isReferral(x:Record<string,unknown>) {return x.synthetic===true && x.fixture==="gf41" && typeof x.stage==="string";}
 function safeNote(input:string,max=1500){const s=input.trim();if(s.length<3||s.length>max)throw new Error(`Notes must be 3–${max} characters`);return s;}
 const stagePriority=(x:Stage)=>stages.indexOf(x);
+async function authorizedReferralActor(role:"teacher"|"specialist"){
+ const context=await getCommandContext(getRequest());
+ if(context.role!==role || !context.actorPersonId)throw new AuthorizationError("referrals:"+role);
+ assertSiteScope(context,SITE);
+ return context;
+}
 
 export const getSupportReferrals=createServerFn({method:"GET"}).handler(async()=>{
  const context=await getCommandContext(getRequest());
@@ -65,6 +71,7 @@ export const createSupportReferral=createServerFn({method:"POST"})
  .validator((v:{category:Category;priority:"normal"|"high";observations:string;includeEvidence:boolean})=>v)
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
+  const context=await authorizedReferralActor("teacher");
   if(!categories.includes(data.category))throw new Error("Invalid referral category");
   const observations=safeNote(data.observations);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -74,8 +81,8 @@ export const createSupportReferral=createServerFn({method:"POST"})
    ownerPersonId:null,organizationId:ORG,siteId:SITE,programId:PROGRAM,
    subjectType:"student_profile",subjectId:STUDENT,
    metadata:{synthetic:true,fixture:"gf41",category:data.category,stage:"submitted",
-    source:"teacher",reporterPersonId:TEACHER,requestedArea:destination[data.category],
-    includeEvidence:data.includeEvidence,notes:observations,academicRecommendation:"",history:[{stage:"submitted",actor:TEACHER,at:new Date().toISOString()}]},
+    source:"teacher",reporterPersonId:context.actorPersonId,requestedArea:destination[data.category],
+    includeEvidence:data.includeEvidence,notes:observations,academicRecommendation:"",history:[{stage:"submitted",actor:context.actorPersonId,at:new Date().toISOString()}]},
   }).returning({id:s.actions.id});
   if(!created)throw new Error("Referral not created");
   return {referralId:created.id};
@@ -85,6 +92,7 @@ export const advanceSupportReferral=createServerFn({method:"POST"})
  .validator((v:{referralId:string;nextStage:Stage;note:string;area?:Area;nextReview?:string})=>v)
  .handler(async({data})=>{
   assertSyntheticMutation("specialist");
+  const context=await authorizedReferralActor("specialist");
   if(!stages.includes(data.nextStage))throw new Error("Invalid referral stage");
   const note=safeNote(data.note);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -103,7 +111,7 @@ export const advanceSupportReferral=createServerFn({method:"POST"})
     notes:data.nextStage==="accepted"?record.metadata.notes:record.metadata.notes,
     academicRecommendation:data.nextStage==="review"?note:record.metadata.academicRecommendation,
     nextReview:data.nextReview??record.metadata.nextReview,
-    history:[...historical,{stage:data.nextStage,at:new Date().toISOString(),note,actor:owner}]};
+    history:[...historical,{stage:data.nextStage,at:new Date().toISOString(),note,actor:context.actorPersonId}]};
    await tx.update(s.actions).set({status:data.nextStage==="closed"?"resolved":"in_progress",
     ownerPersonId:owner,metadata,resolvedAt:data.nextStage==="closed"?new Date():null,
     resolutionNote:data.nextStage==="closed"?note:null,updatedAt:new Date()}).where(eq(s.actions.id,record.id));
@@ -125,6 +133,7 @@ export const saveSyntheticSupportPlan=createServerFn({method:"POST"})
  .validator((v:{referralId:string;goal:string;intervention:string;targetDate:string})=>v)
  .handler(async({data})=>{
   assertSyntheticMutation("specialist");
+  const context=await authorizedReferralActor("specialist");
   const goal=safeNote(data.goal,500),intervention=safeNote(data.intervention,1000);
   const date=new Date(data.targetDate);if(Number.isNaN(date.getTime()))throw new Error("Invalid review date");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -142,6 +151,7 @@ export const scheduleSyntheticSupportService=createServerFn({method:"POST"})
  .validator((v:{referralId:string;kind:"tutoring"|"coaching"|"planning"|"learning_support";scheduledAt:string})=>v)
  .handler(async({data})=>{
   assertSyntheticMutation("specialist");
+  const context=await authorizedReferralActor("specialist");
   const when=new Date(data.scheduledAt);if(Number.isNaN(when.getTime()))throw new Error("Invalid appointment date");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
@@ -158,6 +168,7 @@ export const completeSyntheticSupportService=createServerFn({method:"POST"})
  .validator((v:{referralId:string;serviceId:string;outcome:string})=>v)
  .handler(async({data})=>{
   assertSyntheticMutation("specialist");
+  const context=await authorizedReferralActor("specialist");
   const outcome=safeNote(data.outcome,600);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
