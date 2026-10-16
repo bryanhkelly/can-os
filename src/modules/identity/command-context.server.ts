@@ -2,7 +2,7 @@ import {and,eq,gt,isNull,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {accessAccounts,accessSessions,accountPersonGrants,programs} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
-import {resolveAccessContext,type AccessContext} from "@/domain/access-context";
+import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret} from "@/domain/access-tokens";
 
 /**
@@ -41,7 +41,7 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  context.scope.programIds=[];
  if(organizations.length){
   const permitted=await db.select({id:programs.id,siteId:programs.siteId}).from(programs).where(inArray(programs.organizationId,organizations));
-  context.scope.programIds=permitted.filter(p=>sites.length===0||sites.includes(p.siteId??"")).map(p=>p.id);
+  context.scope.programIds=authorizedProgramIds(permitted,organizations,sites);
  }
  return context;
 }
