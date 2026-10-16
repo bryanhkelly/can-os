@@ -41,6 +41,11 @@ function GuardianAcademicsPage() {
   return () => { active = false; };
  }, [selected]);
 
+ const now = Date.now();
+ const outstanding = assignments.filter(item => item.status === "assigned").length;
+ const overdue = assignments.filter(item => item.status === "assigned" && !!item.dueAt && new Date(item.dueAt).getTime() < now).length;
+ const released = assignments.filter(item => item.score !== null).length;
+
  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
   <div className="mx-auto max-w-5xl">
    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Guardian</p>
@@ -56,6 +61,11 @@ function GuardianAcademicsPage() {
    {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
    {!loading && !loadingStudents && !error && students.length === 0 && <p className="mt-8 text-sm">No students with academic-viewing permission were found at your school.</p>}
    {!loading && !loadingStudents && !error && students.length > 0 && assignments.length === 0 && <p className="mt-8 text-sm">No published assignments found.</p>}
+   {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid grid-cols-3 gap-3" aria-label="Assignment summary">
+    <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Not submitted</p><p className="mt-1 text-2xl font-semibold">{outstanding}</p></div>
+    <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Overdue</p><p className="mt-1 text-2xl font-semibold">{overdue}</p></div>
+    <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Grades released</p><p className="mt-1 text-2xl font-semibold">{released}</p></div>
+   </div>}
    {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid gap-4">
     {assignments.map(item => <section key={item.assessmentId} className="rounded-xl border bg-card p-5">
      <div className="flex flex-wrap items-start justify-between gap-3">
