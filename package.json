@@ -12,7 +12,8 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest run --exclude 'tests/integration/**'",
     "test:integration": "node scripts/run-integration-tests.mjs",
-    "typecheck": "vite build && tsc --noEmit"
+    "typecheck": "vite build && tsc --noEmit",
+    "test:integration:gf26": "node scripts/run-integration-tests.mjs gf26"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
