@@ -198,7 +198,7 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
    const [assessment]=await tx.insert(s.assessments).values({
     sectionId:section.id,title:data.title.trim(),instructions:data.instructions.trim(),
     status:"published",pointsPossible:String(data.pointsPossible),dueAt,availableAt:new Date(),
-    createdByPersonId:context.actorPersonId,metadata:{synthetic:true,fixture:"gf1-v2",rubric:data.rubric.trim()},
+    createdByPersonId:context.actorPersonId!,metadata:{synthetic:true,fixture:"gf1-v2",rubric:data.rubric.trim()},
    }).returning({id:s.assessments.id});
    if(!assessment)throw new Error("Assessment could not be created");
    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.create",resourceType:"assessment",resourceId:assessment.id,after:{status:"published"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
