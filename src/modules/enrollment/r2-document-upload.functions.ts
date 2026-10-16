@@ -6,7 +6,6 @@ import {db} from "@/db/client";
 import {applications,journeys,journeyRequirements,documents,auditEvents,programs,guardianRelationships,studentProfiles} from "@/db/schema";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {newDocumentKey,signR2Object,validateDocumentUpload,r2Config} from "./r2-documents.server";
-const REGISTRAR="f1000000-0000-4000-8000-000000000006";
 async function uploadsEnabled(applicationId:string){
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId)throw new Error("Authenticated person required");
@@ -22,6 +21,7 @@ async function uploadsEnabled(applicationId:string){
   if(!relationship)throw new Error("Guardian cannot manage enrollment");
  }else throw new Error("Enrollment documents require registrar or guardian access");
  assertSyntheticMutation(context.role);
+ return context.actorPersonId;
  if(process.env.CAN_R2_DEMO_UPLOADS_ENABLED!=="true")throw new Error("R2 demo uploads are disabled");
 }
 async function requirementScope(applicationId:string,requirementId:string){
@@ -43,7 +43,7 @@ export const beginSyntheticR2DocumentUpload=createServerFn({method:"POST"})
 export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
  .validator((data:{applicationId:string;requirementId:string;key:string;fileName:string;mimeType:string;size:number})=>data)
  .handler(async({data})=>{
-  await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
+  const actorId=await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
   if(!data.key.startsWith("enrollment/"+data.applicationId+"/"+data.requirementId+"/"))throw new Error("Document belongs to another application");
   await requirementScope(data.applicationId,data.requirementId);
   r2Config();
@@ -72,16 +72,16 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
     if(old.metadata.isCurrent===false)continue;
     await tx.update(documents).set({metadata:{...old.metadata,isCurrent:false,supersededAt:new Date().toISOString()},updatedAt:new Date()}).where(eq(documents.id,old.id));
    }
-   const [document]=await tx.insert(documents).values({subjectType:"journey_requirement",subjectId:data.requirementId,category:"enrollment",fileName:data.fileName,storageProvider:"cloudflare_r2",storageKey:data.key,mimeType:data.mimeType,sensitivityTier:"restricted",uploadedByPersonId:REGISTRAR,metadata:{synthetic:true,applicationId:data.applicationId,size:data.size,reviewStatus:"received",version,isCurrent:true}}).returning({id:documents.id});
+   const [document]=await tx.insert(documents).values({subjectType:"journey_requirement",subjectId:data.requirementId,category:"enrollment",fileName:data.fileName,storageProvider:"cloudflare_r2",storageKey:data.key,mimeType:data.mimeType,sensitivityTier:"restricted",uploadedByPersonId:actorId,metadata:{synthetic:true,applicationId:data.applicationId,size:data.size,reviewStatus:"received",version,isCurrent:true}}).returning({id:documents.id});
    if(!document)throw new Error("Could not record document");
    const now=new Date();
    await tx.update(journeyRequirements).set({status:"needs_you",completedAt:null,updatedAt:now,
     evidence:[...requirement.evidence,{kind:"document_review",status:"received",documentId:document.id,
      text:"New file uploaded; review required.",reviewedAt:now.toISOString(),synthetic:true}]}).where(eq(journeyRequirements.id,requirement.id));
    await tx.update(journeys).set({status:"in_progress",completedAt:null,updatedAt:now}).where(eq(journeys.id,journey.id));
-   await tx.insert(auditEvents).values({actorPersonId:REGISTRAR,action:"synthetic.enrollment.document.resubmitted",resourceType:"journey_requirement",resourceId:requirement.id,
+   await tx.insert(auditEvents).values({actorPersonId:actorId,action:"synthetic.enrollment.document.resubmitted",resourceType:"journey_requirement",resourceId:requirement.id,
     before:{status:requirement.status},after:{status:"needs_you",documentId:document.id,version},context:{synthetic:true,applicationId:data.applicationId}});
-   await tx.insert(auditEvents).values({actorPersonId:REGISTRAR,action:"synthetic.enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{synthetic:true}});
+   await tx.insert(auditEvents).values({actorPersonId:actorId,action:"synthetic.enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{synthetic:true}});
    return {documentId:document.id,created:true};
   });
  });
