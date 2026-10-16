@@ -21,7 +21,8 @@ function VerifyAccess(){
  const [status,setStatus]=useState("Use the button to complete your sign-in.");
  const [working,setWorking]=useState(false);
  const [token,setToken]=useState<string|null>(null);
- useEffect(()=>{const fragment=new URLSearchParams(window.location.hash.slice(1)).get("token");const legacy=new URLSearchParams(window.location.search).get("token");const value=fragment??legacy;setToken(value);if(value)window.history.replaceState(null,"","/access/verify");},[]);
+ const [ready,setReady]=useState(false);
+ useEffect(()=>{const fragment=new URLSearchParams(window.location.hash.slice(1)).get("token");const legacy=new URLSearchParams(window.location.search).get("token");const value=fragment??legacy;setToken(value);if(value)window.history.replaceState(null,"","/access/verify");setReady(true);},[]);
  async function verify(){
   setWorking(true);
   try{
@@ -37,6 +38,6 @@ function VerifyAccess(){
  return <main className="mx-auto max-w-lg space-y-5 px-6 py-16">
   <h1 className="font-serif text-3xl">Confirm your CAN OS access</h1>
   <p role="status">{status}</p>
-  <button disabled={working} onClick={verify} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">Sign in securely</button>
+  <button disabled={working||!ready||!token} onClick={verify} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">Sign in securely</button>
  </main>;
 }
