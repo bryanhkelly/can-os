@@ -53,7 +53,7 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
  });
 });
 export const leaveStudyGroup=createServerFn({method:"POST"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
- assertSyntheticMutation("student");const {db,s}=await context();
+ assertSyntheticMutation("student");const actor=await groupActor("student");const {db,s}=await context();
  await db.update(s.studyGroupMemberships).set({status:"left",updatedAt:new Date()}).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!)));return {ok:true};
 });
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
@@ -127,14 +127,14 @@ export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(as
  .where(eq(s.studyGroupMemberships.status,"pending")).limit(100);
 });
 export const listStudyGroupReports=createServerFn({method:"GET"}).handler(async()=>{
- assertSyntheticMutation("teacher");
+ assertSyntheticMutation("teacher");const actor=await groupActor("teacher");
  const {db,s}=await context();
  return db.select({id:s.studyGroupReports.id,groupId:s.studyGroupReports.groupId,reason:s.studyGroupReports.reason,status:s.studyGroupReports.status,postId:s.studyGroupReports.postId})
  .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),eq(s.studyGroups.siteId,SITE)))
  .where(eq(s.studyGroupReports.status,"open")).limit(100);
 });
 export const resolveStudyGroupReport=createServerFn({method:"POST"}).validator((x:{reportId:string;hidePost:boolean})=>x).handler(async({data})=>{
- assertSyntheticMutation("teacher");const {db,s}=await context();
+ assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
  return db.transaction(async tx=>{
  const [report]=await tx.select({id:s.studyGroupReports.id,postId:s.studyGroupReports.postId,groupId:s.studyGroupReports.groupId})
  .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupReports.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),eq(s.studyGroups.siteId,SITE)))
