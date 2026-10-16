@@ -77,6 +77,28 @@ describe("family application retry authorization", () => {
   });
 });
 
+describe("family application authorized retry", () => {
+  const existing = {
+    applicationId:"existing-application", householdId:"household",
+    studentProfileId:"student", submittedByPersonId:"actor", programId:"program",
+  };
+  const args = {programId:"program",idempotencyKey:"existing-key",
+    student:{legalFirstName:"Synthetic",legalLastName:"Student"}};
+  it("returns the original application without creating duplicate records when membership is still valid", async () => {
+    selectRows([existing], [{id:"membership"}], [{id:"existing-journey"}]);
+    await expect(startFamilyApplication(context,args)).resolves.toEqual({
+      applicationId:"existing-application",householdId:"household",
+      studentProfileId:"student",journeyId:"existing-journey",
+    });
+    expect(values).not.toHaveBeenCalled();
+  });
+  it("rejects a replay after program access is revoked before querying the database", async () => {
+    await expect(startFamilyApplication({...context,scope:{programIds:[]}},args))
+      .rejects.toThrow("program scope");
+    expect(transaction).not.toHaveBeenCalled();
+  });
+});
+
 describe("transactional admissions events", () => {
   it("expires an elapsed synthetic offer and records audit under the seat pool lock", async () => {
     selectRows([pool], [year], [program], [{id:"expired-offer",applicationId:"application",expiresAt:new Date("2020-01-01T00:00:00Z"),metadata:{synthetic:true}}]);
