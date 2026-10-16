@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {resolveAccessContext} from "@/domain/access-context";
+import {resolveAccessContext,authorizedProgramIds} from "@/domain/access-context";
 import {assertCapability,assertProgramScope,AuthorizationError} from "@/domain/command-context";
 const principal={accountId:"account",sessionId:"session",activeGrantId:"guardian-grant"};
 const grants=[
@@ -30,5 +30,17 @@ describe("cross-persona admissions authorization",()=>{
   guardian.scope.programIds=["program-one"];
   expect(()=>assertProgramScope(guardian,"program-one")).not.toThrow();
   expect(()=>assertProgramScope(guardian,"other-program")).toThrow(AuthorizationError);
+ });
+ it("limits site grants to their site and excludes organization-wide unsited programs",()=>{
+  const programs=[{id:"campus-a",siteId:"site-a"},{id:"campus-b",siteId:"site-b"},{id:"network",siteId:null}];
+  expect(authorizedProgramIds(programs,["org"],["site-a"])).toEqual(["campus-a"]);
+  expect(authorizedProgramIds(programs,["org"],["site-b"])).toEqual(["campus-b"]);
+ });
+ it("allows organization-wide grants but denies a missing organization",()=>{
+  const programs=[{id:"campus-a",siteId:"site-a"},{id:"network",siteId:null}];
+  expect(authorizedProgramIds(programs,["org"],[])).toEqual(["campus-a","network"]);
+  expect(authorizedProgramIds(programs,[],[])).toEqual([]);
+  expect(authorizedProgramIds(programs,[],["site-a"])).toEqual([]);
+  expect(authorizedProgramIds(programs,["org"],["unknown-site"])).toEqual([]);
  });
 });
