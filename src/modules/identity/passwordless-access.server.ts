@@ -91,10 +91,10 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
 /** Selection is restricted to a grant assigned to the authenticated account. */
 export async function selectAccessGrant(sessionId:string,accountId:string,grantId:string):Promise<void> {
  await db.transaction(async tx=>{
-  const [grant]=await tx.select({id:accountPersonGrants.id,personId:accountPersonGrants.personId})
+  const [grant]=await tx.select({id:accountPersonGrants.id,personId:accountPersonGrants.personId,role:accountPersonGrants.role})
    .from(accountPersonGrants)
    .where(and(eq(accountPersonGrants.id,grantId),eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true))).limit(1);
-  if(!grant)throw new Error("Membership unavailable");
+  if(!grant || !Object.hasOwn(roleCapabilities,grant.role))throw new Error("Membership unavailable");
   const [changed]=await tx.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
     isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date())))
