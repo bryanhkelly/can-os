@@ -1,6 +1,6 @@
 import {and,eq,gt,isNull,lt} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessChallenges,accessSessions,accountPersonGrants} from "@/db/schema";
+import {accessAccounts,accessChallenges,accessSessions,accountPersonGrants,auditEvents} from "@/db/schema";
 import {issueOpaqueSecret,hashAccessSecret,normalizeAccessEmail,sessionCookieHeader,clearSessionCookieHeader} from "@/domain/access-tokens";
 import {sendAccessLinkViaResend,type AccessEmailSender} from "./resend-access-mail.server";
 
@@ -22,7 +22,7 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
  const email=normalizeAccessEmail(rawEmail);
  const [account]=await db.select({id:accessAccounts.id}).from(accessAccounts)
   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false))).limit(1);
- if(!account)return genericResult;
+ if(!account || email.endsWith(".invalid"))return genericResult;
  const now=new Date();
  const recent=await db.select({id:accessChallenges.id}).from(accessChallenges)
   .where(and(eq(accessChallenges.accountId,account.id),gt(accessChallenges.createdAt,new Date(now.getTime()-60_000)))).limit(1);
@@ -61,12 +61,21 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    activeGrantId:grants[0]!.id,expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
   });
   await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
+  const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,grants[0]!.id)).limit(1);
+  if(!member)throw new Error("Membership unavailable");
+  await tx.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.session.started",resourceType:"account",resourceId:account.id,context:{synthetic:true,method:"email_link"}});
   return {accountId:account.id,role:grants[0]!.role,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
 export async function revokeAccessSession(sessionId:string,accountId:string):Promise<string> {
- await db.update(accessSessions).set({revokedAt:new Date(),updatedAt:new Date()})
-  .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId)));
+ await db.transaction(async tx=>{
+  const [row]=await tx.update(accessSessions).set({revokedAt:new Date(),updatedAt:new Date()})
+   .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),isNull(accessSessions.revokedAt))).returning({activeGrantId:accessSessions.activeGrantId});
+  if(row?.activeGrantId){
+   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,row.activeGrantId)).limit(1);
+   if(member)await tx.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.session.revoked",resourceType:"account",resourceId:accountId,context:{synthetic:true,sessionId}});
+  }
+ });
  return clearSessionCookieHeader();
 }
 /** Selection is restricted to a grant assigned to the authenticated account. */
@@ -78,4 +87,6 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
   .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
    isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date()))).returning({id:accessSessions.id});
  if(!changed.length)throw new Error("Session expired");
+ const [member]=await db.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,grant.id)).limit(1);
+ if(member)await db.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.membership.selected",resourceType:"account",resourceId:accountId,context:{synthetic:true,sessionId,grantId}});
 }
