@@ -49,6 +49,8 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
  if((count?.total??0)>=group.maxMembers)throw new Error("Study group is full");
  }
  await tx.update(s.studyGroupMemberships).set({status:data.approve?"approved":"declined",reviewedByPersonId:actor.actorPersonId!,joinedAt:data.approve?new Date():null,updatedAt:new Date()}).where(eq(s.studyGroupMemberships.id,member.id));
+ await tx.insert(s.notifications).values({recipientPersonId:data.personId,type:"study_group_membership_decision",status:"unread",title:data.approve?"Study group membership approved":"Study group membership declined",body:data.approve?"You can now participate in "+group.title+".":"Your request to join "+group.title+" was declined.",resourceType:"study_group",resourceId:group.id});
+ await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:data.approve?"study_group.membership.approve":"study_group.membership.decline",resourceType:"study_group",resourceId:group.id,after:{personId:data.personId,status:data.approve?"approved":"declined"},context:{synthetic:true}});
  return {ok:true};
  });
 });
