@@ -49,3 +49,15 @@ jobs:
         run: npm run db:migrate
       - name: Run isolated admissions acceptance
         run: npm run test:integration:admissions
+      - name: Publish release acceptance result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Admissions Neon acceptance"
+            echo ""
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "- Disposable database preflight, schema migration and integration test status are recorded in the job steps above."
+            echo "- A completed workflow is **not** release approval; inspect every step for failures or skips."
+          } >> "$GITHUB_STEP_SUMMARY"
