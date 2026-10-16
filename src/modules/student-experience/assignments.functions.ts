@@ -101,7 +101,10 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .where(and(eq(s.assessments.id,data.assessmentId),eq(s.assessments.status,"published"),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
    if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Synthetic assessment not found");
-   // Serialize this student/assessment across draft and final submission requests,\n   // including when no submission row exists to lock yet.\n   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);\n   const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(
+   // Serialize this student/assessment across draft and final submission requests, 
+   // including when no submission row exists to lock yet.
+   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);
+   const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(
     eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
    if(!enrollment)throw new Error("Student is not enrolled");
    const priorRows=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
@@ -264,7 +267,10 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
     .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
     .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.assessments.status,"published"))).limit(1);
    if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Synthetic assignment not available");
-   // Serialize this student/assessment across draft and final submission requests,\n   // including when no submission row exists to lock yet.\n   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);\n   const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
+   // Serialize this student/assessment across draft and final submission requests, 
+   // including when no submission row exists to lock yet.
+   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);
+   const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
     .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
    if(!enrollment)throw new Error("Student not enrolled");
    const [latest]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
