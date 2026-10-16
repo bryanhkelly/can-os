@@ -154,6 +154,7 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
   const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,studentProfileId:s.submissions.studentProfileId,metadata:s.assessments.metadata})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+   .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
    .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.submissions.status,"submitted"))).limit(1);
   if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic submitted work not found");
   const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
@@ -182,6 +183,7 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
   const [record]=await tx.select({metadata:s.assessments.metadata})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+   .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
    .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
   if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic graded submission not found");
   const [updated]=await tx.update(s.submissions).set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
@@ -327,6 +329,7 @@ export const gradeSyntheticRubric=createServerFn({method:"POST"})
    const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,metadata:s.assessments.metadata,studentProfileId:s.submissions.studentProfileId})
     .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
     .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+   .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
     .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.submissions.status,"submitted"))).limit(1);
    if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic submitted assignment not found");
    const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
