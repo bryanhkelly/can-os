@@ -288,10 +288,19 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
   if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Only synthetic assignments can be managed");
   const due=data.action==="reschedule"?new Date(data.dueAt??""):undefined;
   if(due&&Number.isNaN(due.getTime()))throw new Error("Invalid due date");
-  await db.update(s.assessments).set({
-   ...(data.action==="close"?{status:"closed" as const}:data.action==="reopen"?{status:"published" as const}:{}),
-   ...(due?{dueAt:due}:{}),updatedAt:new Date(),
-  }).where(eq(s.assessments.id,assessment.id));
+  await db.transaction(async tx=>{
+   const [updated]=await tx.update(s.assessments).set({
+    ...(data.action==="close"?{status:"closed" as const}:data.action==="reopen"?{status:"published" as const}:{}),
+    ...(due?{dueAt:due}:{}),updatedAt:new Date(),
+   }).where(eq(s.assessments.id,assessment.id)).returning({id:s.assessments.id});
+   if(!updated)throw new Error("Assessment unavailable");
+   await tx.insert(s.auditEvents).values({
+    actorPersonId:context.actorPersonId,action:"assignment."+data.action,
+    resourceType:"assessment",resourceId:updated.id,
+    after:{action:data.action,dueAt:due?.toISOString()??null},
+    context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true},
+   });
+  });
   return {saved:true};
  });
 
