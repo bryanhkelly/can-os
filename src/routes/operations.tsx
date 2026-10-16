@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
-import {getOperationsPreview,updateSyntheticOperationsAction} from "@/modules/operations/operations.functions";
+import {getOperationsPreview,updateSyntheticOperationsAction,triageSyntheticOperationsAction} from "@/modules/operations/operations.functions";
 export const Route=createFileRoute("/operations")({loader:async()=>({operations:await getOperationsPreview(),health:await getReleaseHealth()}),component:OperationsPage});
 function OperationsPage(){
  const {operations:data,health}=Route.useLoaderData();
@@ -15,6 +15,12 @@ function OperationsPage(){
   finally{setBusy(null);}
  }
 
+ async function triageAction(id:string,owner:"teacher"|"unassigned",priority:"normal"|"high"|"urgent"){
+  setBusy(id);setError("");
+  try{await triageSyntheticOperationsAction({data:{id,owner,priority}});await router.invalidate();}
+  catch(e){setError(e instanceof Error?e.message:"Unable to triage action");}
+  finally{setBusy(null);}
+ }
  return <main className="mx-auto max-w-6xl px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Synthetic operations preview</p>
   <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
@@ -26,7 +32,7 @@ function OperationsPage(){
   </div>
   <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]"><section><h2 className="font-serif text-3xl">Action queue</h2><div className="mt-4 space-y-3">
   {data.items.map(i=><article className="rounded-xl border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">{i.title}</h3><span className="text-xs uppercase text-muted-foreground">{i.priority}</span></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p><div className="mt-3 flex flex-wrap gap-3">{i.href!=="/operations"&&<Link to={i.href} className="inline-block text-xs font-bold underline">Open related workflow →</Link>}{i.href==="/operations"&&<>
- <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"in_progress")}>Start</button>
+ <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"in_progress")}>Start</button><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>triageAction(i.id,"teacher","high")}>Assign teacher + elevate</button><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>triageAction(i.id,"unassigned","normal")}>Return to unassigned</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>
  </>}</div></article>)}
