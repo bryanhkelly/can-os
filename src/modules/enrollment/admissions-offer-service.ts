@@ -5,6 +5,7 @@ import {assertCapability,assertProgramScope,type CommandContext} from "@/domain/
 import {EventTypes} from "@/domain/event-types";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {transitionAdmissionsOffer,type OfferStatus} from "@/domain/admissions-offer-lifecycle";
+import {calculateSeatOccupancy} from "@/domain/admissions-seat-occupancy";
 
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
 const guarded=(role:"registrar"|"guardian")=>assertSyntheticMutation(role);
@@ -19,10 +20,9 @@ async function lockPool(tx:Transaction,programId:string,schoolYearId:string){
 }
 async function occupancy(tx:Transaction,programId:string,schoolYearId:string,now:Date){
  const enrolled=await tx.select({studentId:enrollments.studentProfileId}).from(enrollments).where(and(eq(enrollments.programId,programId),eq(enrollments.schoolYearId,schoolYearId),eq(enrollments.kind,"program"),eq(enrollments.status,"active")));
- const activeIds=new Set(enrolled.map(x=>x.studentId));
+
  const offers=await tx.select({status:admissionOffers.status,expiresAt:admissionOffers.expiresAt,studentId:applications.studentProfileId}).from(admissionOffers).innerJoin(applications,eq(applications.id,admissionOffers.applicationId)).where(and(eq(admissionOffers.programId,programId),eq(admissionOffers.schoolYearId,schoolYearId),inArray(admissionOffers.status,["issued","accepted"])));
- const held=new Set(offers.filter(o=>!activeIds.has(o.studentId)&&(o.status==="accepted"||(o.expiresAt===null||o.expiresAt.getTime()>now.getTime()))).map(o=>o.studentId)).size;
- return activeIds.size+held;
+ return calculateSeatOccupancy(enrolled,offers,now);
 }
 async function assertGuardian(tx:Transaction,actorId:string|null,studentProfileId:string){
  if(!actorId)throw new Error("Guardian identity required");
