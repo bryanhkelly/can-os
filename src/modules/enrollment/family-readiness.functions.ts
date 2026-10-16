@@ -15,7 +15,7 @@ export const getSyntheticFamilyReadiness=createServerFn({method:"GET"}).handler(
  const requirementIds=requirements.map(r=>r.id);
  const uploadedDocuments=requirementIds.length?await db.select({id:s.documents.id,subjectId:s.documents.subjectId,fileName:s.documents.fileName,createdAt:s.documents.createdAt,metadata:s.documents.metadata})
   .from(s.documents).where(and(eq(s.documents.subjectType,"journey_requirement"),eq(s.documents.storageProvider,"cloudflare_r2"),inArray(s.documents.subjectId,requirementIds))):[];
- return synthetic.map(app=>{const journeyIds=new Set(journeys.filter(j=>j.participantId===app.id).map(j=>j.id));return {id:app.id,householdId:app.householdId,program:app.program,stage:app.stage,journeyStatus:journeys.find(j=>j.participantId===app.id)?.status??null,activeSchoolYears:enrollmentRows.filter(e=>e.studentProfileId===app.studentProfileId&&e.programId===app.programId&&e.kind==="program"&&e.status==="active").map(e=>e.schoolYearId),offers:offers.filter(o=>o.applicationId===app.id).map(o=>({...o,respondedAt:o.respondedAt?.toISOString()??null,expiresAt:o.expiresAt?.toISOString()??null})),requirements:requirements.filter(r=>journeyIds.has(r.journeyId)).map(r=>({...r,documents:uploadedDocuments.filter(d=>d.subjectId===r.id&&d.metadata.synthetic===true&&d.metadata.applicationId===app.id).map(d=>({id:d.id,fileName:d.fileName,uploadedAt:d.createdAt.toISOString(),reviewStatus:typeof d.metadata.reviewStatus==="string"?d.metadata.reviewStatus:"received"})),evidence:r.evidence.filter(e=>(e.kind==="registrar_note"&&typeof e.text==="string")||(e.kind==="document_review"&&typeof e.status==="string")).map(e=>({kind:String(e.kind),text:typeof e.text==="string"?e.text:"",status:typeof e.status==="string"?e.status:"",reviewedAt:typeof e.reviewedAt==="string"?e.reviewedAt:""}))})),readiness:enrollmentReadiness(requirements.filter(r=>journeyIds.has(r.journeyId)))};});
+ return synthetic.map(app=>{const journeyIds=new Set(journeys.filter(j=>j.participantId===app.id).map(j=>j.id));return {id:app.id,householdId:app.householdId,program:app.program,stage:app.stage,journeyStatus:journeys.find(j=>j.participantId===app.id)?.status??null,activeSchoolYears:enrollmentRows.filter(e=>e.studentProfileId===app.studentProfileId&&e.programId===app.programId&&e.kind==="program"&&e.status==="active").map(e=>e.schoolYearId),offers:offers.filter(o=>o.applicationId===app.id).map(o=>({...o,respondedAt:o.respondedAt?.toISOString()??null,expiresAt:o.expiresAt?.toISOString()??null})),requirements:requirements.filter(r=>journeyIds.has(r.journeyId)).map(r=>({...r,documents:uploadedDocuments.filter(d=>d.subjectId===r.id&&d.metadata.synthetic===true&&d.metadata.applicationId===app.id).map(d=>({id:d.id,fileName:d.fileName,uploadedAt:d.createdAt.toISOString(),reviewStatus:typeof d.metadata.reviewStatus==="string"?d.metadata.reviewStatus:"received"})),evidence:r.evidence.filter(e=>(e.kind==="registrar_note"&&typeof e.text==="string")||(e.kind==="document_review"&&typeof e.status==="string")).map(e=>({kind:String(e.kind),text:typeof e.text==="string"?e.text:"",status:typeof e.status==="string"?e.status:"",reviewedAt:typeof e.reviewedAt==="string"?e.reviewedAt:"",documentId:typeof e.documentId==="string"?e.documentId:""}))})),readiness:enrollmentReadiness(requirements.filter(r=>journeyIds.has(r.journeyId)))};});
 });
 
 /** Development-only family checklist. Changes persist in canonical JourneyRequirements. */
@@ -73,7 +73,7 @@ export const addSyntheticRequirementReviewNote=createServerFn({method:"POST"})
 
 /** Review state for synthetic document requirements. Does not upload or validate real files. */
 export const reviewSyntheticRequirementDocument=createServerFn({method:"POST"})
- .validator((data:{applicationId:string;requirementId:string;status:"requested"|"received"|"accepted"|"rejected";reason:string})=>data)
+ .validator((data:{applicationId:string;requirementId:string;status:"requested"|"received"|"accepted"|"rejected";reason:string;documentId?:string})=>data)
  .handler(async({data})=>{
   assertSyntheticMutation("registrar");
   if(!["requested","received","accepted","rejected"].includes(data.status))throw new Error("Invalid review status");
@@ -87,10 +87,20 @@ export const reviewSyntheticRequirementDocument=createServerFn({method:"POST"})
    if(!journey||["active","complete","cancelled"].includes(journey.status))throw new Error("Journey cannot be edited");
    const [requirement]=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status,evidence:s.journeyRequirements.evidence}).from(s.journeyRequirements).where(and(eq(s.journeyRequirements.id,data.requirementId),eq(s.journeyRequirements.journeyId,journey.id))).for("update").limit(1);
    if(!requirement)throw new Error("Requirement does not belong to this application");
+   const documentId=data.documentId??null;
+   if(data.status==="accepted"&&!documentId)throw new Error("Select an uploaded document before accepting");
+   let reviewedDocument:null|{id:string;metadata:Record<string,unknown>}=null;
+   if(documentId){
+    const [record]=await tx.select({id:s.documents.id,metadata:s.documents.metadata}).from(s.documents)
+      .where(and(eq(s.documents.id,documentId),eq(s.documents.subjectType,"journey_requirement"),eq(s.documents.subjectId,requirement.id),eq(s.documents.storageProvider,"cloudflare_r2"))).for("update").limit(1);
+    if(!record||record.metadata.synthetic!==true||record.metadata.applicationId!==app.id)throw new Error("Document is outside this synthetic enrollment requirement");
+    reviewedDocument=record;
+   }
    const previous=[...requirement.evidence].reverse().find(e=>e.kind==="document_review");
-   if(previous?.status===data.status&&previous?.text===reason)return {saved:true};
+   if(previous?.status===data.status&&previous?.text===reason&&(previous?.documentId??null)===documentId)return {saved:true};
    const now=new Date(),next=data.status==="accepted"?"complete":"needs_you";
-   const entry={kind:"document_review",status:data.status,text:reason,reviewedAt:now.toISOString(),synthetic:true};
+   const entry={kind:"document_review",status:data.status,text:reason,documentId,reviewedAt:now.toISOString(),synthetic:true};
+   if(reviewedDocument)await tx.update(s.documents).set({metadata:{...reviewedDocument.metadata,reviewStatus:data.status,reviewReason:reason},verifiedAt:data.status==="accepted"?now:null,verifiedByPersonId:data.status==="accepted"?"f1000000-0000-4000-8000-000000000006":null,updatedAt:now}).where(eq(s.documents.id,reviewedDocument.id));
    await tx.update(s.journeyRequirements).set({evidence:[...requirement.evidence,entry],status:next,completedAt:next==="complete"?now:null,updatedAt:now}).where(eq(s.journeyRequirements.id,requirement.id));
    const all=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking}).from(s.journeyRequirements).where(eq(s.journeyRequirements.journeyId,journey.id));
    const ready=all.every(r=>!r.blocking||(r.id===requirement.id?next:r.status)==="complete");
@@ -111,7 +121,7 @@ export const reviewSyntheticRequirementDocument=createServerFn({method:"POST"})
       resourceType:"application",resourceId:app.id
     })));
    }
-   await tx.insert(s.auditEvents).values({action:"synthetic.enrollment.document.review",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:previous?.status??null},after:{status:data.status,reason},context:{synthetic:true,applicationId:app.id}});
+   await tx.insert(s.auditEvents).values({action:"synthetic.enrollment.document.review",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:previous?.status??null},after:{status:data.status,reason,documentId},context:{synthetic:true,applicationId:app.id}});
    return {saved:true};
   });
  });

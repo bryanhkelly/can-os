@@ -9,6 +9,7 @@ function Families(){
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notes,setNotes]=useState<Record<string,string>>({});
  const families=[...new Set(apps.map(a=>a.householdId))];
  const [files,setFiles]=useState<Record<string,File|null>>({});
+ const [reviewFiles,setReviewFiles]=useState<Record<string,string>>({});
  async function update(applicationId:string,requirementId:string,complete:boolean){
   setBusy(requirementId);setError("");
   try{await setSyntheticFamilyRequirement({data:{applicationId,requirementId,complete}});await router.invalidate();}
@@ -23,7 +24,7 @@ function Families(){
  }
  async function review(applicationId:string,requirementId:string,status:"requested"|"received"|"accepted"|"rejected"){
   setBusy(requirementId);setError("");
-  try{await reviewSyntheticRequirementDocument({data:{applicationId,requirementId,status,reason:notes[requirementId]??""}});await router.invalidate();}
+  try{await reviewSyntheticRequirementDocument({data:{applicationId,requirementId,status,reason:notes[requirementId]??"",documentId:reviewFiles[requirementId]||undefined}});await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Document review failed");}
   finally{setBusy(null);}
  }
@@ -70,7 +71,8 @@ function Families(){
       <span>{r.title}{r.blocking?" · Required":""}</span>
       <span className="text-xs text-muted-foreground">({r.status.replaceAll("_"," ")})</span>
     </label><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="registrar_note"&&typeof e.text==="string").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Review note: {String(e.text)}</p>)}</div><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="document_review").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Document review: {e.status}{e.text?" · "+e.text:""}{e.reviewedAt?" · "+new Date(e.reviewedAt).toLocaleDateString():""}</p>)}</div>
-    <div className="mt-2 flex flex-wrap gap-2">{(["requested","received","accepted","rejected"] as const).map(status=><button key={status} type="button" className="rounded border px-2 py-1 text-xs capitalize disabled:opacity-50" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onClick={()=>review(a.id,r.id,status)}>{status}</button>)}</div>
+    <div className="mt-2 flex items-center gap-2"><label className="text-xs" htmlFor={"document-"+r.id}>Document being reviewed</label><select id={"document-"+r.id} className="min-w-0 flex-1 rounded border bg-background p-1 text-xs" value={reviewFiles[r.id]??""} onChange={e=>setReviewFiles(previous=>({...previous,[r.id]:e.target.value}))}><option value="">No document selected</option>{r.documents.map(d=><option key={d.id} value={d.id}>{d.fileName} · {d.reviewStatus}</option>)}</select></div>
+    <div className="mt-2 flex flex-wrap gap-2">{(["requested","received","accepted","rejected"] as const).map(status=><button key={status} type="button" className="rounded border px-2 py-1 text-xs capitalize disabled:opacity-50" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")||(status==="accepted"&&!reviewFiles[r.id])} onClick={()=>review(a.id,r.id,status)}>{status}</button>)}</div>
     <div className="mt-2 space-y-2">{r.documents.map(d=><div key={d.id} className="flex items-center justify-between gap-3 rounded border p-2 text-xs"><span className="truncate">{d.fileName} · {new Date(d.uploadedAt).toLocaleDateString()} · {d.reviewStatus}</span><button type="button" disabled={busy!==null} className="shrink-0 font-semibold underline disabled:opacity-50" onClick={()=>openDocument(a.id,r.id,d.id)}>View private file</button></div>)}{!r.documents.length&&<p className="text-xs text-muted-foreground">No R2 document registered for this requirement.</p>}</div>
     <div className="mt-2 flex flex-wrap items-center gap-2"><input aria-label={"Select synthetic enrollment document for "+r.title} type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" className="max-w-full text-xs" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onChange={e=>setFiles(previous=>({...previous,[r.id]:e.target.files?.[0]??null}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||!files[r.id]} onClick={()=>upload(a.id,r.id)}>Upload to private R2</button></div>
     <p className="mt-1 text-xs text-muted-foreground">Synthetic demonstration files only. PDF, JPG or PNG, maximum 10 MB. Uploads are disabled until private R2 credentials and the explicit demo upload flag are configured.</p>
