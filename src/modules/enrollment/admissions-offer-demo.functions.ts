@@ -47,8 +47,11 @@ export const issueSyntheticOfferFromDemo=createServerFn({method:"POST"})
  assertSyntheticMutation("registrar");
  const app=await syntheticApplication(data.applicationId);
  const actor=await authorizedActor("registrar","enrollment.decide",app.programId);
- const previous=await db.select({id:admissionOffers.id,status:admissionOffers.status}).from(admissionOffers).where(and(eq(admissionOffers.applicationId,app.id),eq(admissionOffers.schoolYearId,data.schoolYearId)));
- const key="synthetic-offer:"+app.id+":"+data.schoolYearId+":attempt-"+(previous.length+1);
+ // A stable key makes concurrent retries safe; the domain service rejects a second active offer.
+ // Explicit reissuance after expiration/decline requires a distinct attempt identifier.
+ const previous=await db.select({id:admissionOffers.id,status:admissionOffers.status,idempotencyKey:admissionOffers.idempotencyKey}).from(admissionOffers).where(and(eq(admissionOffers.applicationId,app.id),eq(admissionOffers.schoolYearId,data.schoolYearId)));
+ const active=previous.find(o=>o.status==="issued"||o.status==="accepted");
+ const key=active?.idempotencyKey??"synthetic-offer:"+app.id+":"+data.schoolYearId+":attempt-"+(previous.length+1);
  const expiresAt=new Date(Date.now()+14*24*60*60*1000);
  return {offerId:await issueSyntheticAdmissionOffer(actor,{applicationId:app.id,schoolYearId:data.schoolYearId,idempotencyKey:key,expiresAt})};
 });
