@@ -23,19 +23,22 @@ function Admissions(){
  <div className="rounded-xl border p-5"><p className="text-xs">Applications</p><p className="font-serif text-3xl">{summary.total}</p></div>
  <div className="rounded-xl border p-5"><p className="text-xs">Awaiting decision</p><p className="font-serif text-3xl">{summary.awaitingDecision}</p></div>
  <div className="rounded-xl border p-5"><p className="text-xs">Blocking requirements</p><p className="font-serif text-3xl">{summary.missingRequirements}</p></div></div>
+ <div className="mt-3 rounded-xl border p-4"><p className="text-sm">Active program enrollments across applications: <strong>{rows.reduce((n,x)=>n+x.enrollments.length,0)}</strong></p></div>
  <h2 className="mt-9 font-serif text-2xl">Pipeline</h2><div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">{summary.byStage.map(x=><div className="rounded-xl border p-4" key={x.stage}><p className="text-sm capitalize">{x.stage}</p><p className="font-serif text-2xl">{x.count}</p></div>)}</div>
  <h2 className="mt-9 font-serif text-2xl">Synthetic applications</h2>
  <div className="mt-4 space-y-3">{rows.map(x=>{
  const years=options.find(o=>o.applicationId===x.id)?.years??[];
  const latest=x.offers[0];
+ const activated=latest?x.enrollments.some(e=>e.schoolYearId===latest.schoolYearId):false;
  return <article key={x.id} className="rounded-xl border p-4">
  <p className="font-semibold">{x.program}</p>
  <p className="mt-1 text-sm capitalize text-muted-foreground">{x.stage} · {x.outstandingRequirements} outstanding blocking requirements</p>
  <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o=><span key={o.id} className="rounded-lg border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt?` · Expires ${new Date(o.expiresAt).toLocaleDateString()}`:""}</span>)}{!latest&&<span className="text-xs text-muted-foreground">No offer issued</span>}</div>
+ {activated&&<p className="mt-3 text-sm font-semibold">Enrollment active · Student is enrolled in this school year</p>}
  <div className="mt-4 flex flex-wrap gap-2">
  {!latest&&x.outstandingRequirements===0&&["application","eligibility"].includes(x.stage)&&years.map(year=><button key={year.id} disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>issueSyntheticOfferFromDemo({data:{applicationId:x.id,schoolYearId:year.id}}))}>Registrar: Issue offer · {year.name}</button>)}
  {latest?.status==="issued"&&<><button disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>respondSyntheticOfferFromDemo({data:{offerId:latest.id,decision:"accept"}}))}>Guardian: Accept</button><button disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>respondSyntheticOfferFromDemo({data:{offerId:latest.id,decision:"decline"}}))}>Guardian: Decline</button></>}
- {latest?.status==="accepted"&&<button disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>activateSyntheticOfferFromDemo({data:{offerId:latest.id}}))}>Registrar: Activate enrollment</button>}
+ {latest?.status==="accepted"&&!activated&&<button disabled={busy!==null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>transact(x.id,()=>activateSyntheticOfferFromDemo({data:{offerId:latest.id}}))}>Registrar: Activate enrollment</button>}
  </div>
  <Link to="/admissions/families" className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
  </article>})}
