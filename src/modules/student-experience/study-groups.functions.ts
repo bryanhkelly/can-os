@@ -5,8 +5,6 @@ import {AuthorizationError} from "@/domain/command-context";
 import {and,eq,desc,sql} from "drizzle-orm";
 import {assertSyntheticMutation,isSyntheticAccessEnabled} from "./demo-write-gate";
 import {canAccessGroup,validateGroupInput,validateGroupPost,validateSession} from "@/domain/study-groups";
-const STUDENT="f1000000-0000-4000-8000-000000000005";
-const TEACHER="f1000000-0000-4000-8000-000000000006";
 const SITE="f1000000-0000-4000-8000-000000000003";
 async function groupActor(role:"student"|"teacher"){
  const actor=await getCommandContext(getRequest());
@@ -40,17 +38,17 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
  });
 });
 export const decideStudyGroupMembership=createServerFn({method:"POST"}).validator((x:{groupId:string;personId:string;approve:boolean})=>x).handler(async({data})=>{
- assertSyntheticMutation("teacher");const {db,s}=await context();
+ assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
  return db.transaction(async tx=>{
- const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.status,"active"))).for("update").limit(1);
- if(!group||data.personId===TEACHER)throw new Error("Not authorized to approve");
+ const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.status,"active"))).for("update").limit(1);
+ if(!group||data.personId===actor.actorPersonId!)throw new Error("Not authorized to approve");
  const [member]=await tx.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,data.personId),eq(s.studyGroupMemberships.status,"pending"))).limit(1);
  if(!member)throw new Error("Pending membership not found");
  if(data.approve){
  const [count]=await tx.select({total:sql<number>`count(*)::int`}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.status,"approved")));
  if((count?.total??0)>=group.maxMembers)throw new Error("Study group is full");
  }
- await tx.update(s.studyGroupMemberships).set({status:data.approve?"approved":"declined",reviewedByPersonId:TEACHER,joinedAt:data.approve?new Date():null,updatedAt:new Date()}).where(eq(s.studyGroupMemberships.id,member.id));
+ await tx.update(s.studyGroupMemberships).set({status:data.approve?"approved":"declined",reviewedByPersonId:actor.actorPersonId!,joinedAt:data.approve?new Date():null,updatedAt:new Date()}).where(eq(s.studyGroupMemberships.id,member.id));
  return {ok:true};
  });
 });
@@ -79,8 +77,8 @@ export const postStudyGroupMessage=createServerFn({method:"POST"}).validator((x:
  const [post]=await db.insert(s.studyGroupPosts).values({groupId:data.groupId,body,authorPersonId:actor.actorPersonId!}).returning({id:s.studyGroupPosts.id});if(!post)throw new Error('Post creation failed');return {id:post.id};
 });
 export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator((x:{groupId:string;title:string;agenda:string;startsAt:string;endsAt:string})=>x).handler(async({data})=>{
- assertSyntheticMutation("teacher");const {start,end}=validateSession(data.startsAt,data.endsAt);const {db,s}=await context();
- const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,TEACHER))).limit(1);
+ assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {start,end}=validateSession(data.startsAt,data.endsAt);const {db,s}=await context();
+ const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!))).limit(1);
  if(!group)throw new Error("Facilitator required");
  if(data.title.trim().length<3||data.title.length>120||data.agenda.length>2000)throw new Error("Invalid session details");
  return db.transaction(async tx=>{
@@ -92,7 +90,7 @@ export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator
  type:"study_group",title:data.title.trim(),description:data.agenda,
  startsAt:start,endsAt:end,timezone:site.timezone,
  organizationId:site.organizationId,siteId:group.siteId,programId:group.programId,sectionId:group.sectionId,
- sourceType:"study_group_session",sourceId:session.id,createdByPersonId:TEACHER,
+ sourceType:"study_group_session",sourceId:session.id,createdByPersonId:actor.actorPersonId!,
  metadata:{synthetic:true,fixture:"gf26",groupId:group.id}
  });
  const members=await tx.select({personId:s.studyGroupMemberships.personId}).from(s.studyGroupMemberships)
@@ -120,11 +118,11 @@ export const reportStudyGroupPost=createServerFn({method:"POST"}).validator((x:{
 });
 
 export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(async()=>{
- assertSyntheticMutation("teacher");
+ assertSyntheticMutation("teacher");const actor=await groupActor("teacher");
  const {db,s}=await context();
  return db.select({groupId:s.studyGroups.id,groupTitle:s.studyGroups.title,personId:s.studyGroupMemberships.personId,personName:s.people.legalFirstName,status:s.studyGroupMemberships.status})
  .from(s.studyGroupMemberships)
- .innerJoin(s.studyGroups,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE)))
+ .innerJoin(s.studyGroups,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),eq(s.studyGroups.siteId,SITE)))
  .innerJoin(s.people,eq(s.studyGroupMemberships.personId,s.people.id))
  .where(eq(s.studyGroupMemberships.status,"pending")).limit(100);
 });
@@ -132,14 +130,14 @@ export const listStudyGroupReports=createServerFn({method:"GET"}).handler(async(
  assertSyntheticMutation("teacher");
  const {db,s}=await context();
  return db.select({id:s.studyGroupReports.id,groupId:s.studyGroupReports.groupId,reason:s.studyGroupReports.reason,status:s.studyGroupReports.status,postId:s.studyGroupReports.postId})
- .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE)))
+ .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),eq(s.studyGroups.siteId,SITE)))
  .where(eq(s.studyGroupReports.status,"open")).limit(100);
 });
 export const resolveStudyGroupReport=createServerFn({method:"POST"}).validator((x:{reportId:string;hidePost:boolean})=>x).handler(async({data})=>{
  assertSyntheticMutation("teacher");const {db,s}=await context();
  return db.transaction(async tx=>{
  const [report]=await tx.select({id:s.studyGroupReports.id,postId:s.studyGroupReports.postId,groupId:s.studyGroupReports.groupId})
- .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupReports.groupId),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE)))
+ .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupReports.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),eq(s.studyGroups.siteId,SITE)))
  .where(and(eq(s.studyGroupReports.id,data.reportId),eq(s.studyGroupReports.status,"open"))).limit(1);
  if(!report)throw new Error("Open report not found");
  if(data.hidePost&&report.postId)await tx.update(s.studyGroupPosts).set({hidden:true,updatedAt:new Date()}).where(and(eq(s.studyGroupPosts.id,report.postId),eq(s.studyGroupPosts.groupId,report.groupId)));
@@ -150,7 +148,7 @@ export const resolveStudyGroupReport=createServerFn({method:"POST"}).validator((
 
 export const rsvpStudyGroupSession=createServerFn({method:"POST"})
 .validator((x:{sessionId:string;rsvp:"going"|"maybe"|"declined"})=>x).handler(async({data})=>{
- assertSyntheticMutation("student");
+ assertSyntheticMutation("student");const actor=await groupActor("student");
  if(!["going","maybe","declined"].includes(data.rsvp))throw new Error("Invalid RSVP");
  const {db,s}=await context();
  const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId})
@@ -161,18 +159,18 @@ export const rsvpStudyGroupSession=createServerFn({method:"POST"})
  const [calendar]=await tx.select({metadata:s.calendarEvents.metadata}).from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
  if(!calendar||calendar.metadata.cancelled===true)throw new Error("Session is cancelled or missing its calendar event");
  const [member]=await tx.select({id:s.studyGroupMemberships.id}).from(s.studyGroupMemberships)
- .where(and(eq(s.studyGroupMemberships.groupId,session.groupId),eq(s.studyGroupMemberships.personId,STUDENT),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
+ .where(and(eq(s.studyGroupMemberships.groupId,session.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
  if(!member)throw new Error("Approved membership required");
- await tx.insert(s.studyGroupSessionAttendance).values({sessionId:session.id,personId:STUDENT,rsvp:data.rsvp})
+ await tx.insert(s.studyGroupSessionAttendance).values({sessionId:session.id,personId:actor.actorPersonId!,rsvp:data.rsvp})
  .onConflictDoUpdate({target:[s.studyGroupSessionAttendance.sessionId,s.studyGroupSessionAttendance.personId],set:{rsvp:data.rsvp,updatedAt:new Date()}});
  return {ok:true};
  });
 });
 export const recordStudyGroupAttendance=createServerFn({method:"POST"})
 .validator((x:{sessionId:string;personId:string;attended:boolean})=>x).handler(async({data})=>{
- assertSyntheticMutation("teacher");const {db,s}=await context();
+ assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
  const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions)
- .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE)))
+ .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),eq(s.studyGroups.siteId,SITE)))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Not authorized for this session");
  return db.transaction(async tx=>{
@@ -180,16 +178,16 @@ export const recordStudyGroupAttendance=createServerFn({method:"POST"})
  if(!calendar||calendar.metadata.cancelled===true)throw new Error("Cannot record attendance for a cancelled or unlinked session");
  const [member]=await tx.select({id:s.studyGroupMemberships.id}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,session.groupId),eq(s.studyGroupMemberships.personId,data.personId),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
  if(!member)throw new Error("Attendance requires approved member");
- await tx.insert(s.studyGroupSessionAttendance).values({sessionId:data.sessionId,personId:data.personId,rsvp:"going",attended:data.attended,recordedByPersonId:TEACHER})
- .onConflictDoUpdate({target:[s.studyGroupSessionAttendance.sessionId,s.studyGroupSessionAttendance.personId],set:{attended:data.attended,recordedByPersonId:TEACHER,updatedAt:new Date()}});
+ await tx.insert(s.studyGroupSessionAttendance).values({sessionId:data.sessionId,personId:data.personId,rsvp:"going",attended:data.attended,recordedByPersonId:actor.actorPersonId!})
+ .onConflictDoUpdate({target:[s.studyGroupSessionAttendance.sessionId,s.studyGroupSessionAttendance.personId],set:{attended:data.attended,recordedByPersonId:actor.actorPersonId!,updatedAt:new Date()}});
  return {ok:true};
  });
 });
 export const listStudyGroupAttendance=createServerFn({method:"GET"})
 .validator((x:{sessionId:string})=>x).handler(async({data})=>{
- assertSyntheticMutation("teacher");const {db,s}=await context();
+ assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
  const [session]=await db.select({id:s.studyGroupSessions.id}).from(s.studyGroupSessions)
- .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.facilitatorPersonId,TEACHER)))
+ .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!)))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Access denied");
  return db.select({personId:s.studyGroupSessionAttendance.personId,rsvp:s.studyGroupSessionAttendance.rsvp,attended:s.studyGroupSessionAttendance.attended})
@@ -200,13 +198,13 @@ export const listStudyGroupAttendance=createServerFn({method:"GET"})
 export const reviseStudyGroupSession=createServerFn({method:"POST"})
 .validator((x:{sessionId:string;action:"reschedule"|"cancel";startsAt?:string;endsAt?:string})=>x)
 .handler(async({data})=>{
- assertSyntheticMutation("teacher");
+ assertSyntheticMutation("teacher");const actor=await groupActor("teacher");
  if(data.action!=="reschedule"&&data.action!=="cancel")throw new Error("Invalid session action");
  const {db,s}=await context();
  const times=data.action==="reschedule"?validateSession(data.startsAt??"",data.endsAt??""):null;
  return db.transaction(async tx=>{
   const [session]=await tx.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt}).from(s.studyGroupSessions)
-   .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,TEACHER),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.status,"active")))
+   .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),eq(s.studyGroups.siteId,SITE),eq(s.studyGroups.status,"active")))
    .where(eq(s.studyGroupSessions.id,data.sessionId)).for("update").limit(1);
   if(!session)throw new Error("Facilitator session not found");
   const [event]=await tx.select().from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
@@ -232,7 +230,7 @@ export const reviseStudyGroupSession=createServerFn({method:"POST"})
     resourceId:session.id
    })));
   }
-  await tx.insert(s.auditEvents).values({actorPersonId:TEACHER,action:data.action==="cancel"?"synthetic.study_group.session.cancel":"synthetic.study_group.session.reschedule",resourceType:"study_group_session",resourceId:session.id,before:{startsAt:session.startsAt.toISOString(),endsAt:session.endsAt.toISOString()},after:data.action==="cancel"?{cancelled:true}:{startsAt:times!.start.toISOString(),endsAt:times!.end.toISOString()},context:{synthetic:true,calendarEventId:event.id}});
+  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:data.action==="cancel"?"synthetic.study_group.session.cancel":"synthetic.study_group.session.reschedule",resourceType:"study_group_session",resourceId:session.id,before:{startsAt:session.startsAt.toISOString(),endsAt:session.endsAt.toISOString()},after:data.action==="cancel"?{cancelled:true}:{startsAt:times!.start.toISOString(),endsAt:times!.end.toISOString()},context:{synthetic:true,calendarEventId:event.id}});
   return {ok:true};
  });
 });
