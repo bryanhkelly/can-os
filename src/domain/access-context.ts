@@ -34,7 +34,7 @@ export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Obj
 /** This may be called only after authenticating a server session and fetching grants from Neon. */
 export function resolveAccessContext(principal: SessionPrincipal, grants: readonly VerifiedAccessGrant[]): AccessContext {
  const grant = grants.find(g => g.id === principal.activeGrantId && g.accountId === principal.accountId && g.active);
- if (!grant || !roleCapabilities[grant.role]) throw new AuthorizationError("active membership");
+ if (!grant || !Object.hasOwn(roleCapabilities,grant.role)) throw new AuthorizationError("active membership");
  return {
   accountId: principal.accountId,
   sessionId: principal.sessionId,
@@ -49,7 +49,7 @@ export function resolveAccessContext(principal: SessionPrincipal, grants: readon
  };
 }
 export function assertGrantSelection(accountId: string, proposedGrantId: string, grants: readonly VerifiedAccessGrant[]): void {
- if (!grants.some(g => g.accountId === accountId && g.id === proposedGrantId && g.active && Boolean(roleCapabilities[g.role]))) {
+ if (!grants.some(g => g.accountId === accountId && g.id === proposedGrantId && g.active && Object.hasOwn(roleCapabilities,g.role))) {
   throw new AuthorizationError("active membership");
  }
 }
