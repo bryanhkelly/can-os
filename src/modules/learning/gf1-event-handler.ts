@@ -1,17 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import {
-  assessments,
-  domainEvents,
-  guardianRelationships,
-  insights,
-  notifications,
-  people,
-  sectionTeachers,
-  studentProfiles,
-  submissions,
-} from "@/db/schema";
+import { domainEvents, insights } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
+import { applyNotificationPolicy } from "@/platform/notifications";
+import { assignmentMissingPolicy } from "@/platform/notifications/policies";
 import {
   emailNotificationRecipients,
   sendNotificationEmail,
@@ -38,59 +30,21 @@ export async function handleAcademicInterventionEvent(
     if (!event || event.status === "processed") return;
     if (event.eventType !== EventTypes.AssignmentBecameMissing) return;
 
-    const [record] = await tx
-      .select({
-        submissionId: submissions.id,
-        assessmentId: assessments.id,
-        assessmentTitle: assessments.title,
-        sectionId: assessments.sectionId,
-        studentProfileId: submissions.studentProfileId,
-        studentPersonId: studentProfiles.personId,
-        studentPreferredName: people.preferredName,
-        studentLegalFirstName: people.legalFirstName,
-      })
-      .from(submissions)
-      .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
-      .innerJoin(
-        studentProfiles,
-        eq(studentProfiles.id, submissions.studentProfileId),
-      )
-      .innerJoin(people, eq(people.id, studentProfiles.personId))
-      .where(eq(submissions.id, event.aggregateId))
-      .limit(1);
-
-    if (!record) throw new Error("Missing submission context for domain event");
-
-    const studentName =
-      record.studentPreferredName ?? record.studentLegalFirstName;
-
-    const guardians = await tx
-      .select({ personId: guardianRelationships.guardianPersonId })
-      .from(guardianRelationships)
-      .where(
-        and(
-          eq(guardianRelationships.studentPersonId, record.studentPersonId),
-          eq(guardianRelationships.canViewAcademics, true),
-        ),
-      );
-
-    const teachers = await tx
-      .select({ personId: sectionTeachers.personId })
-      .from(sectionTeachers)
-      .where(eq(sectionTeachers.sectionId, record.sectionId));
+    const context = await assignmentMissingPolicy.load(tx, event);
+    if (!context) throw new Error("Missing submission context for domain event");
 
     await tx.insert(insights).values({
       type: "missing_assignment",
-      title: `${studentName} missed ${record.assessmentTitle}`,
+      title: `${context.studentName} missed ${context.assessmentTitle}`,
       summary:
         "The assignment deadline passed without a submission. Review context before deciding whether formal intervention is needed.",
       subjectType: "student_profile",
-      subjectId: record.studentProfileId,
-      sectionId: record.sectionId,
+      subjectId: context.studentProfileId,
+      sectionId: context.sectionId,
       evidence: [
         {
-          submissionId: record.submissionId,
-          assessmentId: record.assessmentId,
+          submissionId: context.submissionId,
+          assessmentId: context.assessmentId,
           fact: "assigned_and_missing",
         },
       ],
@@ -106,28 +60,7 @@ export async function handleAcademicInterventionEvent(
       ],
     });
 
-    const recipients = new Set([
-      record.studentPersonId,
-      ...guardians.map((row) => row.personId),
-      ...teachers.map((row) => row.personId),
-    ]);
-
-    if (recipients.size > 0) {
-      await tx.insert(notifications).values(
-        [...recipients].map((recipientPersonId) => ({
-          recipientPersonId,
-          type: "missing_assignment",
-          title: `${record.assessmentTitle} is missing`,
-          body:
-            recipientPersonId === record.studentPersonId
-              ? "Submit the assignment when ready. If you need help, contact your teacher."
-              : `${studentName} has a missing assignment that may need follow-up.`,
-          resourceType: "submission",
-          resourceId: record.submissionId,
-          eventId: event.id,
-        })),
-      );
-    }
+    await applyNotificationPolicy(tx, event, assignmentMissingPolicy, context);
 
     await tx
       .update(domainEvents)
@@ -138,9 +71,9 @@ export async function handleAcademicInterventionEvent(
       .where(eq(domainEvents.id, event.id));
 
     guardianEmailNotice = {
-      guardianPersonIds: guardians.map((row) => row.personId),
-      studentName,
-      assessmentTitle: record.assessmentTitle,
+      guardianPersonIds: context.guardianPersonIds,
+      studentName: context.studentName,
+      assessmentTitle: context.assessmentTitle,
     };
   });
 

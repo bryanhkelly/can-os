@@ -2,7 +2,6 @@ import { and, count, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   activities,
-  activityCalendarEvents,
   activityEligibilityChecks,
   activityRegistrations,
   activitySeasons,
@@ -439,11 +438,6 @@ export async function addActivityCalendarEvent(
       .returning({ id: calendarEvents.id });
 
     if (!event) throw new Error("Failed to create activity CalendarEvent");
-
-    await tx.insert(activityCalendarEvents).values({
-      activitySeasonId: input.activitySeasonId,
-      calendarEventId: event.id,
-    });
 
     return event.id;
   });

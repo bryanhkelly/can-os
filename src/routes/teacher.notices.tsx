@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {getSyntheticTeacherNotices,acknowledgeSyntheticTeacherNotice} from "@/modules/student-experience/teacher-notices.functions";
+import {getSyntheticTeacherNotices,acknowledgeSyntheticTeacherNotice} from "@/modules/learning/teacher-notices.functions";
 export const Route=createFileRoute("/teacher/notices")({loader:()=>getSyntheticTeacherNotices(),component:TeacherNotices});
 function TeacherNotices(){
  const {connected,items}=Route.useLoaderData();const router=useRouter();

@@ -4,7 +4,7 @@ import {
   getCoachCaseload,
   getCoachStudentHistory,
   logCoachOutreach,
-} from "@/modules/student-experience/coach.functions";
+} from "@/modules/support/coach.functions";
 
 export const Route = createFileRoute("/coach")({ component: CoachPage });
 

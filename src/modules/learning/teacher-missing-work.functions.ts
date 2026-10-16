@@ -46,7 +46,7 @@ export const getSyntheticTeacherMissingWork=createServerFn({method:"GET"}).handl
 export const createSyntheticMissingWorkFollowUp=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({assessmentId:z.string().uuid(),studentProfileId:z.string().uuid()}).parse(data))
  .handler(async({data})=>{
-  const {assertSyntheticMutation}=await import("./demo-write-gate");
+  const {assertSyntheticMutation}=await import("@/modules/student-experience/demo-write-gate");
   assertSyntheticMutation("teacher");
   const context=await assertDemoTeacher();
   const [{db},s,{and,eq,lt,sql,inArray}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);

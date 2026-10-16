@@ -64,6 +64,13 @@
       "when": 1792181247777,
       "tag": "0008_chilly_arclight",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792186712376,
+      "tag": "0009_retire_dead_join_tables",
+      "breakpoints": true
     }
   ]
 }

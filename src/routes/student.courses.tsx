@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { getCourseRegistration, requestCourseChange, decideCourseChange } from "@/modules/student-experience/course-registration.functions";
+import { getCourseRegistration, requestCourseChange, decideCourseChange } from "@/modules/learning/course-registration.functions";
 
 export const Route=createFileRoute("/student/courses")({
  loader:()=>getCourseRegistration(),

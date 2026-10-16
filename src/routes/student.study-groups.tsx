@@ -1,6 +1,6 @@
 import {useEffect,useState} from "react";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
-import {getStudyGroupAvailability,listStudyGroups,requestStudyGroupMembership,leaveStudyGroup,getStudyGroupDetail,postStudyGroupMessage,reportStudyGroupPost,rsvpStudyGroupSession} from "@/modules/student-experience/study-groups.functions";
+import {getStudyGroupAvailability,listStudyGroups,requestStudyGroupMembership,leaveStudyGroup,getStudyGroupDetail,postStudyGroupMessage,reportStudyGroupPost,rsvpStudyGroupSession} from "@/modules/study-groups/study-groups.functions";
 export const Route=createFileRoute("/student/study-groups")({validateSearch:(search:Record<string,unknown>):{group?:string;session?:string}=>({group:typeof search.group==="string"?search.group:undefined,session:typeof search.session==="string"?search.session:undefined}),loader:async()=>{
  const {enabled}=await getStudyGroupAvailability();
  if(!enabled)return {enabled,groups:[]};

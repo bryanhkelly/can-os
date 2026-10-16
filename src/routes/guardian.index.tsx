@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getFamilyHome, getGuardianNeedsYou } from "@/modules/student-experience/family-home.functions";
+import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
 import { WorkspaceShell, EmptyState, QueryState } from "@/components/workspace";
 
 export const Route = createFileRoute("/guardian/")({ component: FamilyHomePage });

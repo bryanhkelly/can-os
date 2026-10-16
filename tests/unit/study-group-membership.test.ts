@@ -3,7 +3,7 @@ import {
   decideStudyGroupMembership,
   listStudyGroups,
   requestStudyGroupMembership,
-} from "@/modules/student-experience/study-groups.functions";
+} from "@/modules/study-groups/study-groups.functions";
 
 const { transaction, select, insert, update, values, set, getCommandContext } = vi.hoisted(() => ({
   transaction: vi.fn(),

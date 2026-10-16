@@ -212,6 +212,7 @@ integration("GF36 co-curriculars and athletics", () => {
     expect(event.siteId).toBe(site.id);
     expect(event.timezone).toBe("America/New_York");
     expect(event.sourceType).toBe("activity_season");
+    expect(event.sourceId).toBe(seasonId);
 
     await expect(activities.withdrawActivityRegistration({ ...guardianContext, actorPersonId: coach.id }, { registrationId }))
       .rejects.toThrow(/authorized guardian/);

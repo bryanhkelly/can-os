@@ -12,7 +12,6 @@ import {
 import { createdAt, id, updatedAt } from "./common";
 import { people, studentProfiles } from "./identity";
 import { programs, sites } from "./organizations";
-import { calendarEvents } from "./calendar";
 import { documents } from "./documents";
 import { consentRecords, financialObligations } from "./governance";
 
@@ -118,22 +117,5 @@ export const activityEligibilityChecks = pgTable(
   },
   (table) => [
     index("activity_eligibility_registration_idx").on(table.activityRegistrationId, table.checkedAt),
-  ],
-);
-
-export const activityCalendarEvents = pgTable(
-  "activity_calendar_events",
-  {
-    id: id(),
-    activitySeasonId: uuid("activity_season_id")
-      .notNull()
-      .references(() => activitySeasons.id, { onDelete: "cascade" }),
-    calendarEventId: uuid("calendar_event_id")
-      .notNull()
-      .references(() => calendarEvents.id, { onDelete: "cascade" }),
-    createdAt: createdAt(),
-  },
-  (table) => [
-    uniqueIndex("activity_calendar_event_uq").on(table.activitySeasonId, table.calendarEventId),
   ],
 );

@@ -4,7 +4,7 @@ import {
   getStudentReportCard,
   getStudentTranscript,
 } from "@/modules/learning/report-cards.functions";
-import { getGuardianStudents } from "@/modules/student-experience/guardian-assignments.functions";
+import { getGuardianStudents } from "@/modules/family/guardian-assignments.functions";
 import { ReportCardView, TranscriptView } from "@/components/report-card";
 
 export const Route = createFileRoute("/guardian/report-cards")({ component: GuardianReportCardsPage });

@@ -5,7 +5,6 @@ import {
   auditEvents,
   calendarEventParticipants,
   calendarEvents,
-  conferenceActions,
   conferenceBookings,
   conferenceNotes,
   conferenceSeries,
@@ -364,11 +363,6 @@ export async function completeConference(
 
       if (!action) throw new Error("Failed to create Conference follow-up Action");
       actionId = action.id;
-
-      await tx.insert(conferenceActions).values({
-        conferenceBookingId: input.bookingId,
-        actionId,
-      });
     }
 
     if (input.outcome === "held") {

@@ -4,7 +4,7 @@ import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
 import{and,eq,desc,inArray,sql} from "drizzle-orm";
 import{z} from "zod";
-import{assertSyntheticMutation,isSyntheticAccessEnabled} from "./demo-write-gate";
+import{assertSyntheticMutation,isSyntheticAccessEnabled} from "@/modules/student-experience/demo-write-gate";
 import {canAccessGroup,validateGroupInput,validateGroupPost,validateSession} from "@/domain/study-groups";
 async function groupActor(role:"student"|"teacher"){
  const actor=await getCommandContext(getRequest());

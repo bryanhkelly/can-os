@@ -97,33 +97,48 @@ export async function writeAudit(
   });
 }
 
+export type NotificationInput = {
+  recipientPersonId: string;
+  type: string;
+  title: string;
+  body?: string | null;
+  resourceType?: string | null;
+  resourceId?: string | null;
+  eventId?: string | null;
+};
+
 /** Queue an in-app notification for a single recipient. */
 export async function notify(
   tx: MutationTx,
-  notification: {
-    recipientPersonId: string;
-    type: string;
-    title: string;
-    body?: string | null;
-    resourceType?: string | null;
-    resourceId?: string | null;
-    eventId?: string | null;
-  },
+  notification: NotificationInput,
 ): Promise<string> {
-  const rows = await tx
-    .insert(notifications)
-    .values({
-      recipientPersonId: notification.recipientPersonId,
-      type: notification.type,
-      title: notification.title,
-      body: notification.body ?? null,
-      resourceType: notification.resourceType ?? null,
-      resourceId: notification.resourceId ?? null,
-      eventId: notification.eventId ?? null,
-    })
-    .returning({ id: notifications.id });
-
-  const id = rows[0]?.id;
+  const ids = await notifyMany(tx, [notification]);
+  const id = ids[0];
   if (typeof id !== "string") throw new Error("Failed to create notification");
   return id;
+}
+
+/** Queue in-app notifications for many recipients in one insert. */
+export async function notifyMany(
+  tx: MutationTx,
+  items: ReadonlyArray<NotificationInput>,
+): Promise<string[]> {
+  if (!items.length) return [];
+  const rows = await tx
+    .insert(notifications)
+    .values(
+      items.map((notification) => ({
+        recipientPersonId: notification.recipientPersonId,
+        type: notification.type,
+        title: notification.title,
+        body: notification.body ?? null,
+        resourceType: notification.resourceType ?? null,
+        resourceId: notification.resourceId ?? null,
+        eventId: notification.eventId ?? null,
+      })),
+    )
+    .returning({ id: notifications.id });
+  return rows
+    .map((row) => row.id)
+    .filter((value): value is string => typeof value === "string");
 }

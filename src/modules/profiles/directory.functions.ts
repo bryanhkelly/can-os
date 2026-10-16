@@ -13,7 +13,7 @@ import { AuthorizationError, type CommandContext } from "@/domain/command-contex
  * - Registrar: all students with an active section enrollment at scoped sites.
  * - Teacher: students actively enrolled in sections they teach (at scoped sites).
  * - Specialist: students at scoped sites. Specialists are routed site-wide
- *   (see student-experience/support-referrals.functions.ts), so directory scope
+ *   (see support/support-referrals.functions.ts), so directory scope
  *   matches site scope rather than referral-only scope.
  *
  * Medical, discipline, and contact fields are never selected or returned.

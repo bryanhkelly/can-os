@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { getSyntheticTeacherMissingWork, createSyntheticMissingWorkFollowUp } from "@/modules/student-experience/teacher-missing-work.functions";
+import { getSyntheticTeacherMissingWork, createSyntheticMissingWorkFollowUp } from "@/modules/learning/teacher-missing-work.functions";
 import { WorkspaceShell, StatCard, EmptyState } from "@/components/workspace";
 
 export const Route = createFileRoute("/teacher/missing-work")({

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { advanceSupportReferral, createSupportReferral, getSupportReferrals, saveSyntheticSupportPlan, scheduleSyntheticSupportService, completeSyntheticSupportService } from "@/modules/student-experience/support-referrals.functions";
+import { advanceSupportReferral, createSupportReferral, getSupportReferrals, saveSyntheticSupportPlan, scheduleSyntheticSupportService, completeSyntheticSupportService } from "@/modules/support/support-referrals.functions";
 
 export const Route=createFileRoute("/student/support")({
  loader:()=>getSupportReferrals(),

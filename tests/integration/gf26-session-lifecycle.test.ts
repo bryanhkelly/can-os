@@ -2,7 +2,7 @@ import {describe,expect,it} from "vitest";
 import {and,eq} from "drizzle-orm";
 import {db} from "@/db/client";
 import {studyGroups,studyGroupMemberships,studyGroupSessions,calendarEvents,notifications} from "@/db/schema";
-import {reviseStudyGroupSession} from "@/modules/student-experience/study-groups.functions";
+import {reviseStudyGroupSession} from "@/modules/study-groups/study-groups.functions";
 
 const SESSION="f2600000-0000-4000-8000-000000000010";
 const PERSON="f1000000-0000-4000-8000-000000000005";

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getGuardianAssignments, getGuardianStudents } from "@/modules/student-experience/guardian-assignments.functions";
+import { getGuardianAssignments, getGuardianStudents } from "@/modules/family/guardian-assignments.functions";
 import { guardianAssignmentSummary } from "@/domain/guardian-academics";
 
 export const Route = createFileRoute("/guardian/academics")({ component: GuardianAcademicsPage });

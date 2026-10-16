@@ -1,8 +1,8 @@
 import {useState} from "react";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
-import {getStudyGroupAvailability,createStudyGroup,listStudyGroupReviewQueue,listStudyGroupReports,decideStudyGroupMembership,resolveStudyGroupReport,scheduleStudyGroupSession,reviseStudyGroupSession,listStudyGroupAttendance,recordStudyGroupAttendance} from "@/modules/student-experience/study-groups.functions";
+import {getStudyGroupAvailability,createStudyGroup,listStudyGroupReviewQueue,listStudyGroupReports,decideStudyGroupMembership,resolveStudyGroupReport,scheduleStudyGroupSession,reviseStudyGroupSession,listStudyGroupAttendance,recordStudyGroupAttendance} from "@/modules/study-groups/study-groups.functions";
 
-import {getFacilitatorStudyGroups} from "@/modules/student-experience/study-group-facilitator-query.functions";
+import {getFacilitatorStudyGroups} from "@/modules/study-groups/facilitator-query.functions";
 export const Route=createFileRoute("/teacher/study-groups")({
  loader:async()=>{
   const {enabled}=await getStudyGroupAvailability();

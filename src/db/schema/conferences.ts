@@ -14,7 +14,6 @@ import { sections } from "./academics";
 import { sites } from "./organizations";
 import { calendarEvents } from "./calendar";
 import { communicationThreads } from "./communication";
-import { actions } from "./work";
 
 export const conferenceSeries = pgTable(
   "conference_series",
@@ -112,21 +111,4 @@ export const conferenceNotes = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [index("conference_note_booking_idx").on(table.conferenceBookingId)],
-);
-
-export const conferenceActions = pgTable(
-  "conference_actions",
-  {
-    id: id(),
-    conferenceBookingId: uuid("conference_booking_id")
-      .notNull()
-      .references(() => conferenceBookings.id, { onDelete: "cascade" }),
-    actionId: uuid("action_id")
-      .notNull()
-      .references(() => actions.id, { onDelete: "cascade" }),
-    createdAt: createdAt(),
-  },
-  (table) => [
-    uniqueIndex("conference_action_uq").on(table.conferenceBookingId, table.actionId),
-  ],
 );

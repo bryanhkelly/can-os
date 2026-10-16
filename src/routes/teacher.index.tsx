@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getTeacherToday } from "@/modules/student-experience/teacher-today.functions";
+import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { WorkspaceShell, StatCard, EmptyState, QueryState } from "@/components/workspace";
 
 export const Route = createFileRoute("/teacher/")({ component: TeacherTodayPage });

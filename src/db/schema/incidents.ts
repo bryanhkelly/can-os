@@ -11,7 +11,6 @@ import { createdAt, id, updatedAt } from "./common";
 import { people } from "./identity";
 import { organizations, programs, sites } from "./organizations";
 import { documents } from "./documents";
-import { actions } from "./work";
 
 export const incidents = pgTable(
   "incidents",
@@ -163,21 +162,4 @@ export const incidentAmendments = pgTable(
     createdAt: createdAt(),
   },
   (table) => [index("incident_amendment_incident_idx").on(table.incidentId)],
-);
-
-export const incidentActions = pgTable(
-  "incident_actions",
-  {
-    id: id(),
-    incidentId: uuid("incident_id")
-      .notNull()
-      .references(() => incidents.id, { onDelete: "cascade" }),
-    actionId: uuid("action_id")
-      .notNull()
-      .references(() => actions.id, { onDelete: "cascade" }),
-    createdAt: createdAt(),
-  },
-  (table) => [
-    uniqueIndex("incident_action_uq").on(table.incidentId, table.actionId),
-  ],
 );

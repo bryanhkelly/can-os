@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { auditEvents, domainEvents, notifications } from "@/db/schema";
 import type { CommandContext } from "@/domain/command-context";
-import { emitEvent, notify, writeAudit, type InsertChain, type MutationTx } from "@/platform/mutation";
+import { emitEvent, notify, notifyMany, writeAudit, type InsertChain, type MutationTx } from "@/platform/mutation";
 
 type InsertCall = { table: unknown; values: unknown };
 
@@ -134,7 +134,7 @@ describe("notify", () => {
     expect(id).toBe("notif-1");
     expect(calls).toHaveLength(1);
     expect(calls[0].table).toBe(notifications);
-    expect(calls[0].values).toEqual({
+    expect(calls[0].values).toEqual([{
       recipientPersonId: "guardian-1",
       type: "student_absent",
       title: "Attendance needs your attention",
@@ -142,7 +142,7 @@ describe("notify", () => {
       resourceType: "attendance_event",
       resourceId: "att-1",
       eventId: null,
-    });
+    }]);
   });
 
   it("defaults optional columns to null", async () => {
@@ -152,7 +152,7 @@ describe("notify", () => {
       type: "generic",
       title: "Hello",
     });
-    expect(calls[0].values).toEqual({
+    expect(calls[0].values).toEqual([{
       recipientPersonId: "guardian-2",
       type: "generic",
       title: "Hello",
@@ -160,6 +160,25 @@ describe("notify", () => {
       resourceType: null,
       resourceId: null,
       eventId: null,
-    });
+    }]);
+  });
+});
+
+describe("notifyMany", () => {
+  it("inserts one row per recipient in a single call and returns ids", async () => {
+    const { tx, calls } = makeFakeTx();
+    const ids = await notifyMany(tx, [
+      { recipientPersonId: "p-1", type: "t", title: "One" },
+      { recipientPersonId: "p-2", type: "t", title: "Two", eventId: "evt-1" },
+    ]);
+    expect(ids).toEqual(["11111111-1111-1111-1111-111111111111"]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].values).toHaveLength(2);
+  });
+
+  it("skips the insert entirely for an empty batch", async () => {
+    const { tx, calls } = makeFakeTx();
+    expect(await notifyMany(tx, [])).toEqual([]);
+    expect(calls).toHaveLength(0);
   });
 });
