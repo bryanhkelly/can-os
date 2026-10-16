@@ -12,7 +12,15 @@ const sources={
   "/student/experiences": "student-calendar-comms-office-hours.sql",
   "/student/study-groups": "gf26-study-groups.sql",
   "/student/support": "gf41-support-referrals.sql",
-  "/teacher/missing-work": "gf1-assignments-v2.sql"
+  "/teacher/missing-work": "gf1-assignments-v2.sql",
+  "/guardian": "new-experiences-v1.sql",
+  "/guardian/attendance": "new-experiences-v1.sql",
+  "/guardian/report-cards": "new-experiences-v1.sql",
+  "/student/report-card": "new-experiences-v1.sql",
+  "/staff/attendance": "new-experiences-v1.sql",
+  "/teacher": "new-experiences-v1.sql",
+  "/messages": "new-experiences-v1.sql",
+  "/operations/launch": "new-experiences-v1.sql"
 };
 const pageFiles=readdirSync("src/routes").filter(f=>f.endsWith(".tsx")&&!f.startsWith("__")&&!["student.tsx","admissions.tsx"].includes(f));
 const pages=pageFiles.map(file=>{const name=file.slice(0,-4);return name==="index"?"/":"/"+name.replace(/\.index$/,"").replaceAll(".","/");});
