@@ -83,6 +83,10 @@ export async function startFamilyApplication(
 
     if (existing) {
       assertApplicationRetryOwnership(existing,actorPersonId,input.programId);
+      // Ownership of an old submission is not sufficient if household access was revoked.
+      const [activeMembership] = await tx.select({id:householdMemberships.id}).from(householdMemberships)
+        .where(and(eq(householdMemberships.householdId,existing.householdId),eq(householdMemberships.personId,actorPersonId))).limit(1);
+      if (!activeMembership) throw new Error("Guardian is no longer a member of the Application Household");
       const [existingJourney] = await tx
         .select({ id: journeys.id })
         .from(journeys)
