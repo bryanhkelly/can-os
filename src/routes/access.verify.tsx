@@ -31,7 +31,7 @@ function VerifyAccess(){
    if(!res.ok){setStatus("This access link is invalid or expired.");return;}
    setToken(null);
    const body=await res.json() as {role?:string};
-   const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/admissions/families",registrar:"/admissions",specialist:"/student/support"};
+   const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/student/support"};
    window.location.replace(home[body.role??""]??"/access");
   }catch{setStatus("Unable to complete sign-in.");}finally{setWorking(false);}
  }
