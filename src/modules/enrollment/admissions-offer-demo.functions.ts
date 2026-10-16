@@ -4,13 +4,18 @@ import {db} from "@/db/client";
 import {applications,admissionOffers,admissionSeatPools,guardianRelationships,studentProfiles,schoolYears} from "@/db/schema";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment} from "./admissions-offer-service";
-import type {CommandContext} from "@/domain/command-context";
+import {getRequest} from "@tanstack/react-start/server";
+import {getCommandContext} from "@/modules/identity/command-context.server";
+import {assertCapability,assertProgramScope,AuthorizationError} from "@/domain/command-context";
 
-const DEMO_REGISTRAR="f1000000-0000-4000-8000-000000000006";
-const context=(actorPersonId:string,programId:string,capability:string):CommandContext=>({
- actorPersonId,capabilities:new Set([capability]),scope:{programIds:[programId]},
- requestId:"synthetic-admissions-demo"
-});
+async function authorizedActor(role:"registrar"|"guardian",capability:string,programId:string){
+ const actor=await getCommandContext(getRequest());
+ if(actor.role!==role||!actor.actorPersonId)throw new AuthorizationError(role+" admission access");
+ assertCapability(actor,capability);
+ if(!actor.scope.programIds?.includes(programId))throw new AuthorizationError("admissions program membership");
+ assertProgramScope(actor,programId);
+ return actor;
+}
 
 export const getSyntheticAdmissionOfferOptions=createServerFn({method:"GET"}).handler(async()=>{
  if(!process.env.DATABASE_URL)return [];
@@ -37,25 +42,28 @@ export const issueSyntheticOfferFromDemo=createServerFn({method:"POST"})
 .validator((data:{applicationId:string;schoolYearId:string})=>data).handler(async({data})=>{
  assertSyntheticMutation("registrar");
  const app=await syntheticApplication(data.applicationId);
+ const actor=await authorizedActor("registrar","enrollment.decide",app.programId);
  const previous=await db.select({id:admissionOffers.id,status:admissionOffers.status}).from(admissionOffers).where(and(eq(admissionOffers.applicationId,app.id),eq(admissionOffers.schoolYearId,data.schoolYearId)));
  const key="synthetic-offer:"+app.id+":"+data.schoolYearId+":attempt-"+(previous.length+1);
  const expiresAt=new Date(Date.now()+14*24*60*60*1000);
- return {offerId:await issueSyntheticAdmissionOffer(context(DEMO_REGISTRAR,app.programId,"enrollment.decide"),{applicationId:app.id,schoolYearId:data.schoolYearId,idempotencyKey:key,expiresAt})};
+ return {offerId:await issueSyntheticAdmissionOffer(actor,{applicationId:app.id,schoolYearId:data.schoolYearId,idempotencyKey:key,expiresAt})};
 });
 export const respondSyntheticOfferFromDemo=createServerFn({method:"POST"})
 .validator((data:{offerId:string;decision:"accept"|"decline"})=>data).handler(async({data})=>{
  assertSyntheticMutation("guardian");
  if(!["accept","decline"].includes(data.decision))throw new Error("Invalid decision");
  const {offer,app}=await syntheticOffer(data.offerId);
+ const actor=await authorizedActor("guardian","enrollment.apply",app.programId);
  const [profile]=await db.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
  if(!profile)throw new Error("Student profile missing");
- const [guardian]=await db.select({id:guardianRelationships.guardianPersonId}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.canManageEnrollment,true))).limit(1);
+ const [guardian]=await db.select({id:guardianRelationships.guardianPersonId}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.canManageEnrollment,true),eq(guardianRelationships.guardianPersonId,actor.actorPersonId!))).limit(1);
  if(!guardian)throw new Error("Synthetic guardian relationship missing");
- return {offerId:await respondToSyntheticAdmissionOffer(context(guardian.id,app.programId,"enrollment.apply"),offer.id,data.decision)};
+ return {offerId:await respondToSyntheticAdmissionOffer(actor,offer.id,data.decision)};
 });
 export const activateSyntheticOfferFromDemo=createServerFn({method:"POST"})
 .validator((data:{offerId:string})=>data).handler(async({data})=>{
  assertSyntheticMutation("registrar");
  const {offer,app}=await syntheticOffer(data.offerId);
- return {enrollmentId:await activateSyntheticOfferedEnrollment(context(DEMO_REGISTRAR,app.programId,"enrollment.activate"),offer.id)};
+ const actor=await authorizedActor("registrar","enrollment.activate",app.programId);
+ return {enrollmentId:await activateSyntheticOfferedEnrollment(actor,offer.id)};
 });
