@@ -51,6 +51,14 @@ integration("synthetic admissions offer concurrency",()=>{
   const guardianNotices=await db.select().from(s.notifications).where(eq(s.notifications.recipientPersonId,guardian.id));
   expect(guardianNotices.filter(n=>n.type==="admission_offer_issued"&&n.resourceId===offerId)).toHaveLength(1);
 
+  // A person with the guardian capability but without the student relationship must be denied.
+  const unrelatedGuardian={actorPersonId:registrarPerson.id,capabilities:new Set(["enrollment.apply"]),scope:{programIds:[program.id]}};
+  await expect(svc.respondToSyntheticAdmissionOffer(unrelatedGuardian,offerId,"accept")).rejects.toThrow("Guardian is not authorized");
+  const [beforeDecision]=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.id,offerId));
+  expect(beforeDecision.status).toBe("issued");
+  // Enrollment activation is forbidden before the actual guardian has accepted.
+  await expect(svc.activateSyntheticOfferedEnrollment(registrar,offerId)).rejects.toThrow("Guardian must accept offer first");
+
   await expect(svc.respondToSyntheticAdmissionOffer(family,offerId,"accept")).resolves.toBe(offerId);
   const registrarNotices=await db.select().from(s.notifications).where(eq(s.notifications.recipientPersonId,registrarPerson.id));
   expect(registrarNotices.filter(n=>n.type==="admission_offer_accepted"&&n.resourceId===offerId)).toHaveLength(1);
