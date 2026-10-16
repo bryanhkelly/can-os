@@ -20,7 +20,7 @@ function GuardianAdmissionOffers(){
   <header><h1 className="font-serif text-4xl">Enrollment offers</h1><p className="mt-2 text-muted-foreground">Review offers for students whose enrollment you are authorized to manage.</p></header>
   {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}
   {applications.map(app=><section className="rounded-xl border p-5" key={app.applicationId}>
-    <h2 className="text-xl font-semibold">{app.program}</h2>
+    <h2 className="text-xl font-semibold">{app.studentName}</h2><p className="text-sm text-muted-foreground">{app.program}</p>
     {app.offers.map(o=><div className="mt-3 border-t pt-3" key={o.id}>
      <p className="text-sm">Offer status: {o.status}{o.expiresAt?" · Expires "+new Date(o.expiresAt).toLocaleDateString():""}</p>
      {o.status==="issued"&&(!o.expiresAt||new Date(o.expiresAt).getTime()>Date.now())&&<div className="mt-3 flex gap-3"><button disabled={busy!==null} className="rounded border px-4 py-2" onClick={()=>respond(o.id,"accept")}>Accept</button><button disabled={busy!==null} className="rounded border px-4 py-2" onClick={()=>respond(o.id,"decline")}>Decline</button></div>}
