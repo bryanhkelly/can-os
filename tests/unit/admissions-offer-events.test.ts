@@ -92,6 +92,24 @@ describe("transactional admissions events", () => {
     expect(values).not.toHaveBeenCalled();
   });
 
+  it("rejects issuance when authorized program scope is missing", async () => {
+    selectRows([application]);
+    await expect(issueSyntheticAdmissionOffer({...context,scope:{}},input)).rejects.toThrow("program scope");
+    expect(values).not.toHaveBeenCalled();
+  });
+
+  it("rejects guardian response when authorized program scope is missing", async () => {
+    selectRows([offer]);
+    await expect(respondToSyntheticAdmissionOffer({...context,scope:{}},"offer","accept")).rejects.toThrow("program scope");
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects activation when authorized program scope is missing", async () => {
+    selectRows([offer]);
+    await expect(activateSyntheticOfferedEnrollment({...context,scope:{}},"offer")).rejects.toThrow("program scope");
+    expect(values).not.toHaveBeenCalled();
+  });
+
   it("rejects non-synthetic applications before issuing an offer", async () => {
     selectRows([{ ...application, metadata: { synthetic: false } }]);
     await expect(issueSyntheticAdmissionOffer(context, input)).rejects.toThrow("Synthetic application not found");
