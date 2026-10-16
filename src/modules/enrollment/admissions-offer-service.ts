@@ -1,6 +1,6 @@
 import {and,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
-import {admissionOffers,admissionSeatPools,applications,auditEvents,domainEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles} from "@/db/schema";
+import {admissionOffers,admissionSeatPools,applications,auditEvents,domainEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles,notifications} from "@/db/schema";
 import {assertCapability,assertProgramScope,type CommandContext} from "@/domain/command-context";
 import {EventTypes} from "@/domain/event-types";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
@@ -105,6 +105,15 @@ export async function activateSyntheticOfferedEnrollment(context:CommandContext,
   const [enrollment]=await tx.insert(enrollments).values({studentProfileId:app.studentProfileId,kind:"program",status:"active",organizationId,programId:offer!.programId,schoolYearId:offer!.schoolYearId,startedAt:new Date()}).returning({id:enrollments.id});
   if(!enrollment)throw new Error("Enrollment activation failed");
   await tx.update(journeys).set({status:"active",completedAt:new Date(),updatedAt:new Date()}).where(eq(journeys.id,journey.id));
+  const [student]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
+  if(!student)throw new Error("Student profile missing during activation");
+  const recipients=[...new Set([student.personId,offer!.respondedByPersonId].filter((id):id is string=>Boolean(id)))];
+  await tx.insert(notifications).values(recipients.map(recipientPersonId=>({
+   recipientPersonId,type:"enrollment_activated",status:"unread" as const,
+   title:"Enrollment confirmed",body:"Your accepted admission offer has been activated for the school year.",
+   resourceType:"enrollment",resourceId:enrollment.id
+  })));
+
   await tx.insert(domainEvents).values({eventType:EventTypes.EnrollmentActivated,aggregateType:"enrollment",aggregateId:enrollment.id,actorPersonId:context.actorPersonId,payload:{applicationId:app.id,studentProfileId:app.studentProfileId,programId:offer!.programId,schoolYearId:offer!.schoolYearId,offerId}});
   await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"journey.activate",resourceType:"journey",resourceId:journey.id,scope:{programId:offer!.programId},before:{status:journey.status},after:{status:"active"},context:{requestId:context.requestId??null,offerId,enrollmentId:enrollment.id}});
   await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"admissions.offer.activate",resourceType:"enrollment",resourceId:enrollment.id,scope:{programId:offer!.programId},after:{offerId,schoolYearId:offer!.schoolYearId,status:"active"},context:{requestId:context.requestId??null}});
