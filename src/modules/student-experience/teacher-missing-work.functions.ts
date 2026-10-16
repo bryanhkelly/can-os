@@ -3,11 +3,10 @@ import {getRequest} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,assertSiteScope,AuthorizationError} from "@/domain/command-context";
 import {and,eq,inArray,lt} from "drizzle-orm";
-const TEACHER="f1000000-0000-4000-8000-000000000006";
 const SITE="f1000000-0000-4000-8000-000000000003";
 async function assertDemoTeacher(){
  const context=await getCommandContext(getRequest());
- if(context.role!=="teacher"||context.actorPersonId!==TEACHER)throw new AuthorizationError("demo teacher identity required");
+ if(context.role!=="teacher"||!context.actorPersonId)throw new AuthorizationError("demo teacher identity required");
  assertCapability(context,"assignments:grade");
  if(!context.scope.siteIds?.includes(SITE))throw new AuthorizationError("demo teacher site membership");
  assertSiteScope(context,SITE);
@@ -16,12 +15,12 @@ async function assertDemoTeacher(){
 
 /** A real enrolled-roster queue restricted to synthetic students in the demo teacher's assigned sections. */
 export const getSyntheticTeacherMissingWork=createServerFn({method:"GET"}).handler(async()=>{
- await assertDemoTeacher();
+ const context=await assertDemoTeacher();
  if(!process.env.DATABASE_URL)return {connected:false,items:[]};
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const assigned=await db.select({sectionId:s.sectionTeachers.sectionId}).from(s.sectionTeachers)
   .innerJoin(s.sections,and(eq(s.sections.id,s.sectionTeachers.sectionId),eq(s.sections.siteId,SITE)))
-  .where(eq(s.sectionTeachers.personId,TEACHER));
+  .where(eq(s.sectionTeachers.personId,context.actorPersonId!));
  const sectionIds=[...new Set(assigned.map(x=>x.sectionId))];
  if(!sectionIds.length)return {connected:true,items:[]};
  const now=new Date();
@@ -50,7 +49,7 @@ export const createSyntheticMissingWorkFollowUp=createServerFn({method:"POST"})
  .handler(async({data})=>{
   const {assertSyntheticMutation}=await import("./demo-write-gate");
   assertSyntheticMutation("teacher");
-  await assertDemoTeacher();
+  const context=await assertDemoTeacher();
   const [{db},s,{and,eq,lt,sql,inArray}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
   return db.transaction(async tx=>{
    const key="missing-work:"+data.assessmentId+":"+data.studentProfileId;
@@ -58,7 +57,7 @@ export const createSyntheticMissingWorkFollowUp=createServerFn({method:"POST"})
    const [assessment]=await tx.select({id:s.assessments.id,title:s.assessments.title,sectionId:s.assessments.sectionId,organizationId:s.programs.organizationId})
     .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
     .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
-    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,TEACHER)))
+    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
     .where(and(eq(s.assessments.id,data.assessmentId),eq(s.sections.siteId,SITE),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,new Date()))).limit(1);
    if(!assessment)throw new Error("Overdue teacher-assigned assessment not found");
    const [student]=await tx.select({id:s.studentProfiles.id,personId:s.people.id,name:s.people.legalFirstName,metadata:s.people.metadata})
@@ -73,10 +72,10 @@ export const createSyntheticMissingWorkFollowUp=createServerFn({method:"POST"})
     .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,student.id),eq(s.actions.siteId,SITE)));
    const open=existing.find(a=>a.metadata.synthetic===true&&a.metadata.assessmentId===assessment.id&&!["resolved","cancelled"].includes(a.status));
    if(open)return {actionId:open.id,created:false};
-   const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:TEACHER,organizationId:assessment.organizationId,siteId:SITE,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{synthetic:true,fixture:"gf1",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});
+   const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:context.actorPersonId!,organizationId:assessment.organizationId,siteId:SITE,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{synthetic:true,fixture:"gf1",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});
    if(!action)throw new Error("Unable to create follow-up");
    await tx.insert(s.notifications).values({recipientPersonId:student.personId,type:"missing_work_follow_up",status:"unread",title:"Teacher follow-up: "+assessment.title,body:"Your teacher flagged overdue work. Open the assignment to review and submit it.",resourceType:"action",resourceId:action.id});
-   await tx.insert(s.auditEvents).values({actorPersonId:TEACHER,action:"synthetic.missing_work.follow_up",resourceType:"action",resourceId:action.id,after:{assessmentId:assessment.id,studentProfileId:student.id},context:{synthetic:true}});
+   await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId!,action:"synthetic.missing_work.follow_up",resourceType:"action",resourceId:action.id,after:{assessmentId:assessment.id,studentProfileId:student.id},context:{synthetic:true}});
    return {actionId:action.id,created:true};
   });
  });
