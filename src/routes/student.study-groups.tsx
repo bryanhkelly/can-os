@@ -1,7 +1,7 @@
 import {useEffect,useState} from "react";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
 import {getStudyGroupAvailability,createStudyGroup,listStudyGroups,requestStudyGroupMembership,leaveStudyGroup,getStudyGroupDetail,postStudyGroupMessage,reportStudyGroupPost,scheduleStudyGroupSession,reviseStudyGroupSession,rsvpStudyGroupSession,recordStudyGroupAttendance,listStudyGroupAttendance,listStudyGroupReviewQueue,decideStudyGroupMembership,listStudyGroupReports,resolveStudyGroupReport} from "@/modules/student-experience/study-groups.functions";
-export const Route=createFileRoute("/student/study-groups")({validateSearch:(search:Record<string,unknown>)=>({group:typeof search.group==="string"?search.group:undefined}),loader:async()=>{
+export const Route=createFileRoute("/student/study-groups")({validateSearch:(search:Record<string,unknown>):{group?:string}=>({group:typeof search.group==="string"?search.group:undefined}),loader:async()=>{
  const {enabled}=await getStudyGroupAvailability();
  if(!enabled)return {enabled,groups:[],queue:[],reports:[]};
  const [groups,queue,reports]=await Promise.all([listStudyGroups(),listStudyGroupReviewQueue(),listStudyGroupReports()]);
