@@ -41,6 +41,12 @@ if (process.env.CAN_APPLICATION_DB_HOST && testEndpoint === process.env.CAN_APPL
   fail("TEST_DATABASE_URL must not use the configured application database host.");
 }
 
+if (process.argv.includes("--preflight")) {
+  if (mode !== "admissions-offers") fail("preflight is only supported for admissions-offers.");
+  console.log("Disposable admissions database endpoint check passed.");
+  process.exit(0);
+}
+
 const targeted = mode === "gf26" || mode === "gf26-lifecycle" || mode === "admissions-offers";
 const suite = mode === "gf26" ? ["tests/integration/gf26-fixture-integrity.test.ts"] : mode === "gf26-lifecycle" ? ["tests/integration/gf26-session-lifecycle.test.ts"] : mode === "admissions-offers" ? ["tests/integration/admissions-offers.integration.test.ts"] : ["tests/integration"];
 const args = targeted ? process.argv.slice(3) : process.argv.slice(2);
