@@ -1,10 +1,21 @@
 import {createServerFn} from "@tanstack/react-start";
+import {getRequest} from "@tanstack/react-start/server";
+import {getCommandContext} from "@/modules/identity/command-context.server";
+import {assertCapability,assertSiteScope,AuthorizationError} from "@/domain/command-context";
 import {and,eq,inArray,lt} from "drizzle-orm";
 const TEACHER="f1000000-0000-4000-8000-000000000006";
 const SITE="f1000000-0000-4000-8000-000000000003";
+async function assertDemoTeacher(){
+ const context=await getCommandContext(getRequest());
+ if(context.role!=="teacher"||context.actorPersonId!==TEACHER)throw new AuthorizationError("demo teacher identity required");
+ assertCapability(context,"assignments:grade");
+ assertSiteScope(context,SITE);
+ return context;
+}
 
 /** A real enrolled-roster queue restricted to synthetic students in the demo teacher's assigned sections. */
 export const getSyntheticTeacherMissingWork=createServerFn({method:"GET"}).handler(async()=>{
+ await assertDemoTeacher();
  if(!process.env.DATABASE_URL)return {connected:false,items:[]};
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const assigned=await db.select({sectionId:s.sectionTeachers.sectionId}).from(s.sectionTeachers)
@@ -38,6 +49,7 @@ export const createSyntheticMissingWorkFollowUp=createServerFn({method:"POST"})
  .handler(async({data})=>{
   const {assertSyntheticMutation}=await import("./demo-write-gate");
   assertSyntheticMutation("teacher");
+  await assertDemoTeacher();
   const [{db},s,{and,eq,lt,sql,inArray}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
   return db.transaction(async tx=>{
    const key="missing-work:"+data.assessmentId+":"+data.studentProfileId;
