@@ -32,3 +32,37 @@ export const getSyntheticTeacherMissingWork=createServerFn({method:"GET"}).handl
  })).sort((a,b)=>a.dueAt.localeCompare(b.dueAt));
  return {connected:true,items};
 });
+
+export const createSyntheticMissingWorkFollowUp=createServerFn({method:"POST"})
+ .validator((data:{assessmentId:string;studentProfileId:string})=>data)
+ .handler(async({data})=>{
+  const {assertSyntheticMutation}=await import("./demo-write-gate");
+  assertSyntheticMutation("teacher");
+  const [{db},s,{and,eq,lt,sql,inArray}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
+  return db.transaction(async tx=>{
+   const key="missing-work:"+data.assessmentId+":"+data.studentProfileId;
+   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+   const [assessment]=await tx.select({id:s.assessments.id,title:s.assessments.title,sectionId:s.assessments.sectionId,organizationId:s.programs.organizationId})
+    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+    .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,TEACHER)))
+    .where(and(eq(s.assessments.id,data.assessmentId),eq(s.sections.siteId,SITE),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,new Date()))).limit(1);
+   if(!assessment)throw new Error("Overdue teacher-assigned assessment not found");
+   const [student]=await tx.select({id:s.studentProfiles.id,name:s.people.legalFirstName,metadata:s.people.metadata})
+    .from(s.enrollments).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+    .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
+    .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.studentProfiles.id,data.studentProfileId))).limit(1);
+   if(!student||student.metadata.synthetic!==true)throw new Error("Synthetic student not actively enrolled");
+   const attempts=await tx.select({status:s.submissions.status}).from(s.submissions)
+    .where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,student.id)));
+   if(attempts.some(a=>a.status!=="assigned"))throw new Error("Work has already been submitted");
+   const existing=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata}).from(s.actions)
+    .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,student.id),eq(s.actions.siteId,SITE)));
+   const open=existing.find(a=>a.metadata.synthetic===true&&a.metadata.assessmentId===assessment.id&&!["resolved","cancelled"].includes(a.status));
+   if(open)return {actionId:open.id,created:false};
+   const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:TEACHER,organizationId:assessment.organizationId,siteId:SITE,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{synthetic:true,fixture:"gf1",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});
+   if(!action)throw new Error("Unable to create follow-up");
+   await tx.insert(s.auditEvents).values({actorPersonId:TEACHER,action:"synthetic.missing_work.follow_up",resourceType:"action",resourceId:action.id,after:{assessmentId:assessment.id,studentProfileId:student.id},context:{synthetic:true}});
+   return {actionId:action.id,created:true};
+  });
+ });
