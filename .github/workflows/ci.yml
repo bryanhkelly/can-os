@@ -33,6 +33,9 @@ jobs:
       - name: Audit route fixture coverage
         run: node scripts/check-route-fixture-coverage.mjs
 
+      - name: Admissions and authorization regressions
+        run: npx vitest run tests/unit/admissions-session-roles.test.ts tests/unit/admissions-offer-events.test.ts tests/unit/admissions-seat-occupancy.test.ts
+
       - name: Typecheck
         run: npm run typecheck
 
