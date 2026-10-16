@@ -47,7 +47,14 @@ export const readSyntheticNotification=createServerFn({method:"POST"})
   assertCapability(context,"notifications:manage");
   const personId=context.actorPersonId!;
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  await db.update(s.notifications).set({status:"read",readAt:new Date(),updatedAt:new Date()}).where(and(eq(s.notifications.id,data.id),eq(s.notifications.recipientPersonId,personId)));
+  const changed=await db.update(s.notifications).set({status:"read",readAt:new Date(),updatedAt:new Date()})
+   .where(and(eq(s.notifications.id,data.id),eq(s.notifications.recipientPersonId,personId),eq(s.notifications.status,"unread")))
+   .returning({id:s.notifications.id});
+  if(changed.length)return {saved:true};
+  const [existing]=await db.select({status:s.notifications.status}).from(s.notifications)
+   .where(and(eq(s.notifications.id,data.id),eq(s.notifications.recipientPersonId,personId))).limit(1);
+  if(!existing)throw new Error("Notification not found");
+  if(existing.status==="dismissed")throw new Error("Dismissed notifications cannot be marked read");
   return {saved:true};
  });
 
