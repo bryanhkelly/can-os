@@ -13,7 +13,8 @@
     "test": "vitest run --exclude 'tests/integration/**'",
     "test:integration": "node scripts/run-integration-tests.mjs",
     "typecheck": "vite build && tsc --noEmit",
-    "test:integration:gf26": "node scripts/run-integration-tests.mjs gf26"
+    "test:integration:gf26": "node scripts/run-integration-tests.mjs gf26",
+    "test:integration:gf26-lifecycle": "node scripts/run-integration-tests.mjs gf26-lifecycle"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
