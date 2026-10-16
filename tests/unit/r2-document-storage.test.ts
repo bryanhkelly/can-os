@@ -26,6 +26,7 @@ describe("private Cloudflare R2 upload controls",()=>{
  });
  it("requires safe file names, size and supported MIME types",()=>{
   expect(()=>validateDocumentUpload("report.pdf","application/pdf",2048)).not.toThrow();
+  expect(()=>validateDocumentUpload("report.pdf","application/pdf",15)).toThrow();
   expect(()=>validateDocumentUpload("../bad.pdf","application/pdf",2048)).toThrow();
   expect(()=>validateDocumentUpload("report.svg","image/svg+xml",2048)).toThrow();
   expect(()=>validateDocumentUpload("report.pdf","application/pdf",11*1024*1024)).toThrow();
