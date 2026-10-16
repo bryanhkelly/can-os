@@ -25,10 +25,10 @@ export type AccessContext = CommandContext & {
 /** Capability mapping is centralized; domain-specific relationship checks are still required. */
 export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Object.freeze({
  student: ["student:read","assignments:submit","study-groups:participate","notifications:manage"],
- teacher: ["teacher:read","assignments:grade","assignments:create","referrals:create","discussions:moderate"],
- guardian: ["guardian:read","enrollment:manage","student:related-read"],
- registrar: ["admissions:read","admissions:decide","enrollment:manage","registrations:approve"],
- specialist: ["referrals:read","referrals:manage","support-plans:manage"],
+ teacher: ["teacher:read","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate"],
+ guardian: ["guardian:read","notifications:manage","enrollment:manage","student:related-read"],
+ registrar: ["admissions:read","notifications:manage","admissions:decide","enrollment:manage","registrations:approve"],
+ specialist: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage"],
 });
 
 /** This may be called only after authenticating a server session and fetching grants from Neon. */
