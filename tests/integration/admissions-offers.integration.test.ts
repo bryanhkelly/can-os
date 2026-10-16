@@ -1,8 +1,9 @@
 import {describe,expect,it} from "vitest";
 /** Explicit opt-in only. Never write integration fixtures to a production DB automatically. */
-const integration=process.env.DATABASE_URL&&process.env.CAN_TEST_DB_WRITES_ENABLED==="true"&&process.env.NODE_ENV!=="production"?describe:describe.skip;
+const integration=process.env.DATABASE_URL&&process.env.CAN_TEST_DB_WRITES_ENABLED==="true"&&process.env.APP_ENV==="test"&&process.env.NODE_ENV==="test"?describe:describe.skip;
 integration("synthetic admissions offer concurrency",()=>{
  it("only one offer takes the final seat and accepted offer activates once",async()=>{
+  if(process.env.CAN_TEST_DB_WRITES_ENABLED!=="true"||process.env.APP_ENV!=="test"||process.env.NODE_ENV!=="test")throw new Error("Disposable Neon test guard required");
   process.env.CAN_DEMO_WRITES_ENABLED="true";
   const [{db},s,{eq},svc,{startFamilyApplication}]=await Promise.all([
    import("@/db/client"),import("@/db/schema"),import("drizzle-orm"),
