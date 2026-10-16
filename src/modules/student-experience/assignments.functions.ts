@@ -151,11 +151,11 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForSubmission(data.submissionId);
   return db.transaction(async tx=>{
-  const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,studentProfileId:s.submissions.studentProfileId})
+  const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,studentProfileId:s.submissions.studentProfileId,metadata:s.assessments.metadata})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.submissions.status,"submitted"))).limit(1);
-  if(!record)throw new Error("Submitted work not found");
+  if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic submitted work not found");
   const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
   if(!student)throw new AuthorizationError("student profile");
   const studentPersonId=student.personId;
@@ -179,6 +179,11 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForSubmission(data.submissionId);
   return db.transaction(async tx=>{
+  const [record]=await tx.select({metadata:s.assessments.metadata})
+   .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
+   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+   .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
+  if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic graded submission not found");
   const [updated]=await tx.update(s.submissions).set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
    .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.status,"graded"))).returning({id:s.submissions.id});
   if(!updated)throw new Error("Graded synthetic submission not found");
