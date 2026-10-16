@@ -52,6 +52,7 @@ export const triageSyntheticOperationsAction=createServerFn({method:"POST"})
  .validator((data:{id:string;owner:"unassigned"|"teacher";priority:"normal"|"high"|"urgent"})=>data)
  .handler(async({data})=>{
   assertSyntheticMutation("registrar");
+  const actor=await registrarActor();
   if(!["unassigned","teacher"].includes(data.owner)||!["normal","high","urgent"].includes(data.priority))throw new Error("Invalid assignment or priority");
   const ownerPersonId=data.owner==="teacher"?"f1000000-0000-4000-8000-000000000006":null;
   const [{db},s,{and,eq}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);

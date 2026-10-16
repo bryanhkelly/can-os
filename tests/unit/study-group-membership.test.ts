@@ -5,16 +5,19 @@ import {
   requestStudyGroupMembership,
 } from "@/modules/student-experience/study-groups.functions";
 
-const { transaction, select, insert, update, values, set } = vi.hoisted(() => ({
+const { transaction, select, insert, update, values, set, getCommandContext } = vi.hoisted(() => ({
   transaction: vi.fn(),
   select: vi.fn(),
   insert: vi.fn(),
   update: vi.fn(),
   values: vi.fn(),
   set: vi.fn(),
+  getCommandContext: vi.fn(),
 }));
 
 vi.mock("@/db/client", () => ({ db: { transaction } }));
+vi.mock("@tanstack/react-start/server", () => ({getRequest: vi.fn(() => new Request("https://can.local"))}));
+vi.mock("@/modules/identity/command-context.server", () => ({getCommandContext}));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({
     validator() { return this; },
@@ -37,6 +40,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("NODE_ENV", "test");
   vi.stubEnv("CAN_DEMO_WRITES_ENABLED", "true");
+  getCommandContext.mockResolvedValue({actorPersonId:"student",role:"student",scope:{siteIds:["f1000000-0000-4000-8000-000000000003"]}});
   transaction.mockImplementation(async (callback) => callback({ select, insert, update }));
   insert.mockReturnValue({ values });
   values.mockReturnValue({ onConflictDoUpdate: vi.fn().mockResolvedValue(undefined) });
@@ -65,6 +69,7 @@ describe("synthetic Study Group membership transitions", () => {
   });
 
   it("locks group capacity before refusing an over-capacity approval", async () => {
+    getCommandContext.mockResolvedValue({actorPersonId:"teacher",role:"teacher",scope:{siteIds:["f1000000-0000-4000-8000-000000000003"]}});
     const group = query([{ id: "group", maxMembers: 2 }]);
     select.mockReturnValueOnce(group)
       .mockReturnValueOnce(query([{ id: "membership" }]))
