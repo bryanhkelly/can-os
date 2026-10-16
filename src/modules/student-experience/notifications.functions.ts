@@ -1,25 +1,36 @@
 import { createServerFn } from "@tanstack/react-start";
 import { eq, desc, and, inArray } from "drizzle-orm";
-import { assertSyntheticMutation } from "./demo-write-gate";
-const STUDENT_PERSON="f1000000-0000-4000-8000-000000000005";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { assertCapability } from "@/domain/command-context";
+async function notificationActor(){
+ const context=await getCommandContext(getRequest());
+ if(!context.actorPersonId)throw new Error("Authenticated person required");
+ return context;
+}
 export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(async()=>{
- if(!process.env.DATABASE_URL)return [];
+ const context=await notificationActor();
+ setResponseHeader("Cache-Control","no-store");
+ const personId=context.actorPersonId!;
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const rows=await db.select({id:s.notifications.id,type:s.notifications.type,title:s.notifications.title,body:s.notifications.body,
   status:s.notifications.status,resourceType:s.notifications.resourceType,resourceId:s.notifications.resourceId,createdAt:s.notifications.createdAt})
- .from(s.notifications).where(eq(s.notifications.recipientPersonId,STUDENT_PERSON)).orderBy(desc(s.notifications.createdAt)).limit(50);
+ .from(s.notifications).where(eq(s.notifications.recipientPersonId,personId)).orderBy(desc(s.notifications.createdAt)).limit(50);
  const sessionIds=rows.filter(n=>n.resourceType==="study_group_session"&&n.resourceId).map(n=>n.resourceId as string);
- const sessions=sessionIds.length?await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions).innerJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroupSessions.groupId),eq(s.studyGroupMemberships.personId,STUDENT_PERSON),eq(s.studyGroupMemberships.status,"approved"))).where(inArray(s.studyGroupSessions.id,sessionIds)):[];
+ const sessions=sessionIds.length?await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions).innerJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroupSessions.groupId),eq(s.studyGroupMemberships.personId,personId),eq(s.studyGroupMemberships.status,"approved"))).where(inArray(s.studyGroupSessions.id,sessionIds)):[];
  const groupBySession=new Map(sessions.map(s=>[s.id,s.groupId]));
  const submissionIds=rows.filter(n=>n.resourceType==="submission"&&n.resourceId).map(n=>n.resourceId as string);
- const [submissions,referrals]=await Promise.all([
-  submissionIds.length?db.select({id:s.submissions.id,assessmentId:s.submissions.assessmentId,studentProfileId:s.submissions.studentProfileId}).from(s.submissions).where(inArray(s.submissions.id,submissionIds)):Promise.resolve([]),
-  db.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions).where(and(eq(s.actions.type,"support_referral"),eq(s.actions.subjectId,"f1000000-0000-4000-8000-000000000007")))
- ]);
- const bySubmission=new Map(submissions.filter(x=>submissionIds.includes(x.id)&&x.studentProfileId==="f1000000-0000-4000-8000-000000000007").map(x=>[x.id,x.assessmentId]));
- const referralIds=new Set(referrals.filter(r=>r.metadata.synthetic===true&&r.metadata.fixture==="gf41").map(r=>r.id));
+ const studentProfiles=await db.select({id:s.studentProfiles.id}).from(s.studentProfiles).where(eq(s.studentProfiles.personId,personId));
+ const studentIds=studentProfiles.map(p=>p.id);
+ const submissions=submissionIds.length&&studentIds.length?
+  await db.select({id:s.submissions.id,assessmentId:s.submissions.assessmentId,studentProfileId:s.submissions.studentProfileId})
+   .from(s.submissions).where(and(inArray(s.submissions.id,submissionIds),inArray(s.submissions.studentProfileId,studentIds))):[];
+ const referralRows=studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata})
+  .from(s.actions).where(and(eq(s.actions.type,"support_referral"),inArray(s.actions.subjectId,studentIds))):[];
+ const bySubmission=new Map(submissions.map(x=>[x.id,x.assessmentId]));
+ const referralIds=new Set(referralRows.filter(r=>r.metadata.synthetic===true&&r.metadata.fixture==="gf41").map(r=>r.id));
  const missingIds=rows.filter(n=>n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId as string);
- const followUps=missingIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions).where(and(inArray(s.actions.id,missingIds),eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectId,"f1000000-0000-4000-8000-000000000007"))):[];
+ const followUps=missingIds.length&&studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions).where(and(inArray(s.actions.id,missingIds),eq(s.actions.type,"missing_work_follow_up"),inArray(s.actions.subjectId,studentIds))):[];
  const missingAssessmentByAction=new Map(followUps.filter(a=>a.metadata.synthetic===true&&typeof a.metadata.assessmentId==="string").map(a=>[a.id,a.metadata.assessmentId as string]));
 
  return rows.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
@@ -32,19 +43,23 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
 });
 export const readSyntheticNotification=createServerFn({method:"POST"})
  .validator((data:{id:string})=>data).handler(async({data})=>{
-  assertSyntheticMutation("student");
+  const context=await notificationActor();
+  assertCapability(context,"notifications:manage");
+  const personId=context.actorPersonId!;
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  await db.update(s.notifications).set({status:"read",readAt:new Date(),updatedAt:new Date()}).where(and(eq(s.notifications.id,data.id),eq(s.notifications.recipientPersonId,STUDENT_PERSON)));
+  await db.update(s.notifications).set({status:"read",readAt:new Date(),updatedAt:new Date()}).where(and(eq(s.notifications.id,data.id),eq(s.notifications.recipientPersonId,personId)));
   return {saved:true};
  });
 
 /** Idempotently acknowledge all unread notifications for the fixed synthetic student. */
 export const readAllSyntheticNotifications=createServerFn({method:"POST"}).handler(async()=>{
- assertSyntheticMutation("student");
+ const context=await notificationActor();
+ assertCapability(context,"notifications:manage");
+ const personId=context.actorPersonId!;
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const changed=await db.update(s.notifications)
   .set({status:"read",readAt:new Date(),updatedAt:new Date()})
-  .where(and(eq(s.notifications.recipientPersonId,STUDENT_PERSON),eq(s.notifications.status,"unread")))
+  .where(and(eq(s.notifications.recipientPersonId,personId),eq(s.notifications.status,"unread")))
   .returning({id:s.notifications.id});
  return {saved:true,count:changed.length};
 });
@@ -53,12 +68,14 @@ export const readAllSyntheticNotifications=createServerFn({method:"POST"}).handl
 export const setSyntheticNotificationStatus=createServerFn({method:"POST"})
  .validator((data:{id:string;status:"unread"|"read"|"dismissed"})=>data)
  .handler(async({data})=>{
-  assertSyntheticMutation("student");
+  const context=await notificationActor();
+  assertCapability(context,"notifications:manage");
+  const personId=context.actorPersonId!;
   if(!["unread","read","dismissed"].includes(data.status))throw new Error("Invalid notification status");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   const changed=await db.update(s.notifications).set({
    status:data.status,readAt:data.status==="unread"?null:new Date(),updatedAt:new Date()
-  }).where(and(eq(s.notifications.id,data.id),eq(s.notifications.recipientPersonId,STUDENT_PERSON)))
+  }).where(and(eq(s.notifications.id,data.id),eq(s.notifications.recipientPersonId,personId)))
   .returning({id:s.notifications.id});
   if(!changed.length)throw new Error("Synthetic notification not found");
   return {saved:true};
