@@ -71,7 +71,12 @@ export async function issueSyntheticAdmissionOffer(context:CommandContext,input:
   const {pool}=await lockPool(tx,app.programId,input.schoolYearId);
   await expireElapsedOffers(tx,context,app.programId,input.schoolYearId,new Date());
   const [retry]=await tx.select().from(admissionOffers).where(eq(admissionOffers.idempotencyKey,input.idempotencyKey)).limit(1);
-  if(retry){if(retry.applicationId!==app.id||retry.schoolYearId!==input.schoolYearId)throw new Error("Idempotency key reused across applications");if(retry.status!=="issued"&&retry.status!=="accepted")throw new Error("Existing offer is no longer actionable");return retry.id;}
+  if(retry){
+   if(retry.applicationId!==app.id||retry.schoolYearId!==input.schoolYearId)throw new Error("Idempotency key reused across applications");
+   if(retry.status==="issued"&&retry.expiresAt&&retry.expiresAt.getTime()<=Date.now())throw new Error("Existing offer has expired");
+   if(retry.status!=="issued"&&retry.status!=="accepted")throw new Error("Existing offer is no longer actionable");
+   return retry.id;
+  }
   if(!["application","eligibility"].includes(app.stage))throw new Error("Application stage is not eligible");
   const existingOffers=await tx.select({id:admissionOffers.id,status:admissionOffers.status,expiresAt:admissionOffers.expiresAt}).from(admissionOffers).where(and(eq(admissionOffers.applicationId,app.id),eq(admissionOffers.schoolYearId,input.schoolYearId),inArray(admissionOffers.status,["issued","accepted"])));
   if(existingOffers.some(o=>o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now()))))throw new Error("An active offer already exists for this application and school year");
