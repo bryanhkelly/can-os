@@ -1,4 +1,4 @@
-import {and,eq,gt,isNull,lt} from "drizzle-orm";
+import {and,eq,gt,isNull,lt,sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import {accessAccounts,accessChallenges,accessSessions,accountPersonGrants,auditEvents} from "@/db/schema";
 import {issueOpaqueSecret,hashAccessSecret,normalizeAccessEmail,sessionCookieHeader,clearSessionCookieHeader} from "@/domain/access-tokens";
@@ -31,15 +31,22 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
  const now=new Date();
- const recent=await db.select({id:accessChallenges.id}).from(accessChallenges)
-  .where(and(eq(accessChallenges.accountId,account.id),gt(accessChallenges.createdAt,new Date(now.getTime()-REQUEST_COOLDOWN_MS)))).limit(1);
- if(recent.length)return genericResult;
- const token=issueOpaqueSecret(),hash=hashAccessSecret(token,secretPepper());
- const challenge=await db.insert(accessChallenges).values({
-  accountId:account.id,tokenHash:hash,expiresAt:new Date(now.getTime()+CHALLENGE_LIFETIME_MS),
- }).returning({id:accessChallenges.id});
+ // Serialize concurrent requests for the same account before enforcing cooldown.
+ // Without this transaction, simultaneous requests can each see zero recent challenges.
+ const issued=await db.transaction(async tx=>{
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${account.id}))`);
+  const recent=await tx.select({id:accessChallenges.id}).from(accessChallenges)
+   .where(and(eq(accessChallenges.accountId,account.id),gt(accessChallenges.createdAt,new Date(now.getTime()-REQUEST_COOLDOWN_MS)))).limit(1);
+  if(recent.length)return null;
+  const token=issueOpaqueSecret(),hash=hashAccessSecret(token,secretPepper());
+  await tx.insert(accessChallenges).values({
+   accountId:account.id,tokenHash:hash,expiresAt:new Date(now.getTime()+CHALLENGE_LIFETIME_MS),
+  });
+  return token;
+ });
+ if(!issued)return genericResult;
  try {
-  await sender({to:email,accessUrl:accessOrigin+"/access/verify#token="+encodeURIComponent(token)});
+  await sender({to:email,accessUrl:accessOrigin+"/access/verify#token="+encodeURIComponent(issued)});
  }catch(error){
   // Preserve the issued challenge and cooldown on delivery failure; a rapid retry
   // must not turn a mail-provider outage into unbounded request generation.
