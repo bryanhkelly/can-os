@@ -30,13 +30,13 @@ export const createStudyGroup=createServerFn({method:"POST"}).validator((x:{titl
  if(!group)throw new Error('Group creation failed');return {id:group.id};
 });
 export const requestStudyGroupMembership=createServerFn({method:"POST"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
- assertSyntheticMutation("student");const {db,s}=await context();
+ assertSyntheticMutation("student");const actor=await groupActor("student");const {db,s}=await context();
  return db.transaction(async tx=>{
  const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.status,"active"),eq(s.studyGroups.siteId,SITE))).for("update").limit(1);
  if(!group)throw new Error("Group unavailable");
- const [existing]=await tx.select({status:s.studyGroupMemberships.status}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,group.id),eq(s.studyGroupMemberships.personId,STUDENT))).limit(1);
+ const [existing]=await tx.select({status:s.studyGroupMemberships.status}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,group.id),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  if(existing?.status==="approved"||existing?.status==="pending")return {ok:true};
- await tx.insert(s.studyGroupMemberships).values({groupId:group.id,personId:STUDENT,role:"student",status:"pending"}).onConflictDoUpdate({target:[s.studyGroupMemberships.groupId,s.studyGroupMemberships.personId],set:{status:"pending",reviewedByPersonId:null,joinedAt:null,updatedAt:new Date()}});return {ok:true};
+ await tx.insert(s.studyGroupMemberships).values({groupId:group.id,personId:actor.actorPersonId!,role:"student",status:"pending"}).onConflictDoUpdate({target:[s.studyGroupMemberships.groupId,s.studyGroupMemberships.personId],set:{status:"pending",reviewedByPersonId:null,joinedAt:null,updatedAt:new Date()}});return {ok:true};
  });
 });
 export const decideStudyGroupMembership=createServerFn({method:"POST"}).validator((x:{groupId:string;personId:string;approve:boolean})=>x).handler(async({data})=>{
@@ -56,7 +56,7 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
 });
 export const leaveStudyGroup=createServerFn({method:"POST"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
  assertSyntheticMutation("student");const {db,s}=await context();
- await db.update(s.studyGroupMemberships).set({status:"left",updatedAt:new Date()}).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,STUDENT)));return {ok:true};
+ await db.update(s.studyGroupMemberships).set({status:"left",updatedAt:new Date()}).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!)));return {ok:true};
 });
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator((x:{groupId:string})=>x).handler(async({data})=>{
  assertSyntheticMutation("student");
