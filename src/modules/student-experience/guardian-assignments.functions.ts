@@ -3,6 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { guardianFeedbackReleased, latestGuardianAttempts } from "@/domain/guardian-academics";
 
 /**
  * Guardian academic visibility is derived from a verified session AND an active
@@ -67,13 +68,8 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
     inArray(s.assessments.sectionId, sectionIds),
     inArray(s.assessments.status, ["published", "closed"]),
    )).orderBy(desc(s.assessments.dueAt));
-  const latest = new Map<string, (typeof rows)[number]>();
-  for (const row of rows) {
-   const prior = latest.get(row.assessmentId);
-   if (!prior || (row.attemptNumber ?? 0) > (prior.attemptNumber ?? 0)) latest.set(row.assessmentId, row);
-  }
-  return { assignments: [...latest.values()].map(row => {
-   const released = row.submissionStatus === "graded" || row.submissionStatus === "returned";
+  return { assignments: latestGuardianAttempts(rows).map(row => {
+   const released = guardianFeedbackReleased(row.submissionStatus);
    return {
     assessmentId: row.assessmentId,
     sectionId: row.sectionId,
