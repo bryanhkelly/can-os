@@ -31,6 +31,12 @@ function HomePage() {
           <p className="mt-2 max-w-lg text-sm text-muted-foreground">Explore Today, your courses, recovery, feedback, and clear submission confirmations in an interactive demonstration.</p></div>
           <Link to="/student" className="rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background">Explore Student Today →</Link>
         </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-6">
+          <div><p className="text-[10px] font-bold uppercase tracking-[.17em] text-muted-foreground">Guardian academics</p>
+          <h2 className="mt-2 font-serif text-2xl">Stay connected to student progress.</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Authorized guardians can review assignments, grades, and released feedback.</p></div>
+          <Link to="/guardian/academics" className="rounded-xl border border-border px-5 py-3 text-sm font-semibold">View guardian academics →</Link>
+        </div>
         <section className="mt-8 grid gap-4 md:grid-cols-2">
           <FlowCard
             label="Academic"
