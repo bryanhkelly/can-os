@@ -45,6 +45,13 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(householdApplications).toHaveLength(2);
   const expiry=new Date(Date.now()+7*24*60*60*1000);
   // First verify that a declined offer actually releases the sole seat for a sibling.
+  const wrongProgramRegistrar={actorPersonId:registrarPerson.id,capabilities:new Set(["enrollment.decide"]),scope:{programIds:[crypto.randomUUID()]}};
+  await expect(svc.issueSyntheticAdmissionOffer(wrongProgramRegistrar,{
+   applicationId:records[0]!.applicationId,schoolYearId:calendar.schoolYear.id,
+   idempotencyKey:`unauthorized-program-${suffix}`,expiresAt:expiry
+  })).rejects.toThrow(/program scope|Missing required capability or scope/);
+  const beforeIssuance=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.schoolYearId,calendar.schoolYear.id));
+  expect(beforeIssuance).toHaveLength(0);
   const temporaryOffer=await svc.issueSyntheticAdmissionOffer(registrar,{
    applicationId:records[0]!.applicationId,schoolYearId:calendar.schoolYear.id,
    idempotencyKey:`temporary-seat-${suffix}`,expiresAt:expiry
