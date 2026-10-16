@@ -80,6 +80,14 @@ export async function issueSyntheticAdmissionOffer(context:CommandContext,input:
   if(held>=pool.capacity)throw new Error("Seat pool is full");
   const [offer]=await tx.insert(admissionOffers).values({applicationId:app.id,programId:app.programId,schoolYearId:input.schoolYearId,status:"issued",expiresAt:input.expiresAt,issuedAt:new Date(),issuedByPersonId:context.actorPersonId,idempotencyKey:input.idempotencyKey}).returning({id:admissionOffers.id});
   if(!offer)throw new Error("Offer issuance failed");
+  const [profile]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
+  if(!profile)throw new Error("Student profile missing");
+  const guardians=await tx.select({personId:guardianRelationships.guardianPersonId}).from(guardianRelationships)
+   .where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.canManageEnrollment,true)));
+  if(guardians.length)await tx.insert(notifications).values([...new Set(guardians.map(g=>g.personId))].map(recipientPersonId=>({
+   recipientPersonId,type:"admission_offer_issued",status:"unread" as const,title:"New enrollment offer",
+   body:"An enrollment offer is ready for your review.",resourceType:"admission_offer",resourceId:offer.id
+  })));
   await tx.insert(domainEvents).values({eventType:EventTypes.AdmissionOfferIssued,aggregateType:"admission_offer",aggregateId:offer.id,actorPersonId:context.actorPersonId,payload:{applicationId:app.id,programId:app.programId,schoolYearId:input.schoolYearId,expiresAt:input.expiresAt.toISOString()}});
   await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"admissions.offer.issue",resourceType:"admission_offer",resourceId:offer.id,scope:{programId:app.programId},after:{status:"issued",schoolYearId:input.schoolYearId},context:{requestId:context.requestId??null}});
   return offer.id;
@@ -103,6 +111,12 @@ export async function respondToSyntheticAdmissionOffer(context:CommandContext,of
   const now=new Date();
   await tx.update(admissionOffers).set({status:changed.status,respondedAt:now,respondedByPersonId:context.actorPersonId,updatedAt:now}).where(eq(admissionOffers.id,offerId));
   if(action==="accept")await tx.update(applications).set({stage:"accepted",decidedAt:now,updatedAt:now}).where(eq(applications.id,app.id));
+  if(offer!.issuedByPersonId)await tx.insert(notifications).values({
+   recipientPersonId:offer!.issuedByPersonId,type:action==="accept"?"admission_offer_accepted":"admission_offer_declined",status:"unread",
+   title:action==="accept"?"Enrollment offer accepted":"Enrollment offer declined",
+   body:action==="accept"?"A guardian accepted an enrollment offer. Activation may proceed.":"A guardian declined an enrollment offer.",
+   resourceType:"admission_offer",resourceId:offerId
+  });
   await tx.insert(domainEvents).values({eventType:action==="accept"?EventTypes.AdmissionOfferAccepted:EventTypes.AdmissionOfferDeclined,aggregateType:"admission_offer",aggregateId:offerId,actorPersonId:context.actorPersonId,payload:{applicationId:app.id,programId:app.programId,schoolYearId:offer!.schoolYearId}});
   if(action==="accept"&&app.stage!=="accepted")await tx.insert(domainEvents).values({eventType:EventTypes.ApplicationAccepted,aggregateType:"application",aggregateId:app.id,actorPersonId:context.actorPersonId,payload:{studentProfileId:app.studentProfileId,programId:app.programId}});
   await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"admissions.offer."+action,resourceType:"admission_offer",resourceId:offerId,scope:{programId:app.programId},before:{status:offer!.status},after:{status:changed.status},context:{requestId:context.requestId??null}});
