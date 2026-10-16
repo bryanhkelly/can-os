@@ -5,12 +5,13 @@ import { getRequest } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, assertSiteScope, AuthorizationError } from "@/domain/command-context";
 import { and, eq, inArray, desc } from "drizzle-orm";
-const SITE="f1000000-0000-4000-8000-000000000003";
+
 
 /** Never accept a browser-selected actor or role for assignment authorization. */
 async function studentActor(){
  const context=await getCommandContext(getRequest());
  assertCapability(context,"assignments:submit");
+ if(!context.scope.siteIds?.length)throw new AuthorizationError("student site membership");
  if(context.role!=="student"||!context.actorPersonId)throw new AuthorizationError("student assignment access");
  const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const [profile]=await db.select({id:schema.studentProfiles.id}).from(schema.studentProfiles)
@@ -21,6 +22,7 @@ async function studentActor(){
 async function teacherActor(sectionId?:string){
  const context=await getCommandContext(getRequest());
  if(context.role!=="teacher"||!context.actorPersonId)throw new AuthorizationError("teacher assignment access");
+ if(!context.scope.siteIds?.length)throw new AuthorizationError("teacher site membership");
  const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  if(sectionId){
   const [section]=await db.select({siteId:schema.sections.siteId})
@@ -46,15 +48,15 @@ async function teacherForAssessment(assessmentId:string){
  if(!row||!row.sectionId)throw new AuthorizationError("assessment section");
  return teacherActor(row.sectionId);
 }
-/** Assignment flows only work on the named synthetic student and enrolled sections. */
+/** Assignment flows are scoped to an authenticated student and active enrollments. */
 export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
  const {context,studentId}=await studentActor();
- assertSiteScope(context,SITE);
+ if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
  if(!process.env.DATABASE_URL)return {connected:false,assignments:[]};
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const enrollmentRows=await db.select({sectionId:s.enrollments.sectionId})
  .from(s.enrollments).innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
- .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.status,"active"),eq(s.enrollments.kind,"section"),eq(s.sections.siteId,SITE)));
+ .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.status,"active"),eq(s.enrollments.kind,"section"),inArray(s.sections.siteId,context.scope.siteIds!)));
  const ids=enrollmentRows.map(e=>e.sectionId).filter((id):id is string=>id!==null);
  if(!ids.length)return {connected:true,assignments:[]};
  const rows=await db.select({
@@ -90,14 +92,14 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("student");
   const {context,studentId,studentPersonId}=await studentActor();
-  assertSiteScope(context,SITE);
+  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const text=data.text.trim();
   if(text.length<3||text.length>20000)throw new Error("Response must be 3–20,000 characters");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
    const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,dueAt:s.assessments.dueAt})
    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .where(and(eq(s.assessments.id,data.assessmentId),eq(s.assessments.status,"published"),eq(s.sections.siteId,SITE))).limit(1);
+   .where(and(eq(s.assessments.id,data.assessmentId),eq(s.assessments.status,"published"),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
    if(!assessment)throw new Error("Assessment not found");
    const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(
     eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
@@ -108,7 +110,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
    const resolveFollowUps=async(submissionId:string)=>{
     const rows=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata}).from(s.actions)
-     .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,studentId),eq(s.actions.siteId,SITE)));
+     .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,studentId),inArray(s.actions.siteId,context.scope.siteIds!)));
     for(const action of rows){
      if(action.metadata.synthetic!==true||action.metadata.assessmentId!==assessment.id||action.status==="resolved"||action.status==="cancelled")continue;
      await tx.update(s.actions).set({status:"resolved",resolvedAt:now,resolutionNote:"Student submitted overdue assignment.",updatedAt:now}).where(eq(s.actions.id,action.id));
@@ -143,7 +145,7 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
-  assertSiteScope(context,SITE);
+  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   if(!Number.isFinite(data.score)||data.score<0||data.score>100)throw new Error("Score must be from 0 to 100");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForSubmission(data.submissionId);
@@ -151,7 +153,7 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
   const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,studentProfileId:s.submissions.studentProfileId})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .where(and(eq(s.submissions.id,data.submissionId),eq(s.sections.siteId,SITE),eq(s.submissions.status,"submitted"))).limit(1);
+   .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.submissions.status,"submitted"))).limit(1);
   if(!record)throw new Error("Submitted work not found");
   const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
   if(!student)throw new AuthorizationError("student profile");
@@ -171,7 +173,7 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
-  assertSiteScope(context,SITE);
+  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForSubmission(data.submissionId);
   return db.transaction(async tx=>{
@@ -189,7 +191,7 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
-  assertSiteScope(context,SITE);
+  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   if(data.title.trim().length<3||data.title.length>180)throw new Error("Title must be 3–180 characters");
   if(!Number.isFinite(data.pointsPossible)||data.pointsPossible<=0||data.pointsPossible>1000)throw new Error("Invalid point value");
   const dueAt=new Date(data.dueAt);
@@ -197,7 +199,7 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherActor(data.sectionId);
   return db.transaction(async tx=>{
-   const [section]=await tx.select({id:s.sections.id}).from(s.sections).where(and(eq(s.sections.id,data.sectionId),eq(s.sections.siteId,SITE))).limit(1);
+   const [section]=await tx.select({id:s.sections.id}).from(s.sections).where(and(eq(s.sections.id,data.sectionId),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
    if(!section)throw new Error("Section not found at synthetic Site");
    const [assessment]=await tx.insert(s.assessments).values({
     sectionId:section.id,title:data.title.trim(),instructions:data.instructions.trim(),
@@ -216,14 +218,14 @@ export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
  .validator((value:{assessmentId:string})=>value)
  .handler(async({data})=>{
   const {context,studentId}=await studentActor();
-  assertSiteScope(context,SITE);
+  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   const rows=await db.select({attempt:s.submissions.attemptNumber,status:s.submissions.status,
    submittedAt:s.submissions.submittedAt,score:s.submissions.score,
    response:s.submissions.response,feedback:s.submissions.feedback})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .where(and(eq(s.submissions.assessmentId,data.assessmentId),eq(s.submissions.studentProfileId,studentId),eq(s.sections.siteId,SITE)))
+   .where(and(eq(s.submissions.assessmentId,data.assessmentId),eq(s.submissions.studentProfileId,studentId),inArray(s.sections.siteId,context.scope.siteIds!)))
    .orderBy(desc(s.submissions.attemptNumber));
   return rows.map(row=>({attempt:row.attempt,status:row.status,
    submittedAt:row.submittedAt?.toISOString()??null,score:row.score,
@@ -237,13 +239,13 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("student");
   const {context,studentId}=await studentActor();
-  assertSiteScope(context,SITE);
+  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   if(data.text.length>20000)throw new Error("Draft too long");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
    const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId})
     .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-    .where(and(eq(s.assessments.id,data.assessmentId),eq(s.sections.siteId,SITE),eq(s.assessments.status,"published"))).limit(1);
+    .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.assessments.status,"published"))).limit(1);
    if(!assessment)throw new Error("Assignment not available");
    const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
     .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
@@ -277,12 +279,12 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
-  assertSiteScope(context,SITE);
+  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForAssessment(data.assessmentId);
   const [assessment]=await db.select({id:s.assessments.id,metadata:s.assessments.metadata})
    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .where(and(eq(s.assessments.id,data.assessmentId),eq(s.sections.siteId,SITE))).limit(1);
+   .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
   if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Only synthetic assignments can be managed");
   const due=data.action==="reschedule"?new Date(data.dueAt??""):undefined;
   if(due&&Number.isNaN(due.getTime()))throw new Error("Invalid due date");
@@ -299,14 +301,14 @@ export const gradeSyntheticRubric=createServerFn({method:"POST"})
  .handler(async({data})=>{
   assertSyntheticMutation("teacher");
   const context=await teacherActor();
-  assertSiteScope(context,SITE);
+  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForSubmission(data.submissionId);
   return db.transaction(async tx=>{
    const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,metadata:s.assessments.metadata,studentProfileId:s.submissions.studentProfileId})
     .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
     .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-    .where(and(eq(s.submissions.id,data.submissionId),eq(s.sections.siteId,SITE),eq(s.submissions.status,"submitted"))).limit(1);
+    .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.submissions.status,"submitted"))).limit(1);
    if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic submitted assignment not found");
    const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
    if(!student)throw new AuthorizationError("student profile");
