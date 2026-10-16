@@ -22,15 +22,16 @@ describe("GF2 real transactional admissions lifecycle on isolated Neon",()=>{
   expect(app?.metadata.synthetic).toBe(true);
   expect(app?.programId).toBe(PROGRAM);
   const [prior]=await db.select().from(admissionOffers).where(eq(admissionOffers.idempotencyKey,fixtureKey)).limit(1);
-  if(!prior){
+  expect(prior,"GF2 service integration requires a fresh seeded test branch, not a previously executed scenario").toBeUndefined();
+  {
    expect(app?.stage).toBe("application");
    const [journey]=await db.select().from(journeys).where(and(eq(journeys.participantType,"application"),eq(journeys.participantId,APP))).limit(1);
    expect(journey?.status).toBe("ready");
   }
-  const offerId=prior?.id??await issueSyntheticAdmissionOffer(ctx(REGISTRAR,"enrollment.decide"),{
+  const offerId=await issueSyntheticAdmissionOffer(ctx(REGISTRAR,"enrollment.decide"),{
    applicationId:APP,schoolYearId:YEAR,idempotencyKey:fixtureKey,expiresAt:new Date(Date.now()+14*86400000)
   });
-  const sameOffer=prior?.id??await issueSyntheticAdmissionOffer(ctx(REGISTRAR,"enrollment.decide"),{
+  const sameOffer=await issueSyntheticAdmissionOffer(ctx(REGISTRAR,"enrollment.decide"),{
    applicationId:APP,schoolYearId:YEAR,idempotencyKey:fixtureKey,expiresAt:new Date(Date.now()+14*86400000)
   });
   expect(sameOffer).toBe(offerId);
@@ -48,5 +49,8 @@ describe("GF2 real transactional admissions lifecycle on isolated Neon",()=>{
   expect(offer?.status).toBe("accepted");
   const events=await db.select().from(domainEvents).where(and(eq(domainEvents.aggregateType,"enrollment"),eq(domainEvents.aggregateId,enrollmentId)));
   expect(events.filter(e=>e.eventType==="EnrollmentActivated")).toHaveLength(1);
+  const issuance=await db.select().from(domainEvents).where(and(eq(domainEvents.aggregateType,"admission_offer"),eq(domainEvents.aggregateId,offerId)));
+  expect(issuance.filter(e=>e.eventType==="AdmissionOfferIssued")).toHaveLength(1);
+  expect(issuance.filter(e=>e.eventType==="AdmissionOfferAccepted")).toHaveLength(1);
  });
 });
