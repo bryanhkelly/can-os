@@ -44,6 +44,7 @@ export function visibleDemoLinks(role: DemoPersona) {
 export function DemoNavigation(){
  const [role,setRole]=useState<DemoPersona>("student");
  const [memberships,setMemberships]=useState<Array<{id:string;role:string;firstName:string;lastName:string}>>([]);
+ const [signedIn,setSignedIn]=useState(false);
 
  const location=useLocation();
  useEffect(()=>{
@@ -57,10 +58,16 @@ export function DemoNavigation(){
  useEffect(()=>{let canceled=false;fetch("/access/session",{credentials:"same-origin"})
   .then(async response=>response.ok?response.json():null)
   .then(data=>{if(canceled||!data?.authenticated)return;
+   setSignedIn(true);
    setMemberships(data.grants??[]);
    const active=(data.grants??[]).find((g:{id:string})=>g.id===data.activeGrantId);
    if(active&&demoRoles.includes(active.role)){setRole(active.role);}
   }).catch(()=>{});return()=>{canceled=true};},[]);
+ const logout=async()=>{
+  const response=await fetch("/access/logout",{method:"POST",credentials:"same-origin"});
+  if(response.ok)window.location.assign("/access");
+  else window.alert("Sign out failed. Please try again.");
+ };
  const changePersona=(next:DemoPersona)=>{
   if(memberships.length){
    const grant=memberships.find(x=>x.role===next);
@@ -79,11 +86,12 @@ export function DemoNavigation(){
   <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3">
    <Link to="/" className="font-serif text-xl font-semibold">CAN OS</Link>
    <div className="flex flex-1 flex-wrap gap-x-4 gap-y-2">{visibleDemoLinks(role).map(x=><Link key={x.to} to={x.to} className="text-xs font-semibold text-muted-foreground hover:text-foreground">{x.label}</Link>)}</div>
-   <label className="flex items-center gap-2 text-xs text-muted-foreground">Demo persona
+   <label className="flex items-center gap-2 text-xs text-muted-foreground">{signedIn?"Active membership":"Demo persona"}
     <select aria-label="Demo persona" value={role} onChange={event=>changePersona(getDemoPersona(event.target.value))} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
      {(memberships.length?demoRoles.filter(r=>memberships.some(g=>g.role===r)):demoRoles).map(r=><option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>)}
     </select>
    </label>
+   {signedIn?<button type="button" onClick={()=>void logout()} className="text-xs font-semibold text-muted-foreground hover:text-foreground">Sign out</button>:<Link to="/access" className="text-xs font-semibold text-muted-foreground hover:text-foreground">Sign in</Link>}
   </div>
   <p className="mx-auto mt-1 max-w-6xl text-[10px] text-muted-foreground">Shared synthetic demonstration · Persona switching changes the visible workflow, not server authorization. Do not enter real student data.</p>
  </nav>;
