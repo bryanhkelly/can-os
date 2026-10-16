@@ -1,10 +1,10 @@
 import {createServerFn} from "@tanstack/react-start";
-import {and,eq,sql} from "drizzle-orm";
+import {and,eq,sql,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,admissionOffers,admissionSeatPools,guardianRelationships,studentProfiles,schoolYears} from "@/db/schema";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment} from "./admissions-offer-service";
-import {getRequest} from "@tanstack/react-start/server";
+import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,assertProgramScope,AuthorizationError} from "@/domain/command-context";
 
@@ -18,11 +18,15 @@ async function authorizedActor(role:"registrar"|"guardian",capability:string,pro
 }
 
 export const getSyntheticAdmissionOfferOptions=createServerFn({method:"GET"}).handler(async()=>{
+ const actor=await getCommandContext(getRequest());
+ setResponseHeader("Cache-Control","private, no-store");
+ if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.programIds?.length)throw new AuthorizationError("registrar offer options");
+ assertCapability(actor,"enrollment.decide");
  if(!process.env.DATABASE_URL)return [];
- const apps=await db.select({id:applications.id,programId:applications.programId,metadata:applications.metadata}).from(applications).where(sql`${applications.metadata}->>'synthetic' = 'true'`).limit(150);
+ const apps=await db.select({id:applications.id,programId:applications.programId,metadata:applications.metadata}).from(applications).where(and(sql`${applications.metadata}->>'synthetic' = 'true'`,inArray(applications.programId,actor.scope.programIds))).limit(150);
  const synthetic=apps.filter(a=>a.metadata.synthetic===true);
  if(!synthetic.length)return [];
- const pools=await db.select({programId:admissionSeatPools.programId,schoolYearId:admissionSeatPools.schoolYearId,capacity:admissionSeatPools.capacity,name:schoolYears.name}).from(admissionSeatPools).innerJoin(schoolYears,eq(schoolYears.id,admissionSeatPools.schoolYearId));
+ const pools=await db.select({programId:admissionSeatPools.programId,schoolYearId:admissionSeatPools.schoolYearId,capacity:admissionSeatPools.capacity,name:schoolYears.name}).from(admissionSeatPools).innerJoin(schoolYears,eq(schoolYears.id,admissionSeatPools.schoolYearId)).where(inArray(admissionSeatPools.programId,actor.scope.programIds));
  return synthetic.map(app=>({applicationId:app.id,years:pools.filter(p=>p.programId===app.programId).map(p=>({id:p.schoolYearId,name:p.name,capacity:p.capacity}))}));
 });
 
