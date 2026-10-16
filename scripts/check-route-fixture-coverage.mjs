@@ -20,7 +20,15 @@ const sources={
   "/staff/attendance": "new-experiences-v1.sql",
   "/teacher": "new-experiences-v1.sql",
   "/messages": "new-experiences-v1.sql",
-  "/operations/launch": "new-experiences-v1.sql"
+  "/operations/launch": "new-experiences-v1.sql",
+  "/operations/insights": "staff-experiences-v1.sql",
+  "/coach": "staff-experiences-v1.sql",
+  "/calendar": "staff-experiences-v1.sql",
+  "/staff/students": "staff-experiences-v1.sql",
+  "/staff/students/$personId": "staff-experiences-v1.sql",
+  "/staff/teachers": "staff-experiences-v1.sql",
+  "/teacher/gradebook": "staff-experiences-v1.sql",
+  "/admin": "staff-experiences-v1.sql"
 };
 const pageFiles=readdirSync("src/routes").filter(f=>f.endsWith(".tsx")&&!f.startsWith("__")&&!["student.tsx","admissions.tsx"].includes(f));
 const pages=pageFiles.map(file=>{const name=file.slice(0,-4);return name==="index"?"/":"/"+name.replace(/\.index$/,"").replaceAll(".","/");});
