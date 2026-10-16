@@ -10,7 +10,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "test": "vitest run",
+    "test": "vitest run --exclude 'tests/integration/**'",
     "test:integration": "node scripts/run-integration-tests.mjs",
     "typecheck": "vite build && tsc --noEmit"
   },
