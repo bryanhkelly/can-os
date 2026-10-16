@@ -47,3 +47,17 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
    return {documentId:document.id,created:true};
   });
  });
+
+/** Restricted synthetic registrar-only document retrieval; never expose raw R2 keys. */
+export const getSyntheticR2DocumentDownload=createServerFn({method:"POST"})
+ .validator((data:{applicationId:string;requirementId:string;documentId:string})=>data)
+ .handler(async({data})=>{
+  uploadsEnabled();
+  await requirementScope(data.applicationId,data.requirementId);
+  const [record]=await db.select({id:documents.id,storageKey:documents.storageKey,metadata:documents.metadata})
+   .from(documents).where(and(eq(documents.id,data.documentId),eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageProvider,"cloudflare_r2"))).limit(1);
+  if(!record||record.metadata.synthetic!==true||record.metadata.applicationId!==data.applicationId)throw new Error("Document not found within synthetic enrollment scope");
+  const expectedPrefix="enrollment/"+data.applicationId+"/"+data.requirementId+"/";
+  if(!record.storageKey.startsWith(expectedPrefix))throw new Error("Document storage scope mismatch");
+  return {downloadUrl:signR2Object("GET",record.storageKey,undefined,60),expiresInSeconds:60};
+ });
