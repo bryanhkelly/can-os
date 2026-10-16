@@ -35,6 +35,15 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(new Set(records.map(r=>r.householdId)).size).toBe(1);
   expect(new Set(records.map(r=>r.studentProfileId)).size).toBe(2);
   const expiry=new Date(Date.now()+7*24*60*60*1000);
+  // First verify that a declined offer actually releases the sole seat for a sibling.
+  const temporaryOffer=await svc.issueSyntheticAdmissionOffer(registrar,{
+   applicationId:records[0]!.applicationId,schoolYearId:calendar.schoolYear.id,
+   idempotencyKey:`temporary-seat-${suffix}`,expiresAt:expiry
+  });
+  await expect(svc.respondToSyntheticAdmissionOffer(family,temporaryOffer,"decline")).resolves.toBe(temporaryOffer);
+  const [declined]=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.id,temporaryOffer));
+  expect(declined.status).toBe("declined");
+  // Both children may now compete again; exactly one should obtain the freed seat.
   const settled=await Promise.allSettled(records.map((row,i)=>svc.issueSyntheticAdmissionOffer(registrar,{applicationId:row.applicationId,schoolYearId:calendar.schoolYear.id,idempotencyKey:`synthetic-seat-${suffix}-${i}`,expiresAt:expiry})));
   const successes=settled.filter(x=>x.status==="fulfilled");
   expect(successes).toHaveLength(1);
