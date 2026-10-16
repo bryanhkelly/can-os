@@ -21,7 +21,7 @@ async function occupancy(tx:Transaction,programId:string,schoolYearId:string,now
  const enrolled=await tx.select({studentId:enrollments.studentProfileId}).from(enrollments).where(and(eq(enrollments.programId,programId),eq(enrollments.schoolYearId,schoolYearId),eq(enrollments.kind,"program"),eq(enrollments.status,"active")));
  const activeIds=new Set(enrolled.map(x=>x.studentId));
  const offers=await tx.select({status:admissionOffers.status,expiresAt:admissionOffers.expiresAt,studentId:applications.studentProfileId}).from(admissionOffers).innerJoin(applications,eq(applications.id,admissionOffers.applicationId)).where(and(eq(admissionOffers.programId,programId),eq(admissionOffers.schoolYearId,schoolYearId),inArray(admissionOffers.status,["issued","accepted"])));
- const held=offers.filter(o=>!activeIds.has(o.studentId)&&(o.status==="accepted"||(o.expiresAt===null||o.expiresAt.getTime()>now.getTime()))).length;
+ const held=new Set(offers.filter(o=>!activeIds.has(o.studentId)&&(o.status==="accepted"||(o.expiresAt===null||o.expiresAt.getTime()>now.getTime()))).map(o=>o.studentId)).size;
  return activeIds.size+held;
 }
 async function assertGuardian(tx:Transaction,actorId:string|null,studentProfileId:string){
