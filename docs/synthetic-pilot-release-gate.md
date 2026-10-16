@@ -25,11 +25,11 @@ CI runs on pushes to `main` and pull requests. Inspect the **Actions** tab and l
 2. In GitHub repository **Settings → Environments**, configure the `integration-test` environment. Use any approval rules appropriate to the deployment team.
 3. Create the secret `CAN_ADMISSIONS_TEST_DATABASE_URL` holding the isolated branch connection string.
 4. Create the **nonsecret** environment variable `CAN_APPLICATION_DB_HOST` holding the application database hostname (not a connection string; no password).
-5. Open **Actions → Admissions Neon Acceptance → Run workflow**, selecting the release candidate ref.
+5. Open **Actions → Admissions Neon Acceptance → Run workflow**, selecting the release candidate ref. The job first validates the test target without writing, then applies committed Drizzle migrations **to the disposable branch only**, then runs the admissions suite.
 6. Capture the job URL, commit SHA, test results and any failing assertions. Fix failures and rerun. Do not mark the checklist complete on a skipped run.
 7. The runner requires `APP_ENV=test`, `CAN_TEST_DB_WRITES_ENABLED=true`, `TEST_DATABASE_URL` and a nonproduction `NODE_ENV`. It rejects a matching application database hostname. These guards complement, not replace, using a disposable branch.
 
-Alternatively, on a trusted isolated runner, set `TEST_DATABASE_URL` and `CAN_APPLICATION_DB_HOST`, then run `npm ci` followed by `npm run test:integration:admissions`. Never upload credentials or include them in test logs.
+Alternatively, on a trusted isolated runner, set `TEST_DATABASE_URL` and `CAN_APPLICATION_DB_HOST`, then run `npm ci`, `npm run test:integration:admissions -- --preflight`, `DATABASE_URL="$TEST_DATABASE_URL" npm run db:migrate`, and `npm run test:integration:admissions`, in that order. Never upload credentials or include them in test logs.
 
 ### Browser acceptance
 
