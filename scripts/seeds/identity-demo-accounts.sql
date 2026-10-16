@@ -25,3 +25,23 @@ WHERE s.id IN (
  'f1000000-0000-4000-8000-000000000043'
 ) AND s.site_id='f1000000-0000-4000-8000-000000000003'
 ON CONFLICT (section_id,person_id) DO NOTHING;
+
+-- Morgan Example is Jordan's verified synthetic guardian (guardian_relationships).
+INSERT INTO access_accounts (id,email_normalized)
+VALUES ('fa000000-0000-4000-8000-000000000004','morgan.guardian@can-os.invalid')
+ON CONFLICT (email_normalized) DO NOTHING;
+INSERT INTO account_person_grants(id,account_id,person_id,role,organization_id,site_id,is_synthetic)
+SELECT 'fb000000-0000-4000-8000-000000000004',
+       'fa000000-0000-4000-8000-000000000004',
+       'f3000000-0000-4000-8000-000000000007',
+       'guardian',
+       'f1000000-0000-4000-8000-000000000002',
+       'f1000000-0000-4000-8000-000000000003',
+       true
+WHERE EXISTS (
+ SELECT 1 FROM guardian_relationships
+ WHERE guardian_person_id='f3000000-0000-4000-8000-000000000007'
+   AND student_person_id='f1000000-0000-4000-8000-000000000005'
+   AND can_view_academics=true
+)
+ON CONFLICT (id) DO NOTHING;
