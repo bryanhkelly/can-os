@@ -80,13 +80,17 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
 }
 /** Selection is restricted to a grant assigned to the authenticated account. */
 export async function selectAccessGrant(sessionId:string,accountId:string,grantId:string):Promise<void> {
- const [grant]=await db.select({id:accountPersonGrants.id}).from(accountPersonGrants)
-  .where(and(eq(accountPersonGrants.id,grantId),eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true))).limit(1);
- if(!grant)throw new Error("Membership unavailable");
- const changed=await db.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date()})
-  .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
-   isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date()))).returning({id:accessSessions.id});
- if(!changed.length)throw new Error("Session expired");
- const [member]=await db.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,grant.id)).limit(1);
- if(member)await db.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.membership.selected",resourceType:"account",resourceId:accountId,context:{synthetic:true,sessionId,grantId}});
+ await db.transaction(async tx=>{
+  const [grant]=await tx.select({id:accountPersonGrants.id,personId:accountPersonGrants.personId})
+   .from(accountPersonGrants)
+   .where(and(eq(accountPersonGrants.id,grantId),eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true))).limit(1);
+  if(!grant)throw new Error("Membership unavailable");
+  const [changed]=await tx.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date()})
+   .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
+    isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date())))
+   .returning({id:accessSessions.id});
+  if(!changed)throw new Error("Session expired");
+  await tx.insert(auditEvents).values({actorPersonId:grant.personId,action:"identity.membership.selected",
+   resourceType:"account",resourceId:accountId,context:{synthetic:true,sessionId,grantId}});
+ });
 }
