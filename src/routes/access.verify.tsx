@@ -1,6 +1,5 @@
 import {createFileRoute} from "@tanstack/react-router";
 import {useEffect,useState} from "react";
-import {redeemOneTimeAccess} from "@/modules/identity/passwordless-access.server";
 export const Route=createFileRoute("/access/verify")({
  server:{handlers:{
   POST:async({request})=>{
@@ -10,6 +9,7 @@ export const Route=createFileRoute("/access/verify")({
    const token=value&&typeof value==="object"&&"token" in value?(value as {token:unknown}).token:null;
    if(typeof token!=="string")return Response.json({error:"Invalid request"},{status:400});
    try{
+    const {redeemOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
     const result=await redeemOneTimeAccess(token);
     return new Response(JSON.stringify({ok:true,role:result.role}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
    }catch{return Response.json({error:"Invalid or expired access link"},{status:401});}
@@ -28,6 +28,7 @@ function VerifyAccess(){
    if(!token){setStatus("Access link is missing.");return;}
    const res=await fetch("/access/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token})});
    if(!res.ok){setStatus("This access link is invalid or expired.");return;}
+   setToken(null);
    const body=await res.json() as {role?:string};
    const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/admissions/families",registrar:"/admissions",specialist:"/student/support"};
    window.location.replace(home[body.role??""]??"/access");
