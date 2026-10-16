@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   migration:
@@ -17,26 +17,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      - name: Install migration tooling only
-        run: |
-          mkdir -p /tmp/can-migration-tools
-          cd /tmp/can-migration-tools
-          npm init -y
-          npm install drizzle-kit@0.31.11 drizzle-orm@0.45.4 typescript@5.8.3 tsx@4.20.0
-          ln -s /tmp/can-migration-tools/node_modules "$GITHUB_WORKSPACE/node_modules"
+      - name: Install locked dependencies
+        run: npm ci
 
       - name: Generate incremental migration SQL
-        run: /tmp/can-migration-tools/node_modules/.bin/drizzle-kit generate
+        run: npm run db:generate
 
-      - name: Commit generated migration
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add drizzle
-          if git diff --cached --quiet; then
-            echo "No migration changes to commit."
-          else
-            git commit -m "Generate whole-school operations migration"
-            git push
-          fi
+      - name: Upload migration preview for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: drizzle-migration-preview
+          path: drizzle/
+          retention-days: 7

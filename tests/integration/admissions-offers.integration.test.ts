@@ -41,5 +41,11 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(await svc.activateSyntheticOfferedEnrollment(registrar,offerId)).toBe(enrolled);
   const actual=await db.select().from(s.enrollments).where(eq(s.enrollments.programId,program.id));
   expect(actual.filter(x=>x.kind==="program"&&x.status==="active")).toHaveLength(1);
+  const offerEvents=await db.select().from(s.domainEvents).where(eq(s.domainEvents.aggregateId,offerId));
+  expect(offerEvents.map(x=>x.eventType).sort()).toEqual(["AdmissionOfferAccepted","AdmissionOfferIssued"]);
+  const activationEvents=await db.select().from(s.domainEvents).where(eq(s.domainEvents.aggregateId,enrolled));
+  expect(activationEvents.map(x=>x.eventType)).toEqual(["EnrollmentActivated"]);
+  const journeyAudits=await db.select().from(s.auditEvents).where(eq(s.auditEvents.resourceId,records[settled.findIndex(x=>x.status==="fulfilled")]!.journeyId));
+  expect(journeyAudits.filter(x=>x.action==="journey.activate")).toHaveLength(1);
  },90000);
 });

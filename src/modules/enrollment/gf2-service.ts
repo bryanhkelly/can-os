@@ -367,6 +367,7 @@ export async function activateEnrollmentFromApplication(
       .select()
       .from(applications)
       .where(eq(applications.id, applicationId))
+      .for("update")
       .limit(1);
 
     if (!application) throw new Error("Application not found");
@@ -411,10 +412,6 @@ export async function activateEnrollmentFromApplication(
       )
       .limit(1);
 
-    if (!journey || journey.status !== "ready") {
-      throw new Error("Enrollment Journey must be ready before activation");
-    }
-
     const [existing] = await tx
       .select({ id: enrollments.id })
       .from(enrollments)
@@ -430,6 +427,10 @@ export async function activateEnrollmentFromApplication(
       .limit(1);
 
     if (existing) return existing.id;
+
+    if (!journey || journey.status !== "ready") {
+      throw new Error("Enrollment Journey must be ready before activation");
+    }
 
     const [enrollment] = await tx
       .insert(enrollments)
@@ -462,6 +463,21 @@ export async function activateEnrollmentFromApplication(
         updatedAt: activatedAt,
       })
       .where(eq(journeys.id, journey.id));
+
+    await tx.insert(auditEvents).values({
+      actorPersonId: context.actorPersonId,
+      action: "journey.activate",
+      resourceType: "journey",
+      resourceId: journey.id,
+      scope: { programId: application.programId },
+      before: { status: journey.status },
+      after: { status: "active" },
+      context: {
+        requestId: context.requestId ?? null,
+        applicationId,
+        enrollmentId: enrollment.id,
+      },
+    });
 
     await tx.insert(domainEvents).values({
       eventType: EventTypes.EnrollmentActivated,

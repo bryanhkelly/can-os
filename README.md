@@ -40,3 +40,21 @@ Finance/ESA claim and disbursement workflows are intentionally deferred.
 - Playwright golden-flow tests
 
 The prototype repository `academy-union-core` remains a product and UX reference. Prototype JSON stores, hard-coded personas, localStorage workflow state, and portal-specific architecture should not be copied into production.
+
+## Development and release validation
+
+Use Node.js 22 and `npm ci` to install the committed dependency versions.
+Run `npm test` and `npm run typecheck` for unit tests and production build/type checking.
+Use `npm run db:generate` to verify that schema changes have committed migrations.
+
+Database integration tests require a disposable `TEST_DATABASE_URL` and explicit
+fixture-write opt-in; see [Neon development](docs/neon-development.md).
+Do not run fixture-writing tests against the deployed application's database.
+The connection belongs in ignored `.env.local`, never in `.env.example`.
+
+The current deployed application is a synthetic demonstration, not a completed
+authenticated production release. Study Groups remain disabled on production
+deployments pending authenticated principals, safeguarding policy, and isolated
+database verification; see [GF26 rollout](docs/gf26-rollout.md).
+Medical/legal workflows remain subject to the
+[school operations release gates](docs/school-operations-security-gates.md).

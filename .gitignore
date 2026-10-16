@@ -1,0 +1,10 @@
+# Local Netlify folder
+.netlify
+node_modules/
+dist/
+.tanstack/
+src/routeTree.gen.ts
+.env
+.env.*
+!.env.example
+coverage/

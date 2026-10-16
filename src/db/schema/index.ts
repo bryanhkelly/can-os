@@ -20,3 +20,4 @@ export * from "./activities";
 export * from "./conferences";
 export * from "./profiles-compliance";
 export * from "./admissions-offers";
+export * from "./study-groups";

@@ -36,6 +36,13 @@
       "when": 1792100500000,
       "tag": "0004_extended_learning_capacity",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792104756914,
+      "tag": "0005_nervous_patch",
+      "breakpoints": true
     }
   ]
 }

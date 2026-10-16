@@ -34,10 +34,23 @@ export async function completeJourneyRequirement(
       .from(journeyRequirements)
       .innerJoin(journeys, eq(journeys.id, journeyRequirements.journeyId))
       .where(eq(journeyRequirements.id, requirementId))
+      .for("update")
       .limit(1);
 
     if (!current) throw new Error("Journey requirement not found");
     assertProgramScope(context, current.programId);
+    if (current.journeyStatus === "cancelled") {
+      throw new Error("Cannot complete requirements for a cancelled Journey");
+    }
+    if (
+      current.journeyStatus === "active" ||
+      current.journeyStatus === "complete"
+    ) {
+      if (current.requirementStatus !== "complete") {
+        throw new Error("Cannot change requirements after Journey activation");
+      }
+      return "ready";
+    }
 
     const completedAt = new Date();
 
@@ -103,6 +116,21 @@ export async function completeJourneyRequirement(
         aggregateId: current.journeyId,
         actorPersonId: context.actorPersonId,
         payload: {},
+      });
+
+      await tx.insert(auditEvents).values({
+        actorPersonId: context.actorPersonId,
+        action: "journey.ready",
+        resourceType: "journey",
+        resourceId: current.journeyId,
+        scope: {
+          organizationId: current.organizationId,
+          siteId: current.siteId,
+          programId: current.programId,
+        },
+        before: { status: current.journeyStatus },
+        after: { status: "ready" },
+        context: { requestId: context.requestId ?? null },
       });
     }
 

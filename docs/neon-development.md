@@ -25,7 +25,18 @@ A CI job should:
 4. run `npm run test:integration`;
 5. delete the temporary Neon branch.
 
-Until Neon branch automation is wired into CI, integration tests skip when `DATABASE_URL` is absent.
+`npm test` skips database integration files when `DATABASE_URL` is absent.
+When a database is supplied directly, the test setup requires `APP_ENV=test`,
+`CAN_TEST_DB_WRITES_ENABLED=true`, and non-production mode.
+
+For explicit integration validation, put the disposable branch connection in
+`TEST_DATABASE_URL` in ignored `.env.local` and set
+`CAN_TEST_DB_WRITES_ENABLED=true`, then run `npm run test:integration`.
+This command refuses to run without the isolated connection and opt-in; it
+never falls back to the application `DATABASE_URL`. If both connections are
+present, their endpoints must differ, including pooled/direct variants.
+The integration command loads `.env.local` for the child test process only.
+Skipped tests do not count as database-backed acceptance verification.
 
 ## Migrations
 
@@ -44,6 +55,11 @@ npm run db:migrate
 ```
 
 Do not use `db:push` against production.
+
+If an existing database has tables but no Drizzle migration-history table,
+do not replay the initial migrations against it. Compare the deployed schema
+with committed snapshots and establish a reviewed baseline first. Production
+migrations require explicit approval and successful isolated validation.
 
 ## Connection handling
 

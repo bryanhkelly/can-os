@@ -1,0 +1,53 @@
+# GF26 rollout and verification
+
+The GF26 implementation is intentionally behind the synthetic access gate.
+Production reads, mutations, and facilitator-private review queues remain disabled.
+The production route displays an explicit unavailable state without querying group data.
+Private development query failures surface as errors, not empty successful results.
+
+## Apply to a private synthetic database
+
+1. Back up the test branch.
+2. On a fresh isolated database, apply the committed Drizzle migration chain with
+   `npm run db:migrate`. GF26 is recorded in `drizzle/0005_nervous_patch.sql` and
+   its snapshot/journal; do not apply a second handwritten GF26 migration.
+   Existing databases without Drizzle history require schema reconciliation and
+   a reviewed baseline before running the migration chain.
+3. Apply `scripts/seeds/gf26-study-groups.sql` after prerequisite identity/site fixtures.
+4. Check `study_groups`, `study_group_memberships`, `study_group_posts`, and `study_group_sessions`.
+   The fixture supplies two groups, approved and pending membership, visible and
+   hidden content, an open moderation report, an upcoming RSVP, completed
+   attendance, and two canonical calendar entries with fixed dates and IDs.
+5. Set `CAN_DEMO_WRITES_ENABLED=true` only in private development and never in a public deployment.
+6. Run `npm ci`, `npm run typecheck`, and `npm test`.
+7. Configure a disposable `TEST_DATABASE_URL` and
+   `CAN_TEST_DB_WRITES_ENABLED=true` in ignored `.env.local`, then run
+   `npm run test:integration`. Never use the deployed application's database.
+
+## Reset and reseed
+
+Use a disposable synthetic Neon branch. To reset, recreate that branch, apply
+the committed migrations and prerequisite synthetic identity/site fixtures, then
+reapply `scripts/seeds/gf26-study-groups.sql`. Reapplying the seed preserves
+existing rows; it is not a destructive reset and does not remove user mutations.
+Never reset the deployed database as part of a test run.
+
+## Known release blockers
+
+- Synthetic hard-coded identities require replacement with authenticated, scoped principals.
+- Enrollment/section-based eligibility and verified guardian consent must be enforced.
+- Facilitator queues need session-based authorization before they can contain real records.
+- RSVP, attendance, notification delivery, session updates/cancellations and calendar subscriber tests are unfinished.
+- Drizzle generation, build/typecheck, and unit tests can be verified locally;
+  real isolated-Neon migration, concurrency, and calendar propagation tests remain
+  required before activating the feature.
+- No real student data may be loaded into the demonstration.
+
+## Current behavior
+
+Session creation writes a group session and a canonical CalendarEvent in the same transaction.
+Event sourceType is `study_group_session` with sourceId set to the new session UUID.
+Membership decisions lock the group row before counting approved members so
+concurrent decisions cannot overfill capacity.
+Repeated join requests preserve approved/pending membership instead of demoting
+approved members. Rejoining after leaving clears the old approval metadata.
