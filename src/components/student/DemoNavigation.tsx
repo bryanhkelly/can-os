@@ -15,6 +15,7 @@ const links=[
  {to:"/student/courses",label:"Classes"},
  {to:"/student/assignments",label:"Assignments"},
  {to:"/student/discussions",label:"Discussions"},
+ {to:"/student/study-groups",label:"Study Groups"},
  {to:"/teacher/discussions",label:"Manage Discussions"},
  {to:"/student/experiences",label:"Calendar"},
  {to:"/student/support",label:"Support"},
