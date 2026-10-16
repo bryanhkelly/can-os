@@ -13,6 +13,11 @@ describe("provider-independent authorization context",()=>{
   expect(()=>resolveAccessContext({accountId:"account-2",sessionId:"session-2",activeGrantId:"grant-1"},[grant])).toThrow();
   expect(()=>assertGrantSelection("account-2","grant-1",[grant])).toThrow();
  });
+ it("rejects unsupported and inactive roles even if linked to the account",()=>{
+  expect(()=>assertGrantSelection("account-1","grant-1",[{...grant,role:"superadmin"}])).toThrow();
+  expect(()=>assertGrantSelection("account-1","grant-1",[{...grant,role:"toString"}])).toThrow();
+  expect(()=>resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},[{...grant,role:"toString"}])).toThrow();
+ });
  it("rejects inactive or arbitrary role grants",()=>{
   expect(()=>assertGrantSelection("account-1","grant-1",[{...grant,active:false}])).toThrow();
   expect(()=>resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},[{...grant,role:"superadmin"}])).toThrow();
