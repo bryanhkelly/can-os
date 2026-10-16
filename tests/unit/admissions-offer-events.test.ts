@@ -160,7 +160,7 @@ describe("transactional admissions events", () => {
 
   it("emits activation and audits the Journey transition", async () => {
     selectRows([offer], [pool], [year], [program], [{ ...offer, status: "accepted", respondedAt: new Date("2026-10-01T00:00:00Z") }],
-      [{ ...application, stage: "accepted" }], [], [journey], [], [], []);
+      [{ ...application, stage: "accepted" }], [], [journey], [], [], [], [{personId:"student-person"}]);
     await expect(activateSyntheticOfferedEnrollment(context, "offer")).resolves.toBe("created");
     expect(values).toHaveBeenCalledWith(expect.objectContaining({
       eventType: "EnrollmentActivated", aggregateId: "created",
