@@ -5,7 +5,7 @@ import {
   issueSyntheticAdmissionOffer,
   respondToSyntheticAdmissionOffer,
 } from "@/modules/enrollment/admissions-offer-service";
-import { activateEnrollmentFromApplication } from "@/modules/enrollment/gf2-service";
+import { activateEnrollmentFromApplication, startFamilyApplication } from "@/modules/enrollment/gf2-service";
 
 const { transaction, select, values, update } = vi.hoisted(() => ({
   transaction: vi.fn(),
@@ -58,6 +58,23 @@ beforeEach(() => {
     then: Promise.resolve().then.bind(Promise.resolve()),
   });
   update.mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }) });
+});
+
+describe("family application retry authorization", () => {
+  it("rejects a former household member even if their application idempotency key matches", async () => {
+    selectRows([{
+      applicationId:"existing-application",
+      householdId:"household",
+      studentProfileId:"student",
+      submittedByPersonId:"actor",
+      programId:"program",
+    }], []);
+    await expect(startFamilyApplication(context,{
+      programId:"program",idempotencyKey:"existing-key",
+      student:{legalFirstName:"Synthetic",legalLastName:"Student"},
+    })).rejects.toThrow("Guardian is no longer a member");
+    expect(values).not.toHaveBeenCalled();
+  });
 });
 
 describe("transactional admissions events", () => {
