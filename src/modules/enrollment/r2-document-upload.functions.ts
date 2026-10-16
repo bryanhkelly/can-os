@@ -1,4 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
+import {assertR2DemoEnabled,assertR2DocumentGrant} from "@/domain/r2-document-access";
 import {getRequest} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {and,eq,desc,sql} from "drizzle-orm";
@@ -7,22 +8,23 @@ import {applications,journeys,journeyRequirements,documents,auditEvents,programs
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {newDocumentKey,signR2Object,validateDocumentUpload,r2Config} from "./r2-documents.server";
 async function uploadsEnabled(applicationId:string){
+ assertR2DemoEnabled(process.env.CAN_R2_DEMO_UPLOADS_ENABLED);
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId)throw new Error("Authenticated person required");
  const [app]=await db.select({programId:applications.programId,studentProfileId:applications.studentProfileId}).from(applications).where(eq(applications.id,applicationId)).limit(1);
  if(!app)throw new Error("Application not found");
  if(context.role==="registrar"){
   const [program]=await db.select({organizationId:programs.organizationId}).from(programs).where(eq(programs.id,app.programId)).limit(1);
-  if(!program||!context.scope.organizationIds?.includes(program.organizationId))throw new Error("Registrar has no organization grant");
+  if(!program)throw new Error("Program not found");
+  assertR2DocumentGrant({role:context.role,actorPersonId:context.actorPersonId,organizationIds:context.scope.organizationIds},{organizationId:program.organizationId,guardianCanManage:false});
  }else if(context.role==="guardian"){
   const [student]=await db.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
   if(!student)throw new Error("Student missing");
   const [relationship]=await db.select({id:guardianRelationships.id}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,student.personId),eq(guardianRelationships.guardianPersonId,context.actorPersonId),eq(guardianRelationships.canManageEnrollment,true))).limit(1);
-  if(!relationship)throw new Error("Guardian cannot manage enrollment");
+  assertR2DocumentGrant({role:context.role,actorPersonId:context.actorPersonId},{organizationId:"",guardianCanManage:Boolean(relationship)});
  }else throw new Error("Enrollment documents require registrar or guardian access");
  assertSyntheticMutation(context.role);
  return context.actorPersonId;
- if(process.env.CAN_R2_DEMO_UPLOADS_ENABLED!=="true")throw new Error("R2 demo uploads are disabled");
 }
 async function requirementScope(applicationId:string,requirementId:string){
  const [app]=await db.select({id:applications.id,metadata:applications.metadata}).from(applications).where(eq(applications.id,applicationId)).limit(1);
