@@ -1,5 +1,5 @@
 import {createFileRoute} from "@tanstack/react-router";
-import {useState} from "react";
+import {useEffect,useState} from "react";
 import {redeemOneTimeAccess} from "@/modules/identity/passwordless-access.server";
 export const Route=createFileRoute("/access/verify")({
  server:{handlers:{
@@ -11,7 +11,7 @@ export const Route=createFileRoute("/access/verify")({
    if(typeof token!=="string")return Response.json({error:"Invalid request"},{status:400});
    try{
     const result=await redeemOneTimeAccess(token);
-    return new Response(JSON.stringify({ok:true}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store"}});
+    return new Response(JSON.stringify({ok:true,role:result.role}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
    }catch{return Response.json({error:"Invalid or expired access link"},{status:401});}
   },
  }},
@@ -20,14 +20,17 @@ export const Route=createFileRoute("/access/verify")({
 function VerifyAccess(){
  const [status,setStatus]=useState("Use the button to complete your sign-in.");
  const [working,setWorking]=useState(false);
+ const [token,setToken]=useState<string|null>(null);
+ useEffect(()=>{const value=new URLSearchParams(window.location.search).get("token");setToken(value);if(value)window.history.replaceState(null,"","/access/verify");},[]);
  async function verify(){
   setWorking(true);
   try{
-   const token=new URLSearchParams(window.location.search).get("token");
    if(!token){setStatus("Access link is missing.");return;}
    const res=await fetch("/access/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token})});
    if(!res.ok){setStatus("This access link is invalid or expired.");return;}
-   window.location.replace("/student");
+   const body=await res.json() as {role?:string};
+   const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/admissions/families",registrar:"/admissions",specialist:"/student/support"};
+   window.location.replace(home[body.role??""]??"/access");
   }catch{setStatus("Unable to complete sign-in.");}finally{setWorking(false);}
  }
  return <main className="mx-auto max-w-lg space-y-5 px-6 py-16">
