@@ -30,6 +30,10 @@ function endpoint(value) {
 }
 
 const testEndpoint = endpoint(testUrl);
+const mode = process.argv[2];
+if (mode === "admissions-offers" && !process.env.CAN_APPLICATION_DB_HOST && !process.env.DATABASE_URL) {
+  fail("admissions acceptance requires CAN_APPLICATION_DB_HOST or DATABASE_URL for a production endpoint comparison.");
+}
 if (process.env.DATABASE_URL && testEndpoint === endpoint(process.env.DATABASE_URL)) {
   fail("TEST_DATABASE_URL must not use the application database endpoint.");
 }
@@ -37,7 +41,6 @@ if (process.env.CAN_APPLICATION_DB_HOST && testEndpoint === process.env.CAN_APPL
   fail("TEST_DATABASE_URL must not use the configured application database host.");
 }
 
-const mode = process.argv[2];
 const targeted = mode === "gf26" || mode === "gf26-lifecycle" || mode === "admissions-offers";
 const suite = mode === "gf26" ? ["tests/integration/gf26-fixture-integrity.test.ts"] : mode === "gf26-lifecycle" ? ["tests/integration/gf26-session-lifecycle.test.ts"] : mode === "admissions-offers" ? ["tests/integration/admissions-offers.integration.test.ts"] : ["tests/integration"];
 const args = targeted ? process.argv.slice(3) : process.argv.slice(2);
