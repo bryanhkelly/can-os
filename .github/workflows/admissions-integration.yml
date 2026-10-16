@@ -20,7 +20,7 @@ jobs:
       APP_ENV: test
       CAN_TEST_DB_WRITES_ENABLED: "true"
       TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
-      DATABASE_URL: ${{ secrets.CAN_APPLICATION_DATABASE_URL }}
+      CAN_APPLICATION_DB_HOST: ${{ vars.CAN_APPLICATION_DB_HOST }}
       CAN_DEMO_WRITES_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
@@ -35,8 +35,8 @@ jobs:
             echo "::error::Configure CAN_ADMISSIONS_TEST_DATABASE_URL on the integration-test environment, pointing to a disposable Neon branch."
             exit 1
           fi
-          if [ -z "$DATABASE_URL" ]; then
-            echo "::error::Configure CAN_APPLICATION_DATABASE_URL to allow the guarded runner to reject the application endpoint."
+          if [ -z "$CAN_APPLICATION_DB_HOST" ]; then
+            echo "::error::Configure CAN_APPLICATION_DB_HOST as a nonsecret environment variable identifying the production database host."
             exit 1
           fi
       - name: Install dependencies
