@@ -117,7 +117,7 @@ export const reportStudyGroupPost=createServerFn({method:"POST"}).validator((x:{
  if(data.reason.trim().length<5||data.reason.length>1000)throw new Error("Please provide a reason");
  return db.transaction(async tx=>{
  const [member]=await tx.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
- const [post]=await tx.select().from(s.studyGroupPosts).where(and(eq(s.studyGroupPosts.groupId,data.groupId),eq(s.studyGroupPosts.id,data.postId),eq(s.studyGroupPosts.hidden,false))).limit(1);
+ const [post]=await tx.select().from(s.studyGroupPosts).where(and(eq(s.studyGroupPosts.groupId,data.groupId),eq(s.studyGroupPosts.id,data.postId),eq(s.studyGroupPosts.hidden,false))).for("update").limit(1);
  if(!member||!post)throw new Error("Cannot report this content");
  const [existing]=await tx.select({id:s.studyGroupReports.id}).from(s.studyGroupReports).where(and(eq(s.studyGroupReports.groupId,data.groupId),eq(s.studyGroupReports.postId,data.postId),eq(s.studyGroupReports.reporterPersonId,actor.actorPersonId!),eq(s.studyGroupReports.status,"open"))).limit(1);
  if(existing)return {ok:true,created:false};
