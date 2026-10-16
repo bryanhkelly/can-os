@@ -1,6 +1,6 @@
 import { assertSyntheticMutation } from "./demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 const STUDENT = "f1000000-0000-4000-8000-000000000007";
 const TEACHER = "f1000000-0000-4000-8000-000000000006";
@@ -25,13 +25,14 @@ const stagePriority=(x:Stage)=>stages.indexOf(x);
 
 export const getSupportReferrals=createServerFn({method:"GET"}).handler(async()=>{
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const [rows,workers]=await Promise.all([
+ const rows=await (
   db.select({id:s.actions.id,title:s.actions.title,description:s.actions.description,status:s.actions.status,
    priority:s.actions.priority,metadata:s.actions.metadata,ownerPersonId:s.actions.ownerPersonId,createdAt:s.actions.createdAt})
    .from(s.actions).where(and(eq(s.actions.type,"support_referral"),eq(s.actions.subjectId,STUDENT),eq(s.actions.siteId,SITE)))
    .orderBy(desc(s.actions.createdAt)).limit(100),
-  db.select({id:s.people.id,firstName:s.people.legalFirstName,lastName:s.people.legalLastName}).from(s.people),
- ]);
+ );
+ const ownerIds=[...new Set(rows.map(row=>row.ownerPersonId).filter((id):id is string=>Boolean(id)))];
+ const workers=ownerIds.length ? await db.select({id:s.people.id,firstName:s.people.legalFirstName,lastName:s.people.legalLastName}).from(s.people).where(inArray(s.people.id,ownerIds)) : [];
  const names=new Map(workers.map(w=>[w.id,`${w.firstName} ${w.lastName}`]));
  return rows.filter(x=>isReferral(x.metadata)).map(row=>{
   const meta=row.metadata;
