@@ -65,6 +65,8 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
      gt(accessChallenges.expiresAt,now),lt(accessChallenges.attempts,5)))
    .returning({accountId:accessChallenges.accountId});
   if(!claimed)throw new Error("Invalid or expired access link");
+  // A redeemed challenge is single-use even under simultaneous POSTs: the UPDATE
+  // above atomically requires consumedAt IS NULL and returns at most one row.
   const [account]=await tx.select({id:accessAccounts.id}).from(accessAccounts)
    .where(and(eq(accessAccounts.id,claimed.accountId),eq(accessAccounts.disabled,false))).limit(1);
   if(!account)throw new Error("Account unavailable");
