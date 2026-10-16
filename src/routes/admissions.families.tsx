@@ -1,5 +1,5 @@
 import {useState} from "react";
-import {beginSyntheticR2DocumentUpload,finishSyntheticR2DocumentUpload} from "@/modules/enrollment/r2-document-upload.functions";
+import {beginSyntheticR2DocumentUpload,finishSyntheticR2DocumentUpload,getSyntheticR2DocumentDownload} from "@/modules/enrollment/r2-document-upload.functions";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
 import {getSyntheticFamilyReadiness,setSyntheticFamilyRequirement,addSyntheticRequirementReviewNote,reviewSyntheticRequirementDocument} from "@/modules/enrollment/family-readiness.functions";
 export const Route=createFileRoute("/admissions/families")({loader:()=>getSyntheticFamilyReadiness(),component:Families});
@@ -25,6 +25,14 @@ function Families(){
   setBusy(requirementId);setError("");
   try{await reviewSyntheticRequirementDocument({data:{applicationId,requirementId,status,reason:notes[requirementId]??""}});await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Document review failed");}
+  finally{setBusy(null);}
+ }
+ async function openDocument(applicationId:string,requirementId:string,documentId:string){
+  setBusy(requirementId);setError("");
+  try{
+   const result=await getSyntheticR2DocumentDownload({data:{applicationId,requirementId,documentId}});
+   window.open(result.downloadUrl,"_blank","noopener,noreferrer");
+  }catch(e){setError(e instanceof Error?e.message:"Unable to open document");}
   finally{setBusy(null);}
  }
  async function upload(applicationId:string,requirementId:string){
@@ -63,6 +71,7 @@ function Families(){
       <span className="text-xs text-muted-foreground">({r.status.replaceAll("_"," ")})</span>
     </label><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="registrar_note"&&typeof e.text==="string").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Review note: {String(e.text)}</p>)}</div><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="document_review").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Document review: {e.status}{e.text?" · "+e.text:""}{e.reviewedAt?" · "+new Date(e.reviewedAt).toLocaleDateString():""}</p>)}</div>
     <div className="mt-2 flex flex-wrap gap-2">{(["requested","received","accepted","rejected"] as const).map(status=><button key={status} type="button" className="rounded border px-2 py-1 text-xs capitalize disabled:opacity-50" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onClick={()=>review(a.id,r.id,status)}>{status}</button>)}</div>
+    <div className="mt-2 space-y-2">{r.documents.map(d=><div key={d.id} className="flex items-center justify-between gap-3 rounded border p-2 text-xs"><span className="truncate">{d.fileName} · {new Date(d.uploadedAt).toLocaleDateString()} · {d.reviewStatus}</span><button type="button" disabled={busy!==null} className="shrink-0 font-semibold underline disabled:opacity-50" onClick={()=>openDocument(a.id,r.id,d.id)}>View private file</button></div>)}{!r.documents.length&&<p className="text-xs text-muted-foreground">No R2 document registered for this requirement.</p>}</div>
     <div className="mt-2 flex flex-wrap items-center gap-2"><input aria-label={"Select synthetic enrollment document for "+r.title} type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" className="max-w-full text-xs" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onChange={e=>setFiles(previous=>({...previous,[r.id]:e.target.files?.[0]??null}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||!files[r.id]} onClick={()=>upload(a.id,r.id)}>Upload to private R2</button></div>
     <p className="mt-1 text-xs text-muted-foreground">Synthetic demonstration files only. PDF, JPG or PNG, maximum 10 MB. Uploads are disabled until private R2 credentials and the explicit demo upload flag are configured.</p>
     <div className="mt-2 flex gap-2"><input className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-sm" value={notes[r.id]??""} maxLength={500} placeholder="Review note / rejection reason (no file uploaded)" onChange={e=>setNotes(previous=>({...previous,[r.id]:e.target.value}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||(notes[r.id]??"").trim().length<5} onClick={()=>addNote(a.id,r.id)}>Save note</button></div></div>)}</div>
