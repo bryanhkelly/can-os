@@ -26,6 +26,18 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
   .from(s.studyGroupMemberships).where(and(inArray(s.studyGroupMemberships.groupId,groupIds),eq(s.studyGroupMemberships.personId,personId))):[];
  const permittedGroups=new Set(groupRows.filter(g=>g.facilitator===personId).map(g=>g.id));
  for(const row of memberRows)permittedGroups.add(row.groupId);
+ const admissionOfferIds=rows.filter(n=>n.resourceType==="admission_offer"&&n.resourceId).map(n=>n.resourceId as string);
+ const admissionOffers=admissionOfferIds.length?await db.select({id:s.admissionOffers.id,applicationId:s.admissionOffers.applicationId,issuedByPersonId:s.admissionOffers.issuedByPersonId,studentProfileId:s.applications.studentProfileId})
+  .from(s.admissionOffers).innerJoin(s.applications,eq(s.applications.id,s.admissionOffers.applicationId))
+  .where(inArray(s.admissionOffers.id,admissionOfferIds)):[];
+ const relatedStudentPeople=admissionOffers.length?await db.select({id:s.studentProfiles.id,personId:s.studentProfiles.personId})
+  .from(s.studentProfiles).where(inArray(s.studentProfiles.id,admissionOffers.map(o=>o.studentProfileId))):[];
+ const guardianLinks=relatedStudentPeople.length?await db.select({guardianPersonId:s.guardianRelationships.guardianPersonId,studentPersonId:s.guardianRelationships.studentPersonId})
+  .from(s.guardianRelationships).where(and(eq(s.guardianRelationships.guardianPersonId,personId),eq(s.guardianRelationships.canManageEnrollment,true))):[];
+ const manageableStudents=new Set(guardianLinks.map(g=>g.studentPersonId));
+ const personByProfile=new Map(relatedStudentPeople.map(p=>[p.id,p.personId]));
+ const permittedGuardianOffers=new Set(admissionOffers.filter(o=>manageableStudents.has(personByProfile.get(o.studentProfileId)??"")).map(o=>o.id));
+ const permittedRegistrarOffers=new Set(admissionOffers.filter(o=>o.issuedByPersonId===personId).map(o=>o.id));
  const submissionIds=rows.filter(n=>n.resourceType==="submission"&&n.resourceId).map(n=>n.resourceId as string);
  const studentProfiles=await db.select({id:s.studentProfiles.id}).from(s.studentProfiles).where(eq(s.studentProfiles.personId,personId));
  const studentIds=studentProfiles.map(p=>p.id);
@@ -46,6 +58,8 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    `/student/support?referral=${encodeURIComponent(n.resourceId)}`:
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:
+   n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)?"/guardian/admission-offers":
+   n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)?"/admissions/":
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?((n.type==="study_group_membership_request"||n.type==="study_group_report_submitted")?"/teacher/study-groups":`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`):
    n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });
