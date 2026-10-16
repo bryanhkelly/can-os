@@ -11,8 +11,8 @@ export const getSyntheticFamilyReadiness=createServerFn({method:"GET"}).handler(
  const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId,status:s.journeys.status}).from(s.journeys).where(inArray(s.journeys.participantId,synthetic.map(x=>x.id)));
  const enrollmentRows=await db.select({studentProfileId:s.enrollments.studentProfileId,programId:s.enrollments.programId,schoolYearId:s.enrollments.schoolYearId,status:s.enrollments.status,kind:s.enrollments.kind}).from(s.enrollments).where(inArray(s.enrollments.studentProfileId,[...new Set(synthetic.map(a=>a.studentProfileId))]));
  const offers=await db.select({applicationId:s.admissionOffers.applicationId,status:s.admissionOffers.status,schoolYearId:s.admissionOffers.schoolYearId,respondedAt:s.admissionOffers.respondedAt,expiresAt:s.admissionOffers.expiresAt}).from(s.admissionOffers).where(inArray(s.admissionOffers.applicationId,synthetic.map(x=>x.id)));
- const requirements=journeys.length?await db.select({id:s.journeyRequirements.id,journeyId:s.journeyRequirements.journeyId,title:s.journeyRequirements.title,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking}).from(s.journeyRequirements).where(inArray(s.journeyRequirements.journeyId,journeys.map(x=>x.id))):[];
- return synthetic.map(app=>{const journeyIds=new Set(journeys.filter(j=>j.participantId===app.id).map(j=>j.id));return {id:app.id,householdId:app.householdId,program:app.program,stage:app.stage,journeyStatus:journeys.find(j=>j.participantId===app.id)?.status??null,activeSchoolYears:enrollmentRows.filter(e=>e.studentProfileId===app.studentProfileId&&e.programId===app.programId&&e.kind==="program"&&e.status==="active").map(e=>e.schoolYearId),offers:offers.filter(o=>o.applicationId===app.id).map(o=>({...o,respondedAt:o.respondedAt?.toISOString()??null,expiresAt:o.expiresAt?.toISOString()??null})),requirements:requirements.filter(r=>journeyIds.has(r.journeyId)),readiness:enrollmentReadiness(requirements.filter(r=>journeyIds.has(r.journeyId)))};});
+ const requirements=journeys.length?await db.select({id:s.journeyRequirements.id,journeyId:s.journeyRequirements.journeyId,title:s.journeyRequirements.title,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking,evidence:s.journeyRequirements.evidence}).from(s.journeyRequirements).where(inArray(s.journeyRequirements.journeyId,journeys.map(x=>x.id))):[];
+ return synthetic.map(app=>{const journeyIds=new Set(journeys.filter(j=>j.participantId===app.id).map(j=>j.id));return {id:app.id,householdId:app.householdId,program:app.program,stage:app.stage,journeyStatus:journeys.find(j=>j.participantId===app.id)?.status??null,activeSchoolYears:enrollmentRows.filter(e=>e.studentProfileId===app.studentProfileId&&e.programId===app.programId&&e.kind==="program"&&e.status==="active").map(e=>e.schoolYearId),offers:offers.filter(o=>o.applicationId===app.id).map(o=>({...o,respondedAt:o.respondedAt?.toISOString()??null,expiresAt:o.expiresAt?.toISOString()??null})),requirements:requirements.filter(r=>journeyIds.has(r.journeyId)).map(r=>({...r,evidence:r.evidence.filter(e=>e.kind==="registrar_note"&&typeof e.text==="string").map(e=>({kind:"registrar_note",text:String(e.text)}))})),readiness:enrollmentReadiness(requirements.filter(r=>journeyIds.has(r.journeyId)))};});
 });
 
 /** Development-only family checklist. Changes persist in canonical JourneyRequirements. */
@@ -39,6 +39,31 @@ export const setSyntheticFamilyRequirement=createServerFn({method:"POST"})
    const everyBlockingComplete=all.every(r=>!r.blocking||(r.id===requirement.id?next:r.status)==="complete");
    await tx.update(s.journeys).set({status:everyBlockingComplete?"ready":"in_progress",updatedAt:new Date()}).where(eq(s.journeys.id,journey.id));
    await tx.insert(s.auditEvents).values({action:"synthetic.enrollment.requirement",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:requirement.status},after:{status:next},context:{synthetic:true,applicationId:app.id}});
+   return {saved:true};
+  });
+ });
+
+/** Synthetic registrar checklist review note; not a document upload or guardian signature. */
+export const addSyntheticRequirementReviewNote=createServerFn({method:"POST"})
+ .validator((data:{applicationId:string;requirementId:string;note:string})=>data)
+ .handler(async({data})=>{
+  assertSyntheticMutation("registrar");
+  const note=data.note.trim();
+  if(note.length<5||note.length>500)throw new Error("Review note must be 5–500 characters");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [app]=await tx.select({id:s.applications.id,metadata:s.applications.metadata})
+    .from(s.applications).where(eq(s.applications.id,data.applicationId)).limit(1);
+   if(!app||app.metadata.synthetic!==true)throw new Error("Synthetic application not found");
+   const [journey]=await tx.select({id:s.journeys.id,status:s.journeys.status}).from(s.journeys)
+    .where(and(eq(s.journeys.participantType,"application"),eq(s.journeys.participantId,app.id))).limit(1);
+   if(!journey)throw new Error("Enrollment journey not found");
+   const [requirement]=await tx.select({id:s.journeyRequirements.id,evidence:s.journeyRequirements.evidence})
+    .from(s.journeyRequirements).where(and(eq(s.journeyRequirements.id,data.requirementId),eq(s.journeyRequirements.journeyId,journey.id))).for("update").limit(1);
+   if(!requirement)throw new Error("Requirement does not belong to this application");
+   const entry={kind:"registrar_note",text:note,createdAt:new Date().toISOString(),synthetic:true};
+   await tx.update(s.journeyRequirements).set({evidence:[...requirement.evidence,entry],updatedAt:new Date()}).where(eq(s.journeyRequirements.id,requirement.id));
+   await tx.insert(s.auditEvents).values({action:"synthetic.enrollment.requirement.note",resourceType:"journey_requirement",resourceId:requirement.id,after:{kind:entry.kind},context:{synthetic:true,applicationId:app.id}});
    return {saved:true};
   });
  });
