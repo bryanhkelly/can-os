@@ -4,10 +4,9 @@ import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability, AuthorizationError} from "@/domain/command-context";
 import {and,eq} from "drizzle-orm";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
-const DEMO_TEACHER="f1000000-0000-4000-8000-000000000006";
 async function authorizedTeacher(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="teacher"||actor.actorPersonId!==DEMO_TEACHER)throw new AuthorizationError("demo teacher identity");
+ if(actor.role!=="teacher"||!actor.actorPersonId)throw new AuthorizationError("demo teacher identity");
  assertCapability(actor,"assignments:grade");
  if(!actor.scope.siteIds?.length)throw new AuthorizationError("teacher site membership");
  return actor;
@@ -22,13 +21,13 @@ export const createSyntheticCourseDiscussion=createServerFn({method:"POST"})
  if(subject.length<3||subject.length>160||prompt.length<3||prompt.length>5000)throw new Error("Discussion title or prompt outside allowed length");
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  return db.transaction(async tx=>{
-  const [assigned]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,data.sectionId),eq(s.sectionTeachers.personId,DEMO_TEACHER))).limit(1);
+  const [assigned]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,data.sectionId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assigned)throw new Error("Teacher is not assigned to this section");
   const [site]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,data.sectionId)).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId))throw new AuthorizationError("discussion section site");
-  const [thread]=await tx.insert(s.communicationThreads).values({subject,contextType:"section",contextId:data.sectionId,createdByPersonId:DEMO_TEACHER,metadata:{synthetic:true,kind:"course_discussion",locked:false,graded:false}}).returning({id:s.communicationThreads.id});
+  const [thread]=await tx.insert(s.communicationThreads).values({subject,contextType:"section",contextId:data.sectionId,createdByPersonId:actor.actorPersonId!,metadata:{synthetic:true,kind:"course_discussion",locked:false,graded:false}}).returning({id:s.communicationThreads.id});
   if(!thread)throw new Error("Unable to create discussion");
-  await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:DEMO_TEACHER,body:prompt,metadata:{synthetic:true,kind:"prompt"}});
+  await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:actor.actorPersonId!,body:prompt,metadata:{synthetic:true,kind:"prompt"}});
   return {id:thread.id};
  });
 });
@@ -41,7 +40,7 @@ export const setSyntheticCourseDiscussionLock=createServerFn({method:"POST"})
  return db.transaction(async tx=>{
   const [thread]=await tx.select({id:s.communicationThreads.id,contextId:s.communicationThreads.contextId,contextType:s.communicationThreads.contextType,metadata:s.communicationThreads.metadata}).from(s.communicationThreads).where(eq(s.communicationThreads.id,data.threadId)).for("update").limit(1);
   if(!thread||thread.contextType!=="section"||!thread.contextId||thread.metadata.synthetic!==true||thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
-  const [assigned]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,DEMO_TEACHER))).limit(1);
+  const [assigned]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assigned)throw new Error("Teacher is not assigned to this section");
   const [site]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId))throw new AuthorizationError("discussion section site");
@@ -61,9 +60,9 @@ export const moderateSyntheticDiscussionMessage=createServerFn({method:"POST"})
   if(!message||message.metadata.synthetic!==true||message.metadata.kind==="prompt")throw new Error("Post unavailable for moderation");
   const [thread]=await tx.select({contextId:s.communicationThreads.contextId,contextType:s.communicationThreads.contextType,metadata:s.communicationThreads.metadata}).from(s.communicationThreads).where(eq(s.communicationThreads.id,message.threadId)).limit(1);
   if(!thread||thread.contextType!=="section"||!thread.contextId||thread.metadata.synthetic!==true||thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
-  const [assignment]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,DEMO_TEACHER))).limit(1);
+  const [assignment]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assignment)throw new Error("Teacher is not assigned to this section");
-  await tx.update(s.communicationMessages).set({metadata:{...message.metadata,hidden:data.hidden,moderatedBy:DEMO_TEACHER}}).where(eq(s.communicationMessages.id,message.id));
+  await tx.update(s.communicationMessages).set({metadata:{...message.metadata,hidden:data.hidden,moderatedBy:actor.actorPersonId!}}).where(eq(s.communicationMessages.id,message.id));
   return {saved:true};
  });
 });
