@@ -66,14 +66,15 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   const activeGrant=grants.find(g=>Object.hasOwn(roleCapabilities,g.role));
   if(!activeGrant)throw new Error("No supported CAN OS membership");
   const secret=issueOpaqueSecret();
-  await tx.insert(accessSessions).values({
+  const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,secretHash:hashAccessSecret(secret,secretPepper()),
    activeGrantId:activeGrant.id,expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
-  });
+  }).returning({id:accessSessions.id});
+  if(!session)throw new Error("Unable to establish session");
   await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
   if(!member)throw new Error("Membership unavailable");
-  await tx.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.session.started",resourceType:"account",resourceId:account.id,context:{synthetic:true,method:"email_link"}});
+  await tx.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.session.started",resourceType:"account",resourceId:account.id,context:{synthetic:true,method:"email_link",sessionId:session.id,grantId:activeGrant.id}});
   return {accountId:account.id,role:activeGrant.role,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
