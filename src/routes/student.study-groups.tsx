@@ -1,18 +1,24 @@
-import {useState} from "react";
+import {useEffect,useState} from "react";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
 import {getStudyGroupAvailability,createStudyGroup,listStudyGroups,requestStudyGroupMembership,leaveStudyGroup,getStudyGroupDetail,postStudyGroupMessage,reportStudyGroupPost,scheduleStudyGroupSession,reviseStudyGroupSession,rsvpStudyGroupSession,recordStudyGroupAttendance,listStudyGroupAttendance,listStudyGroupReviewQueue,decideStudyGroupMembership,listStudyGroupReports,resolveStudyGroupReport} from "@/modules/student-experience/study-groups.functions";
-export const Route=createFileRoute("/student/study-groups")({loader:async()=>{
+export const Route=createFileRoute("/student/study-groups")({validateSearch:(search:Record<string,unknown>):{group?:string}=>({group:typeof search.group==="string"?search.group:undefined}),loader:async()=>{
  const {enabled}=await getStudyGroupAvailability();
  if(!enabled)return {enabled,groups:[],queue:[],reports:[]};
  const [groups,queue,reports]=await Promise.all([listStudyGroups(),listStudyGroupReviewQueue(),listStudyGroupReports()]);
  return {enabled,groups,queue,reports};
 },component:StudyGroups});
 function StudyGroups(){
- const {enabled,groups,queue,reports}=Route.useLoaderData();const router=useRouter();
+ const {enabled,groups,queue,reports}=Route.useLoaderData();const router=useRouter();const search=Route.useSearch();
  const [selected,setSelected]=useState<string|null>(null),[detail,setDetail]=useState<Awaited<ReturnType<typeof getStudyGroupDetail>>|null>(null),[notice,setNotice]=useState("");
  const [title,setTitle]=useState(""),[description,setDescription]=useState(""),[kind,setKind]=useState<"course"|"interest">("course"),[message,setMessage]=useState("");
  const [attendanceRows,setAttendanceRows]=useState<Array<{personId:string;rsvp:string;attended:boolean|null}>>([]);const [attendanceSession,setAttendanceSession]=useState<string|null>(null);
  const [sessionTitle,setSessionTitle]=useState(""),[agenda,setAgenda]=useState(""),[startsAt,setStartsAt]=useState(""),[endsAt,setEndsAt]=useState("");
+ useEffect(()=>{
+  if(!enabled||!search.group||!groups.some(g=>g.id===search.group))return;
+  let active=true;
+  getStudyGroupDetail({data:{groupId:search.group}}).then(result=>{if(active){setSelected(search.group!);setDetail(result);}}).catch(()=>{if(active)setNotice("Unable to open the requested study group");});
+  return ()=>{active=false};
+ },[enabled,search.group,groups]);
  async function refresh(id?:string){if(id)setDetail(await getStudyGroupDetail({data:{groupId:id}}));await router.invalidate();}
  async function action(cb:()=>Promise<unknown>,id?:string){try{await cb();setNotice("Saved");await refresh(id);}catch(e){setNotice(e instanceof Error?e.message:"Action failed");}}
  if(!enabled)return <main className="mx-auto max-w-6xl space-y-6 px-6 py-10"><h1 className="font-serif text-4xl">Study Groups</h1><p role="status" className="rounded-lg border p-4">Study Groups are turned off for this deployment. Set CAN_DEMO_WRITES_ENABLED to a value other than false to restore this first-development workflow. No group or moderation records have been loaded.</p></main>;

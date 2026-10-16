@@ -8,6 +8,9 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
  const rows=await db.select({id:s.notifications.id,type:s.notifications.type,title:s.notifications.title,body:s.notifications.body,
   status:s.notifications.status,resourceType:s.notifications.resourceType,resourceId:s.notifications.resourceId,createdAt:s.notifications.createdAt})
  .from(s.notifications).where(eq(s.notifications.recipientPersonId,STUDENT_PERSON)).orderBy(desc(s.notifications.createdAt)).limit(50);
+ const sessionIds=rows.filter(n=>n.resourceType==="study_group_session"&&n.resourceId).map(n=>n.resourceId as string);
+ const sessions=sessionIds.length?await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions).innerJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroupSessions.groupId),eq(s.studyGroupMemberships.personId,STUDENT_PERSON),eq(s.studyGroupMemberships.status,"approved"))).where(inArray(s.studyGroupSessions.id,sessionIds)):[];
+ const groupBySession=new Map(sessions.map(s=>[s.id,s.groupId]));
  const submissionIds=rows.filter(n=>n.resourceType==="submission"&&n.resourceId).map(n=>n.resourceId as string);
  const [submissions,referrals]=await Promise.all([
   submissionIds.length?db.select({id:s.submissions.id,assessmentId:s.submissions.assessmentId,studentProfileId:s.submissions.studentProfileId}).from(s.submissions).where(inArray(s.submissions.id,submissionIds)):Promise.resolve([]),
@@ -20,7 +23,7 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
    `/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    `/student/support?referral=${encodeURIComponent(n.resourceId)}`:
-   n.resourceType==="study_group_session"&&n.resourceId?"/student/study-groups":null}));
+   n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}`:null}));
 });
 export const readSyntheticNotification=createServerFn({method:"POST"})
  .validator((data:{id:string})=>data).handler(async({data})=>{
