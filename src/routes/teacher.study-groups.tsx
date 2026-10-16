@@ -17,7 +17,7 @@ function TeacherStudyGroups(){
  const [title,setTitle]=useState(""),[description,setDescription]=useState(""),[kind,setKind]=useState<"course"|"interest">("course");
  const [error,setError]=useState(""),[busy,setBusy]=useState(false);
  const [groupId,setGroupId]=useState(""),[sessionTitle,setSessionTitle]=useState(""),[agenda,setAgenda]=useState(""),[startsAt,setStartsAt]=useState(""),[endsAt,setEndsAt]=useState("");
- const [attendance,setAttendance]=useState<Array<{personId:string;rsvp:string;attended:boolean|null}>>([]),[attendanceSession,setAttendanceSession]=useState("");
+ const [attendance,setAttendance]=useState<Array<{personId:string;rsvp:string|null;attended:boolean|null}>>([]),[attendanceSession,setAttendanceSession]=useState("");
  async function run(operation:()=>Promise<unknown>){
   setBusy(true);setError("");
   try{await operation();await router.invalidate();}
@@ -48,7 +48,7 @@ function TeacherStudyGroups(){
        <button disabled={busy} className="rounded border px-2 py-1" onClick={async()=>{try{setAttendance(await listStudyGroupAttendance({data:{sessionId:session.id}}));setAttendanceSession(session.id)}catch(e){setError(e instanceof Error?e.message:"Attendance unavailable")}}}>Attendance</button></>}
       </div>)}
     </div>)}
-    {attendanceSession&&<div className="space-y-2"><h3 className="font-semibold">Attendance</h3>{attendance.map(person=><div key={person.personId} className="flex gap-2 text-xs"><span>{person.personId.slice(0,8)} · {person.rsvp} · {person.attended===null?"Unrecorded":person.attended?"Present":"Absent"}</span>
+    {attendanceSession&&<div className="space-y-2"><h3 className="font-semibold">Attendance</h3>{attendance.map(person=><div key={person.personId} className="flex gap-2 text-xs"><span>{person.personId.slice(0,8)} · {person.rsvp??"No RSVP"} · {person.attended===null?"Unrecorded":person.attended?"Present":"Absent"}</span>
     <button disabled={busy} className="underline" onClick={()=>run(async()=>{await recordStudyGroupAttendance({data:{sessionId:attendanceSession,personId:person.personId,attended:true}});setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}))})}>Present</button>
     <button disabled={busy} className="underline" onClick={()=>run(async()=>{await recordStudyGroupAttendance({data:{sessionId:attendanceSession,personId:person.personId,attended:false}});setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}))})}>Absent</button></div>)}</div>}
     <h3 className="font-semibold">Schedule a session</h3><select className="w-full rounded border p-2" aria-label="Choose study group" value={groupId} onChange={e=>setGroupId(e.target.value)}><option value="">Choose a group</option>{groups.map(g=><option key={g.id} value={g.id}>{g.title}</option>)}</select>
@@ -56,7 +56,7 @@ function TeacherStudyGroups(){
     <textarea className="w-full rounded border p-2" placeholder="Agenda" aria-label="Agenda" value={agenda} onChange={e=>setAgenda(e.target.value)}/>
     <label className="block">Starts at<input className="ml-2 rounded border p-2" type="datetime-local" value={startsAt} onChange={e=>setStartsAt(e.target.value)}/></label>
     <label className="block">Ends at<input className="ml-2 rounded border p-2" type="datetime-local" value={endsAt} onChange={e=>setEndsAt(e.target.value)}/></label>
-    <button disabled={busy||!groupId||!sessionTitle.trim()||!startsAt||!endsAt} className="rounded border px-3 py-2" onClick={()=>run(()=>scheduleStudyGroupSession({data:{groupId,title:sessionTitle,agenda,startsAt,endsAt}}))}>Schedule</button>
+    <button disabled={busy||!groupId||!sessionTitle.trim()||!startsAt||!endsAt} className="rounded border px-3 py-2" onClick={()=>run(()=>scheduleStudyGroupSession({data:{groupId,title:sessionTitle,agenda,startsAt:new Date(startsAt).toISOString(),endsAt:new Date(endsAt).toISOString()}}))}>Schedule</button>
    </section>
   <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Create a group</h2>
    <input className="w-full rounded border p-2" aria-label="Group title" placeholder="Group title" value={title} onChange={e=>setTitle(e.target.value)}/>
