@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   activateSyntheticOfferedEnrollment,
+  expireSyntheticAdmissionOffers,
   issueSyntheticAdmissionOffer,
   respondToSyntheticAdmissionOffer,
 } from "@/modules/enrollment/admissions-offer-service";
@@ -60,6 +61,13 @@ beforeEach(() => {
 });
 
 describe("transactional admissions events", () => {
+  it("expires an elapsed synthetic offer and records audit under the seat pool lock", async () => {
+    selectRows([pool], [year], [program], [{id:"expired-offer",applicationId:"application",expiresAt:new Date("2020-01-01T00:00:00Z"),metadata:{synthetic:true}}]);
+    await expect(expireSyntheticAdmissionOffers(context,{programId:"program",schoolYearId:"year"})).resolves.toBe(1);
+    expect(update).toHaveBeenCalled();
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({action:"admissions.offer.expire",resourceId:"expired-offer"}));
+  });
+
   it("emits offer issuance alongside audit", async () => {
     selectRows([application], [pool], [year], [program], [], [], [], [journey], [], [], []);
     await expect(issueSyntheticAdmissionOffer(context, input)).resolves.toBe("created");
