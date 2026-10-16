@@ -13,6 +13,8 @@ export const postSyntheticDiscussionMessage=createServerFn({method:"POST"})
  const actor=await getCommandContext(getRequest());
  if(actor.role!=="student"||!actor.actorPersonId)throw new AuthorizationError("demo student identity");
  assertCapability(actor,"assignments:submit");
+ const actorPersonId=actor.actorPersonId;
+ if(!actorPersonId)throw new AuthorizationError("student identity");
  if(!actor.scope.siteIds?.length)throw new AuthorizationError("student site membership");
  if(!isValidDiscussionPost(data.body))throw new Error("Message must contain 1–5,000 characters");
  if(!/^[0-9a-f-]{36}$/i.test(data.threadId))throw new Error("Invalid discussion");
@@ -21,7 +23,7 @@ export const postSyntheticDiscussionMessage=createServerFn({method:"POST"})
   const [thread]=await tx.select({id:s.communicationThreads.id,contextType:s.communicationThreads.contextType,contextId:s.communicationThreads.contextId,metadata:s.communicationThreads.metadata}).from(s.communicationThreads).where(eq(s.communicationThreads.id,data.threadId)).for("update").limit(1);
   if(!thread||thread.contextType!=="section"||!thread.contextId||thread.metadata?.synthetic!==true||thread.metadata?.kind!=="course_discussion")throw new Error("Discussion not available");
   if(thread.metadata?.locked===true)throw new Error("Discussion is locked");
-  const [profile]=await tx.select({id:s.studentProfiles.id}).from(s.studentProfiles).where(eq(s.studentProfiles.personId,actor.actorPersonId)).limit(1);
+  const [profile]=await tx.select({id:s.studentProfiles.id}).from(s.studentProfiles).where(eq(s.studentProfiles.personId,actorPersonId)).limit(1);
   if(!profile)throw new AuthorizationError("student profile");
   const [enrolled]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,profile.id),eq(s.enrollments.sectionId,thread.contextId),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"))).limit(1);
   if(!enrolled)throw new Error("Student is not enrolled in this section");
@@ -31,7 +33,7 @@ export const postSyntheticDiscussionMessage=createServerFn({method:"POST"})
    const [parent]=await tx.select({id:s.communicationMessages.id,metadata:s.communicationMessages.metadata}).from(s.communicationMessages).where(and(eq(s.communicationMessages.id,data.parentMessageId),eq(s.communicationMessages.threadId,thread.id))).limit(1);
    if(!parent||parent.metadata?.synthetic!==true||parent.metadata?.hidden===true)throw new Error("Reply target is unavailable");
   }
-  const [created]=await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:actor.actorPersonId,body:data.body.trim(),metadata:{synthetic:true,...(data.parentMessageId?{parentMessageId:data.parentMessageId}:{})}}).returning({id:s.communicationMessages.id});
+  const [created]=await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:actorPersonId,body:data.body.trim(),metadata:{synthetic:true,...(data.parentMessageId?{parentMessageId:data.parentMessageId}:{})}}).returning({id:s.communicationMessages.id});
   if(!created)throw new Error("Unable to create discussion response");
   await tx.update(s.communicationThreads).set({lastMessageAt:new Date(),updatedAt:new Date()}).where(eq(s.communicationThreads.id,thread.id));
   await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,action:"discussion.post",resourceType:"communication_message",resourceId:created.id,after:{threadId:thread.id,parentMessageId:data.parentMessageId??null},context:{synthetic:true}});
