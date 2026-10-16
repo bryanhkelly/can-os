@@ -1,4 +1,7 @@
 import {createServerFn} from "@tanstack/react-start";
+import {getRequest} from "@tanstack/react-start/server";
+import {getCommandContext} from "@/modules/identity/command-context.server";
+import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {and,eq} from "drizzle-orm";
 import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
 import {isValidDiscussionPost} from "@/domain/course-discussions";
@@ -9,6 +12,10 @@ export const postSyntheticDiscussionMessage=createServerFn({method:"POST"})
 .validator((input:{threadId:string;body:string;parentMessageId?:string|null})=>input)
 .handler(async({data})=>{
  assertSyntheticMutation("student");
+ const actor=await getCommandContext(getRequest());
+ if(actor.role!=="student"||actor.actorPersonId!==STUDENT_PERSON)throw new AuthorizationError("demo student identity");
+ assertCapability(actor,"assignments:submit");
+ if(!actor.scope.siteIds?.length)throw new AuthorizationError("student site membership");
  if(!isValidDiscussionPost(data.body))throw new Error("Message must contain 1–5,000 characters");
  if(!/^[0-9a-f-]{36}$/i.test(data.threadId))throw new Error("Invalid discussion");
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -18,6 +25,8 @@ export const postSyntheticDiscussionMessage=createServerFn({method:"POST"})
   if(thread.metadata.locked===true)throw new Error("Discussion is locked");
   const [enrolled]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,STUDENT_PROFILE),eq(s.enrollments.sectionId,thread.contextId),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"))).limit(1);
   if(!enrolled)throw new Error("Student is not enrolled in this section");
+  const [section]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
+  if(!section?.siteId||!actor.scope.siteIds.includes(section.siteId))throw new AuthorizationError("discussion section site");
   if(data.parentMessageId){
    const [parent]=await tx.select({id:s.communicationMessages.id}).from(s.communicationMessages).where(and(eq(s.communicationMessages.id,data.parentMessageId),eq(s.communicationMessages.threadId,thread.id))).limit(1);
    if(!parent)throw new Error("Reply target must belong to this discussion");
