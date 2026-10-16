@@ -48,7 +48,7 @@ export const createSyntheticMissingWorkFollowUp=createServerFn({method:"POST"})
     .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,TEACHER)))
     .where(and(eq(s.assessments.id,data.assessmentId),eq(s.sections.siteId,SITE),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,new Date()))).limit(1);
    if(!assessment)throw new Error("Overdue teacher-assigned assessment not found");
-   const [student]=await tx.select({id:s.studentProfiles.id,name:s.people.legalFirstName,metadata:s.people.metadata})
+   const [student]=await tx.select({id:s.studentProfiles.id,personId:s.people.id,name:s.people.legalFirstName,metadata:s.people.metadata})
     .from(s.enrollments).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
     .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
     .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.studentProfiles.id,data.studentProfileId))).limit(1);
@@ -62,6 +62,7 @@ export const createSyntheticMissingWorkFollowUp=createServerFn({method:"POST"})
    if(open)return {actionId:open.id,created:false};
    const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:TEACHER,organizationId:assessment.organizationId,siteId:SITE,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{synthetic:true,fixture:"gf1",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});
    if(!action)throw new Error("Unable to create follow-up");
+   await tx.insert(s.notifications).values({recipientPersonId:student.personId,type:"missing_work_follow_up",status:"unread",title:"Teacher follow-up: "+assessment.title,body:"Your teacher flagged overdue work. Open the assignment to review and submit it.",resourceType:"action",resourceId:action.id});
    await tx.insert(s.auditEvents).values({actorPersonId:TEACHER,action:"synthetic.missing_work.follow_up",resourceType:"action",resourceId:action.id,after:{assessmentId:assessment.id,studentProfileId:student.id},context:{synthetic:true}});
    return {actionId:action.id,created:true};
   });
