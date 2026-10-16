@@ -23,7 +23,8 @@ function GuardianAdmissionOffers(){
     <h2 className="text-xl font-semibold">{app.program}</h2>
     {app.offers.map(o=><div className="mt-3 border-t pt-3" key={o.id}>
      <p className="text-sm">Offer status: {o.status}{o.expiresAt?" · Expires "+new Date(o.expiresAt).toLocaleDateString():""}</p>
-     {o.status==="issued"&&<div className="mt-3 flex gap-3"><button disabled={busy!==null} className="rounded border px-4 py-2" onClick={()=>respond(o.id,"accept")}>Accept</button><button disabled={busy!==null} className="rounded border px-4 py-2" onClick={()=>respond(o.id,"decline")}>Decline</button></div>}
+     {o.status==="issued"&&(!o.expiresAt||new Date(o.expiresAt).getTime()>Date.now())&&<div className="mt-3 flex gap-3"><button disabled={busy!==null} className="rounded border px-4 py-2" onClick={()=>respond(o.id,"accept")}>Accept</button><button disabled={busy!==null} className="rounded border px-4 py-2" onClick={()=>respond(o.id,"decline")}>Decline</button></div>}
+     {o.status==="issued"&&o.expiresAt&&new Date(o.expiresAt).getTime()<=Date.now()&&<p className="mt-2 text-sm" role="status">This offer has expired. Contact admissions for next steps.</p>}
     </div>)}{app.offers.length===0&&<p className="mt-3 text-sm">No offers yet.</p>}
   </section>)}
   {applications.length===0&&<p className="rounded-lg border p-4">No synthetic enrollment offers are currently associated with your guardian session.</p>}
