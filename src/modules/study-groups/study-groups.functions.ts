@@ -158,6 +158,14 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
  const [member]=await tx.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,data.personId),eq(s.studyGroupMemberships.status,"pending"))).limit(1);
  if(!member)throw new Error("Pending membership not found");
  if(data.approve){
+  const [eligible]=await tx.select({id:s.enrollments.id}).from(s.studentProfiles)
+   .innerJoin(s.enrollments,eq(s.enrollments.studentProfileId,s.studentProfiles.id))
+   .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+   .where(and(eq(s.studentProfiles.personId,data.personId),eq(s.enrollments.status,"active"),
+     eq(s.programs.siteId,group.siteId),
+     group.programId?eq(s.enrollments.programId,group.programId):undefined))
+   .limit(1);
+  if(!eligible)throw new AuthorizationError("student no longer enrolled in this group's school or program");
   const guardians=await tx.select({personId:s.guardianRelationships.guardianPersonId})
    .from(s.guardianRelationships).where(and(
     eq(s.guardianRelationships.studentPersonId,data.personId),
