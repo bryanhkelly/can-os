@@ -66,6 +66,7 @@
 - Both academic-time command services and the School-Year Studio use the same lock for calendar creation and day changes, schedule template creation and timetable replacement, instructional-day bulk population, calendar-day deletion and school-year activation. Activation status is reread under the lock to avoid duplicate state transitions after a concurrent activation.
 - Retroactive calendar or schedule edits do **not** rewrite or delete existing attendance facts. The Connected Workflows projection now detects effective recorded onsite attendance outside the newly configured expected student-day set within its last 30 completed local dates, shows an exception count and limited occurrence details, and directs registrars to the existing calendar and attendance screens for reconciliation.
 - No new schema or duplicate workflow command service; fixture and authentic records take the same path. This does not replace **historical as-of enrollment semantics** or authorization for administrative reversals of formerly eligible recorded attendance.
+- Calendar and template **creation**, as well as subsequent schedule period edits, now publish typed `AcademicCalendarChanged` / `ScheduleTemplateChanged` events into the shared subscription-capable outbox and audit the initial creation. The worker acknowledges both lifecycle event types through the established pass-through consumer; this is propagation of facts, not a new notification or calendar sync service.
 
 ## Scope limitations and follow-ups
 
