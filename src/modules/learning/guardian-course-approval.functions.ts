@@ -81,6 +81,7 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
   }).from(consentRecords).where(and(
     eq(consentRecords.subjectType, CONSENT_SUBJECT),
     eq(consentRecords.consentType, CONSENT_TYPE),
+    eq(consentRecords.version, CONSENT_VERSION),
     isNull(consentRecords.revokedAt),
     inArray(consentRecords.subjectId, valid.map(row => row.id)),
   )).orderBy(desc(consentRecords.signedAt), desc(consentRecords.createdAt));
