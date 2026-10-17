@@ -1,7 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {eq,inArray,and} from "drizzle-orm";
 import {z} from "zod";
-import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
 import {enrollmentReadiness} from "@/domain/enrollment-readiness";
 import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
