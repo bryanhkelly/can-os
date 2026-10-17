@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
+import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { r2Config } from "@/modules/enrollment/r2-documents.server";
 
 /**
@@ -100,6 +101,31 @@ async function assertUploadedLearningObject(
  const actualType=head.headers.get("content-type");
  if(actualType?.split(";")[0]?.toLowerCase()!==contentType.toLowerCase())
   throw new Error("Uploaded attachment type does not match the expected format");
+ // The supported image/PDF formats have recognizable magic bytes. Request
+ // exactly 16 bytes and reject any storage server that ignores the Range.
+ if(["application/pdf","image/jpeg","image/png"].includes(contentType)){
+  if(Number(expectedSize)<16)throw new Error("Uploaded file is too small");
+  const sample=await fetch(signLearningObject("GET",key,undefined,30),{
+   headers:{Range:"bytes=0-15"}
+  });
+  if(sample.status!==206||
+   sample.headers.get("content-range")!==`bytes 0-15/${expectedSize}`)
+   throw new Error("Storage did not honor the bounded signature request");
+  const reader=sample.body?.getReader();
+  if(!reader)throw new Error("Attachment signature response missing");
+  const bytes=new Uint8Array(16);
+  let offset=0;
+  try{
+   while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    if(offset+value.length>16)throw new Error("Signature response exceeded 16 bytes");
+    bytes.set(value,offset);offset+=value.length;
+   }
+  }finally{await reader.cancel().catch(()=>{});}
+  if(offset!==16||!matchesEnrollmentDocumentSignature(contentType,bytes))
+   throw new Error("File signature does not match the declared format");
+ }
 }
 
 /** Verified student actor; identity always comes from the server session. */
