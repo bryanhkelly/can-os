@@ -295,6 +295,22 @@ export async function createAcademicCalendar(
       .returning({ id: academicCalendars.id });
 
     if (!calendar) throw new Error("Failed to create AcademicCalendar");
+    await tx.insert(domainEvents).values({
+      eventType: EventTypes.AcademicCalendarChanged,
+      aggregateType: "academic_calendar",
+      aggregateId: calendar.id,
+      actorPersonId: context.actorPersonId,
+      payload: { operation: "create", siteId: year.siteId,
+        programId: year.programId ?? null, schoolYearId: year.id },
+    });
+    await tx.insert(auditEvents).values({
+      actorPersonId: context.actorPersonId,
+      action: "academic_calendar.create",
+      resourceType: "academic_calendar", resourceId: calendar.id,
+      scope: { organizationId: year.organizationId, programId: year.programId ?? null,
+        siteId: year.siteId }, after: { version: 1, active: true },
+      context: { requestId: context.requestId ?? null },
+    });
     return calendar.id;
   });
 }
@@ -471,6 +487,24 @@ export async function createScheduleTemplate(
         })),
       );
     }
+    await tx.insert(domainEvents).values({
+      eventType: EventTypes.ScheduleTemplateChanged,
+      aggregateType: "schedule_template", aggregateId: template.id,
+      actorPersonId: context.actorPersonId,
+      payload: { operation: "create", siteId: year.siteId,
+        programId: input.programId ?? year.programId ?? null,
+        schoolYearId: year.id, periodCount: input.periods.length },
+    });
+    await tx.insert(auditEvents).values({
+      actorPersonId: context.actorPersonId, action: "schedule_template.create",
+      resourceType: "schedule_template", resourceId: template.id,
+      scope: { organizationId: year.organizationId, siteId: year.siteId,
+        programId: input.programId ?? year.programId ?? null },
+      after: { effectiveFrom: input.effectiveFrom,
+        effectiveThrough: input.effectiveThrough ?? null,
+        periodCount: input.periods.length },
+      context: { requestId: context.requestId ?? null },
+    });
 
     return template.id;
   });
