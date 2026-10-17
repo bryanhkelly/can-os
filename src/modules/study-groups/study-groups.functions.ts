@@ -2,6 +2,7 @@ import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
+import {EventTypes} from "@/domain/event-types";
 import{and,eq,desc,inArray,sql,isNull,or} from "drizzle-orm";
 import{z} from "zod";
 import{assertSyntheticMutation,isSyntheticAccessEnabled} from "@/modules/_demo/demo-write-gate";
@@ -165,6 +166,13 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
    recipientPersonId:guardian.personId,type:"study_group_consent_requested",status:"unread",
    title:"Study group permission requested",body:"Review your student's request to join "+group.title,
    resourceType:"action",resourceId:consent!.id,
+  });
+  await tx.insert(s.domainEvents).values({
+   eventType:EventTypes.ActionCreated,aggregateType:"action",
+   aggregateId:consent!.id,actorPersonId:actor.actorPersonId!,
+   payload:{subjectType:"study_group",subjectId:group.id,
+    studentPersonId:actor.actorPersonId!,ownerPersonId:guardian.personId,
+    purpose:"guardian_group_consent"}
   });
  }
  await tx.insert(s.notifications).values({recipientPersonId:group.facilitatorPersonId,type:"study_group_membership_request",status:"unread",title:"Study group membership request",body:"A student has requested to join "+group.title+".",resourceType:"study_group",resourceId:group.id});
@@ -549,6 +557,12 @@ export const decideGuardianStudyGroupConsent=createServerFn({method:"POST"})
     resolutionNote:data.approve?"Consent given":"Consent withheld",
     metadata:{...action.metadata,decision:data.approve?"approve":"decline"},updatedAt:new Date()})
     .where(eq(s.actions.id,action.id));
+   await tx.insert(s.domainEvents).values({
+    eventType:EventTypes.ActionResolved,aggregateType:"action",
+    aggregateId:action.id,actorPersonId:actor.actorPersonId,
+    payload:{subjectType:"study_group",subjectId:action.subjectId,
+     studentPersonId,decision:data.approve?"approve":"decline"}
+   });
    const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title})
     .from(s.studyGroups).where(eq(s.studyGroups.id,action.subjectId)).limit(1);
    if(group){
