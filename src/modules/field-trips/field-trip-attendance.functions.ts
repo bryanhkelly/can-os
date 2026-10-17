@@ -94,6 +94,8 @@ export const recordCanonicalFieldTripCheckpoint = createServerFn({ method: "POST
         if (!consent) throw new AuthorizationError("currently valid guardian permission");
       }
       if (data.checkpoint === "return") {
+        if (now < trip.departsAt) throw new Error(
+          "Return cannot be recorded before the trip's scheduled departure.");
         const [boarded] = await tx.select({ id: s.fieldTripAttendance.id })
           .from(s.fieldTripAttendance).where(and(
             eq(s.fieldTripAttendance.sourceKey,
