@@ -30,6 +30,7 @@ export async function resolveVisibleStudents(
   context: AcademicReadContext,
   nameQuery?: string,
 ): Promise<VisibleStudent[]> {
+  assertAnyCapability(context, READ_CAPABILITIES);
   const actorId = context.actorPersonId;
 
   const asGuardian = await db
@@ -82,7 +83,11 @@ export async function resolveVisibleStudents(
     );
 
   const byProfile = new Map<string, VisibleStudent>();
-  for (const row of [...asGuardian, ...asSelf, ...asTeacher]) {
+  for (const row of [
+    ...(context.capabilities.has("student:related-read") ? asGuardian : []),
+    ...(context.capabilities.has("student:read") ? asSelf : []),
+    ...(context.capabilities.has("teacher:read") ? asTeacher : []),
+  ]) {
     byProfile.set(row.studentProfileId, {
       studentProfileId: row.studentProfileId,
       personId: row.personId,
@@ -193,7 +198,4 @@ export async function getStudentAcademicSummary(context: AcademicReadContext, st
       ],
       data: { missingCount: missing.length },
     };
-  },
-};
-
-
+}
