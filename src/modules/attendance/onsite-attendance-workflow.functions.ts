@@ -241,6 +241,7 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
       expectedAt: siteDayStart(data.date, program.timezone),
       mutationId: data.mutationId, note: data.note,
       expectedPreviousEventId: data.expectedPreviousEventId,
+      requireExpectedOnsiteDate: data.date,
     });
     return { attendanceEventId };
   });
