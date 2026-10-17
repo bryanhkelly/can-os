@@ -28,6 +28,21 @@ async function loadServer() {
  return { db, s, ops };
 }
 
+/** Read-only site/program selector projected from the active insight-viewer grant. */
+export const listInsightScopeOptions=createServerFn({method:"GET"}).handler(async()=>{
+ const context=await getCommandContext(getRequest());
+ assertCapability(context,"insights:read");
+ if(!context.actorPersonId)throw new AuthorizationError("insights actor");
+ const siteIds=context.scope.siteIds??[],programIds=context.scope.programIds??[];
+ if(!siteIds.length||!programIds.length)return [];
+ const {db,s,ops}=await loadServer();
+ return db.select({id:s.programs.id,name:s.programs.name,
+  siteId:s.sites.id,siteName:s.sites.name})
+  .from(s.programs).innerJoin(s.sites,ops.eq(s.sites.id,s.programs.siteId))
+  .where(ops.and(ops.inArray(s.programs.id,programIds),ops.inArray(s.sites.id,siteIds)))
+  .orderBy(ops.asc(s.sites.name),ops.asc(s.programs.name));
+});
+
 export const listInsights = createServerFn({ method: "GET" })
  .validator((value: unknown) => operationsSelectionSchema.extend({status:z.enum(insightStatuses).optional()}).parse(value ?? {}))
  .handler(async ({ data }) => {
