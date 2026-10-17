@@ -11,11 +11,14 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [ ] Introduce verified active-account/site/program/child context shared across all routes.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
 - [ ] Consolidate duplicate legacy operations service and migrate remaining consumers before deleting it; add complete action transition tests.
-- [ ] Consolidate live and demo student components and reads.
-- [ ] Remove or protect `/demo-health`; migrate diagnostics to staff-only operations.
-- [ ] Replace showcase home with appropriate authenticated start route.
+- [x] Remove local-only StudentQuickWins from active experiences route and require canonical Student Today input (no fallback sample student).
+- [ ] Replace synthetic-gated quick-win and experience mutations with canonical student/support/calendar commands, maintaining verified authorization.
+- [x] Remove `/demo-health` from the application routes; retain fixture diagnostics only in test tooling.
+- [x] Replace showcase home with session-based workspace redirection.
 - [x] Remove synthetic metadata dependency from recipient-scoped notification deep-link resolution.
 - [ ] Unify notification center routes and remove guardian→student notification route shortcut.
+- [ ] Remove local-only demo interactions from StudentExperience, not merely its fallback dataset.
+- [ ] Verify typecheck, build, unit tests and role-switch browser journeys before closing Phase 1.
 - [ ] Build machine-verifiable inventory for every route and data-flow acceptance gate.
 - [ ] Audit all server functions for verified identity and per-record resource scopes.
 
