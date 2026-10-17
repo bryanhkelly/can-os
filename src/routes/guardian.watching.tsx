@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   getMyWatches,
+  getMyWatchDeliveries,
   updateWatchStatus,
 } from "@/modules/conversation/ask-can.functions";
 import { WorkspaceShell, EmptyState, QueryState } from "@/components/workspace";
@@ -17,6 +18,8 @@ function WatchingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [historyFor, setHistoryFor] = useState("");
+  const [history, setHistory] = useState<Awaited<ReturnType<typeof getMyWatchDeliveries>>>([]);
 
   const load = useCallback(async () => {
     const rows = await getMyWatches();
@@ -86,6 +89,13 @@ function WatchingPage() {
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                <button type="button" className="rounded-full border px-3 py-1"
+                  onClick={async () => {
+                    if (historyFor === watch.id) { setHistoryFor(""); return; }
+                    setHistoryFor(watch.id);
+                    try { setHistory(await getMyWatchDeliveries({ data: { subscriptionId: watch.id } })); }
+                    catch { setError("Unable to load delivery history."); }
+                  }}>Delivery history</button>
                 {watch.status === "active" && (
                   <button
                     type="button"
@@ -117,6 +127,14 @@ function WatchingPage() {
                   </button>
                 )}
               </div>
+              {historyFor === watch.id && <div className="mt-4 border-t pt-3 text-xs">
+                <p className="mb-2 font-semibold">Recent reminder deliveries</p>
+                {history.length === 0 && <p>No history yet.</p>}
+                {history.map(item => <div key={item.id} className="mb-2 rounded border p-2">
+                  {item.kind} · {item.channel} · {item.status} · {new Date(item.createdAt).toLocaleString()}
+                  {item.lastError && <p className="text-amber-600">{item.lastError}</p>}
+                </div>)}
+              </div>}
             </article>
           ))}
         </div>
