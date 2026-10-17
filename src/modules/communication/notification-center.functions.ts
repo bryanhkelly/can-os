@@ -17,7 +17,25 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   status:s.notifications.status,resourceType:s.notifications.resourceType,resourceId:s.notifications.resourceId,createdAt:s.notifications.createdAt})
  .from(s.notifications).where(eq(s.notifications.recipientPersonId,personId)).orderBy(desc(s.notifications.createdAt)).limit(50);
  const sessionIds=rows.filter(n=>n.resourceType==="study_group_session"&&n.resourceId).map(n=>n.resourceId as string);
- const sessions=sessionIds.length?await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions).innerJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroupSessions.groupId),eq(s.studyGroupMemberships.personId,personId),eq(s.studyGroupMemberships.status,"approved"))).where(inArray(s.studyGroupSessions.id,sessionIds)):[];
+ const sessions=sessionIds.length&&context.role==="student"?await db.selectDistinct({
+  id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId
+ }).from(s.studyGroupSessions)
+ .innerJoin(s.studyGroups,eq(s.studyGroups.id,s.studyGroupSessions.groupId))
+ .innerJoin(s.studyGroupMemberships,and(
+  eq(s.studyGroupMemberships.groupId,s.studyGroups.id),
+  eq(s.studyGroupMemberships.personId,personId),
+  eq(s.studyGroupMemberships.status,"approved")))
+ .innerJoin(s.studentProfiles,eq(s.studentProfiles.personId,personId))
+ .innerJoin(s.enrollments,and(eq(s.enrollments.studentProfileId,s.studentProfiles.id),
+  eq(s.enrollments.status,"active")))
+ .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+ .where(and(inArray(s.studyGroupSessions.id,sessionIds),
+  eq(s.studyGroups.status,"active"),
+  eq(s.programs.siteId,s.studyGroups.siteId),
+  inArray(s.studyGroups.siteId,context.scope.siteIds??[]),
+  inArray(s.enrollments.programId,context.scope.programIds??[]),
+  or(isNull(s.studyGroups.programId),
+    eq(s.studyGroups.programId,s.enrollments.programId)))):[];
  const groupBySession=new Map(sessions.map(s=>[s.id,s.groupId]));
  const groupIds=rows.filter(n=>n.resourceType==="study_group"&&n.resourceId).map(n=>n.resourceId as string);
  const groupRows=groupIds.length?await db.select({id:s.studyGroups.id,facilitator:s.studyGroups.facilitatorPersonId})
@@ -45,13 +63,22 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const studentIds=studentProfiles.map(p=>p.id);
  const submissions=submissionIds.length&&studentIds.length?
   await db.select({id:s.submissions.id,assessmentId:s.submissions.assessmentId,studentProfileId:s.submissions.studentProfileId})
-   .from(s.submissions).where(and(inArray(s.submissions.id,submissionIds),inArray(s.submissions.studentProfileId,studentIds))):[];
+   .from(s.submissions)
+   .innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
+   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+   .innerJoin(s.enrollments,and(eq(s.enrollments.sectionId,s.sections.id),
+    eq(s.enrollments.studentProfileId,s.submissions.studentProfileId),
+    eq(s.enrollments.status,"active")))
+   .where(and(inArray(s.submissions.id,submissionIds),
+    inArray(s.submissions.studentProfileId,studentIds),
+    inArray(s.sections.siteId,context.scope.siteIds??[]),
+    inArray(s.sections.programId,context.scope.programIds??[]))):[];
  const referralRows=studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata})
-  .from(s.actions).where(and(eq(s.actions.type,"support_referral"),inArray(s.actions.subjectId,studentIds))):[];
+  .from(s.actions).where(and(eq(s.actions.type,"support_referral"),eq(s.actions.subjectType,"student_profile"),inArray(s.actions.subjectId,studentIds),inArray(s.actions.siteId,context.scope.siteIds??[]),inArray(s.actions.programId,context.scope.programIds??[]))):[];
  const bySubmission=new Map(submissions.map(x=>[x.id,x.assessmentId]));
  const referralIds=new Set(referralRows.map(r=>r.id));
  const missingIds=rows.filter(n=>n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId as string);
- const followUps=missingIds.length&&studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions).where(and(inArray(s.actions.id,missingIds),eq(s.actions.type,"missing_work_follow_up"),inArray(s.actions.subjectId,studentIds))):[];
+ const followUps=missingIds.length&&studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions).where(and(inArray(s.actions.id,missingIds),eq(s.actions.type,"missing_work_follow_up"),inArray(s.actions.subjectId,studentIds),inArray(s.actions.siteId,context.scope.siteIds??[]),inArray(s.actions.programId,context.scope.programIds??[]))):[];
  const consentActionIds=rows.filter(n=>n.resourceType==="action"&&
   n.resourceId&&n.type==="study_group_consent_requested").map(n=>n.resourceId as string);
  const consentActions=consentActionIds.length?await db.select({
