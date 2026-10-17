@@ -725,6 +725,102 @@
         "open related operating area"
       ],
       "downstreamRecords": []
+    },
+    "/admissions/intake": {
+      "persona": "registrar",
+      "seeds": [
+        "gf2-admissions-test.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "applications": 1,
+        "programs": 1
+      },
+      "interactions": [
+        "create family inquiry",
+        "advance admissions stage",
+        "provision guardian login"
+      ],
+      "downstreamRecords": [
+        "applications",
+        "access_accounts",
+        "account_person_grants"
+      ]
+    },
+    "/guardian/study-group-consent": {
+      "persona": "guardian",
+      "seeds": [
+        "gf26-study-groups.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "study_groups": 1
+      },
+      "interactions": [
+        "review study-group consent request",
+        "approve or decline participation"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "study_group_memberships"
+      ]
+    },
+    "/operations/launch/$programId": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "synthetic-profiles-compliance.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "sections": 1,
+        "section_teachers": 1
+      },
+      "interactions": [
+        "provision class",
+        "assign instructor"
+      ],
+      "downstreamRecords": [
+        "sections",
+        "section_teachers"
+      ]
+    },
+    "/operations/school-years": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "programs": 1
+      },
+      "interactions": [
+        "create school year",
+        "add terms and calendar",
+        "activate school year"
+      ],
+      "downstreamRecords": [
+        "school_years",
+        "terms",
+        "grading_periods",
+        "academic_calendars"
+      ]
+    },
+    "/sites": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "programs": 1
+      },
+      "interactions": [
+        "browse authorized school sites",
+        "open Site Today workspace"
+      ],
+      "downstreamRecords": []
     }
   }
 }
