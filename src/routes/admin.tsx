@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 export const Route = createFileRoute("/admin")({ component: AdminConsolePage });
 
-const roles = ["student", "teacher", "guardian", "registrar", "specialist"] as const;
+const roles = ["teacher", "registrar", "specialist"] as const;
 
 const inviteSchema = z.object({
   email: z.string().trim().email(),
@@ -41,6 +41,7 @@ const authMessage = "Sign in with an authorized registrar account to manage acce
 
 function AdminConsolePage() {
   const [sites, setSites] = useState<Site[]>([]);
+  const [requireSiteSelection,setRequireSiteSelection]=useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +60,9 @@ function AdminConsolePage() {
       .then(([siteResult, accountResult, peopleResult]) => {
         if (!active) return;
         setSites(siteResult.sites);
+        setRequireSiteSelection(siteResult.requireSiteSelection);
+        if(siteResult.requireSiteSelection&&siteResult.sites.length===1)
+          form.setValue("siteId",siteResult.sites[0].id);
         setAccounts(accountResult.accounts);
         setPeople(peopleResult.people);
         setLoading(false);
@@ -104,7 +108,7 @@ function AdminConsolePage() {
       setNotice(result.created
         ? `Invitation recorded for ${values.email}. Trigger the access-link flow so they receive their sign-in challenge.`
         : `${values.email} already has this grant; no changes were made.`);
-      form.reset(inviteDefaults);
+      form.reset({...inviteDefaults,siteId:requireSiteSelection&&sites.length===1?sites[0].id:""});
       await refresh();
     } catch {
       setError("Unable to invite this staff member. Check the details and your permissions.");
@@ -119,7 +123,7 @@ function AdminConsolePage() {
       await setGrantActive({ data: { grantId, active: !active } });
       await refresh();
     } catch {
-      setError("Unable to update this grant. You cannot deactivate your own active grant.");
+      setError("Unable to update this grant. Check your authorized school scope and active grant.");
     }
   }
 
@@ -180,10 +184,10 @@ function AdminConsolePage() {
               )} />
               <FormField control={form.control} name="siteId" render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel className="text-sm font-semibold">Site (optional)</FormLabel>
+                  <FormLabel className="text-sm font-semibold">Site {requireSiteSelection?"(required for your membership)":"(optional)"}</FormLabel>
                   <FormControl>
                     <select className={fieldClass} {...field}>
-                      <option value="">Organization-wide</option>
+                      <option value="">{requireSiteSelection?"Select a permitted school":"Organization-wide"}</option>
                       {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
                     </select>
                   </FormControl>
@@ -191,7 +195,7 @@ function AdminConsolePage() {
                 </FormItem>
               )} />
               <div className="sm:col-span-2">
-                <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy}>
+                <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy||(requireSiteSelection&&!form.watch("siteId"))}>
                   {busy ? "Inviting…" : "Invite staff member"}
                 </button>
               </div>
