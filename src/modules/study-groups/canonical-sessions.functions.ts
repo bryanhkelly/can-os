@@ -13,7 +13,7 @@ const time = z.string().datetime({ offset: true });
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Actor = Awaited<ReturnType<typeof requireActor>>;
 
-async function facilitatedGroup(tx: Tx, actor: Actor, groupId: string) {
+export async function facilitatedGroup(tx: Tx, actor: Actor, groupId: string) {
   const [group] = await tx.select().from(s.studyGroups)
     .where(and(eq(s.studyGroups.id, groupId),
       eq(s.studyGroups.status, "active"),
