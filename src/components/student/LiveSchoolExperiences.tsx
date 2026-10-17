@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {getGuardianStudents} from "@/modules/family/guardian-assignments.functions";
 import { useRouter } from "@tanstack/react-router";
 import { bookSyntheticOfficeHour } from "@/modules/student-experience/school-experiences.functions";
 import { readNotification } from "@/modules/communication/notification-center.functions";
@@ -13,6 +14,9 @@ type Data={
 export function LiveSchoolExperiences({data}:{data:Data}) {
  const router=useRouter();
  const [busy,setBusy]=useState(false);
+ const [children,setChildren]=useState<{studentPersonId:string;firstName:string;lastName:string}[]>([]);
+ const [selectedChild,setSelectedChild]=useState("");
+ useEffect(()=>{if(data.viewerRole!=="guardian")return;let active=true;getGuardianStudents().then(result=>{if(active){setChildren(result.students);setSelectedChild(result.students[0]?.studentPersonId??"");}}).catch(()=>{});return()=>{active=false};},[data.viewerRole]);
  const [message,setMessage]=useState("");
  const [error,setError]=useState("");
  async function perform(operation:()=>Promise<unknown>,success:string) {
@@ -53,10 +57,11 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
     </div>
     <div className="space-y-3">
      <h3 className="font-semibold">Teacher office hours</h3>
+     {data.viewerRole==="guardian"&&<label className="block text-xs">Student<select className="mt-1 block w-full rounded border bg-background p-2" aria-label="Student for office-hour booking" value={selectedChild} onChange={e=>setSelectedChild(e.target.value)}><option value="">Choose student</option>{children.map(child=><option key={child.studentPersonId} value={child.studentPersonId}>{child.firstName} {child.lastName}</option>)}</select></label>}
      <p className="text-xs text-muted-foreground">Book an available teacher office-hour appointment.</p>
      {data.slots.map(slot=><div key={slot.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-4">
       <div className="flex-1"><p className="text-sm font-semibold">{format(slot.startsAt)}</p><p className="mt-1 text-xs text-muted-foreground">{slot.status}</p></div>
-      <button disabled={busy||slot.status!=="available"||data.viewerRole!=="guardian"} onClick={()=>perform(()=>bookSyntheticOfficeHour({data:{slotId:slot.id}}),"Office-hour booking saved.")} className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">{slot.status!=="available"?"Booked":data.viewerRole==="guardian"?"Book":"Guardians book"}</button>
+      <button disabled={busy||!selectedChild||slot.status!=="available"||data.viewerRole!=="guardian"} onClick={()=>perform(()=>bookSyntheticOfficeHour({data:{slotId:slot.id,studentPersonId:selectedChild}}),"Office-hour booking saved.")} className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">{slot.status!=="available"?"Booked":data.viewerRole==="guardian"?"Book":"Guardians book"}</button>
      </div>)}
      {data.slots.length===0&&<p className="text-xs text-muted-foreground">No office-hour slots available.</p>}
     </div>
