@@ -168,6 +168,7 @@ export const subscriptionChannel = pgEnum("subscription_channel", [
 
 export const subscriptionDeliveryStatus = pgEnum("subscription_delivery_status", [
   "pending",
+  "processing",
   "delivered",
   "suppressed",
   "failed",
