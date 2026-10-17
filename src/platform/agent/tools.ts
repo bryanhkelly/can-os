@@ -1,14 +1,7 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  assessments,
-  enrollments,
   guardianRelationships,
-  people,
-  sections,
-  sectionTeachers,
-  studentProfiles,
-  submissions,
   subscriptions,
   type EvidenceRef,
 } from "@/db/schema";
@@ -40,9 +33,9 @@ export type AgentTool = {
 
 /** Agent runtime consumes academic module capabilities; academic SQL stays in learning. */
 export { resolveVisibleStudents, assertStudentAccess } from "@/modules/learning/academic-domain-api";
+import { resolveVisibleStudents } from "@/modules/learning/academic-domain-api";
 import { getStudentAcademicSummary as academicSummary } from "@/modules/learning/academic-domain-api";
 import { assertStudentAccess } from "@/modules/learning/academic-domain-api";
-import type { AcademicReadContext } from "@/modules/learning/academic-domain-api";
 export type { VisibleStudent } from "@/modules/learning/academic-domain-api";
 
 export const getStudentAcademicSummary: AgentTool = {
@@ -122,32 +115,8 @@ export const listWatches: AgentTool = {
       };
     }
 
-    const studentIds = [
-      ...new Set(
-        active
-          .filter((row) => row.subjectType === "student_profile")
-          .map((row) => row.subjectId),
-      ),
-    ];
-    const names = new Map<string, string>();
-    if (studentIds.length) {
-      const students = await db
-        .select({
-          studentProfileId: studentProfiles.id,
-          preferredName: people.preferredName,
-          legalFirstName: people.legalFirstName,
-          legalLastName: people.legalLastName,
-        })
-        .from(studentProfiles)
-        .innerJoin(people, eq(people.id, studentProfiles.personId))
-        .where(inArray(studentProfiles.id, studentIds));
-      for (const student of students) {
-        names.set(
-          student.studentProfileId,
-          `${student.preferredName ?? student.legalFirstName} ${student.legalLastName}`,
-        );
-      }
-    }
+    const visible = await resolveVisibleStudents(context);
+    const names = new Map(visible.map(student => [student.studentProfileId, student.displayName]));
 
     return {
       summary: [
