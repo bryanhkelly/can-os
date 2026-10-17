@@ -1,5 +1,6 @@
 import { and, eq, inArray, lte, gte, or, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
 import {
   courseTemplateVersions,
   courseTemplates,
@@ -25,6 +26,20 @@ import {
   assertSiteScope,
   type CommandContext,
 } from "@/domain/command-context";
+
+/** Acquired before capacity reservation locks when teacher assignments may change. */
+async function lockSectionStaffingSite(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  context: CommandContext, sectionId: string,
+) {
+  const [site] = await tx.select({
+    siteId: sections.siteId, programId: sections.programId,
+  }).from(sections).where(eq(sections.id, sectionId)).limit(1);
+  if (!site || !context.scope.programIds?.includes(site.programId) ||
+      !context.scope.siteIds?.includes(site.siteId))
+    throw new Error("Section capacity is not in the authorized teaching site");
+  await lockAttendanceConfigurationAtSite(tx, site.siteId);
+}
 
 const ACTIVE_RESERVATION_STATUSES = ["held", "committed"] as const;
 
@@ -463,6 +478,8 @@ export async function reserveInstructionalCapacity(
     const demand = await loadDemandContext(tx, input.demandId);
     if (!demand) throw new Error("Section capacity demand not found");
     assertDemandScope(context, demand);
+    if (input.status === "committed")
+      await lockSectionStaffingSite(tx, context, demand.sectionId);
     if (demand.demandStatus !== "open") throw new Error("Section capacity demand is not open");
 
     const [offering] = await tx
@@ -609,6 +626,12 @@ export async function releaseInstructionalCapacity(
 ): Promise<void> {
   assertCapability(context, "capacity.reserve");
   await db.transaction(async tx => {
+    const [lookup] = await tx.select({
+      sectionId: instructionalCapacityReservations.sectionId,
+    }).from(instructionalCapacityReservations)
+      .where(eq(instructionalCapacityReservations.id, reservationId)).limit(1);
+    if (!lookup) throw new Error("Capacity reservation not found");
+    await lockSectionStaffingSite(tx, context, lookup.sectionId);
     const [reservation] = await tx.select({
       id:instructionalCapacityReservations.id,demandId:instructionalCapacityReservations.demandId,
       offeringId:instructionalCapacityReservations.offeringId,status:instructionalCapacityReservations.status,
@@ -721,6 +744,12 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
   assertCapability(context,"capacity.reserve");
   if(input.reason.trim().length<5)throw new Error("Explain the staffing replacement");
   return db.transaction(async tx=>{
+    const [lookup] = await tx.select({
+      sectionId: instructionalCapacityReservations.sectionId,
+    }).from(instructionalCapacityReservations)
+      .where(eq(instructionalCapacityReservations.id, input.reservationId)).limit(1);
+    if (!lookup) throw new Error("Capacity reservation not found");
+    await lockSectionStaffingSite(tx, context, lookup.sectionId);
     const [old]=await tx.select({
       id:instructionalCapacityReservations.id,demandId:instructionalCapacityReservations.demandId,
       sectionId:instructionalCapacityReservations.sectionId,seats:instructionalCapacityReservations.seats,
