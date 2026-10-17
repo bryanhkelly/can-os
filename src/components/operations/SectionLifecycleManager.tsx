@@ -2,7 +2,7 @@ import {useEffect,useState} from "react";
 import {useRouter} from "@tanstack/react-router";
 import {
  getSectionLifecycle,setSectionLifecycleState,updateSectionLifecycleSchedule,replaceLifecycleTeacher,
- transitionLifecycleEnrollment,queueLifecycleWaitlist,resolveLifecycleWaitlist
+ transitionLifecycleEnrollment,queueLifecycleWaitlist,resolveLifecycleWaitlist,transferLifecycleEnrollment,promoteLifecycleWaitlist
 } from "@/modules/programs/section-lifecycle.functions";
 type Snapshot=Awaited<ReturnType<typeof getSectionLifecycle>>;
 export function SectionLifecycleWorkspace({programId,staff}:{programId:string;staff:{personId:string;first:string;last:string}[]}){
@@ -45,12 +45,12 @@ export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Sna
   {error&&<p role="alert" className="rounded border p-3 text-sm text-red-600">{error}</p>}
   {message&&<p role="status" className="rounded border p-3 text-sm">{message}</p>}
   {sections.map(section=><LifecycleSection key={section.id} section={section} staff={staff}
-   busy={Boolean(busy)} reason={reason} run={run}/>)}
+   busy={Boolean(busy)} reason={reason} allSections={sections} run={run}/>)}
  </section>;
 }
-function LifecycleSection({section,staff,busy,reason,run}:{
+function LifecycleSection({section,staff,busy,reason,allSections,run}:{
  section:Snapshot[number];staff:{personId:string;first:string;last:string}[];
- busy:boolean;reason:string;run:(id:string,operation:()=>Promise<unknown>,success:string)=>Promise<void>
+ busy:boolean;reason:string;allSections:Snapshot;run:(id:string,operation:()=>Promise<unknown>,success:string)=>Promise<void>
 }){
  const [newTeacher,setNewTeacher]=useState("");
  const [outgoing,setOutgoing]=useState("");
@@ -59,6 +59,7 @@ function LifecycleSection({section,staff,busy,reason,run}:{
  const [end,setEnd]=useState(section.endsAt?.slice(0,16)??"");
  const [schedule,setSchedule]=useState(section.scheduleTemplateId??"");
  const [enrollmentId,setEnrollmentId]=useState("");
+ const [destination,setDestination]=useState("");
  const [enrollmentStatus,setEnrollmentStatus]=useState<"withdrawn"|"transferred">("withdrawn");
  return <article className="rounded-xl border bg-card p-5">
   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -114,6 +115,15 @@ function LifecycleSection({section,staff,busy,reason,run}:{
       <option value="withdrawn">Withdrawn</option><option value="transferred">Transferred</option>
      </select>
     </label>
+    <label className="mt-2 block text-xs">Transfer destination (same program and term)
+      <select value={destination} onChange={e=>setDestination(e.target.value)} className="mt-1 w-full rounded border bg-background p-2">
+       <option value="">Choose destination</option>
+       {allSections.filter(x=>x.id!==section.id&&x.active).map(x=><option key={x.id} value={x.id}>{x.title} · {x.code}</option>)}
+      </select>
+    </label>
+    <button type="button" disabled={busy||!enrollmentId||!destination} onClick={()=>void run(section.id,
+      ()=>transferLifecycleEnrollment({data:{enrollmentId,destinationSectionId:destination,reason}}),"Student transferred atomically.")}
+      className="mt-2 rounded border px-3 py-2 text-xs disabled:opacity-50">Transfer student</button>
     <button type="button" disabled={busy||!enrollmentId} onClick={()=>void run(section.id,
       ()=>transitionLifecycleEnrollment({data:{enrollmentId,status:enrollmentStatus,reason}}),"Enrollment status updated.")}
       className="mt-3 rounded border px-3 py-2 text-xs disabled:opacity-50">Record transition</button>
@@ -129,6 +139,7 @@ function LifecycleSection({section,staff,busy,reason,run}:{
       className="mt-2 rounded border px-3 py-2 text-xs disabled:opacity-50">Add to waitlist</button>
     {section.waitlist.map(w=><div key={w.id} className="mt-2 flex justify-between gap-2 rounded border p-2 text-xs">
      <span>{w.subjectId}</span><button disabled={busy} onClick={()=>void run(section.id,
+       ()=>promoteLifecycleWaitlist({data:{actionId:w.id}}),"Waitlisted student enrolled.")} className="underline">Promote</button><button disabled={busy} onClick={()=>void run(section.id,
        ()=>resolveLifecycleWaitlist({data:{actionId:w.id,reason}}),"Waitlist item resolved.")} className="underline">Resolve</button>
     </div>)}
     <button type="button" disabled={busy} onClick={()=>void run(section.id,
