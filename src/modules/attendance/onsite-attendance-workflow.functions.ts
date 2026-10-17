@@ -425,6 +425,7 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
     }).from(attendanceEvents).where(and(
       inArray(attendanceEvents.programId, [...new Set(rows.map(r => r.programId))]),
       inArray(attendanceEvents.studentProfileId, [...new Set(rows.map(r => r.studentProfileId))]),
+      inArray(attendanceEvents.occurrenceKey, [...new Set(rows.map(r => r.occurrenceKey))]),
     ));
     const effective = new Map(effectiveAttendanceEvents(events).map(r =>
       [[r.studentProfileId, r.programId, r.occurrenceKey].join(":"), r]));
