@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, asc, eq, inArray, gte, lt, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, gte, lt, ne, isNull, notExists, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions, attendanceEvents, calendarEvents, enrollments, organizations, programs, sites } from "@/db/schema";
+import { actions, attendanceEvents, calendarEvents, calendarEventParticipants, enrollments, organizations, programs, sites } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 
@@ -47,6 +47,14 @@ export const getSiteToday = createServerFn({ method: "GET" })
     const localDate = (value: Date) => new Intl.DateTimeFormat("en-CA", {
       timeZone: site.timezone, year: "numeric", month: "2-digit", day: "2-digit"
     }).format(value);
+    // Site Today is a shared screen: exclude private calendar entries, section-only
+    // events, and events with an explicit participant audience.
+    const hasParticipants = db.select({id:calendarEventParticipants.id})
+      .from(calendarEventParticipants)
+      .where(eq(calendarEventParticipants.calendarEventId,calendarEvents.id));
+    const allowedProgram = programIds.length
+      ? or(isNull(calendarEvents.programId),inArray(calendarEvents.programId,programIds))
+      : isNull(calendarEvents.programId);
     const [actionRows, eventRows, attendanceRows, enrolledRows] = await Promise.all([
       db.select({
         id: actions.id, title: actions.title, description: actions.description,
@@ -61,7 +69,8 @@ export const getSiteToday = createServerFn({ method: "GET" })
         programId: calendarEvents.programId,
       }).from(calendarEvents)
         .where(and(eq(calendarEvents.siteId, site.id), gte(calendarEvents.startsAt, start),
-          lt(calendarEvents.startsAt, end)))
+          lt(calendarEvents.startsAt, end),isNull(calendarEvents.sectionId),
+          ne(calendarEvents.type,"personal"),notExists(hasParticipants),allowedProgram))
         .orderBy(asc(calendarEvents.startsAt)).limit(200),
       programIds.length ? db.select({
         id: attendanceEvents.id, programId: attendanceEvents.programId,
@@ -86,8 +95,9 @@ export const getSiteToday = createServerFn({ method: "GET" })
     const todayAttendance = attendanceRows.filter(row => localDate(row.expectedAt) === dayText);
     const latest = new Map<string, (typeof todayAttendance)[number]>();
     for (const row of todayAttendance) {
-      const previous = latest.get(row.occurrenceKey);
-      if (!previous || row.recordedAt >= previous.recordedAt) latest.set(row.occurrenceKey, row);
+      const key = `${row.studentProfileId}:${row.programId}:${row.occurrenceKey}`;
+      const previous = latest.get(key);
+      if (!previous || row.recordedAt >= previous.recordedAt) latest.set(key, row);
     }
     const observations = [...latest.values()];
     const enrollmentCount = new Set(enrolledRows.map(row => row.studentProfileId)).size;
@@ -100,7 +110,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
         present: observations.filter(row => row.status === "present").length,
         absent: observations.filter(row => row.status === "absent").length,
         tardy: observations.filter(row => row.status === "tardy").length,
-        note: "Latest recorded attendance event per occurrence today; not a percent of all expected students",
+        note: "Latest event per student, program and occurrence today; not a percent of expected students",
       },
       actions: filteredActions.map(row => ({
         ...row, dueAt: row.dueAt?.toISOString() ?? null,
