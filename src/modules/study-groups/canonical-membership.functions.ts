@@ -36,12 +36,16 @@ export async function eligibleStudent(tx: Tx, studentPersonId: string, group: Gr
   if (!membership) throw new AuthorizationError("active student program enrollment");
   if (group.sectionId) {
     const [section] = await tx.select({ id: s.enrollments.id }).from(s.enrollments)
+      .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
       .where(and(
         eq(s.enrollments.studentProfileId, membership.studentProfileId),
         eq(s.enrollments.sectionId, group.sectionId),
         eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active"),
+        eq(s.sections.active, true), eq(s.sections.siteId, group.siteId),
+        group.programId ? eq(s.sections.programId, group.programId) : undefined,
+        inArray(s.sections.programId, grantedPrograms),
       )).limit(1);
-    if (!section) throw new AuthorizationError("active course section enrollment");
+    if (!section) throw new AuthorizationError("active course section enrollment at this group school");
   }
   return membership.studentProfileId;
 }
