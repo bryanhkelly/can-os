@@ -14,7 +14,7 @@ async function groupActor(role:"student"|"teacher"){
  return {...actor,sites};
 }
 async function context(){const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);return {db,s};}
-/** Unreleased discussion and session commands must never mutate authentic groups, even with demo mode enabled. */
+/** Unreleased session commands must never mutate authentic groups, even with demo mode enabled. */
 function requireLegacyGroup(metadata:Record<string,unknown>){
  if(metadata.synthetic!==true)throw new AuthorizationError("live group discussion and session writes are not enabled");
 }
