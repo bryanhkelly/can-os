@@ -294,6 +294,7 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
    }).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
    if(!app||!actor.scope.programIds?.includes(app.programId))
     throw new AuthorizationError("guardian relationship verification");
+   assertRecordWriteAllowed(app.metadata,"registrar");
    const contactId=String(app.metadata.contactPersonId??"");
    const [learner]=await tx.select({personId:studentProfiles.personId})
     .from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
