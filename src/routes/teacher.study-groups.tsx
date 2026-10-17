@@ -6,10 +6,10 @@ import {getFacilitatorStudyGroups} from "@/modules/study-groups/facilitator-quer
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 const loadFacilitatorStudyGroups=async()=>{
- const {enabled,writesEnabled,membershipEnabled}=await getStudyGroupAvailability();
- if(!enabled)return {enabled,writesEnabled,membershipEnabled,queue:[],reports:[],groups:[],scopes:[]};
+ const {enabled,writesEnabled,membershipEnabled,creationEnabled}=await getStudyGroupAvailability();
+ if(!enabled)return {enabled,writesEnabled,membershipEnabled,creationEnabled,queue:[],reports:[],groups:[],scopes:[]};
  const [queue,reports,groups,scopes]=await Promise.all([listStudyGroupReviewQueue(),listStudyGroupReports(),getFacilitatorStudyGroups(),listFacilitatorGroupScopes()]);
- return {enabled,writesEnabled,membershipEnabled,queue,reports,groups,scopes};
+ return {enabled,writesEnabled,membershipEnabled,creationEnabled,queue,reports,groups,scopes};
 };
 export const Route=createFileRoute("/teacher/study-groups")({
  loader:safeLoader(loadFacilitatorStudyGroups,{authMessage:"Sign in with an authorized teacher account to facilitate study groups."}),
@@ -21,7 +21,7 @@ function TeacherStudyGroups(){
  return <TeacherStudyGroupsView data={outcome.data}/>;
 }
 function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacilitatorStudyGroups>>}){
- const {enabled,writesEnabled,membershipEnabled,queue,reports,groups,scopes}=data,router=useRouter();
+ const {enabled,writesEnabled,membershipEnabled,creationEnabled,queue,reports,groups,scopes}=data,router=useRouter();
  const [title,setTitle]=useState(""),[description,setDescription]=useState(""),[kind,setKind]=useState<"course"|"interest">("course");
  const [siteId,setSiteId]=useState(""),[programId,setProgramId]=useState("");
  const sites=[...new Map(scopes.map(s=>[s.siteId,{id:s.siteId,name:s.siteName}])).values()];
@@ -82,7 +82,7 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
     <option value="">{kind==="course"?"Choose the course program":"Site-wide interest group (all permitted programs)"}</option>
     {sitePrograms.map(program=><option key={program.programId} value={program.programId}>{program.programName}</option>)}
    </select>
-   <button disabled={busy||!writesEnabled||!siteId||(kind==="course"&&!programId)||title.trim().length<3} className="rounded border px-3 py-2 disabled:opacity-40" onClick={()=>run(async()=>{await createStudyGroup({data:{title,description,kind,maxMembers:20,siteId,...(programId?{programId}:{})}});setTitle("");setDescription("");})}>Create group</button>
+   <button disabled={busy||!creationEnabled||!siteId||(kind==="course"&&!programId)||title.trim().length<3} className="rounded border px-3 py-2 disabled:opacity-40" onClick={()=>run(async()=>{await createStudyGroup({data:{title,description,kind,maxMembers:20,siteId,...(programId?{programId}:{})}});setTitle("");setDescription("");})}>Create group</button>
   </section></>}
  </main>;
 }
