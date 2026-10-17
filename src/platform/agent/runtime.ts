@@ -11,6 +11,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { writeAudit } from "@/platform/mutation";
 import {
   createWatch,
+  createWeeklyDigest,
   getAgentTool,
   getStudentAcademicSummary,
   listWatches,
@@ -240,6 +241,36 @@ export async function sendMessage(
           agentRunId: run!.id,
         });
         await finish("awaiting_approval", { tool: createWatch.name, args });
+      }
+    } else if (plan.intent === "manage" && plan.action === "create_digest") {
+      const matches = await resolveVisibleStudents(context, plan.studentQuery);
+      if (matches.length !== 1) {
+        reply = await addMessage(tx, {
+          conversationId, role: "agent",
+          body: matches.length ? studentAmbiguousMessage(matches)
+            : studentNotFoundMessage(plan.studentQuery, 0),
+          agentRunId: run!.id,
+        });
+        await finish("completed", { kind: "clarification" });
+      } else {
+        const student = matches[0]!;
+        const args = {
+          studentProfileId: student.studentProfileId,
+          weekday: plan.weekday, hour: plan.hour,
+          sourceConversationId: conversationId,
+        };
+        const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+        const preview: ActionPreview = {
+          runId: run!.id, tool: createWeeklyDigest.name,
+          summary: `Send a weekly progress digest for ${student.displayName} every ${days[plan.weekday]} at ${plan.hour}:00 in your notification timezone.`,
+          args,
+        };
+        reply = await addMessage(tx, {
+          conversationId, role: "agent",
+          body: "I can schedule that weekly academic digest. Confirm the details below.",
+          actionPreview: preview, agentRunId: run!.id,
+        });
+        await finish("awaiting_approval", { tool: createWeeklyDigest.name, args });
       }
     } else if (plan.intent === "manage" && plan.action === "list") {
       const result = await listWatches.execute(context, {});
