@@ -108,6 +108,7 @@ async function finalizedGradeRows(
       sectionTitle: s.sections.title,
       sectionMetadata:s.sections.metadata,
       gradingPeriodId: s.sectionGrades.gradingPeriodId,
+      gradingPeriodSequence:s.gradingPeriods.sequence,
       gradingPeriodName: s.gradingPeriods.name,
       termId: s.sectionGrades.termId,
       termName: s.terms.name,
@@ -143,11 +144,18 @@ async function finalizedGradeRows(
       asc(s.gradingPeriods.sequence),
       asc(s.sections.title),
     );
+  const periodRows=rows.length?await db.select({termId:s.gradingPeriods.termId,
+    sequence:s.gradingPeriods.sequence}).from(s.gradingPeriods)
+    .where(inArray(s.gradingPeriods.termId,[...new Set(rows.map(row=>row.termId))])):[];
+  const lastPeriod=new Map<string,number>();
+  for(const p of periodRows)lastPeriod.set(p.termId,Math.max(lastPeriod.get(p.termId)??0,p.sequence));
   return rows.map((row) => ({
     ...row,
     finalizedAt: row.finalizedAt?.toISOString() ?? null,
-    creditsAttempted:typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1,
-    creditsEarned:["A","B","C","D","P","Pass"].includes(row.letterGrade??"")?
+    creditsAttempted:row.gradingPeriodSequence===lastPeriod.get(row.termId)?
+      (typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1):0,
+    creditsEarned:row.gradingPeriodSequence===lastPeriod.get(row.termId)&&
+      ["A","B","C","D","P","Pass"].includes(row.letterGrade??"")?
       (typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1):0,
   }));
 }
