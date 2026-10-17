@@ -100,6 +100,7 @@ async function loadScopedRoster(
       eq(s.enrollments.status, "active"),
       eq(s.sections.active, true),
       inArray(s.sections.siteId, siteIds),
+      inArray(s.sections.programId, context.scope.programIds ?? []),
       ...(studentProfileId ? [eq(s.enrollments.studentProfileId, studentProfileId)] : []),
     ));
   const programRows = await db
@@ -117,6 +118,7 @@ async function loadScopedRoster(
       eq(s.enrollments.kind, "program"),
       eq(s.enrollments.status, "active"),
       inArray(s.programs.siteId, siteIds),
+      inArray(s.programs.id, context.scope.programIds ?? []),
       ...(studentProfileId ? [eq(s.enrollments.studentProfileId, studentProfileId)] : []),
     ));
   const roster = new Map<string, RosterEntry>();
@@ -221,7 +223,9 @@ export const markAttendance = createServerFn({ method: "POST" })
   });
 
 /** Recent absences/tardies for students the verified guardian may view, plus excuse state. */
-export const listGuardianAbsences = createServerFn({ method: "GET" }).handler(async () => {
+export const listGuardianAbsences = createServerFn({ method: "GET" })
+ .validator((value:unknown)=>z.object({studentPersonId:z.string().uuid().optional()}).parse(value??{}))
+ .handler(async ({data}) => {
   const context = await guardianActor();
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const relationships = await db
@@ -236,6 +240,7 @@ export const listGuardianAbsences = createServerFn({ method: "GET" }).handler(as
     .where(and(
       eq(s.guardianRelationships.guardianPersonId, context.actorPersonId!),
       eq(s.guardianRelationships.canViewAcademics, true),
+      ...(data.studentPersonId?[eq(s.guardianRelationships.studentPersonId,data.studentPersonId)]:[]),
     ));
   if (!relationships.length) return { absences: [] };
   const studentNames = new Map(
