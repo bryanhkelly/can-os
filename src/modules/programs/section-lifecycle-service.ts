@@ -51,7 +51,7 @@ export async function sectionLifecycleSnapshot(context: LifecycleContext, progra
   const termYears=rows.length?await db.select({termId:terms.id,schoolYearId:terms.schoolYearId}).from(terms)
     .where(inArray(terms.id,[...new Set(rows.map(r=>r.termId))])):[];
   const yearByTerm=new Map(termYears.map(t=>[t.termId,t.schoolYearId]));
-  const [staff, students, waits, allocations]=await Promise.all([
+  const [staff, students, waits, allocations, demands]=await Promise.all([
     ids.length?db.select({sectionId:sectionTeachers.sectionId,personId:sectionTeachers.personId})
       .from(sectionTeachers).where(inArray(sectionTeachers.sectionId,ids)):[],
     ids.length?db.select({sectionId:enrollments.sectionId,id:enrollments.id,studentProfileId:enrollments.studentProfileId,status:enrollments.status})
@@ -60,6 +60,8 @@ export async function sectionLifecycleSnapshot(context: LifecycleContext, progra
       .from(actions).where(and(eq(actions.type,"section_waitlist"),inArray(actions.sectionId,ids),inArray(actions.status,["open","waiting","in_progress"]))):[],
     ids.length?db.select({sectionId:instructionalCapacityReservations.sectionId,id:instructionalCapacityReservations.id,status:instructionalCapacityReservations.status,offeringId:instructionalCapacityReservations.offeringId})
       .from(instructionalCapacityReservations).where(inArray(instructionalCapacityReservations.sectionId,ids)):[],
+    ids.length?db.select({id:sectionCapacityDemands.id,sectionId:sectionCapacityDemands.sectionId})
+      .from(sectionCapacityDemands).where(inArray(sectionCapacityDemands.sectionId,ids)):[],
   ]);
   return rows.map(row=>({
     id:row.id,title:row.title,code:row.code,active:row.active,
@@ -71,6 +73,7 @@ export async function sectionLifecycleSnapshot(context: LifecycleContext, progra
     students:students.filter(e=>e.sectionId===row.id),
     waitlist:waits.filter(w=>w.sectionId===row.id),
     allocations:allocations.filter(a=>a.sectionId===row.id),
+    demandId:demands.find(d=>d.sectionId===row.id)?.id??null,
   }));
 }
 export async function changeSectionSchedule(context: LifecycleContext, input: {sectionId:string;scheduleTemplateId:string|null;startsAt:Date|null;endsAt:Date|null;reason:string}) {
