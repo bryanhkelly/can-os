@@ -51,7 +51,7 @@ async function expireElapsedOffers(tx:Transaction,context:CommandContext,program
   .where(and(eq(admissionOffers.programId,programId),eq(admissionOffers.schoolYearId,schoolYearId),eq(admissionOffers.status,"issued")));
  let count=0;
  for(const offer of pending){
-  if(offer.metadata.synthetic!==true||!offer.expiresAt||offer.expiresAt.getTime()>now.getTime())continue;
+  if(!offer.expiresAt||offer.expiresAt.getTime()>now.getTime())continue;
   await tx.update(admissionOffers).set({status:"expired",updatedAt:now}).where(and(eq(admissionOffers.id,offer.id),eq(admissionOffers.status,"issued")));
   await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"admissions.offer.expire",resourceType:"admission_offer",resourceId:offer.id,scope:{programId},before:{status:"issued"},after:{status:"expired"},context:{requestId:context.requestId??null}});
   count++;
