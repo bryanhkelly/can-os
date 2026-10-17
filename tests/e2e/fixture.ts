@@ -38,16 +38,21 @@ export interface Gf1Fixture {
   teacherPersonId: string;
   studentPersonId: string;
   guardianPersonId: string;
+  specialistPersonId: string;
   studentProfileId: string;
   studentAccountId: string;
   teacherAccountId: string;
   guardianAccountId: string;
+  specialistAccountId: string;
   studentGrantId: string;
   teacherGrantId: string;
   guardianGrantId: string;
+  specialistGrantId: string;
   /** Raw session secrets — the browser only ever sees these, never the hashes. */
   studentSecret: string;
   teacherSecret: string;
+  guardianSecret: string;
+  specialistSecret: string;
   assessmentTitle: string;
 }
 
@@ -226,6 +231,12 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
        values ('E2E Morgan', $1, $2, $3::jsonb) returning id`,
       [`Guardian-${suffix}`, `e2e-guardian-${suffix}@can-os.invalid`, synthetic],
     );
+    fixture.specialistPersonId = await insertId(
+      sql,
+      `insert into people (legal_first_name, legal_last_name, email, metadata)
+       values ('E2E Casey', $1, $2, $3::jsonb) returning id`,
+      [`Specialist-${suffix}`, `e2e-specialist-${suffix}@can-os.invalid`, synthetic],
+    );
 
     fixture.studentProfileId = await insertId(
       sql,
@@ -298,6 +309,7 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
     fixture.studentAccountId = await accountFor(`e2e-student-${suffix}@can-os.invalid`);
     fixture.teacherAccountId = await accountFor(`e2e-teacher-${suffix}@can-os.invalid`);
     fixture.guardianAccountId = await accountFor(`e2e-guardian-${suffix}@can-os.invalid`);
+    fixture.specialistAccountId = await accountFor(`e2e-specialist-${suffix}@can-os.invalid`);
 
     const grantFor = async (accountId: string, personId: string, role: string) =>
       insertId(
@@ -310,6 +322,7 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
     fixture.studentGrantId = await grantFor(fixture.studentAccountId, fixture.studentPersonId, "student");
     fixture.teacherGrantId = await grantFor(fixture.teacherAccountId, fixture.teacherPersonId, "teacher");
     fixture.guardianGrantId = await grantFor(fixture.guardianAccountId, fixture.guardianPersonId, "guardian");
+    fixture.specialistGrantId = await grantFor(fixture.specialistAccountId, fixture.specialistPersonId, "specialist");
 
     // Sessions: only the SHA-256 hash of secret+pepper is stored, exactly like
     // the real verify-challenge flow in src/modules/identity.
@@ -329,6 +342,8 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
     };
     fixture.studentSecret = await sessionFor(fixture.studentAccountId, fixture.studentGrantId);
     fixture.teacherSecret = await sessionFor(fixture.teacherAccountId, fixture.teacherGrantId);
+    fixture.guardianSecret = await sessionFor(fixture.guardianAccountId, fixture.guardianGrantId);
+    fixture.specialistSecret = await sessionFor(fixture.specialistAccountId, fixture.specialistGrantId);
 
     return fixture as Gf1Fixture;
   } catch (error) {
@@ -349,7 +364,7 @@ export async function destroyGf1Fixture(
   ];
   const steps: Array<[string, unknown[] | undefined]> = [
     // Side-effect tables first (they hold plain UUID references or restrict FKs).
-    ...[fixture.studentPersonId, fixture.guardianPersonId, fixture.teacherPersonId].map(
+    ...[fixture.studentPersonId, fixture.guardianPersonId, fixture.teacherPersonId, fixture.specialistPersonId].map(
       (id) => one(`delete from notifications where recipient_person_id = $1`, id),
     ),
     ...[fixture.submissionId, fixture.assessmentId].map((id) =>
@@ -360,13 +375,13 @@ export async function destroyGf1Fixture(
       one(`delete from domain_events where aggregate_id = $1`, id),
     ),
     // Auth graph.
-    ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId].map(
+    ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId, fixture.specialistAccountId].map(
       (id) => one(`delete from access_sessions where account_id = $1`, id),
     ),
-    ...[fixture.studentGrantId, fixture.teacherGrantId, fixture.guardianGrantId].map(
+    ...[fixture.studentGrantId, fixture.teacherGrantId, fixture.guardianGrantId, fixture.specialistGrantId].map(
       (id) => one(`delete from account_person_grants where id = $1`, id),
     ),
-    ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId].map(
+    ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId, fixture.specialistAccountId].map(
       (id) => one(`delete from access_accounts where id = $1`, id),
     ),
     // Academic graph, children before parents.
@@ -387,7 +402,7 @@ export async function destroyGf1Fixture(
         : undefined,
     ],
     one(`delete from student_profiles where id = $1`, fixture.studentProfileId),
-    ...[fixture.teacherPersonId, fixture.studentPersonId, fixture.guardianPersonId].map(
+    ...[fixture.teacherPersonId, fixture.studentPersonId, fixture.guardianPersonId, fixture.specialistPersonId].map(
       (id) => one(`delete from people where id = $1`, id),
     ),
     // Delivery hierarchy, children before parents.

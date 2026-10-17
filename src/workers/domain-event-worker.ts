@@ -14,6 +14,11 @@ import { db } from "@/db/client";
 import { actions, domainEvents } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
 import { handleAcademicInterventionEvent } from "@/modules/learning/missing-assignment-event-handler";
+import {
+  handleAcademicPassThroughEvent,
+  handleGradePostedEvent,
+  handleSubmissionReceivedEvent,
+} from "@/modules/learning/academic-event-handler";
 import { processEventSubscriptions } from "@/platform/subscriptions";
 
 export type DomainEventHandler = (eventId: string) => Promise<void>;
@@ -25,7 +30,13 @@ export function registerDomainEventHandler(eventType: string, handler: DomainEve
   registry.set(eventType, handler);
 }
 
+registerDomainEventHandler(EventTypes.AssessmentPublished, handleAcademicPassThroughEvent);
 registerDomainEventHandler(EventTypes.AssignmentBecameMissing, handleAcademicInterventionEvent);
+registerDomainEventHandler(EventTypes.SubmissionReceived, handleSubmissionReceivedEvent);
+registerDomainEventHandler(EventTypes.GradePosted, handleGradePostedEvent);
+registerDomainEventHandler(EventTypes.CommunicationMessageSent, handleAcademicPassThroughEvent);
+registerDomainEventHandler(EventTypes.ActionCreated, handleAcademicPassThroughEvent);
+registerDomainEventHandler(EventTypes.ActionResolved, handleAcademicPassThroughEvent);
 
 /** Bounded retry: after this many failed attempts an event escalates to an ops Action. */
 const MAX_ATTEMPTS = 5;
