@@ -1,15 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  listPendingExcuses,
-  reviewExcuse,
-} from "@/modules/attendance/attendance.functions";
-import { listExpectedOnsiteRoster, markExpectedOnsiteAttendance } from "@/modules/attendance/onsite-attendance-workflow.functions";
+  listExpectedOnsiteRoster, markExpectedOnsiteAttendance,
+  listExpectedPendingExcuses, reviewCurrentAttendanceExcuse,
+} from "@/modules/attendance/onsite-attendance-workflow.functions";
 
 export const Route = createFileRoute("/staff/attendance")({ component: StaffAttendancePage });
 
 type RosterStudent = Awaited<ReturnType<typeof listExpectedOnsiteRoster>>["students"][number];
-type PendingExcuse = Awaited<ReturnType<typeof listPendingExcuses>>["excuses"][number];
+type PendingExcuse = Awaited<ReturnType<typeof listExpectedPendingExcuses>>["excuses"][number];
 
 const statusOptions = ["present", "absent", "tardy"] as const;
 type OfflineMark = {studentProfileId:string;programId:string;date:string;status:"present"|"absent"|"tardy";mutationId:string;note:string;expectedPreviousEventId?:string|null};
@@ -97,7 +96,7 @@ function StaffAttendancePage() {
     try {
       const [roster, pending] = await Promise.all([
         listExpectedOnsiteRoster({ data: { date: targetDate } }),
-        listPendingExcuses(),
+        listExpectedPendingExcuses(),
       ]);
       setStudents(roster.students);
       setPrograms(roster.programs);
@@ -118,7 +117,7 @@ function StaffAttendancePage() {
       try {
         const [roster, pending] = await Promise.all([
           listExpectedOnsiteRoster({ data: { date } }),
-          listPendingExcuses(),
+          listExpectedPendingExcuses(),
         ]);
         if (!active) return;
         setStudents(roster.students);
@@ -184,7 +183,7 @@ function StaffAttendancePage() {
     setBusy(`excuse:${excuse.excuseId}`);
     setNotice("");
     try {
-      await reviewExcuse({ data: { excuseId: excuse.excuseId, decision, note: notes[excuse.excuseId] ?? "" } });
+      await reviewCurrentAttendanceExcuse({ data: { excuseId: excuse.excuseId, decision, note: notes[excuse.excuseId] ?? "" } });
       setNotice(`Excuse ${decision} for ${excuse.studentName}.`);
       await load(date);
     } catch (cause) {
@@ -295,6 +294,7 @@ function StaffAttendancePage() {
               <span className="rounded-full border px-3 py-1 text-xs">Submitted</span>
             </div>
             <p className="mt-3 rounded-lg bg-muted p-3 text-sm">{excuse.reason}</p>
+            {!excuse.canReview && <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-400">Attendance was subsequently corrected. Review and reconcile the current mark before deciding this historical excuse.</p>}
             <label className="mt-3 block text-sm font-semibold">
               Review note
               <textarea
@@ -308,13 +308,13 @@ function StaffAttendancePage() {
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                disabled={busy !== ""}
+                disabled={busy !== "" || !excuse.canReview}
                 className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                 onClick={() => review(excuse, "approved")}
               >Approve excuse</button>
               <button
                 type="button"
-                disabled={busy !== ""}
+                disabled={busy !== "" || !excuse.canReview}
                 className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                 onClick={() => review(excuse, "rejected")}
               >Reject</button>
