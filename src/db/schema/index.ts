@@ -26,3 +26,4 @@ export * from "./access";
 export * from "./support";
 export * from "./conversations";
 export * from "./subscriptions";
+export * from "./notification-preferences";
