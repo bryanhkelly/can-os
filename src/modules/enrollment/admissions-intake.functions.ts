@@ -1,9 +1,10 @@
+import {normalizeAccessEmail} from "@/domain/access-tokens";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray} from "drizzle-orm";
+import {and,desc,eq,inArray,isNull} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
-import {applications,auditEvents,domainEvents,guardianRelationships,householdMemberships,households,journeys,journeyRequirements,people,programs,studentProfiles} from "@/db/schema";
+import {accessAccounts,accountPersonGrants,applications,auditEvents,domainEvents,guardianRelationships,householdMemberships,households,journeys,journeyRequirements,people,programs,studentProfiles} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {instantiateJourneyFromDefinition} from "@/modules/journeys/instantiate";
@@ -148,5 +149,64 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
     scope:{programId:app.programId},before:{stage:app.stage,disposition:app.metadata.admissionsDisposition??null},
     after:{stage:next,disposition:nextMetadata.admissionsDisposition??null},context:{note:data.note??null}});
    return {stage:next};
+  });
+ });
+
+/**
+ * Connect the prospective guardian's existing Person to a real passwordless
+ * login. Do not grant an existing account to a different Person just because
+ * an operator typed that email; such cases need verified identity resolution.
+ */
+export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({applicationId:uuid}).parse(v))
+ .handler(async({data})=>{
+  assertSyntheticMutation("registrar");
+  const actor=await registrar();
+  return db.transaction(async tx=>{
+   const [app]=await tx.select({
+    id:applications.id,programId:applications.programId,metadata:applications.metadata,
+   }).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
+   if(!app||app.metadata.synthetic!==true||!actor.scope.programIds?.includes(app.programId))
+    throw new AuthorizationError("admissions guardian provisioning");
+   const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
+    .from(programs).where(eq(programs.id,app.programId)).limit(1);
+   if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
+    (actor.scope.siteIds?.length&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))
+    throw new AuthorizationError("guardian membership scope");
+   const contactId=String(app.metadata.contactPersonId??"");
+   const [contact]=await tx.select({id:people.id,email:people.email})
+    .from(people).where(eq(people.id,contactId)).limit(1);
+   if(!contact?.email)throw new Error("Guardian contact email missing");
+   const email=normalizeAccessEmail(contact.email);
+   let [account]=await tx.select({id:accessAccounts.id,disabled:accessAccounts.disabled})
+    .from(accessAccounts).where(eq(accessAccounts.emailNormalized,email)).limit(1);
+   if(account?.disabled)throw new Error("Guardian account is disabled");
+   if(account){
+    const existing=await tx.select({personId:accountPersonGrants.personId})
+     .from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id));
+    if(existing.some(g=>g.personId!==contact.id))
+     throw new Error("Account email belongs to another identity; verify and reconcile before granting access");
+   } else {
+    [account]=await tx.insert(accessAccounts).values({emailNormalized:email})
+     .returning({id:accessAccounts.id,disabled:accessAccounts.disabled});
+   }
+   const [grant]=await tx.select({id:accountPersonGrants.id})
+    .from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,account!.id),
+     eq(accountPersonGrants.personId,contact.id),eq(accountPersonGrants.role,"guardian"),
+     eq(accountPersonGrants.organizationId,program.organizationId),
+     program.siteId?eq(accountPersonGrants.siteId,program.siteId):isNull(accountPersonGrants.siteId)))
+    .limit(1);
+   if(grant)return {created:false,email,accountId:account!.id};
+   const [newGrant]=await tx.insert(accountPersonGrants).values({
+    accountId:account!.id,personId:contact.id,role:"guardian",
+    organizationId:program.organizationId,siteId:program.siteId,isSynthetic:true,
+   }).returning({id:accountPersonGrants.id});
+   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+    action:"admissions.guardian_access.provision",resourceType:"account_person_grant",
+    resourceId:newGrant!.id,scope:{organizationId:program.organizationId,
+     programId:app.programId,siteId:program.siteId},
+    after:{personId:contact.id,role:"guardian",applicationId:app.id},
+    context:{synthetic:true}});
+   return {created:true,email,accountId:account!.id};
   });
  });
