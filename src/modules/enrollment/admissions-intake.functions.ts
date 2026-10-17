@@ -8,7 +8,6 @@ import {accessAccounts,accountPersonGrants,applications,auditEvents,domainEvents
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {instantiateJourneyFromDefinition} from "@/modules/journeys/instantiate";
-import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 const uuid=z.string().uuid();
 const applicant=z.object({
  requestId:uuid,programId:uuid,existingApplicationId:uuid.optional(), studentFirstName:z.string().trim().min(1).max(100),
@@ -48,7 +47,6 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
 });
 export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((v:unknown)=>applicant.parse(v))
  .handler(async({data})=>{
-  assertSyntheticMutation("registrar");
   const actor=await registrar();
   if(!actor.scope.programIds?.includes(data.programId))throw new AuthorizationError("admissions program");
   const [program]=await db.select({organizationId:programs.organizationId}).from(programs)
@@ -130,7 +128,6 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
   decision:z.enum(["application","eligibility","accept","decline","withdraw","waitlist","restore"]),
   note:z.string().trim().max(2000).optional()}).parse(v))
  .handler(async({data})=>{
-  assertSyntheticMutation("registrar");
   const actor=await registrar();
   return db.transaction(async tx=>{
    const [app]=await tx.select().from(applications).where(eq(applications.id,data.applicationId))
@@ -193,7 +190,6 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
 export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({applicationId:uuid}).parse(v))
  .handler(async({data})=>{
-  assertSyntheticMutation("registrar");
   const actor=await registrar();
   return db.transaction(async tx=>{
    const [app]=await tx.select({
