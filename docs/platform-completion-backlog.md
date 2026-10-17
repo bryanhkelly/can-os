@@ -73,3 +73,5 @@ Return to Phase 0 CI/migrations/release baseline and Phase 4 security/performanc
 - [x] Canonicalize authenticated office-hour booking and protect published availability and related section enrollment.
 
 - [x] Guardian upcoming appointments and same-series rescheduling added; cancellation still pending.
+
+- [x] Guardian appointment cancel button visible but disabled until lifecycle implementation.
