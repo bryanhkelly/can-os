@@ -346,3 +346,24 @@ export async function expireWaitlistOffers(context: LifecycleContext,programId:s
  }
  return {expired:count};
 }
+
+/** Internal maintenance task invoked only from the authenticated scheduled-job entrypoint. */
+export async function expireOutstandingSectionOffers(limit=100):Promise<number>{
+ const pending=await db.select({id:actions.id}).from(actions).where(and(
+  eq(actions.type,"section_waitlist"),eq(actions.status,"in_progress"),
+  sql`due_at is not null and due_at < now()`)).limit(limit);
+ let expired=0;
+ for(const pendingItem of pending){
+  await db.transaction(async tx=>{
+   const [item]=await tx.select().from(actions).where(eq(actions.id,pendingItem.id)).limit(1).for("update");
+   if(!item||item.status!=="in_progress"||!item.dueAt||item.dueAt>new Date())return;
+   await tx.update(actions).set({status:"waiting",dueAt:null,updatedAt:new Date(),
+    metadata:{...item.metadata,offerExpiredAt:new Date().toISOString()}}).where(eq(actions.id,item.id));
+   await tx.insert(auditEvents).values({action:"SectionWaitlistOfferExpired",resourceType:"action",
+    resourceId:item.id,scope:{organizationId:item.organizationId,programId:item.programId,siteId:item.siteId},
+    before:{status:"in_progress"},after:{status:"waiting"}});
+   expired++;
+  });
+ }
+ return expired;
+}
