@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { domainEvents, subscriptionDeliveries, subscriptions } from "@/db/schema";
 import { emailNotificationRecipients, sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { getSubscriptionPolicy } from "./policy";
+import { getNotificationPreferences, nextAllowedDelivery, sendOptedInSms } from "./preferences";
 
 const LEASE_MS = 120_000;
 const MAX_ATTEMPTS = 5;
@@ -21,7 +22,8 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
     const rows = await tx.select({ id: subscriptionDeliveries.id })
       .from(subscriptionDeliveries)
       .where(or(
-        or(eq(subscriptionDeliveries.status, "pending"),
+        or(and(eq(subscriptionDeliveries.status, "pending"),
+          or(isNull(subscriptionDeliveries.nextAttemptAt), lte(subscriptionDeliveries.nextAttemptAt, now))),
           and(eq(subscriptionDeliveries.status, "failed"), lte(subscriptionDeliveries.nextAttemptAt, now))),
         and(eq(subscriptionDeliveries.status, "processing"), lte(subscriptionDeliveries.leaseUntil, now))
       ))
@@ -73,6 +75,14 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
         };
       });
       if (!delivery) continue;
+      const prefs = await getNotificationPreferences(delivery.personId);
+      const quietUntil = prefs ? nextAllowedDelivery(now, prefs.timezone, prefs.quietStart, prefs.quietEnd) : null;
+      if (quietUntil) {
+        await db.update(subscriptionDeliveries).set({
+          status: "pending", leaseUntil: null, nextAttemptAt: quietUntil, updatedAt: now,
+        }).where(eq(subscriptionDeliveries.id, id));
+        continue;
+      }
       let ok = false;
       let error = "channel_not_supported";
       if (delivery.channel === "email") {
@@ -87,13 +97,22 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
           error = "email_provider_failed";
         }
       }
+      if (delivery.channel === "sms") {
+        if (!prefs?.smsOptedIn || !prefs.smsVerifiedAt || !prefs.smsVerifiedPhone) {
+          error = "sms_consent_required";
+        } else {
+          // SMS previews must remain low-sensitivity; the guardian opens CAN for detail.
+          ok = await sendOptedInSms(prefs.smsVerifiedPhone, "CAN OS: An assignment reminder needs your attention. Sign in to CAN OS to review.");
+          error = "sms_provider_failed";
+        }
+      }
       const attempt = delivery.attempt;
       await db.update(subscriptionDeliveries).set({
         status: ok ? "delivered" : "failed",
         attempts: attempt,
         deliveredAt: ok ? new Date() : null,
         lastError: ok ? null : error,
-        nextAttemptAt: ok || attempt >= MAX_ATTEMPTS || error === "channel_not_supported"
+        nextAttemptAt: ok || attempt >= MAX_ATTEMPTS || ["channel_not_supported", "sms_consent_required"].includes(error)
           ? null : new Date(Date.now() + RETRY_MS(attempt)),
         leaseUntil: null,
         updatedAt: new Date(),
