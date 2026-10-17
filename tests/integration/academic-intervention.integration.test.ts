@@ -247,6 +247,25 @@ integration("GF1 academic intervention", () => {
     expect(insight).toBeDefined();
     expect(insight.type).toBe("missing_assignment");
 
+    // GF1 step 9: the Insight must carry delivery scope so site-scoped
+    // support views (e.g. the coach caseload) can surface the signal.
+    expect(insight.organizationId).toBe(hostOrg.id);
+    expect(insight.siteId).toBe(site.id);
+    expect(insight.programId).toBe(program.id);
+
+    const coachVisibleInsights = await db
+      .select({ id: schema.insights.id })
+      .from(schema.insights)
+      .where(
+        and(
+          eq(schema.insights.subjectType, "student_profile"),
+          eq(schema.insights.siteId, site.id),
+          eq(schema.insights.status, "open"),
+        ),
+      );
+
+    expect(coachVisibleInsights.map((row) => row.id)).toContain(insight.id);
+
     const notifications = await db
       .select()
       .from(schema.notifications)
@@ -265,6 +284,19 @@ integration("GF1 academic intervention", () => {
 
     expect(notifications.length).toBeGreaterThanOrEqual(3);
 
+    // GF1 steps 6-8: student, guardian, and teacher are each notified with a
+    // link back to the canonical submission resource.
+    const notifiedPersonIds = new Set(
+      notifications.map((row) => row.recipientPersonId),
+    );
+    expect(notifiedPersonIds).toContain(studentPerson.id);
+    expect(notifiedPersonIds).toContain(guardian.id);
+    expect(notifiedPersonIds).toContain(teacher.id);
+    for (const row of notifications) {
+      expect(row.resourceType).toBe("submission");
+      expect(row.resourceId).toBe(submission.id);
+    }
+
     const actionId = await actionModule.createActionFromInsight(
       teacherContext,
       {
@@ -275,6 +307,17 @@ integration("GF1 academic intervention", () => {
     );
 
     expect(actionId).toBeTruthy();
+
+    // GF1 step 11: the Action inherits delivery scope from the Insight so
+    // site-scoped work queues can surface it.
+    const [createdAction] = await db
+      .select()
+      .from(schema.actions)
+      .where(eq(schema.actions.id, actionId));
+
+    expect(createdAction.organizationId).toBe(hostOrg.id);
+    expect(createdAction.siteId).toBe(site.id);
+    expect(createdAction.programId).toBe(program.id);
 
     const guardianContext = {
       actorPersonId: guardian.id,
@@ -380,5 +423,32 @@ integration("GF1 academic intervention", () => {
       );
 
     expect(resolvedEvents).toHaveLength(1);
+
+    // GF1 step 18: the audit log alone can reconstruct the complete flow.
+    const { inArray } = await import("drizzle-orm");
+    const flowAudit = await db
+      .select({ action: schema.auditEvents.action })
+      .from(schema.auditEvents)
+      .where(
+        inArray(schema.auditEvents.resourceId, [
+          assessment.id,
+          submission.id,
+          actionId,
+          familyThreadId,
+        ]),
+      );
+
+    const auditActions = new Set(flowAudit.map((row) => row.action));
+    for (const expected of [
+      "assessment.publish",
+      "submission.mark_missing",
+      "communication.message_send",
+      "submission.submit",
+      "submission.grade",
+      "action.create_from_insight",
+      "action.resolve",
+    ]) {
+      expect(auditActions).toContain(expected);
+    }
   });
 });

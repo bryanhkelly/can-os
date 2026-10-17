@@ -3,6 +3,8 @@ import {
   assessments,
   guardianRelationships,
   people,
+  programs,
+  sections,
   sectionTeachers,
   studentProfiles,
   submissions,
@@ -27,6 +29,9 @@ export type AssignmentMissingContext = {
   assessmentId: string;
   assessmentTitle: string;
   sectionId: string;
+  organizationId: string | null;
+  siteId: string | null;
+  programId: string | null;
   studentProfileId: string;
   studentPersonId: string;
   studentName: string;
@@ -44,6 +49,9 @@ export const assignmentMissingPolicy: NotificationPolicy<AssignmentMissingContex
         assessmentId: assessments.id,
         assessmentTitle: assessments.title,
         sectionId: assessments.sectionId,
+        siteId: sections.siteId,
+        programId: sections.programId,
+        organizationId: programs.organizationId,
         studentProfileId: submissions.studentProfileId,
         studentPersonId: studentProfiles.personId,
         studentPreferredName: people.preferredName,
@@ -51,6 +59,8 @@ export const assignmentMissingPolicy: NotificationPolicy<AssignmentMissingContex
       })
       .from(submissions)
       .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
+      .innerJoin(sections, eq(sections.id, assessments.sectionId))
+      .innerJoin(programs, eq(programs.id, sections.programId))
       .innerJoin(
         studentProfiles,
         eq(studentProfiles.id, submissions.studentProfileId),
@@ -81,6 +91,9 @@ export const assignmentMissingPolicy: NotificationPolicy<AssignmentMissingContex
       assessmentId: record.assessmentId,
       assessmentTitle: record.assessmentTitle,
       sectionId: record.sectionId,
+      organizationId: record.organizationId,
+      siteId: record.siteId,
+      programId: record.programId,
       studentProfileId: record.studentProfileId,
       studentPersonId: record.studentPersonId,
       studentName: record.studentPreferredName ?? record.studentLegalFirstName,

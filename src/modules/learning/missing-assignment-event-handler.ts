@@ -40,6 +40,9 @@ export async function handleAcademicInterventionEvent(
         "The assignment deadline passed without a submission. Review context before deciding whether formal intervention is needed.",
       subjectType: "student_profile",
       subjectId: context.studentProfileId,
+      organizationId: context.organizationId,
+      siteId: context.siteId,
+      programId: context.programId,
       sectionId: context.sectionId,
       evidence: [
         {
