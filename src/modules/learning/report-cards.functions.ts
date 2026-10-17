@@ -25,13 +25,13 @@ async function stores() {
   return { db, s };
 }
 
-/** Simple letter bands; historical rows retain the GradeScale version finalized with. */
-function letterFor(percentage: number): string {
-  if (percentage >= 90) return "A";
-  if (percentage >= 80) return "B";
-  if (percentage >= 70) return "C";
-  if (percentage >= 60) return "D";
-  return "F";
+/** Resolve the published, school-specific GradeScale rather than fixed A–F bands. */
+function letterFor(percentage:number,entries:Array<{
+ label:string;minPercent?:number;maxPercent?:number
+}>):string{
+ const matched=entries.find(e=>percentage>=(e.minPercent??0)&&percentage<=(e.maxPercent??100));
+ if(!matched)throw new Error("Percentage does not fit the school grading scale");
+ return matched.label;
 }
 
 type Viewer = { context: CommandContext; studentProfileId: string; siteIds: string[] };
@@ -217,6 +217,9 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         .where(eq(s.gradingPeriods.id, data.gradingPeriodId))
         .limit(1);
       if (!period) throw new Error("GradingPeriod not found");
+      const [gradeScale]=await tx.select({configuration:s.gradeScales.configuration})
+       .from(s.gradeScales).where(eq(s.gradeScales.id,period.gradeScaleId)).limit(1);
+      if(!gradeScale?.configuration.entries.length)throw new Error("Active school grade scale is required");
 
       // Window is [startsOn, endsOn] inclusive in the school-year timezone's dates.
       const windowStart = new Date(`${period.startsOn}T00:00:00.000Z`);
@@ -325,7 +328,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           continue;
         }
         const percentage = Math.round((total.earned / total.possible) * 10000) / 100;
-        const letterGrade = letterFor(percentage);
+        const letterGrade = letterFor(percentage,gradeScale.configuration.entries);
         const values = {
           status: "finalized" as const,
           score: String(Math.round(total.earned * 100) / 100),
@@ -515,6 +518,7 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
           percentage: s.sectionGrades.percentage,
           letterGrade: s.sectionGrades.letterGrade,
           correctionOfId: s.sectionGrades.correctionOfId,
+          gradeScaleId:s.sectionGrades.gradeScaleId,
           metadata: s.sectionGrades.metadata,
         })
         .from(s.sectionGrades)
@@ -546,12 +550,14 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
       if (!section) throw new AuthorizationError("assigned teacher");
       assertSiteScope(context, section.siteId);
 
+      const [gradeScale]=grade.gradeScaleId?await tx.select({configuration:s.gradeScales.configuration})
+       .from(s.gradeScales).where(eq(s.gradeScales.id,grade.gradeScaleId)).limit(1):[];
       const now = new Date();
       const newPercentage =
         data.percentage !== undefined ? String(data.percentage) : grade.percentage;
       const newLetterGrade =
         data.letterGrade ??
-        (data.percentage !== undefined ? letterFor(data.percentage) : grade.letterGrade);
+        (data.percentage !== undefined ? letterFor(data.percentage,gradeScale?.configuration.entries??[]) : grade.letterGrade);
 
       const priorCorrections = Array.isArray(grade.metadata?.corrections)
         ? (grade.metadata.corrections as GradeCorrection[])
