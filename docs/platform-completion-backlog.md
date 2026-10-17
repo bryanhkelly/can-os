@@ -13,7 +13,9 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Show server-resolved site names and authorized program deep links in the workspace shell; do not treat UI selection as an authorization claim.
 - [x] Wire site/program selectors into the operations Action queue and live readiness summary, validating both against the server-issued grant and program/site relationship.
 - [x] Expand organization-wide grants to their owned sites without broadening site-specific grants.
-- [ ] Carry active site/program selection through the remaining operational routes and child context through attendance/admissions.
+- [x] Add child-specific attendance links from the family dashboard and resolve guardian attendance through relationship-scoped server queries.
+- [x] Restrict active academic roster, guardian assignments and office-hour child eligibility to verified program IDs, in addition to site membership.
+- [ ] Carry active site/program selection through the remaining operational routes and child context through admissions.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
 - [x] Delete legacy synthetic-only operations service after replacing its route consumer.
 - [x] Connect staff Action assignment UI to authorized per-site assignee directory and existing audited assignment command; exclude student/guardian grants from operational assignees.
@@ -43,7 +45,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Converge enrolled-student discussion posting and teacher discussion creation, locking and moderation on records independent of fixture markers; maintain verified section membership and relationship guards.
 - [ ] Run deferred integration and authorization testing for discussion lifecycle before production release.
 - [x] Replace local-only StudentExperience with canonical read-only student work/schedule/action projection and real workflow deep links.
-- [ ] Verify typecheck, build, unit tests and role-switch browser journeys before closing Phase 1.
+- [ ] Verify typecheck, build, unit tests and role-switch browser journeys before closing Phase 1 (user deferred, so Phase 1 cannot be marked verified).
 - [x] Align fixture manifest after removing `/demo-health` (previously blocked CI at route fixture coverage).
 - [ ] Build machine-verifiable inventory for every route and data-flow acceptance gate.
 - [x] Remove unconditional synthetic markers from shared domain audits and authenticated session audits.
@@ -75,3 +77,7 @@ Return to Phase 0 CI/migrations/release baseline and Phase 4 security/performanc
 - [x] Guardian upcoming appointments and same-series rescheduling added; cancellation still pending.
 
 - [x] Guardian appointment cancel button visible but disabled until lifecycle implementation.
+
+## Phase 1 completion gate
+
+Do not mark Phase 1 complete or merge its draft branch merely because feature commits exist. In addition to the unchecked items above, validate the route inventory, remaining synthetic-only write boundaries, school/program/child access for every affected server operation, Action lifecycle parity, and notification target permissions. Typecheck, build, multi-role integration and browser acceptance are currently deferred by the user, not waived; completion and production release must not be claimed until that validation is performed.
