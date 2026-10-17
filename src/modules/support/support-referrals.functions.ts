@@ -224,7 +224,7 @@ export const advanceSupportReferral = createServerFn({ method: "POST" })
     });
   });
 
-export const saveSyntheticSupportPlan = createServerFn({ method: "POST" })
+export const saveSupportPlan = createServerFn({ method: "POST" })
   .validator(z.object({ referralId: z.string().uuid(), goal: z.string(), intervention: z.string(), targetDate: z.string() }).parse)
   .handler(async ({ data }) => {
     const actor = await requireActor(["specialist"], "support-plans:manage");
@@ -253,7 +253,7 @@ export const saveSyntheticSupportPlan = createServerFn({ method: "POST" })
     });
   });
 
-export const scheduleSyntheticSupportService = createServerFn({ method: "POST" })
+export const scheduleSupportService = createServerFn({ method: "POST" })
   .validator(z.object({ referralId: z.string().uuid(), kind: z.enum(["tutoring", "coaching", "planning", "learning_support"]), scheduledAt: z.string() }).parse)
   .handler(async ({ data }) => {
     const actor = await requireActor(["specialist"], "support-plans:manage");
@@ -274,7 +274,7 @@ export const scheduleSyntheticSupportService = createServerFn({ method: "POST" }
     });
   });
 
-export const completeSyntheticSupportService = createServerFn({ method: "POST" })
+export const completeSupportService = createServerFn({ method: "POST" })
   .validator(z.object({ referralId: z.string().uuid(), serviceId: z.string().uuid(), outcome: z.string() }).parse)
   .handler(async ({ data }) => {
     const actor = await requireActor(["specialist"], "support-plans:manage");
@@ -291,3 +291,8 @@ export const completeSyntheticSupportService = createServerFn({ method: "POST" }
       return { saved: true };
     });
   });
+
+/** Legacy route import compatibility during shared support convergence. */
+export const saveSyntheticSupportPlan=saveSupportPlan;
+export const scheduleSyntheticSupportService=scheduleSupportService;
+export const completeSyntheticSupportService=completeSupportService;
