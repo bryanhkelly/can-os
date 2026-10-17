@@ -2,7 +2,6 @@ import {createServerFn} from "@tanstack/react-start";
 import {and,eq,sql,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,admissionOffers,admissionSeatPools,guardianRelationships,studentProfiles,schoolYears} from "@/db/schema";
-import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment} from "./admissions-offer-service";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
@@ -44,7 +43,6 @@ async function syntheticOffer(id:string){
 }
 export const issueSyntheticOfferFromDemo=createServerFn({method:"POST"})
 .validator((data:{applicationId:string;schoolYearId:string})=>data).handler(async({data})=>{
- assertSyntheticMutation("registrar");
  const app=await syntheticApplication(data.applicationId);
  const actor=await authorizedActor("registrar","enrollment.decide",app.programId);
  // A stable key makes concurrent retries safe; the domain service rejects a second active offer.
@@ -57,7 +55,6 @@ export const issueSyntheticOfferFromDemo=createServerFn({method:"POST"})
 });
 export const respondSyntheticOfferFromDemo=createServerFn({method:"POST"})
 .validator((data:{offerId:string;decision:"accept"|"decline"})=>data).handler(async({data})=>{
- assertSyntheticMutation("guardian");
  if(!["accept","decline"].includes(data.decision))throw new Error("Invalid decision");
  const {offer,app}=await syntheticOffer(data.offerId);
  const actor=await authorizedActor("guardian","enrollment.apply",app.programId);
@@ -69,7 +66,6 @@ export const respondSyntheticOfferFromDemo=createServerFn({method:"POST"})
 });
 export const activateSyntheticOfferFromDemo=createServerFn({method:"POST"})
 .validator((data:{offerId:string})=>data).handler(async({data})=>{
- assertSyntheticMutation("registrar");
  const {offer,app}=await syntheticOffer(data.offerId);
  const actor=await authorizedActor("registrar","enrollment.activate",app.programId);
  return {enrollmentId:await activateSyntheticOfferedEnrollment(actor,offer.id)};
