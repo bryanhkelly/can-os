@@ -27,7 +27,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Prevent site/section calendar memberships from revealing personal or explicitly participant-restricted events; bound guardian sections to authorized programs/sites.
 - [ ] Build canonical school calendar edit/reschedule/cancel commands with downstream propagation in Phase 2.
 - [x] Restrict non-registrar school-experience calendar queries to site-level events, leaving section events to authorized student/teacher read models.
-- [ ] Verify calendar visibility and office-hour child/site selection with multi-role tests.
+- [x] Require explicit guardian child selection for office-hour booking; check guardian relationship and active enrollment at the appointment's site.
+- [ ] Verify calendar visibility and office-hour child/site selection with multi-role tests (deferred).
 - [x] Remove `/demo-health` from the application routes; retain fixture diagnostics only in test tooling.
 - [x] Replace showcase home with session-based workspace redirection.
 - [x] Remove synthetic metadata dependency from recipient-scoped notification deep-link resolution.
@@ -35,6 +36,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Move recipient-scoped notifications into communication module and drop synthetic-specific function names and superseded student-only service.
 - [x] Redirect teacher-only notices into the canonical notification center and delete duplicate notification handlers.
 - [ ] Tighten every resource-specific notification deep-link permission for cross-role data.
+- [x] Allow enrolled students to read course discussions independent of fixture metadata; preserve legacy route export until mutation consolidation.
+- [ ] Consolidate discussion write and moderation paths only after complete domain and authorization review.
 - [x] Replace local-only StudentExperience with canonical read-only student work/schedule/action projection and real workflow deep links.
 - [ ] Verify typecheck, build, unit tests and role-switch browser journeys before closing Phase 1.
 - [x] Align fixture manifest after removing `/demo-health` (previously blocked CI at route fixture coverage).
