@@ -1,5 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
-import {eq,inArray,sql,and} from "drizzle-orm";
+import {eq,inArray,and} from "drizzle-orm";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
@@ -12,8 +12,8 @@ export const getSyntheticAdmissionsDashboard=createServerFn({method:"GET"}).hand
  assertCapability(actor,"enrollment.decide");
  if(!process.env.DATABASE_URL)return [] as (AdmissionsPipelineItem & {offers:{id:string;status:string;expiresAt:string|null;schoolYearId:string}[];enrollments:{schoolYearId:string;status:string}[]})[];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const records=await db.select({id:s.applications.id,stage:s.applications.stage,metadata:s.applications.metadata,submittedAt:s.applications.submittedAt,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.applications.programId,s.programs.id)).where(and(sql`${s.applications.metadata}->>'synthetic' = 'true'`,inArray(s.applications.programId,actor.scope.programIds))).limit(150);
- const synthetic=records.filter(r=>r.metadata.synthetic===true);
+ const records=await db.select({id:s.applications.id,stage:s.applications.stage,metadata:s.applications.metadata,submittedAt:s.applications.submittedAt,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.applications.programId,s.programs.id)).where(inArray(s.applications.programId,actor.scope.programIds)).limit(150);
+ const synthetic=records;
  if(!synthetic.length)return [];
  const ids=synthetic.map(x=>x.id);
  const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId}).from(s.journeys).where(inArray(s.journeys.participantId,ids));
