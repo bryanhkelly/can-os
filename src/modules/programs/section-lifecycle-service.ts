@@ -41,7 +41,11 @@ export async function sectionLifecycleSnapshot(context: LifecycleContext, progra
   if (!program || !context.scope.organizationIds?.includes(program.organizationId) ||
     (program.siteId && context.scope.siteIds && !context.scope.siteIds.includes(program.siteId)))
     throw new AuthorizationError("program lifecycle");
-  const rows=await db.select().from(sections).where(eq(sections.programId,programId));
+  const rows=await db.select().from(sections).where(and(
+    eq(sections.programId,programId),
+    ...(context.scope.sectionIds ? [inArray(sections.id,context.scope.sectionIds)] : []),
+    ...(context.scope.siteIds ? [inArray(sections.siteId,context.scope.siteIds)] : []),
+  ));
   const ids=rows.map(r=>r.id);
   const schedules=await db.select({scheduleId:scheduleTemplates.id,name:scheduleTemplates.name,schoolYearId:scheduleTemplates.schoolYearId}).from(scheduleTemplates);
   const termYears=rows.length?await db.select({termId:terms.id,schoolYearId:terms.schoolYearId}).from(terms)
