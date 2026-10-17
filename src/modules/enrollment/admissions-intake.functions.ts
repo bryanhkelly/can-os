@@ -100,7 +100,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     metadata:{synthetic:false,origin:"registrar_intake"},
    }).returning({id:people.id});
    const [student]=await tx.insert(studentProfiles).values({
-    personId:studentPerson!.id,gradeLevel:data.gradeLevel||null,metadata:{synthetic:true},
+    personId:studentPerson!.id,gradeLevel:data.gradeLevel||null,metadata:{synthetic:false,origin:"registrar_intake"},
    }).returning({id:studentProfiles.id});
    await tx.insert(householdMemberships).values({
     householdId,personId:studentPerson!.id,relationshipLabel:"student",
@@ -197,7 +197,7 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
   const actor=await registrar();
   return db.transaction(async tx=>{
    const [app]=await tx.select({
-    id:applications.id,programId:applications.programId,metadata:applications.metadata,
+    id:applications.id,programId:applications.programId,studentProfileId:applications.studentProfileId,metadata:applications.metadata,
    }).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
    if(!app||!actor.scope.programIds?.includes(app.programId))
     throw new AuthorizationError("admissions guardian provisioning");
@@ -211,6 +211,20 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    const [contact]=await tx.select({id:people.id,email:people.email})
     .from(people).where(eq(people.id,contactId)).limit(1);
    if(!contact?.email)throw new Error("Guardian contact email missing");
+   const [learner]=await tx.select({personId:studentProfiles.personId})
+    .from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
+   const [relationship]=learner?await tx.select({
+    metadata:guardianRelationships.metadata,
+    canManageEnrollment:guardianRelationships.canManageEnrollment,
+   }).from(guardianRelationships).where(and(
+    eq(guardianRelationships.guardianPersonId,contact.id),
+    eq(guardianRelationships.studentPersonId,learner.personId),
+   )).limit(1):[];
+   // An email entered during intake is not proof of guardianship. Never
+   // activate passwordless access before an authorized relationship check.
+   if(!relationship||relationship.metadata.verification!=="verified"||
+      !relationship.canManageEnrollment)
+    throw new Error("Verify the student's guardian relationship before granting account access");
    const email=normalizeAccessEmail(contact.email);
    let [account]=await tx.select({id:accessAccounts.id,disabled:accessAccounts.disabled})
     .from(accessAccounts).where(eq(accessAccounts.emailNormalized,email)).limit(1);
@@ -233,14 +247,13 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    if(grant)return {created:false,email,accountId:account!.id};
    const [newGrant]=await tx.insert(accountPersonGrants).values({
     accountId:account!.id,personId:contact.id,role:"guardian",
-    organizationId:program.organizationId,siteId:program.siteId,isSynthetic:true,
+    organizationId:program.organizationId,siteId:program.siteId,isSynthetic:false,
    }).returning({id:accountPersonGrants.id});
    await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
     action:"admissions.guardian_access.provision",resourceType:"account_person_grant",
     resourceId:newGrant!.id,scope:{organizationId:program.organizationId,
      programId:app.programId,siteId:program.siteId},
-    after:{personId:contact.id,role:"guardian",applicationId:app.id},
-    context:{synthetic:true}});
+    after:{personId:contact.id,role:"guardian",applicationId:app.id}});
    return {created:true,email,accountId:account!.id};
   });
  });
@@ -253,7 +266,10 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
  .handler(async({data})=>{
   const actor=await registrar();
   const [application]=await db.select({programId:applications.programId,
+   studentProfileId:applications.studentProfileId,
+   organizationId:programs.organizationId,siteId:programs.siteId,
    metadata:applications.metadata}).from(applications)
+   .innerJoin(programs,eq(programs.id,applications.programId))
    .where(eq(applications.id,data.applicationId)).limit(1);
   if(!application||!actor.scope.programIds?.includes(application.programId))
    throw new AuthorizationError("admissions invitation");
@@ -261,11 +277,24 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
   const [contact]=await db.select({email:people.email})
    .from(people).where(eq(people.id,contactId)).limit(1);
   if(!contact?.email)throw new Error("Guardian email is missing");
+  const [learner]=await db.select({personId:studentProfiles.personId})
+   .from(studentProfiles).where(eq(studentProfiles.id,application.studentProfileId)).limit(1);
+  const [verified]=learner?await db.select({
+   metadata:guardianRelationships.metadata,
+   canManageEnrollment:guardianRelationships.canManageEnrollment,
+  }).from(guardianRelationships).where(and(
+   eq(guardianRelationships.guardianPersonId,contactId),
+   eq(guardianRelationships.studentPersonId,learner.personId),
+  )).limit(1):[];
+  if(!verified||verified.metadata.verification!=="verified"||!verified.canManageEnrollment)
+   throw new Error("Guardian relationship verification is required before inviting");
   const [grant]=await db.select({id:accountPersonGrants.id})
    .from(accountPersonGrants)
    .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
    .where(and(eq(accountPersonGrants.personId,contactId),
     eq(accountPersonGrants.role,"guardian"),eq(accountPersonGrants.active,true),
+    eq(accountPersonGrants.organizationId,application.organizationId),
+    ...(application.siteId?[eq(accountPersonGrants.siteId,application.siteId)]:[isNull(accountPersonGrants.siteId)]),
     eq(accessAccounts.emailNormalized,normalizeAccessEmail(contact.email)))).limit(1);
   if(!grant)throw new Error("Provision the guardian's identity-bound access first");
   const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
