@@ -77,7 +77,7 @@ export const getGradebook = createServerFn({ method: "GET" })
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const [section] = await db.select({ id: s.sections.id, code: s.sections.code, title: s.sections.title })
    .from(s.sections)
-   .where(and(eq(s.sections.id, data.sectionId), inArray(s.sections.siteId, context.scope.siteIds!)))
+   .where(and(eq(s.sections.id, data.sectionId), inArray(s.sections.siteId, context.scope.siteIds!), inArray(s.sections.programId,context.scope.programIds??[])))
    .limit(1);
   if (!section) throw new AuthorizationError("section");
 
@@ -231,7 +231,6 @@ export const createAssessment = createServerFn({ method: "POST" })
   dueAt: z.string().refine(v => !Number.isNaN(new Date(v).getTime()), "dueAt must be an ISO date").optional(),
  }).parse(value))
  .handler(async ({ data }) => {
-  assertSyntheticMutation("teacher");
   const context = await teacherActor(data.sectionId);
   assertCapability(context, "assignments:create");
   const dueAt = data.dueAt ? new Date(data.dueAt) : null;
