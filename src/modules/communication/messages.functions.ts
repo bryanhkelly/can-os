@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import { demoAllowedRoles } from "@/modules/_demo/demo-write-gate";
+import {roleCapabilities} from "@/domain/access-context";
 
 /**
  * Contextual messaging surface (GF1 step 12, Experience Flow N1).
@@ -229,7 +229,7 @@ export const listThreadContacts = createServerFn({ method: "GET" }).handler(asyn
   setResponseHeader("Cache-Control", "private, no-store");
   const actorPersonId = requireActorPerson(context.actorPersonId);
   const role = context.role;
-  if (!role || !(demoAllowedRoles as readonly string[]).includes(role)) {
+  if (!role || !Object.hasOwn(roleCapabilities,role)) {
     return { contacts: [] as ThreadContact[] };
   }
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
@@ -259,7 +259,7 @@ export const startThread = createServerFn({ method: "POST" })
     const context = await getCommandContext(getRequest());
     assertCapability(context, "communication.send");
     const role = context.role;
-    if (!role || !(demoAllowedRoles as readonly string[]).includes(role)) {
+    if (!role || !Object.hasOwn(roleCapabilities,role)) {
       throw new AuthorizationError("authorized messaging role");
     }
     const actorPersonId = requireActorPerson(context.actorPersonId);
@@ -487,7 +487,7 @@ export const replyToThread = createServerFn({ method: "POST" })
     const context = await getCommandContext(getRequest());
     assertCapability(context, "communication.send");
     const role = context.role;
-    if (!role || !(demoAllowedRoles as readonly string[]).includes(role)) {
+    if (!role || !Object.hasOwn(roleCapabilities,role)) {
       throw new AuthorizationError("authorized messaging role");
     }
     const actorPersonId = requireActorPerson(context.actorPersonId);
