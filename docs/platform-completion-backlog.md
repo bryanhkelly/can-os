@@ -75,10 +75,14 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Reset stale guardian approvals on a new membership request after leaving; require affirmative current consent from every linked enrollment guardian before facilitating approval.
 - [x] Permit verified guardian consent decisions only on pending memberships with current child enrollment; cancel outstanding consent actions when students leave and emit ActionCreated/ActionResolved for the consent lifecycle.
 - [x] Link authorized guardian consent notifications to the actual consent screen, including the selected child’s name.
-- [x] Keep seven unreleased study-group mutations (posting, sessions, reporting, moderation, RSVP, attendance recording, session revision) behind the demo flag **and** a server-side legacy synthetic-record guard; newly created authentic groups cannot enter those paths even if demo writes are on.
+- [x] Keep the four unreleased group-session mutations (scheduling, RSVP, attendance recording, revision) behind the demo flag **and** a synthetic-group record guard; authentic groups cannot enter those paths even if demo writes are on.
 - [x] Add pending-request withdrawal to the student UI, so students can withdraw and re-request with fresh guardian consent after a decline.
-- [ ] Converge remaining study-group posting, reporting, moderation, RSVP, attendance and session WRITE lifecycles, including safe content handling and notification/audit integration.
+- [x] Enable authentic student group discussion posts (approved membership, current enrollment, plain-text validation, short post cooldown, audit records).
+- [x] Enable authenticated content reporting and facilitator moderation, including post-context review, transactional ActionCreated/ActionResolved, owner notification, hidden-post state and student notification.
+- [x] Distinguish real group content/moderation controls from still-restricted legacy session scheduling, RSVP and attendance UI, even in demo-enabled deployments.
+- [ ] Converge group session scheduling, RSVP, attendance recording, reschedule/cancellation with correct real-data calendar and notification lifecycle (Phase 2 dependency).
 - [x] Extend attachment read/upload scoping to authorized programs; keep restricted R2 fixture-only mutation gates until complete document verification and storage review.
+- [x] Before linking an existing R2 learning attachment, verify its private storage-key scope, object existence, exact content length and MIME type; verify PDF/image signatures using bounded reads. Keep authentic uploads gated until lifecycle, all format verification and retention/security review are complete.
 - [x] Remove the obsolete fixture-only write restriction from canonical teacher assessment creation, including published roster assignment and audit/domain events.
 - [x] Add canonical teacher assessment publication, close, reopen, deadline changes, and latest-graded-attempt returns; expose controls in the authenticated teacher gradebook.
 - [x] Connect standalone rubric grading UI to the canonical grading service instead of an alternative synthetic submission grader.
