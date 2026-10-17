@@ -31,7 +31,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const stages=["inquiry","application","eligibility","accepted","declined","withdrawn"];
  return <WorkspaceShell eyebrow="CAN OS · Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
-  actions={<Link to="/admissions" className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
+  actions={<Link to="/admissions" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <section className="mt-8 rounded-xl border bg-card p-5">
@@ -105,6 +105,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
        Send secure guardian invitation
       </button>
       {r.disposition==="ready_for_offer" && <Link to="/admissions"
+        search={{siteId:undefined,programId:undefined}}
         className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background">Issue enrollment offer →</Link>}
     </div>
     <div className="mt-4 flex flex-wrap gap-2">

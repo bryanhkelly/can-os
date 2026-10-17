@@ -358,16 +358,23 @@ export async function activateEnrollmentFromApplication(
     }).from(schoolYears).where(eq(schoolYears.id, schoolYearId)).limit(1);
     // GF23 establishes the Site's effective academic year. It may be shared
     // by multiple Programs at that Site, or explicitly program-scoped.
-    // Either form must match BOTH the actual site and organization.
-    if (!programForYear || !programForYear.siteId || !schoolYear ||
-        schoolYear.organizationId !== programForYear.organizationId ||
-        schoolYear.siteId !== programForYear.siteId ||
-        (schoolYear.programId !== null && schoolYear.programId !== application.programId)) {
+    // Site-less virtual programs require an explicitly program-scoped year.
+    if (!programForYear || !schoolYear ||
+        schoolYear.organizationId !== programForYear.organizationId) {
+      throw new Error("School year must belong to the application's program or its host site");
+    }
+    const yearMatchesProgram = programForYear.siteId === null
+      ? schoolYear.programId === application.programId
+      : schoolYear.siteId === programForYear.siteId &&
+        (schoolYear.programId === null || schoolYear.programId === application.programId);
+    if (!yearMatchesProgram) {
       throw new Error("School year must belong to the application's program or its host site");
     }
     // Enrollment adds a new onsite roster member. Serialize with the
     // same site configuration lock that attendance marking holds.
-    await lockAttendanceConfigurationAtSite(tx, programForYear.siteId);
+    if (programForYear.siteId) {
+      await lockAttendanceConfigurationAtSite(tx, programForYear.siteId);
+    }
 
     const [journey] = await tx
       .select()

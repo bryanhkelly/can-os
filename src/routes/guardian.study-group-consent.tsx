@@ -26,7 +26,7 @@ function ConsentList({items}:{items:Awaited<ReturnType<typeof listGuardianStudyG
  }
  return <WorkspaceShell eyebrow="CAN OS · Family" title="Study group permissions"
   subtitle="Decide whether your student may participate in a teacher-facilitated group. The facilitator must also approve membership."
-  actions={<Link to="/guardian/" className="rounded-lg border px-3 py-2 text-sm">Family Home</Link>}>
+  actions={<Link to="/guardian" className="rounded-lg border px-3 py-2 text-sm">Family Home</Link>}>
   {notice&&<p className="mt-5 rounded-lg border p-3 text-sm" role="status">{notice}</p>}
   {error&&<p className="mt-5 rounded-lg border border-red-500 p-3 text-sm" role="alert">{error}</p>}
   <div className="mt-7 space-y-3">{items.map(item=><article key={item.id} className="rounded-xl border bg-card p-5">

@@ -90,7 +90,7 @@ function FamilyHomePage() {
      <Link to="/ask" className="rounded-full border px-4 py-2 hover:bg-muted">Ask CAN</Link>
      <Link to="/guardian/study-group-consent" className="rounded-full border px-4 py-2 hover:bg-muted">Study group permissions</Link>
      <Link to="/guardian/watching" className="rounded-full border px-4 py-2 hover:bg-muted">Things CAN Is Watching</Link>
-     <Link to="/guardian/admission-offers" className="rounded-full border px-4 py-2 hover:bg-muted">Admission offers</Link>
+     <Link to="/guardian/admission-offers" search={{student:undefined}} className="rounded-full border px-4 py-2 hover:bg-muted">Admission offers</Link>
      <Link to="/messages" className="rounded-full border px-4 py-2 hover:bg-muted">Messages</Link>
      <Link to="/notifications" className="rounded-full border px-4 py-2 hover:bg-muted">Notifications</Link>
     </div>

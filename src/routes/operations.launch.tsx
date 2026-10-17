@@ -195,8 +195,8 @@ function LaunchWizardPage() {
   return (
     <main className="min-h-screen bg-background px-6 py-10 text-foreground">
       <div className="mx-auto max-w-5xl">
-        <Link to="/operations" className="text-xs underline">← Operations</Link>
-        <Link to="/operations/workflows" className="ml-4 text-xs underline">Connected workflows →</Link>
+        <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Operations</Link>
+        <Link to="/operations/workflows" search={{siteId:undefined,programId:undefined}} className="ml-4 text-xs underline">Connected workflows →</Link>
         <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           CAN OS · Program launch
         </p>
@@ -393,6 +393,7 @@ function LaunchWizardPage() {
                       <span className="text-xs uppercase text-muted-foreground">{launch.status}</span>
                     </div>
                     <Link to="/operations/launch/$programId" params={{programId:launch.id}}
+                      search={{siteId:undefined,programId:undefined}}
                       className="mt-2 inline-block text-xs font-semibold underline">Configure classes and instructors →</Link>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {typeLabels[launch.type] ?? launch.type}

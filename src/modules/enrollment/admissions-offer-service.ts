@@ -157,9 +157,10 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   assertRecordWriteAllowed(app.metadata,"registrar");
   const [programSite]=await tx.select({siteId:programs.siteId,organizationId:programs.organizationId})
     .from(programs).where(eq(programs.id,offer!.programId)).limit(1);
-  if(!programSite?.siteId||programSite.organizationId!==organizationId)
-    throw new Error("Enrollment program must have a matching school site");
-  await lockAttendanceConfigurationAtSite(tx,programSite.siteId);
+  if(!programSite||programSite.organizationId!==organizationId)
+    throw new Error("Enrollment program must belong to the offer's organization");
+  // Site-less virtual programs have no onsite roster to coordinate.
+  if(programSite.siteId)await lockAttendanceConfigurationAtSite(tx,programSite.siteId);
   const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(eq(enrollments.studentProfileId,app.studentProfileId),eq(enrollments.programId,offer!.programId),eq(enrollments.schoolYearId,offer!.schoolYearId),eq(enrollments.status,"active"),eq(enrollments.kind,"program"))).limit(1);
   if(existing)return existing.id;
   const journey=await ready(tx,app.id);

@@ -19,10 +19,11 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  const [sectionSite]=await tx.select({siteId:s.sections.siteId,
   programId:s.sections.programId}).from(s.sections)
   .where(eq(s.sections.id,sectionId)).limit(1);
- if(!sectionSite?.siteId || !actor.scope.siteIds?.includes(sectionSite.siteId) ||
-  !actor.scope.programIds?.includes(sectionSite.programId))
+ if(!sectionSite || !actor.scope.programIds?.includes(sectionSite.programId) ||
+  (sectionSite.siteId!==null && !actor.scope.siteIds?.includes(sectionSite.siteId)))
   throw new Error("Section outside authorized school and program scope");
- await lockAttendanceConfigurationAtSite(tx,sectionSite.siteId);
+ // Site-less online sections have no onsite attendance configuration to coordinate.
+ if(sectionSite.siteId)await lockAttendanceConfigurationAtSite(tx,sectionSite.siteId);
  const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata,
   termId:s.sections.termId,startsOn:s.terms.startsOn,endsOn:s.terms.endsOn,
   programId:s.sections.programId,siteId:s.sections.siteId,

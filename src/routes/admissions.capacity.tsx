@@ -46,7 +46,7 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
   finally{setBusy(null);}
  }
  return <main className="mx-auto max-w-5xl px-5 py-10">
- <Link to="/admissions" className="text-xs underline">← Admissions command center</Link>
+ <Link to="/admissions" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Admissions command center</Link>
  <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Admissions</p>
  <h1 className="mt-2 font-serif text-4xl">Program capacity</h1>
  <p className="mt-3 text-sm text-muted-foreground">Live, school-year seat pools from Neon. Reservations include unexpired issued offers and accepted offers that have not yet activated enrollment. Changes cannot reduce capacity below existing commitments.</p>

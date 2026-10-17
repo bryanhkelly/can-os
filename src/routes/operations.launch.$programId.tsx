@@ -7,7 +7,7 @@ import {WorkspaceShell} from "@/components/workspace";
 import {SectionLifecycleWorkspace} from "@/components/operations/SectionLifecycleManager";
 export const Route=createFileRoute("/operations/launch/$programId")({
  loader:({params})=>safeLoader(()=>getLaunchAcademicSetup({data:{programId:params.programId}}),
-  {authMessage:"Sign in with a registrar grant for this program."}),
+  {authMessage:"Sign in with a registrar grant for this program."})(),
  component:LaunchAcademicSetup
 });
 function LaunchAcademicSetup(){
@@ -31,7 +31,7 @@ function Setup({data}:{data:Snapshot}){
  }
  return <WorkspaceShell eyebrow="CAN OS · School launch" title={data.program.name+" · academic setup"}
   subtitle="Turn a launch journey into an actual instructional program with school-year dates, published course content and assigned instructors."
-  actions={<Link to="/operations/launch" className="rounded-lg border px-3 py-2 text-sm">Launch checklist →</Link>}>
+  actions={<Link to="/operations/launch" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Launch checklist →</Link>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
@@ -45,7 +45,7 @@ function Setup({data}:{data:Snapshot}){
    </div>)}
   </div>
   {!data.years.length&&<p className="mt-6 rounded-lg border p-4 text-sm">
-   This program has no configured academic year. <Link to="/operations/school-years" className="underline">Set up the school year →</Link>
+   This program has no configured academic year. <Link to="/operations/school-years" search={{siteId:undefined,programId:undefined}} className="underline">Set up the school year →</Link>
   </p>}
   {!data.catalog.length&&<p className="mt-6 rounded-lg border p-4 text-sm">
    No published course templates are available from this program's academic provider. Publish curriculum before creating sections.
@@ -72,7 +72,7 @@ function Setup({data}:{data:Snapshot}){
    </form>
   </section>
   <div className="mt-6 rounded-lg border p-4 text-sm">
-   After provisioning sections, <Link to="/operations/course-policies" className="font-semibold underline">
+   After provisioning sections, <Link to="/operations/course-policies" search={{siteId:undefined,programId:undefined}} className="font-semibold underline">
     configure enrollment windows, prerequisites, seat capacity and credit limits →
    </Link>
   </div>

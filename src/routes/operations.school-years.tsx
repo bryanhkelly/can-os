@@ -36,7 +36,7 @@ function Studio({data}:{data:Snapshot}){
  const site=data.sites.find(s=>s.id===siteId);
  return <WorkspaceShell eyebrow="CAN OS · Academic operations" title="School-year studio"
   subtitle="Configure site-owned school years, terms, grading periods and academic calendars. Activation requires readiness checks."
-  actions={<Link to="/operations" className="rounded-lg border px-3 py-2 text-sm">Operations</Link>}>
+  actions={<Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <section className="mt-8 rounded-xl border bg-card p-5">

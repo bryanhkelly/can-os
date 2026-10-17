@@ -826,6 +826,26 @@
         "domainEvents:CourseRegistrationPolicyChanged"
       ]
     },
+    "/operations/workflows": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "journeys": 1,
+        "admission_offers": 1
+      },
+      "interactions": [
+        "review connected launch, admissions, intervention, and attendance workflows",
+        "activate a ready program",
+        "reconcile elapsed admission offers"
+      ],
+      "downstreamRecords": [
+        "audit_events"
+      ]
+    },
     "/notifications": {
       "persona": "authenticated",
       "seeds": [

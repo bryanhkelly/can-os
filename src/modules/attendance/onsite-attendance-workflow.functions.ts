@@ -456,14 +456,14 @@ export const reviewCurrentAttendanceExcuse = createServerFn({ method: "POST" })
     const actor = await staff("attendance.excuse.review");
     const [record] = await db.select({
       attendanceEventId: attendanceExcuses.attendanceEventId,
+      status: attendanceExcuses.status,
       programId: attendanceEvents.programId, siteId: attendanceEvents.siteId,
       sectionId: attendanceEvents.sectionId,
       studentProfileId: attendanceEvents.studentProfileId,
       occurrenceKey: attendanceEvents.occurrenceKey,
     }).from(attendanceExcuses)
       .innerJoin(attendanceEvents, eq(attendanceEvents.id, attendanceExcuses.attendanceEventId))
-      .where(and(eq(attendanceExcuses.id, data.excuseId),
-        eq(attendanceExcuses.status, "submitted"))).limit(1);
+      .where(eq(attendanceExcuses.id, data.excuseId)).limit(1);
     if (!record || !record.siteId || !actor.scope.siteIds?.includes(record.siteId) ||
       !actor.scope.programIds?.includes(record.programId))
       throw new AuthorizationError("pending excuse and site/program grant");
@@ -478,18 +478,22 @@ export const reviewCurrentAttendanceExcuse = createServerFn({ method: "POST" })
           eq(sectionTeachers.personId, actor.actorPersonId!))).limit(1) : [];
       if (!assignment) throw new AuthorizationError("teacher excuse section assignment");
     }
-    const chain = await db.select({
-      id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
-      programId: attendanceEvents.programId, occurrenceKey: attendanceEvents.occurrenceKey,
-      status: attendanceEvents.status, recordedAt: attendanceEvents.recordedAt,
-    }).from(attendanceEvents).where(and(
-      eq(attendanceEvents.studentProfileId, record.studentProfileId),
-      eq(attendanceEvents.programId, record.programId),
-      eq(attendanceEvents.occurrenceKey, record.occurrenceKey)));
-    const [current] = effectiveAttendanceEvents(chain);
-    if (!current || current.id !== record.attendanceEventId ||
-      !["absent", "tardy"].includes(current.status))
-      throw new Error("Attendance changed after the guardian's excuse. Reconcile the school mark before reviewing this excuse");
+    // The stale-attendance guard applies only to a first decision; an
+    // already-reviewed excuse falls through to the service's idempotent retry.
+    if (record.status === "submitted") {
+      const chain = await db.select({
+        id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
+        programId: attendanceEvents.programId, occurrenceKey: attendanceEvents.occurrenceKey,
+        status: attendanceEvents.status, recordedAt: attendanceEvents.recordedAt,
+      }).from(attendanceEvents).where(and(
+        eq(attendanceEvents.studentProfileId, record.studentProfileId),
+        eq(attendanceEvents.programId, record.programId),
+        eq(attendanceEvents.occurrenceKey, record.occurrenceKey)));
+      const [current] = effectiveAttendanceEvents(chain);
+      if (!current || current.id !== record.attendanceEventId ||
+        !["absent", "tardy"].includes(current.status))
+        throw new Error("Attendance changed after the guardian's excuse. Reconcile the school mark before reviewing this excuse");
+    }
     return reviewAttendanceExcuse(actor, {
       excuseId: data.excuseId, decision: data.decision,
       reviewNote: data.note?.trim() || undefined,

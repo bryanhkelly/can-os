@@ -84,7 +84,7 @@ function OperationsPage(){
      {commandCenter.issues.map(issue=><div key={issue.kind+issue.sectionId} className="rounded border p-3 text-sm">
        <strong>{issue.title}</strong><p className="text-muted-foreground">{issue.description}</p>
        <Link className="mt-2 inline-block underline" to="/operations/launch/$programId"
-        params={{programId:issue.programId}}>Review lifecycle →</Link>
+        params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}}>Review lifecycle →</Link>
      </div>)}
      {!commandCenter.issues.length&&<p className="text-sm">No staffing or capacity exceptions detected.</p>}
     </div>
@@ -92,7 +92,7 @@ function OperationsPage(){
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
   {[["Open items",data.summary.total],["Urgent",data.summary.urgent],["Needs response",data.summary.needsResponse]].map(([label,num])=><div key={label} className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 font-serif text-3xl">{num}</p></div>)}
   </div>
-  <p className="mt-6"><Link to="/sites/" className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Open School/Site Today →</Link> <Link to="/operations/school-years" className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Configure school year →</Link> <Link to="/operations/course-policies" className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Course policies →</Link></p>
+  <p className="mt-6"><Link to="/sites" className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Open School/Site Today →</Link> <Link to="/operations/school-years" search={{siteId:undefined,programId:undefined}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Configure school year →</Link> <Link to="/operations/course-policies" search={{siteId:undefined,programId:undefined}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Course policies →</Link></p>
   <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]"><section><h2 className="font-serif text-3xl">Action queue</h2><div className="mt-4 space-y-3">
   {data.items.map(i=><article className="rounded-xl border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">{i.title}</h3><span className="text-xs uppercase text-muted-foreground">{i.priority}</span></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p><div className="mt-3 flex flex-wrap gap-3">{i.href==="/operations"&&<label className="flex items-center gap-2 text-xs">Assigned to
  <select aria-label={"Assign "+i.title} className="rounded border bg-background px-2 py-1" disabled={busy!==null} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>

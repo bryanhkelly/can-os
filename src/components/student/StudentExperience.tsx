@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import type { StudentTodayData } from "@/modules/student-experience/student-today.server";
+import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 
 /** Read-only, canonical Student Today projection. All mutations live in the owning workflow. */
-export function StudentExperience({ liveData }: { liveData: StudentTodayData }) {
+export function StudentExperience({ liveData }: { liveData: Awaited<ReturnType<typeof getMyStudentToday>> }) {
  const displayName=liveData.student.preferredName??liveData.student.firstName;
  const missing=liveData.coursework.filter(item=>item.timeliness==="missing");
  const upcoming=liveData.coursework.filter(item=>item.status==="assigned"&&item.timeliness!=="missing");

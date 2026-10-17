@@ -83,7 +83,7 @@ function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness
     <p className="mt-2 text-sm">Journey: <strong>{a.journeyStatus?.replaceAll("_"," ")??"Not started"}</strong> · Program enrollment: <strong>{a.activeSchoolYears.length?"Active":"Not active"}</strong></p>
     {a.activeSchoolYears.length>0&&<p className="mt-1 text-xs text-muted-foreground">Active school-year records: {a.activeSchoolYears.length}</p>}
     <p className="mt-1 text-sm text-muted-foreground">{a.readiness.completed} of {a.readiness.total} requirements complete · {a.readiness.blockers} blocking</p>
-    <Link to="/admissions" className="mt-2 inline-block text-xs font-semibold underline">Review offers and enrollment →</Link>
+    <Link to="/admissions" search={{siteId:undefined,programId:undefined}} className="mt-2 inline-block text-xs font-semibold underline">Review offers and enrollment →</Link>
     {a.activeSchoolYears.length>0&&<p className="mt-2 text-xs text-muted-foreground">The admissions checklist is now a historical record. Active enrollment requirements are managed separately.</p>}
     {!((a.isFixture?uploadModes.demo:uploadModes.live))&&<p className="mt-3 text-xs text-muted-foreground">Document uploads are not enabled for this application. Existing verified documents may still be reviewed.</p>}
     <div className="mt-3 space-y-3">{a.requirements.map(r=><div key={r.id} className="rounded-lg border p-3"><label className="flex items-center gap-3 text-sm">

@@ -22,13 +22,13 @@ function SiteTodayPage() {
   }).format(new Date(date));
   return <WorkspaceShell eyebrow="CAN OS · Site Operations" title={data.site.name}
     subtitle={data.site.organizationName + " · " + data.localDate + " · " + data.site.timezone}
-    actions={<Link className="rounded-lg border px-3 py-2 text-sm" to="/operations">All operations →</Link>}>
+    actions={<Link className="rounded-lg border px-3 py-2 text-sm" to="/operations" search={{siteId:undefined,programId:undefined}}>All operations →</Link>}>
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {[
         ["Operations", "/operations"], ["Launch", "/operations/launch"],
         ["Readiness", "/readiness"], ["Admissions", "/admissions"],
         ["People", "/profiles"], ["Ask CAN", "/ask"],
-      ].map(([name, href]) => <Link key={href} to={href as "/operations"}
+      ].map(([name, href]) => <Link key={href} to={href as "/operations"} search={{siteId:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
     </nav>
     <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -56,7 +56,7 @@ function SiteTodayPage() {
             {action.description && <p className="mt-2 text-sm text-muted-foreground">{action.description}</p>}
             <div className="mt-3 flex flex-wrap justify-between gap-3 text-xs">
               <span>{action.dueAt ? "Due " + new Date(action.dueAt).toLocaleDateString() : "No due date"}</span>
-              <Link className="underline" to="/operations">Review action →</Link>
+              <Link className="underline" to="/operations" search={{siteId:undefined,programId:undefined}}>Review action →</Link>
             </div>
           </article>)}
           {!data.actions.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">No outstanding actions are recorded for your site.</p>}

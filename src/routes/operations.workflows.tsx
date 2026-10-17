@@ -48,7 +48,7 @@ function ConnectedWorkflowsPage() {
   }
   return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
     <div className="mx-auto max-w-6xl">
-      <Link to="/operations" className="text-xs underline">← Operations</Link>
+      <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Operations</Link>
       <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Phase 2</p>
       <h1 className="mt-2 font-serif text-4xl">Connected school workflows</h1>
       <p className="mt-3 max-w-3xl text-sm text-muted-foreground">
@@ -72,6 +72,7 @@ function ConnectedWorkflowsPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Link to="/operations/launch/$programId" params={{programId:program.id}}
+                search={{siteId:undefined,programId:undefined}}
                 className="rounded-lg border px-3 py-2 text-xs font-semibold underline">
                 Open program setup
               </Link>
@@ -87,7 +88,7 @@ function ConnectedWorkflowsPage() {
             <section className="rounded-xl border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF23 / GF3 · Launch readiness</h3>
-                <Link to="/operations/school-years" className="text-xs underline">School-year studio</Link>
+                <Link to="/operations/school-years" search={{siteId:undefined,programId:undefined}} className="text-xs underline">School-year studio</Link>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <Metric label="Active year" value={program.launch.hasActiveSchoolYear ? "Yes" : "No"} />
@@ -102,7 +103,7 @@ function ConnectedWorkflowsPage() {
             <section className="rounded-xl border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF22 / GF2 · Admissions to enrollment</h3>
-                <Link to="/admissions/families" className="text-xs underline">Family readiness</Link>
+                <Link to="/admissions/families" search={{siteId:undefined,programId:undefined}} className="text-xs underline">Family readiness</Link>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <Metric label="Applications" value={program.enrollment.applications} />
@@ -125,7 +126,7 @@ function ConnectedWorkflowsPage() {
             <section className="rounded-xl border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF1 · Learning and intervention</h3>
-                <Link to="/operations" className="text-xs underline">Actions queue</Link>
+                <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="text-xs underline">Actions queue</Link>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <Metric label="Latest missing attempts" value={program.learning.missingLatestAttempts} />
@@ -166,7 +167,7 @@ function ConnectedWorkflowsPage() {
                     never silently deletes or reclassifies recorded attendance.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-3">
-                    <Link to="/operations/school-years" className="text-xs underline">Review calendar and schedule</Link>
+                    <Link to="/operations/school-years" search={{siteId:undefined,programId:undefined}} className="text-xs underline">Review calendar and schedule</Link>
                     <Link to="/staff/attendance" className="text-xs underline">Open attendance</Link>
                   </div>
                   <details className="mt-2 text-xs">

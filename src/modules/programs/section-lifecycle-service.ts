@@ -14,9 +14,10 @@ async function authorizedSection(tx: Parameters<Parameters<typeof db.transaction
   // attendance mark command takes the site lock before reading section rows.
   const [location] = await tx.select({ siteId: sections.siteId })
     .from(sections).where(eq(sections.id, sectionId)).limit(1);
-  if (!location?.siteId || !context.scope.siteIds?.includes(location.siteId))
+  if (!location || (location.siteId !== null && !context.scope.siteIds?.includes(location.siteId)))
     throw new AuthorizationError("section site");
-  await lockAttendanceConfigurationAtSite(tx, location.siteId);
+  // Site-less online sections have no onsite attendance configuration to coordinate.
+  if (location.siteId) await lockAttendanceConfigurationAtSite(tx, location.siteId);
   const [row] = await tx.select({
     id: sections.id, title: sections.title, active: sections.active,
     metadata: sections.metadata, programId: sections.programId, siteId: sections.siteId,
@@ -171,9 +172,9 @@ export async function changeSectionEnrollment(context: LifecycleContext,input:{e
     const [enrollmentSite] = await tx.select({ siteId: sections.siteId })
       .from(enrollments).innerJoin(sections,eq(sections.id,enrollments.sectionId))
       .where(eq(enrollments.id,input.enrollmentId)).limit(1);
-    if (!enrollmentSite?.siteId || !context.scope.siteIds?.includes(enrollmentSite.siteId))
+    if (!enrollmentSite || (enrollmentSite.siteId !== null && !context.scope.siteIds?.includes(enrollmentSite.siteId)))
       throw new AuthorizationError("section enrollment site");
-    await lockAttendanceConfigurationAtSite(tx, enrollmentSite.siteId);
+    if (enrollmentSite.siteId) await lockAttendanceConfigurationAtSite(tx, enrollmentSite.siteId);
     const [record]=await tx.select().from(enrollments).where(eq(enrollments.id,input.enrollmentId)).limit(1).for("update");
     if(!record||record.kind!=="section"||!record.sectionId||record.status!=="active")throw new Error("Active section enrollment not found");
     const section=await authorizedSection(tx,context,record.sectionId);
@@ -255,7 +256,7 @@ export async function transferSectionEnrollment(context: LifecycleContext,input:
       .from(sections).where(eq(sections.id,input.destinationSectionId)).limit(1);
     const transferSites = [...new Set([enrollmentSite?.siteId, destinationSite?.siteId]
       .filter((id): id is string => !!id))].sort();
-    if (!enrollmentSite?.siteId || !destinationSite?.siteId ||
+    if (!enrollmentSite || !destinationSite ||
         !transferSites.every(id=>context.scope.siteIds?.includes(id)))
       throw new AuthorizationError("both section transfer sites");
     for (const siteId of transferSites) await lockAttendanceConfigurationAtSite(tx, siteId);

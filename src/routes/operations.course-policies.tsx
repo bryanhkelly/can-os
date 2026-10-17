@@ -26,7 +26,7 @@ function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
  }
  return <WorkspaceShell eyebrow="CAN OS · Academic operations" title="Course registration policies"
   subtitle="Set enrollment limits, academic prerequisites, credit rules and registration deadlines. Schedule conflicts use the section’s canonical timetable."
-  actions={<Link to="/operations" className="rounded-lg border px-3 py-2 text-sm">Operations</Link>}>
+  actions={<Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <div className="mt-8 space-y-4">
