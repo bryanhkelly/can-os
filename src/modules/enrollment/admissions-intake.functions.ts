@@ -243,3 +243,35 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    return {created:true,email,accountId:account!.id};
   });
  });
+
+/** Issue a short-lived, single-use verified-email sign-in link to the linked
+ * household contact. The underlying access service enforces cooldowns and
+ * never creates a session without a real active membership. */
+export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({applicationId:uuid}).parse(value))
+ .handler(async({data})=>{
+  const actor=await registrar();
+  const [application]=await db.select({programId:applications.programId,
+   metadata:applications.metadata}).from(applications)
+   .where(eq(applications.id,data.applicationId)).limit(1);
+  if(!application||!actor.scope.programIds?.includes(application.programId))
+   throw new AuthorizationError("admissions invitation");
+  const contactId=String(application.metadata.contactPersonId??"");
+  const [contact]=await db.select({email:people.email})
+   .from(people).where(eq(people.id,contactId)).limit(1);
+  if(!contact?.email)throw new Error("Guardian email is missing");
+  const [grant]=await db.select({id:accountPersonGrants.id})
+   .from(accountPersonGrants)
+   .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+   .where(and(eq(accountPersonGrants.personId,contactId),
+    eq(accountPersonGrants.role,"guardian"),eq(accountPersonGrants.active,true),
+    eq(accessAccounts.emailNormalized,normalizeAccessEmail(contact.email)))).limit(1);
+  if(!grant)throw new Error("Provision the guardian's identity-bound access first");
+  const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
+  await requestOneTimeAccess(contact.email);
+  await db.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+   action:"admissions.guardian.invite",resourceType:"application",
+   resourceId:data.applicationId,scope:{programId:application.programId},
+   after:{invitationRequested:true}});
+  return {sent:true};
+ });
