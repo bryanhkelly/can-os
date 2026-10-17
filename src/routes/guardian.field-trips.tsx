@@ -101,7 +101,7 @@ function TripPermissions({ items }: { items: Trip[] }) {
               : <p className="mt-4 text-sm text-amber-700">
                   This school has not published a permission statement for this trip.
                 </p>}
-          {item.feeAmountCents > 0 && <p className="mt-3 text-xs text-muted-foreground">
+          {(item.feeAmountCents ?? 0) > 0 && <p className="mt-3 text-xs text-muted-foreground">
             Signing permission does not pay the trip fee. Payment or financial assistance
             must be handled through the school's existing finance process.
           </p>}
