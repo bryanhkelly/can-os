@@ -35,7 +35,9 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Provide one /notifications route for all authenticated people; redirect the legacy student URL and update guardian/global navigation.
 - [x] Move recipient-scoped notifications into communication module and drop synthetic-specific function names and superseded student-only service.
 - [x] Redirect teacher-only notices into the canonical notification center and delete duplicate notification handlers.
-- [ ] Tighten every resource-specific notification deep-link permission for cross-role data.
+- [x] Route operational Action notices only when the recipient still owns the Action within the active school and program grant.
+- [x] Hide links into student, teacher and guardian screens when another workspace role is active.
+- [ ] Complete remaining notification target permission audits.
 - [x] Allow enrolled students to read course discussions independent of fixture metadata; preserve legacy route export until mutation consolidation.
 - [x] Converge enrolled-student discussion posting and teacher discussion creation, locking and moderation on records independent of fixture markers; maintain verified section membership and relationship guards.
 - [ ] Run deferred integration and authorization testing for discussion lifecycle before production release.
