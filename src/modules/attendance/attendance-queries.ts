@@ -1,4 +1,5 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
+import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { db } from "@/db/client";
 import {
   attendanceEvents,
@@ -50,22 +51,27 @@ export async function getAttendanceCase(
     .orderBy(desc(attendanceExcuses.createdAt))
     .limit(1);
 
-  const corrections = await db
+  // Corrections may supersede other corrections, not just the requested
+  // event. Resolve the whole canonical occurrence chain, not one parent hop.
+  const revisions = await db
     .select({
       id: attendanceEvents.id,
+      studentProfileId: attendanceEvents.studentProfileId,
+      programId: attendanceEvents.programId,
+      occurrenceKey: attendanceEvents.occurrenceKey,
       status: attendanceEvents.status,
       recordedAt: attendanceEvents.recordedAt,
       supersedesAttendanceEventId: attendanceEvents.supersedesAttendanceEventId,
     })
     .from(attendanceEvents)
-    .where(
-      eq(
-        attendanceEvents.supersedesAttendanceEventId,
-        record.attendanceEventId,
-      ),
-    )
-    .orderBy(desc(attendanceEvents.recordedAt));
+    .where(and(
+      eq(attendanceEvents.studentProfileId, record.studentProfileId),
+      eq(attendanceEvents.programId, record.programId),
+      eq(attendanceEvents.occurrenceKey, record.occurrenceKey),
+    ))
+    .orderBy(desc(attendanceEvents.recordedAt), desc(attendanceEvents.id));
 
+  const [effective] = effectiveAttendanceEvents(revisions);
   return {
     attendance: {
       ...record,
@@ -74,7 +80,7 @@ export async function getAttendanceCase(
         `${record.legalFirstName} ${record.legalLastName}`,
     },
     excuse: excuse ?? null,
-    corrections,
-    effectiveStatus: corrections[0]?.status ?? record.status,
+    corrections: revisions.filter(revision => revision.id !== record.attendanceEventId),
+    effectiveStatus: effective?.status ?? record.status,
   };
 }

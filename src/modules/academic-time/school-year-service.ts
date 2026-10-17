@@ -21,6 +21,7 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 
 function assertDateRange(startsOn: string, endsOn: string, label: string) {
   if (startsOn > endsOn) {
@@ -279,6 +280,8 @@ export async function createAcademicCalendar(
     if (!year) throw new Error("SchoolYear not found");
     assertOrganizationScope(context, year.organizationId);
     assertProgramScope(context, year.programId);
+    assertSiteScope(context, year.siteId);
+    await lockAttendanceConfigurationAtSite(tx, year.siteId);
 
     const [calendar] = await tx
       .insert(academicCalendars)
@@ -292,6 +295,22 @@ export async function createAcademicCalendar(
       .returning({ id: academicCalendars.id });
 
     if (!calendar) throw new Error("Failed to create AcademicCalendar");
+    await tx.insert(domainEvents).values({
+      eventType: EventTypes.AcademicCalendarChanged,
+      aggregateType: "academic_calendar",
+      aggregateId: calendar.id,
+      actorPersonId: context.actorPersonId,
+      payload: { operation: "create", siteId: year.siteId,
+        programId: year.programId ?? null, schoolYearId: year.id },
+    });
+    await tx.insert(auditEvents).values({
+      actorPersonId: context.actorPersonId,
+      action: "academic_calendar.create",
+      resourceType: "academic_calendar", resourceId: calendar.id,
+      scope: { organizationId: year.organizationId, programId: year.programId ?? null,
+        siteId: year.siteId }, after: { version: 1, active: true },
+      context: { requestId: context.requestId ?? null },
+    });
     return calendar.id;
   });
 }
@@ -338,6 +357,7 @@ export async function setAcademicCalendarDay(
     ) {
       throw new Error("Calendar day must fit within SchoolYear");
     }
+    await lockAttendanceConfigurationAtSite(tx, record.siteId);
 
     const [existing] = await tx
       .select({ id: academicCalendarDays.id })
@@ -429,6 +449,7 @@ export async function createScheduleTemplate(
     if (!year) throw new Error("SchoolYear not found");
     assertOrganizationScope(context, year.organizationId);
     assertProgramScope(context, input.programId ?? year.programId);
+    assertSiteScope(context, year.siteId);
 
     if (
       input.effectiveFrom < year.startsOn ||
@@ -436,6 +457,7 @@ export async function createScheduleTemplate(
     ) {
       throw new Error("ScheduleTemplate must fit within SchoolYear");
     }
+    await lockAttendanceConfigurationAtSite(tx, year.siteId);
 
     const [template] = await tx
       .insert(scheduleTemplates)
@@ -465,6 +487,24 @@ export async function createScheduleTemplate(
         })),
       );
     }
+    await tx.insert(domainEvents).values({
+      eventType: EventTypes.ScheduleTemplateChanged,
+      aggregateType: "schedule_template", aggregateId: template.id,
+      actorPersonId: context.actorPersonId,
+      payload: { operation: "create", siteId: year.siteId,
+        programId: input.programId ?? year.programId ?? null,
+        schoolYearId: year.id, periodCount: input.periods.length },
+    });
+    await tx.insert(auditEvents).values({
+      actorPersonId: context.actorPersonId, action: "schedule_template.create",
+      resourceType: "schedule_template", resourceId: template.id,
+      scope: { organizationId: year.organizationId, siteId: year.siteId,
+        programId: input.programId ?? year.programId ?? null },
+      after: { effectiveFrom: input.effectiveFrom,
+        effectiveThrough: input.effectiveThrough ?? null,
+        periodCount: input.periods.length },
+      context: { requestId: context.requestId ?? null },
+    });
 
     return template.id;
   });
@@ -488,7 +528,15 @@ export async function activateSchoolYear(
     assertProgramScope(context, year.programId);
     assertSiteScope(context, year.siteId);
 
-    if (year.status === "active") return;
+    // Even activation changes the eligible year set; a live attendance
+    // transaction must never observe a half-activated site/year.
+    await lockAttendanceConfigurationAtSite(tx, year.siteId);
+    // Another registrar may have activated the year while we waited for
+    // the site lock. Re-read after acquisition to avoid duplicate events.
+    const [currentYear] = await tx.select({ status: schoolYears.status })
+      .from(schoolYears).where(eq(schoolYears.id, schoolYearId)).limit(1);
+    if (!currentYear) throw new Error("SchoolYear not found");
+    if (currentYear.status === "active") return;
 
     const yearTerms = await tx
       .select({ id: terms.id })

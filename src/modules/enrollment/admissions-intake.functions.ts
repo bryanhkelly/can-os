@@ -2,7 +2,7 @@ import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
 import {normalizeAccessEmail} from "@/domain/access-tokens";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray,isNull} from "drizzle-orm";
+import {and,desc,eq,inArray,isNull,or} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {accessAccounts,accountPersonGrants,applications,auditEvents,domainEvents,guardianRelationships,householdMemberships,households,journeys,journeyRequirements,people,programs,studentProfiles} from "@/db/schema";
@@ -34,6 +34,8 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
  const actor=await registrar();
  const rows=await db.select({id:applications.id,stage:applications.stage,metadata:applications.metadata,
   createdAt:applications.createdAt,updatedAt:applications.updatedAt,programId:applications.programId,
+  organizationId:programs.organizationId,siteId:programs.siteId,
+  studentPersonId:studentProfiles.personId,
   programName:programs.name,studentFirst:people.legalFirstName,studentLast:people.legalLastName})
   .from(applications)
   .innerJoin(programs,eq(programs.id,applications.programId))
@@ -41,10 +43,33 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
   .innerJoin(people,eq(people.id,studentProfiles.personId))
   .where(inArray(applications.programId,actor.scope.programIds!))
   .orderBy(desc(applications.updatedAt)).limit(300);
+ const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+ const contactIds=[...new Set(rows.map(r=>String(r.metadata.contactPersonId??""))
+  .filter(id=>uuidPattern.test(id)))];
+ const relations=rows.length?await db.select({
+  guardianPersonId:guardianRelationships.guardianPersonId,
+  studentPersonId:guardianRelationships.studentPersonId,
+  metadata:guardianRelationships.metadata,
+  canManageEnrollment:guardianRelationships.canManageEnrollment,
+ }).from(guardianRelationships).where(
+  inArray(guardianRelationships.studentPersonId,rows.map(r=>r.studentPersonId))):[];
+ const grants=contactIds.length?await db.select({
+  personId:accountPersonGrants.personId,organizationId:accountPersonGrants.organizationId,
+  siteId:accountPersonGrants.siteId,
+ }).from(accountPersonGrants).where(and(
+  inArray(accountPersonGrants.personId,contactIds),eq(accountPersonGrants.role,"guardian"),
+  eq(accountPersonGrants.active,true))):[];
  return rows.map(r=>{
   const {metadata,...rest}=r;
+  const contactId=String(metadata.contactPersonId??"");
+  const verified=relations.some(rel=>rel.guardianPersonId===contactId&&
+   rel.studentPersonId===r.studentPersonId&&rel.metadata.verification==="verified"&&
+   rel.canManageEnrollment);
+  const loginProvisioned=verified&&grants.some(g=>g.personId===contactId&&
+   g.organizationId===r.organizationId&&(!g.siteId||g.siteId===r.siteId));
   return {
-   ...rest,createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
+   ...rest,guardianVerified:verified,guardianLoginProvisioned:loginProvisioned,
+   createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
    disposition:metadata.admissionsDisposition==="waitlisted"?"waitlisted":metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
   };
  });
@@ -103,7 +128,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     metadata:{synthetic:false,origin:"registrar_intake"},
    }).returning({id:people.id});
    const [student]=await tx.insert(studentProfiles).values({
-    personId:studentPerson!.id,gradeLevel:data.gradeLevel||null,metadata:{synthetic:true},
+    personId:studentPerson!.id,gradeLevel:data.gradeLevel||null,metadata:{synthetic:false,origin:"registrar_intake"},
    }).returning({id:studentProfiles.id});
    await tx.insert(householdMemberships).values({
     householdId,personId:studentPerson!.id,relationshipLabel:"student",
@@ -200,7 +225,7 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
   const actor=await registrar();
   return db.transaction(async tx=>{
    const [app]=await tx.select({
-    id:applications.id,programId:applications.programId,metadata:applications.metadata,
+    id:applications.id,programId:applications.programId,studentProfileId:applications.studentProfileId,metadata:applications.metadata,
    }).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
    if(!app||!actor.scope.programIds?.includes(app.programId))
     throw new AuthorizationError("admissions guardian provisioning");
@@ -214,6 +239,20 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    const [contact]=await tx.select({id:people.id,email:people.email})
     .from(people).where(eq(people.id,contactId)).limit(1);
    if(!contact?.email)throw new Error("Guardian contact email missing");
+   const [learner]=await tx.select({personId:studentProfiles.personId})
+    .from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
+   const [relationship]=learner?await tx.select({
+    metadata:guardianRelationships.metadata,
+    canManageEnrollment:guardianRelationships.canManageEnrollment,
+   }).from(guardianRelationships).where(and(
+    eq(guardianRelationships.guardianPersonId,contact.id),
+    eq(guardianRelationships.studentPersonId,learner.personId),
+   )).limit(1):[];
+   // An email entered during intake is not proof of guardianship. Never
+   // activate passwordless access before an authorized relationship check.
+   if(!relationship||relationship.metadata.verification!=="verified"||
+      !relationship.canManageEnrollment)
+    throw new Error("Verify the student's guardian relationship before granting account access");
    const email=normalizeAccessEmail(contact.email);
    let [account]=await tx.select({id:accessAccounts.id,disabled:accessAccounts.disabled})
     .from(accessAccounts).where(eq(accessAccounts.emailNormalized,email)).limit(1);
@@ -227,23 +266,26 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
     [account]=await tx.insert(accessAccounts).values({emailNormalized:email})
      .returning({id:accessAccounts.id,disabled:accessAccounts.disabled});
    }
-   const [grant]=await tx.select({id:accountPersonGrants.id})
+   const [grant]=await tx.select({id:accountPersonGrants.id,active:accountPersonGrants.active})
     .from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,account!.id),
      eq(accountPersonGrants.personId,contact.id),eq(accountPersonGrants.role,"guardian"),
      eq(accountPersonGrants.organizationId,program.organizationId),
      program.siteId?eq(accountPersonGrants.siteId,program.siteId):isNull(accountPersonGrants.siteId)))
     .limit(1);
-   if(grant)return {created:false,email,accountId:account!.id};
+   if(grant){
+    if(!grant.active)throw new Error("A revoked guardian grant requires a separate reauthorization");
+    return {created:false,email,accountId:account!.id};
+   }
    const [newGrant]=await tx.insert(accountPersonGrants).values({
     accountId:account!.id,personId:contact.id,role:"guardian",
-    organizationId:program.organizationId,siteId:program.siteId,isSynthetic:true,
+    organizationId:program.organizationId,siteId:program.siteId,
+    isSynthetic:app.metadata.synthetic===true,
    }).returning({id:accountPersonGrants.id});
    await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
     action:"admissions.guardian_access.provision",resourceType:"account_person_grant",
     resourceId:newGrant!.id,scope:{organizationId:program.organizationId,
      programId:app.programId,siteId:program.siteId},
-    after:{personId:contact.id,role:"guardian",applicationId:app.id},
-    context:{synthetic:true}});
+    after:{personId:contact.id,role:"guardian",applicationId:app.id}});
    return {created:true,email,accountId:account!.id};
   });
  });
@@ -256,7 +298,10 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
  .handler(async({data})=>{
   const actor=await registrar();
   const [application]=await db.select({programId:applications.programId,
+   studentProfileId:applications.studentProfileId,
+   organizationId:programs.organizationId,siteId:programs.siteId,
    metadata:applications.metadata}).from(applications)
+   .innerJoin(programs,eq(programs.id,applications.programId))
    .where(eq(applications.id,data.applicationId)).limit(1);
   if(!application||!actor.scope.programIds?.includes(application.programId))
    throw new AuthorizationError("admissions invitation");
@@ -264,11 +309,24 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
   const [contact]=await db.select({email:people.email})
    .from(people).where(eq(people.id,contactId)).limit(1);
   if(!contact?.email)throw new Error("Guardian email is missing");
+  const [learner]=await db.select({personId:studentProfiles.personId})
+   .from(studentProfiles).where(eq(studentProfiles.id,application.studentProfileId)).limit(1);
+  const [verified]=learner?await db.select({
+   metadata:guardianRelationships.metadata,
+   canManageEnrollment:guardianRelationships.canManageEnrollment,
+  }).from(guardianRelationships).where(and(
+   eq(guardianRelationships.guardianPersonId,contactId),
+   eq(guardianRelationships.studentPersonId,learner.personId),
+  )).limit(1):[];
+  if(!verified||verified.metadata.verification!=="verified"||!verified.canManageEnrollment)
+   throw new Error("Guardian relationship verification is required before inviting");
   const [grant]=await db.select({id:accountPersonGrants.id})
    .from(accountPersonGrants)
    .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
    .where(and(eq(accountPersonGrants.personId,contactId),
     eq(accountPersonGrants.role,"guardian"),eq(accountPersonGrants.active,true),
+    eq(accountPersonGrants.organizationId,application.organizationId),
+    ...(application.siteId?[or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,application.siteId))]:[isNull(accountPersonGrants.siteId)]),
     eq(accessAccounts.emailNormalized,normalizeAccessEmail(contact.email)))).limit(1);
   if(!grant)throw new Error("Provision the guardian's identity-bound access first");
   const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");

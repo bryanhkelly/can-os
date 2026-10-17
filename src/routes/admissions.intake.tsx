@@ -74,11 +74,13 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
      <p className="mt-1 text-xs text-muted-foreground">{r.programName} · {r.disposition??r.stage} · Last updated {new Date(r.updatedAt).toLocaleDateString()}</p></div>
      <span className="rounded-full border px-3 py-1 text-xs">{r.disposition??r.stage}</span>
     </div>
+    <p className="mt-3 text-xs text-muted-foreground">
+      Guardian verification: <strong>{r.guardianVerified?"Verified":"Required"}</strong> ·
+      {" "}Sign-in access: <strong>{r.guardianLoginProvisioned?"Provisioned":"Not provisioned"}</strong>.
+      Verify the relationship independently before granting or inviting access.
+    </p>
     <div className="mt-3 flex flex-wrap gap-2">
-      <button disabled={busy} onClick={()=>perform(()=>provisionInquiryGuardianAccount({data:{applicationId:r.id}}),
-        "Guardian sign-in membership provisioned. The guardian can request an email access link at sign-in.")}
-        className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Provision guardian login</button>
-      <button disabled={busy} onClick={()=>{
+      <button disabled={busy||r.guardianVerified} onClick={()=>{
         const evidenceNote=window.prompt("Verification record: describe the independent documentation or identification reviewed.");
         if(!evidenceNote)return;
         const method=window.prompt("Method: in_person_id, verified_school_record, or live_video_verification","verified_school_record");
@@ -88,9 +90,15 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
         }}),"Guardian relationship verified and family permissions enabled.");
        }}
        className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-       Verify guardian relationship
+       {r.guardianVerified?"Relationship verified":"Verify guardian relationship"}
       </button>
-      <button disabled={busy}
+      <button disabled={busy||!r.guardianVerified||r.guardianLoginProvisioned}
+        onClick={()=>perform(()=>provisionInquiryGuardianAccount({data:{applicationId:r.id}}),
+          "Verified guardian sign-in access provisioned.")}
+        className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+        {r.guardianLoginProvisioned?"Login provisioned":"Provision guardian login"}
+      </button>
+      <button disabled={busy||!r.guardianLoginProvisioned}
        onClick={()=>perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId:r.id}}),
         "A secure email sign-in invitation was requested for this guardian.")}
        className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">

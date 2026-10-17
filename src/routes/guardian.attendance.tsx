@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { listGuardianAbsences, submitExcuse } from "@/modules/attendance/attendance.functions";
+import { listGuardianEffectiveAbsences, submitEffectiveAttendanceExcuse } from "@/modules/attendance/onsite-attendance-workflow.functions";
 import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachmentCounts } from "@/modules/learning/submission-attachments.functions";
 
 const excuseAttachmentAccept = ".pdf,.png,.jpg,.jpeg";
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/guardian/attendance")({
  component: GuardianAttendancePage,
 });
 
-type Absence = Awaited<ReturnType<typeof listGuardianAbsences>>["absences"][number];
+type Absence = Awaited<ReturnType<typeof listGuardianEffectiveAbsences>>["absences"][number];
 
 function GuardianAttendancePage() {
   const {student}=Route.useSearch();
@@ -29,7 +29,7 @@ function GuardianAttendancePage() {
     setLoading(true);
     setError("");
     try {
-      const result = await listGuardianAbsences({data:{studentPersonId:student}});
+      const result = await listGuardianEffectiveAbsences({data:{studentPersonId:student}});
       setAbsences(result.absences);
       const excusedIds = result.absences.filter(absence => absence.excuse).map(absence => absence.attendanceEventId);
       if (excusedIds.length) {
@@ -54,7 +54,7 @@ function GuardianAttendancePage() {
     setBusy(absence.attendanceEventId);
     setNotice("");
     try {
-      await submitExcuse({
+      await submitEffectiveAttendanceExcuse({
         data: { attendanceEventId: absence.attendanceEventId, reason: reasons[absence.attendanceEventId] ?? "" },
       });
       setNotice(`Excuse submitted for ${absence.studentName}. You can attach a supporting document below.`);
@@ -91,7 +91,8 @@ function GuardianAttendancePage() {
     }
   };
 
-  const needsExcuse = absences.filter(absence => !absence.excuse && absence.status !== "excused");
+  const needsExcuse = absences.filter(absence => !absence.excuse &&
+    (absence.status === "absent" || absence.status === "tardy"));
 
   return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
     <div className="mx-auto max-w-5xl">
@@ -105,11 +106,11 @@ function GuardianAttendancePage() {
       {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance…</p>}
       {!loading && !error && <>
         <div className="mt-6 grid grid-cols-3 gap-3" aria-label="Attendance summary">
-          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Recent absences</p><p className="mt-1 text-2xl font-semibold">{absences.length}</p></div>
+          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Recent attendance cases</p><p className="mt-1 text-2xl font-semibold">{absences.length}</p></div>
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Needs an excuse</p><p className="mt-1 text-2xl font-semibold">{needsExcuse.length}</p></div>
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Excuses submitted</p><p className="mt-1 text-2xl font-semibold">{absences.filter(absence => absence.excuse).length}</p></div>
         </div>
-        {absences.length === 0 && <p className="mt-8 text-sm">No recent absences or tardies were found for your students.</p>}
+        {absences.length === 0 && <p className="mt-8 text-sm">No recent absence or tardy cases were found for your students.</p>}
         {absences.length > 0 && <div className="mt-8 grid gap-4">
           {absences.map(absence => <section key={absence.attendanceEventId} className="rounded-xl border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -121,6 +122,7 @@ function GuardianAttendancePage() {
                 {absence.excuse ? `Excuse ${absence.excuse.status}` : absence.status}
               </span>
             </div>
+            {absence.status === "present" && <p className="mt-3 text-xs text-muted-foreground">The school corrected this attendance case to present. No excuse is required.</p>}
             {absence.excuse && <div className="mt-3">
               <p className="rounded-lg bg-muted p-3 text-sm">Your excuse: {absence.excuse.reason}</p>
               <p className="mt-2 text-xs text-muted-foreground">{docCounts[absence.attendanceEventId] ?? 0} document(s) attached</p>
@@ -147,7 +149,7 @@ function GuardianAttendancePage() {
                 >Attach document</button>
               </div>}
             </div>}
-            {!absence.excuse && absence.status !== "excused" && <div className="mt-3">
+            {!absence.excuse && (absence.status === "absent" || absence.status === "tardy") && <div className="mt-3">
               <label className="block text-sm font-semibold">
                 Excuse reason
                 <textarea

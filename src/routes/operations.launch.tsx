@@ -196,6 +196,7 @@ function LaunchWizardPage() {
     <main className="min-h-screen bg-background px-6 py-10 text-foreground">
       <div className="mx-auto max-w-5xl">
         <Link to="/operations" className="text-xs underline">← Operations</Link>
+        <Link to="/operations/workflows" className="ml-4 text-xs underline">Connected workflows →</Link>
         <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
           CAN OS · Program launch
         </p>

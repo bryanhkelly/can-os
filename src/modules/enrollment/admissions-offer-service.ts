@@ -5,6 +5,7 @@ import {admissionOffers,admissionSeatPools,applications,auditEvents,domainEvents
 import {assertCapability,assertProgramScope,AuthorizationError,type CommandContext} from "@/domain/command-context";
 import type {AccessContext} from "@/domain/access-context";
 import {EventTypes} from "@/domain/event-types";
+import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
 import {transitionAdmissionsOffer,type OfferStatus} from "@/domain/admissions-offer-lifecycle";
 import {calculateSeatOccupancy} from "@/domain/admissions-seat-occupancy";
 
@@ -24,7 +25,8 @@ async function lockPool(tx:Transaction,programId:string,schoolYearId:string){
  const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId}).from(programs).where(eq(programs.id,programId)).limit(1);
  if(!year||!program||year.organizationId!==program.organizationId||
   (year.programId!==null&&year.programId!==programId)||
-  (year.programId===null&&year.siteId!==program.siteId))
+  (program.siteId!==null&&year.siteId!==program.siteId)||
+  (year.programId===null&&(!program.siteId||year.siteId!==program.siteId)))
   throw new Error("School year does not belong to this program or host site");
  return {pool,organizationId:program.organizationId};
 }
@@ -48,16 +50,16 @@ async function ready(tx:Transaction,applicationId:string){
  if(blocks.some(b=>b.status!=="complete"))throw new Error("Blocking requirements remain");
  return journey;
 }
-/** Expire elapsed synthetic offers while holding the same pool lock used for issuance. */
+/** Expire elapsed offers while holding the same pool lock used for issuance. */
 async function expireElapsedOffers(tx:Transaction,context:CommandContext,programId:string,schoolYearId:string,now:Date){
- const pending=await tx.select({id:admissionOffers.id,expiresAt:admissionOffers.expiresAt,applicationId:admissionOffers.applicationId,metadata:applications.metadata}).from(admissionOffers)
-  .innerJoin(applications,eq(applications.id,admissionOffers.applicationId))
+ const pending=await tx.select({id:admissionOffers.id,expiresAt:admissionOffers.expiresAt}).from(admissionOffers)
   .where(and(eq(admissionOffers.programId,programId),eq(admissionOffers.schoolYearId,schoolYearId),eq(admissionOffers.status,"issued")));
  let count=0;
  for(const offer of pending){
   if(!offer.expiresAt||offer.expiresAt.getTime()>now.getTime())continue;
   await tx.update(admissionOffers).set({status:"expired",updatedAt:now}).where(and(eq(admissionOffers.id,offer.id),eq(admissionOffers.status,"issued")));
   await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"admissions.offer.expire",resourceType:"admission_offer",resourceId:offer.id,scope:{programId},before:{status:"issued"},after:{status:"expired"},context:{requestId:context.requestId??null}});
+  await tx.insert(domainEvents).values({eventType:EventTypes.AdmissionOfferExpired,aggregateType:"admission_offer",aggregateId:offer.id,actorPersonId:context.actorPersonId,payload:{programId,schoolYearId}});
   count++;
  }
  return count;
@@ -76,7 +78,7 @@ export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{
  if(!input.idempotencyKey.trim()||!Number.isFinite(input.expiresAt.getTime())||input.expiresAt.getTime()<=Date.now())throw new Error("Invalid offer issuance input");
  return db.transaction(async tx=>{
   const [app]=await tx.select().from(applications).where(eq(applications.id,input.applicationId)).limit(1);
-  if(!app)throw new Error("Synthetic application not found");
+  if(!app)throw new Error("Application not found");
   requireAdmissionsProgramScope(context,app.programId);
   assertRecordWriteAllowed(app.metadata,"registrar");
   const {pool}=await lockPool(tx,app.programId,input.schoolYearId);
@@ -118,9 +120,9 @@ export async function respondToSyntheticAdmissionOffer(context:AccessContext,off
   await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
-  if(!app||app.programId!==offer!.programId)throw new Error("Synthetic offer application mismatch");
+  if(!app||app.programId!==offer!.programId)throw new Error("Offer application mismatch");
   await assertGuardian(tx,context.actorPersonId,app.studentProfileId);
-  assertRecordWriteAllowed(app.metadata,context.role==="guardian"?"guardian":"registrar");
+  assertRecordWriteAllowed(app.metadata,"guardian");
   if(offer!.status==="accepted"&&action==="accept")return offerId;
   if(offer!.status==="declined"&&action==="decline")return offerId;
   const changed=transitionAdmissionsOffer({status:offer!.status as OfferStatus,applicationId:app.id,schoolYearId:offer!.schoolYearId,expiresAt:offer!.expiresAt?.toISOString()??null},action,new Date());
@@ -151,8 +153,13 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   if(offer!.status!=="accepted")throw new Error("Guardian must accept offer first");
   if(!offer!.respondedAt)throw new Error("Accepted offer must record a guardian response");
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
-  if(!app||app.programId!==offer!.programId||app.stage!=="accepted")throw new Error("Synthetic application not accepted for this offer");
-  assertRecordWriteAllowed(app.metadata,context.role==="guardian"?"guardian":"registrar");
+  if(!app||app.programId!==offer!.programId||app.stage!=="accepted")throw new Error("Application not accepted for this offer");
+  assertRecordWriteAllowed(app.metadata,"registrar");
+  const [programSite]=await tx.select({siteId:programs.siteId,organizationId:programs.organizationId})
+    .from(programs).where(eq(programs.id,offer!.programId)).limit(1);
+  if(!programSite?.siteId||programSite.organizationId!==organizationId)
+    throw new Error("Enrollment program must have a matching school site");
+  await lockAttendanceConfigurationAtSite(tx,programSite.siteId);
   const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(eq(enrollments.studentProfileId,app.studentProfileId),eq(enrollments.programId,offer!.programId),eq(enrollments.schoolYearId,offer!.schoolYearId),eq(enrollments.status,"active"),eq(enrollments.kind,"program"))).limit(1);
   if(existing)return existing.id;
   const journey=await ready(tx,app.id);

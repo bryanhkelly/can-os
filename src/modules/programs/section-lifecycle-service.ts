@@ -6,9 +6,17 @@ import {
   sectionCapacityDemands, sectionTeachers, sections, terms, scheduleTemplates,
 } from "@/db/schema";
 import { assertCapability, assertProgramScope, assertSectionScope, assertSiteScope, AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 
 type LifecycleContext = CommandContext & { actorPersonId: string };
 async function authorizedSection(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], context: LifecycleContext, sectionId: string) {
+  // Acquire the attendance configuration lock BEFORE row FOR UPDATE. The
+  // attendance mark command takes the site lock before reading section rows.
+  const [location] = await tx.select({ siteId: sections.siteId })
+    .from(sections).where(eq(sections.id, sectionId)).limit(1);
+  if (!location?.siteId || !context.scope.siteIds?.includes(location.siteId))
+    throw new AuthorizationError("section site");
+  await lockAttendanceConfigurationAtSite(tx, location.siteId);
   const [row] = await tx.select({
     id: sections.id, title: sections.title, active: sections.active,
     metadata: sections.metadata, programId: sections.programId, siteId: sections.siteId,
@@ -158,6 +166,14 @@ export async function changeSectionEnrollment(context: LifecycleContext,input:{e
   assertCapability(context,"program.launch.start");
   if(input.reason.trim().length<5)throw new Error("Provide an enrollment transition reason");
   await db.transaction(async tx=>{
+    // Obtain the site lock before locking an enrollment row to keep lock order
+    // consistent with attendance's configuration -> enrollment row reads.
+    const [enrollmentSite] = await tx.select({ siteId: sections.siteId })
+      .from(enrollments).innerJoin(sections,eq(sections.id,enrollments.sectionId))
+      .where(eq(enrollments.id,input.enrollmentId)).limit(1);
+    if (!enrollmentSite?.siteId || !context.scope.siteIds?.includes(enrollmentSite.siteId))
+      throw new AuthorizationError("section enrollment site");
+    await lockAttendanceConfigurationAtSite(tx, enrollmentSite.siteId);
     const [record]=await tx.select().from(enrollments).where(eq(enrollments.id,input.enrollmentId)).limit(1).for("update");
     if(!record||record.kind!=="section"||!record.sectionId||record.status!=="active")throw new Error("Active section enrollment not found");
     const section=await authorizedSection(tx,context,record.sectionId);
@@ -230,6 +246,19 @@ export async function transferSectionEnrollment(context: LifecycleContext,input:
   assertCapability(context,"program.launch.start");
   if(input.reason.trim().length<5)throw new Error("Provide a transfer reason");
   return db.transaction(async tx=>{
+    // Cross-site transfers must take BOTH site locks in deterministic order
+    // before any enrollment or section FOR UPDATE locks.
+    const [enrollmentSite] = await tx.select({ siteId: sections.siteId })
+      .from(enrollments).innerJoin(sections,eq(sections.id,enrollments.sectionId))
+      .where(eq(enrollments.id,input.enrollmentId)).limit(1);
+    const [destinationSite] = await tx.select({ siteId: sections.siteId })
+      .from(sections).where(eq(sections.id,input.destinationSectionId)).limit(1);
+    const transferSites = [...new Set([enrollmentSite?.siteId, destinationSite?.siteId]
+      .filter((id): id is string => !!id))].sort();
+    if (!enrollmentSite?.siteId || !destinationSite?.siteId ||
+        !transferSites.every(id=>context.scope.siteIds?.includes(id)))
+      throw new AuthorizationError("both section transfer sites");
+    for (const siteId of transferSites) await lockAttendanceConfigurationAtSite(tx, siteId);
     const [sourceEnrollment]=await tx.select().from(enrollments).where(eq(enrollments.id,input.enrollmentId)).limit(1).for("update");
     if(!sourceEnrollment||sourceEnrollment.kind!=="section"||sourceEnrollment.status!=="active"||!sourceEnrollment.sectionId)
       throw new Error("Active section enrollment not found");
