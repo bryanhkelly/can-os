@@ -31,8 +31,9 @@ export const getOperationsActions=createServerFn({method:"GET"}).handler(async()
   href:record.type==="support_referral"?"/student/support?referral="+encodeURIComponent(record.id):"/operations",
   needsResponse:record.status==="open",
  })));
+ const scopedItems=items.map(item=>({...item,siteId:records.find(record=>record.id===item.id)?.siteId??null,ownerPersonId:records.find(record=>record.id===item.id)?.ownerPersonId??null}));
  const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,actor.scope.siteIds!),eq(accountPersonGrants.active,true)));
- return {items,assignees,summary:notificationSummary(items)};
+ return {items:scopedItems,assignees,summary:notificationSummary(items)};
 });
 
 /** Generic Actions only: domain-owned referrals must use their own state machine. */
