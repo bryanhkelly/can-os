@@ -131,7 +131,7 @@ export async function replaceSectionTeacher(context: LifecycleContext, input:{se
         eq(instructionalCapacityOfferings.personId,input.oldPersonId),
         inArray(instructionalCapacityReservations.status,["held","committed"])));
     if(capacity.length)throw new Error("Outgoing instructor has reserved instructional capacity. Release it and commit replacement capacity before changing the teaching roster.");
-    await tx.insert(sectionTeachers).values({sectionId:section.id,personId:input.newPersonId,role:old.role})
+    await tx.insert(sectionTeachers).values({sectionId:section.id,personId:input.newPersonId,role:old.role,assignmentSource:"manual"})
       .onConflictDoNothing();
     await tx.delete(sectionTeachers).where(eq(sectionTeachers.id,old.id));
     await tx.insert(notifications).values({
