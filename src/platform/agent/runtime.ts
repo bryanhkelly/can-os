@@ -378,7 +378,12 @@ export async function confirmRun(
     if (Date.now() - run.createdAt.getTime() > 10 * 60_000) {
       await tx.update(agentRuns).set({ status: "cancelled", updatedAt: new Date() })
         .where(eq(agentRuns.id, run.id));
-      throw new Error("This approval expired. Please ask CAN again.");
+      const message = await addMessage(tx, {
+        conversationId: run.conversationId, role: "agent",
+        body: "This approval expired. Ask me again to prepare a fresh action.",
+        agentRunId: run.id,
+      });
+      return { conversationId: run.conversationId, runId: run.id, runStatus: "cancelled", message };
     }
 
     if (!input.approve) {
