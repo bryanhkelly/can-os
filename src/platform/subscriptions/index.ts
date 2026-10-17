@@ -15,3 +15,4 @@ export {
 } from "./matcher";
 export { processSubscriptionReminders } from "./reminders";
 export { processQueuedSubscriptionDeliveries } from "./delivery-worker";
+export { processWeeklyDigests } from "./digests";
