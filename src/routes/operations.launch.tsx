@@ -6,6 +6,7 @@ import {
   listLaunches,
   listLaunchOptions,
   startLaunch,
+  createLaunchSite,
 } from "@/modules/programs/launch.functions";
 
 const programTypes = [
@@ -74,6 +75,19 @@ function LaunchWizardPage() {
   const [academicProviderOrganizationId, setAcademicProviderOrganizationId] = useState("");
   const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState("");
   const [siteId, setSiteId] = useState("");
+  const [newSiteName,setNewSiteName]=useState("");
+  const [newSiteSlug,setNewSiteSlug]=useState("");
+  const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
+  async function addSite(){
+    if(!hostOrganizationId)return;
+    setBusy(true);setError("");
+    try{
+      await createLaunchSite({data:{organizationId:hostOrganizationId,name:newSiteName,
+        slug:newSiteSlug,timezone:newSiteTimezone}});
+      await router.invalidate();setNewSiteName("");setNewSiteSlug("");
+    }catch(e){setError(e instanceof Error?e.message:"Unable to create site");}
+    finally{setBusy(false);}
+  }
 
   const hostSites = options?.sites.filter((site) => site.organizationId === hostOrganizationId) ?? [];
 
@@ -289,6 +303,15 @@ function LaunchWizardPage() {
                       ))}
                     </select>
                   </label>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold">New host site</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <input aria-label="New site name" placeholder="Campus name" className={inputClass} value={newSiteName} onChange={e=>setNewSiteName(e.target.value)}/>
+                      <input aria-label="New site slug" placeholder="campus-slug" className={inputClass} value={newSiteSlug} onChange={e=>setNewSiteSlug(e.target.value)}/>
+                      <input aria-label="New site timezone" placeholder="Timezone" className={inputClass} value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}/>
+                    </div>
+                    <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Create site</button>
+                  </div>
                   <label className="block text-xs">
                     Jurisdiction
                     <select aria-label="Jurisdiction" className={selectClass} value={jurisdictionId} onChange={(e) => setJurisdictionId(e.target.value)} required>
