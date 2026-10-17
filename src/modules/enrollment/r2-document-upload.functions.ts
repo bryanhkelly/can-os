@@ -1,4 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
+import {z} from "zod";
 import {matchesEnrollmentDocumentSignature} from "@/domain/enrollment-document-signature";
 import {assertR2DemoEnabled,assertR2DocumentGrant} from "@/domain/r2-document-access";
 import {getRequest} from "@tanstack/react-start/server";
@@ -35,16 +36,16 @@ async function uploadsEnabled(applicationId:string,mode:"upload"|"download"="upl
  }else throw new Error("Enrollment documents require registrar or guardian access");
  return context.actorPersonId;
 }
-async function requirementScope(applicationId:string,requirementId:string){
+async function requirementScope(applicationId:string,requirementId:string,allowClosed=false){
  const [app]=await db.select({id:applications.id}).from(applications).where(eq(applications.id,applicationId)).limit(1);
  if(!app)throw new Error("Application not found");
  const [journey]=await db.select({id:journeys.id,status:journeys.status}).from(journeys).where(and(eq(journeys.participantType,"application"),eq(journeys.participantId,app.id))).limit(1);
- if(!journey||["active","complete","cancelled"].includes(journey.status))throw new Error("Enrollment journey is closed");
+ if(!journey||(!allowClosed&&["active","complete","cancelled"].includes(journey.status)))throw new Error("Enrollment journey is closed or unavailable");
  const [requirement]=await db.select({id:journeyRequirements.id}).from(journeyRequirements).where(and(eq(journeyRequirements.id,requirementId),eq(journeyRequirements.journeyId,journey.id))).limit(1);
  if(!requirement)throw new Error("Requirement is outside the application");
 }
 export const beginSyntheticR2DocumentUpload=createServerFn({method:"POST"})
- .validator((data:{applicationId:string;requirementId:string;fileName:string;mimeType:string;size:number})=>data)
+ .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),fileName:z.string().min(1).max(150),mimeType:z.enum(["application/pdf","image/jpeg","image/png"]),size:z.number().int().min(16).max(10*1024*1024)}).parse(data))
  .handler(async({data})=>{
   await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
   await requirementScope(data.applicationId,data.requirementId);
@@ -52,7 +53,7 @@ export const beginSyntheticR2DocumentUpload=createServerFn({method:"POST"})
   return {key,uploadUrl:signR2Object("PUT",key,data.mimeType,180),expiresInSeconds:180};
  });
 export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
- .validator((data:{applicationId:string;requirementId:string;key:string;fileName:string;mimeType:string;size:number})=>data)
+ .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),key:z.string().regex(/^enrollment\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i),fileName:z.string().min(1).max(150),mimeType:z.enum(["application/pdf","image/jpeg","image/png"]),size:z.number().int().min(16).max(10*1024*1024)}).parse(data))
  .handler(async({data})=>{
   const actorId=await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
   if(!data.key.startsWith("enrollment/"+data.applicationId+"/"+data.requirementId+"/"))throw new Error("Document belongs to another application");
@@ -120,10 +121,10 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
 
 /** Short-lived document retrieval after application and guardian/registrar scope checks. */
 export const getSyntheticR2DocumentDownload=createServerFn({method:"POST"})
- .validator((data:{applicationId:string;requirementId:string;documentId:string})=>data)
+ .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),documentId:z.string().uuid()}).parse(data))
  .handler(async({data})=>{
   await uploadsEnabled(data.applicationId,"download");
-  await requirementScope(data.applicationId,data.requirementId);
+  await requirementScope(data.applicationId,data.requirementId,true);
   const [record]=await db.select({id:documents.id,storageKey:documents.storageKey,metadata:documents.metadata})
    .from(documents).where(and(eq(documents.id,data.documentId),eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageProvider,"cloudflare_r2"))).limit(1);
   if(!record||record.metadata.applicationId!==data.applicationId||record.metadata.isCurrent===false)throw new Error("Document not found within the current enrollment requirement");
