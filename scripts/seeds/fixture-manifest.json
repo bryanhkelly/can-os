@@ -16,9 +16,10 @@
     "/": {
       "fixtureRequired": false,
       "persona": "public",
-      "rationale": "Landing page; renders without domain data.",
+      "rationale": "Session-based application entry point; redirects to the user's verified active membership.",
       "interactions": [
-        "navigate to access request"
+        "resolve verified session",
+        "redirect to active workspace or access"
       ],
       "downstreamRecords": []
     },
@@ -180,15 +181,6 @@
       "downstreamRecords": [
         "auditEvents:coach.outreach"
       ]
-    },
-    "/demo-health": {
-      "fixtureRequired": false,
-      "persona": "staff",
-      "rationale": "Meta page reporting fixture health; it is the coverage surface, not a consumer of it.",
-      "interactions": [
-        "inspect fixture recommendations"
-      ],
-      "downstreamRecords": []
     },
     "/guardian": {
       "persona": "guardian",
