@@ -14,18 +14,7 @@ import {
   subscriptions,
 } from "@/db/schema";
 import { notify } from "@/platform/mutation";
-import {
-  emailNotificationRecipients,
-  sendNotificationEmail,
-} from "@/modules/communication/notification-email.server";
 import { getSubscriptionPolicy } from "./policy";
-
-type PendingEmail = {
-  deliveryId: string;
-  recipientPersonId: string;
-  subject: string;
-  text: string;
-};
 
 /**
  * Match a processed domain event against active subscriptions and deliver to
@@ -44,7 +33,6 @@ export async function processEventSubscriptions(eventId: string): Promise<number
   const policy = getSubscriptionPolicy(event.eventType);
   if (!policy) return 0;
 
-  const emailsToSend: PendingEmail[] = [];
   let delivered = 0;
 
   await db.transaction(async (tx) => {
@@ -135,57 +123,10 @@ export async function processEventSubscriptions(eventId: string): Promise<number
           })
           .where(eq(subscriptionDeliveries.id, delivery.id));
         delivered += 1;
-      } else if (subscription.channel === "email") {
-        emailsToSend.push({
-          deliveryId: delivery.id,
-          recipientPersonId: subscription.subscriberPersonId,
-          subject: content.title,
-          text: content.body ?? content.title,
-        });
-      } else {
-        // sms / agent_webhook routes are not built yet; fail explicitly
-        // rather than leaving a permanently pending delivery.
-        await tx
-          .update(subscriptionDeliveries)
-          .set({
-            status: "failed",
-            attempts: 1,
-            lastError: "channel_not_supported",
-            updatedAt: now,
-          })
-          .where(eq(subscriptionDeliveries.id, delivery.id));
       }
+      // Other channels stay pending for the independently retryable worker.
     }
   });
-
-  if (emailsToSend.length > 0) {
-    const emails = await emailNotificationRecipients(
-      emailsToSend.map((mail) => mail.recipientPersonId),
-    );
-    const origin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
-    const actionUrl = origin ? `${new URL(origin).origin}/guardian` : undefined;
-
-    for (const mail of emailsToSend) {
-      const to = emails.get(mail.recipientPersonId);
-      const sent = to ? await sendNotificationEmail({
-          to,
-          subject: mail.subject,
-          text: mail.text,
-          actionUrl,
-        }) : false;
-      await db
-        .update(subscriptionDeliveries)
-        .set({
-          status: sent ? "delivered" : "failed",
-          attempts: 1,
-          lastError: sent ? null : to ? "email_provider_failed" : "no_active_email",
-          deliveredAt: sent ? new Date() : null,
-          updatedAt: new Date(),
-        })
-        .where(eq(subscriptionDeliveries.id, mail.deliveryId));
-      if (sent) delivered += 1;
-    }
-  }
 
   return delivered;
 }
