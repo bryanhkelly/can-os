@@ -6,6 +6,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { readScope } from "@/platform/scope";
 import { assertInsightManageScope } from "@/modules/operations/insights.scope";
+import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
 
 /**
  * Insight read scoping is registered in ./insights.scope; teachers see insights for
@@ -28,11 +29,12 @@ async function loadServer() {
 }
 
 export const listInsights = createServerFn({ method: "GET" })
- .validator((value: unknown) => z.object({ status: z.enum(insightStatuses).optional() }).parse(value ?? {}))
+ .validator((value: unknown) => operationsSelectionSchema.extend({status:z.enum(insightStatuses).optional()}).parse(value ?? {}))
  .handler(async ({ data }) => {
   const context = await getCommandContext(getRequest());
   assertCapability(context, "insights:read");
   if (!context.actorPersonId) throw new AuthorizationError("insights actor");
+  const selection=await resolveOperationsSelection(context,{siteId:data.siteId,programId:data.programId});
   if (!process.env.DATABASE_URL) return { insights: [] };
   const server = await loadServer();
   const { db, s, ops } = server;
@@ -56,7 +58,9 @@ export const listInsights = createServerFn({ method: "GET" })
    .leftJoin(s.sections, ops.eq(s.sections.id, s.insights.sectionId))
    .leftJoin(s.studentProfiles, ops.eq(s.studentProfiles.id, s.insights.subjectId))
    .leftJoin(s.people, ops.eq(s.people.id, s.studentProfiles.personId))
-   .where(ops.and(scope, data.status ? ops.eq(s.insights.status, data.status) : undefined))
+   .where(ops.and(scope, data.status ? ops.eq(s.insights.status, data.status) : undefined,
+    data.siteId||data.programId?ops.inArray(s.insights.siteId,selection.siteIds):undefined,
+    data.programId?ops.eq(s.insights.programId,data.programId):undefined))
    .orderBy(ops.desc(s.insights.createdAt))
    .limit(50);
   return {
