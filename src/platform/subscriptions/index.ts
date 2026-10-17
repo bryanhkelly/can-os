@@ -14,3 +14,4 @@ export {
   setSubscriptionStatus,
 } from "./matcher";
 export { processSubscriptionReminders } from "./reminders";
+export { processQueuedSubscriptionDeliveries } from "./delivery-worker";
