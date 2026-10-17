@@ -35,9 +35,13 @@ export async function beginSmsVerification(personId: string, phone: string): Pro
     .onConflictDoNothing();
   const rows = await db.update(notificationPreferences).set({
     smsVerificationRequestedAt: now, updatedAt: now,
-  }).where(
+  }).where(and(
     eq(notificationPreferences.personId, personId),
-  ).returning({ id: notificationPreferences.id });
+    or(
+      isNull(notificationPreferences.smsVerificationRequestedAt),
+      lte(notificationPreferences.smsVerificationRequestedAt, new Date(now.getTime() - 60_000)),
+    ),
+  )).returning({ id: notificationPreferences.id });
   if (!rows.length) throw new Error("SMS verification rate limit");
   await twilioPost(verifyUrl("Verifications"), { To: phone, Channel: "sms" });
 }
