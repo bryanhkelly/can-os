@@ -42,9 +42,10 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  const policy=await getSectionRegistrationPolicy(sectionId,tx);
  const today=new Date().toISOString().slice(0,10);
  if(today>policy.addDropEndsOn)throw new Error("Add/drop deadline has passed");
- const [{total}]=await tx.select({total:sql<number>`count(*)::int`}).from(s.enrollments)
+ const [rosterCount]=await tx.select({total:sql<number>`count(*)::int`}).from(s.enrollments)
   .where(and(eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.kind,"section"),
    eq(s.enrollments.status,"active")));
+ const total=rosterCount?.total??0;
  if(total>=policy.enrollmentCapacity)throw new Error("Section is full");
  const current=await tx.select({id:s.enrollments.id,termId:s.sections.termId,
   code:s.sections.code,metadata:s.sections.metadata,template:s.sections.courseTemplateVersionId,
