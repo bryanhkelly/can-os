@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, eq, inArray, isNull, or, sql, desc } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql, desc } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
@@ -12,7 +12,7 @@ type Actor = Awaited<ReturnType<typeof requireActor>>;
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type GroupScope = { id: string; siteId: string | null; programId: string | null; sectionId: string | null };
 
-function assertGroupScope(actor: Actor, group: GroupScope) {
+export function assertGroupScope(actor: Actor, group: GroupScope) {
   if (!group.siteId || !actorSiteIds(actor).includes(group.siteId) ||
       (group.programId && !(actor.scope.programIds ?? []).includes(group.programId))) {
     throw new AuthorizationError("study group school/program grant");
@@ -20,7 +20,7 @@ function assertGroupScope(actor: Actor, group: GroupScope) {
 }
 
 /** Active enrollment in the group's school/program and, for course groups, section. */
-async function eligibleStudent(tx: Tx, studentPersonId: string, group: GroupScope, grantedPrograms: string[]) {
+export async function eligibleStudent(tx: Tx, studentPersonId: string, group: GroupScope, grantedPrograms: string[]) {
   if (!group.siteId) throw new AuthorizationError("group site");
   const [membership] = await tx.select({ studentProfileId: s.studentProfiles.id })
     .from(s.studentProfiles)
