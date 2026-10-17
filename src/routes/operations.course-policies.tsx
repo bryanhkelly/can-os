@@ -13,7 +13,8 @@ function CoursePoliciesPage(){
  if(!result.ok)return <LoaderFailure eyebrow="CAN OS · Registration" title="Course registration rules" outcome={result}/>;
  return <CoursePolicies rows={result.data}/>;
 }
-function CoursePolicies({rows}:{rows:Awaited<ReturnType<typeof listCoursePolicies>>}){
+type CoursePolicyRow=Awaited<ReturnType<typeof listCoursePolicies>>[number];
+function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
  const router=useRouter();
  const [error,setError]=useState(""),[notice,setNotice]=useState(""),[saving,setSaving]=useState("");
  async function save(sectionId:string,policy:(typeof rows)[number]["policy"]){
@@ -38,8 +39,8 @@ function CoursePolicies({rows}:{rows:Awaited<ReturnType<typeof listCoursePolicie
  </WorkspaceShell>;
 }
 function CoursePolicyCard({row,save,disabled}:{
- row:Awaited<ReturnType<typeof listCoursePolicies>>[number],
- disabled:boolean,save:(policy:typeof row.policy)=>Promise<void>
+ row:CoursePolicyRow,
+ disabled:boolean,save:(policy:CoursePolicyRow["policy"])=>Promise<void>
 }){
  const [value,setValue]=useState(row.policy);
  const [prerequisites,setPrerequisites]=useState(row.policy.prerequisites.join(", "));
