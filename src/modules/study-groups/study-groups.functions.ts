@@ -345,8 +345,9 @@ export const reportStudyGroupPost=createServerFn({method:"POST"}).validator(z.ob
  const [existing]=await tx.select({id:s.studyGroupReports.id}).from(s.studyGroupReports).where(and(eq(s.studyGroupReports.groupId,data.groupId),eq(s.studyGroupReports.postId,data.postId),eq(s.studyGroupReports.reporterPersonId,actor.actorPersonId!),eq(s.studyGroupReports.status,"open"))).limit(1);
  if(existing)return {ok:true,created:false};
  const [createdReport]=await tx.insert(s.studyGroupReports).values({groupId:data.groupId,postId:data.postId,reporterPersonId:actor.actorPersonId!,reason:data.reason.trim()}).returning({id:s.studyGroupReports.id});
- const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title,siteId:s.studyGroups.siteId}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active"))).limit(1);
+ const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title,siteId:s.studyGroups.siteId,metadata:s.studyGroups.metadata}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active"))).limit(1);
  if(!group)throw new Error("Group unavailable");
+ requireLegacyGroup(group.metadata);
  await tx.insert(s.actions).values({type:"study_group_moderation",status:"open",
   priority:"high",title:"Review reported content: "+group.title,
   description:"A student report requires a moderator decision.",
@@ -378,10 +379,11 @@ export const listStudyGroupReports=createServerFn({method:"GET"}).handler(async(
 export const resolveStudyGroupReport=createServerFn({method:"POST"}).validator(z.object({reportId:z.string().min(1),hidePost:z.boolean()}).parse).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
  return db.transaction(async tx=>{
- const [report]=await tx.select({id:s.studyGroupReports.id,postId:s.studyGroupReports.postId,groupId:s.studyGroupReports.groupId,reporterPersonId:s.studyGroupReports.reporterPersonId})
+ const [report]=await tx.select({id:s.studyGroupReports.id,postId:s.studyGroupReports.postId,groupId:s.studyGroupReports.groupId,reporterPersonId:s.studyGroupReports.reporterPersonId,groupMetadata:s.studyGroups.metadata})
  .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupReports.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
  .where(and(eq(s.studyGroupReports.id,data.reportId),eq(s.studyGroupReports.status,"open"))).limit(1);
  if(!report)throw new Error("Open report not found");
+ requireLegacyGroup(report.groupMetadata);
  if(data.hidePost&&report.postId)await tx.update(s.studyGroupPosts).set({hidden:true,updatedAt:new Date()}).where(and(eq(s.studyGroupPosts.id,report.postId),eq(s.studyGroupPosts.groupId,report.groupId)));
  await tx.update(s.studyGroupReports).set({status:"resolved"}).where(eq(s.studyGroupReports.id,report.id));
  const moderationActions=await tx.select({id:s.actions.id,status:s.actions.status}).from(s.actions)
