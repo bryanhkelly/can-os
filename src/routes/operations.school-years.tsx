@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import {
  getSchoolYearStudio, createStudioGradeScale, createStudioYear, addStudioTerm, addStudioGradingPeriod,
- addStudioCalendar, addStudioCalendarDay, removeStudioCalendarDay, addStudioSchedule, replaceStudioSchedulePeriods, activateStudioYear,
+ addStudioCalendar, addStudioCalendarDay, removeStudioCalendarDay, populateStudioInstructionalDays, addStudioSchedule, replaceStudioSchedulePeriods, activateStudioYear,
 } from "@/modules/academic-time/school-year-studio.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -72,6 +72,8 @@ function YearCard({year:y,busy,run}:{year:Snapshot["years"][number],busy:boolean
  const [termStart,setTermStart]=useState(y.startsOn),[termEnd,setTermEnd]=useState(y.endsOn);
  const [day,setDay]=useState(y.startsOn),[dayType,setDayType]=useState<"instructional"|"holiday"|"closure"|"special"|"makeup">("holiday");
  const [title,setTitle]=useState("");
+ const [weekdays,setWeekdays]=useState([1,2,3,4,5]);
+ const [dailyMinutes,setDailyMinutes]=useState(390);
  return <article className="rounded-xl border bg-card p-5">
   <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">{y.name}</h3><p className="mt-1 text-sm text-muted-foreground">{y.startsOn} to {y.endsOn} · {y.status}</p></div>
    <button disabled={busy||y.status==="active"} onClick={()=>run(()=>activateStudioYear({data:{schoolYearId:y.id}}))} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">Activate year</button>
@@ -91,6 +93,25 @@ function YearCard({year:y,busy,run}:{year:Snapshot["years"][number],busy:boolean
     <p className="mt-2 text-sm">{y.calendars.length} calendar(s), {y.schedules.length} schedule(s)</p>
     {!y.calendars.length&&<button disabled={busy} className="mt-3 rounded border px-3 py-2 text-sm" onClick={()=>run(()=>addStudioCalendar({data:{schoolYearId:y.id}}))}>Create calendar</button>}
     {y.calendars.map(cal=><div key={cal.id} className="mt-3 rounded bg-muted p-3 text-sm"><p className="font-medium">{cal.name}</p>
+     <div className="mt-3 rounded-lg border bg-background p-3">
+      <p className="text-xs font-semibold">Generate instructional days</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+       {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d,n)=><label key={n} className="flex items-center gap-1 text-xs">
+        <input type="checkbox" checked={weekdays.includes(n)} onChange={e=>setWeekdays(current=>
+         e.target.checked?[...current,n]:current.filter(day=>day!==n))}/>{d}
+       </label>)}
+      </div>
+      <label className="mt-2 block text-xs">Instructional minutes per day
+       <input type="number" min={1} max={1440} value={dailyMinutes} onChange={e=>setDailyMinutes(Number(e.target.value))}
+        className="ml-2 w-24 rounded border p-1"/></label>
+      <button type="button" disabled={busy||weekdays.length===0}
+       onClick={()=>run(()=>populateStudioInstructionalDays({data:{
+        academicCalendarId:cal.id,weekdays,instructionalMinutes:dailyMinutes}}))}
+       className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+       Populate school year
+      </button>
+      <p className="mt-1 text-xs text-muted-foreground">Existing holidays, closures and special days will not be overwritten.</p>
+     </div>
      <div className="mt-2 flex flex-wrap gap-2"><input type="date" aria-label="Calendar date" value={day} onChange={e=>setDay(e.target.value)} className="rounded border p-2 bg-background"/>
       <select aria-label="Day type" value={dayType} onChange={e=>setDayType(e.target.value as typeof dayType)} className="rounded border p-2 bg-background">{["instructional","holiday","closure","special","makeup"].map(v=><option key={v} value={v}>{v}</option>)}</select>
       <input aria-label="Day title" placeholder="Optional description" value={title} onChange={e=>setTitle(e.target.value)} className="rounded border p-2 bg-background"/></div>
