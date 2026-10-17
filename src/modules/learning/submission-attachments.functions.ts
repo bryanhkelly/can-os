@@ -112,10 +112,10 @@ type DbSchema = typeof import("@/db/schema");
 type Tx = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
 /** Published synthetic assessment at a scoped site where the student is actively enrolled. */
-async function requireEnrolledAssessment(tx: Tx, s: DbSchema, assessmentId: string, studentId: string, siteIds: string[]) {
+async function requireEnrolledAssessment(tx: Tx, s: DbSchema, assessmentId: string, studentId: string, siteIds: string[], programIds: string[]) {
   const [assessment] = await tx.select({ id: s.assessments.id, sectionId: s.assessments.sectionId, metadata: s.assessments.metadata })
     .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
-    .where(and(eq(s.assessments.id, assessmentId), eq(s.assessments.status, "published"), inArray(s.sections.siteId, siteIds))).limit(1);
+    .where(and(eq(s.assessments.id, assessmentId), eq(s.assessments.status, "published"), inArray(s.sections.siteId, siteIds),inArray(s.sections.programId,programIds))).limit(1);
   if (!assessment || assessment.metadata.synthetic !== true) throw new Error("Synthetic assessment not found");
   const [enrollment] = await tx.select({ id: s.enrollments.id }).from(s.enrollments).where(and(
     eq(s.enrollments.studentProfileId, studentId), eq(s.enrollments.sectionId, assessment.sectionId), eq(s.enrollments.status, "active"))).limit(1);
@@ -157,7 +157,7 @@ export const createSubmissionAttachmentUpload = createServerFn({ method: "POST" 
     const key = newAttachmentKey("assignment", data.assessmentId);
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async (tx) => {
-      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!);
+      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!,context.scope.programIds??[]);
       const [document] = await tx.insert(s.documents).values({
         subjectType: "assessment",
         subjectId: assessment.id,
@@ -194,7 +194,7 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
     const { context, studentId, studentPersonId } = await studentActor();
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async (tx) => {
-      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!);
+      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!,context.scope.programIds??[]);
       // Serialize with draft/submit writes for this student+assessment.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);
       const [document] = await tx.select({ id: s.documents.id }).from(s.documents).where(and(
@@ -265,7 +265,7 @@ export const listSubmissionAttachments = createServerFn({ method: "GET" })
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const [assessment] = await db.select({ id: s.assessments.id, sectionId: s.assessments.sectionId })
       .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
-      .where(and(eq(s.assessments.id, data.assessmentId), inArray(s.sections.siteId, context.scope.siteIds!))).limit(1);
+      .where(and(eq(s.assessments.id, data.assessmentId), inArray(s.sections.siteId, context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
     if (!assessment) return { attachments: [] };
     const [enrollment] = await db.select({ id: s.enrollments.id }).from(s.enrollments).where(and(
       eq(s.enrollments.studentProfileId, studentId), eq(s.enrollments.sectionId, assessment.sectionId), eq(s.enrollments.status, "active"))).limit(1);
