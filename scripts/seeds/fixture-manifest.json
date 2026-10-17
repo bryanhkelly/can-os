@@ -526,16 +526,11 @@
       ]
     },
     "/student/notifications": {
-      "persona": "student",
-      "seeds": [
-        "new-experiences-v1.sql",
-        "student-calendar-comms-office-hours.sql"
-      ],
-      "recordCounts": {
-        "notifications": 1
-      },
+      "fixtureRequired": false,
+      "persona": "authenticated",
+      "rationale": "Compatibility redirect to /notifications",
       "interactions": [
-        "triage notification to its resource"
+        "redirect to canonical notification center"
       ],
       "downstreamRecords": []
     },
@@ -834,6 +829,20 @@
         "section_prerequisites",
         "domainEvents:CourseRegistrationPolicyChanged"
       ]
+    },
+    "/notifications": {
+      "persona": "authenticated",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "student-calendar-comms-office-hours.sql"
+      ],
+      "recordCounts": {
+        "notifications": 1
+      },
+      "interactions": [
+        "triage notification to its resource"
+      ],
+      "downstreamRecords": []
     }
   }
 }
