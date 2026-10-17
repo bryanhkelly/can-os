@@ -178,7 +178,7 @@ export async function processEventSubscriptions(eventId: string): Promise<number
         .set({
           status: sent ? "delivered" : "failed",
           attempts: 1,
-          lastError: sent ? null : "no_active_email",
+          lastError: sent ? null : to ? "email_provider_failed" : "no_active_email",
           deliveredAt: sent ? new Date() : null,
           updatedAt: new Date(),
         })
