@@ -22,7 +22,7 @@ function OperationsPage(){
  </main>;
  async function moveAction(id:string,status:"in_progress"|"waiting"|"resolved"){
   setBusy(id);setError("");
-  try{await updateOperationsAction({data:{id,status,resolutionNote:status==="resolved"?"Resolved by school operator":undefined}});await router.invalidate();}
+  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim()){setBusy(null);return;}await updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}});await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Unable to update action");}
   finally{setBusy(null);}
  }
