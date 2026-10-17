@@ -179,34 +179,8 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
   }});
  });
 
-export const returnSyntheticAssignment=createServerFn({method:"POST"})
- .validator((value:unknown)=>z.object({submissionId:z.string().min(1)}).parse(value))
- .handler(async({data})=>{
-  assertSyntheticMutation("teacher");
-  const context=await teacherActor();
-  assertCapability(context,"assignments:grade");
-  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
-  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  await teacherForSubmission(data.submissionId);
-  return db.transaction(async tx=>{
-  const [record]=await tx.select({metadata:s.assessments.metadata})
-   .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
-   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-   .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
-  if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic graded submission not found");
-  const [updated]=await tx.update(s.submissions).set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
-   .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.status,"graded"))).returning({id:s.submissions.id});
-  if(!updated)throw new Error("Graded synthetic submission not found");
-  await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.return",resourceType:"submission",resourceId:updated.id,before:{status:"graded"},after:{status:"returned"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
-  const [recipient]=await tx.select({personId:s.studentProfiles.personId})
-   .from(s.submissions).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.submissions.studentProfileId))
-   .where(eq(s.submissions.id,updated.id)).limit(1);
-  if(!recipient)throw new Error("Student profile missing for returned assignment");
-  await tx.insert(s.notifications).values({recipientPersonId:recipient.personId,type:"assignment_feedback",status:"unread",title:"Assignment returned for revision",body:"Your teacher returned your work. Review the feedback and submit a revision.",resourceType:"submission",resourceId:updated.id});
-  return {submissionId:updated.id};
-  });
- });
+/** Legacy name delegates to the single audited return-for-revision command. */
+export const returnSyntheticAssignment=returnSubmissionForRevision;
 
 /** Create and publish a synthetic class assignment using the existing model. */
 export const createSyntheticAssignment=createServerFn({method:"POST"})
