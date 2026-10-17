@@ -126,6 +126,9 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
  const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).for("update").limit(1);
  if(!group)throw new Error("Group unavailable");
  await requireStudentGroupEnrollment(tx,s,actor,group);
+ const [school]=await tx.select({organizationId:s.sites.organizationId})
+  .from(s.sites).where(eq(s.sites.id,group.siteId!)).limit(1);
+ if(!school)throw new AuthorizationError("group school");
  const [existing]=await tx.select({status:s.studyGroupMemberships.status}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,group.id),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  if(existing?.status==="approved"||existing?.status==="pending")return {ok:true};
  await tx.insert(s.studyGroupMemberships).values({groupId:group.id,personId:actor.actorPersonId!,role:"student",status:"pending"}).onConflictDoUpdate({target:[s.studyGroupMemberships.groupId,s.studyGroupMemberships.personId],set:{status:"pending",reviewedByPersonId:null,joinedAt:null,updatedAt:new Date()}});
@@ -144,6 +147,7 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
    // A prior approval is not consent to a new request after leave or decline.
    await tx.update(s.actions).set({status:"open",resolvedAt:null,
     resolutionNote:null,updatedAt:new Date(),
+    organizationId:school.organizationId,siteId:group.siteId,programId:group.programId,
     metadata:{...prior.metadata,decision:null}
    }).where(eq(s.actions.id,prior.id));
    await tx.insert(s.notifications).values({
@@ -158,6 +162,7 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
    type:"study_group_consent",status:"open",priority:"normal",
    title:"Approve study group participation: "+group.title,
    ownerPersonId:guardian.personId,siteId:group.siteId,
+   organizationId:school.organizationId,
    subjectType:"study_group",subjectId:group.id,
    programId:group.programId,
    metadata:{studentPersonId:actor.actorPersonId!,groupId:group.id},
