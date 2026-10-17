@@ -163,12 +163,12 @@ export const reportStudyGroupPost=createServerFn({method:"POST"}).validator(z.ob
  const [existing]=await tx.select({id:s.studyGroupReports.id}).from(s.studyGroupReports).where(and(eq(s.studyGroupReports.groupId,data.groupId),eq(s.studyGroupReports.postId,data.postId),eq(s.studyGroupReports.reporterPersonId,actor.actorPersonId!),eq(s.studyGroupReports.status,"open"))).limit(1);
  if(existing)return {ok:true,created:false};
  const [createdReport]=await tx.insert(s.studyGroupReports).values({groupId:data.groupId,postId:data.postId,reporterPersonId:actor.actorPersonId!,reason:data.reason.trim()}).returning({id:s.studyGroupReports.id});
- const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),eq(s.studyGroups.status,"active"))).limit(1);
+ const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title,siteId:s.studyGroups.siteId}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),eq(s.studyGroups.status,"active"))).limit(1);
  if(!group)throw new Error("Group unavailable");
  await tx.insert(s.actions).values({type:"study_group_moderation",status:"open",
   priority:"high",title:"Review reported content: "+group.title,
   description:"A student report requires a moderator decision.",
-  ownerPersonId:group.facilitatorPersonId,siteId:actor.sites[0],
+  ownerPersonId:group.facilitatorPersonId,siteId:group.siteId,
   subjectType:"study_group_report",subjectId:createdReport!.id,
   dueAt:new Date(Date.now()+24*60*60*1000),
   metadata:{synthetic:true,fixture:"gf26",groupId:data.groupId,postId:data.postId,reportId:createdReport!.id},
