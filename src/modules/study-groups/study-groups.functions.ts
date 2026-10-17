@@ -112,8 +112,7 @@ export const createStudyGroup=createServerFn({method:"POST"})
   if(!group)throw new Error("Group creation failed");
   return {id:group.id};
  });
-export const requestStudyGroupMembership=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
- assertSyntheticMutation("student");const actor=await groupActor("student");const {db,s}=await context();
+export const requestStudyGroupMembership=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().uuid()}).parse).handler(async({data})=>{const actor=await groupActor("student");const {db,s}=await context();
  return db.transaction(async tx=>{
  const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).for("update").limit(1);
  if(!group)throw new Error("Group unavailable");
@@ -128,16 +127,31 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
    eq(s.guardianRelationships.studentPersonId,actor.actorPersonId!),
    eq(s.guardianRelationships.canManageEnrollment,true)));
  for(const guardian of guardians){
-  const consentRecords=await tx.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions)
-   .where(and(eq(s.actions.ownerPersonId,guardian.personId),
+  const consentRecords=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata})
+   .from(s.actions).where(and(eq(s.actions.ownerPersonId,guardian.personId),
     eq(s.actions.type,"study_group_consent"),eq(s.actions.subjectId,group.id)));
-  if(consentRecords.some(a=>a.metadata.studentPersonId===actor.actorPersonId))continue;
+  const prior=consentRecords.find(a=>a.metadata.studentPersonId===actor.actorPersonId);
+  if(prior){
+   // A prior approval is not consent to a new request after leave or decline.
+   await tx.update(s.actions).set({status:"open",resolvedAt:null,
+    resolutionNote:null,updatedAt:new Date(),
+    metadata:{...prior.metadata,decision:null}
+   }).where(eq(s.actions.id,prior.id));
+   await tx.insert(s.notifications).values({
+    recipientPersonId:guardian.personId,type:"study_group_consent_requested",
+    status:"unread",title:"Study group permission requested",
+    body:"Review a new request to join "+group.title,
+    resourceType:"action",resourceId:prior.id,
+   });
+   continue;
+  }
   const [consent]=await tx.insert(s.actions).values({
    type:"study_group_consent",status:"open",priority:"normal",
    title:"Approve study group participation: "+group.title,
    ownerPersonId:guardian.personId,siteId:group.siteId,
    subjectType:"study_group",subjectId:group.id,
-   metadata:{studentPersonId:actor.actorPersonId!,groupId:group.id,synthetic:true},
+   programId:group.programId,
+   metadata:{studentPersonId:actor.actorPersonId!,groupId:group.id},
   }).returning({id:s.actions.id});
   await tx.insert(s.notifications).values({
    recipientPersonId:guardian.personId,type:"study_group_consent_requested",status:"unread",
@@ -146,7 +160,7 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
   });
  }
  await tx.insert(s.notifications).values({recipientPersonId:group.facilitatorPersonId,type:"study_group_membership_request",status:"unread",title:"Study group membership request",body:"A student has requested to join "+group.title+".",resourceType:"study_group",resourceId:group.id});
- await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"study_group.membership.request",resourceType:"study_group",resourceId:group.id,after:{personId:actor.actorPersonId!,status:"pending"},context:{synthetic:true}});
+ await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"study_group.membership.request",resourceType:"study_group",resourceId:group.id,after:{personId:actor.actorPersonId!,status:"pending"},context:{accountId:actor.accountId,sessionId:actor.sessionId}});
  return {ok:true};
  });
 });
