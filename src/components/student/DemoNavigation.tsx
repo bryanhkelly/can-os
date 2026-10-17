@@ -1,15 +1,11 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { openPaletteEvent } from "@/lib/workspace-search";
 
-/**
- * Demo personas are presentation/workflow selectors, NOT authenticated identities.
- * Never rely on this browser value for server-side authorization.
- */
+/** The verified server grant determines all navigable workspaces. */
 export const demoRoles = ["student", "teacher", "guardian", "registrar", "specialist"] as const;
 export type DemoPersona = typeof demoRoles[number];
-export const demoPersonaStorageKey = "can-os-demo-persona";
 export const demoPersonaHome: Record<DemoPersona, string> = {
  student: "/student",
  teacher: "/teacher",
@@ -64,13 +60,6 @@ export function DemoNavigation(){
  const [memberships,setMemberships]=useState<Array<{id:string;role:string;firstName:string;lastName:string}>>([]);
  const [signedIn,setSignedIn]=useState(false);
 
- const location=useLocation();
- useEffect(()=>{
-  // Once signed in, the verified server grant—not URL or localStorage—owns navigation.
-  if(signedIn)return;
-  // The visible workspace is never selected from URL or localStorage.
-  // Server-issued grants are the only source of workspace navigation.
- },[location.pathname,signedIn]);
  useEffect(()=>{let canceled=false;fetch("/access/session",{credentials:"same-origin"})
   .then(async response=>response.ok?response.json():null)
   .then(data=>{if(canceled||!data?.authenticated)return;
@@ -103,8 +92,8 @@ export function DemoNavigation(){
    <button type="button" aria-label="Search workspace" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))} className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
     <Search className="size-3.5" aria-hidden/> Search <kbd className="rounded border border-border px-1 text-[10px]">Ctrl+K</kbd>
    </button>
-   {signedIn&&<label className="flex items-center gap-2 text-xs text-muted-foreground">{signedIn?"Active membership":"Demo persona"}
-    <select aria-label="Demo persona" value={role} onChange={event=>changePersona(getDemoPersona(event.target.value))} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
+   {signedIn&&<label className="flex items-center gap-2 text-xs text-muted-foreground">Active membership
+    <select aria-label="Active membership" value={role} onChange={event=>changePersona(getDemoPersona(event.target.value))} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
      {demoRoles.filter(r=>memberships.some(g=>g.role===r)).map(r=><option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>)}
     </select>
    </label>}
