@@ -43,6 +43,7 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
     eq(s.enrollments.kind, "section"),
     eq(s.enrollments.status, "active"),
     inArray(s.sections.siteId, context.scope.siteIds),
+    inArray(s.sections.programId, context.scope.programIds??[]),
    ));
   const sectionIds = active.map(row => row.sectionId).filter((id): id is string => !!id);
   if (!sectionIds.length) return { assignments: [] };
@@ -109,6 +110,7 @@ export const getGuardianStudents = createServerFn({ method: "GET" }).handler(asy
    inArray(s.enrollments.kind, ["program", "school_year", "section"]),
    eq(s.enrollments.status, "active"),
    inArray(s.programs.siteId, context.scope.siteIds),
+   inArray(s.programs.id, context.scope.programIds??[]),
   ));
  return { students: Array.from(new Map(rows.map(row => [row.studentPersonId, row])).values()) };
 });
