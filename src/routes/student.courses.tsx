@@ -54,7 +54,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
       <p className="mt-2 text-xs text-muted-foreground">{s.credits} credit(s) · {enrolled?"Enrolled":s.enrollmentStatus==="withdrawn"?"Previously withdrawn":s.enrollmentStatus==="cancelled"?"Previously dropped":"Available"}</p>
       <p className="mt-1 text-xs text-muted-foreground">Add/drop deadline: {s.policy.addDropEndsOn} · Withdrawal deadline: {s.policy.withdrawalEndsOn}</p>
       {s.policy.prerequisites.length>0&&<p className="mt-1 text-xs text-muted-foreground">Prerequisites: {s.policy.prerequisites.join(", ")}</p>}
-      {s.policy.guardianApprovalRequired&&<p className="mt-1 text-xs text-amber-700">This class requires guardian consent; requests are paused until the school enables a verified consent process.</p>}
+      {s.policy.guardianApprovalRequired&&<p className="mt-1 text-xs text-amber-700">This class requires guardian permission. Your guardian can review the request under Family → Study group permissions → Course approvals.</p>}
       {s.withdrawalNotation&&<p className="mt-1 text-xs font-semibold">Transcript notation: {String(s.withdrawalNotation)}</p>}
      </div>
      {role==="registrar"?<span className="rounded-lg border border-border px-3 py-2 text-xs font-semibold">Decision mode below</span>:
@@ -63,7 +63,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
        {today<=s.policy.addDropEndsOn&&<button disabled={busy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"drop"}}),"Drop request sent to the registrar.")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">Request drop</button>}
        {today<=s.policy.withdrawalEndsOn&&<button disabled={busy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"withdraw"}}),"Withdrawal request sent for review.")} className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">Request withdrawal</button>}
        {today>s.policy.withdrawalEndsOn&&<span className="text-xs text-muted-foreground">Change period closed</span>}
-      </>:s.policy.guardianApprovalRequired?<span className="text-xs text-amber-700">Awaiting guardian consent workflow</span>:today<=s.policy.addDropEndsOn?<button disabled={busy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"add"}}),"Course request sent to the registrar.")} className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">Request class</button>:<span className="text-xs text-muted-foreground">Registration closed</span>
+      </>:today<=s.policy.addDropEndsOn?<button disabled={busy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"add"}}),"Course request sent to the registrar.")} className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">{s.policy.guardianApprovalRequired?"Request guardian approval":"Request class"}</button>:<span className="text-xs text-muted-foreground">Registration closed</span>
      </div>}
     </div>
    </article>;
