@@ -45,6 +45,21 @@
 
 **Important release constraints:** K–12 groups currently require an enrollment-authorized guardian for every student, and every such guardian must consent. Schools must review custody, age-of-majority and consent policy before use. Legacy group sessions without a canonical calendar source are treated as unavailable for RSVP/cancellation in this new surface. Phase 1's calendar intentionally excludes study-group events from broad feeds to prevent leaking restricted groups; a membership-aware calendar read must be added before claiming shared calendar integration. No CI, tests, typecheck, browser acceptance or DB migrations have been run.
 
+## Implemented slice — field-trip proposal, calendar, invitations and guardian permission
+
+- The new registrar-only `/operations/field-trips` route and `src/modules/field-trips/field-trip-operations.functions.ts` implement school-scoped proposals, approval, canonical `calendar_events`, verified active-enrollment invitation selection, guardian notifications, and participant permission status. Every state mutation writes an audit and domain event in the same transaction.
+- Each trip must have school-authored, versioned permission language in its canonical `field_trips.metadata`. The policy parser in `src/modules/field-trips/permission-policy.ts` refuses missing or malformed terms; a signed statement cannot be manufactured by a browser-provided version or fixture.
+- The new `/guardian/field-trips` route and `src/modules/field-trips/guardian-permissions.functions.ts` expose only invitations for guardian-linked children with active program enrollment at an authorized school. They show the exact school statement and the trip's date, permission deadline and fees. Guardian signatures require an explicit acknowledgement, an unexpired invitation, the authenticated guardian with `canManageEnrollment`, and current enrollment. The handler locks the trip and participant before writing a linked `consent_records` signature and participant state, then audits and emits `FieldTripPermissionSigned`.
+- Paid-trip invitations create `financial_obligations` for a unique verified household containing the student and an enrollment-authorized guardian. Ambiguous/missing household associations block the invitation rather than billing an arbitrary household. Signing permission does **not** settle an obligation; the finance team remains responsible for collection/refunds/assistance.
+- All existing field trip schema and calendars are reused; no migration, synthetic fixture dependency, or changes to Phase 1/Phase 2 domain services. Older trips without valid permission language are read-only until appropriately migrated through a reviewed school policy procedure.
+- Phase 3-owned registrar and guardian permission routes are cross-linked. Family-home and Operations workspace shortcut/navigation consolidation requires coordinated Phase 1/2 integration.
+- **Open gates:** legal review of school permission language, guardian authority/custody handling, fee obligations/payments/reconciliation, field-trip roster operations and chaperone-sensitive access acceptance, cross-role typecheck/CI/browser verification. No tests or CI were run.
+
+## Coordination — Phase 1-owned guardian route
+
+- The new canonical `/guardian/group-permissions` owns the authenticated group-consent workflow. The existing Phase 1 `/guardian/study-group-consent` source has been restored to Phase 1's current version on this branch to avoid changing its implementation contract before route/nav handoff. Until Phase 1 navigation is coordinated, both URLs exist and the old route remains behind its inherited demo-specific write gates.
+- Avoid declaring study-group screen unification complete merely because the new route works. Phase 1 must ultimately point the Family Home shortcut to the canonical screen and retire the old behavior after acceptance; this branch cannot safely own its source.
+
 ## Known remaining gaps / not release-ready
 
 1. Guardian course-add decision path and configurable policy control are implemented, but the format and legal sufficiency of guardian consent evidence require school/legal review before deployment. The current flow intentionally requires one approval and no active declines; multi-guardian and custody-specific policies may demand stronger rules.
@@ -55,6 +70,7 @@
 6. CI/build/typecheck/integration/browser testing have deliberately **not** run. Guardian/registrar workflow, group moderation/capacity, Action locking, consent ordering and real cross-persona permissions remain unverified; this PR is implementation evidence, not production certification.
 7. Retire the Phase 1 demo-gated study-group mutation handlers and reconcile the existing /student/study-groups and /teacher/study-groups screens only after Phase 1's route contracts stabilize. Do not expose two competing live write lifecycles to production students. Add the /groups link to the authorized teacher nav when coordinated.
 8. Moderation escalation SLA, safeguarding oversight for abuse reports, session calendar membership visibility, and legal guardian-consent rules require security and school-policy review before enabling real student data.
+9. Conference cancellation/reopening remains intentionally blocked: `conference_slot_booking_uq` only allows one historical booking per slot and `conference_booking_status` has no cancelled state. A safe release-and-rebook lifecycle requires a separately reviewed schema/data migration and coordination with Phase 1's appointment read/write module.
 
 ## Integration sequence
 
