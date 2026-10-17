@@ -5,10 +5,10 @@ import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
  * workflows remain separately gated. */
 import {createServerFn} from "@tanstack/react-start";
 import {z} from "zod";
-import {and,eq,inArray} from "drizzle-orm";
+import {and,eq,inArray,lt} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,admissionOffers,admissionSeatPools,guardianRelationships,studentProfiles,schoolYears} from "@/db/schema";
-import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment} from "./admissions-offer-service";
+import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment,expireSyntheticAdmissionOffers} from "./admissions-offer-service";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
@@ -82,3 +82,22 @@ export const activateSyntheticOfferFromDemo=createServerFn({method:"POST"})
  assertRecordWriteAllowed(app.metadata,"registrar");
  return {enrollmentId:await activateSyntheticOfferedEnrollment(actor,offer.id)};
 });
+
+/**
+ * Reconcile elapsed offers on demand; pool-level locking, domain events and
+ * audit history remain owned by the canonical service. No synthetic metadata
+ * influences which offers expire.
+ */
+export const reconcileExpiredAdmissionOffers=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({programId:z.string().uuid()}).parse(value))
+ .handler(async({data})=>{
+  const actor=await authorizedActor("registrar","enrollment.decide",data.programId);
+  const outdated=await db.select({schoolYearId:admissionOffers.schoolYearId})
+   .from(admissionOffers).where(and(eq(admissionOffers.programId,data.programId),
+    eq(admissionOffers.status,"issued"),lt(admissionOffers.expiresAt,new Date())));
+  let expired=0;
+  for(const schoolYearId of new Set(outdated.map(o=>o.schoolYearId))){
+   expired+=await expireSyntheticAdmissionOffers(actor,{programId:data.programId,schoolYearId});
+  }
+  return {expired};
+ });
