@@ -11,7 +11,7 @@ import {instantiateJourneyFromDefinition} from "@/modules/journeys/instantiate";
 import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 const uuid=z.string().uuid();
 const applicant=z.object({
- programId:uuid, studentFirstName:z.string().trim().min(1).max(100),
+ requestId:uuid,programId:uuid, studentFirstName:z.string().trim().min(1).max(100),
  studentLastName:z.string().trim().min(1).max(100),gradeLevel:z.string().trim().max(10).optional(),
  guardianFirstName:z.string().trim().min(1).max(100),guardianLastName:z.string().trim().min(1).max(100),
  guardianEmail:z.string().trim().email(),source:z.string().trim().max(80).default("school_direct"),
@@ -55,6 +55,13 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
    .where(eq(programs.id,data.programId)).limit(1);
   if(!program||!actor.scope.organizationIds?.includes(program.organizationId))throw new AuthorizationError("admissions organization");
   return db.transaction(async tx=>{
+   const idempotencyKey="registrar-inquiry:"+data.requestId;
+   const [repeat]=await tx.select({id:applications.id,programId:applications.programId})
+    .from(applications).where(eq(applications.idempotencyKey,idempotencyKey)).limit(1);
+   if(repeat){
+    if(repeat.programId!==data.programId)throw new Error("Inquiry request key reused for another program");
+    return {applicationId:repeat.id};
+   }
    // A prospective guardian has a Person and relationship, but no account grant.
    // Being listed as the contact does not authenticate anyone as that person.
    const [guardian]=await tx.insert(people).values({
@@ -79,7 +86,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
    const [application]=await tx.insert(applications).values({
     householdId:household!.id,studentProfileId:student!.id,programId:data.programId,
     submittedByPersonId:actor.actorPersonId!,stage:"inquiry",
-    idempotencyKey:"registrar-inquiry:"+crypto.randomUUID(),
+    idempotencyKey,
     metadata:{synthetic:true,source:data.source,notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardian!.id},
    }).returning({id:applications.id});
    await tx.insert(domainEvents).values({eventType:"AdmissionsInquiryCreated",aggregateType:"application",
