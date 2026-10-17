@@ -10,6 +10,7 @@ import {
   getInstructorCapacity,
   releaseInstructionalCapacity,
   reserveInstructionalCapacity,
+  replaceCommittedCapacity,
   upsertSectionCapacityDemand,
 } from "./educational-capacity-service";
 
@@ -99,3 +100,7 @@ export const releaseCapacity = createServerFn({ method: "POST" })
 export const getPersonCapacity = createServerFn({ method: "GET" })
   .validator((v: unknown) => z.object({ personId: uuid }).parse(v))
   .handler(async ({ data }) => getInstructorCapacity(await getCommandContext(getRequest()), data.personId));
+
+export const swapCommittedInstructor=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({reservationId:uuid,replacementOfferingId:uuid,reason:z.string().trim().min(5).max(1000)}).parse(v))
+ .handler(async({data})=>replaceCommittedCapacity(await getCommandContext(getRequest()),data));
