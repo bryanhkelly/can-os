@@ -22,12 +22,13 @@
 
 - Canonical admissions offer issuance/response/activation keeps **verified registrar/guardian grants, guardian-to-student relationship checks, the site/program/year seat-pool lock, journey readiness, idempotency, notifications, domain events and audit**. The existing fixture-only write opt-in remains intact; authentic records are already eligible under the same domain rules.
 - Issuance requires a school year at the program's host site (shared site year or explicit program year). Site-less virtual programs may use an explicitly program-scoped year; no unrelated site-wide year can be borrowed.
-- Input validators on existing offer server functions now require UUIDs and a typed decision. Existing Phase 1 callers retain the legacy export names; these are compatibility aliases for the same authorized lifecycle.
-- Reconciliation of elapsed issued offers is now a registrar-authorized action in Connected Workflows. It processes only elapsed offers, locks each relevant pool, and writes `AdmissionOfferExpired` plus audit in the transaction. Issued offers whose expiration has elapsed no longer count as actionable.
+- Existing Phase 1 offer server functions are preserved unchanged to avoid an overlapping draft-PR change. A new Phase 2 server function validates UUID input and invokes the canonical pool-locked expiration service.
+- Reconciliation of elapsed issued offers is now a registrar-authorized action in Connected Workflows via `admission-offer-reconciliation.functions.ts`. It processes only elapsed offers, locks each relevant pool, and writes `AdmissionOfferExpired` plus audit in the transaction. Issued offers whose expiration has elapsed no longer count as actionable.
 - A real registrar intake inquiry now marks its StudentProfile as authentic, rather than contradicting the authentic Person/Application provenance. Newly provisioned guardian grants likewise no longer identify as synthetic.
 - Guardian login provisioning now requires the **existing independently verified guardian/student relationship** with enrollment permission. The invitation path independently checks the verification and a role grant for the correct organization and compatible site.
 - Admissions intake presents verification → account provisioning → secure invitation in that order, and disables steps until the prior verified condition exists. A staff-entered email is never taken as proof of guardianship.
 - All changes use the existing schema and audited domain commands. Restricted enrollment documents still require their separate R2 controls; this work does not bypass upload review or create an alternative identity path.
+- Phase 1 PR #120 advanced after this branch was created. The changed file `admissions-offer-demo.functions.ts` was restored to the latest Phase 1 version, and Phase 2 reconciliation moved to its own module to eliminate direct file overlap. Reconcile/advance the stacked base before eventual merge; neither PR has been merged.
 
 ## Scope limitations and follow-ups
 
