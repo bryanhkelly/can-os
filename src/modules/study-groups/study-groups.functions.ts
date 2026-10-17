@@ -269,7 +269,7 @@ export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.obje
  const actor=await groupActor("student");
  const {db,s}=await context();
  const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt,legacySessionWrites:sql<boolean>`coalesce(${s.studyGroups.metadata}->>\'synthetic\',\'false\') = \'true\'`}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).limit(1);
- if(!group)throw new Error("Group unavailable");
+ if(!group||group.status!=="active")throw new AuthorizationError("active study group required");
  await requireStudentGroupEnrollment(db,s,actor,group);
  const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  const permitted=canAccessGroup((membership?.status??null) as "pending"|"approved"|"declined"|"left"|null,"student");
@@ -452,9 +452,21 @@ export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(as
 });
 export const listStudyGroupReports=createServerFn({method:"GET"}).handler(async()=>{const actor=await groupActor("teacher");
  const {db,s}=await context();
- return db.select({id:s.studyGroupReports.id,groupId:s.studyGroupReports.groupId,reason:s.studyGroupReports.reason,status:s.studyGroupReports.status,postId:s.studyGroupReports.postId})
- .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
- .where(eq(s.studyGroupReports.status,"open")).limit(100);
+ return db.select({
+  id:s.studyGroupReports.id,groupId:s.studyGroupReports.groupId,
+  groupTitle:s.studyGroups.title,
+  reason:s.studyGroupReports.reason,status:s.studyGroupReports.status,
+  postId:s.studyGroupReports.postId,postBody:s.studyGroupPosts.body,
+  postHidden:s.studyGroupPosts.hidden
+ }).from(s.studyGroupReports)
+ .innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),
+   eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),
+   inArray(s.studyGroups.siteId,actor.sites),
+   or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
+ .leftJoin(s.studyGroupPosts,and(eq(s.studyGroupPosts.id,s.studyGroupReports.postId),
+   eq(s.studyGroupPosts.groupId,s.studyGroups.id)))
+ .where(eq(s.studyGroupReports.status,"open"))
+ .orderBy(desc(s.studyGroupReports.createdAt)).limit(100);
 });
 /** The assigned group facilitator reviews, hides, and closes reported content. */
 export const resolveStudyGroupReport=createServerFn({method:"POST"})
