@@ -159,6 +159,18 @@ export async function addSectionWaitlist(context: LifecycleContext,input:{sectio
   await db.transaction(async tx=>{
     const section=await authorizedSection(tx,context,input.sectionId);
     if(!section.active)throw new Error("Section is closed");
+    const [year]=await tx.select({schoolYearId:terms.schoolYearId}).from(terms)
+      .where(eq(terms.id,section.termId)).limit(1);
+    if(!year)throw new Error("Academic term not found");
+    const [eligible]=await tx.select({id:enrollments.id}).from(enrollments).where(and(
+      eq(enrollments.studentProfileId,input.studentProfileId),
+      eq(enrollments.programId,section.programId),eq(enrollments.schoolYearId,year.schoolYearId),
+      eq(enrollments.kind,"program"),eq(enrollments.status,"active"))).limit(1);
+    if(!eligible)throw new Error("Student must be enrolled in this program and school year");
+    const [alreadyEnrolled]=await tx.select({id:enrollments.id}).from(enrollments).where(and(
+      eq(enrollments.studentProfileId,input.studentProfileId),
+      eq(enrollments.sectionId,section.id),eq(enrollments.status,"active"))).limit(1);
+    if(alreadyEnrolled)throw new Error("Student is already enrolled in this class");
     const [existing]=await tx.select({id:actions.id}).from(actions).where(and(eq(actions.type,"section_waitlist"),
       eq(actions.sectionId,section.id),eq(actions.subjectId,input.studentProfileId),inArray(actions.status,["open","waiting"]))).limit(1);
     if(existing)return;
