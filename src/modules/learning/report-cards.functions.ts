@@ -106,6 +106,7 @@ async function finalizedGradeRows(
       sectionGradeId: s.sectionGrades.id,
       sectionId: s.sectionGrades.sectionId,
       sectionTitle: s.sections.title,
+      sectionMetadata:s.sections.metadata,
       gradingPeriodId: s.sectionGrades.gradingPeriodId,
       gradingPeriodName: s.gradingPeriods.name,
       termId: s.sectionGrades.termId,
@@ -145,6 +146,9 @@ async function finalizedGradeRows(
   return rows.map((row) => ({
     ...row,
     finalizedAt: row.finalizedAt?.toISOString() ?? null,
+    creditsAttempted:typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1,
+    creditsEarned:["A","B","C","D","P","Pass"].includes(row.letterGrade??"")?
+      (typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1):0,
   }));
 }
 
@@ -675,6 +679,7 @@ export const getStudentReportCard = createServerFn({ method: "GET" })
 async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
  const rows=await db.select({
   enrollmentId:s.enrollments.id,sectionId:s.sections.id,sectionTitle:s.sections.title,
+  sectionMetadata:s.sections.metadata,
   termId:s.terms.id,termName:s.terms.name,schoolYearId:s.schoolYears.id,
   schoolYearName:s.schoolYears.name,programName:s.programs.name,
   creditIssuingOrganizationId:s.programs.creditIssuingOrganizationId,
@@ -695,6 +700,8 @@ async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
   gradingPeriodName:"Withdrawal",termId:row.termId,termName:row.termName,
   schoolYearId:row.schoolYearId,schoolYearName:row.schoolYearName,
   letterGrade:"W",percentage:null,score:null,programName:row.programName,
+  creditsAttempted:typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1,
+  creditsEarned:0,
   creditIssuingOrganizationId:row.creditIssuingOrganizationId,
   creditIssuingOrganization:row.creditIssuingOrganization,
   finalizedAt:row.endedAt?.toISOString()??null,
