@@ -1,8 +1,7 @@
-import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
 import {activateSectionEnrollment} from "@/modules/enrollment/section-allocation.service";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { actorSiteIds, assertProgramGranted, recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
@@ -14,7 +13,7 @@ async function studentProfileFor(actor: Actor) {
  if (!profile) throw new AuthorizationError("student profile");
  return profile.id;
 }
-/** Student/guardian course registration prototype for the synthetic tenant only. */
+/** Authorized student requests and scoped registrar decisions use canonical enrollment records. */
 export const getCourseRegistration = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await requireActor(["student", "registrar"]);
   setResponseHeader("Cache-Control", "private, no-store");
@@ -34,13 +33,13 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
       .innerJoin(s.courseTemplates,eq(s.courseTemplates.id,s.courseTemplateVersions.courseTemplateId))
       .where(and(inArray(s.sections.siteId,sites),inArray(s.sections.programId,programIds),eq(s.sections.active,true))),
     studentId ? db.select({ id:s.enrollments.id, sectionId:s.enrollments.sectionId, status:s.enrollments.status, metadata:s.enrollments.metadata })
-      .from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.kind,"section"),inArray(s.enrollments.programId,programIds))) : Promise.resolve([]),
+      .from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.kind,"section"),inArray(s.enrollments.programId,programIds))).orderBy(desc(s.enrollments.createdAt)) : Promise.resolve([]),
     db.select({ id:s.actions.id, title:s.actions.title, status:s.actions.status, subjectId:s.actions.subjectId, metadata:s.actions.metadata })
       .from(s.actions).where(and(eq(s.actions.type,"course_registration_request"),inArray(s.actions.programId,programIds),
         viewerRole === "student" ? eq(s.actions.ownerPersonId,actor.actorPersonId) : inArray(s.actions.siteId,sites))),
   ]);
   const latest = new Map<string,(typeof memberships)[number]>();
-  for (const membership of memberships) if (membership.sectionId) latest.set(membership.sectionId,membership);
+  for (const membership of memberships) if (membership.sectionId && !latest.has(membership.sectionId)) latest.set(membership.sectionId,membership);
   const sectionsWithPolicy=await Promise.all(catalog.map(async course=>{
     const policy=await getSectionRegistrationPolicy(course.id);
     return {
@@ -76,7 +75,6 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         .where(and(eq(s.sections.id,data.sectionId),inArray(s.sections.siteId,sites),eq(s.sections.active,true))).limit(1);
       if(!section) throw new Error("Section not offered at this Site");
       assertProgramGranted(actor,section.programId);
-      assertRecordWriteAllowed(section.metadata,"student");
       const [programMembership]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
        .where(and(eq(s.enrollments.studentProfileId,studentId),
         eq(s.enrollments.programId,section.programId),
@@ -100,10 +98,11 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         title:`${data.operation==="add"?"Add":data.operation==="drop"?"Drop":"Withdraw from"} ${section.title}`,
         description:data.operation==="withdraw"?"Withdrawal requires review of transcript consequences.":"Requested by the student.",
         ownerPersonId:actor.actorPersonId,organizationId:section.organizationId,siteId:section.siteId,programId:section.programId,subjectType:"section",subjectId:section.id,
-        metadata:{synthetic:false,fixture:"gf40",operation:data.operation,studentProfileId:studentId,schoolYearId:section.schoolYearId,enrollmentId:membership?.id??null},
+        metadata:{operation:data.operation,studentProfileId:studentId,schoolYearId:section.schoolYearId,enrollmentId:membership?.id??null,requestOrigin:"student"},
       }).returning({id:s.actions.id});
       if(!request)throw new Error("Unable to create course request");
       await recordAudit(tx,actor,{action:"course_registration.request",resourceType:"action",resourceId:request.id,after:{operation:data.operation,sectionId:section.id},scope:{programId:section.programId,siteId:section.siteId}});
+      await tx.insert(s.domainEvents).values({eventType:"CourseRegistrationRequested",aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId:studentId,sectionId:section.id,programId:section.programId,operation:data.operation}});
       return {requestId:request.id};
     });
   });
@@ -119,19 +118,34 @@ export const decideCourseChange = createServerFn({method:"POST"})
       const [request]=await tx.select().from(s.actions).where(and(
         eq(s.actions.id,data.requestId),eq(s.actions.type,"course_registration_request"),
         eq(s.actions.status,"open"))).limit(1).for("update");
-      if(!request||request.metadata.fixture!=="gf40")throw new Error("Pending synthetic request not found");
+      if(!request)throw new Error("Pending course request not found");
+      if(!request.ownerPersonId||!request.organizationId||!request.siteId||!request.programId||
+         request.subjectType!=="section"||!request.subjectId)throw new Error("Invalid course request context");
       assertProgramGranted(actor,request.programId);
-      assertRecordWriteAllowed(request.metadata,"registrar");
-      if(!request.siteId||!sites.includes(request.siteId))throw new AuthorizationError("site scope");
-      const studentProfileId=String(request.metadata.studentProfileId??"");
-      const schoolYearId=String(request.metadata.schoolYearId??"");
-      const programId=request.programId!,organizationId=request.organizationId!,siteId=request.siteId;
+      if(!sites.includes(request.siteId)||!actor.scope.organizationIds?.includes(request.organizationId))
+        throw new AuthorizationError("course request site/organization scope");
+      const studentProfileId=typeof request.metadata.studentProfileId==="string"?request.metadata.studentProfileId:"";
+      const schoolYearId=typeof request.metadata.schoolYearId==="string"?request.metadata.schoolYearId:"";
+      const programId=request.programId,organizationId=request.organizationId,siteId=request.siteId;
       const operation=request.metadata.operation;
       const sectionId=request.subjectId;
-      if(!studentProfileId||!sectionId||!["add","drop","withdraw"].includes(String(operation)))throw new Error("Invalid request");
+      if(!studentProfileId||!schoolYearId||!["add","drop","withdraw"].includes(String(operation)))
+        throw new Error("Invalid course request payload");
+      // An Action is not enrollment authority: revalidate its student owner and
+      // academic scope before acting on metadata, including older fixture requests.
+      const [requestStudent]=await tx.select({personId:s.studentProfiles.personId})
+        .from(s.studentProfiles).where(eq(s.studentProfiles.id,studentProfileId)).limit(1);
+      if(!requestStudent||requestStudent.personId!==request.ownerPersonId)
+        throw new AuthorizationError("course request student ownership");
       if(data.approve){
-        const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata,termId:s.sections.termId,title:s.sections.title,termStartsOn:s.terms.startsOn,termEndsOn:s.terms.endsOn}).from(s.sections).innerJoin(s.terms,eq(s.terms.id,s.sections.termId)).where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,siteId),eq(s.sections.programId,programId),eq(s.sections.active,true))).limit(1).for("update");
-        if(!section)throw new Error("Section unavailable");
+        const [section]=await tx.select({id:s.sections.id,termId:s.sections.termId,title:s.sections.title,
+          schoolYearId:s.terms.schoolYearId,organizationId:s.programs.organizationId})
+          .from(s.sections).innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+          .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+          .where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,siteId),
+            eq(s.sections.programId,programId),eq(s.sections.active,true))).limit(1).for("update");
+        if(!section||section.schoolYearId!==schoolYearId||section.organizationId!==organizationId)
+          throw new Error("Course request no longer matches its school, program and academic year");
         const [activeProgram]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
          .where(and(eq(s.enrollments.studentProfileId,studentProfileId),
           eq(s.enrollments.programId,programId),eq(s.enrollments.schoolYearId,schoolYearId),
@@ -139,16 +153,18 @@ export const decideCourseChange = createServerFn({method:"POST"})
         if(!activeProgram)throw new Error("Student program enrollment is no longer active");
         const policyAtApproval=await getSectionRegistrationPolicy(section.id,tx);
         const today=new Date().toISOString().slice(0,10);
+        if(operation==="add" && policyAtApproval.guardianApprovalRequired)
+          throw new Error("This class requires guardian approval. Approval cannot proceed until guardian consent has been recorded.");
         if(operation==="add" && today>policyAtApproval.addDropEndsOn)throw new Error("Registration window closed before approval");
         if(operation==="drop" && today>policyAtApproval.addDropEndsOn)throw new Error("Drop deadline passed; submit withdrawal request");
         if(operation==="withdraw" && today>policyAtApproval.withdrawalEndsOn)throw new Error("Withdrawal deadline passed");
         if(operation==="add"){
-          await activateSectionEnrollment(tx,{studentProfileId,sectionId,actor,source:"gf40",requestId:request.id});
+          await activateSectionEnrollment(tx,{studentProfileId,sectionId,actor,source:"course_registration",requestId:request.id});
         } else {
-          const [membership]=await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active"))).limit(1);
+          const [membership]=await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"))).limit(1);
           if(!membership)throw new Error("Enrollment no longer active");
           await tx.update(s.enrollments).set({status:operation==="drop"?"cancelled":"withdrawn",endedAt:new Date(),updatedAt:new Date(),
-            metadata:{...membership.metadata,synthetic:true,withdrawalNotation:operation==="withdraw"?"W":null,changeRequestId:request.id}
+            metadata:{...membership.metadata,withdrawalNotation:operation==="withdraw"?"W":null,changeRequestId:request.id}
           }).where(eq(s.enrollments.id,membership.id));
           await tx.insert(s.domainEvents).values({eventType:operation==="drop"?"SectionEnrollmentDropped":"SectionEnrollmentWithdrawn",
             aggregateType:"enrollment",aggregateId:membership.id,actorPersonId:actor.actorPersonId,
@@ -180,6 +196,7 @@ export const decideCourseChange = createServerFn({method:"POST"})
        }
       }
       await recordAudit(tx,actor,{action:data.approve?"course_registration.approve":"course_registration.decline",resourceType:"action",resourceId:request.id,before:{status:"open"},after:{status:data.approve?"resolved":"cancelled",operation:String(operation)},scope:{programId,siteId}});
+      await tx.insert(s.domainEvents).values({eventType:"CourseRegistrationDecided",aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId,sectionId,programId,operation,approved:data.approve}});
       return {approved:data.approve};
     });
   });
