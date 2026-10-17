@@ -6,7 +6,7 @@ import { assertCapability, AuthorizationError, type CommandContext } from "@/dom
 /** Live operational exceptions, not demo/synthetic fixture rows. */
 export async function getSchoolOperationsCommandCenter(context: CommandContext & { role?: string }) {
   assertCapability(context,"program.launch.start");
-  if(context.role!=="registrar"||!context.scope.organizationIds?.length)throw new AuthorizationError("operations membership");
+  if(!context.scope.organizationIds?.length)throw new AuthorizationError("operations membership");
   const accessible=await db.select({id:sections.id,title:sections.title,programId:sections.programId,siteId:sections.siteId,active:sections.active})
     .from(sections).innerJoin(programs,eq(programs.id,sections.programId))
     .where(and(inArray(programs.organizationId,context.scope.organizationIds),
