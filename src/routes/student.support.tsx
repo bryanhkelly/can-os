@@ -64,7 +64,7 @@ function SupportView({referrals}:{referrals:Awaited<ReturnType<typeof loadSuppor
   finally{setBusy(false);}
  }
  const next=chosen?stages[stages.indexOf(chosen.stage as typeof stages[number])+1]:undefined;
- if(!role&& !error)return <main className="mx-auto max-w-6xl px-5 py-10" role="status">Loading authorized support workspace…</main>;
+ if(!role)return <main className="mx-auto max-w-6xl px-5 py-10" role={error?"alert":"status"}>{error||"Loading authorized support workspace…"}</main>;
  return <main className="mx-auto max-w-6xl px-5 pb-24 pt-9">
   <Link to={role==="teacher"?"/teacher":"/coach"} className="text-xs font-semibold text-muted-foreground hover:underline">← Workspace home</Link>
   <p className="mt-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · GF41 · SYNTHETIC DEVELOPMENT WORKSPACE</p>
