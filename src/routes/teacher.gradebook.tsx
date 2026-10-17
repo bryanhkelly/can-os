@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
  createAssessment,
+ manageAssessment,
+ returnSubmissionForRevision,
  getGradebook,
  getGradebookSections,
  gradeSubmission,
@@ -32,6 +34,7 @@ function TeacherGradebookPage() {
  const [title, setTitle] = useState("");
  const [points, setPoints] = useState("");
  const [due, setDue] = useState("");
+ const [assessmentDueDates,setAssessmentDueDates]=useState<Record<string,string>>({});
 
  useEffect(() => {
   let active = true;
@@ -163,6 +166,33 @@ function TeacherGradebookPage() {
    setBusy(false);
   }
  };
+
+ async function changeAssessment(id:string,action:"publish"|"close"|"reopen"|"reschedule"){
+  const date=assessmentDueDates[id];
+  if((action==="publish"||action==="reschedule")&&!date){
+   setNotice("Select a future due date first.");return;
+  }
+  setBusy(true);setNotice("");
+  try{
+   const result=await manageAssessment({data:{
+    assessmentId:id,action,
+    ...(date?{dueAt:new Date(date+"T23:59:00").toISOString()}:{})
+   }});
+   setNotice("Assessment "+result.status+".");
+   if(selected)await loadGradebook(selected);
+  }catch(cause){setNotice(cause instanceof Error?cause.message:"Unable to update assessment");}
+  finally{setBusy(false);}
+ }
+ async function returnForRevision(submissionId:string){
+  setBusy(true);setNotice("");
+  try{
+   await returnSubmissionForRevision({data:{submissionId}});
+   setNotice("Assignment returned to student for revision.");
+   setDetailKey("");
+   if(selected)await loadGradebook(selected);
+  }catch(cause){setNotice(cause instanceof Error?cause.message:"Unable to return assignment");}
+  finally{setBusy(false);}
+ }
 
  const cellLabel = (cell: Cell | undefined, assessment: Assessment) => {
   if (!cell) return { text: "—", tone: "text-muted-foreground" };
