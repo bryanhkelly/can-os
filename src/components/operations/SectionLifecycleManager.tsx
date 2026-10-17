@@ -1,11 +1,27 @@
-import {useState} from "react";
+import {useEffect,useState} from "react";
 import {useRouter} from "@tanstack/react-router";
 import {
  getSectionLifecycle,setSectionLifecycleState,updateSectionLifecycleSchedule,replaceLifecycleTeacher,
  transitionLifecycleEnrollment,queueLifecycleWaitlist,resolveLifecycleWaitlist
 } from "@/modules/programs/section-lifecycle.functions";
 type Snapshot=Awaited<ReturnType<typeof getSectionLifecycle>>;
-export function SectionLifecycleManager({sections,staff}:{sections:Snapshot;staff:{personId:string;first:string;last:string}[]}){
+export function SectionLifecycleWorkspace({programId,staff}:{programId:string;staff:{personId:string;first:string;last:string}[]}){
+ const [sections,setSections]=useState<Snapshot>([]);
+ const [loading,setLoading]=useState(true);
+ const [error,setError]=useState("");
+ const reload=async()=>setSections(await getSectionLifecycle({data:{programId}}));
+ useEffect(()=>{
+  let active=true;
+  getSectionLifecycle({data:{programId}}).then(rows=>{if(active)setSections(rows)})
+   .catch(()=>{if(active)setError("Unable to load lifecycle records.")})
+   .finally(()=>{if(active)setLoading(false)});
+  return ()=>{active=false};
+ },[programId]);
+ return <div>{loading?<p className="mt-6 text-sm">Loading operational lifecycle…</p>:error?
+  <p role="alert" className="mt-6 text-sm">{error}</p>:
+  <SectionLifecycleManager sections={sections} staff={staff} onChanged={reload}/>}</div>;
+}
+export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Snapshot;staff:{personId:string;first:string;last:string}[];onChanged:()=>Promise<void>}){
  const router=useRouter();
  const [reason,setReason]=useState("");
  const [busy,setBusy]=useState("");
@@ -14,7 +30,7 @@ export function SectionLifecycleManager({sections,staff}:{sections:Snapshot;staf
  async function run(id:string,operation:()=>Promise<unknown>,success:string){
   if(reason.trim().length<5){setError("Provide an explanation (at least 5 characters) for the operational record.");return;}
   setBusy(id);setError("");setMessage("");
-  try{await operation();await router.invalidate();setMessage(success);setReason("");}
+  try{await operation();await onChanged();await router.invalidate();setMessage(success);setReason("");}
   catch(e){setError(e instanceof Error?e.message:"Lifecycle change failed");}
   finally{setBusy("");}
  }
