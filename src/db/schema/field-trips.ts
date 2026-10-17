@@ -9,6 +9,11 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import {
+  fieldTripAttendanceStatus,
+  fieldTripParticipantStatus,
+  fieldTripStatus,
+} from "./enums";
 import { people, studentProfiles } from "./identity";
 import { programs, sites } from "./organizations";
 import { calendarEvents } from "./calendar";
@@ -30,7 +35,7 @@ export const fieldTrips = pgTable(
     }),
     title: text("title").notNull(),
     destination: text("destination").notNull(),
-    status: text("status").default("proposed").notNull(),
+    status: fieldTripStatus("status").default("proposed").notNull(),
     proposedByPersonId: uuid("proposed_by_person_id")
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
@@ -62,7 +67,7 @@ export const fieldTripParticipants = pgTable(
     studentProfileId: uuid("student_profile_id")
       .notNull()
       .references(() => studentProfiles.id, { onDelete: "restrict" }),
-    status: text("status").default("invited").notNull(),
+    status: fieldTripParticipantStatus("status").default("invited").notNull(),
     consentRecordId: uuid("consent_record_id").references(() => consentRecords.id, {
       onDelete: "restrict",
     }),
@@ -111,7 +116,7 @@ export const fieldTripAttendance = pgTable(
     studentProfileId: uuid("student_profile_id")
       .notNull()
       .references(() => studentProfiles.id, { onDelete: "restrict" }),
-    status: text("status").notNull(),
+    status: fieldTripAttendanceStatus("status").notNull(),
     checkpoint: text("checkpoint").notNull(),
     recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
     recordedByPersonId: uuid("recorded_by_person_id")

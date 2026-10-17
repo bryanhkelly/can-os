@@ -3,17 +3,25 @@ import {createFileRoute,useRouter} from "@tanstack/react-router";
 import {getStudyGroupAvailability,createStudyGroup,listStudyGroupReviewQueue,listStudyGroupReports,decideStudyGroupMembership,resolveStudyGroupReport,scheduleStudyGroupSession,reviseStudyGroupSession,listStudyGroupAttendance,recordStudyGroupAttendance} from "@/modules/study-groups/study-groups.functions";
 
 import {getFacilitatorStudyGroups} from "@/modules/study-groups/facilitator-query.functions";
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+const loadFacilitatorStudyGroups=async()=>{
+ const {enabled}=await getStudyGroupAvailability();
+ if(!enabled)return {enabled,queue:[],reports:[],groups:[]};
+ const [queue,reports,groups]=await Promise.all([listStudyGroupReviewQueue(),listStudyGroupReports(),getFacilitatorStudyGroups()]);
+ return {enabled,queue,reports,groups};
+};
 export const Route=createFileRoute("/teacher/study-groups")({
- loader:async()=>{
-  const {enabled}=await getStudyGroupAvailability();
-  if(!enabled)return {enabled,queue:[],reports:[],groups:[]};
-  const [queue,reports,groups]=await Promise.all([listStudyGroupReviewQueue(),listStudyGroupReports(),getFacilitatorStudyGroups()]);
-  return {enabled,queue,reports,groups};
- },
+ loader:safeLoader(loadFacilitatorStudyGroups,{authMessage:"Sign in with an authorized teacher account to facilitate study groups."}),
  component:TeacherStudyGroups,
 });
 function TeacherStudyGroups(){
- const {enabled,queue,reports,groups}=Route.useLoaderData(),router=useRouter();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure title="Facilitate study groups" outcome={outcome}/>;
+ return <TeacherStudyGroupsView data={outcome.data}/>;
+}
+function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacilitatorStudyGroups>>}){
+ const {enabled,queue,reports,groups}=data,router=useRouter();
  const [title,setTitle]=useState(""),[description,setDescription]=useState(""),[kind,setKind]=useState<"course"|"interest">("course");
  const [error,setError]=useState(""),[busy,setBusy]=useState(false);
  const [groupId,setGroupId]=useState(""),[sessionTitle,setSessionTitle]=useState(""),[agenda,setAgenda]=useState(""),[startsAt,setStartsAt]=useState(""),[endsAt,setEndsAt]=useState("");

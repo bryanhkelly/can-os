@@ -7,6 +7,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import { calendarParticipantResponseStatus } from "./enums";
 import { people } from "./identity";
 import { organizations, programs, sites } from "./organizations";
 import { sections } from "./academics";
@@ -50,7 +51,7 @@ export const calendarEventParticipants = pgTable(
     participantType: text("participant_type").notNull(),
     participantId: uuid("participant_id").notNull(),
     role: text("role"),
-    responseStatus: text("response_status").default("none").notNull(),
+    responseStatus: calendarParticipantResponseStatus("response_status").default("none").notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

@@ -1,13 +1,21 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getCourseRegistration, requestCourseChange, decideCourseChange } from "@/modules/learning/course-registration.functions";
+import { safeLoader } from "@/lib/safe-loader";
+import { LoaderFailure } from "@/lib/loader-failure";
 
+const loadCourseRegistration=()=>getCourseRegistration();
 export const Route=createFileRoute("/student/courses")({
- loader:()=>getCourseRegistration(),
+ loader:safeLoader(loadCourseRegistration,{authMessage:"Sign in with an authorized student account to choose your classes."}),
  component:CourseRegistrationPage,
 });
 function CourseRegistrationPage(){
- const {connected,sections,requests,viewerRole:role}=Route.useLoaderData();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · GF40 · Synthetic Neon" title="Choose your classes." outcome={outcome}/>;
+ return <CourseRegistrationView data={outcome.data}/>;
+}
+function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCourseRegistration>>}){
+ const {connected,sections,requests,viewerRole:role}=data;
   const router=useRouter();
   const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  async function run(fn:()=>Promise<unknown>,message:string){

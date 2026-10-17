@@ -5,14 +5,24 @@ import { getSyntheticAdmissionOfferOptions, issueSyntheticOfferFromDemo, activat
 import { admissionsPipelineSummary } from "@/domain/admissions-pipeline";
 import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions-offer-selection";
 import { WorkspaceShell, StatCard, EmptyState } from "@/components/workspace";
+import { safeLoader } from "@/lib/safe-loader";
+import { LoaderFailure } from "@/lib/loader-failure";
+
+const loadAdmissions = async () => ({ rows: await getSyntheticAdmissionsDashboard(), options: await getSyntheticAdmissionOfferOptions() });
 
 export const Route = createFileRoute("/admissions/")({
-  loader: async () => ({ rows: await getSyntheticAdmissionsDashboard(), options: await getSyntheticAdmissionOfferOptions() }),
+  loader: safeLoader(loadAdmissions, { authMessage: "Sign in with an authorized registrar account to view the admissions command center." }),
   component: Admissions,
 });
 
 function Admissions() {
-  const { rows, options } = Route.useLoaderData();
+  const outcome = Route.useLoaderData();
+  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Synthetic admissions" title="Admissions command center" outcome={outcome} />;
+  return <AdmissionsView data={outcome.data} />;
+}
+
+function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissions>> }) {
+  const { rows, options } = data;
   const summary = admissionsPipelineSummary(rows);
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null), [error, setError] = useState(""), [notice, setNotice] = useState("");

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { roleCapabilities } from "@/domain/access-context";
-import { assertSyntheticMutation } from "@/modules/student-experience/demo-write-gate";
+import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 
 const assignableRoles = Object.keys(roleCapabilities);
 

@@ -2,17 +2,13 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   actions,
-  auditEvents,
   calendarEventParticipants,
   calendarEvents,
   conferenceBookings,
   conferenceNotes,
   conferenceSeries,
   conferenceSlots,
-  domainEvents,
   guardianRelationships,
-  notifications,
-  people,
   sites,
   studentProfiles,
 } from "@/db/schema";
@@ -22,6 +18,10 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { emitEvent, writeAudit } from "@/platform/mutation";
+import { claimAvailableSlot } from "@/platform/scheduling/booking";
+import { scheduleReminder } from "@/platform/scheduling/reminders";
+import { materializeSlots } from "@/platform/scheduling/slots";
 
 export async function createConferenceSeries(
   context: CommandContext,
@@ -61,25 +61,16 @@ export async function createConferenceSeries(
 
     if (!series) throw new Error("Failed to create Conference series");
 
-    const slots: Array<{
-      conferenceSeriesId: string;
-      startsAt: Date;
-      endsAt: Date;
-      status: "available";
-    }> = [];
-
-    for (
-      let cursor = input.startsAt.getTime();
-      cursor + slotMinutes * 60_000 <= input.endsAt.getTime();
-      cursor += slotMinutes * 60_000
-    ) {
-      slots.push({
-        conferenceSeriesId: series.id,
-        startsAt: new Date(cursor),
-        endsAt: new Date(cursor + slotMinutes * 60_000),
-        status: "available",
-      });
-    }
+    const slots = materializeSlots({
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      slotMinutes,
+    }).map((slot) => ({
+      conferenceSeriesId: series.id,
+      startsAt: slot.startsAt,
+      endsAt: slot.endsAt,
+      status: "available" as const,
+    }));
 
     if (slots.length === 0) throw new Error("Conference series has no valid slots");
     await tx.insert(conferenceSlots).values(slots);
@@ -201,25 +192,15 @@ export async function bookConference(
       },
     ]);
 
-    await tx
-      .update(conferenceSlots)
-      .set({
-        status: "booked",
-        calendarEventId: event.id,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(conferenceSlots.id, input.conferenceSlotId),
-          eq(conferenceSlots.status, "available"),
-        ),
-      );
+    await claimAvailableSlot(tx, input.conferenceSlotId, {
+      calendarEventId: event.id,
+    });
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.ConferenceBooked,
       aggregateType: "conference_booking",
       aggregateId: booking.id,
-      actorPersonId: actorPersonId,
+      actorPersonId,
       payload: {
         studentProfileId: input.studentProfileId,
         slotId: input.conferenceSlotId,
@@ -227,18 +208,16 @@ export async function bookConference(
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: actorPersonId,
+    await writeAudit(tx, context, {
       action: "conference.book",
-      resourceType: "conference_booking",
-      resourceId: booking.id,
+      entityType: "conference_booking",
+      entityId: booking.id,
       scope: { siteId: slot.siteId },
       after: {
         studentProfileId: input.studentProfileId,
         slotId: input.conferenceSlotId,
         status: "booked",
       },
-      context: { requestId: context.requestId ?? null },
     });
 
     return booking.id;
@@ -267,7 +246,7 @@ export async function queueConferenceReminder(
 
     if (!booking) throw new Error("Conference booking not found");
 
-    await tx.insert(notifications).values({
+    await scheduleReminder(tx, {
       recipientPersonId: booking.guardianPersonId,
       type: "conference_reminder",
       title: "Parent-teacher conference reminder",
@@ -366,7 +345,7 @@ export async function completeConference(
     }
 
     if (input.outcome === "held") {
-      await tx.insert(domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.ConferenceHeld,
         aggregateType: "conference_booking",
         aggregateId: input.bookingId,
@@ -378,11 +357,10 @@ export async function completeConference(
       });
     }
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "conference.complete",
-      resourceType: "conference_booking",
-      resourceId: input.bookingId,
+      entityType: "conference_booking",
+      entityId: input.bookingId,
       scope: { siteId: record.siteId },
       before: { status: record.bookingStatus },
       after: {
@@ -390,7 +368,6 @@ export async function completeConference(
         noteVisibility: input.note ? input.noteVisibility ?? "staff_private" : null,
         actionId: actionId ?? null,
       },
-      context: { requestId: context.requestId ?? null },
     });
 
     return actionId ? { actionId } : {};

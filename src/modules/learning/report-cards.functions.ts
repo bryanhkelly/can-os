@@ -9,7 +9,7 @@ import {
   AuthorizationError,
   type CommandContext,
 } from "@/domain/command-context";
-import { assertSyntheticMutation } from "@/modules/student-experience/demo-write-gate";
+import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { EventTypes } from "@/domain/event-types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

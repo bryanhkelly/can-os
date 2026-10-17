@@ -3,7 +3,7 @@ import {getRequest} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {and,eq} from "drizzle-orm";
-import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {isValidDiscussionPost} from "@/domain/course-discussions";
 import { z } from "zod";
 /** Private synthetic-only write. Never infer permissions from a browser-selected persona. */

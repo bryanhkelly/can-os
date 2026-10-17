@@ -1,5 +1,6 @@
 import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import { complianceFrameworkVersionStatus, schoolConfigurationStatus } from "./enums";
 import { people } from "./identity";
 import { roleAssignments, organizations, programs, sites, jurisdictions } from "./organizations";
 import { documents } from "./documents";
@@ -23,7 +24,7 @@ export const schoolConfigurationVersions = pgTable("school_configuration_version
   programId: uuid("program_id").notNull().references(() => programs.id, { onDelete: "restrict" }),
   version: integer("version").notNull(),
   deploymentModel: text("deployment_model").notNull(),
-  status: text("status").default("draft").notNull(),
+  status: schoolConfigurationStatus("status").default("draft").notNull(),
   config: jsonb("config").$type<{
     grades: { min: string; max: string };
     delivery: { onsite: boolean; asynchronous: boolean; liveOnline: boolean; onsiteDaysPerWeek?: number };
@@ -73,7 +74,7 @@ export const complianceFrameworks=pgTable("compliance_frameworks",{
 },t=>[uniqueIndex("compliance_framework_key_uq").on(t.key)]);
 export const complianceFrameworkVersions=pgTable("compliance_framework_versions",{
  id:id(),frameworkId:uuid("framework_id").notNull().references(()=>complianceFrameworks.id,{onDelete:"restrict"}),
- version:text("version").notNull(),status:text("status").default("draft").notNull(),
+ version:text("version").notNull(),status:complianceFrameworkVersionStatus("status").default("draft").notNull(),
  effectiveFrom:timestamp("effective_from",{withTimezone:true}),
  effectiveThrough:timestamp("effective_through",{withTimezone:true}),
  createdAt:createdAt(),updatedAt:updatedAt(),

@@ -2,9 +2,17 @@ import {createFileRoute,useRouter} from "@tanstack/react-router";
 import {useState} from "react";
 import {getTeacherCourseDiscussions} from "@/modules/learning/discussion-teacher-query.functions";
 import {createSyntheticCourseDiscussion,setSyntheticCourseDiscussionLock,moderateSyntheticDiscussionMessage} from "@/modules/learning/discussion-teacher.functions";
-export const Route=createFileRoute("/teacher/discussions")({loader:()=>getTeacherCourseDiscussions(),component:TeacherDiscussions});
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+const loadTeacherDiscussions=()=>getTeacherCourseDiscussions();
+export const Route=createFileRoute("/teacher/discussions")({loader:safeLoader(loadTeacherDiscussions,{authMessage:"Sign in with an authorized teacher account to manage course discussions."}),component:TeacherDiscussions});
 function TeacherDiscussions(){
- const {sections,threads}=Route.useLoaderData(),router=useRouter();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic teacher preview" title="Manage course discussions" outcome={outcome}/>;
+ return <TeacherDiscussionsView data={outcome.data}/>;
+}
+function TeacherDiscussionsView({data}:{data:Awaited<ReturnType<typeof loadTeacherDiscussions>>}){
+ const {sections,threads}=data,router=useRouter();
  const [sectionId,setSectionId]=useState(sections[0]?.id??""),[subject,setSubject]=useState(""),[prompt,setPrompt]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false);
  async function create(){setBusy(true);setError("");try{await createSyntheticCourseDiscussion({data:{sectionId,subject,prompt}});setSubject("");setPrompt("");await router.invalidate();}catch(e){setError(e instanceof Error?e.message:"Unable to create discussion.");}finally{setBusy(false);}}
  async function lock(threadId:string,locked:boolean){setBusy(true);setError("");try{await setSyntheticCourseDiscussionLock({data:{threadId,locked}});await router.invalidate();}catch(e){setError(e instanceof Error?e.message:"Unable to change discussion lock.");}finally{setBusy(false);}}

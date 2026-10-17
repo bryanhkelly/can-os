@@ -1,4 +1,4 @@
-import { assertSyntheticMutation } from "./demo-write-gate";
+import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { readRubric, scoreRubric, type CriterionGrade } from "./rubric";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";

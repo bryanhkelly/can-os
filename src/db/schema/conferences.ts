@@ -9,6 +9,11 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import {
+  conferenceBookingStatus,
+  conferenceSeriesStatus,
+  conferenceSlotStatus,
+} from "./enums";
 import { people, studentProfiles } from "./identity";
 import { sections } from "./academics";
 import { sites } from "./organizations";
@@ -32,7 +37,7 @@ export const conferenceSeries = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     slotMinutes: integer("slot_minutes").default(20).notNull(),
-    status: text("status").default("draft").notNull(),
+    status: conferenceSeriesStatus("status").default("draft").notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -52,7 +57,7 @@ export const conferenceSlots = pgTable(
       .references(() => conferenceSeries.id, { onDelete: "cascade" }),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
-    status: text("status").default("available").notNull(),
+    status: conferenceSlotStatus("status").default("available").notNull(),
     calendarEventId: uuid("calendar_event_id").references(() => calendarEvents.id, {
       onDelete: "restrict",
     }),
@@ -78,7 +83,7 @@ export const conferenceBookings = pgTable(
     guardianPersonId: uuid("guardian_person_id")
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
-    status: text("status").default("booked").notNull(),
+    status: conferenceBookingStatus("status").default("booked").notNull(),
     communicationThreadId: uuid("communication_thread_id").references(
       () => communicationThreads.id,
       { onDelete: "restrict" },

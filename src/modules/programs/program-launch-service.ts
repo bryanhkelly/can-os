@@ -4,8 +4,6 @@ import {
   auditEvents,
   calendarEvents,
   domainEvents,
-  journeyDefinitions,
-  journeyRequirements,
   journeys,
   organizations,
   programs,
@@ -19,17 +17,8 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-
-type LaunchRequirementDefinition = {
-  key: string;
-  title: string;
-  blocking?: boolean;
-  owner?: "partner" | "can" | "third_party";
-};
-
-type LaunchJourneyConfiguration = {
-  requirements?: LaunchRequirementDefinition[];
-};
+import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
+import { emitEvent, writeAudit } from "@/platform/mutation";
 
 export async function startProgramLaunch(
   context: CommandContext,
@@ -110,62 +99,18 @@ export async function startProgramLaunch(
 
     const definitionKey = input.journeyDefinitionKey ?? "program-launch";
 
-    const [definition] = await tx
-      .select()
-      .from(journeyDefinitions)
-      .where(
-        and(
-          eq(journeyDefinitions.key, definitionKey),
-          eq(journeyDefinitions.active, true),
-        ),
-      )
-      .orderBy(journeyDefinitions.createdAt)
-      .limit(1);
+    const { journeyId } = await instantiateJourneyFromDefinition(tx, {
+      definitionKey,
+      subjectType: "program",
+      subjectId: program.id,
+      organizationId: input.hostOrganizationId,
+      siteId: input.siteId,
+      programId: program.id,
+      ownerPersonId: context.actorPersonId,
+      insertErrorLabel: "Launch",
+    });
 
-    if (!definition) {
-      throw new Error(`Journey definition not found: ${definitionKey}`);
-    }
-
-    const [journey] = await tx
-      .insert(journeys)
-      .values({
-        type: definition.key,
-        status: "in_progress",
-        participantType: "program",
-        participantId: program.id,
-        organizationId: input.hostOrganizationId,
-        siteId: input.siteId,
-        programId: program.id,
-        ownerPersonId: context.actorPersonId,
-        journeyDefinitionId: definition.id,
-        definitionVersion: definition.version,
-        startedAt: new Date(),
-      })
-      .returning({ id: journeys.id });
-
-    if (!journey) throw new Error("Failed to create Launch Journey");
-
-    const config = definition.configuration as LaunchJourneyConfiguration;
-    const requirements = config.requirements ?? [];
-
-    if (requirements.length > 0) {
-      await tx.insert(journeyRequirements).values(
-        requirements.map((requirement) => ({
-          journeyId: journey.id,
-          key: requirement.key,
-          title: requirement.title,
-          blocking: requirement.blocking ?? false,
-          status:
-            requirement.owner === "can"
-              ? ("needs_can" as const)
-              : requirement.owner === "third_party"
-                ? ("waiting_third_party" as const)
-                : ("needs_you" as const),
-        })),
-      );
-    }
-
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.ProgramLaunchStarted,
       aggregateType: "program",
       aggregateId: program.id,
@@ -174,15 +119,14 @@ export async function startProgramLaunch(
         hostOrganizationId: input.hostOrganizationId,
         siteId: input.siteId ?? null,
         programType: input.type,
-        journeyId: journey.id,
+        journeyId,
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "program.launch.start",
-      resourceType: "program",
-      resourceId: program.id,
+      entityType: "program",
+      entityId: program.id,
       scope: {
         organizationId: input.hostOrganizationId,
         siteId: input.siteId ?? null,
@@ -194,10 +138,9 @@ export async function startProgramLaunch(
         academicProviderOrganizationId: input.academicProviderOrganizationId,
         creditIssuingOrganizationId: input.creditIssuingOrganizationId,
       },
-      context: { requestId: context.requestId ?? null },
     });
 
-    return { programId: program.id, journeyId: journey.id };
+    return { programId: program.id, journeyId };
   });
 }
 

@@ -10,6 +10,7 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import { sectionGradeStatus } from "./enums";
 import { sections } from "./academics";
 import { gradeScales, gradingPeriods, terms } from "./academic-time";
 import { people, studentProfiles } from "./identity";
@@ -36,7 +37,7 @@ export const sectionGrades = pgTable(
     termId: uuid("term_id")
       .notNull()
       .references(() => terms.id, { onDelete: "restrict" }),
-    status: text("status").default("draft").notNull(),
+    status: sectionGradeStatus("status").default("draft").notNull(),
     score: numeric("score", { precision: 8, scale: 2 }),
     percentage: numeric("percentage", { precision: 8, scale: 2 }),
     letterGrade: text("letter_grade"),

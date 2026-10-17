@@ -1,11 +1,12 @@
 import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import { studyGroupMembershipStatus, studyGroupReportStatus, studyGroupStatus } from "./enums";
 import { people } from "./identity";
 import { sites, programs } from "./organizations";
 import { sections } from "./academics";
 export const studyGroups = pgTable("study_groups", {
  id:id(), title:text("title").notNull(), description:text("description").notNull(),
- kind:text("kind").notNull(), status:text("status").default("active").notNull(),
+ kind:text("kind").notNull(), status:studyGroupStatus("status").default("active").notNull(),
  visibility:text("visibility").default("site").notNull(),
  siteId:uuid("site_id").references(()=>sites.id,{onDelete:"restrict"}),
  programId:uuid("program_id").references(()=>programs.id,{onDelete:"restrict"}),
@@ -19,7 +20,7 @@ export const studyGroups = pgTable("study_groups", {
 export const studyGroupMemberships=pgTable("study_group_memberships",{
  id:id(),groupId:uuid("group_id").notNull().references(()=>studyGroups.id,{onDelete:"cascade"}),
  personId:uuid("person_id").notNull().references(()=>people.id,{onDelete:"restrict"}),
- role:text("role").default("student").notNull(),status:text("status").default("pending").notNull(),
+ role:text("role").default("student").notNull(),status:studyGroupMembershipStatus("status").default("pending").notNull(),
  reviewedByPersonId:uuid("reviewed_by_person_id").references(()=>people.id,{onDelete:"restrict"}),
  joinedAt:timestamp("joined_at",{withTimezone:true}),createdAt:createdAt(),updatedAt:updatedAt(),
 },t=>[uniqueIndex("study_group_member_uq").on(t.groupId,t.personId),index("study_group_person_idx").on(t.personId)]);
@@ -41,7 +42,7 @@ export const studyGroupReports=pgTable("study_group_reports",{
  id:id(),groupId:uuid("group_id").notNull().references(()=>studyGroups.id,{onDelete:"cascade"}),
  reporterPersonId:uuid("reporter_person_id").notNull().references(()=>people.id,{onDelete:"restrict"}),
  postId:uuid("post_id").references(()=>studyGroupPosts.id,{onDelete:"set null"}),
- reason:text("reason").notNull(),status:text("status").default("open").notNull(),
+ reason:text("reason").notNull(),status:studyGroupReportStatus("status").default("open").notNull(),
  createdAt:createdAt(),updatedAt:updatedAt(),
 },t=>[index("study_group_report_idx").on(t.groupId,t.status)]);
 

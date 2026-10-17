@@ -3,9 +3,13 @@ import {getSyntheticPrograms} from "@/modules/operations/program-preview.functio
 import {programIndicators} from "@/domain/program-indicators";
 import {schoolTemplates} from "@/domain/school-template";
 import {programReadiness,readinessFromSnapshot} from "@/domain/program-readiness";
-export const Route=createFileRoute("/readiness")({loader:()=>getSyntheticPrograms(),component:ReadinessPage});
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+export const Route=createFileRoute("/readiness")({loader:safeLoader(()=>getSyntheticPrograms(),{authMessage:"Sign in with an authorized staff account to view program launch readiness."}),component:ReadinessPage});
 function ReadinessPage(){
- const programs=Route.useLoaderData();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic planning example" title="Program launch readiness" outcome={outcome}/>;
+ const programs=outcome.data;
  const items=readinessFromSnapshot({academics:"ready",staffing:"needs_review",safeguarding:"missing",calendar:"ready",enrollment:"needs_review",records:"missing"});
  const summary=programReadiness(items);
  return <main className="mx-auto max-w-5xl px-5 py-10">

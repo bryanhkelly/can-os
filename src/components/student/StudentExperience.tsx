@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Lightbulb, MessageCircle, Play, RotateCcw, Send, Sparkles,
   Target, Video, X,
 } from "lucide-react";
-import { demoStudent, type StudentWork, type StudentMoment } from "@/modules/student-experience/demo-data";
+import { demoStudent, type StudentWork, type StudentMoment } from "@/modules/_demo/demo-data";
 import type { StudentTodayData } from "@/modules/student-experience/student-today.server";
 
 type Area = "today" | "courses" | "progress";

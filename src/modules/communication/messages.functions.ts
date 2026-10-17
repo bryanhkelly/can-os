@@ -9,7 +9,7 @@ import {
   assertSyntheticMutation,
   demoAllowedRoles,
   type DemoRole,
-} from "@/modules/student-experience/demo-write-gate";
+} from "@/modules/_demo/demo-write-gate";
 
 /**
  * Contextual messaging surface (GF1 step 12, Experience Flow N1).

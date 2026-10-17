@@ -2,7 +2,7 @@ import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
-import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {timelineFromReferralHistory} from "@/domain/workflow-timeline";
 import {dedupeQueue,notificationSummary,type QueueItem} from "@/domain/notification-triage";
 async function operationsActor(){

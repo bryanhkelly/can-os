@@ -2,9 +2,16 @@ import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getSyntheticNotifications,readSyntheticNotification,readAllSyntheticNotifications,setSyntheticNotificationStatus} from "@/modules/student-experience/notifications.functions";
 import {groupNotices} from "@/domain/notification-center";
-export const Route=createFileRoute("/student/notifications")({loader:()=>getSyntheticNotifications(),component:NotificationsPage});
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+const loadNotifications=()=>getSyntheticNotifications();
+export const Route=createFileRoute("/student/notifications")({loader:safeLoader(loadNotifications,{authMessage:"Sign in with an authorized student account to view your notifications."}),component:NotificationsPage});
 function NotificationsPage(){
- const notices=Route.useLoaderData();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic student" title="Notification center" outcome={outcome}/>;
+ return <NotificationsView notices={outcome.data}/>;
+}
+function NotificationsView({notices}:{notices:Awaited<ReturnType<typeof loadNotifications>>}){
  const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null);
  const [error,setError]=useState("");

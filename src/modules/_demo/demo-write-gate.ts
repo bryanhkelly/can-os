@@ -1,4 +1,8 @@
 /**
+ * Module boundary: synthetic/demo write gating lives here in `modules/_demo`
+ * (non-domain infrastructure). Domain modules import from `_demo` only for
+ * demo-path guards; demo logic must never flow back into domain modules.
+ *
  * Synthetic demo writes are disabled unless an operator explicitly sets
  * CAN_DEMO_WRITES_ENABLED=true (fail closed). See docs/identity-and-demo-access.md,
  * "Demo kill switch". A UI role is still not arbitrary authorization: callers must

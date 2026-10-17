@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {and,eq,inArray} from "drizzle-orm";
-import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {z} from "zod";
 import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
 

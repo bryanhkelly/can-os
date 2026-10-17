@@ -2,14 +2,24 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getSyntheticTeacherMissingWork, createSyntheticMissingWorkFollowUp } from "@/modules/learning/teacher-missing-work.functions";
 import { WorkspaceShell, StatCard, EmptyState } from "@/components/workspace";
+import { safeLoader } from "@/lib/safe-loader";
+import { LoaderFailure } from "@/lib/loader-failure";
+
+const loadMissingWork = () => getSyntheticTeacherMissingWork();
 
 export const Route = createFileRoute("/teacher/missing-work")({
-  loader: () => getSyntheticTeacherMissingWork(),
+  loader: safeLoader(loadMissingWork, { authMessage: "Sign in with an authorized teacher account to view missing work." }),
   component: TeacherMissingWork,
 });
 
 function TeacherMissingWork() {
-  const { connected, items } = Route.useLoaderData();
+  const outcome = Route.useLoaderData();
+  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Synthetic teacher" title="Missing work" outcome={outcome} />;
+  return <TeacherMissingWorkView data={outcome.data} />;
+}
+
+function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof loadMissingWork>> }) {
+  const { connected, items } = data;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");

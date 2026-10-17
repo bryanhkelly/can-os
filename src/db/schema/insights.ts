@@ -7,6 +7,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import { insightStatus } from "./enums";
 import { people } from "./identity";
 import { organizations, programs, sites } from "./organizations";
 import { sections } from "./academics";
@@ -16,7 +17,7 @@ export const insights = pgTable(
   {
     id: id(),
     type: text("type").notNull(),
-    status: text("status").default("open").notNull(),
+    status: insightStatus("status").default("open").notNull(),
     title: text("title").notNull(),
     summary: text("summary").notNull(),
     subjectType: text("subject_type").notNull(),

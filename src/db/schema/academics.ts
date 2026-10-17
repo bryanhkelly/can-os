@@ -13,6 +13,7 @@ import {
 import { createdAt, id, updatedAt } from "./common";
 import {
   assessmentStatus,
+  courseTemplateVersionStatus,
   enrollmentKind,
   enrollmentStatus,
   submissionStatus,
@@ -53,7 +54,7 @@ export const courseTemplateVersions = pgTable(
       .notNull()
       .references(() => courseTemplates.id, { onDelete: "restrict" }),
     version: integer("version").notNull(),
-    status: text("status").default("draft").notNull(),
+    status: courseTemplateVersionStatus("status").default("draft").notNull(),
     curriculum: jsonb("curriculum").$type<Record<string, unknown>>().default({}).notNull(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: createdAt(),

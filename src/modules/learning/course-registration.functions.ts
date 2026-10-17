@@ -1,4 +1,4 @@
-import { assertSyntheticMutation } from "@/modules/student-experience/demo-write-gate";
+import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, inArray } from "drizzle-orm";

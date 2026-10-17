@@ -1,5 +1,6 @@
 import {index,integer,pgTable,text,timestamp,uniqueIndex,uuid} from "drizzle-orm/pg-core";
 import {createdAt,id,updatedAt} from "./common";
+import {admissionOfferStatus} from "./enums";
 import {applications} from "./admissions";
 import {programs} from "./organizations";
 import {schoolYears} from "./academic-time";
@@ -15,7 +16,7 @@ export const admissionOffers=pgTable("admission_offers",{
  id:id(),applicationId:uuid("application_id").notNull().references(()=>applications.id,{onDelete:"restrict"}),
  programId:uuid("program_id").notNull().references(()=>programs.id,{onDelete:"restrict"}),
  schoolYearId:uuid("school_year_id").notNull().references(()=>schoolYears.id,{onDelete:"restrict"}),
- status:text("status").default("draft").notNull(),expiresAt:timestamp("expires_at",{withTimezone:true}),
+ status:admissionOfferStatus("status").default("draft").notNull(),expiresAt:timestamp("expires_at",{withTimezone:true}),
  issuedAt:timestamp("issued_at",{withTimezone:true}),respondedAt:timestamp("responded_at",{withTimezone:true}),
  issuedByPersonId:uuid("issued_by_person_id").references(()=>people.id,{onDelete:"restrict"}),
  respondedByPersonId:uuid("responded_by_person_id").references(()=>people.id,{onDelete:"restrict"}),

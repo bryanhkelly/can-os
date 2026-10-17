@@ -1,9 +1,17 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getSyntheticTeacherNotices,acknowledgeSyntheticTeacherNotice} from "@/modules/learning/teacher-notices.functions";
-export const Route=createFileRoute("/teacher/notices")({loader:()=>getSyntheticTeacherNotices(),component:TeacherNotices});
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+const loadTeacherNotices=()=>getSyntheticTeacherNotices();
+export const Route=createFileRoute("/teacher/notices")({loader:safeLoader(loadTeacherNotices,{authMessage:"Sign in with an authorized teacher account to view your notifications."}),component:TeacherNotices});
 function TeacherNotices(){
- const {connected,items}=Route.useLoaderData();const router=useRouter();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic teacher" title="My notifications" outcome={outcome}/>;
+ return <TeacherNoticesView data={outcome.data}/>;
+}
+function TeacherNoticesView({data}:{data:Awaited<ReturnType<typeof loadTeacherNotices>>}){
+ const {connected,items}=data;const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState("");
  return <main className="mx-auto max-w-4xl px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Synthetic teacher</p>

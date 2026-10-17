@@ -6,7 +6,7 @@ import {getCommandContext} from "@/modules/identity/command-context.server";
 import {and,eq,desc,sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,journeys,journeyRequirements,documents,auditEvents,programs,guardianRelationships,studentProfiles} from "@/db/schema";
-import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {newDocumentKey,signR2Object,validateDocumentUpload,r2Config} from "./r2-documents.server";
 async function uploadsEnabled(applicationId:string){
  assertR2DemoEnabled(process.env.CAN_R2_DEMO_UPLOADS_ENABLED);

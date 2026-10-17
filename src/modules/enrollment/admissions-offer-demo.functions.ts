@@ -2,7 +2,7 @@ import {createServerFn} from "@tanstack/react-start";
 import {and,eq,sql,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,admissionOffers,admissionSeatPools,guardianRelationships,studentProfiles,schoolYears} from "@/db/schema";
-import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment} from "./admissions-offer-service";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";

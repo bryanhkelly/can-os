@@ -2,9 +2,16 @@ import {useState} from "react";
 import {beginSyntheticR2DocumentUpload,finishSyntheticR2DocumentUpload,getSyntheticR2DocumentDownload} from "@/modules/enrollment/r2-document-upload.functions";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
 import {getSyntheticFamilyReadiness,setSyntheticFamilyRequirement,addSyntheticRequirementReviewNote,reviewSyntheticRequirementDocument} from "@/modules/enrollment/family-readiness.functions";
-export const Route=createFileRoute("/admissions/families")({loader:()=>getSyntheticFamilyReadiness(),component:Families});
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+const loadFamilyReadiness=()=>getSyntheticFamilyReadiness();
+export const Route=createFileRoute("/admissions/families")({loader:safeLoader(loadFamilyReadiness,{authMessage:"Sign in with an authorized staff account to view family enrollment readiness."}),component:Families});
 function Families(){
- const apps=Route.useLoaderData();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic family cases" title="Family enrollment readiness" outcome={outcome}/>;
+ return <FamiliesView apps={outcome.data}/>;
+}
+function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness>>}){
  const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notes,setNotes]=useState<Record<string,string>>({});
  const families=[...new Set(apps.map(a=>a.householdId))];

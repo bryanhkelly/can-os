@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { advanceSupportReferral, createSupportReferral, getSupportReferrals, saveSyntheticSupportPlan, scheduleSyntheticSupportService, completeSyntheticSupportService } from "@/modules/support/support-referrals.functions";
+import { safeLoader } from "@/lib/safe-loader";
+import { LoaderFailure } from "@/lib/loader-failure";
 
+const loadSupportReferrals=()=>getSupportReferrals();
 export const Route=createFileRoute("/student/support")({
- loader:()=>getSupportReferrals(),
+ loader:safeLoader(loadSupportReferrals,{authMessage:"Sign in with an authorized student account to view student support."}),
  component:SupportPage,
 });
 const destinations=[
@@ -13,7 +16,11 @@ const destinations=[
 ] as const;
 const stages=["submitted","accepted","plan_created","in_service","review","closed"] as const;
 function SupportPage(){
- const referrals=Route.useLoaderData();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · GF41 · SYNTHETIC DEVELOPMENT WORKSPACE" title="Student support that follows through." outcome={outcome}/>;
+ return <SupportView referrals={outcome.data}/>;
+}
+function SupportView({referrals}:{referrals:Awaited<ReturnType<typeof loadSupportReferrals>>}){
  const router=useRouter();
  const [role,setRole]=useState<"teacher"|"specialist">("teacher");
  const [category,setCategory]=useState<typeof destinations[number]["value"]>("academic");

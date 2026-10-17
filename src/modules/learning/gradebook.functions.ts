@@ -4,7 +4,7 @@ import { z } from "zod";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, assertSiteScope, AuthorizationError } from "@/domain/command-context";
-import { assertSyntheticMutation } from "@/modules/student-experience/demo-write-gate";
+import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { EventTypes } from "@/domain/event-types";
 
 /**

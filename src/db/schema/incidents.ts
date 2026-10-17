@@ -8,6 +8,11 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import {
+  incidentNotificationStatus,
+  incidentReviewStatus,
+  incidentStatus,
+} from "./enums";
 import { people } from "./identity";
 import { organizations, programs, sites } from "./organizations";
 import { documents } from "./documents";
@@ -19,7 +24,7 @@ export const incidents = pgTable(
     incidentNumber: text("incident_number").notNull(),
     type: text("type").notNull(),
     severity: text("severity").notNull(),
-    status: text("status").default("filed").notNull(),
+    status: incidentStatus("status").default("filed").notNull(),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     reportedAt: timestamp("reported_at", { withTimezone: true }).defaultNow().notNull(),
     reporterPersonId: uuid("reporter_person_id")
@@ -86,7 +91,7 @@ export const incidentReviews = pgTable(
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
     level: text("level").notNull(),
-    status: text("status").default("pending").notNull(),
+    status: incidentReviewStatus("status").default("pending").notNull(),
     decision: text("decision"),
     notes: text("notes"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
@@ -113,7 +118,7 @@ export const incidentNotifications = pgTable(
     recipientLabel: text("recipient_label"),
     channel: text("channel").notNull(),
     purpose: text("purpose").notNull(),
-    status: text("status").default("pending").notNull(),
+    status: incidentNotificationStatus("status").default("pending").notNull(),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
     createdAt: createdAt(),

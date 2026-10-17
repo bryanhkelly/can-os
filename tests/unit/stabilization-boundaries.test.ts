@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { assertSyntheticMutation, isSyntheticAccessEnabled } from "@/modules/student-experience/demo-write-gate";
+import { assertSyntheticMutation, isSyntheticAccessEnabled } from "@/modules/_demo/demo-write-gate";
 describe("synthetic mutation authorization boundary",()=>{
  const originalMode=process.env.NODE_ENV;
  const originalFlag=process.env.CAN_DEMO_WRITES_ENABLED;

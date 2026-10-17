@@ -1,9 +1,14 @@
 import {createFileRoute} from "@tanstack/react-router";
 import {getAssignments} from "@/modules/student-experience/assignments.functions";
 import {renderICS} from "@/domain/calendar-ics";
-export const Route=createFileRoute("/calendar-export")({loader:()=>getAssignments(),component:CalendarExport});
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+const loadAssignments=()=>getAssignments();
+export const Route=createFileRoute("/calendar-export")({loader:safeLoader(loadAssignments,{authMessage:"Sign in with an authorized student account to export your calendar."}),component:CalendarExport});
 function CalendarExport(){
- const data=Route.useLoaderData();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic calendar" title="Calendar export" outcome={outcome}/>;
+ const data=outcome.data;
  const exportCalendar=()=>{
   const items=data.assignments.filter(x=>x.dueAt&&x.metadata.synthetic).map(x=>({id:x.assessmentId,title:x.title,description:x.course,startsAt:x.dueAt!,endsAt:new Date(new Date(x.dueAt!).getTime()+30*60*1000).toISOString()}));
   const blob=new Blob([renderICS(items,"CAN OS synthetic assignments")],{type:"text/calendar;charset=utf-8"});

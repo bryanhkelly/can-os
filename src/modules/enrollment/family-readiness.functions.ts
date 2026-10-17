@@ -1,7 +1,7 @@
 import {createServerFn} from "@tanstack/react-start";
 import {eq,inArray,and,sql} from "drizzle-orm";
 import {z} from "zod";
-import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
 import {enrollmentReadiness} from "@/domain/enrollment-readiness";
 const registrar=()=>requireActor(["registrar"],"enrollment.decide");

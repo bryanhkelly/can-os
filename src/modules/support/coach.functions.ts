@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { z } from "zod";
-import { assertSyntheticMutation } from "@/modules/student-experience/demo-write-gate";
+import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { actorSiteIds, recordAudit, requireActor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";

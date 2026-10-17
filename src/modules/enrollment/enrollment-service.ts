@@ -9,8 +9,6 @@ import {
   guardianRelationships,
   householdMemberships,
   households,
-  journeyDefinitions,
-  journeyRequirements,
   journeys,
   people,
   programs,
@@ -25,23 +23,14 @@ import {
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import {assertApplicationAcceptance,assertApplicationRetryOwnership} from "@/domain/admissions-transitions";
+import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
+import { emitEvent, writeAudit } from "@/platform/mutation";
 
 /** Enrollment commands must never interpret an absent program grant as global access. */
 function requireEnrollmentProgramScope(context:CommandContext,programId:string):void {
   if (!context.scope.programIds?.includes(programId)) throw new AuthorizationError(`program scope: ${programId}`);
   assertProgramScope(context,programId);
 }
-
-type EnrollmentRequirementDefinition = {
-  key: string;
-  title: string;
-  blocking?: boolean;
-  owner?: "family" | "can" | "third_party";
-};
-
-type EnrollmentJourneyConfiguration = {
-  requirements?: EnrollmentRequirementDefinition[];
-};
 
 export async function startFamilyApplication(
   context: CommandContext,
@@ -214,62 +203,17 @@ export async function startFamilyApplication(
 
     const definitionKey = input.journeyDefinitionKey ?? "family-enrollment";
 
-    const [definition] = await tx
-      .select()
-      .from(journeyDefinitions)
-      .where(
-        and(
-          eq(journeyDefinitions.key, definitionKey),
-          eq(journeyDefinitions.active, true),
-        ),
-      )
-      .orderBy(journeyDefinitions.createdAt)
-      .limit(1);
+    const { journeyId } = await instantiateJourneyFromDefinition(tx, {
+      definitionKey,
+      subjectType: "application",
+      subjectId: application.id,
+      organizationId: program.organizationId,
+      programId: input.programId,
+      ownerPersonId: actorPersonId,
+      insertErrorLabel: "Enrollment",
+    });
 
-    if (!definition) {
-      throw new Error(`Journey definition not found: ${definitionKey}`);
-    }
-
-    const [journey] = await tx
-      .insert(journeys)
-      .values({
-        type: definition.key,
-        status: "in_progress",
-        participantType: "application",
-        participantId: application.id,
-        organizationId: program.organizationId,
-        programId: input.programId,
-        ownerPersonId: actorPersonId,
-        journeyDefinitionId: definition.id,
-        definitionVersion: definition.version,
-        startedAt: new Date(),
-      })
-      .returning({ id: journeys.id });
-
-    if (!journey) throw new Error("Failed to create Enrollment Journey");
-
-    const config =
-      definition.configuration as EnrollmentJourneyConfiguration;
-    const requirementDefinitions = config.requirements ?? [];
-
-    if (requirementDefinitions.length > 0) {
-      await tx.insert(journeyRequirements).values(
-        requirementDefinitions.map((requirement) => ({
-          journeyId: journey.id,
-          key: requirement.key,
-          title: requirement.title,
-          blocking: requirement.blocking ?? false,
-          status:
-            requirement.owner === "can"
-              ? ("needs_can" as const)
-              : requirement.owner === "third_party"
-                ? ("waiting_third_party" as const)
-                : ("needs_you" as const),
-        })),
-      );
-    }
-
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.ApplicationStarted,
       aggregateType: "application",
       aggregateId: application.id,
@@ -278,15 +222,14 @@ export async function startFamilyApplication(
         householdId,
         studentProfileId: studentProfile.id,
         programId: input.programId,
-        journeyId: journey.id,
+        journeyId,
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: actorPersonId,
+    await writeAudit(tx, context, {
       action: "application.start",
-      resourceType: "application",
-      resourceId: application.id,
+      entityType: "application",
+      entityId: application.id,
       scope: {
         organizationId: program.organizationId,
         programId: input.programId,
@@ -296,17 +239,14 @@ export async function startFamilyApplication(
         householdId,
         studentProfileId: studentProfile.id,
       },
-      context: {
-        requestId: context.requestId ?? null,
-        idempotencyKey: input.idempotencyKey,
-      },
+      contextExtras: { idempotencyKey: input.idempotencyKey },
     });
 
     return {
       applicationId: application.id,
       householdId,
       studentProfileId: studentProfile.id,
-      journeyId: journey.id,
+      journeyId,
     };
   });
 }

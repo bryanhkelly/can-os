@@ -1,15 +1,23 @@
 import {useEffect,useState} from "react";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
 import {getStudyGroupAvailability,listStudyGroups,requestStudyGroupMembership,leaveStudyGroup,getStudyGroupDetail,postStudyGroupMessage,reportStudyGroupPost,rsvpStudyGroupSession} from "@/modules/study-groups/study-groups.functions";
-export const Route=createFileRoute("/student/study-groups")({validateSearch:(search:Record<string,unknown>):{group?:string;session?:string}=>({group:typeof search.group==="string"?search.group:undefined,session:typeof search.session==="string"?search.session:undefined}),loader:async()=>{
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+const loadStudyGroups=async()=>{
  const {enabled}=await getStudyGroupAvailability();
  if(!enabled)return {enabled,groups:[]};
  const groups=await listStudyGroups();
  // Student pages must not require facilitator-only permissions to render.
  return {enabled,groups};
-},component:StudyGroups});
+};
+export const Route=createFileRoute("/student/study-groups")({validateSearch:(search:Record<string,unknown>):{group?:string;session?:string}=>({group:typeof search.group==="string"?search.group:undefined,session:typeof search.session==="string"?search.session:undefined}),loader:safeLoader(loadStudyGroups,{authMessage:"Sign in with an authorized student account to view study groups."}),component:StudyGroups});
 function StudyGroups(){
- const {enabled,groups}=Route.useLoaderData();const router=useRouter();const search=Route.useSearch();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure title="Study Groups" outcome={outcome}/>;
+ return <StudyGroupsView data={outcome.data}/>;
+}
+function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>>}){
+ const {enabled,groups}=data;const router=useRouter();const search=Route.useSearch();
  const [selected,setSelected]=useState<string|null>(null),[detail,setDetail]=useState<Awaited<ReturnType<typeof getStudyGroupDetail>>|null>(null),[notice,setNotice]=useState("");
  const [message,setMessage]=useState("");
  useEffect(()=>{

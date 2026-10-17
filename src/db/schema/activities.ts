@@ -10,6 +10,14 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import {
+  activityEligibilityCheckStatus,
+  activityEligibilityStatus,
+  activityRegistrationStatus,
+  activityRosterStatus,
+  activitySeasonStatus,
+  activityStatus,
+} from "./enums";
 import { people, studentProfiles } from "./identity";
 import { programs, sites } from "./organizations";
 import { documents } from "./documents";
@@ -27,7 +35,7 @@ export const activities = pgTable(
     }),
     type: text("type").notNull(),
     name: text("name").notNull(),
-    status: text("status").default("active").notNull(),
+    status: activityStatus("status").default("active").notNull(),
     advisorPersonId: uuid("advisor_person_id").references(() => people.id, {
       onDelete: "restrict",
     }),
@@ -54,7 +62,7 @@ export const activitySeasons = pgTable(
     registrationClosesAt: timestamp("registration_closes_at", { withTimezone: true }),
     feeAmountCents: integer("fee_amount_cents"),
     capacity: integer("capacity"),
-    status: text("status").default("registration").notNull(),
+    status: activitySeasonStatus("status").default("registration").notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -71,7 +79,7 @@ export const activityRegistrations = pgTable(
     studentProfileId: uuid("student_profile_id")
       .notNull()
       .references(() => studentProfiles.id, { onDelete: "restrict" }),
-    status: text("status").default("pending").notNull(),
+    status: activityRegistrationStatus("status").default("pending").notNull(),
     consentRecordId: uuid("consent_record_id").references(() => consentRecords.id, {
       onDelete: "restrict",
     }),
@@ -83,8 +91,8 @@ export const activityRegistrations = pgTable(
       () => financialObligations.id,
       { onDelete: "restrict" },
     ),
-    eligibilityStatus: text("eligibility_status").default("pending").notNull(),
-    rosterStatus: text("roster_status").default("not_rostered").notNull(),
+    eligibilityStatus: activityEligibilityStatus("eligibility_status").default("pending").notNull(),
+    rosterStatus: activityRosterStatus("roster_status").default("not_rostered").notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -105,7 +113,7 @@ export const activityEligibilityChecks = pgTable(
     activityRegistrationId: uuid("activity_registration_id")
       .notNull()
       .references(() => activityRegistrations.id, { onDelete: "cascade" }),
-    status: text("status").notNull(),
+    status: activityEligibilityCheckStatus("status").notNull(),
     checkedAt: timestamp("checked_at", { withTimezone: true }).defaultNow().notNull(),
     checkedByPersonId: uuid("checked_by_person_id").references(() => people.id, {
       onDelete: "restrict",

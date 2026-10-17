@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {eq} from "drizzle-orm";
-import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {parseStudentDisplayPreferences,studentDisplayPreferences} from "@/domain/student-display-preferences";
 import {recordAudit,requireActor} from "@/modules/identity/actors.server";
 export const getSyntheticStudentPreferences=createServerFn({method:"GET"}).handler(async()=>{

@@ -2,9 +2,17 @@ import {createFileRoute,useRouter} from "@tanstack/react-router";
 import {useState} from "react";
 import {getSyntheticCourseDiscussions} from "@/modules/learning/course-discussions.functions";
 import {postSyntheticDiscussionMessage} from "@/modules/learning/discussion-post.functions";
-export const Route=createFileRoute("/student/discussions")({loader:()=>getSyntheticCourseDiscussions(),component:DiscussionsPage});
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+const loadCourseDiscussions=()=>getSyntheticCourseDiscussions();
+export const Route=createFileRoute("/student/discussions")({loader:safeLoader(loadCourseDiscussions,{authMessage:"Sign in with an authorized student account to view course discussions."}),component:DiscussionsPage});
 function DiscussionsPage(){
- const threads=Route.useLoaderData(),router=useRouter();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Course discussions" title="Course discussions" outcome={outcome}/>;
+ return <DiscussionsView threads={outcome.data}/>;
+}
+function DiscussionsView({threads}:{threads:Awaited<ReturnType<typeof loadCourseDiscussions>>}){
+ const router=useRouter();
  const [drafts,setDrafts]=useState<Record<string,string>>({});
  const [replyTo,setReplyTo]=useState<Record<string,string|null>>({});
  const [error,setError]=useState<string|null>(null),[busy,setBusy]=useState(false);

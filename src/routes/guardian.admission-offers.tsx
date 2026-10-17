@@ -2,13 +2,21 @@ import {useState} from "react";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
 import {getGuardianSyntheticAdmissionOffers} from "@/modules/enrollment/guardian-admission-offers.functions";
 import {respondSyntheticOfferFromDemo} from "@/modules/enrollment/admissions-offer-demo.functions";
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
 
+const loadGuardianOffers=()=>getGuardianSyntheticAdmissionOffers();
 export const Route=createFileRoute("/guardian/admission-offers")({
- loader:()=>getGuardianSyntheticAdmissionOffers(),
+ loader:safeLoader(loadGuardianOffers,{authMessage:"Sign in with an authorized guardian account to view enrollment offers."}),
  component:GuardianAdmissionOffers
 });
 function GuardianAdmissionOffers(){
- const applications=Route.useLoaderData(),router=useRouter();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure title="Enrollment offers" outcome={outcome}/>;
+ return <GuardianAdmissionOffersView applications={outcome.data}/>;
+}
+function GuardianAdmissionOffersView({applications}:{applications:Awaited<ReturnType<typeof loadGuardianOffers>>}){
+ const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState("");
  async function respond(offerId:string,decision:"accept"|"decline"){
   setBusy(offerId);setError("");

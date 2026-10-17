@@ -160,3 +160,153 @@ export const communicationParticipantType = pgEnum("communication_participant_ty
   "program",
   "section",
 ]);
+
+export const courseTemplateVersionStatus = pgEnum("course_template_version_status", [
+  "draft",
+  "published",
+]);
+
+export const activityStatus = pgEnum("activity_status", ["active"]);
+
+export const activitySeasonStatus = pgEnum("activity_season_status", ["registration"]);
+
+export const activityRegistrationStatus = pgEnum("activity_registration_status", [
+  "pending",
+  "waitlisted",
+  "eligible",
+  "ineligible",
+  "conditional",
+  "withdrawn",
+]);
+
+export const activityEligibilityStatus = pgEnum("activity_eligibility_status", [
+  "pending",
+  "eligible",
+  "ineligible",
+  "conditional",
+]);
+
+export const activityRosterStatus = pgEnum("activity_roster_status", ["not_rostered"]);
+
+export const activityEligibilityCheckStatus = pgEnum("activity_eligibility_check_status", [
+  "eligible",
+  "ineligible",
+  "conditional",
+]);
+
+export const admissionOfferStatus = pgEnum("admission_offer_status", [
+  "draft",
+  "issued",
+  "accepted",
+  "declined",
+  "expired",
+  "revoked",
+]);
+
+export const calendarParticipantResponseStatus = pgEnum("calendar_participant_response_status", [
+  "none",
+  "accepted",
+]);
+
+export const conferenceSeriesStatus = pgEnum("conference_series_status", [
+  "draft",
+  "published",
+]);
+
+export const conferenceSlotStatus = pgEnum("conference_slot_status", [
+  "available",
+  "booked",
+]);
+
+export const conferenceBookingStatus = pgEnum("conference_booking_status", [
+  "booked",
+  "held",
+  "no_show",
+]);
+
+export const fieldTripStatus = pgEnum("field_trip_status", [
+  "proposed",
+  "approved",
+]);
+
+export const fieldTripParticipantStatus = pgEnum("field_trip_participant_status", [
+  "invited",
+  "permission_complete",
+]);
+
+export const fieldTripAttendanceStatus = pgEnum("field_trip_attendance_status", [
+  "present",
+  "absent",
+  "boarded",
+  "returned",
+]);
+
+export const financialObligationStatus = pgEnum("financial_obligation_status", ["due"]);
+
+export const healthComplianceStatus = pgEnum("health_compliance_status", [
+  "missing",
+  "pending_review",
+  "compliant",
+  "expired",
+  "waived",
+]);
+
+export const medicationAuthorizationStatus = pgEnum("medication_authorization_status", [
+  "active",
+]);
+
+export const returnToSchoolClearanceStatus = pgEnum("return_to_school_clearance_status", [
+  "required",
+  "cleared",
+]);
+
+export const incidentStatus = pgEnum("incident_status", ["filed", "closed"]);
+
+export const incidentReviewStatus = pgEnum("incident_review_status", [
+  "pending",
+  "complete",
+]);
+
+export const incidentNotificationStatus = pgEnum("incident_notification_status", ["pending"]);
+
+export const insightStatus = pgEnum("insight_status", [
+  "open",
+  "acknowledged",
+  "dismissed",
+]);
+
+export const schoolConfigurationStatus = pgEnum("school_configuration_status", ["draft"]);
+
+export const complianceFrameworkVersionStatus = pgEnum("compliance_framework_version_status", [
+  "draft",
+]);
+
+export const sectionGradeStatus = pgEnum("section_grade_status", ["draft", "finalized"]);
+
+export const studyGroupStatus = pgEnum("study_group_status", ["active"]);
+
+export const studyGroupMembershipStatus = pgEnum("study_group_membership_status", [
+  "pending",
+  "approved",
+  "declined",
+  "left",
+]);
+
+export const studyGroupReportStatus = pgEnum("study_group_report_status", [
+  "open",
+  "resolved",
+]);
+
+export const supportReferralStage = pgEnum("support_referral_stage", [
+  "submitted",
+  "accepted",
+  "plan_created",
+  "in_service",
+  "review",
+  "closed",
+]);
+
+export const supportServiceStatus = pgEnum("support_service_status", [
+  "scheduled",
+  "completed",
+]);

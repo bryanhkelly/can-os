@@ -3,7 +3,7 @@ import {db} from "@/db/client";
 import {admissionOffers,admissionSeatPools,applications,auditEvents,domainEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles,notifications} from "@/db/schema";
 import {assertCapability,assertProgramScope,AuthorizationError,type CommandContext} from "@/domain/command-context";
 import {EventTypes} from "@/domain/event-types";
-import {assertSyntheticMutation} from "@/modules/student-experience/demo-write-gate";
+import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {transitionAdmissionsOffer,type OfferStatus} from "@/domain/admissions-offer-lifecycle";
 import {calculateSeatOccupancy} from "@/domain/admissions-seat-occupancy";
 

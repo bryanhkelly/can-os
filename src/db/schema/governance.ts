@@ -9,6 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import { financialObligationStatus } from "./enums";
 import { people, households } from "./identity";
 import { sites } from "./organizations";
 import { documents } from "./documents";
@@ -89,7 +90,7 @@ export const financialObligations = pgTable(
     description: text("description").notNull(),
     amountCents: integer("amount_cents").notNull(),
     currency: text("currency").default("USD").notNull(),
-    status: text("status").default("due").notNull(),
+    status: financialObligationStatus("status").default("due").notNull(),
     dueAt: timestamp("due_at", { withTimezone: true }),
     satisfiedAt: timestamp("satisfied_at", { withTimezone: true }),
     externalPaymentReference: text("external_payment_reference"),

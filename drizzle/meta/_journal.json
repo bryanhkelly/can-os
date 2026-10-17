@@ -71,6 +71,13 @@
       "when": 1792186712376,
       "tag": "0009_retire_dead_join_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792199734768,
+      "tag": "0010_status_enums",
+      "breakpoints": true
     }
   ]
 }

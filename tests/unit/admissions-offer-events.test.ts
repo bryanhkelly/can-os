@@ -14,7 +14,7 @@ const { transaction, select, values, update } = vi.hoisted(() => ({
   update: vi.fn(),
 }));
 vi.mock("@/db/client", () => ({ db: { transaction } }));
-vi.mock("@/modules/student-experience/demo-write-gate", () => ({
+vi.mock("@/modules/_demo/demo-write-gate", () => ({
   assertSyntheticMutation: vi.fn(),
 }));
 

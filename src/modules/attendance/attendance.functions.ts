@@ -3,7 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { assertSyntheticMutation, type DemoRole } from "../student-experience/demo-write-gate";
+import { assertSyntheticMutation, type DemoRole } from "../_demo/demo-write-gate";
 import { z } from "zod";
 
 /**

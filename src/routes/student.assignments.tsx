@@ -3,14 +3,22 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getAssignments, saveAssignmentResponse, gradeSyntheticAssignment, returnSyntheticAssignment, createSyntheticAssignment, getSyntheticAssignmentHistory, saveSyntheticAssignmentDraft, manageSyntheticAssignment } from "@/modules/student-experience/assignments.functions";
 import { createSubmissionAttachmentUpload, attachDocumentToSubmission, listSubmissionAttachments } from "@/modules/learning/submission-attachments.functions";
+import { safeLoader } from "@/lib/safe-loader";
+import { LoaderFailure } from "@/lib/loader-failure";
 
 const attachmentAccept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.md";
 const attachmentMimes:Record<string,string>={pdf:"application/pdf",docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",txt:"text/plain",png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",md:"text/markdown"};
 function attachmentMime(name:string){return attachmentMimes[name.split(".").pop()?.toLowerCase()??""]??null;}
 
-export const Route=createFileRoute("/student/assignments")({loader:()=>getAssignments(),component:AssignmentsPage});
+const loadAssignments=()=>getAssignments();
+export const Route=createFileRoute("/student/assignments")({loader:safeLoader(loadAssignments,{authMessage:"Sign in with an authorized student account to view your assignments."}),component:AssignmentsPage});
 function AssignmentsPage(){
- const {connected,assignments}=Route.useLoaderData();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · ASSIGNMENTS · SYNTHETIC NEON" title="Your learning work." outcome={outcome}/>;
+ return <AssignmentsView data={outcome.data}/>;
+}
+function AssignmentsView({data}:{data:Awaited<ReturnType<typeof loadAssignments>>}){
+ const {connected,assignments}=data;
  const router=useRouter();
  const [selected,setSelected]=useState<string|null>(null);
  const [role,setRole]=useState<"student"|"teacher">("student");

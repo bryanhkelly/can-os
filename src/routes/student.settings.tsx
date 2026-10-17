@@ -2,9 +2,16 @@ import {createFileRoute} from "@tanstack/react-router";
 import {useState} from "react";
 import {getSyntheticStudentPreferences,saveSyntheticStudentPreferences} from "@/modules/student-experience/student-preferences.functions";
 import type {StudentDisplayPreferences} from "@/domain/student-display-preferences";
-export const Route=createFileRoute("/student/settings")({loader:()=>getSyntheticStudentPreferences(),component:StudentSettings});
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+const loadStudentPreferences=()=>getSyntheticStudentPreferences();
+export const Route=createFileRoute("/student/settings")({loader:safeLoader(loadStudentPreferences,{authMessage:"Sign in with an authorized student account to view display settings."}),component:StudentSettings});
 function StudentSettings(){
- const initial=Route.useLoaderData();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic student" title="Display settings" outcome={outcome}/>;
+ return <StudentSettingsView initial={outcome.data}/>;
+}
+function StudentSettingsView({initial}:{initial:Awaited<ReturnType<typeof loadStudentPreferences>>}){
  const [value,setValue]=useState<StudentDisplayPreferences>(initial);
  const [message,setMessage]=useState("");
  const [busy,setBusy]=useState(false);

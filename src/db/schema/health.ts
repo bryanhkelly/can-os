@@ -10,6 +10,11 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import {
+  healthComplianceStatus,
+  medicationAuthorizationStatus,
+  returnToSchoolClearanceStatus,
+} from "./enums";
 import { people, studentProfiles } from "./identity";
 import { documents } from "./documents";
 import { sites } from "./organizations";
@@ -42,7 +47,7 @@ export const healthComplianceItems = pgTable(
       .notNull()
       .references(() => studentProfiles.id, { onDelete: "restrict" }),
     type: text("type").notNull(),
-    status: text("status").default("missing").notNull(),
+    status: healthComplianceStatus("status").default("missing").notNull(),
     dueOn: date("due_on"),
     expiresOn: date("expires_on"),
     documentId: uuid("document_id").references(() => documents.id, {
@@ -71,7 +76,7 @@ export const medicationAuthorizations = pgTable(
       .references(() => studentProfiles.id, { onDelete: "restrict" }),
     medicationName: text("medication_name").notNull(),
     instructions: text("instructions").notNull(),
-    status: text("status").default("active").notNull(),
+    status: medicationAuthorizationStatus("status").default("active").notNull(),
     startsOn: date("starts_on").notNull(),
     expiresOn: date("expires_on"),
     authorizationDocumentId: uuid("authorization_document_id").references(
@@ -156,7 +161,7 @@ export const returnToSchoolClearances = pgTable(
       () => healthOfficeVisits.id,
       { onDelete: "restrict" },
     ),
-    status: text("status").default("required").notNull(),
+    status: returnToSchoolClearanceStatus("status").default("required").notNull(),
     documentId: uuid("document_id").references(() => documents.id, {
       onDelete: "restrict",
     }),

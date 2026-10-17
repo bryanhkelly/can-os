@@ -1,9 +1,13 @@
 import {createFileRoute,Link} from "@tanstack/react-router";
 import {getSyntheticFixtureHealth} from "@/modules/operations/fixture-health.functions";
 import {fixtureRecommendations} from "@/domain/synthetic-fixture-recommendations";
-export const Route=createFileRoute("/demo-health")({loader:()=>getSyntheticFixtureHealth(),component:DemoHealth});
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+export const Route=createFileRoute("/demo-health")({loader:safeLoader(()=>getSyntheticFixtureHealth(),{authMessage:"Sign in with an authorized staff account to view demo fixture health."}),component:DemoHealth});
 function DemoHealth(){
- const data=Route.useLoaderData();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic development" title="Demo fixture health" outcome={outcome}/>;
+ const data=outcome.data;
  const recommendations=fixtureRecommendations(data.checks,data.admissions);
  return <main className="mx-auto max-w-5xl px-5 py-10">
  <Link to="/operations" className="text-xs underline">← School operations</Link>

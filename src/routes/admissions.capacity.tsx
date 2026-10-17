@@ -1,9 +1,17 @@
 import {useState} from "react";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
 import {getSyntheticAdmissionsCapacity,updateSyntheticAdmissionsCapacity} from "@/modules/enrollment/capacity-preview.functions";
-export const Route=createFileRoute("/admissions/capacity")({loader:()=>getSyntheticAdmissionsCapacity(),component:Capacity});
+import {safeLoader} from "@/lib/safe-loader";
+import {LoaderFailure} from "@/lib/loader-failure";
+const loadCapacity=()=>getSyntheticAdmissionsCapacity();
+export const Route=createFileRoute("/admissions/capacity")({loader:safeLoader(loadCapacity,{authMessage:"Sign in with an authorized staff account to view program capacity."}),component:Capacity});
 function Capacity(){
- const rows=Route.useLoaderData(),router=useRouter();
+ const outcome=Route.useLoaderData();
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic admissions" title="Program capacity" outcome={outcome}/>;
+ return <CapacityView rows={outcome.data}/>;
+}
+function CapacityView({rows}:{rows:Awaited<ReturnType<typeof loadCapacity>>}){
+ const router=useRouter();
  const [edits,setEdits]=useState<Record<string,string>>({});
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
  async function save(id:string,current:number){
