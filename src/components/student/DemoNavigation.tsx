@@ -1,5 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
+import { openPaletteEvent } from "@/lib/workspace-search";
 
 /**
  * Demo personas are presentation/workflow selectors, NOT authenticated identities.
@@ -104,6 +106,9 @@ export function DemoNavigation(){
   <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3">
    <Link to="/" className="font-serif text-xl font-semibold">CAN OS</Link>
    <div className="flex flex-1 flex-wrap gap-x-4 gap-y-2">{visibleDemoLinks(role).map(x=><Link key={x.to} to={x.to} className="text-xs font-semibold text-muted-foreground hover:text-foreground">{x.label}</Link>)}</div>
+   <button type="button" aria-label="Search workspace" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))} className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
+    <Search className="size-3.5" aria-hidden/> Search <kbd className="rounded border border-border px-1 text-[10px]">Ctrl+K</kbd>
+   </button>
    <label className="flex items-center gap-2 text-xs text-muted-foreground">{signedIn?"Active membership":"Demo persona"}
     <select aria-label="Demo persona" value={role} onChange={event=>changePersona(getDemoPersona(event.target.value))} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
      {(memberships.length?demoRoles.filter(r=>memberships.some(g=>g.role===r)):demoRoles).map(r=><option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>)}
