@@ -6,10 +6,10 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import {
   assertCapability,
   assertSiteScope,
+  assertProgramScope,
   AuthorizationError,
   type CommandContext,
 } from "@/domain/command-context";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { EventTypes } from "@/domain/event-types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -34,7 +34,7 @@ function letterFor(percentage:number,entries:Array<{
  return matched.label;
 }
 
-type Viewer = { context: CommandContext; studentProfileId: string; siteIds: string[] };
+type Viewer = { context: CommandContext; studentProfileId: string; siteIds: string[]; programIds: string[] };
 
 /**
  * Report cards and transcripts are visible to the student themselves or to a
@@ -61,7 +61,7 @@ async function resolveStudentViewer(
       .where(eq(s.studentProfiles.personId, context.actorPersonId))
       .limit(1);
     if (!profile) throw new AuthorizationError("student profile");
-    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds };
+    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds,programIds:context.scope.programIds??[] };
   }
   if (context.role === "guardian") {
     assertCapability(context, "student:related-read");
@@ -89,7 +89,7 @@ async function resolveStudentViewer(
       .where(eq(s.studentProfiles.personId, studentPersonId))
       .limit(1);
     if (!profile) throw new AuthorizationError("student profile");
-    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds };
+    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds,programIds:context.scope.programIds??[] };
   }
   throw new AuthorizationError("report card access");
 }
@@ -135,6 +135,7 @@ async function finalizedGradeRows(
         eq(s.sectionGrades.studentProfileId, viewer.studentProfileId),
         eq(s.sectionGrades.status, "finalized"),
         inArray(s.sections.siteId, viewer.siteIds),
+        inArray(s.sections.programId,viewer.programIds),
         gradingPeriodId ? eq(s.sectionGrades.gradingPeriodId, gradingPeriodId) : undefined,
       ),
     )
@@ -172,7 +173,6 @@ export type FinalizedGradeRow = Awaited<ReturnType<typeof finalizedGradeRows>>[n
 export const finalizeSectionGrades = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ sectionId: z.string().min(1), gradingPeriodId: z.string().min(1) }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("teacher");
     const context = await getCommandContext(getRequest());
     assertCapability(context, "assignments:grade");
     if (context.role !== "teacher" || !context.actorPersonId) {
@@ -208,6 +208,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         .limit(1);
       if (!section) throw new AuthorizationError("assigned teacher");
       assertSiteScope(context, section.siteId);
+      assertProgramScope(context,section.programId);
 
       const [period] = await tx
         .select({
@@ -501,7 +502,6 @@ type GradeCorrection = {
 export const correctSectionGrade = createServerFn({ method: "POST" })
   .validator((value: unknown) => correctSectionGradeSchema.parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("teacher");
     const context = await getCommandContext(getRequest());
     assertCapability(context, "assignments:grade");
     if (context.role !== "teacher" || !context.actorPersonId) {
@@ -557,6 +557,7 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
         .limit(1);
       if (!section) throw new AuthorizationError("assigned teacher");
       assertSiteScope(context, section.siteId);
+      assertProgramScope(context,section.programId);
 
       const [gradeScale]=grade.gradeScaleId?await tx.select({configuration:s.gradeScales.configuration})
        .from(s.gradeScales).where(eq(s.gradeScales.id,grade.gradeScaleId)).limit(1):[];
@@ -707,7 +708,7 @@ async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
   .innerJoin(s.organizations,eq(s.organizations.id,s.programs.creditIssuingOrganizationId))
   .where(and(eq(s.enrollments.studentProfileId,viewer.studentProfileId),
    eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"withdrawn"),
-   inArray(s.sections.siteId,viewer.siteIds)));
+   inArray(s.sections.siteId,viewer.siteIds),inArray(s.sections.programId,viewer.programIds)));
  return rows.filter(row=>row.metadata.withdrawalNotation==="W").map(row=>({
   sectionGradeId:"withdrawal:"+row.enrollmentId,
   sectionId:row.sectionId,sectionTitle:row.sectionTitle,
@@ -760,7 +761,6 @@ async function listIssuances(db: DbClient, s: Schema, studentProfileId: string) 
 export const issueTranscript = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1), purpose: z.string().optional() }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const context = await getCommandContext(getRequest());
     assertCapability(context, "enrollment:manage");
     if (context.role !== "registrar" || !context.actorPersonId) {
@@ -786,6 +786,7 @@ export const issueTranscript = createServerFn({ method: "POST" })
       context,
       studentProfileId: profile.id,
       siteIds: context.scope.siteIds,
+      programIds:context.scope.programIds??[],
     };
     const rows = [...await finalizedGradeRows(db, s, viewer), ...await withdrawalTranscriptRows(db, s, viewer)];
     if (!rows.length) {
