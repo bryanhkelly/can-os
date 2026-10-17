@@ -1,4 +1,5 @@
-import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
+import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { db } from "@/db/client";
 import { attendanceEvents } from "@/db/schema";
 import type { CommandContext } from "@/domain/command-context";
@@ -25,6 +26,9 @@ export async function getStudentAttendanceSummary(
 
   const rows = await db
     .select({
+      id: attendanceEvents.id,
+      programId: attendanceEvents.programId,
+      studentProfileId: attendanceEvents.studentProfileId,
       occurrenceKey: attendanceEvents.occurrenceKey,
       status: attendanceEvents.status,
       recordedAt: attendanceEvents.recordedAt,
@@ -36,17 +40,12 @@ export async function getStudentAttendanceSummary(
         gte(attendanceEvents.expectedAt, input.from),
         lte(attendanceEvents.expectedAt, input.through),
       ),
-    )
-    .orderBy(asc(attendanceEvents.recordedAt));
+    );
 
-  const effective = new Map<string, (typeof rows)[number]>();
-
-  for (const row of rows) {
-    effective.set(row.occurrenceKey, row);
-  }
+  const effective = effectiveAttendanceEvents(rows);
 
   const summary: AttendanceSummary = {
-    totalOccurrences: effective.size,
+    totalOccurrences: effective.length,
     present: 0,
     tardy: 0,
     absent: 0,
@@ -54,7 +53,7 @@ export async function getStudentAttendanceSummary(
     attendanceRate: null,
   };
 
-  for (const row of effective.values()) {
+  for (const row of effective) {
     if (row.status === "present") summary.present += 1;
     if (row.status === "tardy") summary.tardy += 1;
     if (row.status === "absent") summary.absent += 1;
