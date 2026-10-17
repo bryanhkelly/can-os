@@ -27,7 +27,8 @@ function GuardianReportCardsPage() {
     getGuardianStudents().then(result => {
       if (!active) return;
       setStudents(result.students);
-      setSelected(result.students[0]?.studentPersonId ?? "");
+      const requested = new URLSearchParams(window.location.search).get("student");
+   setSelected(result.students.find(student => student.studentPersonId === requested)?.studentPersonId ?? result.students[0]?.studentPersonId ?? "");
       setLoadingStudents(false);
     }).catch(() => {
       if (active) {
