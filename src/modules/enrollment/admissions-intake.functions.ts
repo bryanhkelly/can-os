@@ -42,7 +42,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
   .orderBy(desc(applications.updatedAt)).limit(300);
  return rows.filter(r=>r.metadata.synthetic===true).map(r=>({
   ...r,createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
-  disposition:r.metadata.admissionsDisposition==="waitlisted"?"waitlisted":null,
+  disposition:r.metadata.admissionsDisposition==="waitlisted"?"waitlisted":r.metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
  }));
 });
 export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((v:unknown)=>applicant.parse(v))
@@ -58,15 +58,17 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
    // Being listed as the contact does not authenticate anyone as that person.
    const [guardian]=await tx.insert(people).values({
     legalFirstName:data.guardianFirstName,legalLastName:data.guardianLastName,email:data.guardianEmail,
+    metadata:{synthetic:true,origin:"registrar_intake"},
    }).returning({id:people.id});
    const [studentPerson]=await tx.insert(people).values({
     legalFirstName:data.studentFirstName,legalLastName:data.studentLastName,
+    metadata:{synthetic:true,origin:"registrar_intake"},
    }).returning({id:people.id});
    const [household]=await tx.insert(households).values({
     displayName:data.guardianLastName+" Household",primaryEmail:data.guardianEmail,
    }).returning({id:households.id});
    const [student]=await tx.insert(studentProfiles).values({personId:studentPerson!.id,
-    gradeLevel:data.gradeLevel||null}).returning({id:studentProfiles.id});
+    gradeLevel:data.gradeLevel||null,metadata:{synthetic:true}}).returning({id:studentProfiles.id});
    await tx.insert(householdMemberships).values([
     {householdId:household!.id,personId:guardian!.id,relationshipLabel:"guardian",isPrimaryContact:true},
     {householdId:household!.id,personId:studentPerson!.id,relationshipLabel:"student"},
@@ -112,10 +114,11 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
       (waitlisted&&!["restore","decline","withdraw"].includes(data.decision)))
     throw new Error("Decision is not permitted from the current admissions stage");
    const next=data.decision==="application"?"application":data.decision==="eligibility"?"eligibility":
-    data.decision==="accept"?"accepted":data.decision==="decline"?"declined":
+    data.decision==="accept"?app.stage:data.decision==="decline"?"declined":
     data.decision==="withdraw"?"withdrawn":app.stage;
    let nextMetadata:Record<string,unknown>={...app.metadata};
    if(data.decision==="waitlist")nextMetadata={...nextMetadata,admissionsDisposition:"waitlisted"};
+   if(data.decision==="accept")nextMetadata={...nextMetadata,admissionsDisposition:"offer_ready"};
    if(data.decision==="restore")nextMetadata={...nextMetadata,admissionsDisposition:null};
    if(data.decision==="eligibility" || data.decision==="accept"){
     const [journey]=await tx.select({id:journeys.id}).from(journeys)
@@ -135,7 +138,7 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
     }
    }
    await tx.update(applications).set({stage:next,metadata:nextMetadata,
-    decidedAt:["accept","decline","withdraw"].includes(data.decision)?new Date():app.decidedAt,
+    decidedAt:["decline","withdraw"].includes(data.decision)?new Date():app.decidedAt,
     decisionNote:data.note||app.decisionNote,updatedAt:new Date()}).where(eq(applications.id,app.id));
    await tx.insert(domainEvents).values({eventType:"AdmissionsStageChanged",aggregateType:"application",
     aggregateId:app.id,actorPersonId:actor.actorPersonId,
