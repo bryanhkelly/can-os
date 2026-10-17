@@ -104,7 +104,7 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
     if(old.metadata.isCurrent===false)continue;
     await tx.update(documents).set({metadata:{...old.metadata,isCurrent:false,supersededAt:new Date().toISOString()},updatedAt:new Date()}).where(eq(documents.id,old.id));
    }
-   const [document]=await tx.insert(documents).values({subjectType:"journey_requirement",subjectId:data.requirementId,category:"enrollment",fileName:data.fileName,storageProvider:"cloudflare_r2",storageKey:data.key,mimeType:data.mimeType,sensitivityTier:"restricted",uploadedByPersonId:actorId,metadata:{applicationId:data.applicationId,size:data.size,reviewStatus:"received",version,isCurrent:true}}).returning({id:documents.id});
+   const [document]=await tx.insert(documents).values({subjectType:"journey_requirement",subjectId:data.requirementId,category:"enrollment",fileName:data.fileName,storageProvider:"cloudflare_r2",storageKey:data.key,mimeType:data.mimeType,sensitivityTier:"restricted",uploadedByPersonId:actorId,metadata:{applicationId:data.applicationId,size:data.size,storageVerified:true,reviewStatus:"received",version,isCurrent:true}}).returning({id:documents.id});
    if(!document)throw new Error("Could not record document");
    const now=new Date();
    await tx.update(journeyRequirements).set({status:"needs_you",completedAt:null,updatedAt:now,
