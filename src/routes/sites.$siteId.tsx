@@ -5,10 +5,11 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
 export const Route = createFileRoute("/sites/$siteId")({
-  loader: ({ params }) => safeLoader(
-    () => getSiteToday({ data: { siteId: params.siteId } }),
-    { authMessage: "You do not have access to this school site." },
-  ),
+  loader: ({ params }) =>
+    safeLoader(
+      () => getSiteToday({ data: { siteId: params.siteId } }),
+      { authMessage: "You do not have access to this school site." },
+    )(),
   component: SiteTodayPage,
 });
 function SiteTodayPage() {
