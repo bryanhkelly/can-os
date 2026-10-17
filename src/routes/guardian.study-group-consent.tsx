@@ -1,11 +1,12 @@
 import {useState} from "react";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
-import {listGuardianStudyGroupConsents,decideGuardianStudyGroupConsent} from "@/modules/study-groups/study-groups.functions";
+import {listCanonicalGuardianGroupConsents} from "@/modules/study-groups/canonical-workspace.functions";
+import {decideCanonicalGroupConsent} from "@/modules/study-groups/canonical-membership.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 export const Route=createFileRoute("/guardian/study-group-consent")({
- loader:safeLoader(()=>listGuardianStudyGroupConsents(),{
+ loader:safeLoader(()=>listCanonicalGuardianGroupConsents(),{
   authMessage:"Sign in as the student's authorized guardian to review group participation."}),
  component:GuardianConsents
 });
@@ -14,12 +15,12 @@ function GuardianConsents(){
  if(!data.ok)return <LoaderFailure eyebrow="CAN OS · Family" title="Study group consent" outcome={data}/>;
  return <ConsentList items={data.data}/>;
 }
-function ConsentList({items}:{items:Awaited<ReturnType<typeof listGuardianStudyGroupConsents>>}){
+function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuardianGroupConsents>>}){
  const router=useRouter();
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  async function decide(actionId:string,approve:boolean){
   setBusy(true);setError("");setNotice("");
-  try{await decideGuardianStudyGroupConsent({data:{actionId,approve}});
+  try{await decideCanonicalGroupConsent({data:{actionId,approve,acknowledged:approve}});
    await router.invalidate();setNotice(approve?"Permission granted.":"Permission declined.");}
   catch(e){setError(e instanceof Error?e.message:"Unable to save permission");}
   finally{setBusy(false);}
