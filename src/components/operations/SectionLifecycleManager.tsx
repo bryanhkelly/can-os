@@ -102,6 +102,12 @@ function LifecycleSection({section,staff,busy,reason,allSections,run,onChanged}:
       {section.scheduleOptions.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
      </select>
     </label>
+    <div className="mt-3 rounded border bg-muted p-2 text-xs">
+     <strong>Schedule impact preview:</strong> {section.students.length} active enrollments,
+     {" "}{section.teachers.length} assigned instructors and
+     {" "}{section.allocations.filter(a=>a.status==="held"||a.status==="committed").length} active capacity allocations.
+     Calendar and attendance obligations should be reviewed before confirming.
+    </div>
     <button type="button" disabled={busy||!section.active} onClick={()=>void run(section.id,
       ()=>updateSectionLifecycleSchedule({data:{sectionId:section.id,scheduleTemplateId:schedule||null,
         startsAt:start?new Date(start).toISOString():null,endsAt:end?new Date(end).toISOString():null,reason}}),
