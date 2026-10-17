@@ -335,6 +335,17 @@ integration("GF-A2 durable subscriptions", () => {
       .where(eq(schema.subscriptionDeliveries.domainEventId, event.id));
     expect(deliveriesAfterRerun).toHaveLength(deliveries.length);
 
+    // Reconciliation after a crash re-creates its receipt without duplicate alerts.
+    await db.delete(schema.subscriptionEventReceipts)
+      .where(eq(schema.subscriptionEventReceipts.eventId, event.id));
+    await subscriptionsPlatform.recoverSubscriptionEventMatches();
+    const [recoveredReceipt] = await db.select().from(schema.subscriptionEventReceipts)
+      .where(eq(schema.subscriptionEventReceipts.eventId, event.id));
+    expect(recoveredReceipt).toBeDefined();
+    const deliveriesAfterRecovery = await db.select().from(schema.subscriptionDeliveries)
+      .where(eq(schema.subscriptionDeliveries.domainEventId, event.id));
+    expect(deliveriesAfterRecovery).toHaveLength(deliveriesAfterRerun.length);
+
     // --- External delivery is durable and reports missing contact accurately ----
     const [queued] = await db.select().from(schema.subscriptionDeliveries)
       .where(and(
@@ -381,6 +392,20 @@ integration("GF-A2 durable subscriptions", () => {
     const remindersAgain =
       await subscriptionsPlatform.processSubscriptionReminders(reminderTime);
     expect(remindersAgain).toBe(0);
+
+    // A changed schedule can add one further deduplicated reminder.
+    await db.update(schema.subscriptions).set({
+      reminderPolicy: { remindAfterHours: 1, repeatEveryHours: 1, maxReminders: 2 },
+    }).where(eq(schema.subscriptions.id, guardianSub!.id));
+    const nextReminderTime = new Date(reminderTime.getTime() + 3_600_000);
+    await subscriptionsPlatform.processSubscriptionReminders(nextReminderTime);
+    const [repeatReminder] = await db.select().from(schema.subscriptionDeliveries)
+      .where(and(
+        eq(schema.subscriptionDeliveries.subscriptionId, guardianSub!.id),
+        eq(schema.subscriptionDeliveries.domainEventId, event.id),
+        eq(schema.subscriptionDeliveries.kind, "reminder:2"),
+      ));
+    expect(repeatReminder?.status).toBe("delivered");
 
     // --- Condition resolved: no reminder for the next watched event ------------
     const [assessmentTwo] = await db
