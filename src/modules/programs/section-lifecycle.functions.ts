@@ -5,7 +5,7 @@ import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {
  sectionLifecycleSnapshot,changeSectionSchedule,changeSectionState,replaceSectionTeacher,
- changeSectionEnrollment,addSectionWaitlist,resolveSectionWaitlist
+ changeSectionEnrollment,addSectionWaitlist,resolveSectionWaitlist,transferSectionEnrollment,promoteSectionWaitlist
 } from "./section-lifecycle-service";
 const uuid=z.string().uuid();
 async function actor(){
@@ -38,3 +38,10 @@ export const queueLifecycleWaitlist=createServerFn({method:"POST"})
 export const resolveLifecycleWaitlist=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({actionId:uuid,reason:z.string().trim().max(1000)}).parse(v))
  .handler(async({data})=>{await resolveSectionWaitlist(await actor(),data.actionId,data.reason);return {ok:true}});
+
+export const transferLifecycleEnrollment=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({enrollmentId:uuid,destinationSectionId:uuid,reason:z.string().trim().min(5).max(1000)}).parse(v))
+ .handler(async({data})=>transferSectionEnrollment(await actor(),data));
+export const promoteLifecycleWaitlist=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({actionId:uuid}).parse(v))
+ .handler(async({data})=>promoteSectionWaitlist(await actor(),data.actionId));
