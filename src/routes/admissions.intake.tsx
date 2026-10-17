@@ -18,6 +18,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const router=useRouter();
  const programs=data.programs;
  const [programId,setProgramId]=useState(programs[0]?.id??"");
+ const [requestId,setRequestId]=useState(()=>crypto.randomUUID());
  const [studentFirstName,setStudentFirstName]=useState(""),[studentLastName,setStudentLastName]=useState("");
  const [guardianFirstName,setGuardianFirstName]=useState(""),[guardianLastName,setGuardianLastName]=useState("");
  const [guardianEmail,setGuardianEmail]=useState(""),[gradeLevel,setGradeLevel]=useState("9"),[source,setSource]=useState("school_direct");
@@ -35,8 +36,9 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   <section className="mt-8 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">New inquiry</h2>
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void perform(
-    ()=>createAdmissionsInquiry({data:{programId,studentFirstName,studentLastName,guardianFirstName,guardianLastName,
-     guardianEmail,gradeLevel,source,notes}}),"Inquiry created.");}}>
+    async()=>{await createAdmissionsInquiry({data:{requestId,programId,studentFirstName,studentLastName,
+     guardianFirstName,guardianLastName,guardianEmail,gradeLevel,source,notes}});
+     setRequestId(crypto.randomUUID());},"Inquiry created.");}}>
     <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required value={programId} onChange={e=>setProgramId(e.target.value)}>
      <option value="">Choose program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
     </select></label>
