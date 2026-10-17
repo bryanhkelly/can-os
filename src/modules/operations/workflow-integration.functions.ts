@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { getRequest } from "@tanstack/react-start/server";
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   actions, admissionOffers, applications, assessments, attendanceEvents,
@@ -38,7 +38,8 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
   if (!programRows.length) return { programs: [], windowDays: 30 };
   const ids = programRows.map(p => p.id);
   const siteIds = [...new Set(programRows.map(p => p.siteId).filter((id): id is string => !!id))];
-  const since = new Date(Date.now() - 30 * 86400000);
+  const now = new Date();
+  const since = new Date(now.getTime() - 30 * 86400000);
 
   const [
     yearRows, sectionRows, launchJourneys, launchRequirements,
@@ -91,6 +92,7 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
       recordedAt: attendanceEvents.recordedAt,
     }).from(attendanceEvents).where(and(
       inArray(attendanceEvents.programId, ids), gte(attendanceEvents.expectedAt, since),
+      lte(attendanceEvents.expectedAt, now),
     )).orderBy(desc(attendanceEvents.recordedAt), desc(attendanceEvents.id)),
     db.select({
       programId: attendanceEvents.programId, id: attendanceExcuses.id,
