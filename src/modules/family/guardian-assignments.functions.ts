@@ -102,13 +102,13 @@ export const getGuardianStudents = createServerFn({ method: "GET" }).handler(asy
   .innerJoin(s.people, eq(s.people.id, s.guardianRelationships.studentPersonId))
   .innerJoin(s.studentProfiles, eq(s.studentProfiles.personId, s.guardianRelationships.studentPersonId))
   .innerJoin(s.enrollments, eq(s.enrollments.studentProfileId, s.studentProfiles.id))
-  .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+  .innerJoin(s.programs, eq(s.programs.id, s.enrollments.programId))
   .where(and(
    eq(s.guardianRelationships.guardianPersonId, context.actorPersonId),
    eq(s.guardianRelationships.canViewAcademics, true),
-   eq(s.enrollments.kind, "section"),
+   inArray(s.enrollments.kind, ["program", "school_year", "section"]),
    eq(s.enrollments.status, "active"),
-   inArray(s.sections.siteId, context.scope.siteIds),
+   inArray(s.programs.siteId, context.scope.siteIds),
   ));
  return { students: Array.from(new Map(rows.map(row => [row.studentPersonId, row])).values()) };
 });
