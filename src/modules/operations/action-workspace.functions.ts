@@ -5,7 +5,8 @@ import {db} from "@/db/client";
 import {actions,auditEvents,domainEvents,notifications,accountPersonGrants} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
-import {notificationSummary,dedupeQueue,type QueueItem} from "@/domain/notification-triage";
+import {notificationSummary,dedupeQueue} from "@/domain/notification-triage";
+import {EventTypes} from "@/domain/event-types";
 
 async function operator() {
  const actor=await getCommandContext(getRequest());
@@ -48,7 +49,7 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    const now=new Date();
    await tx.update(actions).set({status:data.status,resolvedAt:data.status==="resolved"?now:null,resolutionNote:data.status==="resolved"?data.resolutionNote?.trim():record.resolutionNote,updatedAt:now}).where(eq(actions.id,record.id));
    await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,action:"action.status.change",resourceType:"action",resourceId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{status:record.status},after:{status:data.status},context:{requestId:actor.requestId??null}});
-   if(data.status==="resolved")await tx.insert(domainEvents).values({eventType:"ActionResolved",aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,payload:{subjectType:record.subjectType,subjectId:record.subjectId}});
+   if(data.status==="resolved")await tx.insert(domainEvents).values({eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,payload:{subjectType:record.subjectType,subjectId:record.subjectId}});
    return {saved:true};
   });
  });
@@ -63,6 +64,7 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    if(!record||["resolved","cancelled"].includes(record.status))throw new AuthorizationError("active action scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
    if(data.ownerPersonId){
+    if(!record.siteId)throw new AuthorizationError("site-scoped action required for assignment");
     const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true))).limit(1);
     if(!grant)throw new AuthorizationError("assignee must have active site membership");
    }
