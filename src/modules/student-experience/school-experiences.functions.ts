@@ -25,27 +25,11 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
       .where(inArray(schema.conferenceSeries.siteId,sites)).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25),
   ]);
   return {connected:true,viewerRole,
-    events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:typeof e.metadata.demoStatus==="string"?e.metadata.demoStatus:"scheduled"})),
+    events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:"scheduled"})),
     notices:notices.map(n=>({id:n.id,title:n.title,body:n.body??"",acknowledged:n.status==="read"})),
     slots:slots.map(s=>({id:s.id,startsAt:s.startsAt.toISOString(),endsAt:s.endsAt.toISOString(),status:s.status})),
   };
 });
-export const setSyntheticCalendarStatus=createServerFn({method:"POST"})
-  .validator((value:unknown)=>z.object({eventId:z.string().uuid(),status:z.enum(["scheduled","moved","cancelled"])}).parse(value))
-  .handler(async({data})=>{
-  assertSyntheticMutation("registrar");
-    const actor=await requireActor(["registrar"]);
-   const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-    return db.transaction(async tx=>{
-      const [current]=await tx.select({metadata:schema.calendarEvents.metadata,siteId:schema.calendarEvents.siteId}).from(schema.calendarEvents).where(eq(schema.calendarEvents.id,data.eventId)).for("update").limit(1);
-      if(!current) throw new Error("Event not found");
-      assertSiteGranted(actor,current.siteId);
-      const before=typeof current.metadata.demoStatus==="string"?current.metadata.demoStatus:"scheduled";
-      await tx.update(schema.calendarEvents).set({metadata:{...current.metadata,demoStatus:data.status},updatedAt:new Date()}).where(eq(schema.calendarEvents.id,data.eventId));
-      await recordAudit(tx,actor,{action:"calendar.status.set",resourceType:"calendar_event",resourceId:data.eventId,before:{status:before},after:{status:data.status},scope:{siteId:current.siteId}});
-      return {saved:true};
-    });
-  });
 export const acknowledgeSyntheticNotice=createServerFn({method:"POST"})
   .validator((value:unknown)=>z.object({noticeId:z.string().uuid()}).parse(value))
   .handler(async({data})=>{
