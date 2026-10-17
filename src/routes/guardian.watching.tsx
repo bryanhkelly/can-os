@@ -148,8 +148,8 @@ function WatchingPage() {
 }
 
 function WatchSettings({ watch, onSaved }: { watch: Watch; onSaved: () => Promise<void> }) {
-  const [channel, setChannel] = useState<"in_app" | "email">(
-    watch.channel === "email" ? "email" : "in_app");
+  const [channel, setChannel] = useState<"in_app" | "email" | "sms">(
+    watch.channel === "sms" ? "sms" : watch.channel === "email" ? "email" : "in_app");
   const [first, setFirst] = useState(watch.reminderAfterHours ?? 24);
   const [repeat, setRepeat] = useState(watch.repeatEveryHours ?? 24);
   const [maximum, setMaximum] = useState(watch.maxReminders);
@@ -168,9 +168,9 @@ function WatchSettings({ watch, onSaved }: { watch: Watch; onSaved: () => Promis
   }
   return <div className="mt-4 grid gap-3 border-t pt-3 text-sm sm:grid-cols-2">
     <label>Channel
-      <select value={channel} onChange={e => setChannel(e.target.value as "in_app" | "email")}
+      <select value={channel} onChange={e => setChannel(e.target.value as "in_app" | "email" | "sms")}
         className="mt-1 block w-full rounded-md border bg-background p-2">
-        <option value="in_app">In-app</option><option value="email">Email</option>
+        <option value="in_app">In-app</option><option value="email">Email</option><option value="sms">Verified SMS</option>
       </select>
     </label>
     <label>First reminder after (hours)
