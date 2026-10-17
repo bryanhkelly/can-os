@@ -138,9 +138,11 @@ export const getEnrollmentDocumentUploadAvailability=createServerFn({method:"GET
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId||!["registrar","guardian"].includes(context.role))
   throw new Error("Enrollment document access denied");
+ let configured=true;
+ try{r2Config()}catch{configured=false}
  return {
-  live:process.env.CAN_R2_LIVE_UPLOADS_ENABLED==="true",
-  demo:process.env.CAN_R2_DEMO_UPLOADS_ENABLED==="true",
+  live:configured&&process.env.CAN_R2_LIVE_UPLOADS_ENABLED==="true",
+  demo:configured&&process.env.CAN_R2_DEMO_UPLOADS_ENABLED==="true",
  };
 });
 
