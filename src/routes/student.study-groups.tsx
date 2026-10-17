@@ -4,11 +4,11 @@ import {getStudyGroupAvailability,listStudyGroups,requestStudyGroupMembership,le
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 const loadStudyGroups=async()=>{
- const {enabled}=await getStudyGroupAvailability();
- if(!enabled)return {enabled,groups:[]};
+ const {enabled,writesEnabled}=await getStudyGroupAvailability();
+ if(!enabled)return {enabled,writesEnabled,groups:[]};
  const groups=await listStudyGroups();
  // Student pages must not require facilitator-only permissions to render.
- return {enabled,groups};
+ return {enabled,writesEnabled,groups};
 };
 export const Route=createFileRoute("/student/study-groups")({validateSearch:(search:Record<string,unknown>):{group?:string;session?:string}=>({group:typeof search.group==="string"?search.group:undefined,session:typeof search.session==="string"?search.session:undefined}),loader:safeLoader(loadStudyGroups,{authMessage:"Sign in with an authorized student account to view study groups."}),component:StudyGroups});
 function StudyGroups(){
