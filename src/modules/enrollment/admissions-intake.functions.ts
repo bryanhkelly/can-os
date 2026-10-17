@@ -106,6 +106,8 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
    });
    await tx.insert(guardianRelationships).values({
     guardianPersonId,studentPersonId:studentPerson!.id,relationshipLabel:"guardian",
+    canViewAcademics:false,canManageEnrollment:false,canSubmitAttendanceExcuse:false,
+    metadata:{verification:"pending",source:"registrar_intake"},
    });
    const [application]=await tx.insert(applications).values({
     householdId,studentProfileId:student!.id,programId:data.programId,
@@ -270,4 +272,52 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
    resourceId:data.applicationId,scope:{programId:application.programId},
    after:{invitationRequested:true}});
   return {sent:true};
+ });
+
+/** Guardian permissions are not automatically created from a registrar-entered
+ * email. Staff must attest to an independent relationship check first. */
+export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({
+  applicationId:uuid,
+  method:z.enum(["in_person_id","verified_school_record","live_video_verification"]),
+  evidenceNote:z.string().trim().min(12).max(2000),
+ }).parse(value))
+ .handler(async({data})=>{
+  const actor=await registrar();
+  return db.transaction(async tx=>{
+   const [app]=await tx.select({
+    id:applications.id,programId:applications.programId,
+    studentProfileId:applications.studentProfileId,metadata:applications.metadata,
+   }).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
+   if(!app||!actor.scope.programIds?.includes(app.programId))
+    throw new AuthorizationError("guardian relationship verification");
+   const contactId=String(app.metadata.contactPersonId??"");
+   const [learner]=await tx.select({personId:studentProfiles.personId})
+    .from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
+   if(!learner)throw new Error("Student not found");
+   const [relationship]=await tx.select().from(guardianRelationships)
+    .where(and(eq(guardianRelationships.guardianPersonId,contactId),
+     eq(guardianRelationships.studentPersonId,learner.personId))).for("update").limit(1);
+   if(!relationship)throw new Error("Guardian relationship not found");
+   if(relationship.metadata.verification==="verified")return {verified:true};
+   const verifiedAt=new Date();
+   await tx.update(guardianRelationships).set({
+    canViewAcademics:true,canManageEnrollment:true,canSubmitAttendanceExcuse:true,
+    metadata:{...relationship.metadata,verification:"verified",
+     method:data.method,evidenceNote:data.evidenceNote,
+     verifiedBy:actor.actorPersonId,verifiedAt:verifiedAt.toISOString()},
+    updatedAt:verifiedAt,
+   }).where(eq(guardianRelationships.id,relationship.id));
+   await tx.insert(auditEvents).values({
+    actorPersonId:actor.actorPersonId,
+    action:"admissions.guardian_relationship.verify",
+    resourceType:"guardian_relationship",resourceId:relationship.id,
+    scope:{programId:app.programId},
+    before:{verification:relationship.metadata.verification??"unverified"},
+    after:{verification:"verified",method:data.method,
+     studentProfileId:app.studentProfileId},
+    context:{evidenceNote:data.evidenceNote},
+   });
+   return {verified:true};
+  });
  });
