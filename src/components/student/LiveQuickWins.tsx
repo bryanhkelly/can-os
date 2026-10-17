@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
   finishQuickWinAction, requestQuickWinHelp,
-} from "@/modules/_demo/quick-wins.functions";
+} from "@/modules/actions/student-actions.functions";
 
 type Action = {
   id: string; title: string; description: string | null;
