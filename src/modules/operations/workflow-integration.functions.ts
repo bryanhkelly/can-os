@@ -66,11 +66,12 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
       id: applications.id, programId: applications.programId,
       studentProfileId: applications.studentProfileId, stage: applications.stage,
     }).from(applications).where(inArray(applications.programId, ids)),
-    db.select({ programId: admissionOffers.programId, status: admissionOffers.status })
+    db.select({ programId: admissionOffers.programId, applicationId: admissionOffers.applicationId,
+      schoolYearId: admissionOffers.schoolYearId, status: admissionOffers.status })
       .from(admissionOffers).where(inArray(admissionOffers.programId, ids)),
     db.select({
       programId: enrollments.programId, studentProfileId: enrollments.studentProfileId,
-      kind: enrollments.kind, status: enrollments.status,
+      schoolYearId: enrollments.schoolYearId, kind: enrollments.kind, status: enrollments.status,
     }).from(enrollments).where(and(
       inArray(enrollments.programId, ids), eq(enrollments.kind, "program"),
       eq(enrollments.status, "active"),
@@ -116,7 +117,9 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
     if (!latestSubmissions.has(key)) latestSubmissions.set(key, submission);
   }
   const assessmentProgram = new Map(assessmentRows.map(a => [a.id, a.programId]));
-  const activeProfiles = new Set(enrollmentRows.map(e => e.programId + ":" + e.studentProfileId));
+  const activeProfiles = new Set(enrollmentRows.map(e =>
+    [e.programId, e.schoolYearId, e.studentProfileId].join(":")));
+  const applicationProfiles = new Map(applicationRows.map(a => [a.id, a.studentProfileId]));
 
   return {
     windowDays: 30,
@@ -131,8 +134,12 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
       const programApplications = applicationRows.filter(a => a.programId === program.id);
       const accepted = programApplications.filter(a => a.stage === "accepted");
       const enrolled = enrollmentRows.filter(e => e.programId === program.id).length;
-      const pendingActivation = accepted.filter(a =>
-        !activeProfiles.has(program.id + ":" + a.studentProfileId)).length;
+      // An enrollment in an earlier school year does not activate a newly
+      // accepted offer for the next school year.
+      const pendingActivation = offerRows.filter(o => o.programId === program.id &&
+        o.status === "accepted" && !activeProfiles.has([
+          program.id, o.schoolYearId, applicationProfiles.get(o.applicationId),
+        ].join(":"))).length;
       const grades = [...latestSubmissions.values()].filter(s =>
         assessmentProgram.get(s.assessmentId) === program.id);
       const attendance = effectiveAttendance.filter(e => e.programId === program.id);
