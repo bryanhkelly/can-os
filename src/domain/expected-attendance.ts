@@ -162,6 +162,16 @@ export function summarizeExpectedOnsiteAttendance(input: {
 
     for (let date = year.startsOn > start ? year.startsOn : start;
       date <= through && date <= year.endsOn; date = shiftDay(date, 1)) {
+      const configuredDay = daysByCalendar.get(calendar.id + ":" + date);
+      // Closure, holiday and zero-instruction days cannot create an
+      // expectation regardless of what the recurring timetable says.
+      if (configuredDay &&
+        (configuredDay.type === "holiday" || configuredDay.type === "closure" ||
+          configuredDay.instructionalMinutes === 0)) continue;
+      const instructional = configuredDay?.type === "instructional";
+      const exceptionalInstruction = configuredDay?.type === "makeup" ||
+        (configuredDay?.type === "special" &&
+          (configuredDay.instructionalMinutes ?? 0) > 0);
       const schedules = input.schedules
         .filter(s => s.schoolYearId === year.id && s.siteId === program.siteId &&
           s.active && (!s.programId || s.programId === program.id) &&
@@ -170,7 +180,10 @@ export function summarizeExpectedOnsiteAttendance(input: {
           Number(b.programId === program.id) - Number(a.programId === program.id) ||
           b.effectiveFrom.localeCompare(a.effectiveFrom));
       const chosen = schedules[0];
-      if (!chosen) { scheduleMissing = true; continue; }
+      if (!chosen) {
+        if (instructional || exceptionalInstruction || !configuredDay) scheduleMissing = true;
+        continue;
+      }
       const pattern = periodsBySchedule.get(chosen.id);
       if (!pattern?.size) { scheduleMissing = true; continue; }
       const onsiteDays = program.deliveryModel?.onsiteDaysPerWeek;
@@ -178,17 +191,15 @@ export function summarizeExpectedOnsiteAttendance(input: {
         scheduleMismatch = true;
         continue;
       }
-      if (!pattern.has(weekday(date))) continue;
-      const configuredDay = daysByCalendar.get(calendar.id + ":" + date);
+      // Explicit make-up days may override the standard weekly pattern.
+      // Ordinary weekdays still require an actual scheduled instruction period.
+      if (!pattern.has(weekday(date)) && !exceptionalInstruction) continue;
       if (!configuredDay) {
         partialCalendar = true;
         base.daysWithoutCalendarConfiguration += 1;
         continue;
       }
-      if (configuredDay.type !== "instructional" && configuredDay.type !== "makeup" &&
-        !(configuredDay.type === "special" && (configuredDay.instructionalMinutes ?? 0) > 0))
-        continue;
-      if (configuredDay.instructionalMinutes === 0) continue;
+      if (!instructional && !exceptionalInstruction) continue;
 
       for (const student of students) {
         if (student.startedAt && siteDate(student.startedAt, input.timeZone) > date) continue;
