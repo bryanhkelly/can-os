@@ -1,11 +1,10 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {createAdmissionsInquiry,listAdmissionsIntake,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
-import {listLaunchOptions} from "@/modules/programs/launch.functions";
+import {createAdmissionsInquiry,listAdmissionsIntake,listAdmissionsIntakePrograms,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
-const load=async()=>({records:await listAdmissionsIntake(),options:await listLaunchOptions()});
+const load=async()=>({records:await listAdmissionsIntake(),programs:await listAdmissionsIntakePrograms()});
 export const Route=createFileRoute("/admissions/intake")({
  loader:safeLoader(load,{authMessage:"Sign in as a registrar to manage admissions."}),
  component:IntakePage
@@ -17,7 +16,7 @@ function IntakePage(){
 }
 function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const router=useRouter();
- const programs=data.options.organizations.flatMap(org=>data.records.filter(r=>r.programId!=="").map(r=>({id:r.programId,name:r.programName}))).filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i);
+ const programs=data.programs;
  const [programId,setProgramId]=useState(programs[0]?.id??"");
  const [studentFirstName,setStudentFirstName]=useState(""),[studentLastName,setStudentLastName]=useState("");
  const [guardianFirstName,setGuardianFirstName]=useState(""),[guardianLastName,setGuardianLastName]=useState("");
