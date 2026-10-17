@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getAssignments,saveAssignmentResponse,saveAssignmentDraft} from "@/modules/student-experience/assignments.functions";
-import {createSubmissionAttachmentUpload,attachDocumentToSubmission,listSubmissionAttachments} from "@/modules/learning/submission-attachments.functions";
+import {createSubmissionAttachmentUpload,attachDocumentToSubmission,listSubmissionAttachments,getSubmissionAttachmentDownload} from "@/modules/learning/submission-attachments.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 
@@ -99,6 +99,8 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
     }catch{failures.push(file.name);}
    }
    setPendingFiles([]);
+   const updatedFiles=await listSubmissionAttachments({data:{assessmentId:chosen.assessmentId}});
+   setAttachments(updatedFiles.attachments);
    await router.invalidate();
    setNotice(failures.length
     ?"Your response was submitted, but attachments need attention: "+failures.join(", ")
@@ -152,7 +154,14 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
      {chosen.metadata.rubric&&<p className="mt-4 rounded-lg bg-muted p-3 text-sm">Rubric: {chosen.metadata.rubric}</p>}
      {chosen.feedbackText&&<div className="mt-4 rounded-lg bg-muted p-4"><p className="font-semibold text-sm">Teacher feedback</p><p className="mt-2 text-sm">{chosen.feedbackText}</p></div>}
      {chosen.attempts.length>1&&<div className="mt-4 rounded-lg border p-3"><h3 className="font-semibold text-sm">Submission history</h3>{chosen.attempts.map(attempt=><p key={attempt.attempt} className="mt-1 text-xs">Attempt {attempt.attempt} · {attempt.status}{attempt.score!==null?" · "+attempt.score+" points":""}</p>)}</div>}
-     {attachments.length>0&&<div className="mt-4 rounded-lg border p-3"><p className="font-semibold text-sm">Attached files</p>{attachments.map(file=><p key={file.documentId} className="mt-1 text-xs">{file.fileName}</p>)}</div>}
+     {attachments.length>0&&<div className="mt-4 rounded-lg border p-3"><p className="font-semibold text-sm">Attached files</p>{attachments.map(file=><button type="button" key={file.documentId}
+      className="mt-1 block text-xs underline" onClick={async()=>{
+       if(!chosen)return;
+       try{
+        const result=await getSubmissionAttachmentDownload({data:{assessmentId:chosen.assessmentId,documentId:file.documentId}});
+        window.location.assign(result.downloadUrl);
+       }catch(cause){setError(cause instanceof Error?cause.message:"Unable to open attachment")}
+      }}>{file.fileName}</button>)}</div>}
      {editable?<div className="mt-6">
       <label className="text-sm font-semibold">Your response
        <textarea rows={8} value={draft} maxLength={20000} onChange={event=>{setDraft(event.target.value);setDraftStatus("idle")}}
