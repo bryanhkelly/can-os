@@ -6,6 +6,7 @@ export type AgentPlan =
   | { intent: "ask"; kind: "student_summary"; studentQuery: string }
   | { intent: "watch"; studentQuery: string; eventTypes: string[]; remindAfterHours?: number }
   | { intent: "manage"; action: "list" | "pause" | "resume" | "revoke" }
+  | { intent: "manage"; action: "create_digest"; studentQuery: string; weekday: number; hour: number }
   | { intent: "ask"; kind: "help" };
 
 const missing = /\b(miss(?:ed|es|ing)?|late|overdue|past[ -]due|unsubmitted|not turned in|not handed in|assignment(?:s)?|homework|coursework|schoolwork)\b/i;
