@@ -497,7 +497,12 @@ export async function activateSchoolYear(
     // Even activation changes the eligible year set; a live attendance
     // transaction must never observe a half-activated site/year.
     await lockAttendanceConfigurationAtSite(tx, year.siteId);
-    if (year.status === "active") return;
+    // Another registrar may have activated the year while we waited for
+    // the site lock. Re-read after acquisition to avoid duplicate events.
+    const [currentYear] = await tx.select({ status: schoolYears.status })
+      .from(schoolYears).where(eq(schoolYears.id, schoolYearId)).limit(1);
+    if (!currentYear) throw new Error("SchoolYear not found");
+    if (currentYear.status === "active") return;
 
     const yearTerms = await tx
       .select({ id: terms.id })
