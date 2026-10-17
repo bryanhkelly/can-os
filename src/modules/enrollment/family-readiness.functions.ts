@@ -1,5 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
-import {eq,inArray,and,sql} from "drizzle-orm";
+import {eq,inArray,and} from "drizzle-orm";
 import {z} from "zod";
 import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
@@ -18,7 +18,7 @@ export const getFamilyReadiness=createServerFn({method:"GET"})
  const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,metadata:s.applications.metadata,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).where(inArray(s.applications.programId,scoped.programIds)).limit(150);
  const synthetic=apps;
  if(!synthetic.length)return [];
- const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId,status:s.journeys.status}).from(s.journeys).where(inArray(s.journeys.participantId,synthetic.map(x=>x.id)));
+ const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId,status:s.journeys.status}).from(s.journeys).where(and(eq(s.journeys.participantType,"application"),inArray(s.journeys.participantId,synthetic.map(x=>x.id))));
  const enrollmentRows=await db.select({studentProfileId:s.enrollments.studentProfileId,programId:s.enrollments.programId,schoolYearId:s.enrollments.schoolYearId,status:s.enrollments.status,kind:s.enrollments.kind}).from(s.enrollments).where(inArray(s.enrollments.studentProfileId,[...new Set(synthetic.map(a=>a.studentProfileId))]));
  const offers=await db.select({applicationId:s.admissionOffers.applicationId,status:s.admissionOffers.status,schoolYearId:s.admissionOffers.schoolYearId,respondedAt:s.admissionOffers.respondedAt,expiresAt:s.admissionOffers.expiresAt}).from(s.admissionOffers).where(inArray(s.admissionOffers.applicationId,synthetic.map(x=>x.id)));
  const requirements=journeys.length?await db.select({id:s.journeyRequirements.id,journeyId:s.journeyRequirements.journeyId,title:s.journeyRequirements.title,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking,evidence:s.journeyRequirements.evidence}).from(s.journeyRequirements).where(inArray(s.journeyRequirements.journeyId,journeys.map(x=>x.id))):[];
@@ -70,7 +70,7 @@ export const addRequirementReviewNote=createServerFn({method:"POST"})
    assertProgramGranted(actor,app.programId);
    const [journey]=await tx.select({id:s.journeys.id,status:s.journeys.status}).from(s.journeys)
     .where(and(eq(s.journeys.participantType,"application"),eq(s.journeys.participantId,app.id))).limit(1);
-   if(!journey)throw new Error("Enrollment journey not found");
+   if(!journey||["active","complete","cancelled"].includes(journey.status))throw new Error("Enrollment journey cannot be edited");
    const [requirement]=await tx.select({id:s.journeyRequirements.id,evidence:s.journeyRequirements.evidence})
     .from(s.journeyRequirements).where(and(eq(s.journeyRequirements.id,data.requirementId),eq(s.journeyRequirements.journeyId,journey.id))).for("update").limit(1);
    if(!requirement)throw new Error("Requirement does not belong to this application");
