@@ -1,3 +1,4 @@
+import { getCapacityCandidates, swapCommittedInstructor } from "@/modules/staffing/educational-capacity.functions";
 import {useEffect,useState} from "react";
 import {useRouter} from "@tanstack/react-router";
 import {
@@ -45,12 +46,12 @@ export function SectionLifecycleManager({sections,staff,onChanged}:{sections:Sna
   {error&&<p role="alert" className="rounded border p-3 text-sm text-red-600">{error}</p>}
   {message&&<p role="status" className="rounded border p-3 text-sm">{message}</p>}
   {sections.map(section=><LifecycleSection key={section.id} section={section} staff={staff}
-   busy={Boolean(busy)} reason={reason} allSections={sections} run={run}/>)}
+   busy={Boolean(busy)} reason={reason} allSections={sections} run={run} onChanged={onChanged}/>)}
  </section>;
 }
-function LifecycleSection({section,staff,busy,reason,allSections,run}:{
+function LifecycleSection({section,staff,busy,reason,allSections,run,onChanged}:{
  section:Snapshot[number];staff:{personId:string;first:string;last:string}[];
- busy:boolean;reason:string;allSections:Snapshot;run:(id:string,operation:()=>Promise<unknown>,success:string)=>Promise<void>
+ busy:boolean;reason:string;allSections:Snapshot;onChanged:()=>Promise<void>;run:(id:string,operation:()=>Promise<unknown>,success:string)=>Promise<void>
 }){
  const [newTeacher,setNewTeacher]=useState("");
  const [outgoing,setOutgoing]=useState("");
@@ -84,6 +85,7 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
       {staff.filter(p=>!section.teachers.some(t=>t.personId===p.personId)).map(p=><option key={p.personId} value={p.personId}>{p.first} {p.last}</option>)}
      </select>
     </label>
+    <CapacityReplacement section={section} reason={reason} onChanged={onChanged}/>
     <button type="button" disabled={busy||!section.active||!outgoing||!newTeacher}
      onClick={()=>void run(section.id,()=>replaceLifecycleTeacher({data:{sectionId:section.id,oldPersonId:outgoing,newPersonId:newTeacher,reason}}),"Instructor replacement recorded.")}
      className="mt-3 rounded border px-3 py-2 text-xs disabled:opacity-50">Replace instructor</button>
@@ -158,4 +160,44 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
    </div>
   </div>
  </article>;
+}
+
+function CapacityReplacement({section,reason,onChanged}:{section:Snapshot[number];reason:string;onChanged:()=>Promise<void>}) {
+ const [reservationId,setReservationId]=useState("");
+ const [offeringId,setOfferingId]=useState("");
+ const [candidates,setCandidates]=useState<Awaited<ReturnType<typeof getCapacityCandidates>>>([]);
+ const [error,setError]=useState("");
+ const [busy,setBusy]=useState(false);
+ useEffect(()=>{
+  let alive=true;
+  if(!section.demandId)return;
+  getCapacityCandidates({data:{demandId:section.demandId}}).then(rows=>{if(alive)setCandidates(rows)}).catch(()=>{if(alive)setCandidates([])});
+  return()=>{alive=false};
+ },[section.demandId]);
+ const reservations=section.allocations.filter(a=>a.status==="committed");
+ if(!section.demandId||!reservations.length)return null;
+ return <div className="mt-4 rounded-lg border p-3">
+  <h4 className="text-sm font-semibold">Replace a committed network instructor</h4>
+  <p className="mt-1 text-xs text-muted-foreground">Choose an existing committed allocation and a compatible instructor offering. The replacement and release happen together.</p>
+  <label className="mt-2 block text-xs">Existing allocation
+   <select className="mt-1 w-full rounded border bg-background p-2" value={reservationId} onChange={e=>setReservationId(e.target.value)}>
+    <option value="">Select allocation</option>
+    {reservations.map(r=><option key={r.id} value={r.id}>{r.offeringId}</option>)}
+   </select>
+  </label>
+  <label className="mt-2 block text-xs">Available replacement instructor
+   <select className="mt-1 w-full rounded border bg-background p-2" value={offeringId} onChange={e=>setOfferingId(e.target.value)}>
+    <option value="">Choose compatible capacity</option>
+    {candidates.map(c=><option key={c.offeringId} value={c.offeringId}>{c.instructorName} · {c.remainingSeats} seats</option>)}
+   </select>
+  </label>
+  <button disabled={busy||!reservationId||!offeringId||reason.trim().length<5} type="button"
+    className="mt-3 rounded border px-3 py-2 text-xs disabled:opacity-50" onClick={async()=>{
+     setBusy(true);setError("");
+     try{await swapCommittedInstructor({data:{reservationId,replacementOfferingId:offeringId,reason}});await onChanged();setReservationId("");setOfferingId("")}
+     catch(e){setError(e instanceof Error?e.message:"Unable to replace instructor")}
+     finally{setBusy(false)}
+    }}>Commit replacement</button>
+  {error&&<p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+ </div>;
 }
