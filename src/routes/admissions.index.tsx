@@ -1,7 +1,7 @@
 import { listEnrollmentPlacements, placeEnrolledStudent } from "@/modules/enrollment/course-placement.functions";
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { getSyntheticAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
+import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
 import { getSyntheticAdmissionOfferOptions, issueSyntheticOfferFromDemo, activateSyntheticOfferFromDemo } from "@/modules/enrollment/admissions-offer-demo.functions";
 import { admissionsPipelineSummary } from "@/domain/admissions-pipeline";
 import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions-offer-selection";
@@ -9,7 +9,7 @@ import { WorkspaceShell, StatCard, EmptyState } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
-const loadAdmissions = async () => ({ rows: await getSyntheticAdmissionsDashboard(), options: await getSyntheticAdmissionOfferOptions() });
+const loadAdmissions = async () => ({ rows: await getAdmissionsDashboard(), options: await getSyntheticAdmissionOfferOptions() });
 
 export const Route = createFileRoute("/admissions/")({
   loader: safeLoader(loadAdmissions, { authMessage: "Sign in with an authorized registrar account to view the admissions command center." }),
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/admissions/")({
 
 function Admissions() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Synthetic admissions" title="Admissions command center"
+  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Admissions" title="Admissions command center"
       actions={<Link to="/admissions/intake" className="rounded-lg border px-3 py-2 text-sm font-semibold">Inquiries & decisions →</Link>} outcome={outcome} />;
   return <AdmissionsView data={outcome.data} />;
 }
@@ -31,7 +31,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
 
   async function transact(id: string, fn: () => Promise<unknown>) {
     setBusy(id); setError(""); setNotice("");
-    try { await fn(); await router.invalidate(); setNotice("Saved to the synthetic enrollment database."); }
+    try { await fn(); await router.invalidate(); setNotice("Saved to enrollment records."); }
     catch (e) { setError(e instanceof Error ? e.message : "Admissions transaction failed"); }
     finally { setBusy(null); }
   }
@@ -39,7 +39,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
   return (
     <WorkspaceShell
       className="[&>div]:max-w-6xl"
-      eyebrow="CAN OS · Synthetic admissions"
+      eyebrow="CAN OS · Admissions"
       title="Admissions command center"
       subtitle="Registrar workspace: issue offers and activate accepted enrollments. Guardians respond from their own authenticated offer inbox."
     >
@@ -53,7 +53,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       <div className="mt-3 rounded-xl border p-4"><p className="text-sm">Active program enrollments across applications: <strong>{rows.reduce((n, x) => n + x.enrollments.length, 0)}</strong></p></div>
       <h2 className="mt-9 font-serif text-2xl">Pipeline</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">{summary.byStage.map(x => <div className="rounded-xl border p-4" key={x.stage}><p className="text-sm capitalize">{x.stage}</p><p className="font-serif text-2xl">{x.count}</p></div>)}</div>
-      <h2 className="mt-9 font-serif text-2xl">Synthetic applications</h2>
+      <h2 className="mt-9 font-serif text-2xl">Applications</h2>
       <div className="mt-4 space-y-3">{rows.map(x => {
         const years = options.find(o => o.applicationId === x.id)?.years ?? [];
         const latest = selectActionableOffer(x.offers);
@@ -72,7 +72,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           <Link to="/admissions/families" className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
         </article>;
       })}
-        {!rows.length && <EmptyState title="No synthetic applications loaded. Add controlled fixture data to exercise admissions." />}</div>
+        {!rows.length && <EmptyState title="No applications are available in your authorized programs." />}</div>
     </WorkspaceShell>
   );
 }
