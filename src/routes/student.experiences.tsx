@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { LiveQuickWins } from "@/components/student/LiveQuickWins";
 import { LiveSchoolExperiences } from "@/components/student/LiveSchoolExperiences";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
-import { getQuickWinActions } from "@/modules/_demo/quick-wins.functions";
+import { getQuickWinActions } from "@/modules/actions/student-actions.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
