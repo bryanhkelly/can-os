@@ -47,7 +47,7 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
    </div></div>)}{queue.length===0&&<p>No pending membership requests.</p>}
   </section>
   <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Content moderation</h2>
-   {reports.map(r=><div key={r.id} className="border-b py-3"><p>{r.reason}</p><div className="mt-2 flex gap-2">
+   {reports.map(r=><div key={r.id} className="border-b py-3"><p className="text-xs font-semibold">{r.groupTitle}</p><p className="mt-2 text-sm">Reason: {r.reason}</p><blockquote className="mt-2 rounded border bg-muted p-3 text-sm whitespace-pre-wrap">{r.postBody??"The reported post is unavailable."}</blockquote>{r.postHidden&&<p className="mt-1 text-xs text-muted-foreground">Post already hidden</p>}<div className="mt-2 flex gap-2">
     <button disabled={busy||!moderationEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>resolveStudyGroupReport({data:{reportId:r.id,hidePost:true}}))}>Hide and resolve</button>
     <button disabled={busy||!moderationEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>resolveStudyGroupReport({data:{reportId:r.id,hidePost:false}}))}>Resolve only</button>
    </div></div>)}{reports.length===0&&<p>No open content reports.</p>}
