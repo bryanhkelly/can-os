@@ -58,7 +58,7 @@
 
 ## Coordination — Phase 1-owned guardian route
 
-- The new canonical `/guardian/group-permissions` owns the authenticated group-consent workflow. The existing Phase 1 `/guardian/study-group-consent` source has been restored to Phase 1's current version on this branch to avoid changing its implementation contract before route/nav handoff. Until Phase 1 navigation is coordinated, both URLs exist and the old route remains behind its inherited demo-specific write gates.
+- The new canonical `/guardian/group-permissions` owns the authenticated group-consent workflow. The existing Phase 1 `/guardian/study-group-consent` source has been restored to Phase 1's current version on this branch (identical blob SHA at last comparison) to avoid changing its implementation contract before route/nav handoff. Because the branches share an older merge base, GitHub's compare still lists this historically edited path as changed; its current file contents are identical, and a coordinated rebase onto Phase 1 is required to eliminate the historical compare overlap. Until Phase 1 navigation is coordinated, both URLs exist and the old route remains behind its inherited demo-specific write gates.
 - Avoid declaring study-group screen unification complete merely because the new route works. Phase 1 must ultimately point the Family Home shortcut to the canonical screen and retire the old behavior after acceptance; this branch cannot safely own its source.
 
 ## Known remaining gaps / not release-ready
