@@ -449,12 +449,16 @@ export async function recordAttendanceRevision(
   const [repeat]=await tx.select({id:attendanceEvents.id}).from(attendanceEvents)
    .where(eq(attendanceEvents.sourceKey,sourceKey)).limit(1);
   if(repeat)return repeat.id;
-  if(input.requireExpectedOnsiteDate){
+  // Even legacy callers must pass the same calendar/section entitlement
+  // check for site-day events: no alternate server function may bypass it.
+  const inferredSiteDay=/^(\\d{4}-\\d{2}-\\d{2}):site-day$/.exec(input.occurrenceKey)?.[1];
+  const onsiteDate=input.requireExpectedOnsiteDate??inferredSiteDay;
+  if(onsiteDate){
    const {assertExpectedOnsiteMarkInTransaction}=await import("./attendance-transaction-guards");
    await assertExpectedOnsiteMarkInTransaction(tx,context,{
     studentProfileId:input.studentProfileId,programId:input.programId,
     siteId:input.siteId??null,sectionId:input.sectionId??null,
-    date:input.requireExpectedOnsiteDate,occurrenceKey:input.occurrenceKey,
+    date:onsiteDate,occurrenceKey:input.occurrenceKey,
     expectedAt:input.expectedAt,
    });
   }
