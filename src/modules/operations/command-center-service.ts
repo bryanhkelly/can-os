@@ -4,7 +4,7 @@ import { actions, enrollments, instructionalCapacityReservations, programs, sect
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 
 /** Live operational exceptions, not demo/synthetic fixture rows. */
-export async function getSchoolOperationsCommandCenter(context: CommandContext) {
+export async function getSchoolOperationsCommandCenter(context: CommandContext & { role?: string }) {
   assertCapability(context,"program.launch.start");
   if(context.role!=="registrar"||!context.scope.organizationIds?.length)throw new AuthorizationError("operations membership");
   const accessible=await db.select({id:sections.id,title:sections.title,programId:sections.programId,siteId:sections.siteId,active:sections.active})
