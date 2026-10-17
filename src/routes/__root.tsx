@@ -1,4 +1,4 @@
-import { DemoNavigation } from "@/components/student/DemoNavigation";
+import { WorkspaceNavigation } from "@/components/shell/WorkspaceNavigation";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -62,7 +62,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <DemoNavigation />
+      <WorkspaceNavigation />
       <CommandPalette />
       <Outlet />
     </QueryClientProvider>
