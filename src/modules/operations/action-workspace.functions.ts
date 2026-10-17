@@ -32,7 +32,7 @@ export const getOperationsActions=createServerFn({method:"GET"}).handler(async()
   needsResponse:record.status==="open",
  })));
  const scopedItems=items.map(item=>({...item,siteId:records.find(record=>record.id===item.id)?.siteId??null,ownerPersonId:records.find(record=>record.id===item.id)?.ownerPersonId??null}));
- const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,actor.scope.siteIds!),eq(accountPersonGrants.active,true)));
+ const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,actor.scope.siteIds!),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist"])));
  return {items:scopedItems,assignees,summary:notificationSummary(items)};
 });
 
@@ -68,7 +68,7 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
    if(data.ownerPersonId){
     if(!record.siteId)throw new AuthorizationError("site-scoped action required for assignment");
-    const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true))).limit(1);
+    const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist"]))).limit(1);
     if(!grant)throw new AuthorizationError("assignee must have active site membership");
    }
    if(record.ownerPersonId===data.ownerPersonId&&record.priority===data.priority)return {saved:true};
