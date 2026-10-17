@@ -193,7 +193,7 @@ function StaffAttendancePage() {
     }
   };
 
-  const marked = students.filter(student => student.status !== "unmarked").length;
+  const marked = students.filter(student => student.status !== "unmarked" && student.status !== "expected").length;
 
   return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
     <div className="mx-auto max-w-5xl">
