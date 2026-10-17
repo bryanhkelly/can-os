@@ -418,7 +418,7 @@ export const listGuardianStudyGroupConsents=createServerFn({method:"GET"}).handl
   groupId:s.studyGroups.id,groupTitle:s.studyGroups.title,siteId:s.studyGroups.siteId})
   .from(s.actions).innerJoin(s.studyGroups,eq(s.studyGroups.id,s.actions.subjectId))
   .where(and(eq(s.actions.ownerPersonId,actor.actorPersonId),
-    eq(s.actions.type,"study_group_consent"),inArray(s.studyGroups.siteId,actor.scope.siteIds??[])))
+    eq(s.actions.type,"study_group_consent"),inArray(s.studyGroups.siteId,actor.scope.siteIds??[]),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
   .orderBy(desc(s.actions.createdAt));
  const linked=await db.select({studentPersonId:s.guardianRelationships.studentPersonId})
   .from(s.guardianRelationships).where(and(
@@ -450,6 +450,24 @@ export const decideGuardianStudyGroupConsent=createServerFn({method:"POST"})
      eq(s.guardianRelationships.studentPersonId,studentPersonId),
      eq(s.guardianRelationships.canManageEnrollment,true))).limit(1);
    if(!relationship)throw new AuthorizationError("guardian relationship");
+   const [groupScope]=await tx.select({
+    siteId:s.studyGroups.siteId,programId:s.studyGroups.programId
+   }).from(s.studyGroups)
+    .where(and(eq(s.studyGroups.id,action.subjectId),
+      inArray(s.studyGroups.siteId,actor.scope.siteIds??[]),
+      or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
+    .limit(1);
+   if(!groupScope||!groupScope.siteId)throw new AuthorizationError("group site and program");
+   const [enrollment]=await tx.select({id:s.enrollments.id})
+    .from(s.enrollments)
+    .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+    .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+    .where(and(eq(s.studentProfiles.personId,studentPersonId),
+      eq(s.enrollments.status,"active"),eq(s.programs.siteId,groupScope.siteId),
+      inArray(s.programs.id,actor.scope.programIds??[]),
+      groupScope.programId?eq(s.enrollments.programId,groupScope.programId):undefined))
+    .limit(1);
+   if(!enrollment)throw new AuthorizationError("student group enrollment");
    await tx.update(s.actions).set({status:"resolved",resolvedAt:new Date(),
     resolutionNote:data.approve?"Consent given":"Consent withheld",
     metadata:{...action.metadata,decision:data.approve?"approve":"decline"},updatedAt:new Date()})
