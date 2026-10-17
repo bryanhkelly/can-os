@@ -11,10 +11,10 @@ export const Route=createFileRoute("/student/assignments")({
  component:StudentAssignments
 });
 
-const attachmentAccept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.md";
+const attachmentAccept=".pdf,.png,.jpg,.jpeg";
 const attachmentMimes:Record<string,string>={
- pdf:"application/pdf",docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
- txt:"text/plain",png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",md:"text/markdown"
+ pdf:"application/pdf",
+ png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",
 };
 function attachmentMime(name:string){
  return attachmentMimes[name.split(".").pop()?.toLowerCase()??""]??null;
@@ -88,7 +88,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
    for(const file of pendingFiles){
     try{
      const contentType=attachmentMime(file.name);
-     if(!contentType||file.size<1||file.size>10*1024*1024)
+     if(!contentType||file.size<16||file.size>10*1024*1024)
       throw new Error("Unsupported file type or size");
      const upload=await createSubmissionAttachmentUpload({data:{
       assessmentId:chosen.assessmentId,fileName:file.name,contentType,sizeBytes:file.size
@@ -159,16 +159,14 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
         className="mt-2 block w-full rounded-xl border bg-background p-3 text-sm" placeholder="Write your response…"/>
       </label>
       <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">Draft: {draftStatus==="saving"?"Saving…":draftStatus==="saved"?"Saved":draftStatus==="error"?"Could not autosave":"Ready"}</p>
-      {chosen.metadata.synthetic===true?
-       <>
-        <label className="mt-4 block text-sm font-semibold">Attachments (development records; maximum 10 MB each)
+      <>
+        <label className="mt-4 block text-sm font-semibold">Attachments (PDF, PNG or JPEG; maximum 10 MB each)
          <input type="file" multiple accept={attachmentAccept} disabled={busy}
           onChange={event=>setPendingFiles(Array.from(event.target.files??[]))}
           className="mt-2 block w-full rounded-lg border p-2 text-xs"/>
         </label>
         {pendingFiles.length>0&&<p className="mt-2 text-xs text-muted-foreground">Selected: {pendingFiles.map(file=>file.name).join(", ")}</p>}
-       </>:
-       <p className="mt-3 text-xs text-muted-foreground">File attachments for live records are not yet enabled. You can submit your written response.</p>}
+       </>
       <button type="button" disabled={busy||draft.trim().length<3} onClick={submit}
        className="mt-4 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit assignment</button>
      </div>:<p className="mt-5 rounded-lg bg-muted p-4 text-sm">Your submission is not currently editable. Review its status and feedback above.</p>}
