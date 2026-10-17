@@ -279,29 +279,58 @@ export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.obje
  db.select({id:s.studyGroupSessions.id,title:s.studyGroupSessions.title,agenda:s.studyGroupSessions.agenda,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt,cancelled:sql<boolean>`coalesce(${s.calendarEvents.metadata}->>'cancelled','false') = 'true'`}).from(s.studyGroupSessions).leftJoin(s.calendarEvents,and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,s.studyGroupSessions.id))).where(eq(s.studyGroupSessions.groupId,data.groupId)).orderBy(s.studyGroupSessions.startsAt).limit(50)]);
  return {group,memberStatus:membership?.status??null,posts,sessions};
 });
-export const postStudyGroupMessage=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1),body:z.string()}).parse).handler(async({data})=>{
- assertSyntheticMutation("student");const actor=await groupActor("student");const body=validateGroupPost(data.body);const {db,s}=await context();
- return db.transaction(async tx=>{
-  const [group]=await tx.select({siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,metadata:s.studyGroups.metadata})
-    .from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),
-    eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),
-    or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).limit(1);
-  if(!group)throw new AuthorizationError("study group scope");
-  requireLegacyGroup(group.metadata);
-  await requireStudentGroupEnrollment(tx,s,actor,group);
-  const [membership]=await tx.select({id:s.studyGroupMemberships.id})
+/** Plain-text posting for an approved, actively enrolled study-group member. */
+export const postStudyGroupMessage=createServerFn({method:"POST"})
+ .validator((input:unknown)=>z.object({
+  groupId:z.string().uuid(),body:z.string().min(1).max(3000)
+ }).parse(input))
+ .handler(async({data})=>{
+  const actor=await groupActor("student");
+  const body=validateGroupPost(data.body);
+  const {db,s}=await context();
+  return db.transaction(async tx=>{
+   const [group]=await tx.select({
+    id:s.studyGroups.id,siteId:s.studyGroups.siteId,
+    programId:s.studyGroups.programId
+   }).from(s.studyGroups)
+    .where(and(eq(s.studyGroups.id,data.groupId),
+      eq(s.studyGroups.status,"active"),
+      inArray(s.studyGroups.siteId,actor.sites),
+      or(isNull(s.studyGroups.programId),
+        inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
+    .limit(1);
+   if(!group)throw new AuthorizationError("active group school/program");
+   await requireStudentGroupEnrollment(tx,s,actor,group);
+   const [member]=await tx.select({id:s.studyGroupMemberships.id})
     .from(s.studyGroupMemberships).where(and(
-    eq(s.studyGroupMemberships.groupId,data.groupId),
-    eq(s.studyGroupMemberships.personId,actor.actorPersonId!),
-    eq(s.studyGroupMemberships.status,"approved"))).limit(1);
-  if(!membership)throw new AuthorizationError("approved group membership");
-  const [post]=await tx.insert(s.studyGroupPosts).values({
-    groupId:data.groupId,body,authorPersonId:actor.actorPersonId!
-  }).returning({id:s.studyGroupPosts.id});
-  if(!post)throw new Error("Post creation failed");
-  return {id:post.id};
+      eq(s.studyGroupMemberships.groupId,group.id),
+      eq(s.studyGroupMemberships.personId,actor.actorPersonId!),
+      eq(s.studyGroupMemberships.status,"approved"))).limit(1);
+   if(!member)throw new AuthorizationError("approved group membership");
+
+   // Avoid rapid duplicate posts from repeated submission, without exposing
+   // group membership or posts outside the authorized school.
+   const [recent]=await tx.select({id:s.studyGroupPosts.id})
+    .from(s.studyGroupPosts).where(and(eq(s.studyGroupPosts.groupId,group.id),
+     eq(s.studyGroupPosts.authorPersonId,actor.actorPersonId!),
+     sql`${s.studyGroupPosts.createdAt} >= now() - interval '15 seconds'`))
+    .limit(1);
+   if(recent)throw new Error("Please allow a moment between messages");
+   const [post]=await tx.insert(s.studyGroupPosts).values({
+    groupId:group.id,body,authorPersonId:actor.actorPersonId!
+   }).returning({id:s.studyGroupPosts.id});
+   if(!post)throw new Error("Unable to post message");
+   await tx.insert(s.auditEvents).values({
+    actorPersonId:actor.actorPersonId!,action:"study_group.post.create",
+    resourceType:"study_group_post",resourceId:post.id,
+    scope:{siteId:group.siteId,programId:group.programId},
+    after:{groupId:group.id,characterCount:body.length},
+    context:{accountId:actor.accountId,sessionId:actor.sessionId}
+   });
+   return {id:post.id};
+  });
  });
-});
+
 export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1),title:z.string(),agenda:z.string(),startsAt:z.string(),endsAt:z.string()}).parse).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {start,end}=validateSession(data.startsAt,data.endsAt);const {db,s}=await context();
  const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active"))).limit(1);
