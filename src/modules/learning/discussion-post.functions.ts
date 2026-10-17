@@ -6,7 +6,7 @@ import {and,eq} from "drizzle-orm";
 import {isValidDiscussionPost} from "@/domain/course-discussions";
 import { z } from "zod";
 /** Authorized enrolled student posting into a section discussion. */
-export const postSyntheticDiscussionMessage=createServerFn({method:"POST"})
+export const postDiscussionMessage=createServerFn({method:"POST"})
 .validator((input:unknown)=>z.object({threadId:z.string().min(1),body:z.string(),parentMessageId:z.string().min(1).nullish()}).parse(input))
 .handler(async({data})=>{
  const actor=await getCommandContext(getRequest());
@@ -39,3 +39,5 @@ export const postSyntheticDiscussionMessage=createServerFn({method:"POST"})
   return {id:created.id};
  });
 });
+
+export const postSyntheticDiscussionMessage=postDiscussionMessage;
