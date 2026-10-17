@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {createAdmissionsInquiry,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
+import {createAdmissionsInquiry,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
@@ -78,6 +78,18 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
       <button disabled={busy} onClick={()=>perform(()=>provisionInquiryGuardianAccount({data:{applicationId:r.id}}),
         "Guardian sign-in membership provisioned. The guardian can request an email access link at sign-in.")}
         className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Provision guardian login</button>
+      <button disabled={busy} onClick={()=>{
+        const evidenceNote=window.prompt("Verification record: describe the independent documentation or identification reviewed.");
+        if(!evidenceNote)return;
+        const method=window.prompt("Method: in_person_id, verified_school_record, or live_video_verification","verified_school_record");
+        if(!method||!["in_person_id","verified_school_record","live_video_verification"].includes(method))return;
+        void perform(()=>verifyAdmissionsGuardianRelationship({data:{
+         applicationId:r.id,method:method as "in_person_id"|"verified_school_record"|"live_video_verification",evidenceNote,
+        }}),"Guardian relationship verified and family permissions enabled.");
+       }}
+       className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+       Verify guardian relationship
+      </button>
       <button disabled={busy}
        onClick={()=>perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId:r.id}}),
         "A secure email sign-in invitation was requested for this guardian.")}
