@@ -589,26 +589,34 @@ export async function releaseInstructionalCapacity(
   reservationId: string,
 ): Promise<void> {
   assertCapability(context, "capacity.reserve");
-
-  await db.transaction(async (tx) => {
-    const [reservation] = await tx
-      .select({
-        id: instructionalCapacityReservations.id,
-        demandId: instructionalCapacityReservations.demandId,
-      })
-      .from(instructionalCapacityReservations)
-      .where(eq(instructionalCapacityReservations.id, reservationId))
-      .limit(1);
-    if (!reservation) throw new Error("Capacity reservation not found");
-
-    const demand = await loadDemandContext(tx, reservation.demandId);
-    if (!demand) throw new Error("Section capacity demand not found");
-    assertDemandScope(context, demand);
-
-    await tx
-      .update(instructionalCapacityReservations)
-      .set({ status: "released", updatedAt: new Date() })
-      .where(eq(instructionalCapacityReservations.id, reservationId));
+  await db.transaction(async tx => {
+    const [reservation] = await tx.select({
+      id:instructionalCapacityReservations.id,demandId:instructionalCapacityReservations.demandId,
+      offeringId:instructionalCapacityReservations.offeringId,status:instructionalCapacityReservations.status,
+      sectionId:instructionalCapacityReservations.sectionId,personId:instructionalCapacityOfferings.personId,
+    }).from(instructionalCapacityReservations)
+      .innerJoin(instructionalCapacityOfferings,eq(instructionalCapacityOfferings.id,instructionalCapacityReservations.offeringId))
+      .where(eq(instructionalCapacityReservations.id,reservationId)).limit(1).for("update");
+    if(!reservation)throw new Error("Capacity reservation not found");
+    const demand=await loadDemandContext(tx,reservation.demandId);
+    if(!demand)throw new Error("Section capacity demand not found");
+    assertDemandScope(context,demand);
+    if(reservation.status==="released")return;
+    await tx.update(instructionalCapacityReservations).set({status:"released",updatedAt:new Date()})
+      .where(eq(instructionalCapacityReservations.id,reservation.id));
+    if(reservation.status==="committed"){
+      const other=await tx.select({id:instructionalCapacityReservations.id}).from(instructionalCapacityReservations)
+        .innerJoin(instructionalCapacityOfferings,eq(instructionalCapacityOfferings.id,instructionalCapacityReservations.offeringId))
+        .where(and(eq(instructionalCapacityReservations.sectionId,reservation.sectionId),
+          eq(instructionalCapacityOfferings.personId,reservation.personId),
+          eq(instructionalCapacityReservations.status,"committed"),
+          or(isNull(instructionalCapacityReservations.expiresAt),
+            gte(instructionalCapacityReservations.expiresAt,new Date())))).limit(1);
+      if(!other.length){
+        await tx.delete(sectionTeachers).where(and(eq(sectionTeachers.sectionId,reservation.sectionId),
+          eq(sectionTeachers.personId,reservation.personId)));
+      }
+    }
   });
 }
 
