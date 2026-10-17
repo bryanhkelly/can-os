@@ -22,7 +22,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
     db.select().from(schema.notifications).where(eq(schema.notifications.recipientPersonId,actor.actorPersonId)),
     viewerRole==="guardian" ? db.select({id:schema.conferenceSlots.id,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status})
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
-      .where(inArray(schema.conferenceSeries.siteId,sites)).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
+      .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
   ]);
   return {connected:true,viewerRole,
     events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:"scheduled"})),
@@ -37,10 +37,10 @@ export const bookSyntheticOfficeHour=createServerFn({method:"POST"})
     const actor=await requireActor(["guardian"]);
    const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
-      const [slotSite]=await tx.select({siteId:schema.conferenceSeries.siteId}).from(schema.conferenceSlots)
+      const [slotSite]=await tx.select({siteId:schema.conferenceSeries.siteId,seriesStatus:schema.conferenceSeries.status,sectionId:schema.conferenceSeries.sectionId}).from(schema.conferenceSlots)
         .innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
         .where(eq(schema.conferenceSlots.id,data.slotId)).limit(1);
-      if(!slotSite) throw new Error("Office-hour slot not found");
+      if(!slotSite||slotSite.seriesStatus!=="published") throw new Error("Office-hour slot not available");
       assertSiteGranted(actor,slotSite.siteId);
       const [child]=await tx.select({studentProfileId:schema.studentProfiles.id}).from(schema.guardianRelationships)
         .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.personId,schema.guardianRelationships.studentPersonId))
@@ -50,6 +50,10 @@ export const bookSyntheticOfficeHour=createServerFn({method:"POST"})
         .innerJoin(schema.programs,eq(schema.programs.id,schema.enrollments.programId))
         .where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.status,"active"),eq(schema.programs.siteId,slotSite.siteId))).limit(1);
       if(!siteEnrollment)throw new AuthorizationError("child enrollment at selected school");
+      if(slotSite.sectionId){
+        const [sectionEnrollment]=await tx.select({id:schema.enrollments.id}).from(schema.enrollments).where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.sectionId,slotSite.sectionId),eq(schema.enrollments.status,"active"),eq(schema.enrollments.kind,"section"))).limit(1);
+        if(!sectionEnrollment)throw new AuthorizationError("child is not enrolled in the appointment section");
+      }
       const [slot]=await tx.update(schema.conferenceSlots).set({status:"booked",updatedAt:new Date()}).where(and(eq(schema.conferenceSlots.id,data.slotId),eq(schema.conferenceSlots.status,"available"))).returning({id:schema.conferenceSlots.id});
       if(!slot) throw new Error("Office-hour slot already taken");
       const [booking]=await tx.insert(schema.conferenceBookings).values({conferenceSlotId:slot.id,studentProfileId:child.studentProfileId,guardianPersonId:actor.actorPersonId,status:"booked"}).returning({id:schema.conferenceBookings.id});
