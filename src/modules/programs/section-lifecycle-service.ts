@@ -185,6 +185,23 @@ export async function resolveSectionWaitlist(context: LifecycleContext, actionId
 }
 
 /** Move a student between sections of one program and academic term as one transaction. */
+
+/** Must be called with the destination section locked by authorizedSection. */
+async function assertOpenEnrollmentSeat(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], sectionId: string) {
+  const [demand] = await tx.select({ seats: sectionCapacityDemands.expectedSeats, status: sectionCapacityDemands.status })
+    .from(sectionCapacityDemands).where(eq(sectionCapacityDemands.sectionId, sectionId)).limit(1);
+  if (!demand || demand.status !== "open") throw new Error("Section has no active instructional capacity demand");
+  const [committed] = await tx.select({ seats: sql<number>`coalesce(sum(seats),0)::int` })
+    .from(instructionalCapacityReservations)
+    .where(and(eq(instructionalCapacityReservations.sectionId,sectionId),
+      eq(instructionalCapacityReservations.status,"committed"),
+      sql`(expires_at is null or expires_at > now())`));
+  const [roster] = await tx.select({ count: sql<number>`count(*)::int` }).from(enrollments)
+    .where(and(eq(enrollments.sectionId,sectionId),eq(enrollments.status,"active")));
+  const ceiling = Math.min(demand.seats,Number(committed?.seats??0));
+  if (Number(roster?.count??0)>=ceiling) throw new Error("No committed instructional seat is available");
+}
+
 export async function transferSectionEnrollment(context: LifecycleContext,input:{enrollmentId:string;destinationSectionId:string;reason:string}) {
   assertCapability(context,"program.launch.start");
   if(input.reason.trim().length<5)throw new Error("Provide a transfer reason");
@@ -205,12 +222,7 @@ export async function transferSectionEnrollment(context: LifecycleContext,input:
       eq(enrollments.studentProfileId,sourceEnrollment.studentProfileId),
       eq(enrollments.sectionId,destination.id),eq(enrollments.status,"active"))).limit(1);
     if(existing)throw new Error("Student is already enrolled in destination section");
-    const [capacity]=await tx.select({expectedSeats:sectionCapacityDemands.expectedSeats}).from(sectionCapacityDemands)
-      .where(eq(sectionCapacityDemands.sectionId,destination.id)).limit(1);
-    const [countRow]=await tx.select({count:sql<number>`count(*)::int`}).from(enrollments)
-      .where(and(eq(enrollments.sectionId,destination.id),eq(enrollments.status,"active")));
-    if(capacity&&Number(countRow?.count??0)>=capacity.expectedSeats)
-      throw new Error("Destination section has reached its planned capacity");
+    await assertOpenEnrollmentSeat(tx,destination.id);
     const now=new Date();
     await tx.update(enrollments).set({
       status:"transferred",endedAt:now,updatedAt:now,
@@ -245,11 +257,7 @@ export async function promoteSectionWaitlist(context: LifecycleContext, actionId
      eq(enrollments.studentProfileId,item.subjectId),eq(enrollments.programId,section.programId),
      eq(enrollments.schoolYearId,term.schoolYearId),eq(enrollments.kind,"program"),eq(enrollments.status,"active"))).limit(1);
    if(!member)throw new Error("Student needs active enrollment in this program/year");
-   const [demand]=await tx.select({expectedSeats:sectionCapacityDemands.expectedSeats}).from(sectionCapacityDemands)
-     .where(eq(sectionCapacityDemands.sectionId,section.id)).limit(1);
-   const [roster]=await tx.select({count:sql<number>`count(*)::int`}).from(enrollments)
-     .where(and(eq(enrollments.sectionId,section.id),eq(enrollments.status,"active")));
-   if(demand && Number(roster?.count??0)>=demand.expectedSeats)throw new Error("Section capacity reached");
+   await assertOpenEnrollmentSeat(tx,section.id);
    const [record]=await tx.insert(enrollments).values({
      studentProfileId:item.subjectId,kind:"section",status:"active",
      organizationId:section.organizationId,programId:section.programId,
