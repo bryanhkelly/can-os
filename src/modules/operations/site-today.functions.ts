@@ -70,7 +70,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
       }).from(calendarEvents)
         .where(and(eq(calendarEvents.siteId, site.id), gte(calendarEvents.startsAt, start),
           lt(calendarEvents.startsAt, end),isNull(calendarEvents.sectionId),
-          ne(calendarEvents.type,"personal"),notExists(hasParticipants),allowedProgram))
+          ne(calendarEvents.type,"personal"),ne(calendarEvents.type,"study_group"),notExists(hasParticipants),allowedProgram))
         .orderBy(asc(calendarEvents.startsAt)).limit(200),
       programIds.length ? db.select({
         id: attendanceEvents.id, programId: attendanceEvents.programId,
