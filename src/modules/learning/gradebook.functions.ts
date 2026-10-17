@@ -3,8 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertCapability, assertSiteScope, AuthorizationError } from "@/domain/command-context";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
+import { assertCapability, assertSiteScope, assertProgramScope, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { readRubric, scoreRubric } from "@/modules/student-experience/rubric";
 
@@ -28,13 +27,14 @@ async function teacherActor(sectionId?: string) {
  if (!context.scope.siteIds?.length) throw new AuthorizationError("teacher site membership");
  const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
  if (sectionId) {
-  const [section] = await db.select({ siteId: schema.sections.siteId })
+  const [section] = await db.select({ siteId: schema.sections.siteId, programId: schema.sections.programId })
    .from(schema.sectionTeachers)
    .innerJoin(schema.sections, eq(schema.sections.id, schema.sectionTeachers.sectionId))
    .where(and(eq(schema.sectionTeachers.personId, context.actorPersonId), eq(schema.sectionTeachers.sectionId, sectionId)))
    .limit(1);
   if (!section) throw new AuthorizationError("assigned teacher");
   assertSiteScope(context, section.siteId);
+  assertProgramScope(context, section.programId);
  }
  return context;
 }
@@ -61,6 +61,7 @@ export const getGradebookSections = createServerFn({ method: "GET" }).handler(as
   .where(and(
    eq(s.sectionTeachers.personId, context.actorPersonId!),
    inArray(s.sections.siteId, context.scope.siteIds!),
+   inArray(s.sections.programId, context.scope.programIds??[]),
    eq(s.sections.active, true),
   ))
   .orderBy(asc(s.sections.title));
@@ -178,7 +179,6 @@ export const gradeSubmission = createServerFn({ method: "POST" })
   })).max(20).optional(),
  }).parse(value))
  .handler(async ({ data }) => {
-  assertSyntheticMutation("teacher");
   const context = await teacherForSubmission(data.submissionId);
   assertCapability(context, "assignments:grade");
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
