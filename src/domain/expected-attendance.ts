@@ -107,9 +107,13 @@ export function summarizeExpectedOnsiteAttendance(input: {
   timeZone: string;
   asOf: Date;
   windowDays?: number;
+  /** Explicit date for the live staff roster; otherwise use completed local days. */
+  onDate?: string;
+  /** Capture exact student-day identities without persisting shadow attendance. */
+  onExpectedDay?: (studentProfileId: string, date: string) => void;
 }): ExpectedAttendanceSummary {
-  const through = shiftDay(siteDate(input.asOf, input.timeZone), -1);
-  const start = shiftDay(through, -(Math.max(1, input.windowDays ?? 30) - 1));
+  const through = input.onDate ?? shiftDay(siteDate(input.asOf, input.timeZone), -1);
+  const start = input.onDate ?? shiftDay(through, -(Math.max(1, input.windowDays ?? 30) - 1));
   const base = {
     expectedDays: 0, recordedExpectedDays: 0, unmarkedExpectedDays: 0,
     present: 0, tardy: 0, absent: 0, excused: 0,
@@ -207,6 +211,7 @@ export function summarizeExpectedOnsiteAttendance(input: {
         const key = student.studentProfileId + ":" + date + ":site-day";
         if (uniqueExpected.has(key)) continue;
         uniqueExpected.add(key);
+        input.onExpectedDay?.(student.studentProfileId, date);
         base.expectedDays += 1;
         const status = facts.get(key);
         if (!status || status === "expected") {
