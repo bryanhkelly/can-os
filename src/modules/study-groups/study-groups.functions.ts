@@ -36,6 +36,31 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
  const [existing]=await tx.select({status:s.studyGroupMemberships.status}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,group.id),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  if(existing?.status==="approved"||existing?.status==="pending")return {ok:true};
  await tx.insert(s.studyGroupMemberships).values({groupId:group.id,personId:actor.actorPersonId!,role:"student",status:"pending"}).onConflictDoUpdate({target:[s.studyGroupMemberships.groupId,s.studyGroupMemberships.personId],set:{status:"pending",reviewedByPersonId:null,joinedAt:null,updatedAt:new Date()}});
+ // A minor's identified guardians must decide about participation before
+ // a facilitator can approve the group. Store it as an ordinary owned Action.
+ const guardians=await tx.select({personId:s.guardianRelationships.guardianPersonId})
+  .from(s.guardianRelationships).where(and(
+   eq(s.guardianRelationships.studentPersonId,actor.actorPersonId!),
+   eq(s.guardianRelationships.canManageEnrollment,true)));
+ for(const guardian of guardians){
+  const [existingConsent]=await tx.select({id:s.actions.id}).from(s.actions)
+   .where(and(eq(s.actions.ownerPersonId,guardian.personId),
+    eq(s.actions.type,"study_group_consent"),eq(s.actions.subjectId,group.id)))
+   .limit(1);
+  if(existingConsent)continue;
+  const [consent]=await tx.insert(s.actions).values({
+   type:"study_group_consent",status:"open",priority:"normal",
+   title:"Approve study group participation: "+group.title,
+   ownerPersonId:guardian.personId,siteId:group.siteId,
+   subjectType:"study_group",subjectId:group.id,
+   metadata:{studentPersonId:actor.actorPersonId!,groupId:group.id,synthetic:true},
+  }).returning({id:s.actions.id});
+  await tx.insert(s.notifications).values({
+   recipientPersonId:guardian.personId,type:"study_group_consent_requested",status:"unread",
+   title:"Study group permission requested",body:"Review your student's request to join "+group.title,
+   resourceType:"action",resourceId:consent!.id,
+  });
+ }
  await tx.insert(s.notifications).values({recipientPersonId:group.facilitatorPersonId,type:"study_group_membership_request",status:"unread",title:"Study group membership request",body:"A student has requested to join "+group.title+".",resourceType:"study_group",resourceId:group.id});
  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"study_group.membership.request",resourceType:"study_group",resourceId:group.id,after:{personId:actor.actorPersonId!,status:"pending"},context:{synthetic:true}});
  return {ok:true};
@@ -49,6 +74,18 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
  const [member]=await tx.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,data.personId),eq(s.studyGroupMemberships.status,"pending"))).limit(1);
  if(!member)throw new Error("Pending membership not found");
  if(data.approve){
+  const guardians=await tx.select({personId:s.guardianRelationships.guardianPersonId})
+   .from(s.guardianRelationships).where(and(
+    eq(s.guardianRelationships.studentPersonId,data.personId),
+    eq(s.guardianRelationships.canManageEnrollment,true)));
+  if(guardians.length){
+   const consentRows=await tx.select({status:s.actions.status,metadata:s.actions.metadata})
+    .from(s.actions).where(and(eq(s.actions.type,"study_group_consent"),
+     eq(s.actions.subjectId,data.groupId),
+     inArray(s.actions.ownerPersonId,guardians.map(g=>g.personId))));
+   if(!consentRows.some(row=>row.status==="resolved"&&row.metadata.decision==="approve"))
+    throw new Error("Guardian approval is required before this student joins the group");
+  }
  const [count]=await tx.select({total:sql<number>`count(*)::int`}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.status,"approved")));
  if((count?.total??0)>=group.maxMembers)throw new Error("Study group is full");
  }
@@ -255,3 +292,65 @@ export const reviseStudyGroupSession=createServerFn({method:"POST"})
   return {ok:true};
  });
 });
+
+/** Guardian-owned consent queue. Only the active linked guardian sees the request. */
+export const listGuardianStudyGroupConsents=createServerFn({method:"GET"}).handler(async()=>{
+ const actor=await getCommandContext(getRequest());
+ if(actor.role!=="guardian"||!actor.actorPersonId)throw new AuthorizationError("study group guardian");
+ const {db,s}=await context();
+ const rows=await db.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata,
+  groupId:s.studyGroups.id,groupTitle:s.studyGroups.title,siteId:s.studyGroups.siteId})
+  .from(s.actions).innerJoin(s.studyGroups,eq(s.studyGroups.id,s.actions.subjectId))
+  .where(and(eq(s.actions.ownerPersonId,actor.actorPersonId),
+    eq(s.actions.type,"study_group_consent"),inArray(s.studyGroups.siteId,actor.scope.siteIds??[])))
+  .orderBy(desc(s.actions.createdAt));
+ const linked=await db.select({studentPersonId:s.guardianRelationships.studentPersonId})
+  .from(s.guardianRelationships).where(and(
+   eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),
+   eq(s.guardianRelationships.canManageEnrollment,true)));
+ const allowed=new Set(linked.map(x=>x.studentPersonId));
+ return rows.filter(r=>typeof r.metadata.studentPersonId==="string"&&allowed.has(r.metadata.studentPersonId))
+  .map(r=>({id:r.id,status:r.status,groupTitle:r.groupTitle,groupId:r.groupId,
+   studentPersonId:String(r.metadata.studentPersonId),decision:r.metadata.decision??null}));
+});
+export const decideGuardianStudyGroupConsent=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({actionId:z.string().uuid(),approve:z.boolean()}).parse(v))
+ .handler(async({data})=>{
+  assertSyntheticMutation("guardian");
+  const actor=await getCommandContext(getRequest());
+  if(actor.role!=="guardian"||!actor.actorPersonId)throw new AuthorizationError("study group guardian");
+  const {db,s}=await context();
+  return db.transaction(async tx=>{
+   const [action]=await tx.select().from(s.actions)
+    .where(and(eq(s.actions.id,data.actionId),eq(s.actions.ownerPersonId,actor.actorPersonId),
+     eq(s.actions.type,"study_group_consent"))).for("update").limit(1);
+   if(!action)throw new AuthorizationError("consent request");
+   if(action.status==="resolved")return {ok:true};
+   if(action.status!=="open")throw new Error("Consent is no longer pending");
+   const studentPersonId=String(action.metadata.studentPersonId??"");
+   const [relationship]=await tx.select({id:s.guardianRelationships.id})
+    .from(s.guardianRelationships).where(and(
+     eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),
+     eq(s.guardianRelationships.studentPersonId,studentPersonId),
+     eq(s.guardianRelationships.canManageEnrollment,true))).limit(1);
+   if(!relationship)throw new AuthorizationError("guardian relationship");
+   await tx.update(s.actions).set({status:"resolved",resolvedAt:new Date(),
+    resolutionNote:data.approve?"Consent given":"Consent withheld",
+    metadata:{...action.metadata,decision:data.approve?"approve":"decline"},updatedAt:new Date()})
+    .where(eq(s.actions.id,action.id));
+   const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title})
+    .from(s.studyGroups).where(eq(s.studyGroups.id,action.subjectId)).limit(1);
+   if(group){
+    await tx.insert(s.notifications).values({recipientPersonId:group.facilitatorPersonId,
+     type:"study_group_guardian_consent",status:"unread",
+     title:"Guardian "+(data.approve?"approved":"declined")+" group participation",
+     body:"Guardian permission for "+group.title+" has been updated.",
+     resourceType:"study_group",resourceId:action.subjectId});
+   }
+   await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,
+    action:"study_group.guardian_consent."+(data.approve?"approve":"decline"),
+    resourceType:"action",resourceId:action.id,
+    before:{status:action.status},after:{decision:data.approve?"approve":"decline"}});
+   return {ok:true};
+  });
+ });
