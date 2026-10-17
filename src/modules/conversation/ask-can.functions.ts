@@ -184,8 +184,8 @@ export const getMyNotificationPreferences = createServerFn({ method: "GET" }).ha
 export const saveMyQuietHours = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
     timezone: z.string().min(1).max(80),
-    quietStart: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/).nullable(),
-    quietEnd: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/).nullable(),
+    quietStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
+    quietEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
   }).parse(value))
   .handler(async ({ data }) => {
     const context = await actor();
@@ -194,7 +194,7 @@ export const saveMyQuietHours = createServerFn({ method: "POST" })
   });
 
 export const requestMySmsVerification = createServerFn({ method: "POST" })
-  .validator((value: unknown) => z.object({ phone: z.string().regex(/^\\+[1-9]\\d{7,14}$/) }).parse(value))
+  .validator((value: unknown) => z.object({ phone: z.string().regex(/^\+[1-9]\d{7,14}$/) }).parse(value))
   .handler(async ({ data }) => {
     const context = await actor();
     await beginSmsVerification(context.actorPersonId, data.phone);
@@ -203,8 +203,8 @@ export const requestMySmsVerification = createServerFn({ method: "POST" })
 
 export const verifyMySmsConsent = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
-    phone: z.string().regex(/^\\+[1-9]\\d{7,14}$/),
-    code: z.string().regex(/^\\d{4,10}$/),
+    phone: z.string().regex(/^\+[1-9]\d{7,14}$/),
+    code: z.string().regex(/^\d{4,10}$/),
     consent: z.literal(true),
   }).parse(value))
   .handler(async ({ data }) => {
