@@ -1,6 +1,6 @@
 import { nextAllowedDelivery } from "@/domain/notification-quiet-hours";
 export { nextAllowedDelivery } from "@/domain/notification-quiet-hours";
-import { and, eq } from "drizzle-orm";
+import { eq, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { notificationPreferences } from "@/db/schema";
 
@@ -29,7 +29,16 @@ async function twilioPost(url: string, payload: Record<string, string>) {
 }
 export async function beginSmsVerification(personId: string, phone: string): Promise<void> {
   if (!phonePattern.test(phone)) throw new Error("Phone must use E.164 format");
-  // A new verification never grants delivery permissions on its own.
+  // Claim a per-person cooldown before contacting the paid SMS provider.
+  const now = new Date();
+  await db.insert(notificationPreferences).values({ personId })
+    .onConflictDoNothing();
+  const rows = await db.update(notificationPreferences).set({
+    smsVerificationRequestedAt: now, updatedAt: now,
+  }).where(
+    eq(notificationPreferences.personId, personId),
+  ).returning({ id: notificationPreferences.id });
+  if (!rows.length) throw new Error("SMS verification rate limit");
   await twilioPost(verifyUrl("Verifications"), { To: phone, Channel: "sms" });
 }
 export async function confirmSmsVerification(personId: string, phone: string, code: string): Promise<void> {
