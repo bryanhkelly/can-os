@@ -5,9 +5,13 @@ import {respondSyntheticOfferFromDemo} from "@/modules/enrollment/admissions-off
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 
-const loadGuardianOffers=()=>getGuardianAdmissionOffers();
+const loadGuardianOffers=(studentPersonId?:string)=>getGuardianAdmissionOffers({data:{studentPersonId}});
 export const Route=createFileRoute("/guardian/admission-offers")({
- loader:safeLoader(loadGuardianOffers,{authMessage:"Sign in with an authorized guardian account to view enrollment offers."}),
+ validateSearch:(search:Record<string,unknown>)=>({student:typeof search.student==="string"?search.student:undefined}),
+ loaderDeps:({search})=>({student:search.student}),
+ loader:({deps})=>safeLoader(()=>loadGuardianOffers(deps.student),{
+  authMessage:"Sign in with an authorized guardian account to view enrollment offers.",
+ })(),
  component:GuardianAdmissionOffers
 });
 function GuardianAdmissionOffers(){
@@ -17,6 +21,7 @@ function GuardianAdmissionOffers(){
 }
 function GuardianAdmissionOffersView({applications}:{applications:Awaited<ReturnType<typeof loadGuardianOffers>>}){
  const router=useRouter();
+ const {student}=Route.useSearch();
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState("");
  async function respond(offerId:string,decision:"accept"|"decline"){
   setBusy(offerId);setError("");
@@ -25,7 +30,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
   finally{setBusy(null);}
  }
  return <main className="mx-auto max-w-4xl space-y-6 px-5 py-10">
-  <header><h1 className="font-serif text-4xl">Enrollment offers</h1><p className="mt-2 text-muted-foreground">Review offers for students whose enrollment you are authorized to manage.</p></header>
+  <header><h1 className="font-serif text-4xl">Enrollment offers</h1><p className="mt-2 text-muted-foreground">Review offers for students whose enrollment you are authorized to manage.</p>{student&&<a href="/guardian/admission-offers" className="mt-2 inline-block text-xs font-semibold underline">View offers for all children →</a>}</header>
   {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}
   {applications.map(app=><section className="rounded-xl border p-5" key={app.applicationId}>
     <h2 className="text-xl font-semibold">{app.studentName}</h2><p className="text-sm text-muted-foreground">{app.program}</p>
