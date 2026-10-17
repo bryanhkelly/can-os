@@ -1,10 +1,15 @@
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db/client";
 import { programs } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 
-export type OperationsSelection = { siteId?: string; programId?: string };
+export const operationsSelectionSchema = z.object({
+  siteId: z.string().uuid().optional(),
+  programId: z.string().uuid().optional(),
+}).strict();
+export type OperationsSelection = z.infer<typeof operationsSelectionSchema>;
 
 /**
  * A URL query is only a filter request, never a grant. Resolve it against
