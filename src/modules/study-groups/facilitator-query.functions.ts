@@ -2,7 +2,7 @@ import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
-import {and,eq,desc,inArray,isNull,or} from "drizzle-orm";
+import {and,eq,desc,inArray} from "drizzle-orm";
 
 /** Facilitator-owned groups and sessions; separate from the student membership read model. */
 export const getFacilitatorStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
