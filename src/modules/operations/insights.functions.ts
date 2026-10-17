@@ -102,6 +102,22 @@ export const acceptInsight = createServerFn({ method: "POST" })
    if (!insight) throw new Error("Insight not found");
    if (insight.status !== "open") throw new Error("Insight has already been handled");
    await assertInsightManageScope(server, tx, context, insight);
+   if(data.actionOwnerPersonId){
+    if(!insight.siteId||!insight.organizationId)
+     throw new AuthorizationError("site-specific insight required for assignment");
+    // A caller-supplied person ID is never authority. The assignee must hold a
+    // current staff grant at the insight's school and organization.
+    const [assignee]=await tx.select({id:s.accountPersonGrants.id})
+     .from(s.accountPersonGrants)
+     .where(ops.and(
+      ops.eq(s.accountPersonGrants.personId,data.actionOwnerPersonId),
+      ops.eq(s.accountPersonGrants.organizationId,insight.organizationId),
+      ops.eq(s.accountPersonGrants.siteId,insight.siteId),
+      ops.eq(s.accountPersonGrants.active,true),
+      ops.inArray(s.accountPersonGrants.role,["registrar","teacher","specialist"])
+     )).limit(1);
+    if(!assignee)throw new AuthorizationError("active school staff assignee");
+   }
    const [action] = await tx.insert(s.actions).values({
     type: "academic_intervention",
     title: data.actionTitle ?? insight.recommendedActions[0]?.title ?? insight.title,
@@ -117,6 +133,15 @@ export const acceptInsight = createServerFn({ method: "POST" })
     metadata: { sourceInsightId: insight.id },
    }).returning({ id: s.actions.id });
    if (!action) throw new Error("Failed to create Action");
+   if(data.actionOwnerPersonId){
+    await tx.insert(s.notifications).values({
+     recipientPersonId:data.actionOwnerPersonId,
+     type:"operations_action_assigned",
+     title:"Action assigned from school insight",
+     body:"An Action has been assigned for review.",
+     resourceType:"action",resourceId:action.id,
+    });
+   }
    await tx.update(s.insights).set({
     status: "acknowledged",
     acknowledgedByPersonId: context.actorPersonId,
