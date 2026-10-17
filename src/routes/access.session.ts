@@ -16,9 +16,10 @@ export const Route=createFileRoute("/access/session")({
     const grants=await db.select({
      id:accountPersonGrants.id,personId:accountPersonGrants.personId,role:accountPersonGrants.role,
      firstName:people.legalFirstName,lastName:people.legalLastName,
+     organizationId:accountPersonGrants.organizationId,siteId:accountPersonGrants.siteId,
     }).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId))
      .where(and(eq(accountPersonGrants.accountId,context.accountId),eq(accountPersonGrants.active,true)));
-    return Response.json({authenticated:true,activeGrantId:context.grantId,role:context.role,grants},
+    return Response.json({authenticated:true,activeGrantId:context.grantId,role:context.role,grants,activeContext:{organizationIds:context.scope.organizationIds??[],siteIds:context.scope.siteIds??[],programIds:context.scope.programIds??[]}},
      {headers:{"Cache-Control":"no-store"}});
    }catch{return Response.json({authenticated:false},{status:401,headers:{"Cache-Control":"no-store"}});}
   },
