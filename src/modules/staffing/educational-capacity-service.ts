@@ -571,6 +571,7 @@ export async function reserveInstructionalCapacity(
           sectionId: demand.sectionId,
           personId: offering.personId,
           role: "teacher",
+          assignmentSource: "capacity",
         })
         .onConflictDoNothing({
           target: [sectionTeachers.sectionId, sectionTeachers.personId],
@@ -614,7 +615,8 @@ export async function releaseInstructionalCapacity(
             gte(instructionalCapacityReservations.expiresAt,new Date())))).limit(1);
       if(!other.length){
         await tx.delete(sectionTeachers).where(and(eq(sectionTeachers.sectionId,reservation.sectionId),
-          eq(sectionTeachers.personId,reservation.personId)));
+          eq(sectionTeachers.personId,reservation.personId),
+          eq(sectionTeachers.assignmentSource,"capacity")));
       }
     }
   });
