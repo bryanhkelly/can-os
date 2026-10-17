@@ -35,7 +35,7 @@ async function lockSectionStaffingSite(
   const [site] = await tx.select({
     siteId: sections.siteId, programId: sections.programId,
   }).from(sections).where(eq(sections.id, sectionId)).limit(1);
-  if (!site || !context.scope.programIds?.includes(site.programId) ||
+  if (!site?.siteId || !context.scope.programIds?.includes(site.programId) ||
       !context.scope.siteIds?.includes(site.siteId))
     throw new Error("Section capacity is not in the authorized teaching site");
   await lockAttendanceConfigurationAtSite(tx, site.siteId);
