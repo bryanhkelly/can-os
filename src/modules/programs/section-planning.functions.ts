@@ -31,11 +31,21 @@ export const saveDeliveryArrangement=createServerFn({method:"POST"})
    effectiveFrom:z.string().datetime().nullish(),
    effectiveThrough:z.string().datetime().nullish(),
  }).parse(v))
- .handler(async({data})=>createDeliveryArrangement(await getCommandContext(getRequest()),{
-   ...data,
-   effectiveFrom:data.effectiveFrom?new Date(data.effectiveFrom):data.effectiveFrom,
-   effectiveThrough:data.effectiveThrough?new Date(data.effectiveThrough):data.effectiveThrough,
- }));
+ .handler(async({data})=>{
+   const effectiveFrom=typeof data.effectiveFrom==="string"?new Date(data.effectiveFrom):null;
+   const effectiveThrough=typeof data.effectiveThrough==="string"?new Date(data.effectiveThrough):null;
+   return createDeliveryArrangement(await getCommandContext(getRequest()),{
+     sectionId:data.sectionId,
+     academicProviderOrganizationId:data.academicProviderOrganizationId,
+     capacityReservationId:data.capacityReservationId??null,
+     instructorPersonId:data.instructorPersonId??null,
+     facilitatorPersonId:data.facilitatorPersonId??null,
+     modality:data.modality,
+     status:data.status,
+     effectiveFrom,
+     effectiveThrough,
+   });
+ });
 
 export const activateSectionDelivery=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({arrangementId:uuid}).parse(v))
