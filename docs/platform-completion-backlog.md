@@ -8,7 +8,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Stop using URL/localStorage demo persona as the application navigation authority.
 - [ ] Rename DemoNavigation and remove stale demo persona helper/tests once migrated.
 - [ ] Introduce verified active-account/site/program/child context shared across routes.
-- [ ] Replace synthetic-only operations queries/actions with canonical Action services; remove hard-coded person IDs.
+- [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
+- [ ] Consolidate duplicate legacy operations service and migrate remaining consumers before deleting it; add complete action transition tests.
 - [ ] Consolidate live and demo student components and reads.
 - [ ] Remove or protect `/demo-health`; migrate diagnostics to staff-only operations.
 - [ ] Replace showcase home with appropriate authenticated start route.
