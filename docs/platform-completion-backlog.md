@@ -11,7 +11,9 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Expose active grant organization/site/program scopes from verified session endpoint to the workspace shell.
 - [x] Add family-home child-specific deep links to academics and report cards; resolve requested child from the guardian's authorized roster, ignoring unauthorized IDs, with unit tests.
 - [x] Show server-resolved site names and authorized program deep links in the workspace shell; do not treat UI selection as an authorization claim.
-- [ ] Implement consistent active site/program selection for all operational queries, and remaining child context across attendance and admissions; validate route scope server-side.
+- [x] Wire site/program selectors into the operations Action queue and live readiness summary, validating both against the server-issued grant and program/site relationship.
+- [x] Expand organization-wide grants to their owned sites without broadening site-specific grants.
+- [ ] Carry active site/program selection through the remaining operational routes and child context through attendance/admissions.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
 - [x] Delete legacy synthetic-only operations service after replacing its route consumer.
 - [x] Connect staff Action assignment UI to authorized per-site assignee directory and existing audited assignment command; exclude student/guardian grants from operational assignees.
@@ -21,6 +23,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Remove local-only StudentQuickWins from active experiences route and require canonical Student Today input (no fallback sample student).
 - [x] Remove fixture gating from authenticated student-owned action and display-preference commands.
 - [x] Remove simulated calendar-status metadata command from school-experience service.
+- [x] Move authorized personal-event creation and teaching-scoped assessment due-date changes off synthetic-only write gates.
+- [x] Prevent site/section calendar memberships from revealing personal or explicitly participant-restricted events; bound guardian sections to authorized programs/sites.
 - [ ] Build canonical school calendar edit/reschedule/cancel commands with downstream propagation in Phase 2.
 - [x] Restrict non-registrar school-experience calendar queries to site-level events, leaving section events to authorized student/teacher read models.
 - [ ] Verify calendar visibility and office-hour child/site selection with multi-role tests.
@@ -29,12 +33,14 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Remove synthetic metadata dependency from recipient-scoped notification deep-link resolution.
 - [x] Provide one /notifications route for all authenticated people; redirect the legacy student URL and update guardian/global navigation.
 - [x] Move recipient-scoped notifications into communication module and drop synthetic-specific function names and superseded student-only service.
+- [x] Redirect teacher-only notices into the canonical notification center and delete duplicate notification handlers.
 - [ ] Tighten every resource-specific notification deep-link permission for cross-role data.
 - [x] Replace local-only StudentExperience with canonical read-only student work/schedule/action projection and real workflow deep links.
 - [ ] Verify typecheck, build, unit tests and role-switch browser journeys before closing Phase 1.
 - [x] Align fixture manifest after removing `/demo-health` (previously blocked CI at route fixture coverage).
 - [ ] Build machine-verifiable inventory for every route and data-flow acceptance gate.
-- [ ] Audit all server functions for verified identity and per-record resource scopes.
+- [x] Remove unconditional synthetic markers from shared domain audits and authenticated session audits.
+- [ ] Audit all server functions for verified identity and per-record resource scopes; legacy synthetic write gates remain in multiple unreviewed workflows.
 
 ## Phase 2 — connected school operation
 
