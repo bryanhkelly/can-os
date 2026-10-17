@@ -160,9 +160,17 @@ export const reportStudyGroupPost=createServerFn({method:"POST"}).validator(z.ob
  if(!member||!post)throw new Error("Cannot report this content");
  const [existing]=await tx.select({id:s.studyGroupReports.id}).from(s.studyGroupReports).where(and(eq(s.studyGroupReports.groupId,data.groupId),eq(s.studyGroupReports.postId,data.postId),eq(s.studyGroupReports.reporterPersonId,actor.actorPersonId!),eq(s.studyGroupReports.status,"open"))).limit(1);
  if(existing)return {ok:true,created:false};
- await tx.insert(s.studyGroupReports).values({groupId:data.groupId,postId:data.postId,reporterPersonId:actor.actorPersonId!,reason:data.reason.trim()});
+ const [createdReport]=await tx.insert(s.studyGroupReports).values({groupId:data.groupId,postId:data.postId,reporterPersonId:actor.actorPersonId!,reason:data.reason.trim()}).returning({id:s.studyGroupReports.id});
  const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),eq(s.studyGroups.status,"active"))).limit(1);
  if(!group)throw new Error("Group unavailable");
+ await tx.insert(s.actions).values({type:"study_group_moderation",status:"open",
+  priority:"high",title:"Review reported content: "+group.title,
+  description:"A student report requires a moderator decision.",
+  ownerPersonId:group.facilitatorPersonId,siteId:actor.sites[0],
+  subjectType:"study_group_report",subjectId:createdReport!.id,
+  dueAt:new Date(Date.now()+24*60*60*1000),
+  metadata:{synthetic:true,fixture:"gf26",groupId:data.groupId,postId:data.postId,reportId:createdReport!.id},
+ });
  await tx.insert(s.notifications).values({recipientPersonId:group.facilitatorPersonId,type:"study_group_report_submitted",status:"unread",title:"Study group content reported",body:"A post in "+group.title+" requires moderation.",resourceType:"study_group",resourceId:data.groupId});
  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"study_group.report.submit",resourceType:"study_group_post",resourceId:data.postId,after:{groupId:data.groupId},context:{synthetic:true}});
  return {ok:true,created:true};
@@ -194,6 +202,14 @@ export const resolveStudyGroupReport=createServerFn({method:"POST"}).validator(z
  if(!report)throw new Error("Open report not found");
  if(data.hidePost&&report.postId)await tx.update(s.studyGroupPosts).set({hidden:true,updatedAt:new Date()}).where(and(eq(s.studyGroupPosts.id,report.postId),eq(s.studyGroupPosts.groupId,report.groupId)));
  await tx.update(s.studyGroupReports).set({status:"resolved"}).where(eq(s.studyGroupReports.id,report.id));
+ const moderationActions=await tx.select({id:s.actions.id,status:s.actions.status}).from(s.actions)
+  .where(and(eq(s.actions.type,"study_group_moderation"),
+   eq(s.actions.subjectType,"study_group_report"),eq(s.actions.subjectId,report.id)));
+ for(const action of moderationActions.filter(a=>!["resolved","cancelled"].includes(a.status))){
+  await tx.update(s.actions).set({status:"resolved",resolvedAt:new Date(),
+   resolutionNote:data.hidePost?"Reported content hidden":"Report reviewed; no content removal",
+   updatedAt:new Date()}).where(eq(s.actions.id,action.id));
+ }
  await tx.insert(s.notifications).values({recipientPersonId:report.reporterPersonId,type:"study_group_report_resolved",status:"unread",title:"Study group report reviewed",body:data.hidePost?"The reported post was hidden after review.":"Your report was reviewed by a facilitator.",resourceType:"study_group",resourceId:report.groupId});
  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"study_group.report.resolve",resourceType:"study_group_report",resourceId:report.id,after:{hidden:data.hidePost,groupId:report.groupId},context:{synthetic:true}});
  return {ok:true};
