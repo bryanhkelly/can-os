@@ -112,12 +112,19 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    const prior=priorRows[0];
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
+   const emitSubmission=async(submissionId:string)=>{
+    await tx.insert(s.domainEvents).values({eventType:"SubmissionReceived",aggregateType:"submission",
+     aggregateId:submissionId,actorPersonId:studentPersonId,payload:{
+      assessmentId:assessment.id,studentProfileId:studentId,sectionId:assessment.sectionId,timeliness}});
+   };
    const resolveFollowUps=async(submissionId:string)=>{
     const rows=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata}).from(s.actions)
      .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,studentId),inArray(s.actions.siteId,context.scope.siteIds!)));
     for(const action of rows){
      if(action.metadata.synthetic!==true||action.metadata.assessmentId!==assessment.id||action.status==="resolved"||action.status==="cancelled")continue;
      await tx.update(s.actions).set({status:"resolved",resolvedAt:now,resolutionNote:"Student submitted overdue assignment.",updatedAt:now}).where(eq(s.actions.id,action.id));
+     await tx.insert(s.domainEvents).values({eventType:"ActionResolved",aggregateType:"action",
+      aggregateId:action.id,actorPersonId:studentPersonId,payload:{submissionId,assessmentId:assessment.id}});
      await tx.insert(s.auditEvents).values({actorPersonId:studentPersonId,action:"synthetic.missing_work.resolved_by_submission",resourceType:"action",resourceId:action.id,before:{status:action.status},after:{status:"resolved",submissionId},context:{synthetic:true,assessmentId:assessment.id}});
     }
    };
@@ -126,6 +133,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
     const [revision]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,attemptNumber:prior.attemptNumber+1,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
     if(!revision)throw new Error("Unable to save revision");
     await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.submit_revision",resourceType:"submission",resourceId:revision.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
+    await emitSubmission(revision.id);
     await resolveFollowUps(revision.id);
     return {submissionId:revision.id};
    }
@@ -133,12 +141,14 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
     const [submitted]=await tx.update(s.submissions).set({status:"submitted",response:{text},timeliness,submittedAt:now,updatedAt:now}).where(and(eq(s.submissions.id,prior.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!submitted)throw new Error("Assignment was submitted or changed in another tab");
     await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.submit",resourceType:"submission",resourceId:submitted.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
+    await emitSubmission(submitted.id);
     await resolveFollowUps(submitted.id);
     return {submissionId:submitted.id};
    }
    const [created]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
    if(!created)throw new Error("Unable to submit");
     await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.submit",resourceType:"submission",resourceId:created.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
+    await emitSubmission(created.id);
     await resolveFollowUps(created.id);
    return {submissionId:created.id};
   });
@@ -168,6 +178,9 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
   const [updated]=await tx.update(s.submissions).set({status:"graded",score:String(data.score*points/100),feedback:{comment:data.comment.slice(0,4000)},graderPersonId:context.actorPersonId,gradedAt:new Date(),updatedAt:new Date()})
   .where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"submitted"))).returning({id:s.submissions.id});
   if(!updated)throw new Error("Submission already graded");
+  await tx.insert(s.domainEvents).values({eventType:"GradePosted",aggregateType:"submission",
+   aggregateId:updated.id,actorPersonId:context.actorPersonId,payload:{
+    studentProfileId:record.studentProfileId,score:data.score}});
   await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.grade",resourceType:"submission",resourceId:updated.id,before:{status:"submitted"},after:{status:"graded",score:data.score},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
   await tx.insert(s.notifications).values({recipientPersonId:studentPersonId,type:"assignment_feedback",status:"unread",title:"New feedback on your work",body:data.comment.slice(0,500)||"Your teacher posted a grade.",resourceType:"submission",resourceId:updated.id});
   return {submissionId:updated.id};
