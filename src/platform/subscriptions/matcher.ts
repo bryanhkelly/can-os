@@ -167,15 +167,12 @@ export async function processEventSubscriptions(eventId: string): Promise<number
 
     for (const mail of emailsToSend) {
       const to = emails.get(mail.recipientPersonId);
-      const sent = Boolean(to);
-      if (to) {
-        await sendNotificationEmail({
+      const sent = to ? await sendNotificationEmail({
           to,
           subject: mail.subject,
           text: mail.text,
           actionUrl,
-        });
-      }
+        }) : false;
       await db
         .update(subscriptionDeliveries)
         .set({
