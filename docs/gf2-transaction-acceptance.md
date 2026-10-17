@@ -17,4 +17,4 @@ To execute automated database tests, use `npm run test:integration` with `TEST_D
 
 ## Follow-up
 
-The next implementation increment should build a deterministic fixture harness for two synthetic applicants and one seat pool, exercise the existing service and assert canonical state and audit records; run it in CI against an ephemeral database branch. This note is a tracked test specification, not a substitute for executing that test.
+Implemented as `tests/integration/gf2-enrollment-lifecycle.test.ts`: a deterministic fixture harness (two synthetic households, one single-seat pool) exercising the existing service across all eight scenarios above, asserting canonical state, notifications, DomainEvents, and audit records. Executed and passing against a disposable Neon branch (`test01`, 2026-10-16). It replaces the former seeded-fixture lifecycle test, which required hard-coded demo UUIDs and a never-before-executed branch. Running this harness in CI against an ephemeral database branch remains open.
