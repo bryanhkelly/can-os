@@ -278,43 +278,36 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
   }});
  });
 
-/** Teacher grades a submitted synthetic attempt against the published rubric. */
+/** Compatibility rubric grading; the canonical gradebook owns the write and audit. */
 export const gradeSyntheticRubric=createServerFn({method:"POST"})
- .validator((value:unknown)=>z.object({submissionId:z.string().min(1),grades:z.array(z.object({id:z.string().min(1),points:z.number().finite().min(0),comment:z.string().optional()})),comment:z.string()}).parse(value))
+ .validator((input:unknown)=>z.object({
+  submissionId:z.string().uuid(),
+  grades:z.array(z.object({id:z.string().min(1),points:z.number().finite().min(0),
+   comment:z.string().max(1000).optional()})).max(20),
+  comment:z.string().max(4000)
+ }).parse(input))
  .handler(async({data})=>{
-  assertSyntheticMutation("teacher");
-  const context=await teacherActor();
-  assertCapability(context,"assignments:grade");
-  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
-  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   await teacherForSubmission(data.submissionId);
-  return db.transaction(async tx=>{
-   const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,metadata:s.assessments.metadata,studentProfileId:s.submissions.studentProfileId})
-    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
-    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-    .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]),eq(s.submissions.status,"submitted"))).limit(1);
-   if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic submitted assignment not found");
-   const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
-   if(!student)throw new AuthorizationError("student profile");
-   const studentPersonId=student.personId;
-   const criteria=readRubric(record.metadata.rubricCriteria);
-   const result=scoreRubric(criteria,data.grades);
-   const possible=Number(record.points??100);
-   const [updated]=await tx.update(s.submissions).set({
-    status:"graded",score:String(Math.round(result.percentage*possible)/100),
-    feedback:{comment:data.comment.slice(0,4000),rubricResult:{...result,grades:data.grades,criteria}},
-    graderPersonId:context.actorPersonId,gradedAt:new Date(),updatedAt:new Date()
-   }).where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"submitted")))
-     .returning({id:s.submissions.id});
-   if(!updated)throw new Error("Submission already graded");
-   await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.rubric_grade",resourceType:"submission",resourceId:updated.id,before:{status:"submitted"},after:{status:"graded",score:result.percentage},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
-   await tx.insert(s.notifications).values({recipientPersonId:studentPersonId,
-    type:"assignment_feedback",status:"unread",title:"Your rubric feedback is ready",
-    body:data.comment.slice(0,500)||"Your teacher scored your assignment rubric.",
-    resourceType:"submission",resourceId:updated.id});
-   return {submissionId:updated.id,...result};
-  });
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const [record]=await db.select({
+   metadata:s.assessments.metadata,points:s.assessments.pointsPossible
+  }).from(s.submissions)
+   .innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
+   .where(eq(s.submissions.id,data.submissionId)).limit(1);
+  if(!record)throw new AuthorizationError("assigned submission");
+  const criteria=readRubric(record.metadata.rubricCriteria);
+  const result=scoreRubric(criteria,data.grades);
+  if(result.possible!==Number(record.points))
+   throw new Error("Rubric points do not match the assessment");
+  const rubricNotes=data.grades.filter(grade=>grade.comment?.trim())
+   .map(grade=>grade.id+": "+grade.comment!.trim()).join("\n");
+  const feedbackComment=[data.comment.trim(),rubricNotes].filter(Boolean).join("\n").slice(0,4000);
+  await gradeSubmission({data:{
+   submissionId:data.submissionId,
+   rubricScores:data.grades.map(({id,points})=>({id,points})),
+   feedbackComment
+  }});
+  return {submissionId:data.submissionId,...result};
  });
 
 /** Compatibility for existing student assignment screen imports. */
