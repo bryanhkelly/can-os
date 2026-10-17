@@ -72,6 +72,7 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
         </select>
        </label>
        <button type="button" disabled={busy||!replacementSlots[booking.id]} className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>perform(()=>rescheduleOfficeHour({data:{bookingId:booking.id,newSlotId:replacementSlots[booking.id]}}),"Appointment rescheduled.")}>Save new time</button>
+       <button type="button" disabled aria-label="Cancel appointment (coming soon)" title="Cancellation will be available after the booking lifecycle is connected" className="ml-2 mt-2 rounded border px-3 py-2 text-xs font-semibold opacity-50 cursor-not-allowed">Cancel appointment · Coming soon</button>
       </div>)}
      </div>}
      <p className="text-xs text-muted-foreground">Book an available teacher office-hour appointment.</p>
