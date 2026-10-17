@@ -347,15 +347,22 @@ export async function activateEnrollmentFromApplication(
     const [programForYear] = await tx.select({
       id: programs.id,
       organizationId: programs.organizationId,
+      siteId: programs.siteId,
     }).from(programs).where(eq(programs.id, application.programId)).limit(1);
     const [schoolYear] = await tx.select({
       id: schoolYears.id,
       organizationId: schoolYears.organizationId,
+      siteId: schoolYears.siteId,
       programId: schoolYears.programId,
     }).from(schoolYears).where(eq(schoolYears.id, schoolYearId)).limit(1);
-    if (!programForYear || !schoolYear || schoolYear.programId !== application.programId ||
-        schoolYear.organizationId !== programForYear.organizationId) {
-      throw new Error("School year must belong to the application's program and organization");
+    // GF23 establishes the Site's effective academic year. It may be shared
+    // by multiple Programs at that Site, or explicitly program-scoped.
+    // Either form must match BOTH the actual site and organization.
+    if (!programForYear || !programForYear.siteId || !schoolYear ||
+        schoolYear.organizationId !== programForYear.organizationId ||
+        schoolYear.siteId !== programForYear.siteId ||
+        (schoolYear.programId !== null && schoolYear.programId !== application.programId)) {
+      throw new Error("School year must belong to the application's program or its host site");
     }
 
     const [journey] = await tx
