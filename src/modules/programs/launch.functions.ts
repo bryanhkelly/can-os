@@ -249,7 +249,12 @@ export const scheduleLaunchOrientation=createServerFn({method:"POST"})
   if(!actor.scope.programIds?.includes(data.programId))throw new AuthorizationError("orientation program");
   const start=new Date(data.startsAt),end=new Date(data.endsAt);
   if(end<=start)throw new Error("Orientation end must follow start");
+  const [{db},s,{eq}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
+  const [program]=await db.select({siteId:s.programs.siteId})
+   .from(s.programs).where(eq(s.programs.id,data.programId)).limit(1);
+  const [site]=program?.siteId?await db.select({timezone:s.sites.timezone}).from(s.sites)
+   .where(eq(s.sites.id,program.siteId)).limit(1):[];
   const eventId=await createProgramOrientation(actor,{programId:data.programId,title:data.title,
-   startsAt:start,endsAt:end,timezone:data.timezone});
+   startsAt:start,endsAt:end,timezone:site?.timezone??data.timezone});
   return {eventId};
  });
