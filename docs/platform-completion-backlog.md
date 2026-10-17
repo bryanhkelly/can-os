@@ -36,6 +36,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [ ] Build canonical school calendar edit/reschedule/cancel commands with downstream propagation in Phase 2.
 - [x] Restrict non-registrar school-experience calendar queries to site-level events, leaving section events to authorized student/teacher read models.
 - [x] Require explicit guardian child selection for office-hour booking; check guardian relationship and active enrollment at the appointment's site.
+- [x] Repair guardian conference slot series identifiers needed by the reschedule picker; check published series, guardian-child relationship and active class/program enrollment again on reschedule.
+- [x] Show only upcoming shared school-experience calendar items; apply Action program filters in Site Today before result limits.
 - [ ] Verify calendar visibility and office-hour child/site selection with multi-role tests (deferred).
 - [x] Remove `/demo-health` from the application routes; retain fixture diagnostics only in test tooling.
 - [x] Replace showcase home with session-based workspace redirection.
@@ -75,8 +77,10 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Add canonical teacher assessment publication, close, reopen, deadline changes, and latest-graded-attempt returns; expose controls in the authenticated teacher gradebook.
 - [x] Connect standalone rubric grading UI to the canonical grading service instead of an alternative synthetic submission grader.
 - [x] Tighten calendar month and shared School Experience program filtering, including student/teacher section visibility and teacher due-date changes; emit canonical calendar-change domain events when deadlines move.
-- [ ] Remove or retire still-exported fixture-only legacy teacher assignment mutation endpoints after inventorying all callers; do not open duplicate grading paths without equivalent transactional rules.
-- [ ] Complete remaining service-by-service authorization audit; fixture-only gates persist in alternative teacher grading/management, study group writes, document uploads and other unreviewed workflows.
+- [x] Replace five legacy teacher assignment mutation implementations with compatibility adapters into canonical gradebook grading, rubric grading, creation, deadline/status changes and return-for-revision commands. They now share the same permission, audit and domain-event path.
+- [ ] Remove deprecated compatibility export names after confirming no external integrations or tests depend on them.
+- [x] Validate insight-created Action owners against an active staff grant at the specific insight school/organization, and notify an assigned owner inside the creation transaction.
+- [ ] Complete remaining service-by-service authorization audit; fixture-only gates persist in study-group writes, document uploads and other unreviewed workflows.
 
 ## Phase 2 — connected school operation
 
