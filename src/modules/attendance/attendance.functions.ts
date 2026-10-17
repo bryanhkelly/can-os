@@ -3,7 +3,6 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { assertSyntheticMutation, type DemoRole } from "../_demo/demo-write-gate";
 import { z } from "zod";
 
 /**
@@ -195,7 +194,6 @@ export const markAttendance = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ studentProfileId: z.string().min(1), date: z.string().min(1), status: z.enum(["expected","present","absent","tardy","excused"]), mutationId:z.string().uuid().optional(),expectedPreviousEventId:z.string().uuid().nullable().optional(),note:z.string().max(2000).optional() }).parse(value))
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.write");
-    assertSyntheticMutation(context.role as DemoRole);
     if (!uuidPattern.test(data.studentProfileId ?? "")) throw new Error("Invalid student identifier");
     if (!datePattern.test(data.date ?? "")) throw new Error("Date must be YYYY-MM-DD");
     if (!["present", "absent", "tardy"].includes(data.status)) throw new Error("Invalid attendance status");
@@ -328,7 +326,6 @@ export const submitExcuse = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ attendanceEventId: z.string().min(1), reason: z.string() }).parse(value))
   .handler(async ({ data }) => {
     const context = await guardianActor();
-    assertSyntheticMutation("guardian");
     if (!uuidPattern.test(data.attendanceEventId ?? "")) throw new Error("Invalid attendance event");
     const reason = (data.reason ?? "").trim();
     if (reason.length < 3 || reason.length > 2000) throw new Error("Reason must be 3-2,000 characters");
@@ -402,7 +399,6 @@ export const reviewExcuse = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ excuseId: z.string().min(1), decision: z.enum(["approved","rejected"]), note: z.string().optional() }).parse(value))
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.excuse.review");
-    assertSyntheticMutation(context.role as DemoRole);
     if (!uuidPattern.test(data.excuseId ?? "")) throw new Error("Invalid excuse identifier");
     if (data.decision !== "approved" && data.decision !== "rejected") throw new Error("Invalid review decision");
     const note = (data.note ?? "").trim();
