@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   auditEvents,
@@ -8,6 +8,10 @@ import {
   organizations,
   programs,
   sites,
+  schoolYears,
+  sections,
+  sectionTeachers,
+  terms,
 } from "@/db/schema";
 import {
   assertCapability,
@@ -249,6 +253,30 @@ export async function activateProgram(
       throw new Error("Launch Journey must be ready before Program activation");
     }
 
+    // A checked-off Journey alone does not establish instructional readiness.
+    // Prevent activation of an onsite school without its academic timetable.
+    if(program.deliveryModel.onsite && !program.siteId)
+      throw new Error("Onsite program requires a host site before activation");
+    if(program.siteId){
+      const activeYears=await tx.select({id:schoolYears.id})
+       .from(schoolYears).where(and(eq(schoolYears.siteId,program.siteId),
+        eq(schoolYears.organizationId,program.organizationId),
+        eq(schoolYears.status,"active"),
+        or(isNull(schoolYears.programId),eq(schoolYears.programId,program.id))));
+      if(!activeYears.length)throw new Error(
+        "Activate a school year in School-Year Studio before activating this program");
+      const academicTerms=await tx.select({id:terms.id}).from(terms)
+       .where(inArray(terms.schoolYearId,activeYears.map(y=>y.id)));
+      const sectionRows=academicTerms.length?await tx.select({id:sections.id})
+       .from(sections).where(and(eq(sections.programId,program.id),
+        eq(sections.active,true),inArray(sections.termId,academicTerms.map(t=>t.id)))):[];
+      if(!sectionRows.length)throw new Error(
+        "Provision at least one section in the active school year before launch");
+      const assigned=await tx.select({id:sectionTeachers.id}).from(sectionTeachers)
+       .where(inArray(sectionTeachers.sectionId,sectionRows.map(s=>s.id))).limit(1);
+      if(!assigned.length)throw new Error(
+        "Assign at least one qualified instructor before activating the program");
+    }
     const activatedAt = new Date();
 
     await tx
