@@ -1,3 +1,4 @@
+import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
 import {activateSectionEnrollment} from "@/modules/enrollment/section-allocation.service";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
@@ -63,7 +64,7 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
       enrollmentStatus:latest.get(c.id)?.status??null,
       withdrawalNotation:latest.get(c.id)?.metadata.withdrawalNotation??null,
     })),
-    requests:requests.filter(r=>r.metadata.synthetic===true).map(r=>({id:r.id,sectionId:r.subjectId,status:r.status,operation:r.metadata.operation??"add",title:r.title})),
+    requests:requests.map(r=>({id:r.id,sectionId:r.subjectId,status:r.status,operation:r.metadata.operation??"add",title:r.title})),
   };
 });
 
@@ -81,6 +82,7 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         .where(and(eq(s.sections.id,data.sectionId),inArray(s.sections.siteId,sites),eq(s.sections.active,true))).limit(1);
       if(!section) throw new Error("Section not offered at this Site");
       assertProgramGranted(actor,section.programId);
+      assertRecordWriteAllowed(section.metadata,"student");
       const [programMembership]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
        .where(and(eq(s.enrollments.studentProfileId,studentId),
         eq(s.enrollments.programId,section.programId),
@@ -104,7 +106,7 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         title:`${data.operation==="add"?"Add":data.operation==="drop"?"Drop":"Withdraw from"} ${section.title}`,
         description:data.operation==="withdraw"?"Withdrawal requires review of transcript consequences.":"Requested by the student.",
         ownerPersonId:actor.actorPersonId,organizationId:section.organizationId,siteId:section.siteId,programId:section.programId,subjectType:"section",subjectId:section.id,
-        metadata:{synthetic:true,fixture:"gf40",operation:data.operation,studentProfileId:studentId,schoolYearId:section.schoolYearId,enrollmentId:membership?.id??null},
+        metadata:{synthetic:false,fixture:"gf40",operation:data.operation,studentProfileId:studentId,schoolYearId:section.schoolYearId,enrollmentId:membership?.id??null},
       }).returning({id:s.actions.id});
       if(!request)throw new Error("Unable to create course request");
       await recordAudit(tx,actor,{action:"course_registration.request",resourceType:"action",resourceId:request.id,after:{operation:data.operation,sectionId:section.id},scope:{programId:section.programId,siteId:section.siteId}});
@@ -123,8 +125,9 @@ export const decideCourseChange = createServerFn({method:"POST"})
       const [request]=await tx.select().from(s.actions).where(and(
         eq(s.actions.id,data.requestId),eq(s.actions.type,"course_registration_request"),
         eq(s.actions.status,"open"))).limit(1).for("update");
-      if(!request||request.metadata.synthetic!==true||request.metadata.fixture!=="gf40")throw new Error("Pending synthetic request not found");
+      if(!request||request.metadata.fixture!=="gf40")throw new Error("Pending synthetic request not found");
       assertProgramGranted(actor,request.programId);
+      assertRecordWriteAllowed(request.metadata,"registrar");
       if(!request.siteId||!sites.includes(request.siteId))throw new AuthorizationError("site scope");
       const studentProfileId=String(request.metadata.studentProfileId??"");
       const schoolYearId=String(request.metadata.schoolYearId??"");
