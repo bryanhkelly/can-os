@@ -70,6 +70,11 @@ function Setup({data}:{data:Snapshot}){
     <button type="submit" disabled={busy||!termId||!versionId} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create section</button>
    </form>
   </section>
+  <div className="mt-6 rounded-lg border p-4 text-sm">
+   After provisioning sections, <Link to="/operations/course-policies" className="font-semibold underline">
+    configure enrollment windows, prerequisites, seat capacity and credit limits →
+   </Link>
+  </div>
   <section className="mt-8 space-y-3">
    <h2 className="font-serif text-2xl">Teaching assignments</h2>
    {data.sections.map(section=><SectionRow key={section.id} section={section}
