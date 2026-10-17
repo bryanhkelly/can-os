@@ -12,7 +12,7 @@ async function authorizedTeacher(){
  return actor;
 }
 /** Teacher-created section discussions using actual school records. */
-export const createSyntheticCourseDiscussion=createServerFn({method:"POST"})
+export const createCourseDiscussion=createServerFn({method:"POST"})
 .validator((input:unknown)=>z.object({sectionId:z.string().min(1),subject:z.string(),prompt:z.string()}).parse(input))
 .handler(async({data})=>{
  const actor=await authorizedTeacher();
@@ -31,7 +31,7 @@ export const createSyntheticCourseDiscussion=createServerFn({method:"POST"})
   return {id:thread.id};
  });
 });
-export const setSyntheticCourseDiscussionLock=createServerFn({method:"POST"})
+export const setCourseDiscussionLock=createServerFn({method:"POST"})
 .validator((input:unknown)=>z.object({threadId:z.string().min(1),locked:z.boolean()}).parse(input))
 .handler(async({data})=>{
  const actor=await authorizedTeacher();
@@ -49,7 +49,7 @@ export const setSyntheticCourseDiscussionLock=createServerFn({method:"POST"})
  });
 });
 
-export const moderateSyntheticDiscussionMessage=createServerFn({method:"POST"})
+export const moderateDiscussionMessage=createServerFn({method:"POST"})
 .validator((input:unknown)=>z.object({messageId:z.string().min(1),hidden:z.boolean()}).parse(input))
 .handler(async({data})=>{
  const actor=await authorizedTeacher();
@@ -68,3 +68,4 @@ export const moderateSyntheticDiscussionMessage=createServerFn({method:"POST"})
   return {saved:true};
  });
 });
+\nexport const createSyntheticCourseDiscussion=createCourseDiscussion;\nexport const setSyntheticCourseDiscussionLock=setCourseDiscussionLock;\nexport const moderateSyntheticDiscussionMessage=moderateDiscussionMessage;\n
