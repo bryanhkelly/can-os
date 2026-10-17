@@ -7,6 +7,7 @@ import {
 } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { siteDate, summarizeExpectedOnsiteAttendance } from "@/domain/expected-attendance";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -14,10 +15,11 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
  * Final school/roster entitlement inside recordAttendanceRevision's advisory-
  * locked transaction. The caller cannot invent a program, site or section.
  *
- * SHARE locks protect the *existing* school-year/calendar/schedule/enrollment
- * configuration rows during this write. Calendar additions and other new
- * rows still need coordinated calendar-edit locking before we can claim
- * full serializability of all future configuration changes.
+ * The caller has already acquired the attendance occurrence lock. We now
+ * acquire the site's shared configuration advisory lock before loading any
+ * eligibility source rows; academic-time mutations take the identical lock.
+ * The row SHARE locks additionally protect the selected records themselves.
+ * Enrollment mutations require their own coordination for new/removed rows.
  */
 export async function assertExpectedOnsiteMarkInTransaction(
   tx: Transaction,
@@ -38,6 +40,8 @@ export async function assertExpectedOnsiteMarkInTransaction(
       !context.scope.programIds?.includes(input.programId) ||
       !context.scope.siteIds?.includes(input.siteId))
     throw new AuthorizationError("attendance occurrence, staff and site scope");
+
+  await lockAttendanceConfigurationAtSite(tx, input.siteId);
 
   const [program] = await tx.select({
     id: programs.id, organizationId: programs.organizationId,
