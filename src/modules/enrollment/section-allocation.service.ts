@@ -19,7 +19,7 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  const [sectionSite]=await tx.select({siteId:s.sections.siteId,
   programId:s.sections.programId}).from(s.sections)
   .where(eq(s.sections.id,sectionId)).limit(1);
- if(!sectionSite || !actor.scope.siteIds?.includes(sectionSite.siteId) ||
+ if(!sectionSite?.siteId || !actor.scope.siteIds?.includes(sectionSite.siteId) ||
   !actor.scope.programIds?.includes(sectionSite.programId))
   throw new Error("Section outside authorized school and program scope");
  await lockAttendanceConfigurationAtSite(tx,sectionSite.siteId);
