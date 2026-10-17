@@ -205,8 +205,7 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
  return {ok:true};
  });
 });
-export const leaveStudyGroup=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
- assertSyntheticMutation("student");const actor=await groupActor("student");const {db,s}=await context();
+export const leaveStudyGroup=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().uuid()}).parse).handler(async({data})=>{const actor=await groupActor("student");const {db,s}=await context();
  return db.transaction(async tx=>{
   const [group]=await tx.select({id:s.studyGroups.id})
    .from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),
@@ -214,9 +213,29 @@ export const leaveStudyGroup=createServerFn({method:"POST"}).validator(z.object(
     or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
    .limit(1);
   if(!group)throw new AuthorizationError("study group school and program scope");
+  const [member]=await tx.select({id:s.studyGroupMemberships.id,status:s.studyGroupMemberships.status})
+   .from(s.studyGroupMemberships).where(and(
+    eq(s.studyGroupMemberships.groupId,group.id),
+    eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).for("update").limit(1);
+  if(!member||member.status==="left")return {ok:true};
   await tx.update(s.studyGroupMemberships).set({status:"left",updatedAt:new Date()})
-   .where(and(eq(s.studyGroupMemberships.groupId,group.id),
-    eq(s.studyGroupMemberships.personId,actor.actorPersonId!)));
+   .where(eq(s.studyGroupMemberships.id,member.id));
+  // A pending consent must not outlive the student request it authorizes.
+  const pendingConsents=await tx.select({id:s.actions.id,metadata:s.actions.metadata})
+   .from(s.actions).where(and(eq(s.actions.type,"study_group_consent"),
+    eq(s.actions.subjectId,group.id),eq(s.actions.status,"open")));
+  for(const consent of pendingConsents){
+   if(consent.metadata.studentPersonId!==actor.actorPersonId)continue;
+   await tx.update(s.actions).set({status:"cancelled",
+    resolutionNote:"Student left the study group",updatedAt:new Date()
+   }).where(eq(s.actions.id,consent.id));
+  }
+  await tx.insert(s.auditEvents).values({
+   actorPersonId:actor.actorPersonId!,action:"study_group.membership.leave",
+   resourceType:"study_group",resourceId:group.id,
+   before:{status:member.status},after:{status:"left"},
+   context:{accountId:actor.accountId,sessionId:actor.sessionId}
+  });
   return {ok:true};
  });
 });
