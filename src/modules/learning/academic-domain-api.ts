@@ -44,10 +44,15 @@ export async function resolveVisibleStudents(
     .from(guardianRelationships)
     .innerJoin(people, eq(people.id, guardianRelationships.studentPersonId))
     .innerJoin(studentProfiles, eq(studentProfiles.personId, people.id))
+    .innerJoin(enrollments, eq(enrollments.studentProfileId, studentProfiles.id))
+    .innerJoin(sections, eq(sections.id, enrollments.sectionId))
     .where(
       and(
         eq(guardianRelationships.guardianPersonId, actorId),
         eq(guardianRelationships.canViewAcademics, true),
+        eq(enrollments.status, "active"),
+        ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
+        ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
       ),
     );
 
@@ -61,7 +66,11 @@ export async function resolveVisibleStudents(
     })
     .from(studentProfiles)
     .innerJoin(people, eq(people.id, studentProfiles.personId))
-    .where(eq(studentProfiles.personId, actorId));
+    .innerJoin(enrollments, eq(enrollments.studentProfileId, studentProfiles.id))
+    .innerJoin(sections, eq(sections.id, enrollments.sectionId))
+    .where(and(eq(studentProfiles.personId, actorId), eq(enrollments.status, "active"),
+      ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
+      ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : [])));
 
   const asTeacher = await db
     .select({
@@ -75,10 +84,13 @@ export async function resolveVisibleStudents(
     .innerJoin(enrollments, eq(enrollments.sectionId, sectionTeachers.sectionId))
     .innerJoin(studentProfiles, eq(studentProfiles.id, enrollments.studentProfileId))
     .innerJoin(people, eq(people.id, studentProfiles.personId))
+    .innerJoin(sections, eq(sections.id, enrollments.sectionId))
     .where(
       and(
         eq(sectionTeachers.personId, actorId),
         eq(enrollments.status, "active"),
+        ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
+        ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
       ),
     );
 
@@ -133,6 +145,8 @@ export async function getStudentAcademicSummary(context: AcademicReadContext, st
         and(
           eq(submissions.studentProfileId, studentProfileId),
           eq(submissions.timeliness, "missing"),
+          ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
+          ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
         ),
       )
       .orderBy(desc(assessments.dueAt))
@@ -153,6 +167,8 @@ export async function getStudentAcademicSummary(context: AcademicReadContext, st
         and(
           eq(submissions.studentProfileId, studentProfileId),
           eq(submissions.status, "graded"),
+          ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
+          ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
         ),
       )
       .orderBy(desc(submissions.gradedAt))
