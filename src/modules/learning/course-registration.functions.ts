@@ -47,7 +47,7 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
       credits:policy.credits,
       mode:typeof course.metadata.deliveryMode==="string"?course.metadata.deliveryMode:"hybrid",
       policy:{capacity:policy.enrollmentCapacity,prerequisites:policy.prerequisites,
-       addDropEndsOn:policy.addDropEndsOn,withdrawalEndsOn:policy.withdrawalEndsOn,meetingKey:null},
+       addDropEndsOn:policy.addDropEndsOn,withdrawalEndsOn:policy.withdrawalEndsOn,guardianApprovalRequired:policy.guardianApprovalRequired,meetingKey:null},
       enrollmentId:latest.get(course.id)?.id??null,
       enrollmentStatus:latest.get(course.id)?.status??null,
       withdrawalNotation:latest.get(course.id)?.metadata.withdrawalNotation??null,
