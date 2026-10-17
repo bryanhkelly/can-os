@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {createAdmissionsInquiry,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
+import {createAdmissionsInquiry,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
@@ -78,6 +78,12 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
       <button disabled={busy} onClick={()=>perform(()=>provisionInquiryGuardianAccount({data:{applicationId:r.id}}),
         "Guardian sign-in membership provisioned. The guardian can request an email access link at sign-in.")}
         className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Provision guardian login</button>
+      <button disabled={busy}
+       onClick={()=>perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId:r.id}}),
+        "A secure email sign-in invitation was requested for this guardian.")}
+       className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+       Send secure guardian invitation
+      </button>
       {r.disposition==="ready_for_offer" && <Link to="/admissions"
         className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background">Issue enrollment offer →</Link>}
     </div>
