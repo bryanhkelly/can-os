@@ -14,7 +14,6 @@ import { getSectionRegistrationPolicy } from "./section-registration-policy-serv
 const CONSENT_TYPE = "course_registration_add_decision";
 const CONSENT_SUBJECT = "course_registration_request";
 const CONSENT_VERSION = "course-registration/v1";
-const pendingStatuses = ["open", "in_progress", "waiting"] as const;
 
 /**
  * Guardian approval is tied to the canonical student-owned Action, not a
@@ -30,6 +29,8 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     ownerPersonId: actions.ownerPersonId, studentProfileId: studentProfiles.id,
     sectionId: sections.id, sectionTitle: sections.title, sectionCode: sections.code,
     siteId: sections.siteId, programId: sections.programId,
+    requestSiteId: actions.siteId, requestProgramId: actions.programId,
+    requestOrganizationId: actions.organizationId,
     organizationId: programs.organizationId, schoolYearId: terms.schoolYearId,
     studentName: people.legalFirstName, studentLastName: people.legalLastName,
   }).from(actions)
@@ -46,14 +47,15 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     .where(and(
       eq(actions.type, "course_registration_request"),
       eq(actions.subjectType, "section"),
-      inArray(actions.status, pendingStatuses),
+      eq(actions.status, "open"),
       inArray(sections.siteId, sites),
       inArray(sections.programId, actor.scope.programIds ?? []),
     ))
     .orderBy(desc(actions.createdAt)).limit(100);
   const scoped = rows.filter(row =>
     row.siteId && actor.scope.organizationIds?.includes(row.organizationId) &&
-    row.siteId === row.siteId
+    row.siteId === row.requestSiteId && row.programId === row.requestProgramId &&
+    row.organizationId === row.requestOrganizationId
   );
   // Revalidate the Action's original scope and student/year identifiers.
   const valid = scoped.filter(row =>
