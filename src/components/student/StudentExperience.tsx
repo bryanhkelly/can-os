@@ -30,7 +30,7 @@ export function StudentExperience({ liveData }: { liveData: StudentTodayData }) 
     <div className="mt-4 space-y-3">{liveData.coursework.map(item=><article key={item.assessmentId} className="rounded-xl border bg-card p-4">
      <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{item.assessmentTitle}</h3><p className="mt-1 text-sm text-muted-foreground">{item.instructions??"Review course instructions"}</p></div><span className="text-xs text-muted-foreground">{item.timeliness==="missing"?"Missing":item.status}</span></div>
      <p className="mt-3 text-xs text-muted-foreground">{item.dueAt?"Due "+format(item.dueAt):"No due date"}</p>
-     <Link to="/student/assignments" search={{assessment:item.assessmentId}} className="mt-3 inline-block text-sm font-semibold underline">Open assignment →</Link>
+     <a href={"/student/assignments?assessment="+encodeURIComponent(item.assessmentId)} className="mt-3 inline-block text-sm font-semibold underline">Open assignment →</a>
     </article>)}
     {!liveData.coursework.length&&<p className="rounded-xl border p-4 text-sm text-muted-foreground">No assignments require attention today.</p>}</div>
    </section>
