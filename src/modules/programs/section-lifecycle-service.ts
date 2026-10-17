@@ -114,6 +114,11 @@ export async function changeSectionState(context: LifecycleContext, sectionId:st
       const reserved=await tx.select({id:instructionalCapacityReservations.id}).from(instructionalCapacityReservations)
         .where(and(eq(instructionalCapacityReservations.sectionId,section.id),inArray(instructionalCapacityReservations.status,["held","committed"])));
       if(reserved.length)throw new Error("Release all capacity reservations before closing this section");
+      // Preserve waitlist history but prevent enrollment into a closed class.
+      await tx.update(actions).set({status:"cancelled",resolutionNote:"Section closed",
+        resolvedAt:new Date(),updatedAt:new Date()})
+        .where(and(eq(actions.type,"section_waitlist"),eq(actions.sectionId,section.id),
+          inArray(actions.status,["open","waiting","in_progress"])));
     }
     await tx.update(sections).set({active,updatedAt:new Date(),metadata:{...section.metadata,lastLifecycleReason:reason.trim()}}).where(eq(sections.id,section.id));
     await journal(tx,context,section,active?"SectionReopened":"SectionClosed",{active:section.active},{active,reason:reason.trim()});
