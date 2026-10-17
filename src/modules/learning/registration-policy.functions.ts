@@ -21,6 +21,7 @@ const policy=z.object({
  meetingKey:z.string().trim().max(100).nullable(),
  credits:z.number().min(0).max(20),
  maxCreditsPerTerm:z.number().min(0).max(40),
+ guardianApprovalRequired:z.boolean(),
 });
 export const listCoursePolicies=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await registrar();
@@ -47,6 +48,7 @@ export const listCoursePolicies=createServerFn({method:"GET"}).handler(async()=>
    meetingKey:null,
    credits:effective.credits,
    maxCreditsPerTerm:effective.maxCreditsPerTerm,
+   guardianApprovalRequired:effective.guardianApprovalRequired,
   }};
  }));
 });
@@ -84,6 +86,7 @@ export const updateCoursePolicy=createServerFn({method:"POST"})
     prerequisites:data.policy.prerequisites,addDropEndsOn:data.policy.addDropEndsOn,
     withdrawalEndsOn:data.policy.withdrawalEndsOn,credits:data.policy.credits,
     maxCreditsPerTerm:data.policy.maxCreditsPerTerm,
+    guardianApprovalRequired:data.policy.guardianApprovalRequired,
    });
    const after=await getSectionRegistrationPolicy(section.id,tx);
    await tx.insert(domainEvents).values({eventType:"CourseRegistrationPolicyChanged",
