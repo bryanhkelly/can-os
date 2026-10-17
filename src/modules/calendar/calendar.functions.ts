@@ -34,6 +34,7 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
         eq(schema.enrollments.status, "active"),
         eq(schema.enrollments.kind, "section"),
         inArray(schema.sections.siteId, sites),
+        inArray(schema.sections.programId, actor.scope.programIds ?? []),
       ));
     return rows.map((row) => row.sectionId).filter((id): id is string => Boolean(id));
   }
@@ -42,7 +43,7 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
       .select({ sectionId: schema.sectionTeachers.sectionId })
       .from(schema.sectionTeachers)
       .innerJoin(schema.sections, eq(schema.sections.id, schema.sectionTeachers.sectionId))
-      .where(and(eq(schema.sectionTeachers.personId, actor.actorPersonId), inArray(schema.sections.siteId, sites)));
+      .where(and(eq(schema.sectionTeachers.personId, actor.actorPersonId), inArray(schema.sections.siteId, sites), inArray(schema.sections.programId, actor.scope.programIds ?? [])));
     return rows.map((row) => row.sectionId);
   }
   if (actor.role === "guardian") {
@@ -61,6 +62,7 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
         eq(schema.guardianRelationships.canViewAcademics, true),
         inArray(schema.enrollments.programId, actor.scope.programIds ?? []),
         inArray(schema.sections.siteId, sites),
+        inArray(schema.sections.programId, actor.scope.programIds ?? []),
       ));
     return rows.map((row) => row.sectionId).filter((id): id is string => Boolean(id));
   }
@@ -108,6 +110,7 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
         or(
           and(inArray(schema.calendarEvents.siteId, sites),
             isNull(schema.calendarEvents.sectionId),
+            or(isNull(schema.calendarEvents.programId),inArray(schema.calendarEvents.programId,actor.scope.programIds??[])),
             ne(schema.calendarEvents.type, "personal"),
             notExists(hasExplicitParticipants)),
           sectionIds.length ? and(inArray(schema.calendarEvents.sectionId, sectionIds),
@@ -242,7 +245,7 @@ export const moveAssessmentDueDate = createServerFn({ method: "POST" })
           eq(schema.sectionTeachers.sectionId, schema.sections.id),
           eq(schema.sectionTeachers.personId, actor.actorPersonId),
         ))
-        .where(and(eq(schema.assessments.id, data.assessmentId), inArray(schema.sections.siteId, sites)))
+        .where(and(eq(schema.assessments.id, data.assessmentId), inArray(schema.sections.siteId, sites), inArray(schema.sections.programId,actor.scope.programIds??[])))
         .for("update")
         .limit(1);
       if (!assessment) throw new AuthorizationError("assessment teaching relationship");
