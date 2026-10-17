@@ -56,7 +56,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
   if (!allowed.length) return { role: actor.role, groups: [], sections: teaching };
 
   const ids = allowed.map(x => x.id);
-  const [memberships, sessions, pendingMembers] = await Promise.all([
+  const [memberships, sessions, pendingMembers, posts, reports, roster] = await Promise.all([
     db.select({
       id: s.studyGroupMemberships.id, groupId: s.studyGroupMemberships.groupId,
       personId: s.studyGroupMemberships.personId, status: s.studyGroupMemberships.status,
@@ -89,7 +89,33 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
       .innerJoin(s.people, eq(s.people.id, s.studyGroupMemberships.personId))
       .where(and(inArray(s.studyGroupMemberships.groupId, ids),
         eq(s.studyGroupMemberships.status, "pending"))) : Promise.resolve([]),
+    db.select({ id: s.studyGroupPosts.id, groupId: s.studyGroupPosts.groupId,
+      authorPersonId: s.studyGroupPosts.authorPersonId, body: s.studyGroupPosts.body,
+      createdAt: s.studyGroupPosts.createdAt,
+    }).from(s.studyGroupPosts).where(and(inArray(s.studyGroupPosts.groupId, ids),
+      eq(s.studyGroupPosts.hidden, false))).orderBy(desc(s.studyGroupPosts.createdAt)).limit(300),
+    actor.role === "teacher" ? db.select({
+      id: s.studyGroupReports.id, groupId: s.studyGroupReports.groupId,
+      postId: s.studyGroupReports.postId, reason: s.studyGroupReports.reason,
+    }).from(s.studyGroupReports).where(and(
+      inArray(s.studyGroupReports.groupId, ids),
+      eq(s.studyGroupReports.status, "open"))).limit(200) : Promise.resolve([]),
+    actor.role === "teacher" ? db.select({
+      groupId: s.studyGroupMemberships.groupId,
+      studentPersonId: s.studyGroupMemberships.personId,
+      firstName: s.people.legalFirstName, lastName: s.people.legalLastName,
+    }).from(s.studyGroupMemberships)
+      .innerJoin(s.people, eq(s.people.id, s.studyGroupMemberships.personId))
+      .where(and(inArray(s.studyGroupMemberships.groupId, ids),
+        eq(s.studyGroupMemberships.status, "approved"))).limit(300) : Promise.resolve([]),
   ]);
+  const attendance = actor.role === "teacher" && sessions.length
+    ? await db.select({ sessionId: s.studyGroupSessionAttendance.sessionId,
+        personId: s.studyGroupSessionAttendance.personId,
+        attended: s.studyGroupSessionAttendance.attended,
+      }).from(s.studyGroupSessionAttendance).where(inArray(
+        s.studyGroupSessionAttendance.sessionId, sessions.map(session => session.id),
+      )) : [];
 
   const pendingStudentIds = pendingMembers.map(x => x.studentPersonId);
   const [guardianRows, consentActions, consentEvidence] = pendingMembers.length
@@ -146,13 +172,23 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
           startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString(),
           cancelled: !row.eventMetadata || row.eventMetadata.cancelled === true,
           rsvp: row.rsvp, attended: row.attended,
+          attendance: actor.role === "teacher" ? attendance.filter(a => a.sessionId === row.id) : [],
         })) : [];
       return {
         id: g.id, title: g.title, description: g.description,
         maxMembers: g.maxMembers,
         membershipStatus: own?.status ?? null,
-        approvedCount: memberships.filter(m => m.groupId === g.id && m.status === "approved").length,
+        approvedCount: actor.role === "teacher"
+          ? roster.filter(m => m.groupId === g.id).length
+          : 0,
         sessions: groupSessions,
+        posts: mayReadSessions ? posts.filter(post => post.groupId === g.id)
+          .map(post => ({ id: post.id, authorPersonId: post.authorPersonId,
+            body: post.body, createdAt: post.createdAt.toISOString() })) : [],
+        reports: actor.role === "teacher" ? reports.filter(r => r.groupId === g.id) : [],
+        roster: actor.role === "teacher" ? roster.filter(r => r.groupId === g.id)
+          .map(r => ({ personId: r.studentPersonId,
+            studentName: r.firstName + " " + r.lastName })) : [],
         pendingMembers: actor.role === "teacher"
           ? pendingMembers.filter(m => m.groupId === g.id).map(m => ({
             id: m.id, studentPersonId: m.studentPersonId,
