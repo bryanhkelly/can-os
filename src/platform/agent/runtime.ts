@@ -334,13 +334,20 @@ export async function confirmRun(
       .select()
       .from(agentRuns)
       .where(eq(agentRuns.id, input.runId))
-      .limit(1);
+      .limit(1)
+      .for("update");
 
     if (!run || run.personId !== context.actorPersonId) {
       throw new AuthorizationError(`agent run: ${input.runId}`);
     }
     if (run.status !== "awaiting_approval") {
       throw new Error(`Agent run is not awaiting approval (status: ${run.status})`);
+    }
+
+    if (Date.now() - run.createdAt.getTime() > 10 * 60_000) {
+      await tx.update(agentRuns).set({ status: "cancelled", updatedAt: new Date() })
+        .where(eq(agentRuns.id, run.id));
+      throw new Error("This approval expired. Please ask CAN again.");
     }
 
     if (!input.approve) {
