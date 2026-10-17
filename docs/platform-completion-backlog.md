@@ -65,6 +65,11 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Replace student assignment role-preview and teacher controls with a student-only coursework, autosave, submission and feedback experience; teacher authoring/grading remains in /teacher/gradebook.
 - [x] Accept authentic student assignment written submissions and drafts using verified active enrollment, school/program checks and audited state transitions; resolve missing-work Actions independently of fixture markers.
 - [x] Restrict 13 study-group site queries and mutations to the member's permitted program or site-wide groups; retain demo write gates pending group lifecycle review.
+- [x] Make teacher group creation select a verified site/program and require an active teaching assignment there; display only scopes projected from actual assigned sections.
+- [x] Unblock authenticated student/facilitator study-group READS independently of demo write availability; label gated writes as unavailable rather than failing after click.
+- [x] Validate student active enrollment on membership requests, group details, posts, facilitator approvals and session RSVPs; enforce current scope on leaving and linked-child guardian consent.
+- [x] Keep study-group session metadata out of broadly visible school, Site Today and month calendar feeds until the calendar supports membership-aware study-group events.
+- [ ] Converge remaining study-group membership, moderation, consent and session WRITE lifecycles after verifying school/program record ownership, audit events and guardian safeguards.
 - [x] Extend attachment read/upload scoping to authorized programs; keep restricted R2 fixture-only mutation gates until complete document verification and storage review.
 - [ ] Complete remaining service-by-service authorization audit; fixture-only gates persist in alternative teacher grading/management, study group creation, document uploads and other unreviewed workflows.
 
