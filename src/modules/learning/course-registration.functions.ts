@@ -1,5 +1,6 @@
 import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
 import {activateSectionEnrollment} from "@/modules/enrollment/section-allocation.service";
+import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, inArray } from "drizzle-orm";
@@ -14,7 +15,7 @@ async function studentProfileFor(actor: Actor) {
  if (!profile) throw new AuthorizationError("student profile");
  return profile.id;
 }
-/** Student/guardian course registration prototype for the synthetic tenant only. */
+/** Verified student and registrar course registration, using authentic enrollment records. */
 export const getCourseRegistration = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await requireActor(["student", "registrar"]);
   setResponseHeader("Cache-Control", "private, no-store");
@@ -100,7 +101,7 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         title:`${data.operation==="add"?"Add":data.operation==="drop"?"Drop":"Withdraw from"} ${section.title}`,
         description:data.operation==="withdraw"?"Withdrawal requires review of transcript consequences.":"Requested by the student.",
         ownerPersonId:actor.actorPersonId,organizationId:section.organizationId,siteId:section.siteId,programId:section.programId,subjectType:"section",subjectId:section.id,
-        metadata:{synthetic:false,fixture:"gf40",operation:data.operation,studentProfileId:studentId,schoolYearId:section.schoolYearId,enrollmentId:membership?.id??null},
+        metadata:{operation:data.operation,studentProfileId:studentId,schoolYearId:section.schoolYearId,enrollmentId:membership?.id??null},
       }).returning({id:s.actions.id});
       if(!request)throw new Error("Unable to create course request");
       await recordAudit(tx,actor,{action:"course_registration.request",resourceType:"action",resourceId:request.id,after:{operation:data.operation,sectionId:section.id},scope:{programId:section.programId,siteId:section.siteId}});
@@ -119,7 +120,7 @@ export const decideCourseChange = createServerFn({method:"POST"})
       const [request]=await tx.select().from(s.actions).where(and(
         eq(s.actions.id,data.requestId),eq(s.actions.type,"course_registration_request"),
         eq(s.actions.status,"open"))).limit(1).for("update");
-      if(!request||request.metadata.fixture!=="gf40")throw new Error("Pending synthetic request not found");
+      if(!request)throw new Error("Pending course registration request not found");
       assertProgramGranted(actor,request.programId);
       assertRecordWriteAllowed(request.metadata,"registrar");
       if(!request.siteId||!sites.includes(request.siteId))throw new AuthorizationError("site scope");
@@ -129,6 +130,9 @@ export const decideCourseChange = createServerFn({method:"POST"})
       const operation=request.metadata.operation;
       const sectionId=request.subjectId;
       if(!studentProfileId||!sectionId||!["add","drop","withdraw"].includes(String(operation)))throw new Error("Invalid request");
+      // Even a drop/withdraw can remove a student's live onsite teaching
+      // roster. Lock before the section FOR UPDATE and enrollment status edit.
+      if(data.approve)await lockAttendanceConfigurationAtSite(tx,siteId);
       if(data.approve){
         const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata,termId:s.sections.termId,title:s.sections.title,termStartsOn:s.terms.startsOn,termEndsOn:s.terms.endsOn}).from(s.sections).innerJoin(s.terms,eq(s.terms.id,s.sections.termId)).where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,siteId),eq(s.sections.programId,programId),eq(s.sections.active,true))).limit(1).for("update");
         if(!section)throw new Error("Section unavailable");
@@ -148,7 +152,7 @@ export const decideCourseChange = createServerFn({method:"POST"})
           const [membership]=await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active"))).limit(1);
           if(!membership)throw new Error("Enrollment no longer active");
           await tx.update(s.enrollments).set({status:operation==="drop"?"cancelled":"withdrawn",endedAt:new Date(),updatedAt:new Date(),
-            metadata:{...membership.metadata,synthetic:true,withdrawalNotation:operation==="withdraw"?"W":null,changeRequestId:request.id}
+            metadata:{...membership.metadata,withdrawalNotation:operation==="withdraw"?"W":null,changeRequestId:request.id}
           }).where(eq(s.enrollments.id,membership.id));
           await tx.insert(s.domainEvents).values({eventType:operation==="drop"?"SectionEnrollmentDropped":"SectionEnrollmentWithdrawn",
             aggregateType:"enrollment",aggregateId:membership.id,actorPersonId:actor.actorPersonId,
