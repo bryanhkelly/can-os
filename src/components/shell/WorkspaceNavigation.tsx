@@ -5,8 +5,8 @@ import {openPaletteEvent} from "@/lib/workspace-search";
 
 type Membership={id:string;role:string;firstName:string;lastName:string};
 type Session={authenticated:boolean;activeGrantId?:string;grants?:Membership[]};
-const home:Record<string,string>={student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach"};
-const links:Record<string,{title:string;path:string}[]>={
+export const workspaceHome:Record<string,string>={student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach"};
+export const workspaceLinks:Record<string,{title:string;path:string}[]>={
  student:[{title:"Today",path:"/student"},{title:"Assignments",path:"/student/assignments"},{title:"Courses",path:"/student/courses"},{title:"Support",path:"/student/support"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
  guardian:[{title:"Family",path:"/guardian"},{title:"Academics",path:"/guardian/academics"},{title:"Attendance",path:"/guardian/attendance"},{title:"Offers",path:"/guardian/admission-offers"},{title:"Messages",path:"/messages"}],
  teacher:[{title:"Today",path:"/teacher"},{title:"Gradebook",path:"/teacher/gradebook"},{title:"Students",path:"/staff/students"},{title:"Missing work",path:"/teacher/missing-work"},{title:"Calendar",path:"/calendar"}],
@@ -29,7 +29,7 @@ export function WorkspaceNavigation(){
   if(!target)return;
   const response=await fetch("/access/session",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({grantId:id})});
   if(!response.ok)throw new Error("Unable to change membership");
-  window.location.assign(home[target.role]??"/");
+  window.location.assign(workspaceHome[target.role]??"/");
  };
  const signOut=async()=>{
   const response=await fetch("/access/logout",{method:"POST",credentials:"same-origin"});
@@ -39,7 +39,7 @@ export function WorkspaceNavigation(){
   <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4">
    <Link to="/" className="font-serif text-xl font-semibold">CAN OS</Link>
    <div className="flex flex-1 flex-wrap gap-x-4 gap-y-2">
-    {current&&(links[current.role]??[]).map(item=><a key={item.path} href={item.path} className="text-xs font-semibold text-muted-foreground hover:text-foreground">{item.title}</a>)}
+    {current&&(workspaceLinks[current.role]??[]).map(item=><a key={item.path} href={item.path} className="text-xs font-semibold text-muted-foreground hover:text-foreground">{item.title}</a>)}
    </div>
    {current&&<button type="button" aria-label="Search workspace" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))} className="rounded-lg border px-3 py-2 text-xs"><Search className="mr-1 inline size-3"/>Search</button>}
    {session.authenticated&&<label className="text-xs text-muted-foreground">Workspace
