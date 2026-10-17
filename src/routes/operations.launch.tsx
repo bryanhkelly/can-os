@@ -7,6 +7,7 @@ import {
   listLaunchOptions,
   startLaunch,
   createLaunchSite,
+  scheduleLaunchOrientation,
 } from "@/modules/programs/launch.functions";
 
 const programTypes = [
@@ -78,6 +79,21 @@ function LaunchWizardPage() {
   const [newSiteName,setNewSiteName]=useState("");
   const [newSiteSlug,setNewSiteSlug]=useState("");
   const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
+  const [orientationFor,setOrientationFor]=useState("");
+  const [orientationStart,setOrientationStart]=useState("");
+  const [orientationEnd,setOrientationEnd]=useState("");
+  const [orientationTitle,setOrientationTitle]=useState("Student and family orientation");
+  async function addOrientation(programId:string){
+    setBusy(true);setError("");
+    try {
+      if(!orientationStart||!orientationEnd)throw new Error("Choose orientation start and end times");
+      await scheduleLaunchOrientation({data:{programId,title:orientationTitle,
+        startsAt:new Date(orientationStart).toISOString(),
+        endsAt:new Date(orientationEnd).toISOString(),timezone:"America/Los_Angeles"}});
+      setOrientationFor("");await router.invalidate();
+    } catch(e){setError(e instanceof Error?e.message:"Unable to schedule orientation");}
+    finally{setBusy(false);}
+  }
   async function addSite(){
     if(!hostOrganizationId)return;
     setBusy(true);setError("");
@@ -405,6 +421,18 @@ function LaunchWizardPage() {
                         <li className="text-xs text-muted-foreground">No launch requirements configured.</li>
                       )}
                     </ul>
+                    <div className="mt-4 rounded-lg border p-3">
+                      <button type="button" onClick={()=>setOrientationFor(orientationFor===launch.id?"":launch.id)}
+                        className="text-xs font-semibold underline">Schedule family orientation</button>
+                      {orientationFor===launch.id && <div className="mt-3 grid gap-2">
+                        <label className="text-xs">Title<input className={inputClass} value={orientationTitle} onChange={e=>setOrientationTitle(e.target.value)}/></label>
+                        <label className="text-xs">Start<input type="datetime-local" className={inputClass} value={orientationStart} onChange={e=>setOrientationStart(e.target.value)}/></label>
+                        <label className="text-xs">End<input type="datetime-local" className={inputClass} value={orientationEnd} onChange={e=>setOrientationEnd(e.target.value)}/></label>
+                        <p className="text-xs text-muted-foreground">Times are entered in your local browser timezone and saved with an explicit offset.</p>
+                        <button type="button" disabled={busy||!orientationStart||!orientationEnd}
+                          onClick={()=>addOrientation(launch.id)} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Save orientation</button>
+                      </div>}
+                    </div>
                     <div className="mt-4">
                       <button
                         type="button"
