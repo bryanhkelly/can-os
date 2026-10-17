@@ -93,11 +93,34 @@ export const getSupportReferrals = createServerFn({ method: "GET" }).handler(asy
   });
 });
 
+/** Real students in the authenticated teacher's currently assigned, authorized classes. */
+export const listTeacherReferralStudents=createServerFn({method:"GET"}).handler(async()=>{
+ const actor=await requireActor(["teacher"],"referrals:create");
+ const {db,s}=await context();
+ const rows=await db.select({id:s.studentProfiles.id,
+  firstName:s.people.legalFirstName,lastName:s.people.legalLastName,
+  sectionTitle:s.sections.title
+ }).from(s.enrollments)
+ .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+ .innerJoin(s.sectionTeachers,and(
+   eq(s.sectionTeachers.sectionId,s.sections.id),
+   eq(s.sectionTeachers.personId,actor.actorPersonId)))
+ .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+ .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
+ .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+   inArray(s.sections.siteId,actor.scope.siteIds??[]),
+   inArray(s.sections.programId,actor.scope.programIds??[])));
+ return [...new Map(rows.map(row=>[row.id,{
+  id:row.id,name:`${row.firstName} ${row.lastName}`,
+  sectionTitle:row.sectionTitle
+ }])).values()].sort((a,b)=>a.name.localeCompare(b.name));
+});
+
 export const createSupportReferral = createServerFn({ method: "POST" })
   .validator(z.object({
     category: z.enum(categories), priority: z.enum(["normal", "high"]),
     observations: z.string(), includeEvidence: z.boolean(),
-    studentProfileId: z.string().uuid().optional(),
+    studentProfileId: z.string().uuid(),
   }).parse)
   .handler(async ({ data }) => {
     const actor = await requireActor(["teacher"], "referrals:create");
@@ -105,7 +128,7 @@ export const createSupportReferral = createServerFn({ method: "POST" })
     const sites = actorSiteIds(actor);
     const { db, s } = await context();
     const students = await taughtStudentIds(db, s, actor);
-    const subjectId = data.studentProfileId ?? students[0];
+    const subjectId = data.studentProfileId;
     if (!subjectId || !students.includes(subjectId)) throw new AuthorizationError("referral student relationship");
     const created = await db.transaction(async (tx: any) => {
       // Derive the referral's owning school and program from the student's
