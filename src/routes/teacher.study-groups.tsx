@@ -6,10 +6,10 @@ import {getFacilitatorStudyGroups} from "@/modules/study-groups/facilitator-quer
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 const loadFacilitatorStudyGroups=async()=>{
- const {enabled}=await getStudyGroupAvailability();
- if(!enabled)return {enabled,queue:[],reports:[],groups:[],scopes:[]};
+ const {enabled,writesEnabled}=await getStudyGroupAvailability();
+ if(!enabled)return {enabled,writesEnabled,queue:[],reports:[],groups:[],scopes:[]};
  const [queue,reports,groups,scopes]=await Promise.all([listStudyGroupReviewQueue(),listStudyGroupReports(),getFacilitatorStudyGroups(),listFacilitatorGroupScopes()]);
- return {enabled,queue,reports,groups,scopes};
+ return {enabled,writesEnabled,queue,reports,groups,scopes};
 };
 export const Route=createFileRoute("/teacher/study-groups")({
  loader:safeLoader(loadFacilitatorStudyGroups,{authMessage:"Sign in with an authorized teacher account to facilitate study groups."}),
