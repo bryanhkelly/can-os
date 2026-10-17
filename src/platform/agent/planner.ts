@@ -62,6 +62,13 @@ export function planTurn(message: string): AgentPlan {
   if (/\b(?:resume|restart|unpause) (?:that|the|my|this)?\s*(?:watch|monitoring|alert)\b/i.test(text))
     return { intent: "manage", action: "resume" };
 
+  const weekly = /every\\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/i.exec(text);
+  if (weekly && /summar|digest|progress|update/i.test(text)) {
+    const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+    return { intent: "manage", action: "create_digest",
+      studentQuery: extractStudentQuery(text),
+      weekday: days.indexOf(weekly[1]!.toLowerCase()), hour: 19 };
+  }
   if (watchVerb.test(text) && missing.test(text)) {
     return { intent: "watch", studentQuery: extractStudentQuery(text),
       eventTypes: ["AssignmentBecameMissing"], remindAfterHours: reminderHours(text) };
