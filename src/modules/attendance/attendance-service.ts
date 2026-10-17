@@ -509,7 +509,7 @@ export async function recordAttendanceRevision(
   }).returning({id:attendanceEvents.id});
   if(!record)throw new Error("Unable to record attendance");
   await emitEvent(tx,{eventType:input.status==="absent"?
-   EventTypes.StudentMarkedAbsent:"AttendanceCorrected",
+   EventTypes.StudentMarkedAbsent:EventTypes.AttendanceCorrected,
    aggregateType:"attendance_event",aggregateId:record.id,
    actorPersonId:context.actorPersonId,payload:{
     studentProfileId:input.studentProfileId,programId:input.programId,
