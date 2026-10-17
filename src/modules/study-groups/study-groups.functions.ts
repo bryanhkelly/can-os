@@ -92,9 +92,9 @@ export const createStudyGroup=createServerFn({method:"POST"})
    throw new AuthorizationError("facilitator program");
   if(data.kind==="course"&&!data.programId)throw new Error("Course study groups require a program");
   const {db,s}=await context();
-  // A teacher must actively teach at the chosen school/program. An unrelated
-  // membership or a client-provided site ID never confers facilitator authority.
-  const [assignment]=await db.select({id:s.sectionTeachers.id})
+  return db.transaction(async tx=>{
+   // Resolve current teaching authority inside the same transaction as the write.
+   const [assignment]=await tx.select({id:s.sectionTeachers.id})
     .from(s.sectionTeachers)
     .innerJoin(s.sections,eq(s.sections.id,s.sectionTeachers.sectionId))
     .where(and(eq(s.sectionTeachers.personId,actor.actorPersonId!),
@@ -102,8 +102,7 @@ export const createStudyGroup=createServerFn({method:"POST"})
       inArray(s.sections.programId,actor.scope.programIds??[]),
       data.programId?eq(s.sections.programId,data.programId):undefined))
     .limit(1);
-  if(!assignment)throw new AuthorizationError("active teaching assignment at selected school");
-  return db.transaction(async tx=>{
+   if(!assignment)throw new AuthorizationError("active teaching assignment at selected school");
    const [group]=await tx.insert(s.studyGroups).values({
     ...valid,siteId:data.siteId,programId:data.programId??null,
     facilitatorPersonId:actor.actorPersonId!,requiresApproval:true,
