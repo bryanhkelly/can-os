@@ -3,15 +3,28 @@ import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
 import {getOperationsActions,updateOperationsAction,assignOperationsAction} from "@/modules/operations/action-workspace.functions";
-export const Route=createFileRoute("/operations")({loader:async()=>{
+export const Route=createFileRoute("/operations")({
+ validateSearch:(search:Record<string,unknown>)=>({
+  siteId:typeof search.siteId==="string"?search.siteId:undefined,
+  programId:typeof search.programId==="string"?search.programId:undefined,
+ }),
+ loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
+ loader:async({deps})=>{
  try{
-  return {operations:await getOperationsActions(),health:await getReleaseHealth(),commandCenter:await getLiveOperationsCommandCenter().catch(()=>null),authError:""};
+  return {operations:await getOperationsActions({data:deps}),health:await getReleaseHealth(),commandCenter:await getLiveOperationsCommandCenter({data:deps}).catch(()=>null),authError:""};
  }catch{
   return {operations:null,health:null,commandCenter:null,authError:"Sign in with an authorized staff account to view school operations."};
  }
 },component:OperationsPage});
 function OperationsPage(){
  const {operations:data,health,commandCenter,authError}=Route.useLoaderData();
+ const selected=Route.useSearch();
+ const selectScope=(siteId?:string,programId?:string)=>{
+  const query=new URLSearchParams();
+  if(siteId)query.set("siteId",siteId);
+  if(programId)query.set("programId",programId);
+  window.location.assign("/operations"+(query.size?"?"+query.toString():""));
+ };
  const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null);
  const [error,setError]=useState("");
@@ -37,7 +50,21 @@ function OperationsPage(){
  return <main className="mx-auto max-w-6xl px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · School operations</p>
   <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
-  <p className="mt-3 max-w-2xl text-sm text-muted-foreground">One starting place for authorized school operations across your sites.</p>
+  <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Review actions and launch readiness for an authorized school and program.</p>
+  <div className="mt-5 flex flex-wrap gap-3 rounded-xl border bg-card p-4">
+   <label className="text-sm">School
+    <select aria-label="Filter operations by school" value={selected.siteId??""} onChange={event=>selectScope(event.target.value||undefined)} className="ml-2 rounded border bg-background p-2">
+     <option value="">All authorized schools</option>
+     {data.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+    </select>
+   </label>
+   <label className="text-sm">Program
+    <select aria-label="Filter operations by program" value={selected.programId??""} onChange={event=>selectScope(selected.siteId,event.target.value||undefined)} className="ml-2 rounded border bg-background p-2">
+     <option value="">All authorized programs</option>
+     {data.programs.map(program=><option key={program.id} value={program.id}>{program.name}</option>)}
+    </select>
+   </label>
+  </div>
   <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p>
   {error&&<p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>}
   {commandCenter&&<section className="mt-7 rounded-xl border bg-card p-5">
@@ -72,6 +99,6 @@ function OperationsPage(){
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>
  </>}</div></article>)}
   {!data.items.length&&<p className="rounded-xl border p-5 text-sm">No actions currently require attention.</p>}
-  </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3 rounded-xl border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p><Link className="underline" to="/student/support">Student support</Link></p><p><Link className="underline" to="/student/notifications">Student notices</Link></p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
+  </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3 rounded-xl border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p><Link className="underline" to="/student/support">Student support</Link></p><p><Link className="underline" to="/notifications">Notifications</Link></p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
  </main>;
 }
