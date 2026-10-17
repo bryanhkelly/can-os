@@ -97,6 +97,18 @@ function SectionRow({section,staff,busy,assign}:{
   <p className="mt-2 text-xs text-muted-foreground">
    {section.teachers.length?section.teachers.map(t=>t.first+" "+t.last).join(", "):"Instructor not yet assigned"}
   </p>
+  <div className="mt-3 grid gap-2 sm:grid-cols-4">
+   <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Enrollment</span><br/>{section.readiness.metrics.activeEnrollment}/{section.readiness.metrics.enrollmentCapacity}</div>
+   <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Forecast</span><br/>{section.readiness.metrics.expectedDemand??"Not set"}</div>
+   <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Reserved seats</span><br/>{section.readiness.metrics.reservedInstructionalSeats}</div>
+   <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Readiness</span><br/>{section.readiness.ready?"Ready":"Needs attention"}</div>
+  </div>
+  <div className="mt-3 flex flex-wrap gap-2">
+   {section.readiness.items.filter(item=>item.state!=="ready").map(item=>
+    <span key={item.key} className="rounded border px-2 py-1 text-xs">
+     {item.state==="blocked"?"Blocked":"Review"} · {item.message}
+    </span>)}
+  </div>
   <div className="mt-3 flex flex-wrap items-end gap-2">
    <label className="min-w-48 flex-1 text-xs">Assign instructor<select className="mt-1 block w-full rounded border bg-background p-2" value={personId} onChange={e=>setPersonId(e.target.value)}>
     <option value="">Choose teacher</option>{staff.filter(t=>!section.teachers.some(a=>a.personId===t.personId))
