@@ -6,10 +6,10 @@ import { actorSiteIds, recordAudit, requireActor } from "@/modules/identity/acto
 import { AuthorizationError } from "@/domain/command-context";
 import {EventTypes} from "@/domain/event-types";
 
-const anyone = () => requireActor(["student", "guardian", "registrar", "teacher", "specialist"]);
+const studentActor = () => requireActor(["student"]);
 
 export const getQuickWinActions = createServerFn({ method: "GET" }).handler(async () => {
-  const actor = await anyone();
+  const actor = await studentActor();
   setResponseHeader("Cache-Control", "private, no-store");
   const sites = actorSiteIds(actor);
   if (!process.env.DATABASE_URL) return { connected: false as const, actions: [] };
@@ -23,6 +23,7 @@ export const getQuickWinActions = createServerFn({ method: "GET" }).handler(asyn
   }).from(actions).where(and(
     eq(actions.ownerPersonId, actor.actorPersonId),
     inArray(actions.siteId, sites),
+    inArray(actions.programId, actor.scope.programIds ?? []),
   )).orderBy(desc(actions.createdAt)).limit(100);
   return { connected: true as const, actions: rows.map(row => ({ ...row, metadata: { source: typeof row.metadata.source === "string" ? row.metadata.source : row.type }, dueAt: row.dueAt?.toISOString() ?? null })) };
 });
@@ -30,15 +31,15 @@ export const getQuickWinActions = createServerFn({ method: "GET" }).handler(asyn
 export const finishQuickWinAction = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ actionId: z.string().uuid() }).parse(value))
   .handler(async ({ data }) => {
-    const actor = await anyone();
+    const actor = await studentActor();
     const sites = actorSiteIds(actor);
     if (!process.env.DATABASE_URL) throw new Error("Neon is not configured");
     const [{ db }, { actions }] = await Promise.all([
       import("@/db/client"), import("@/db/schema"),
     ]);
     return db.transaction(async tx => {
-      const [current] = await tx.select({id:actions.id,type:actions.type,subjectType:actions.subjectType,subjectId:actions.subjectId}).from(actions).where(and(eq(actions.id,data.actionId),eq(actions.ownerPersonId,actor.actorPersonId),inArray(actions.siteId,sites),eq(actions.status,"open"))).for("update").limit(1);
-      if(!current)throw new AuthorizationError("open owned action");
+      const [current] = await tx.select({id:actions.id,type:actions.type,subjectType:actions.subjectType,subjectId:actions.subjectId,programId:actions.programId}).from(actions).where(and(eq(actions.id,data.actionId),eq(actions.ownerPersonId,actor.actorPersonId),inArray(actions.siteId,sites),eq(actions.status,"open"))).for("update").limit(1);
+      if(!current||!current.programId||!(actor.scope.programIds??[]).includes(current.programId))throw new AuthorizationError("open owned action in authorized program");
       if(!["student_recovery","student_support","student_support_request","conference_follow_up"].includes(current.type))throw new AuthorizationError("Action requires its owning workflow");
       const [result] = await tx.update(actions).set({
         status: "resolved", resolvedAt: new Date(), resolutionNote: "Completed by owner",
@@ -70,7 +71,7 @@ export const requestQuickWinHelp = createServerFn({ method: "POST" })
       if (!profile) throw new AuthorizationError("student profile");
       const [enrollment] = await tx.select({ organizationId: s.enrollments.organizationId, programId: s.enrollments.programId, siteId:s.programs.siteId })
         .from(s.enrollments).innerJoin(s.programs, eq(s.programs.id, s.enrollments.programId))
-        .where(and(eq(s.enrollments.studentProfileId, profile.id), eq(s.enrollments.status, "active"), inArray(s.programs.siteId, sites))).limit(1);
+        .where(and(eq(s.enrollments.studentProfileId, profile.id), eq(s.enrollments.status, "active"), inArray(s.programs.siteId, sites), inArray(s.enrollments.programId, actor.scope.programIds ?? []))).limit(1);
       if (!enrollment) throw new AuthorizationError("active program enrollment");
       const [result] = await tx.insert(s.actions).values({
         type: "student_support_request", title: "Student asked for help",
@@ -81,6 +82,7 @@ export const requestQuickWinHelp = createServerFn({ method: "POST" })
         metadata: { kind: "message", source: "Student support" },
       }).returning({ id: s.actions.id });
       if (!result) throw new Error("Help request could not be saved");
+      await tx.insert(s.domainEvents).values({eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:result.id,actorPersonId:actor.actorPersonId,payload:{subjectType:"student_profile",subjectId:profile.id,source:"student_support_request"}});
       await recordAudit(tx, actor, { action: "support_request.create", resourceType: "action", resourceId: result.id, after: { kind: "message" } });
       return { id: result.id };
     });
