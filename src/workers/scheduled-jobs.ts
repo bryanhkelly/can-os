@@ -1,5 +1,5 @@
 import { markOverdueSubmissionsMissing } from "@/modules/learning/missing-work-service";
-import { processSubscriptionReminders, processQueuedSubscriptionDeliveries, processWeeklyDigests, recoverSubscriptionEventMatches } from "@/platform/subscriptions";
+import { processSubscriptionReminders, processQueuedSubscriptionDeliveries, processWeeklyDigests, recoverSubscriptionEventMatches, escalateTerminalDeliveryFailures } from "@/platform/subscriptions";
 import { processPendingDomainEvents } from "./domain-event-worker";
 
 /**
@@ -15,12 +15,14 @@ export async function runScheduledJobs(): Promise<{
   deliveries: number;
   digests: number;
   recovered: number;
+  escalated: number;
 }> {
   const missing = await markOverdueSubmissionsMissing();
   const processed = await processPendingDomainEvents();
   const recovered = await recoverSubscriptionEventMatches();
   const reminders = await processSubscriptionReminders();
   const deliveries = await processQueuedSubscriptionDeliveries();
+  const escalated = await escalateTerminalDeliveryFailures();
   const digests = await processWeeklyDigests();
-  return { missing, processed, recovered, reminders, deliveries, digests };
+  return { missing, processed, recovered, reminders, deliveries, digests, escalated };
 }
