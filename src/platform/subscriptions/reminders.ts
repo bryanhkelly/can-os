@@ -11,6 +11,7 @@ type ReminderCandidate = {
   event_type: string;
   subscriber_person_id: string;
   channel: string;
+  next_kind: string;
 };
 
 /**
@@ -27,22 +28,23 @@ export async function processSubscriptionReminders(now = new Date()): Promise<nu
       d.domain_event_id,
       e.event_type,
       s.subscriber_person_id,
-      s.channel
+      s.channel,
+      case when count(r.id) = 0 then 'reminder' else 'reminder:' || (count(r.id) + 1)::text end as next_kind
     from subscription_deliveries d
     join subscriptions s on s.id = d.subscription_id
     join domain_events e on e.id = d.domain_event_id
+    left join subscription_deliveries r on r.subscription_id = d.subscription_id and r.domain_event_id = d.domain_event_id and r.kind like 'reminder%'
     where d.kind = 'initial'
       and d.status = 'delivered'
       and s.status = 'active'
       and (s.expires_at is null or s.expires_at > ${now})
       and (s.reminder_policy->>'remindAfterHours') is not null
       and e.occurred_at <= ${now}::timestamptz - ((s.reminder_policy->>'remindAfterHours')::int * interval '1 hour')
-      and not exists (
-        select 1 from subscription_deliveries r
-        where r.subscription_id = d.subscription_id
-          and r.domain_event_id = d.domain_event_id
-          and r.kind = 'reminder'
-      )
+    group by d.id, d.subscription_id, d.domain_event_id, e.event_type, e.occurred_at, s.subscriber_person_id, s.channel, s.reminder_policy, d.created_at
+    having count(r.id) < greatest(1, least(30, coalesce((s.reminder_policy->>'maxReminders')::int, 1)))
+      and ${now}::timestamptz >= e.occurred_at +
+        (coalesce((s.reminder_policy->>'remindAfterHours')::int, 24) +
+          count(r.id)::int * greatest(1, coalesce((s.reminder_policy->>'repeatEveryHours')::int, 24))) * interval '1 hour'
     order by d.created_at
     limit 100
   `);
@@ -79,7 +81,7 @@ export async function processSubscriptionReminders(now = new Date()): Promise<nu
           .values({
             subscriptionId: candidate.subscription_id,
             domainEventId: candidate.domain_event_id,
-            kind: "reminder",
+            kind: candidate.next_kind,
             channel: candidate.channel as "in_app" | "email" | "sms" | "agent_webhook",
             status: "suppressed",
             lastError: stillAuthorized ? "condition_resolved" : "authorization_failed",
@@ -94,7 +96,7 @@ export async function processSubscriptionReminders(now = new Date()): Promise<nu
         .values({
           subscriptionId: candidate.subscription_id,
           domainEventId: candidate.domain_event_id,
-          kind: "reminder",
+          kind: candidate.next_kind,
           channel: candidate.channel as "in_app" | "email" | "sms" | "agent_webhook",
           status: "pending",
         })
