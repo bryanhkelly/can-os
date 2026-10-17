@@ -1,0 +1,4 @@
+-- Schema snapshot baseline only.
+-- DDL for educational capacity and connected section planning was committed in
+-- migrations 0017 and 0018. This no-op migration advances Drizzle's snapshot
+-- history so future generation does not try to recreate those existing tables.
