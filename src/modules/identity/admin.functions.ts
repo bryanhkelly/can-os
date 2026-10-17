@@ -36,7 +36,7 @@ export const listScopedSites = createServerFn({ method: "GET" }).handler(async (
     inArray(sites.organizationId, actor.organizationIds),
     inArray(sites.id, scopedSiteIds),
   ));
-  return { sites: rows };
+  return { sites: rows, requireSiteSelection:actor.grantSiteId!==null };
 });
 
 /**
@@ -153,7 +153,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     email: z.string().trim().email(),
     firstName: z.string().trim().min(1).max(80),
     lastName: z.string().trim().min(1).max(80),
-    role: z.string().refine(role => assignableRoles.includes(role), { message: "Unknown role" }),
+    role: z.enum(assignableRoles),
     siteId: z.string().uuid().optional(),
   }).parse(value))
   .handler(async ({ data }) => {
@@ -226,7 +226,6 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
 export const setGrantActive = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ grantId: z.string().uuid(), active: z.boolean() }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const actor = await requireRegistrar();
     if (!data.active && data.grantId === actor.grantId) {
       throw new AuthorizationError("cannot deactivate your own active grant");
