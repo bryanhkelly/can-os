@@ -3,7 +3,6 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { startProgramLaunch, activateProgram, createProgramOrientation } from "./program-launch-service";
 import { completeJourneyRequirement } from "@/modules/journeys/complete-requirement";
 
@@ -103,7 +102,6 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
 export const startLaunch = createServerFn({ method: "POST" })
   .validator((data: unknown) => startLaunchInput.parse(data))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const context = await registrarContext("program.launch.start");
     if (!context.scope.organizationIds?.includes(data.hostOrganizationId)) {
       throw new AuthorizationError("host organization scope");
@@ -197,7 +195,6 @@ export const completeLaunchRequirement = createServerFn({ method: "POST" })
     z.object({ journeyRequirementId: uuid }).parse(data),
   )
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const context = await registrarContext("journey.requirement.complete");
     const journeyStatus = await completeJourneyRequirement(
       context,
@@ -210,7 +207,6 @@ export const completeLaunchRequirement = createServerFn({ method: "POST" })
 export const activateLaunch = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ programId: uuid }).parse(data))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const context = await registrarContext("program.activate");
     await activateProgram(context, data.programId);
     return { programId: data.programId, status: "active" as const };
@@ -224,7 +220,6 @@ export const createLaunchSite = createServerFn({method:"POST"})
   timezone:z.string().trim().min(3).max(80),
  }).parse(v))
  .handler(async({data})=>{
-  assertSyntheticMutation("registrar");
   const actor=await registrarContext("program.launch.start");
   if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.scope.siteIds?.length)
    throw new AuthorizationError("organization-wide site creation");
@@ -244,7 +239,6 @@ export const scheduleLaunchOrientation=createServerFn({method:"POST"})
   title:z.string().trim().min(2).max(160),startsAt:z.string().datetime({offset:true}),
   endsAt:z.string().datetime({offset:true}),timezone:z.string().min(3)}).parse(v))
  .handler(async({data})=>{
-  assertSyntheticMutation("registrar");
   const actor=await registrarContext("calendar.event.create");
   if(!actor.scope.programIds?.includes(data.programId))throw new AuthorizationError("orientation program");
   const start=new Date(data.startsAt),end=new Date(data.endsAt);
