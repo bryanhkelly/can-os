@@ -231,13 +231,16 @@ export const moveAssessmentDueDate = createServerFn({ method: "POST" })
     const sites = actorSiteIds(actor);
     const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const newDueAt = new Date(data.newDueAt);
+    if(newDueAt<=new Date())throw new Error("Choose a future assessment due date");
     return db.transaction(async (tx) => {
       const [assessment] = await tx
         .select({
           id: schema.assessments.id,
           sectionId: schema.assessments.sectionId,
           dueAt: schema.assessments.dueAt,
+          status:schema.assessments.status,
           siteId: schema.sections.siteId,
+          programId:schema.sections.programId,
         })
         .from(schema.assessments)
         .innerJoin(schema.sections, eq(schema.sections.id, schema.assessments.sectionId))
@@ -249,6 +252,7 @@ export const moveAssessmentDueDate = createServerFn({ method: "POST" })
         .for("update")
         .limit(1);
       if (!assessment) throw new AuthorizationError("assessment teaching relationship");
+      if(!["published","closed"].includes(assessment.status))throw new Error("Only published or closed assessments can be rescheduled");
       const previousDueAt = assessment.dueAt ? assessment.dueAt.toISOString() : null;
       await tx
         .update(schema.assessments)
@@ -260,7 +264,7 @@ export const moveAssessmentDueDate = createServerFn({ method: "POST" })
         resourceId: assessment.id,
         before: { dueAt: previousDueAt },
         after: { dueAt: newDueAt.toISOString() },
-        scope: { siteId: assessment.siteId, sectionId: assessment.sectionId },
+        scope: { siteId: assessment.siteId, programId:assessment.programId, sectionId: assessment.sectionId },
       });
       await tx.insert(schema.domainEvents).values({
         eventType: EventTypes.AcademicCalendarChanged,
