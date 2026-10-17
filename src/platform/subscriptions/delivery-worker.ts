@@ -21,8 +21,8 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
     const rows = await tx.select({ id: subscriptionDeliveries.id })
       .from(subscriptionDeliveries)
       .where(or(
-        and(inArray(subscriptionDeliveries.status, ["pending", "failed"]),
-          or(isNull(subscriptionDeliveries.nextAttemptAt), lte(subscriptionDeliveries.nextAttemptAt, now))),
+        or(eq(subscriptionDeliveries.status, "pending"),
+          and(eq(subscriptionDeliveries.status, "failed"), lte(subscriptionDeliveries.nextAttemptAt, now))),
         and(eq(subscriptionDeliveries.status, "processing"), lte(subscriptionDeliveries.leaseUntil, now))
       ))
       .orderBy(asc(subscriptionDeliveries.createdAt))
