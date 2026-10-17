@@ -20,6 +20,7 @@ export async function loadExpectedAttendanceCoverage(
   asOf: Date,
   windowDays = 30,
   day?: { date: string; studentIds: Map<string, Set<string>> },
+  expectedOccurrenceKeys?: Map<string, Set<string>>,
 ): Promise<Map<string, ExpectedAttendanceSummary>> {
   const results = new Map<string, ExpectedAttendanceSummary>();
   if (!permittedPrograms.length) return results;
@@ -92,10 +93,20 @@ export async function loadExpectedAttendanceCoverage(
       timeZone: program.siteId ? timezones.get(program.siteId) ?? "UTC" : "UTC",
       asOf, windowDays,
       onDate: day?.date,
-      onExpectedDay: day ? (studentProfileId) => {
-        let ids = day.studentIds.get(program.id);
-        if (!ids) { ids = new Set(); day.studentIds.set(program.id, ids); }
-        ids.add(studentProfileId);
+      onExpectedDay: day || expectedOccurrenceKeys ? (studentProfileId, date) => {
+        if (day) {
+          let ids = day.studentIds.get(program.id);
+          if (!ids) { ids = new Set(); day.studentIds.set(program.id, ids); }
+          ids.add(studentProfileId);
+        }
+        if (expectedOccurrenceKeys) {
+          let keys = expectedOccurrenceKeys.get(program.id);
+          if (!keys) {
+            keys = new Set();
+            expectedOccurrenceKeys.set(program.id, keys);
+          }
+          keys.add(studentProfileId + ":" + date + ":site-day");
+        }
       } : undefined,
     }));
   }
