@@ -17,6 +17,28 @@ const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 type AttendanceStatus = "present" | "absent" | "tardy";
 
+/** Resolve site-local midnight to an instant, including DST changes. */
+function siteDayStart(date:string,timeZone:string):Date {
+ if(!datePattern.test(date))throw new Error("Invalid attendance date");
+ const target=Date.parse(date+"T00:00:00.000Z");
+ if(Number.isNaN(target))throw new Error("Invalid attendance date");
+ const formatter=new Intl.DateTimeFormat("en-US",{
+  timeZone,year:"numeric",month:"2-digit",day:"2-digit",
+  hour:"2-digit",minute:"2-digit",hourCycle:"h23",
+ });
+ let instant=target;
+ for(let pass=0;pass<4;pass++){
+  const values=Object.fromEntries(formatter.formatToParts(new Date(instant))
+   .filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+  const wall=Date.UTC(Number(values.year),Number(values.month)-1,Number(values.day),
+   Number(values.hour),Number(values.minute));
+  const delta=target-wall;
+  if(delta===0)break;
+  instant+=delta;
+ }
+ return new Date(instant);
+}
+
 function dayBounds(date: string): { start: Date; end: Date } {
   const start = new Date(`${date}T00:00:00.000Z`);
   if (Number.isNaN(start.getTime())) throw new Error("Invalid attendance date");
@@ -134,7 +156,6 @@ export const listSiteAttendanceRoster = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.write");
     if (!datePattern.test(data.date ?? "")) throw new Error("Date must be YYYY-MM-DD");
-    const { start, end } = dayBounds(data.date);
     const roster = await loadScopedRoster(context);
     if (!roster.length) return { date: data.date, students: [] };
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
@@ -148,8 +169,7 @@ export const listSiteAttendanceRoster = createServerFn({ method: "GET" })
       .from(s.attendanceEvents)
       .where(and(
         inArray(s.attendanceEvents.studentProfileId, roster.map(row => row.studentProfileId)),
-        gte(s.attendanceEvents.expectedAt, start),
-        lt(s.attendanceEvents.expectedAt, end),
+        eq(s.attendanceEvents.occurrenceKey, `${data.date}:site-day`),
       ))
       .orderBy(desc(s.attendanceEvents.recordedAt));
     const effective = new Map<string, (typeof events)[number]>();
@@ -185,7 +205,10 @@ export const markAttendance = createServerFn({ method: "POST" })
     if (!["present", "absent", "tardy"].includes(data.status)) throw new Error("Invalid attendance status");
     const [enrollment] = await loadScopedRoster(context, data.studentProfileId);
     if (!enrollment) throw new AuthorizationError("active enrollment at your site");
-    const { start } = dayBounds(data.date);
+    const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+    const [site]=enrollment.siteId?await db.select({timezone:s.sites.timezone})
+      .from(s.sites).where(eq(s.sites.id,enrollment.siteId)).limit(1):[];
+    const start=siteDayStart(data.date,site?.timezone??"UTC");
     const occurrenceKey = `${data.date}:site-day`;
     const { recordAttendanceRevision } = await import("./attendance-service");
     const attendanceEventId = await recordAttendanceRevision(context, {
