@@ -57,7 +57,7 @@ export async function sectionLifecycleSnapshot(context: LifecycleContext, progra
     ids.length?db.select({sectionId:enrollments.sectionId,id:enrollments.id,studentProfileId:enrollments.studentProfileId,status:enrollments.status})
       .from(enrollments).where(and(inArray(enrollments.sectionId,ids),eq(enrollments.kind,"section"),eq(enrollments.status,"active"))):[],
     ids.length?db.select({id:actions.id,sectionId:actions.sectionId,subjectId:actions.subjectId,status:actions.status,metadata:actions.metadata})
-      .from(actions).where(and(eq(actions.type,"section_waitlist"),inArray(actions.sectionId,ids),inArray(actions.status,["open","waiting"]))):[],
+      .from(actions).where(and(eq(actions.type,"section_waitlist"),inArray(actions.sectionId,ids),inArray(actions.status,["open","waiting","in_progress"]))):[],
     ids.length?db.select({sectionId:instructionalCapacityReservations.sectionId,id:instructionalCapacityReservations.id,status:instructionalCapacityReservations.status,offeringId:instructionalCapacityReservations.offeringId})
       .from(instructionalCapacityReservations).where(inArray(instructionalCapacityReservations.sectionId,ids)):[],
   ]);
@@ -176,7 +176,7 @@ export async function addSectionWaitlist(context: LifecycleContext,input:{sectio
       eq(enrollments.sectionId,section.id),eq(enrollments.status,"active"))).limit(1);
     if(alreadyEnrolled)throw new Error("Student is already enrolled in this class");
     const [existing]=await tx.select({id:actions.id}).from(actions).where(and(eq(actions.type,"section_waitlist"),
-      eq(actions.sectionId,section.id),eq(actions.subjectId,input.studentProfileId),inArray(actions.status,["open","waiting"]))).limit(1);
+      eq(actions.sectionId,section.id),eq(actions.subjectId,input.studentProfileId),inArray(actions.status,["open","waiting","in_progress"]))).limit(1);
     if(existing)return;
     await tx.insert(actions).values({
       type:"section_waitlist",title:"Section enrollment waitlist: "+section.title,status:"waiting",
