@@ -27,3 +27,4 @@ export * from "./support";
 export * from "./conversations";
 export * from "./subscriptions";
 export * from "./notification-preferences";
+export * from "./educational-capacity";
