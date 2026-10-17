@@ -22,6 +22,7 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {assertApplicationAcceptance,assertApplicationRetryOwnership} from "@/domain/admissions-transitions";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -364,6 +365,9 @@ export async function activateEnrollmentFromApplication(
         (schoolYear.programId !== null && schoolYear.programId !== application.programId)) {
       throw new Error("School year must belong to the application's program or its host site");
     }
+    // Enrollment adds a new onsite roster member. Serialize with the
+    // same site configuration lock that attendance marking holds.
+    await lockAttendanceConfigurationAtSite(tx, programForYear.siteId);
 
     const [journey] = await tx
       .select()
