@@ -86,6 +86,13 @@ export const listFieldTripOperations = createServerFn({ method: "GET" }).handler
     .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.fieldTripParticipants.studentProfileId))
     .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
     .where(inArray(s.fieldTripParticipants.fieldTripId, trips.map(t => t.id)));
+  const attendance = await db.select({
+    tripId: s.fieldTripAttendance.fieldTripId,
+    studentProfileId: s.fieldTripAttendance.studentProfileId,
+    checkpoint: s.fieldTripAttendance.checkpoint,
+    status: s.fieldTripAttendance.status,
+  }).from(s.fieldTripAttendance)
+    .where(inArray(s.fieldTripAttendance.fieldTripId, trips.map(trip => trip.id)));
   return {
     sites: allowedSites, programs,
     trips: trips.map(trip => ({
@@ -107,6 +114,12 @@ export const listFieldTripOperations = createServerFn({ method: "GET" }).handler
       roster: roster.filter(student => student.tripId === trip.id).map(student => ({
         id: student.id, name: student.firstName + " " + student.lastName,
         status: student.status, feeObligationCreated: !!student.obligationId,
+        departure: attendance.find(row => row.tripId === trip.id &&
+          row.studentProfileId === student.studentProfileId &&
+          row.checkpoint === "departure")?.status ?? null,
+        returned: attendance.some(row => row.tripId === trip.id &&
+          row.studentProfileId === student.studentProfileId &&
+          row.checkpoint === "return" && row.status === "returned"),
       })),
     })),
   };
