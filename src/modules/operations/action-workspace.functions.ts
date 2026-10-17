@@ -2,7 +2,7 @@ import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
 import {and,desc,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
-import {actions,auditEvents,domainEvents,notifications,accountPersonGrants} from "@/db/schema";
+import {actions,auditEvents,domainEvents,notifications,accountPersonGrants,people} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {notificationSummary,dedupeQueue} from "@/domain/notification-triage";
@@ -31,7 +31,7 @@ export const getOperationsActions=createServerFn({method:"GET"}).handler(async()
   href:record.type==="support_referral"?"/student/support?referral="+encodeURIComponent(record.id):"/operations",
   needsResponse:record.status==="open",
  })));
- const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role}).from(accountPersonGrants).where(and(inArray(accountPersonGrants.siteId,actor.scope.siteIds!),eq(accountPersonGrants.active,true)));
+ const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,actor.scope.siteIds!),eq(accountPersonGrants.active,true)));
  return {items,assignees,summary:notificationSummary(items)};
 });
 
