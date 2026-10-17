@@ -1,15 +1,15 @@
 import {useState} from "react";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
-import {getStudyGroupAvailability,createStudyGroup,listStudyGroupReviewQueue,listStudyGroupReports,decideStudyGroupMembership,resolveStudyGroupReport,scheduleStudyGroupSession,reviseStudyGroupSession,listStudyGroupAttendance,recordStudyGroupAttendance} from "@/modules/study-groups/study-groups.functions";
+import {getStudyGroupAvailability,listFacilitatorGroupScopes,createStudyGroup,listStudyGroupReviewQueue,listStudyGroupReports,decideStudyGroupMembership,resolveStudyGroupReport,scheduleStudyGroupSession,reviseStudyGroupSession,listStudyGroupAttendance,recordStudyGroupAttendance} from "@/modules/study-groups/study-groups.functions";
 
 import {getFacilitatorStudyGroups} from "@/modules/study-groups/facilitator-query.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 const loadFacilitatorStudyGroups=async()=>{
  const {enabled}=await getStudyGroupAvailability();
- if(!enabled)return {enabled,queue:[],reports:[],groups:[]};
- const [queue,reports,groups]=await Promise.all([listStudyGroupReviewQueue(),listStudyGroupReports(),getFacilitatorStudyGroups()]);
- return {enabled,queue,reports,groups};
+ if(!enabled)return {enabled,queue:[],reports:[],groups:[],scopes:[]};
+ const [queue,reports,groups,scopes]=await Promise.all([listStudyGroupReviewQueue(),listStudyGroupReports(),getFacilitatorStudyGroups(),listFacilitatorGroupScopes()]);
+ return {enabled,queue,reports,groups,scopes};
 };
 export const Route=createFileRoute("/teacher/study-groups")({
  loader:safeLoader(loadFacilitatorStudyGroups,{authMessage:"Sign in with an authorized teacher account to facilitate study groups."}),
@@ -21,8 +21,11 @@ function TeacherStudyGroups(){
  return <TeacherStudyGroupsView data={outcome.data}/>;
 }
 function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacilitatorStudyGroups>>}){
- const {enabled,queue,reports,groups}=data,router=useRouter();
+ const {enabled,queue,reports,groups,scopes}=data,router=useRouter();
  const [title,setTitle]=useState(""),[description,setDescription]=useState(""),[kind,setKind]=useState<"course"|"interest">("course");
+ const [siteId,setSiteId]=useState(""),[programId,setProgramId]=useState("");
+ const sites=[...new Map(scopes.map(s=>[s.siteId,{id:s.siteId,name:s.siteName}])).values()];
+ const sitePrograms=scopes.filter(scope=>scope.siteId===siteId);
  const [error,setError]=useState(""),[busy,setBusy]=useState(false);
  const [groupId,setGroupId]=useState(""),[sessionTitle,setSessionTitle]=useState(""),[agenda,setAgenda]=useState(""),[startsAt,setStartsAt]=useState(""),[endsAt,setEndsAt]=useState("");
  const [attendance,setAttendance]=useState<Array<{personId:string;rsvp:string|null;attended:boolean|null}>>([]),[attendanceSession,setAttendanceSession]=useState("");
@@ -69,8 +72,16 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
   <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Create a group</h2>
    <input className="w-full rounded border p-2" aria-label="Group title" placeholder="Group title" value={title} onChange={e=>setTitle(e.target.value)}/>
    <textarea className="w-full rounded border p-2" aria-label="Group description" placeholder="Purpose" value={description} onChange={e=>setDescription(e.target.value)}/>
+   <select className="w-full rounded border p-2" aria-label="Group school" value={siteId} onChange={e=>{setSiteId(e.target.value);setProgramId("");}}>
+    <option value="">Choose a school where you teach</option>
+    {sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+   </select>
    <select className="rounded border p-2" aria-label="Group type" value={kind} onChange={e=>setKind(e.target.value as "course"|"interest")}><option value="course">Course</option><option value="interest">Interest</option></select>
-   <button disabled={busy||title.trim().length<3} className="rounded border px-3 py-2" onClick={()=>run(async()=>{await createStudyGroup({data:{title,description,kind,maxMembers:20}});setTitle("");setDescription("");})}>Create group</button>
+   <select className="w-full rounded border p-2" aria-label="Group program" value={programId} onChange={e=>setProgramId(e.target.value)} disabled={!siteId}>
+    <option value="">{kind==="course"?"Choose the course program":"Site-wide interest group (all permitted programs)"}</option>
+    {sitePrograms.map(program=><option key={program.programId} value={program.programId}>{program.programName}</option>)}
+   </select>
+   <button disabled={busy||!siteId||(kind==="course"&&!programId)||title.trim().length<3} className="rounded border px-3 py-2" onClick={()=>run(async()=>{await createStudyGroup({data:{title,description,kind,maxMembers:20,siteId,...(programId?{programId}:{})}});setTitle("");setDescription("");})}>Create group</button>
   </section></>}
  </main>;
 }
