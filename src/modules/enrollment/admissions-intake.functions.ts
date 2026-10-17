@@ -11,7 +11,7 @@ import {instantiateJourneyFromDefinition} from "@/modules/journeys/instantiate";
 import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 const uuid=z.string().uuid();
 const applicant=z.object({
- requestId:uuid,programId:uuid, studentFirstName:z.string().trim().min(1).max(100),
+ requestId:uuid,programId:uuid,existingApplicationId:uuid.optional(), studentFirstName:z.string().trim().min(1).max(100),
  studentLastName:z.string().trim().min(1).max(100),gradeLevel:z.string().trim().max(10).optional(),
  guardianFirstName:z.string().trim().min(1).max(100),guardianLastName:z.string().trim().min(1).max(100),
  guardianEmail:z.string().trim().email(),source:z.string().trim().max(80).default("school_direct"),
@@ -62,32 +62,58 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     if(repeat.programId!==data.programId)throw new Error("Inquiry request key reused for another program");
     return {applicationId:repeat.id};
    }
-   // A prospective guardian has a Person and relationship, but no account grant.
-   // Being listed as the contact does not authenticate anyone as that person.
-   const [guardian]=await tx.insert(people).values({
-    legalFirstName:data.guardianFirstName,legalLastName:data.guardianLastName,email:data.guardianEmail,
-    metadata:{synthetic:true,origin:"registrar_intake"},
-   }).returning({id:people.id});
+   let guardianPersonId:string;
+   let householdId:string;
+   if(data.existingApplicationId){
+    const [prior]=await tx.select({householdId:applications.householdId,
+     metadata:applications.metadata,programId:applications.programId,
+     organizationId:programs.organizationId})
+     .from(applications).innerJoin(programs,eq(programs.id,applications.programId))
+     .where(eq(applications.id,data.existingApplicationId)).limit(1);
+    if(!prior||prior.metadata.synthetic!==true||
+     !actor.scope.programIds?.includes(prior.programId)||
+     prior.organizationId!==program.organizationId)
+     throw new AuthorizationError("existing family scope");
+    const contactId=String(prior.metadata.contactPersonId??"");
+    const [contact]=await tx.select({id:people.id,email:people.email})
+     .from(people).where(eq(people.id,contactId)).limit(1);
+    if(!contact?.email||normalizeAccessEmail(contact.email)!==normalizeAccessEmail(data.guardianEmail))
+     throw new Error("Guardian email must match the verified household contact");
+    householdId=prior.householdId;
+    guardianPersonId=contact.id;
+   } else {
+    // Intake creates an unverified prospective contact. No account grant is
+    // created until a registrar explicitly provisions guardian access.
+    const [guardian]=await tx.insert(people).values({
+     legalFirstName:data.guardianFirstName,legalLastName:data.guardianLastName,email:data.guardianEmail,
+     metadata:{synthetic:true,origin:"registrar_intake"},
+    }).returning({id:people.id});
+    const [household]=await tx.insert(households).values({
+     displayName:data.guardianLastName+" Household",primaryEmail:data.guardianEmail,
+    }).returning({id:households.id});
+    guardianPersonId=guardian!.id;householdId=household!.id;
+    await tx.insert(householdMemberships).values({
+     householdId,personId:guardianPersonId,relationshipLabel:"guardian",isPrimaryContact:true,
+    });
+   }
    const [studentPerson]=await tx.insert(people).values({
     legalFirstName:data.studentFirstName,legalLastName:data.studentLastName,
     metadata:{synthetic:true,origin:"registrar_intake"},
    }).returning({id:people.id});
-   const [household]=await tx.insert(households).values({
-    displayName:data.guardianLastName+" Household",primaryEmail:data.guardianEmail,
-   }).returning({id:households.id});
-   const [student]=await tx.insert(studentProfiles).values({personId:studentPerson!.id,
-    gradeLevel:data.gradeLevel||null,metadata:{synthetic:true}}).returning({id:studentProfiles.id});
-   await tx.insert(householdMemberships).values([
-    {householdId:household!.id,personId:guardian!.id,relationshipLabel:"guardian",isPrimaryContact:true},
-    {householdId:household!.id,personId:studentPerson!.id,relationshipLabel:"student"},
-   ]);
-   await tx.insert(guardianRelationships).values({guardianPersonId:guardian!.id,
-    studentPersonId:studentPerson!.id,relationshipLabel:"guardian"});
+   const [student]=await tx.insert(studentProfiles).values({
+    personId:studentPerson!.id,gradeLevel:data.gradeLevel||null,metadata:{synthetic:true},
+   }).returning({id:studentProfiles.id});
+   await tx.insert(householdMemberships).values({
+    householdId,personId:studentPerson!.id,relationshipLabel:"student",
+   });
+   await tx.insert(guardianRelationships).values({
+    guardianPersonId,studentPersonId:studentPerson!.id,relationshipLabel:"guardian",
+   });
    const [application]=await tx.insert(applications).values({
-    householdId:household!.id,studentProfileId:student!.id,programId:data.programId,
+    householdId,studentProfileId:student!.id,programId:data.programId,
     submittedByPersonId:actor.actorPersonId!,stage:"inquiry",
     idempotencyKey,
-    metadata:{synthetic:true,source:data.source,notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardian!.id},
+    metadata:{synthetic:true,source:data.source,notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardianPersonId},
    }).returning({id:applications.id});
    await tx.insert(domainEvents).values({eventType:"AdmissionsInquiryCreated",aggregateType:"application",
     aggregateId:application!.id,actorPersonId:actor.actorPersonId,
