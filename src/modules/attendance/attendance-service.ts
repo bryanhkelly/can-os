@@ -332,7 +332,10 @@ export async function reviewAttendanceExcuse(
     }
     if (lockedExcuse.status !== "submitted")
       throw new Error("Attendance excuse is no longer awaiting review");
-    const [latest] = await tx.select({ id: attendanceEvents.id, status: attendanceEvents.status })
+    const [latest] = await tx.select({
+      id: attendanceEvents.id, status: attendanceEvents.status,
+      recordedAt: attendanceEvents.recordedAt,
+    })
       .from(attendanceEvents).where(and(
         eq(attendanceEvents.studentProfileId, record.studentProfileId),
         eq(attendanceEvents.programId, record.programId),
@@ -342,7 +345,8 @@ export async function reviewAttendanceExcuse(
         !["absent", "tardy"].includes(latest.status))
       throw new Error("Attendance conflict: school record changed after this excuse was submitted. Refresh and reconcile.");
 
-    const reviewedAt = new Date();
+    // Preserve event order even when two corrections share one millisecond.
+    const reviewedAt = new Date(Math.max(Date.now(), latest.recordedAt.getTime() + 1));
 
     await tx
       .update(attendanceExcuses)
@@ -481,7 +485,8 @@ export async function recordAttendanceRevision(
     expectedAt:input.expectedAt,
    });
   }
-  const [prior]=await tx.select({id:attendanceEvents.id,status:attendanceEvents.status})
+  const [prior]=await tx.select({id:attendanceEvents.id,status:attendanceEvents.status,
+   recordedAt:attendanceEvents.recordedAt})
    .from(attendanceEvents).where(and(
     eq(attendanceEvents.studentProfileId,input.studentProfileId),
     eq(attendanceEvents.programId,input.programId),
@@ -493,7 +498,7 @@ export async function recordAttendanceRevision(
   if(prior?.status===input.status)return prior.id;
   if(prior?.status==="excused"&&!input.note?.trim())
    throw new Error("Give a reason before changing excused attendance");
-  const now=new Date();
+  const now=new Date(Math.max(Date.now(),(prior?.recordedAt.getTime()??0)+1));
   const [record]=await tx.insert(attendanceEvents).values({
    studentProfileId:input.studentProfileId,programId:input.programId,
    siteId:input.siteId,sectionId:input.sectionId,
