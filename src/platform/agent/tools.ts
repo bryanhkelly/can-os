@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import type { CommandContext } from "@/domain/command-context";
+import { getNotificationPreferences } from "@/platform/subscriptions/preferences";
 
 /**
  * Agent tools are typed, server-side functions over domain modules. The
@@ -385,8 +386,46 @@ export const setWatchStatus: AgentTool = {
   },
 };
 
+/** A durable weekly family digest runs independently from the chat session. */
+export const createWeeklyDigest: AgentTool = {
+  name: "create_weekly_digest",
+  description: "Create a weekly academic summary schedule for an authorized guardian.",
+  readOnly: false,
+  async execute(context, args) {
+    const studentProfileId = String(args.studentProfileId ?? "");
+    const student = await assertStudentAccess(context, studentProfileId);
+    const [guardian] = await db.select({ id: guardianRelationships.id })
+      .from(guardianRelationships).where(and(
+        eq(guardianRelationships.guardianPersonId, context.actorPersonId),
+        eq(guardianRelationships.studentPersonId, student.personId),
+        eq(guardianRelationships.canViewAcademics, true),
+      )).limit(1);
+    if (!guardian) throw new AuthorizationError("guardian academic relationship");
+    const weekday = Number(args.weekday ?? 5);
+    const hour = Number(args.hour ?? 19);
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 ||
+        !Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error("Invalid schedule");
+    const prefs = await getNotificationPreferences(context.actorPersonId);
+    const [subscription] = await db.insert(subscriptions).values({
+      subscriberPersonId: context.actorPersonId,
+      eventTypes: ["WeeklyStudentDigest"],
+      subjectType: "student_profile",
+      subjectId: studentProfileId,
+      filter: { kind: "weekly_digest", weekday, hour, timezone: prefs?.timezone ?? "UTC" },
+      channel: "in_app",
+      createdVia: "conversation",
+      sourceConversationId: typeof args.sourceConversationId === "string" ? args.sourceConversationId : null,
+    }).returning({ id: subscriptions.id });
+    return {
+      summary: `I'll send a weekly academic digest for ${student.displayName}. You can pause or revoke it in Things CAN Is Watching.`,
+      evidence: [{ type: "subscription", id: subscription!.id, label: "Weekly academic digest" }],
+      data: { subscriptionId: subscription!.id },
+    };
+  },
+};
+
 const toolRegistry = new Map<string, AgentTool>(
-  [getStudentAcademicSummary, createWatch, listWatches, setWatchStatus].map((tool) => [
+  [getStudentAcademicSummary, createWatch, createWeeklyDigest, listWatches, setWatchStatus].map((tool) => [
     tool.name,
     tool,
   ]),
