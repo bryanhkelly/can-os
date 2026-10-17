@@ -65,3 +65,44 @@ export const bookOfficeHour=createServerFn({method:"POST"})
       return {bookingId:booking!.id};
     });
   });
+
+
+/** Move a guardian-owned future booking within its published conference series. */
+export const rescheduleOfficeHour=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({bookingId:z.string().uuid(),newSlotId:z.string().uuid()}).parse(value))
+ .handler(async({data})=>{
+  const actor=await requireActor(["guardian"]);
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [current]=await tx.select({
+    id:s.conferenceBookings.id,oldSlotId:s.conferenceSlots.id,
+    seriesId:s.conferenceSlots.conferenceSeriesId,startsAt:s.conferenceSlots.startsAt,
+    siteId:s.conferenceSeries.siteId,
+   }).from(s.conferenceBookings)
+    .innerJoin(s.conferenceSlots,eq(s.conferenceSlots.id,s.conferenceBookings.conferenceSlotId))
+    .innerJoin(s.conferenceSeries,eq(s.conferenceSeries.id,s.conferenceSlots.conferenceSeriesId))
+    .where(and(eq(s.conferenceBookings.id,data.bookingId),
+      eq(s.conferenceBookings.guardianPersonId,actor.actorPersonId),
+      eq(s.conferenceBookings.status,"booked"))).limit(1);
+   if(!current||current.startsAt<=new Date())throw new AuthorizationError("future guardian booking");
+   assertSiteGranted(actor,current.siteId);
+   if(current.oldSlotId===data.newSlotId)return {saved:true};
+   const [next]=await tx.update(s.conferenceSlots)
+    .set({status:"booked",updatedAt:new Date()})
+    .where(and(eq(s.conferenceSlots.id,data.newSlotId),
+      eq(s.conferenceSlots.conferenceSeriesId,current.seriesId),
+      eq(s.conferenceSlots.status,"available"),gte(s.conferenceSlots.startsAt,new Date())))
+    .returning({id:s.conferenceSlots.id});
+   if(!next)throw new Error("Replacement slot is no longer available");
+   await tx.update(s.conferenceBookings)
+    .set({conferenceSlotId:next.id,updatedAt:new Date()})
+    .where(and(eq(s.conferenceBookings.id,current.id),
+      eq(s.conferenceBookings.conferenceSlotId,current.oldSlotId)));
+   await tx.update(s.conferenceSlots).set({status:"available",updatedAt:new Date()})
+    .where(eq(s.conferenceSlots.id,current.oldSlotId));
+   await recordAudit(tx,actor,{action:"conference.reschedule",
+    resourceType:"conference_booking",resourceId:current.id,
+    before:{slotId:current.oldSlotId},after:{slotId:next.id},scope:{siteId:current.siteId}});
+   return {saved:true};
+  });
+ });
