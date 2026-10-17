@@ -8,7 +8,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Stop using URL/localStorage demo persona as the application navigation authority.
 - [x] Replace DemoNavigation with WorkspaceNavigation and canonical route registry; migrate command palette and route tests from browser-local demo persona; delete obsolete component/tests.
 - [x] Select active membership by verified grant ID (supports multiple grants with same role).
-- [ ] Introduce verified active-account/site/program/child context shared across all routes.
+- [x] Expose active grant organization/site/program scopes from verified session endpoint to the workspace shell.
+- [ ] Implement context-aware site/program/child selection where multiple authorized records exist; validate downstream route scope on the server.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
 - [x] Delete legacy synthetic-only operations service after replacing its route consumer.
 - [ ] Add integration tests for canonical action transitions, assignment and authorization.
@@ -23,7 +24,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Remove `/demo-health` from the application routes; retain fixture diagnostics only in test tooling.
 - [x] Replace showcase home with session-based workspace redirection.
 - [x] Remove synthetic metadata dependency from recipient-scoped notification deep-link resolution.
-- [ ] Unify notification center routes and remove guardian→student notification route shortcut.
+- [x] Provide one /notifications route for all authenticated people; redirect the legacy student URL and update guardian/global navigation.
+- [ ] Rename legacy synthetic notification function exports and tighten every resource-specific deep-link permission for cross-role data.
 - [x] Replace local-only StudentExperience with canonical read-only student work/schedule/action projection and real workflow deep links.
 - [ ] Verify typecheck, build, unit tests and role-switch browser journeys before closing Phase 1.
 - [x] Align fixture manifest after removing `/demo-health` (previously blocked CI at route fixture coverage).
