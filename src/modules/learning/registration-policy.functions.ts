@@ -4,6 +4,7 @@ import {and,asc,eq,inArray,sql} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {sections,terms,programs,enrollments,auditEvents,domainEvents} from "@/db/schema";
+import {getSectionRegistrationPolicy,replaceSectionRegistrationPolicy} from "./section-registration-policy-service";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 const uuid=z.string().uuid(),date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -34,22 +35,19 @@ export const listCoursePolicies=createServerFn({method:"GET"}).handler(async()=>
   .innerJoin(programs,eq(programs.id,sections.programId))
   .innerJoin(terms,eq(terms.id,sections.termId))
   .where(inArray(sections.programId,ids)).orderBy(asc(programs.name),asc(sections.title));
- return rows.filter(r=>actor.scope.organizationIds?.includes(r.organizationId)&&
-  (!actor.scope.siteIds?.length||!!r.siteId&&actor.scope.siteIds.includes(r.siteId)))
- .map(r=>({
-  ...r,policy:{
-   capacity:typeof r.metadata.registrationPolicy==="object"&&r.metadata.registrationPolicy!==null&&
-    typeof (r.metadata.registrationPolicy as Record<string,unknown>).capacity==="number"?
-    Number((r.metadata.registrationPolicy as Record<string,unknown>).capacity):30,
-   prerequisites:Array.isArray((r.metadata.registrationPolicy as Record<string,unknown>|undefined)?.prerequisites)?
-    (r.metadata.registrationPolicy as {prerequisites:string[]}).prerequisites:[],
-   addDropEndsOn:String((r.metadata.registrationPolicy as Record<string,unknown>|undefined)?.addDropEndsOn??r.startsOn),
-   withdrawalEndsOn:String((r.metadata.registrationPolicy as Record<string,unknown>|undefined)?.withdrawalEndsOn??r.endsOn),
-   meetingKey:typeof (r.metadata.registrationPolicy as Record<string,unknown>|undefined)?.meetingKey==="string"?
-    String((r.metadata.registrationPolicy as Record<string,unknown>).meetingKey):null,
-   credits:typeof r.metadata.credits==="number"?r.metadata.credits:1,
-   maxCreditsPerTerm:typeof r.metadata.maxCreditsPerTerm==="number"?r.metadata.maxCreditsPerTerm:7,
-  },
+ const scoped=rows.filter(r=>actor.scope.organizationIds?.includes(r.organizationId)&&
+  (!actor.scope.siteIds?.length||!!r.siteId&&actor.scope.siteIds.includes(r.siteId)));
+ return Promise.all(scoped.map(async r=>{
+  const effective=await getSectionRegistrationPolicy(r.id);
+  return {...r,policy:{
+   capacity:effective.enrollmentCapacity,
+   prerequisites:effective.prerequisites,
+   addDropEndsOn:effective.addDropEndsOn,
+   withdrawalEndsOn:effective.withdrawalEndsOn,
+   meetingKey:null,
+   credits:effective.credits,
+   maxCreditsPerTerm:effective.maxCreditsPerTerm,
+  }};
  }));
 });
 export const updateCoursePolicy=createServerFn({method:"POST"})
@@ -80,15 +78,14 @@ export const updateCoursePolicy=createServerFn({method:"POST"})
    if((roster?.count??0)>data.policy.capacity)
     throw new Error("Cannot set capacity below the existing active roster ("+
       roster!.count+" students)");
-   const before=section.metadata;
-   const after={...before,credits:data.policy.credits,maxCreditsPerTerm:data.policy.maxCreditsPerTerm,
-    registrationPolicy:{
-     capacity:data.policy.capacity,prerequisites:data.policy.prerequisites,
-     addDropEndsOn:data.policy.addDropEndsOn,
-     withdrawalEndsOn:data.policy.withdrawalEndsOn,meetingKey:data.policy.meetingKey,
-    }};
-   await tx.update(sections).set({metadata:after,updatedAt:new Date()})
-    .where(eq(sections.id,section.id));
+   const before=await getSectionRegistrationPolicy(section.id,tx);
+   await replaceSectionRegistrationPolicy(tx,{
+    sectionId:section.id,enrollmentCapacity:data.policy.capacity,
+    prerequisites:data.policy.prerequisites,addDropEndsOn:data.policy.addDropEndsOn,
+    withdrawalEndsOn:data.policy.withdrawalEndsOn,credits:data.policy.credits,
+    maxCreditsPerTerm:data.policy.maxCreditsPerTerm,
+   });
+   const after=await getSectionRegistrationPolicy(section.id,tx);
    await tx.insert(domainEvents).values({eventType:"CourseRegistrationPolicyChanged",
     aggregateType:"section",aggregateId:section.id,actorPersonId:actor.actorPersonId,
     payload:{programId:section.programId,siteId:section.siteId}});
