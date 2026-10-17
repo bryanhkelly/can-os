@@ -15,7 +15,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
   .validator((input: unknown) => requestSchema.parse(input))
   .handler(async ({ data }) => {
     const actor = await getCommandContext(getRequest());
-    if (!actor.actorPersonId || !["registrar", "teacher", "specialist"].includes(actor.role) ||
+    if (!actor.actorPersonId || actor.role !== "registrar" ||
         !actor.scope.siteIds?.includes(data.siteId)) {
       throw new AuthorizationError("site.today.read");
     }
