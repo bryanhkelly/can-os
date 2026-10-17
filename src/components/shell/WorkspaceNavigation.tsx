@@ -44,7 +44,13 @@ export function WorkspaceNavigation(){
     {current&&(workspaceLinks[current.role]??[]).map(item=><a key={item.path} href={item.path} className="text-xs font-semibold text-muted-foreground hover:text-foreground">{item.title}</a>)}
    </div>
    {current&&<button type="button" aria-label="Search workspace" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))} className="rounded-lg border px-3 py-2 text-xs"><Search className="mr-1 inline size-3"/>Search</button>}
-   {current&&Boolean(session.sites?.length)&&<span className="text-xs text-muted-foreground" title="Schools in this active membership">{session.sites!.map(site=>site.name).join(", ")}</span>}
+   {current?.role==="registrar"&&Boolean(session.sites?.length)&&<label className="text-xs text-muted-foreground">School
+    <select aria-label="Open school operations" value="" className="ml-2 max-w-48 rounded-lg border bg-background p-2" onChange={event=>{if(event.target.value)window.location.assign("/operations?siteId="+encodeURIComponent(event.target.value));}}>
+     <option value="">Choose school…</option>
+     {session.sites!.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+    </select>
+   </label>}
+   {current?.role!=="registrar"&&current&&Boolean(session.sites?.length)&&<span className="text-xs text-muted-foreground" title="Schools in this active membership">{session.sites!.map(site=>site.name).join(", ")}</span>}
    {current?.role==="registrar"&&Boolean(session.programs?.length)&&<label className="text-xs text-muted-foreground">Program
     <select aria-label="Open program" value="" className="ml-2 max-w-48 rounded-lg border bg-background p-2" onChange={event=>{if(event.target.value)window.location.assign("/operations/launch/"+encodeURIComponent(event.target.value));}}>
      <option value="">Choose program…</option>
