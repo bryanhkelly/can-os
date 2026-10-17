@@ -68,4 +68,7 @@ export const moderateDiscussionMessage=createServerFn({method:"POST"})
   return {saved:true};
  });
 });
-\nexport const createSyntheticCourseDiscussion=createCourseDiscussion;\nexport const setSyntheticCourseDiscussionLock=setCourseDiscussionLock;\nexport const moderateSyntheticDiscussionMessage=moderateDiscussionMessage;\n
+
+export const createSyntheticCourseDiscussion=createCourseDiscussion;
+export const setSyntheticCourseDiscussionLock=setCourseDiscussionLock;
+export const moderateSyntheticDiscussionMessage=moderateDiscussionMessage;
