@@ -54,6 +54,11 @@ for (const eventType of [
   EventTypes.SchoolYearCreated,
   EventTypes.SchoolYearActivated,
   EventTypes.AcademicCalendarChanged,
+  EventTypes.StudentMarkedAbsent,
+  EventTypes.AttendanceCorrected,
+  EventTypes.AttendanceExcuseSubmitted,
+  EventTypes.AttendanceExcuseApproved,
+  EventTypes.AttendanceExcuseRejected,
 ] as const) {
   registerDomainEventHandler(eventType, handleAcademicPassThroughEvent);
 }
