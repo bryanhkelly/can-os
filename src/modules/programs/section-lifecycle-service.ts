@@ -117,7 +117,7 @@ export async function replaceSectionTeacher(context: LifecycleContext, input:{se
     if(!old)throw new Error("Outgoing instructor is not assigned");
     const [eligible]=await tx.select({id:roleAssignments.id}).from(roleAssignments).where(and(
       eq(roleAssignments.personId,input.newPersonId),eq(roleAssignments.roleKey,"teacher"),
-      inArray(roleAssignments.organizationId,[section.organizationId,section.providerOrganizationId]))).limit(1);
+      inArray(roleAssignments.organizationId,[section.organizationId,...(section.providerOrganizationId ? [section.providerOrganizationId] : [])]))).limit(1);
     if(!eligible)throw new AuthorizationError("replacement instructor must hold a teacher role");
     const capacity=await tx.select({id:instructionalCapacityReservations.id}).from(instructionalCapacityReservations)
       .innerJoin(instructionalCapacityOfferings,eq(instructionalCapacityOfferings.id,instructionalCapacityReservations.offeringId))
