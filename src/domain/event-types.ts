@@ -4,6 +4,7 @@ export const EventTypes = {
   AdmissionOfferIssued: "AdmissionOfferIssued",
   AdmissionOfferAccepted: "AdmissionOfferAccepted",
   AdmissionOfferDeclined: "AdmissionOfferDeclined",
+  AdmissionOfferExpired: "AdmissionOfferExpired",
   JourneyRequirementCompleted: "JourneyRequirementCompleted",
   JourneyReady: "JourneyReady",
   AssessmentPublished: "AssessmentPublished",
