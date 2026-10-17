@@ -43,7 +43,7 @@ export const subscriptions = pgTable(
      * current canonical state and fire only while the condition still holds.
      */
     reminderPolicy: jsonb("reminder_policy")
-      .$type<{ remindAfterHours?: number }>()
+      .$type<{ remindAfterHours?: number; repeatEveryHours?: number; maxReminders?: number }>()
       .default({})
       .notNull(),
     channel: subscriptionChannel("channel").default("in_app").notNull(),
@@ -86,6 +86,8 @@ export const subscriptionDeliveries = pgTable(
     channel: subscriptionChannel("channel").notNull(),
     status: subscriptionDeliveryStatus("status").default("pending").notNull(),
     attempts: integer("attempts").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
     lastError: text("last_error"),
     notificationId: uuid("notification_id").references(() => notifications.id, {
       onDelete: "set null",
@@ -101,5 +103,6 @@ export const subscriptionDeliveries = pgTable(
       table.kind,
     ),
     index("subscription_delivery_status_idx").on(table.status, table.createdAt),
+    index("subscription_delivery_retry_idx").on(table.status, table.nextAttemptAt),
   ],
 );
