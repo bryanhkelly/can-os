@@ -188,7 +188,8 @@ export async function transferSectionEnrollment(context: LifecycleContext,input:
       throw new Error("Active section enrollment not found");
     // Lock in deterministic order to serialize concurrent section transitions.
     const ids=[sourceEnrollment.sectionId,input.destinationSectionId].sort();
-    const scoped=await Promise.all(ids.map(id=>authorizedSection(tx,context,id)));
+    const scoped=[];
+    for(const id of ids)scoped.push(await authorizedSection(tx,context,id));
     const source=scoped.find(s=>s.id===sourceEnrollment.sectionId)!;
     const destination=scoped.find(s=>s.id===input.destinationSectionId)!;
     if(source.id===destination.id)throw new Error("Source and destination must differ");
