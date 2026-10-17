@@ -11,7 +11,6 @@
 import {
   expect,
   test,
-  type APIRequestContext,
   type Browser,
   type BrowserContext,
   type Page,
@@ -71,68 +70,6 @@ async function newSignedInPage(
   return { context, page: await context.newPage() };
 }
 
-/**
- * The teacher grading UI only exists embedded in the student demo page
- * (/student/assignments, "Preview as teacher"), whose loader hard-requires a
- * student session — there is no teacher-reachable grade form today. So the
- * grading step calls the same TanStack Start server function the UI calls
- * (gradeSyntheticAssignment) over HTTP with the teacher session cookie. This
- * still exercises the real authorization path: cookie -> getCommandContext ->
- * teacher role -> assignments:grade capability -> section-teacher relationship.
- *
- * TanStack Start generates opaque server-function ids at compile time, so the
- * id is discovered from the dev server's client transform of the module
- * (exports become `createServerFn(...).handler(createClientRpc("<id>"))`).
- */
-async function resolveServerFnId(
-  request: APIRequestContext,
-  exportName: string,
-): Promise<string> {
-  const moduleUrl = `${baseURL}/src/modules/student-experience/assignments.functions.ts`;
-  const response = await request.get(moduleUrl);
-  if (!response.ok()) {
-    throw new Error(
-      `Unable to load ${moduleUrl} from the dev server (HTTP ${response.status()})`,
-    );
-  }
-  const source = await response.text();
-  const pattern = new RegExp(
-    `${exportName}[\\s\\S]{0,800}?(?:createClientRpc|createSsrRpc)\\(\\s*["']([\\w-]+)["']\\)`,
-  );
-  const match = pattern.exec(source);
-  if (!match?.[1]) {
-    throw new Error(
-      `Could not resolve the TanStack Start server-function id for ${exportName}; ` +
-        `the dev-server module transform may have changed shape.`,
-    );
-  }
-  return match[1];
-}
-
-async function callServerFn(
-  request: APIRequestContext,
-  fnId: string,
-  secret: string,
-  data: Record<string, unknown>,
-): Promise<void> {
-  const response = await request.post(`${baseURL}/_serverFn/${fnId}`, {
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json",
-      "x-tsr-serverFn": "true",
-      cookie: `${accessSessionCookie}=${secret}`,
-    },
-    // Server functions expect the seroval-serialized payload { data: ... };
-    // for plain JSON values seroval's JSON form is identical.
-    data: { data },
-  });
-  if (!response.ok()) {
-    throw new Error(
-      `Server function ${fnId} failed (HTTP ${response.status()}): ${await response.text()}`,
-    );
-  }
-}
-
 test.beforeAll(async () => {
   if (!DATABASE_URL) {
     throw new Error(
@@ -190,6 +127,36 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
       .toBeGreaterThanOrEqual(1);
   });
 
+  const guardian = await newSignedInPage(browser, fixture.guardianSecret);
+  try {
+    await test.step("guardian sees the same missing assignment in academic progress", async () => {
+      await guardian.page.goto("/guardian/academics");
+      await expect(
+        guardian.page.getByRole("heading", { name: "Academic progress" }),
+      ).toBeVisible();
+      await expect(guardian.page.getByText(fixture.assessmentTitle)).toBeVisible();
+      await expect(guardian.page.getByText(/missing/i)).toBeVisible();
+    });
+  } finally {
+    await guardian.context.close();
+  }
+
+  const specialist = await newSignedInPage(browser, fixture.specialistSecret);
+  try {
+    await test.step("specialist caseload receives the intervention insight", async () => {
+      await specialist.page.goto("/coach");
+      await expect(
+        specialist.page.getByRole("heading", { name: "Caseload" }),
+      ).toBeVisible();
+      await expect(
+        specialist.page.getByText(new RegExp(`Jordan Student-${fixture.suffix}`)),
+      ).toBeVisible();
+      await expect(specialist.page.getByText(/1 insight/)).toBeVisible();
+    });
+  } finally {
+    await specialist.context.close();
+  }
+
   const teacher = await newSignedInPage(browser, fixture.teacherSecret);
   try {
     await test.step("teacher sees the missing work in the queue", async () => {
@@ -238,36 +205,76 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     await student.context.close();
   }
 
-  await test.step("teacher grades the late submission", async () => {
-    // See the comment above resolveServerFnId: no teacher-reachable grade UI
-    // exists yet, so this calls the same server function the UI button calls,
-    // over HTTP with the teacher session cookie.
-    const fnId = await resolveServerFnId(request, "gradeSyntheticAssignment");
-    await callServerFn(request, fnId, fixture.teacherSecret, {
-      submissionId: fixture.submissionId,
-      score: 88, // percent of pointsPossible (100) -> stored score 88
-      comment: "Good recovery - glad you got it in.",
+  await test.step("teacher grades the late submission in the real gradebook UI", async () => {
+    const teacherGradebook = await newSignedInPage(browser, fixture.teacherSecret);
+    try {
+      await teacherGradebook.page.goto("/teacher/gradebook");
+      await expect(
+        teacherGradebook.page.getByRole("heading", { name: "Gradebook" }),
+      ).toBeVisible();
+
+      const studentRow = teacherGradebook.page.getByRole("row", {
+        name: new RegExp(`Jordan Student-${fixture.suffix}`),
+      });
+      await studentRow.getByRole("button", { name: /Open grading/ }).click();
+      await teacherGradebook.page.getByLabel(/Score/).fill("88");
+      await teacherGradebook.page
+        .getByLabel("Feedback comment")
+        .fill("Good recovery - glad you got it in.");
+      await teacherGradebook.page.getByRole("button", { name: "Post grade" }).click();
+
+      await expect
+        .poll(async () => (await getSubmission()).status, { timeout: 15_000 })
+        .toBe("graded");
+      const graded = await getSubmission();
+      expect(graded.timeliness).toBe("late");
+      expect(Number(graded.score)).toBe(88);
+    } finally {
+      await teacherGradebook.context.close();
+    }
+  });
+
+  await test.step("grade event is processed into a guardian notification", async () => {
+    const response = await request.post(`${baseURL}/api/jobs`, {
+      headers: { "x-can-job-secret": TEST_JOB_SECRET },
     });
+    expect(response.ok()).toBe(true);
 
     await expect
-      .poll(async () => (await getSubmission()).status, { timeout: 15_000 })
-      .toBe("graded");
-    const graded = await getSubmission();
-    expect(graded.timeliness).toBe("late");
-    expect(Number(graded.score)).toBe(88);
+      .poll(async () => {
+        const rows = (await sql.query(
+          `select id from notifications
+           where recipient_person_id = $1 and type = 'grade_posted' and resource_id = $2`,
+          [fixture.guardianPersonId, fixture.submissionId],
+        )) as Array<{ id: string }>;
+        return rows.length;
+      })
+      .toBeGreaterThanOrEqual(1);
   });
 
   await test.step("submit and grade wrote immutable audit events", async () => {
     const rows = (await sql.query(
       `select action from audit_events
        where resource_type = 'submission' and resource_id = $1
-         and action in ('assignment.submit', 'assignment.grade')`,
+         and action in ('assignment.submit', 'assignment.grade', 'submission.submit', 'submission.grade')`,
       [fixture.submissionId],
     )) as Array<{ action: string }>;
     const actions = new Set(rows.map((row) => row.action));
-    expect(actions).toContain("assignment.submit");
-    expect(actions).toContain("assignment.grade");
+    expect(actions.has("submission.submit") || actions.has("assignment.submit")).toBe(true);
+    expect(actions.has("submission.grade") || actions.has("assignment.grade")).toBe(true);
   });
+
+  const guardianAgain = await newSignedInPage(browser, fixture.guardianSecret);
+  try {
+    await test.step("guardian sees the posted grade and feedback from canonical data", async () => {
+      await guardianAgain.page.goto("/guardian/academics");
+      const card = guardianAgain.page.getByRole("heading", { name: fixture.assessmentTitle }).locator("..").locator("..");
+      await expect(card.getByText(/Grade:\s*88\s*\/\s*100/)).toBeVisible();
+      await expect(card.getByText(/Good recovery/)).toBeVisible();
+    });
+  } finally {
+    await guardianAgain.context.close();
+  }
 
   const studentAgain = await newSignedInPage(browser, fixture.studentSecret);
   try {
