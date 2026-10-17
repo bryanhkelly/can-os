@@ -131,3 +131,19 @@ export const getSyntheticR2DocumentDownload=createServerFn({method:"POST"})
   if(!record.storageKey.startsWith(expectedPrefix))throw new Error("Document storage scope mismatch");
   return {downloadUrl:signR2Object("GET",record.storageKey,undefined,60),expiresInSeconds:60};
  });
+
+/** Deployment switches only; never exposes R2 credentials. */
+export const getEnrollmentDocumentUploadAvailability=createServerFn({method:"GET"}).handler(async()=>{
+ const context=await getCommandContext(getRequest());
+ if(!context.actorPersonId||!["registrar","guardian"].includes(context.role))
+  throw new Error("Enrollment document access denied");
+ return {
+  live:process.env.CAN_R2_LIVE_UPLOADS_ENABLED==="true",
+  demo:process.env.CAN_R2_DEMO_UPLOADS_ENABLED==="true",
+ };
+});
+
+/** Canonical aliases; legacy names remain for existing route consumers. */
+export const beginEnrollmentDocumentUpload=beginSyntheticR2DocumentUpload;
+export const finishEnrollmentDocumentUpload=finishSyntheticR2DocumentUpload;
+export const getEnrollmentDocumentDownload=getSyntheticR2DocumentDownload;
