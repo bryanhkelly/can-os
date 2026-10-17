@@ -182,36 +182,21 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
 /** Legacy name delegates to the single audited return-for-revision command. */
 export const returnSyntheticAssignment=returnSubmissionForRevision;
 
-/** Create and publish a synthetic class assignment using the existing model. */
+/** Compatibility adapter; teacher authoring uses the canonical gradebook command. */
 export const createSyntheticAssignment=createServerFn({method:"POST"})
- .validator((value:unknown)=>z.object({sectionId:z.string().min(1),title:z.string(),instructions:z.string(),dueAt:z.string(),pointsPossible:z.number().finite().positive().max(1000),rubric:z.string()}).parse(value))
+ .validator((input:unknown)=>z.object({
+  sectionId:z.string().uuid(),title:z.string().trim().min(3).max(200),
+  instructions:z.string().max(20000),dueAt:z.string(),
+  pointsPossible:z.number().finite().min(1).max(1000),
+  rubric:z.string().max(10000)
+ }).parse(input))
  .handler(async({data})=>{
-  assertSyntheticMutation("teacher");
-  const context=await teacherActor();
-  assertCapability(context,"assignments:create");
-  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
-  if(data.title.trim().length<3||data.title.length>180)throw new Error("Title must be 3–180 characters");
-  if(!Number.isFinite(data.pointsPossible)||data.pointsPossible<=0||data.pointsPossible>1000)throw new Error("Invalid point value");
   const dueAt=new Date(data.dueAt);
-  if(Number.isNaN(dueAt.getTime()))throw new Error("Invalid due date");
-  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  await teacherActor(data.sectionId);
-  return db.transaction(async tx=>{
-   const [section]=await tx.select({id:s.sections.id}).from(s.sections)
-    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-    .where(and(eq(s.sections.id,data.sectionId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
-   if(!section)throw new Error("Section not found at synthetic Site");
-   const [assessment]=await tx.insert(s.assessments).values({
-    sectionId:section.id,title:data.title.trim(),instructions:data.instructions.trim(),
-    status:"published",pointsPossible:String(data.pointsPossible),dueAt,availableAt:new Date(),
-    createdByPersonId:context.actorPersonId!,metadata:{synthetic:true,fixture:"gf1-v2",rubric:data.rubric.trim()},
-   }).returning({id:s.assessments.id});
-   if(!assessment)throw new Error("Assessment could not be created");
-   await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.create",resourceType:"assessment",resourceId:assessment.id,after:{status:"published"},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
-   const enrolled=await tx.select({studentProfileId:s.enrollments.studentProfileId}).from(s.enrollments).where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.sectionId,section.id),eq(s.enrollments.status,"active")));
-   if(enrolled.length)await tx.insert(s.submissions).values(enrolled.map(row=>({assessmentId:assessment.id,studentProfileId:row.studentProfileId,status:"assigned" as const,timeliness:"on_time" as const})));
-   return {assessmentId:assessment.id};
-  });
+  if(!Number.isFinite(dueAt.getTime()))throw new Error("Invalid due date");
+  return createAssessment({data:{
+   sectionId:data.sectionId,title:data.title,instructions:data.instructions,
+   rubric:data.rubric,pointsPossible:data.pointsPossible,dueAt:dueAt.toISOString()
+  }});
  });
 
 export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
