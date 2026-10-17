@@ -61,7 +61,12 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Remove admissions/family-readiness fixture-only read filtering while leaving sensitive R2 demo-only document operations restricted.
 - [x] Converge assigned-teacher gradebook and assessment creation, student missing-work queue and follow-ups, and support-referral/coach actions with verified student-school-program context rather than fixture-only gates.
 - [x] Replace the staff support demo persona switch and fictional student with the verified active staff role and a selectable authorized student; provide a separate authenticated student help-request and action screen.
-- [ ] Complete remaining service-by-service authorization audit; legacy fixture-only gates persist in some learning, study-group, admin, and attachment workflows.
+- [x] Constrain site-bound registrar administration to its original grant site rather than expanded organization read scopes: account/people listings, staff invitations and grant toggles; allow only staff roles in the staff invite command and require a school where the active grant is site-bound.
+- [x] Replace student assignment role-preview and teacher controls with a student-only coursework, autosave, submission and feedback experience; teacher authoring/grading remains in /teacher/gradebook.
+- [x] Accept authentic student assignment written submissions and drafts using verified active enrollment, school/program checks and audited state transitions; resolve missing-work Actions independently of fixture markers.
+- [x] Restrict 13 study-group site queries and mutations to the member's permitted program or site-wide groups; retain demo write gates pending group lifecycle review.
+- [x] Extend attachment read/upload scoping to authorized programs; keep restricted R2 fixture-only mutation gates until complete document verification and storage review.
+- [ ] Complete remaining service-by-service authorization audit; fixture-only gates persist in alternative teacher grading/management, study group creation, document uploads and other unreviewed workflows.
 
 ## Phase 2 — connected school operation
 
