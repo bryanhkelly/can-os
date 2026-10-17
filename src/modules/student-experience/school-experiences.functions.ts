@@ -1,4 +1,3 @@
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, asc, inArray, isNull, ne, notExists } from "drizzle-orm";
@@ -30,10 +29,9 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
     slots:slots.map(s=>({id:s.id,startsAt:s.startsAt.toISOString(),endsAt:s.endsAt.toISOString(),status:s.status})),
   };
 });
-export const bookSyntheticOfficeHour=createServerFn({method:"POST"})
+export const bookOfficeHour=createServerFn({method:"POST"})
   .validator((value:unknown)=>z.object({slotId:z.string().uuid(),studentPersonId:z.string().uuid()}).parse(value))
   .handler(async({data})=>{
-  assertSyntheticMutation("guardian");
     const actor=await requireActor(["guardian"]);
    const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
