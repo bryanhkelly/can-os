@@ -20,6 +20,7 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { evaluateSectionReadiness } from "./section-readiness-service";
@@ -236,7 +237,15 @@ export async function activateProgram(
 
     if (!program) throw new Error("Program not found");
     assertProgramScope(context, programId);
-    if (program.status === "active") return;
+    if (!context.scope.organizationIds?.includes(program.organizationId))
+      throw new Error("Program activation requires the verified organization grant");
+    if (program.siteId) {
+      assertSiteScope(context, program.siteId);
+      await lockAttendanceConfigurationAtSite(tx, program.siteId);
+    }
+    const [current] = await tx.select({ status: programs.status })
+      .from(programs).where(eq(programs.id, programId)).limit(1);
+    if (current?.status === "active") return;
 
     const [journey] = await tx
       .select()
