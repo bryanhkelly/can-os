@@ -229,6 +229,12 @@ integration("GF1 academic intervention", () => {
 
     expect(submission.status).toBe("assigned");
     expect(submission.timeliness).toBe("missing");
+    // A repeated deadline-worker sweep cannot recreate the same event.
+    await learning.markOverdueSubmissionsMissing(new Date("2026-10-11T09:00:00.000Z"));
+    const missingEvents = await db.select({ id: schema.domainEvents.id }).from(schema.domainEvents)
+      .where(and(eq(schema.domainEvents.eventType, "AssignmentBecameMissing"),
+        eq(schema.domainEvents.aggregateId, submission.id)));
+    expect(missingEvents).toHaveLength(1);
 
     await worker.processPendingDomainEvents();
 
@@ -372,6 +378,13 @@ integration("GF1 academic intervention", () => {
 
     expect(submission.status).toBe("submitted");
     expect(submission.timeliness).toBe("late");
+    await expect(learning.submitAssessment(studentContext, submission.id,
+      { text: "Repeated work" }, new Date("2026-10-11T12:01:00.000Z")))
+      .rejects.toThrow("already been submitted");
+    const receivedEvents = await db.select({ id: schema.domainEvents.id }).from(schema.domainEvents)
+      .where(and(eq(schema.domainEvents.eventType, "SubmissionReceived"),
+        eq(schema.domainEvents.aggregateId, submission.id)));
+    expect(receivedEvents).toHaveLength(1);
 
     await learning.gradeSubmission(teacherContext, submission.id, {
       score: "88",
@@ -385,6 +398,9 @@ integration("GF1 academic intervention", () => {
 
     expect(submission.status).toBe("graded");
     expect(submission.timeliness).toBe("late");
+    await expect(learning.gradeSubmission(teacherContext, submission.id, {
+      score: "99", feedback: { comment: "Should not overwrite" },
+    })).rejects.toThrow("Only submitted work can be graded");
 
     const gradeEvents = await db
       .select()
