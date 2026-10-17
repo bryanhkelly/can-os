@@ -24,7 +24,7 @@ export const getQuickWinActions = createServerFn({ method: "GET" }).handler(asyn
     eq(actions.ownerPersonId, actor.actorPersonId),
     inArray(actions.siteId, sites),
   )).orderBy(desc(actions.createdAt)).limit(100);
-  return { connected: true as const, actions: rows.filter(row => row.metadata.synthetic === true).map(row => ({ ...row, metadata: { source: typeof row.metadata.source === "string" ? row.metadata.source : row.type }, dueAt: row.dueAt?.toISOString() ?? null })) };
+  return { connected: true as const, actions: rows.map(row => ({ ...row, metadata: { source: typeof row.metadata.source === "string" ? row.metadata.source : row.type }, dueAt: row.dueAt?.toISOString() ?? null })) };
 });
 
 export const finishQuickWinAction = createServerFn({ method: "POST" })
