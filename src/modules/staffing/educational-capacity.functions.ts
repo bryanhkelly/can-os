@@ -83,10 +83,14 @@ export const holdCapacity = createServerFn({ method: "POST" })
     status: z.enum(["held", "committed"]).optional(),
     expiresAt: z.string().datetime().nullish(),
   }).parse(v))
-  .handler(async ({ data }) => reserveInstructionalCapacity(await getCommandContext(getRequest()), {
-    ...data,
-    expiresAt: data.expiresAt ? new Date(data.expiresAt) : data.expiresAt,
-  }));
+  .handler(async ({ data }) => {
+    const expiresAt =
+      typeof data.expiresAt === "string" ? new Date(data.expiresAt) : data.expiresAt;
+    return reserveInstructionalCapacity(await getCommandContext(getRequest()), {
+      ...data,
+      expiresAt,
+    });
+  });
 
 export const releaseCapacity = createServerFn({ method: "POST" })
   .validator((v: unknown) => z.object({ reservationId: uuid }).parse(v))
