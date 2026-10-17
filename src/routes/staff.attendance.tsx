@@ -123,7 +123,6 @@ function StaffAttendancePage() {
         if (!active) return;
         setStudents(roster.students);
         setPrograms(roster.programs);
-      setPrograms(roster.programs);
         setExcuses(pending.excuses);
         setError("");
       } catch {
