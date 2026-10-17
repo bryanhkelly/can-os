@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   attendanceEvents, attendanceExcuses, enrollments, guardianRelationships,
-  people, programs, sections, sectionTeachers, sites, studentProfiles,
+  people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
@@ -106,11 +106,15 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
     lastName: people.legalLastName,
   }).from(enrollments)
     .innerJoin(sections, eq(sections.id, enrollments.sectionId))
+    .innerJoin(terms, eq(terms.id, sections.termId))
+    .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
     .innerJoin(studentProfiles, eq(studentProfiles.id, enrollments.studentProfileId))
     .innerJoin(people, eq(people.id, studentProfiles.personId))
     .innerJoin(sectionTeachers, eq(sectionTeachers.sectionId, sections.id))
     .where(and(eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
-      eq(sections.active, true), inArray(sections.programId, permittedIds),
+      eq(sections.active, true), eq(schoolYears.status, "active"),
+      lte(schoolYears.startsOn, date), gte(schoolYears.endsOn, date),
+      inArray(sections.programId, permittedIds),
       inArray(sections.siteId, actor.scope.siteIds!),
       ...(actor.role === "teacher" ? [eq(sectionTeachers.personId, actor.actorPersonId!)] :
         []),
@@ -202,7 +206,7 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
     const [replay] = await db.select({
       id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
       programId: attendanceEvents.programId, status: attendanceEvents.status,
-      occurrenceKey: attendanceEvents.occurrenceKey,
+      occurrenceKey: attendanceEvents.occurrenceKey, sectionId: attendanceEvents.sectionId,
     }).from(attendanceEvents).where(
       eq(attendanceEvents.sourceKey, "manual-revision:" + data.mutationId)).limit(1);
     if (replay) {
@@ -210,6 +214,14 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
         replay.programId !== data.programId || replay.occurrenceKey !== occurrence(data.date) ||
         replay.status !== data.status)
         throw new Error("Attendance mutation ID was already used for different input");
+      if (actor.role === "teacher") {
+        if (!replay.sectionId) throw new AuthorizationError("teacher attendance replay section");
+        const [assignment] = await db.select({ id: sectionTeachers.id })
+          .from(sectionTeachers).where(and(
+            eq(sectionTeachers.sectionId, replay.sectionId),
+            eq(sectionTeachers.personId, actor.actorPersonId!))).limit(1);
+        if (!assignment) throw new AuthorizationError("teacher attendance replay assignment");
+      }
       return { attendanceEventId: replay.id };
     }
 
@@ -292,7 +304,6 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
     const profileToPerson = new Map(profiles.map(p => [p.id, p.personId]));
     const nameByPerson = new Map(relationships.map(r => [r.studentPersonId,
       r.preferredName ?? (r.firstName + " " + r.lastName)]));
-    const excuseById = new Map(excuses.map(e => [e.attendanceEventId, e]));
     return {
       absences: facts.filter(f => {
         const key = [f.studentProfileId, f.programId, f.occurrenceKey].join(":");
