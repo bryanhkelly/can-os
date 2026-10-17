@@ -7,6 +7,7 @@ import {
   approveCanonicalFieldTrip, inviteCanonicalFieldTripStudent,
   listFieldTripOperations, proposeCanonicalFieldTrip,
 } from "@/modules/field-trips/field-trip-operations.functions";
+import { recordCanonicalFieldTripCheckpoint } from "@/modules/field-trips/field-trip-attendance.functions";
 
 export const Route = createFileRoute("/operations/field-trips")({
   loader: safeLoader(() => listFieldTripOperations(), {
@@ -224,7 +225,11 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
           }, "Invitation sent to the student's guardians.")}>Invite student</button>
       </div>}
     <div className="mt-5 border-t pt-4">
-      <h4 className="text-sm font-semibold">Participant permissions · {trip.roster.length}</h4>
+      <h4 className="text-sm font-semibold">Participant permissions and attendance · {trip.roster.length}</h4>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Departure check-in opens six hours before departure. Recording boarding requires guardian permission;
+        return check-in requires an existing boarding record. Recorded safety events cannot be silently overwritten.
+      </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {trip.roster.map(participant =>
           <div key={participant.id} className="rounded-lg border p-3 text-sm">
@@ -234,6 +239,38 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
               {trip.feeAmountCents > 0 &&
                 (participant.feeObligationCreated ? " · Fee due in finance" : " · Fee needs finance review")}
             </p>
+            <p className="mt-2 text-xs">
+              Departure: {participant.departure === "boarded" ? "Boarded" :
+                participant.departure === "absent" ? "Absent" : "Not recorded"}
+              {" · "}Return: {participant.returned ? "Returned" : "Not recorded"}
+            </p>
+            {trip.status === "approved" &&
+              Date.now() >= new Date(trip.departsAt).getTime() - 6 * 60 * 60 * 1000 &&
+              Date.now() <= new Date(trip.returnsAt).getTime() + 7 * 24 * 60 * 60 * 1000 &&
+              <div className="mt-3 flex flex-wrap gap-2">
+                {!participant.departure &&
+                  <>
+                    <button type="button"
+                      disabled={busy || participant.status !== "permission_complete" ||
+                        Date.now() > new Date(trip.returnsAt).getTime()}
+                      className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+                      onClick={() => void run(() => recordCanonicalFieldTripCheckpoint({ data: {
+                        participantId: participant.id, checkpoint: "departure", status: "boarded",
+                      } }), "Boarding recorded.")}>Boarded</button>
+                    <button type="button" disabled={busy ||
+                        Date.now() > new Date(trip.returnsAt).getTime()}
+                      className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+                      onClick={() => void run(() => recordCanonicalFieldTripCheckpoint({ data: {
+                        participantId: participant.id, checkpoint: "departure", status: "absent",
+                      } }), "Departure absence recorded.")}>Absent at departure</button>
+                  </>}
+                {participant.departure === "boarded" && !participant.returned &&
+                  <button type="button" disabled={busy}
+                    className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+                    onClick={() => void run(() => recordCanonicalFieldTripCheckpoint({ data: {
+                      participantId: participant.id, checkpoint: "return", status: "returned",
+                    } }), "Return recorded.")}>Returned</button>}
+              </div>}
           </div>)}
       </div>
       {!trip.roster.length && <p className="mt-3 text-xs text-muted-foreground">
