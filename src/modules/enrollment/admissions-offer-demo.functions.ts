@@ -1,14 +1,9 @@
 import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
-/** Legacy export names are retained for Phase 1 route compatibility; these
- * commands preserve the same production authorization and fixture-write
- * protections as their canonical services. Restricted R2 document upload/read
- * workflows remain separately gated. */
 import {createServerFn} from "@tanstack/react-start";
-import {z} from "zod";
-import {and,eq,inArray,lt} from "drizzle-orm";
+import {and,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,admissionOffers,admissionSeatPools,guardianRelationships,studentProfiles,schoolYears} from "@/db/schema";
-import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment,expireSyntheticAdmissionOffers} from "./admissions-offer-service";
+import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment} from "./admissions-offer-service";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
@@ -32,72 +27,54 @@ export const getSyntheticAdmissionOfferOptions=createServerFn({method:"GET"})
  assertCapability(actor,"enrollment.decide");
  const scoped=await resolveOperationsSelection(actor,data);
  if(!process.env.DATABASE_URL)return [];
- const apps=await db.select({id:applications.id,programId:applications.programId}).from(applications).where(inArray(applications.programId,scoped.programIds)).limit(150);
- if(!apps.length)return [];
+ const apps=await db.select({id:applications.id,programId:applications.programId,metadata:applications.metadata}).from(applications).where(inArray(applications.programId,scoped.programIds)).limit(150);
+ const synthetic=apps;
+ if(!synthetic.length)return [];
  const pools=await db.select({programId:admissionSeatPools.programId,schoolYearId:admissionSeatPools.schoolYearId,capacity:admissionSeatPools.capacity,name:schoolYears.name}).from(admissionSeatPools).innerJoin(schoolYears,eq(schoolYears.id,admissionSeatPools.schoolYearId)).where(inArray(admissionSeatPools.programId,scoped.programIds));
- return apps.map(app=>({applicationId:app.id,years:pools.filter(p=>p.programId===app.programId).map(p=>({id:p.schoolYearId,name:p.name,capacity:p.capacity}))}));
+ return synthetic.map(app=>({applicationId:app.id,years:pools.filter(p=>p.programId===app.programId).map(p=>({id:p.schoolYearId,name:p.name,capacity:p.capacity}))}));
 });
 
-async function loadApplication(id:string){
+async function syntheticApplication(id:string){
  const [app]=await db.select({id:applications.id,programId:applications.programId,studentProfileId:applications.studentProfileId,metadata:applications.metadata}).from(applications).where(eq(applications.id,id)).limit(1);
  if(!app)throw new Error("Application not found");
  return app;
 }
-async function loadOffer(id:string){
+async function syntheticOffer(id:string){
  const [offer]=await db.select({id:admissionOffers.id,applicationId:admissionOffers.applicationId,programId:admissionOffers.programId}).from(admissionOffers).where(eq(admissionOffers.id,id)).limit(1);
  if(!offer)throw new Error("Offer not found");
- const app=await loadApplication(offer.applicationId);
+ const app=await syntheticApplication(offer.applicationId);
  if(app.programId!==offer.programId)throw new Error("Offer program mismatch");
  return {offer,app};
 }
 export const issueSyntheticOfferFromDemo=createServerFn({method:"POST"})
-.validator((data:unknown)=>z.object({applicationId:z.string().uuid(),schoolYearId:z.string().uuid()}).parse(data)).handler(async({data})=>{
- const app=await loadApplication(data.applicationId);
+.validator((data:{applicationId:string;schoolYearId:string})=>data).handler(async({data})=>{
+ const app=await syntheticApplication(data.applicationId);
  const actor=await authorizedActor("registrar","enrollment.decide",app.programId);
  assertRecordWriteAllowed(app.metadata,"registrar");
  // A stable key makes concurrent retries safe; the domain service rejects a second active offer.
  // Explicit reissuance after expiration/decline requires a distinct attempt identifier.
  const previous=await db.select({id:admissionOffers.id,status:admissionOffers.status,idempotencyKey:admissionOffers.idempotencyKey,expiresAt:admissionOffers.expiresAt}).from(admissionOffers).where(and(eq(admissionOffers.applicationId,app.id),eq(admissionOffers.schoolYearId,data.schoolYearId)));
  const active=previous.find(o=>o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now())));
- const key=active?.idempotencyKey??"admission-offer:"+app.id+":"+data.schoolYearId+":attempt-"+(previous.length+1);
+ const key=active?.idempotencyKey??"synthetic-offer:"+app.id+":"+data.schoolYearId+":attempt-"+(previous.length+1);
  const expiresAt=new Date(Date.now()+14*24*60*60*1000);
  return {offerId:await issueSyntheticAdmissionOffer(actor,{applicationId:app.id,schoolYearId:data.schoolYearId,idempotencyKey:key,expiresAt})};
 });
 export const respondSyntheticOfferFromDemo=createServerFn({method:"POST"})
-.validator((data:unknown)=>z.object({offerId:z.string().uuid(),decision:z.enum(["accept","decline"])}).parse(data)).handler(async({data})=>{
+.validator((data:{offerId:string;decision:"accept"|"decline"})=>data).handler(async({data})=>{
  if(!["accept","decline"].includes(data.decision))throw new Error("Invalid decision");
- const {offer,app}=await loadOffer(data.offerId);
+ const {offer,app}=await syntheticOffer(data.offerId);
  const actor=await authorizedActor("guardian","enrollment.apply",app.programId);
  assertRecordWriteAllowed(app.metadata,"guardian");
  const [profile]=await db.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
  if(!profile)throw new Error("Student profile missing");
  const [guardian]=await db.select({id:guardianRelationships.guardianPersonId}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.canManageEnrollment,true),eq(guardianRelationships.guardianPersonId,actor.actorPersonId!))).limit(1);
- if(!guardian)throw new Error("Guardian enrollment relationship missing");
+ if(!guardian)throw new Error("Synthetic guardian relationship missing");
  return {offerId:await respondToSyntheticAdmissionOffer(actor,offer.id,data.decision)};
 });
 export const activateSyntheticOfferFromDemo=createServerFn({method:"POST"})
-.validator((data:unknown)=>z.object({offerId:z.string().uuid()}).parse(data)).handler(async({data})=>{
- const {offer,app}=await loadOffer(data.offerId);
+.validator((data:{offerId:string})=>data).handler(async({data})=>{
+ const {offer,app}=await syntheticOffer(data.offerId);
  const actor=await authorizedActor("registrar","enrollment.activate",app.programId);
  assertRecordWriteAllowed(app.metadata,"registrar");
  return {enrollmentId:await activateSyntheticOfferedEnrollment(actor,offer.id)};
 });
-
-/**
- * Reconcile elapsed offers on demand; pool-level locking, domain events and
- * audit history remain owned by the canonical service. No synthetic metadata
- * influences which offers expire.
- */
-export const reconcileExpiredAdmissionOffers=createServerFn({method:"POST"})
- .validator((value:unknown)=>z.object({programId:z.string().uuid()}).parse(value))
- .handler(async({data})=>{
-  const actor=await authorizedActor("registrar","enrollment.decide",data.programId);
-  const outdated=await db.select({schoolYearId:admissionOffers.schoolYearId})
-   .from(admissionOffers).where(and(eq(admissionOffers.programId,data.programId),
-    eq(admissionOffers.status,"issued"),lt(admissionOffers.expiresAt,new Date())));
-  let expired=0;
-  for(const schoolYearId of new Set(outdated.map(o=>o.schoolYearId))){
-   expired+=await expireSyntheticAdmissionOffers(actor,{programId:data.programId,schoolYearId});
-  }
-  return {expired};
- });
