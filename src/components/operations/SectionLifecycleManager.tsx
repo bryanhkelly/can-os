@@ -2,7 +2,7 @@ import {useEffect,useState} from "react";
 import {useRouter} from "@tanstack/react-router";
 import {
  getSectionLifecycle,setSectionLifecycleState,updateSectionLifecycleSchedule,replaceLifecycleTeacher,
- transitionLifecycleEnrollment,queueLifecycleWaitlist,resolveLifecycleWaitlist,transferLifecycleEnrollment,promoteLifecycleWaitlist
+ transitionLifecycleEnrollment,queueLifecycleWaitlist,resolveLifecycleWaitlist,transferLifecycleEnrollment,promoteLifecycleWaitlist,offerLifecycleWaitlistSeat
 } from "@/modules/programs/section-lifecycle.functions";
 type Snapshot=Awaited<ReturnType<typeof getSectionLifecycle>>;
 export function SectionLifecycleWorkspace({programId,staff}:{programId:string;staff:{personId:string;first:string;last:string}[]}){
@@ -141,7 +141,11 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
       ()=>queueLifecycleWaitlist({data:{sectionId:section.id,studentProfileId:student,reason}}),"Student placed on waitlist.")}
       className="mt-2 rounded border px-3 py-2 text-xs disabled:opacity-50">Add to waitlist</button>
     {section.waitlist.map(w=><div key={w.id} className="mt-2 flex justify-between gap-2 rounded border p-2 text-xs">
-     <span>{w.subjectId}</span><button disabled={busy} onClick={()=>void run(section.id,
+     <span>{w.subjectId} · {w.status}</span>
+     {w.status!=="in_progress"&&<button disabled={busy} onClick={()=>void run(section.id,
+       ()=>offerLifecycleWaitlistSeat({data:{actionId:w.id,expiresAt:new Date(Date.now()+3*86400000).toISOString()}}),
+       "A three-day waitlist offer was recorded.")} className="underline">Offer seat</button>}
+     <button disabled={busy} onClick={()=>void run(section.id,
        ()=>promoteLifecycleWaitlist({data:{actionId:w.id}}),"Waitlisted student enrolled.")} className="underline">Promote</button><button disabled={busy} onClick={()=>void run(section.id,
        ()=>resolveLifecycleWaitlist({data:{actionId:w.id,reason}}),"Waitlist item resolved.")} className="underline">Resolve</button>
     </div>)}
