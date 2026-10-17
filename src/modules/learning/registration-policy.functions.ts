@@ -3,7 +3,7 @@ import {getRequest} from "@tanstack/react-start/server";
 import {and,asc,eq,inArray} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
-import {sections,terms,programs,auditEvents,domainEvents,schoolYears} from "@/db/schema";
+import {sections,terms,programs,auditEvents,domainEvents} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 const uuid=z.string().uuid(),date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
