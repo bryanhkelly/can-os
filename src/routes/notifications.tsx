@@ -1,10 +1,10 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {getSyntheticNotifications,readSyntheticNotification,readAllSyntheticNotifications,setSyntheticNotificationStatus} from "@/modules/student-experience/notifications.functions";
+import {getNotifications,readNotification,readAllNotifications,setNotificationStatus} from "@/modules/communication/notification-center.functions";
 import {groupNotices} from "@/domain/notification-center";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-const loadNotifications=()=>getSyntheticNotifications();
+const loadNotifications=()=>getNotifications();
 export const Route=createFileRoute("/notifications")({loader:safeLoader(loadNotifications,{authMessage:"Sign in to view your notifications."}),component:NotificationsPage});
 function NotificationsPage(){
  const outcome=Route.useLoaderData();
@@ -18,19 +18,19 @@ function NotificationsView({notices}:{notices:Awaited<ReturnType<typeof loadNoti
  const center=groupNotices(notices);
  async function markRead(id:string){
   setBusy(id);setError("");
-  try{await readSyntheticNotification({data:{id}});await router.invalidate();}
+  try{await readNotification({data:{id}});await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Unable to update notification");}
   finally{setBusy(null);}
  }
  async function changeStatus(id:string,status:"unread"|"dismissed"){
   setBusy(id);setError("");
-  try{await setSyntheticNotificationStatus({data:{id,status}});await router.invalidate();}
+  try{await setNotificationStatus({data:{id,status}});await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Unable to update notification");}
   finally{setBusy(null);}
  }
  async function markAllRead(){
   setBusy("all");setError("");
-  try{await readAllSyntheticNotifications();await router.invalidate();}
+  try{await readAllNotifications();await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Unable to update notifications");}
   finally{setBusy(null);}
  }
