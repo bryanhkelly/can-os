@@ -131,6 +131,21 @@ export async function assertStudentAccess(
 export async function getStudentAcademicSummary(context: AcademicReadContext, studentProfileId: string): Promise<AcademicAnswer> {
     const student = await assertStudentAccess(context, studentProfileId);
 
+    const allowedSections = await db.select({ id: sections.id })
+      .from(enrollments)
+      .innerJoin(sections, eq(sections.id, enrollments.sectionId))
+      .where(and(
+        eq(enrollments.studentProfileId, studentProfileId),
+        eq(enrollments.status, "active"),
+        eq(enrollments.kind, "section"),
+        ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
+        ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
+      ));
+    const allowedSectionIds = allowedSections.map(row => row.id);
+    if (!allowedSectionIds.length) {
+      return { summary: "No active academic sections are visible for this student.", evidence: [], data: { missingCount: 0 } };
+    }
+
     const missing = await db
       .select({
         submissionId: submissions.id,
@@ -145,6 +160,7 @@ export async function getStudentAcademicSummary(context: AcademicReadContext, st
         and(
           eq(submissions.studentProfileId, studentProfileId),
           eq(submissions.timeliness, "missing"),
+          inArray(sections.id, allowedSectionIds),
           ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
           ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
         ),
@@ -167,6 +183,7 @@ export async function getStudentAcademicSummary(context: AcademicReadContext, st
         and(
           eq(submissions.studentProfileId, studentProfileId),
           eq(submissions.status, "graded"),
+          inArray(sections.id, allowedSectionIds),
           ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
           ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
         ),
