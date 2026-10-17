@@ -19,7 +19,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Resolve program and site selections as one server-authorized pair, and apply the selection to the canonical operations Action queue, launch readiness, registrar admissions list and family readiness.
 - [x] Carry verified child context from guardian cards through attendance and admission-offer views.
 - [x] Converge admissions seat-pool capacity reads/updates across authentic and fixture records, preserving occupied and held-seat protections.
-- [ ] Review any remaining program/site selection requirements in insights, capacity and other retained operational pages.
+- [x] Add verified school/program selection to capacity and Insights, in addition to admissions, family readiness and operations Actions; retain denied cross-grant selection behavior.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
 - [x] Delete legacy synthetic-only operations service after replacing its route consumer.
 - [x] Connect staff Action assignment UI to authorized per-site assignee directory and existing audited assignment command; exclude student/guardian grants from operational assignees.
@@ -48,7 +48,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Route operational Action notices only when the recipient still owns the Action within the active school and program grant.
 - [x] Hide links into student, teacher and guardian screens when another workspace role is active.
 - [x] Restrict admissions-offer and study-group notification destinations to active program/site grants and approved group membership, in addition to recipient identity.
-- [ ] Audit remaining notification resource categories and target-route guards.
+- [x] Review notification deep-link classes and fail closed for unrecognized resource types; recheck active student enrollment and program/site permissions for group sessions, submissions, missing-work follow-ups and referrals. Pending browser/negative-access verification remains a release gate.
 - [x] Complete verified program checks for teacher discussion locking and moderation, not only discussion creation.
 - [x] Allow enrolled students to read course discussions independent of fixture metadata; preserve legacy route export until mutation consolidation.
 - [x] Converge enrolled-student discussion posting and teacher discussion creation, locking and moderation on records independent of fixture markers; maintain verified section membership and relationship guards.
@@ -81,8 +81,10 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Enable authenticated content reporting and facilitator moderation, including post-context review, transactional ActionCreated/ActionResolved, owner notification, hidden-post state and student notification.
 - [x] Distinguish real group content/moderation controls from still-restricted legacy session scheduling, RSVP and attendance UI, even in demo-enabled deployments.
 - [ ] Converge group session scheduling, RSVP, attendance recording, reschedule/cancellation with correct real-data calendar and notification lifecycle (Phase 2 dependency).
-- [x] Extend attachment read/upload scoping to authorized programs; keep restricted R2 fixture-only mutation gates until complete document verification and storage review.
-- [x] Before linking an existing R2 learning attachment, verify its private storage-key scope, object existence, exact content length and MIME type; verify PDF/image signatures using bounded reads. Keep authentic uploads gated until lifecycle, all format verification and retention/security review are complete.
+- [x] Restrict authenticated student and guardian learning-document uploads and downloads to current school/program and related submission/attendance records; accept only verifiable PDF/JPEG/PNG media.
+- [x] Require verified private R2 object existence, exact content length/MIME and bounded PDF/image signatures before linking an upload. Expire pending attachment metadata and provide 60-second scope-checked private downloads.
+- [x] Implement authentic enrollment R2 upload, versioning, document review, guardian notifications and archived authorized downloads behind `CAN_R2_LIVE_UPLOADS_ENABLED`; keep demo uploads behind their existing separate flag. Only show upload controls when R2 is configured and the respective mode is enabled.
+- [ ] Complete production document malware scanning/quarantine, orphaned object deletion, legal-hold and retention policies, live bucket/CORS verification and privacy/security acceptance before enabling the live deployment flag.
 - [x] Remove the obsolete fixture-only write restriction from canonical teacher assessment creation, including published roster assignment and audit/domain events.
 - [x] Add canonical teacher assessment publication, close, reopen, deadline changes, and latest-graded-attempt returns; expose controls in the authenticated teacher gradebook.
 - [x] Connect standalone rubric grading UI to the canonical grading service instead of an alternative synthetic submission grader.
@@ -90,7 +92,9 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Replace five legacy teacher assignment mutation implementations with compatibility adapters into canonical gradebook grading, rubric grading, creation, deadline/status changes and return-for-revision commands. They now share the same permission, audit and domain-event path.
 - [ ] Remove deprecated compatibility export names after confirming no external integrations or tests depend on them.
 - [x] Validate insight-created Action owners against an active staff grant at the specific insight school/organization, and notify an assigned owner inside the creation transaction.
-- [ ] Complete remaining service-by-service authorization audit; fixture-only gates persist in study-group writes, document uploads and other unreviewed workflows.
+- [x] Source-scan the 54 `*.functions.ts` module files for legacy demo write gates: outside explicit synthetic R2 access, remaining study-group *session* mutations stay deliberately flagged and isolated from authentic groups. The public fixture-preview read remains fixture-only by design.
+- [x] Remove demo-write gates from real grade finalization, append-audited grade corrections and transcript issuance, enforce program grants for finalized grades/withdrawals and scope transcript issuance history to authorized credit issuers.
+- [ ] Complete per-record security review beyond fixture gates, including verified negative-access cases for school/role changes and lifecycle transitions.
 
 ## Phase 2 — connected school operation
 
@@ -121,4 +125,4 @@ Return to Phase 0 CI/migrations/release baseline and Phase 4 security/performanc
 
 ## Phase 1 completion gate
 
-Do not mark Phase 1 complete or merge its draft branch merely because feature commits exist. In addition to the unchecked items above, validate the route inventory, remaining synthetic-only write boundaries, school/program/child access for every affected server operation, Action lifecycle parity, and notification target permissions. Typecheck, build, multi-role integration and browser acceptance are currently deferred by the user, not waived; completion and production release must not be claimed until that validation is performed.
+Development implementation is substantially converged; Phase 2 owns the connected live group-session and calendar mutation lifecycle. Do not mark Phase 1 complete or merge its draft branch merely because feature commits exist. In addition to the unchecked items above, validate the route inventory, remaining synthetic-only write boundaries, school/program/child access for every affected server operation, Action lifecycle parity, and notification target permissions. Typecheck, build, multi-role integration and browser acceptance are currently deferred by the user, not waived; completion and production release must not be claimed until that validation is performed.
