@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import {
- getSchoolYearStudio, createStudioYear, addStudioTerm, addStudioGradingPeriod,
+ getSchoolYearStudio, createStudioGradeScale, createStudioYear, addStudioTerm, addStudioGradingPeriod,
  addStudioCalendar, addStudioCalendarDay, addStudioSchedule, activateStudioYear,
 } from "@/modules/academic-time/school-year-studio.functions";
 import { safeLoader } from "@/lib/safe-loader";
@@ -22,6 +22,7 @@ function Studio({data}:{data:Snapshot}){
  const [siteId,setSiteId]=useState(data.sites[0]?.id??"");
  const [programId,setProgramId]=useState("");
  const [scaleId,setScaleId]=useState(data.gradeScales[0]?.id??"");
+ const [newScaleName,setNewScaleName]=useState("Standard A–F");
  const [name,setName]=useState("2027–2028 School Year");
  const [key,setKey]=useState("2027-28");
  const [start,setStart]=useState("2027-08-16"),[end,setEnd]=useState("2028-06-09");
@@ -48,6 +49,16 @@ function Studio({data}:{data:Snapshot}){
     <label className="text-sm">Starts<input type="date" value={start} onChange={e=>setStart(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"/></label>
     <label className="text-sm">Ends<input type="date" value={end} onChange={e=>setEnd(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"/></label>
     <label className="text-sm sm:col-span-2">Grading scale<select value={scaleId} onChange={e=>setScaleId(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"><option value="">Choose scale</option>{data.gradeScales.filter(g=>g.organizationId===site?.organizationId).map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+   </div>
+   <div className="mt-3 flex flex-wrap items-end gap-2">
+    <label className="text-xs">New grading scale name
+      <input value={newScaleName} onChange={e=>setNewScaleName(e.target.value)}
+        className="mt-1 block rounded border bg-background p-2 text-sm"/>
+    </label>
+    <button type="button" disabled={busy||!site?.organizationId||!newScaleName.trim()}
+      onClick={()=>run(()=>createStudioGradeScale({data:{
+        organizationId:site!.organizationId,name:newScaleName}}))}
+      className="rounded border px-3 py-2 text-sm disabled:opacity-50">Create standard A–F scale</button>
    </div>
    <button disabled={busy||!siteId||!scaleId} onClick={()=>run(()=>createStudioYear({data:{siteId,...(programId?{programId}:{}),gradeScaleId:scaleId,key,name,startsOn:start,endsOn:end}}))} className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create school year</button>
   </section>
