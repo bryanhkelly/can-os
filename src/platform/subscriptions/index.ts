@@ -17,3 +17,4 @@ export {
 export { processSubscriptionReminders } from "./reminders";
 export { processQueuedSubscriptionDeliveries } from "./delivery-worker";
 export { processWeeklyDigests } from "./digests";
+export { escalateTerminalDeliveryFailures } from "./delivery-failure-actions";
