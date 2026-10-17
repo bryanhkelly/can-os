@@ -43,6 +43,18 @@ function AskCanPage() {
     }).catch(() => {});
     return () => { active = false; };
   }, []);
+  useEffect(() => {
+    if (!conversationId || busy) return;
+    let active = true;
+    const timer = setInterval(() => {
+      getAskCanConversation({ data: { conversationId } }).then(rows => {
+        if (!active) return;
+        setMessages(previous => rows.length > previous.length ? rows as ChatMessage[] : previous);
+      }).catch(() => {});
+    }, 15_000);
+    return () => { active = false; clearInterval(timer); };
+  }, [conversationId, busy]);
+
   async function openThread(id: string) {
     try {
       const history = await getAskCanConversation({ data: { conversationId: id } });
