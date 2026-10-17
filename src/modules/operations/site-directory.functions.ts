@@ -9,7 +9,7 @@ import { AuthorizationError } from "@/domain/command-context";
 /** Enumerate only sites in both the authenticated site and organization scope. */
 export const listMySites = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await getCommandContext(getRequest());
-  if (!actor.actorPersonId || !["registrar", "teacher", "specialist"].includes(actor.role)) {
+  if (!actor.actorPersonId || actor.role !== "registrar") {
     throw new AuthorizationError("site.today.read");
   }
   const siteIds = actor.scope.siteIds ?? [];
