@@ -47,10 +47,10 @@ export const getSyntheticNotifications=createServerFn({method:"GET"}).handler(as
  const referralRows=studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata})
   .from(s.actions).where(and(eq(s.actions.type,"support_referral"),inArray(s.actions.subjectId,studentIds))):[];
  const bySubmission=new Map(submissions.map(x=>[x.id,x.assessmentId]));
- const referralIds=new Set(referralRows.filter(r=>r.metadata.synthetic===true&&r.metadata.fixture==="gf41").map(r=>r.id));
+ const referralIds=new Set(referralRows.map(r=>r.id));
  const missingIds=rows.filter(n=>n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId as string);
  const followUps=missingIds.length&&studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions).where(and(inArray(s.actions.id,missingIds),eq(s.actions.type,"missing_work_follow_up"),inArray(s.actions.subjectId,studentIds))):[];
- const missingAssessmentByAction=new Map(followUps.filter(a=>a.metadata.synthetic===true&&typeof a.metadata.assessmentId==="string").map(a=>[a.id,a.metadata.assessmentId as string]));
+ const missingAssessmentByAction=new Map(followUps.filter(a=>typeof a.metadata.assessmentId==="string").map(a=>[a.id,a.metadata.assessmentId as string]));
 
  return rows.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
   date:n.createdAt.toISOString(),href:n.resourceType==="submission"&&n.resourceId&&bySubmission.has(n.resourceId)?
@@ -80,7 +80,7 @@ export const readSyntheticNotification=createServerFn({method:"POST"})
   return {saved:true};
  });
 
-/** Idempotently acknowledge all unread notifications for the fixed synthetic student. */
+/** Idempotently acknowledge unread notifications for the authenticated person. */
 export const readAllSyntheticNotifications=createServerFn({method:"POST"}).handler(async()=>{
  const context=await notificationActor();
  assertCapability(context,"notifications:manage");
@@ -93,7 +93,7 @@ export const readAllSyntheticNotifications=createServerFn({method:"POST"}).handl
  return {saved:true,count:changed.length};
 });
 
-/** Acknowledgements stay scoped to the fixed synthetic recipient during the dev build. */
+/** Status updates remain scoped to the authenticated notification recipient. */
 export const setSyntheticNotificationStatus=createServerFn({method:"POST"})
  .validator((data:{id:string;status:"unread"|"read"|"dismissed"})=>data)
  .handler(async({data})=>{
@@ -106,6 +106,6 @@ export const setSyntheticNotificationStatus=createServerFn({method:"POST"})
    status:data.status,readAt:data.status==="unread"?null:new Date(),updatedAt:new Date()
   }).where(and(eq(s.notifications.id,data.id),eq(s.notifications.recipientPersonId,personId)))
   .returning({id:s.notifications.id});
-  if(!changed.length)throw new Error("Synthetic notification not found");
+  if(!changed.length)throw new Error("Notification not found");
   return {saved:true};
  });
