@@ -1,6 +1,6 @@
 import { nextAllowedDelivery } from "@/domain/notification-quiet-hours";
 export { nextAllowedDelivery } from "@/domain/notification-quiet-hours";
-import { eq, isNull, lte, or } from "drizzle-orm";
+import { and, eq, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { notificationPreferences } from "@/db/schema";
 
