@@ -19,15 +19,16 @@ export async function loadExpectedAttendanceCoverage(
   effectiveFacts: readonly AttendanceFact[],
   asOf: Date,
   windowDays = 30,
+  day?: { date: string; studentIds: Map<string, Set<string>> },
 ): Promise<Map<string, ExpectedAttendanceSummary>> {
   const results = new Map<string, ExpectedAttendanceSummary>();
   if (!permittedPrograms.length) return results;
   const siteIds = [...new Set(permittedPrograms.map(p => p.siteId)
     .filter((siteId): siteId is string => !!siteId))];
   const programIds = permittedPrograms.map(p => p.id);
-  const minDate = new Date(asOf.getTime() - (windowDays + 4) * 86400000)
+  const minDate = day?.date ?? new Date(asOf.getTime() - (windowDays + 4) * 86400000)
     .toISOString().slice(0, 10);
-  const maxDate = asOf.toISOString().slice(0, 10);
+  const maxDate = day?.date ?? asOf.toISOString().slice(0, 10);
 
   const [siteRows, yearRows, enrollmentRows] = await Promise.all([
     siteIds.length ? db.select({ id: sites.id, timezone: sites.timezone })
@@ -90,6 +91,12 @@ export async function loadExpectedAttendanceCoverage(
       enrollments: enrollmentRows, effectiveFacts,
       timeZone: program.siteId ? timezones.get(program.siteId) ?? "UTC" : "UTC",
       asOf, windowDays,
+      onDate: day?.date,
+      onExpectedDay: day ? (studentProfileId) => {
+        let ids = day.studentIds.get(program.id);
+        if (!ids) { ids = new Set(); day.studentIds.set(program.id, ids); }
+        ids.add(studentProfileId);
+      } : undefined,
     }));
   }
   return results;
