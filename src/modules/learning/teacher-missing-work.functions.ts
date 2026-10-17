@@ -47,8 +47,8 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
 export const createMissingWorkFollowUp=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({assessmentId:z.string().uuid(),studentProfileId:z.string().uuid()}).parse(data))
  .handler(async({data})=>{
-  const context=await assertDemoTeacher();
-  const [{db},s,{and,eq,lt,sql,inArray}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
+  const context=await verifiedTeacher();
+  const [{db},s,{and,eq,isNull,lt,sql,inArray}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
   return db.transaction(async tx=>{
    const key="missing-work:"+data.assessmentId+":"+data.studentProfileId;
    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
@@ -67,7 +67,7 @@ export const createMissingWorkFollowUp=createServerFn({method:"POST"})
     .where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,student.id)));
    if(attempts.some(a=>a.status!=="assigned"))throw new Error("Work has already been submitted");
    const existing=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata}).from(s.actions)
-    .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,student.id),eq(s.actions.siteId,assessment.siteId),eq(s.actions.programId,assessment.programId)));
+    .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,student.id),assessment.siteId?eq(s.actions.siteId,assessment.siteId):isNull(s.actions.siteId),eq(s.actions.programId,assessment.programId)));
    const open=existing.find(a=>a.metadata.assessmentId===assessment.id&&!["resolved","cancelled"].includes(a.status));
    if(open)return {actionId:open.id,created:false};
    const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:context.actorPersonId!,organizationId:assessment.organizationId,siteId:assessment.siteId,programId:assessment.programId,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{source:"teacher_missing_work",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});

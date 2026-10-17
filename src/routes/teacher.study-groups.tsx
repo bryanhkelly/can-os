@@ -75,7 +75,7 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
    <textarea className="w-full rounded border p-2" aria-label="Group description" placeholder="Purpose" value={description} onChange={e=>setDescription(e.target.value)}/>
    <select className="w-full rounded border p-2" aria-label="Group school" value={siteId} onChange={e=>{setSiteId(e.target.value);setProgramId("");}}>
     <option value="">Choose a school where you teach</option>
-    {sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+    {sites.map(site=><option key={site.id} value={site.id??""}>{site.name}</option>)}
    </select>
    <select className="rounded border p-2" aria-label="Group type" value={kind} onChange={e=>setKind(e.target.value as "course"|"interest")}><option value="course">Course</option><option value="interest">Interest</option></select>
    <select className="w-full rounded border p-2" aria-label="Group program" value={programId} onChange={e=>setProgramId(e.target.value)} disabled={!siteId}>

@@ -13,7 +13,7 @@ export type DemoRole = "student" | "teacher" | "guardian" | "registrar" | "speci
 export function isSyntheticAccessEnabled(): boolean {
  return process.env.CAN_DEMO_WRITES_ENABLED === "true";
 }
-export function assertSyntheticMutation(role: DemoRole): void {
+export function assertSyntheticMutation(role: string): void {
  if (!isSyntheticAccessEnabled()) {
   throw new Error("Synthetic writes are disabled. Set CAN_DEMO_WRITES_ENABLED=true to enable the synthetic demo workflows.");
  }

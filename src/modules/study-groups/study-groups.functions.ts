@@ -194,6 +194,8 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
  return db.transaction(async tx=>{
  const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active"))).for("update").limit(1);
  if(!group||data.personId===actor.actorPersonId!)throw new Error("Not authorized to approve");
+ const groupSiteId=group.siteId;
+ if(!groupSiteId)throw new Error("Study group school is required");
  const [member]=await tx.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,data.personId),eq(s.studyGroupMemberships.status,"pending"))).limit(1);
  if(!member)throw new Error("Pending membership not found");
  if(data.approve){
@@ -201,7 +203,7 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
    .innerJoin(s.enrollments,eq(s.enrollments.studentProfileId,s.studentProfiles.id))
    .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
    .where(and(eq(s.studentProfiles.personId,data.personId),eq(s.enrollments.status,"active"),
-     eq(s.programs.siteId,group.siteId),
+     eq(s.programs.siteId,groupSiteId),
      group.programId?eq(s.enrollments.programId,group.programId):undefined))
    .limit(1);
   if(!eligible)throw new AuthorizationError("student no longer enrolled in this group's school or program");
@@ -673,10 +675,11 @@ export const decideGuardianStudyGroupConsent=createServerFn({method:"POST"})
  .handler(async({data})=>{
   const actor=await getCommandContext(getRequest());
   if(actor.role!=="guardian"||!actor.actorPersonId)throw new AuthorizationError("study group guardian");
+  const guardianPersonId=actor.actorPersonId;
   const {db,s}=await context();
   return db.transaction(async tx=>{
    const [action]=await tx.select().from(s.actions)
-    .where(and(eq(s.actions.id,data.actionId),eq(s.actions.ownerPersonId,actor.actorPersonId),
+    .where(and(eq(s.actions.id,data.actionId),eq(s.actions.ownerPersonId,guardianPersonId),
      eq(s.actions.type,"study_group_consent"))).for("update").limit(1);
    if(!action)throw new AuthorizationError("consent request");
    if(action.status==="resolved")return {ok:true};
@@ -684,7 +687,7 @@ export const decideGuardianStudyGroupConsent=createServerFn({method:"POST"})
    const studentPersonId=String(action.metadata.studentPersonId??"");
    const [relationship]=await tx.select({id:s.guardianRelationships.id})
     .from(s.guardianRelationships).where(and(
-     eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),
+     eq(s.guardianRelationships.guardianPersonId,guardianPersonId),
      eq(s.guardianRelationships.studentPersonId,studentPersonId),
      eq(s.guardianRelationships.canManageEnrollment,true))).limit(1);
    if(!relationship)throw new AuthorizationError("guardian relationship");

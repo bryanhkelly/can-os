@@ -9,7 +9,7 @@ export const Route=createFileRoute("/readiness")({loader:safeLoader(()=>getSynth
 function ReadinessPage(){
  const outcome=Route.useLoaderData();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic planning example" title="Program launch readiness" outcome={outcome}/>;
- const programs=outcome.data;
+ const programs:Awaited<ReturnType<typeof getSyntheticPrograms>>=outcome.data;
  const items=readinessFromSnapshot({academics:"ready",staffing:"needs_review",safeguarding:"missing",calendar:"ready",enrollment:"needs_review",records:"missing"});
  const summary=programReadiness(items);
  return <main className="mx-auto max-w-5xl px-5 py-10">

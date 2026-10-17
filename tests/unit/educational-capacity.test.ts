@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/db/client", () => ({ db: {} }));
+
 import { remainingSeats } from "@/modules/staffing/educational-capacity-service";
 
 describe("educational capacity math", () => {

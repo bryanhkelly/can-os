@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/db/client", () => ({ db: {} }));
+
 import { meetingPeriodsConflict } from "@/modules/academic-time/section-schedule-service";
 
 describe("section schedule conflicts", () => {

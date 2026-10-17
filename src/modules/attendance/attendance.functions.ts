@@ -191,7 +191,7 @@ export const listSiteAttendanceRoster = createServerFn({ method: "GET" })
 
 /** Mark a student present/absent/tardy; deterministic sourceKey keeps retries idempotent. */
 export const markAttendance = createServerFn({ method: "POST" })
-  .validator((value: unknown) => z.object({ studentProfileId: z.string().min(1), date: z.string().min(1), status: z.enum(["expected","present","absent","tardy","excused"]), mutationId:z.string().uuid().optional(),expectedPreviousEventId:z.string().uuid().nullable().optional(),note:z.string().max(2000).optional() }).parse(value))
+  .validator((value: unknown) => z.object({ studentProfileId: z.string().min(1), date: z.string().min(1), status: z.enum(["present","absent","tardy"]), mutationId:z.string().uuid().optional(),expectedPreviousEventId:z.string().uuid().nullable().optional(),note:z.string().max(2000).optional() }).parse(value))
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.write");
     if (!uuidPattern.test(data.studentProfileId ?? "")) throw new Error("Invalid student identifier");

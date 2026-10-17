@@ -56,7 +56,11 @@ export const Route = createFileRoute("/operations/launch")({
 });
 
 function LaunchWizardPage() {
-  const { options, launches, authError } = Route.useLoaderData();
+  const { options, launches, authError }: {
+    options: Awaited<ReturnType<typeof listLaunchOptions>> | null;
+    launches: Awaited<ReturnType<typeof listLaunches>> | null;
+    authError: string;
+  } = Route.useLoaderData();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

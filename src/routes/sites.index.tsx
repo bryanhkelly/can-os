@@ -11,10 +11,11 @@ export const Route = createFileRoute("/sites/")({
 function SitesDirectoryPage() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Schools" title="Your school sites" outcome={outcome}/>;
+  const sites: Awaited<ReturnType<typeof listMySites>> = outcome.data;
   return <WorkspaceShell eyebrow="CAN OS · Schools" title="Your school sites"
     subtitle="Choose a site to view today's schedule, action queue, active programs and recorded attendance.">
     <div className="mt-8 grid gap-3 sm:grid-cols-2">
-      {outcome.data.map(site => <Link key={site.id}
+      {sites.map(site => <Link key={site.id}
         to="/sites/$siteId" params={{ siteId: site.id }}
         className="rounded-xl border bg-card p-5 transition-colors hover:bg-muted">
         <h2 className="font-serif text-2xl">{site.name}</h2>
@@ -22,7 +23,7 @@ function SitesDirectoryPage() {
         <p className="mt-4 text-sm font-medium underline">Open Site Today →</p>
       </Link>)}
     </div>
-    {!outcome.data.length && <p className="mt-8 rounded-xl border p-5 text-sm text-muted-foreground">
+    {!sites.length && <p className="mt-8 rounded-xl border p-5 text-sm text-muted-foreground">
       No sites are assigned to your current account. Ask a school administrator to review your scoped access.
     </p>}
   </WorkspaceShell>;

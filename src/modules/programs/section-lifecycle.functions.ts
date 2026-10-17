@@ -15,7 +15,10 @@ async function actor(){
 }
 export const getSectionLifecycle=createServerFn({method:"GET"})
  .validator((v:unknown)=>z.object({programId:uuid}).parse(v))
- .handler(async({data})=>sectionLifecycleSnapshot(await actor(),data.programId));
+ .handler(async({data})=>{
+  const rows=await sectionLifecycleSnapshot(await actor(),data.programId);
+  return rows.map(row=>({...row,waitlist:row.waitlist.map(({metadata,...w})=>w)}));
+ });
 export const setSectionLifecycleState=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({sectionId:uuid,active:z.boolean(),reason:z.string().trim().min(5).max(1000)}).parse(v))
  .handler(async({data})=>{await changeSectionState(await actor(),data.sectionId,data.active,data.reason);return {ok:true}});

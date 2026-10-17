@@ -118,6 +118,7 @@ async function finalizedGradeRows(
       letterGrade: s.sectionGrades.letterGrade,
       percentage: s.sectionGrades.percentage,
       score: s.sectionGrades.score,
+      gradeScaleId: s.sectionGrades.gradeScaleId,
       finalizedAt: s.sectionGrades.finalizedAt,
       programName: s.programs.name,
       creditIssuingOrganizationId: s.programs.creditIssuingOrganizationId,
@@ -150,15 +151,28 @@ async function finalizedGradeRows(
     .where(inArray(s.gradingPeriods.termId,[...new Set(rows.map(row=>row.termId))])):[];
   const lastPeriod=new Map<string,number>();
   for(const p of periodRows)lastPeriod.set(p.termId,Math.max(lastPeriod.get(p.termId)??0,p.sequence));
-  return rows.map((row) => ({
-    ...row,
-    finalizedAt: row.finalizedAt?.toISOString() ?? null,
-    creditsAttempted:row.gradingPeriodSequence===lastPeriod.get(row.termId)?
-      (typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1):0,
-    creditsEarned:row.gradingPeriodSequence===lastPeriod.get(row.termId)&&
-      ["A","B","C","D","P","Pass"].includes(row.letterGrade??"")?
-      (typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1):0,
+  const scaleIds=[...new Set(rows.map(row=>row.gradeScaleId).filter((id):id is string=>Boolean(id)))];
+  const scaleRows=scaleIds.length?await db.select({id:s.gradeScales.id,configuration:s.gradeScales.configuration})
+    .from(s.gradeScales).where(inArray(s.gradeScales.id,scaleIds)):[];
+  const passingByScaleId=new Map(scaleRows.map(scale=>{
+    const entries=scale.configuration.entries;
+    const flagged=entries.some(entry=>typeof entry.passing==="boolean");
+    return [scale.id,new Set(flagged?entries.filter(entry=>entry.passing===true).map(entry=>entry.label):entries.map(entry=>entry.label))] as const;
   }));
+  return rows.map((row) => {
+    const { sectionMetadata, gradeScaleId, ...rest } = row;
+    const passingLetters=passingByScaleId.get(gradeScaleId??"");
+    const isPassing=passingLetters?passingLetters.has(row.letterGrade??""):
+      ["A","B","C","D","P","Pass"].includes(row.letterGrade??"");
+    return {
+      ...rest,
+      finalizedAt: row.finalizedAt?.toISOString() ?? null,
+      creditsAttempted:row.gradingPeriodSequence===lastPeriod.get(row.termId)?
+        (typeof sectionMetadata.credits==="number"?sectionMetadata.credits:1):0,
+      creditsEarned:row.gradingPeriodSequence===lastPeriod.get(row.termId)&&isPassing?
+        (typeof sectionMetadata.credits==="number"?sectionMetadata.credits:1):0,
+    };
+  });
 }
 
 export type FinalizedGradeRow = Awaited<ReturnType<typeof finalizedGradeRows>>[number];
@@ -566,9 +580,12 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
       const now = new Date();
       const newPercentage =
         data.percentage !== undefined ? String(data.percentage) : grade.percentage;
+      const scaleEntries = gradeScale?.configuration.entries ?? [];
       const newLetterGrade =
         data.letterGrade ??
-        (data.percentage !== undefined ? letterFor(data.percentage,gradeScale?.configuration.entries??[]) : grade.letterGrade);
+        (data.percentage !== undefined && scaleEntries.length
+          ? letterFor(data.percentage, scaleEntries)
+          : grade.letterGrade);
 
       const priorCorrections = Array.isArray(grade.metadata?.corrections)
         ? (grade.metadata.corrections as GradeCorrection[])

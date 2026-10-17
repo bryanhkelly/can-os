@@ -17,7 +17,12 @@ export const Route=createFileRoute("/operations")({
  }
 },component:OperationsPage});
 function OperationsPage(){
- const {operations:data,health,commandCenter,authError}=Route.useLoaderData();
+ const {operations:data,health,commandCenter,authError}:{
+  operations:Awaited<ReturnType<typeof getOperationsActions>>|null;
+  health:Awaited<ReturnType<typeof getReleaseHealth>>|null;
+  commandCenter:Awaited<ReturnType<typeof getLiveOperationsCommandCenter>>|null;
+  authError:string;
+ }=Route.useLoaderData();
  const selected=Route.useSearch();
  const selectScope=(siteId?:string,programId?:string)=>{
   const query=new URLSearchParams();

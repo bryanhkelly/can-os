@@ -50,7 +50,7 @@ function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness
  async function openDocument(applicationId:string,requirementId:string,documentId:string){
   setBusy(requirementId);setError("");
   try{
-   const result=await getSyntheticR2DocumentDownload({data:{applicationId,requirementId,documentId}});
+   const result=await getEnrollmentDocumentDownload({data:{applicationId,requirementId,documentId}});
    window.open(result.downloadUrl,"_blank","noopener,noreferrer");
   }catch(e){setError(e instanceof Error?e.message:"Unable to open document");}
   finally{setBusy(null);}
@@ -60,10 +60,10 @@ function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness
   setBusy(requirementId);setError("");
   try{
    const request={applicationId,requirementId,fileName:file.name,mimeType:file.type,size:file.size};
-   const {uploadUrl,key}=await beginSyntheticR2DocumentUpload({data:request});
+   const {uploadUrl,key}=await beginEnrollmentDocumentUpload({data:request});
    const response=await fetch(uploadUrl,{method:"PUT",headers:{"Content-Type":file.type},body:file});
    if(!response.ok)throw new Error("Cloudflare R2 upload failed ("+response.status+")");
-   await finishSyntheticR2DocumentUpload({data:{...request,key}});
+   await finishEnrollmentDocumentUpload({data:{...request,key}});
    setFiles(previous=>({...previous,[requirementId]:null}));await router.invalidate();
   }catch(e){setError(e instanceof Error?e.message:"Document upload failed");}
   finally{setBusy(null);}

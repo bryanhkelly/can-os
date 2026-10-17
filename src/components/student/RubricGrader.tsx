@@ -13,7 +13,7 @@ export function RubricGrader({submissionId,criteria,onSaved}:{submissionId:strin
   setBusy(true);setError("");
   try {
    const rubricNotes=criteria.map(criterion=>comments[criterion.id]?.trim()
-    ?criterion.label+": "+comments[criterion.id].trim():"").filter(Boolean).join("\n");
+    ?criterion.label+": "+comments[criterion.id]!.trim():"").filter(Boolean).join("\n");
    await gradeSubmission({data:{
     submissionId,rubricScores:criteria.map(c=>({id:c.id,points:points[c.id]??0})),
     feedbackComment:[overall.trim(),rubricNotes].filter(Boolean).join("\n").slice(0,4000)

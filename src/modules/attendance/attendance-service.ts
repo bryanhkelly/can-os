@@ -415,6 +415,7 @@ export async function recordAttendanceRevision(
  assertProgramScope(context,input.programId);
  assertSiteScope(context,input.siteId);
  if(!context.actorPersonId)throw new Error("Attendance actor required");
+ const recordedByPersonId=context.actorPersonId;
  return db.transaction(async tx=>{
   const key="attendance:"+input.studentProfileId+":"+input.occurrenceKey;
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
@@ -439,7 +440,7 @@ export async function recordAttendanceRevision(
    studentProfileId:input.studentProfileId,programId:input.programId,
    siteId:input.siteId,sectionId:input.sectionId,
    occurrenceKey:input.occurrenceKey,status:input.status,
-   expectedAt:input.expectedAt,recordedAt:now,recordedByPersonId:context.actorPersonId,
+   expectedAt:input.expectedAt,recordedAt:now,recordedByPersonId,
    sourceKey,supersedesAttendanceEventId:prior?.id,
    metadata:{surface:"staff.attendance",reason:input.note??"",mutationId:input.mutationId},
   }).returning({id:attendanceEvents.id});

@@ -1,6 +1,6 @@
 import { listEnrollmentPlacements, placeEnrolledStudent } from "@/modules/enrollment/course-placement.functions";
 import { useState } from "react";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
 import { listMySites } from "@/modules/operations/site-directory.functions";
 import { listAdmissionsPrograms } from "@/modules/enrollment/admissions-program-directory.functions";
@@ -32,8 +32,7 @@ export const Route = createFileRoute("/admissions/")({
 
 function Admissions() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Admissions" title="Admissions command center"
-      actions={<Link to="/admissions/intake" className="rounded-lg border px-3 py-2 text-sm font-semibold">Inquiries & decisions →</Link>} outcome={outcome} />;
+  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Admissions" title="Admissions command center" outcome={outcome} />;
   return <AdmissionsView data={outcome.data} />;
 }
 

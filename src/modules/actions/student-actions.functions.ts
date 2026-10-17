@@ -34,7 +34,7 @@ export const finishQuickWinAction = createServerFn({ method: "POST" })
     const actor = await studentActor();
     const sites = actorSiteIds(actor);
     if (!process.env.DATABASE_URL) throw new Error("Neon is not configured");
-    const [{ db }, { actions }] = await Promise.all([
+    const [{ db }, { actions, domainEvents }] = await Promise.all([
       import("@/db/client"), import("@/db/schema"),
     ]);
     return db.transaction(async tx => {

@@ -16,7 +16,7 @@ function SiteTodayPage() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Site Operations"
     title="Site Today" outcome={outcome} />;
-  const data = outcome.data;
+  const data: Awaited<ReturnType<typeof getSiteToday>> = outcome.data;
   const localTime = (date: string) => new Intl.DateTimeFormat("en-US", {
     timeZone: data.site.timezone, hour: "numeric", minute: "2-digit",
   }).format(new Date(date));

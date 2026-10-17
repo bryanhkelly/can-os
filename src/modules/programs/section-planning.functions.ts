@@ -16,7 +16,8 @@ export const getSectionReadiness=createServerFn({method:"GET"})
    const context=await getCommandContext(getRequest());
    if(!context.capabilities.has("program.read")&&!context.capabilities.has("capacity.read"))
      throw new Error("Section readiness access denied");
-   return evaluateSectionReadiness(data.sectionId);
+   const readiness=await evaluateSectionReadiness(data.sectionId);
+   return {...readiness,items:readiness.items.map(({evidence,...item})=>item)};
  });
 
 export const saveDeliveryArrangement=createServerFn({method:"POST"})

@@ -62,7 +62,7 @@ function AdminConsolePage() {
         setSites(siteResult.sites);
         setRequireSiteSelection(siteResult.requireSiteSelection);
         if(siteResult.requireSiteSelection&&siteResult.sites.length===1)
-          form.setValue("siteId",siteResult.sites[0].id);
+          form.setValue("siteId",siteResult.sites[0]?.id??"");
         setAccounts(accountResult.accounts);
         setPeople(peopleResult.people);
         setLoading(false);
@@ -108,7 +108,7 @@ function AdminConsolePage() {
       setNotice(result.created
         ? `Invitation recorded for ${values.email}. Trigger the access-link flow so they receive their sign-in challenge.`
         : `${values.email} already has this grant; no changes were made.`);
-      form.reset({...inviteDefaults,siteId:requireSiteSelection&&sites.length===1?sites[0].id:""});
+      form.reset({...inviteDefaults,siteId:requireSiteSelection&&sites.length===1?sites[0]?.id??"":""});
       await refresh();
     } catch {
       setError("Unable to invite this staff member. Check the details and your permissions.");

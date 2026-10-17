@@ -41,10 +41,13 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
   .innerJoin(people,eq(people.id,studentProfiles.personId))
   .where(inArray(applications.programId,actor.scope.programIds!))
   .orderBy(desc(applications.updatedAt)).limit(300);
- return rows.map(r=>({
-  ...r,createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
-  disposition:r.metadata.admissionsDisposition==="waitlisted"?"waitlisted":r.metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
- }));
+ return rows.map(r=>{
+  const {metadata,...rest}=r;
+  return {
+   ...rest,createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
+   disposition:metadata.admissionsDisposition==="waitlisted"?"waitlisted":metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
+  };
+ });
 });
 export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((v:unknown)=>applicant.parse(v))
  .handler(async({data})=>{

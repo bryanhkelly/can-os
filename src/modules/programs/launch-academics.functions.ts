@@ -72,10 +72,11 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
    first:people.legalFirstName,last:people.legalLastName,
   }).from(sectionTeachers).innerJoin(people,eq(people.id,sectionTeachers.personId))
    .where(inArray(sectionTeachers.sectionId,sectionRows.map(s=>s.id))):[];
-  const sectionSnapshots=await Promise.all(sectionRows.map(async row=>({
-   ...row,teachers:assignments.filter(a=>a.sectionId===row.id),
-   readiness:await evaluateSectionReadiness(row.id),
-  })));
+  const sectionSnapshots=await Promise.all(sectionRows.map(async row=>{
+   const readiness=await evaluateSectionReadiness(row.id);
+   return {...row,teachers:assignments.filter(a=>a.sectionId===row.id),
+    readiness:{...readiness,items:readiness.items.map(({evidence,...item})=>item)}};
+  }));
   return {program,years,terms:termRows,catalog,teachingStaff,sections:sectionSnapshots};
  });
 

@@ -27,7 +27,7 @@ export const listCoursePolicies=createServerFn({method:"GET"}).handler(async()=>
  const ids=actor.scope.programIds??[];
  if(!ids.length)return [];
  const rows=await db.select({
-  id:sections.id,code:sections.code,title:sections.title,metadata:sections.metadata,
+  id:sections.id,code:sections.code,title:sections.title,
   programId:sections.programId,programName:programs.name,
   siteId:sections.siteId,organizationId:programs.organizationId,
   startsOn:terms.startsOn,endsOn:terms.endsOn,

@@ -8,7 +8,7 @@ export const Route=createFileRoute("/calendar-export")({loader:safeLoader(loadAs
 function CalendarExport(){
  const outcome=Route.useLoaderData();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic calendar" title="Calendar export" outcome={outcome}/>;
- const data=outcome.data;
+ const data:Awaited<ReturnType<typeof getAssignments>>=outcome.data;
  const exportCalendar=()=>{
   const items=data.assignments.filter(x=>x.dueAt&&x.metadata.synthetic).map(x=>({id:x.assessmentId,title:x.title,description:x.course,startsAt:x.dueAt!,endsAt:new Date(new Date(x.dueAt!).getTime()+30*60*1000).toISOString()}));
   const blob=new Blob([renderICS(items,"CAN OS synthetic assignments")],{type:"text/calendar;charset=utf-8"});

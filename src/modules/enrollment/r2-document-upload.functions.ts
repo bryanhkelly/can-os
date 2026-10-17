@@ -114,7 +114,8 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
    await tx.update(journeys).set({status:"in_progress",completedAt:null,updatedAt:now}).where(eq(journeys.id,journey.id));
    await tx.insert(auditEvents).values({actorPersonId:actorId,action:"enrollment.document.resubmitted",resourceType:"journey_requirement",resourceId:requirement.id,
     before:{status:requirement.status},after:{status:"needs_you",documentId:document.id,version},context:{applicationId:data.applicationId}});
-   await tx.insert(auditEvents).values({actorPersonId:actorId,action:"enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{synthetic:true}});
+   const [appRecord]=await tx.select({metadata:applications.metadata}).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
+   await tx.insert(auditEvents).values({actorPersonId:actorId,action:"enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{applicationId:data.applicationId,synthetic:appRecord?.metadata.synthetic===true}});
    return {documentId:document.id,created:true};
   });
  });

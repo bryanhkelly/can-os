@@ -26,5 +26,9 @@ export const getMyStudentToday = createServerFn({ method: "GET" }).handler(async
       eq(enrollments.status, "active"),
       inArray(programs.siteId, context.scope.siteIds))).limit(1);
   if (!membership) throw new AuthorizationError("active student membership");
-  return snapshot;
+  return {
+    ...snapshot,
+    coursework: snapshot.coursework.map(({ feedback, response, ...item }) => item),
+    recoveryCandidates: snapshot.recoveryCandidates.map(({ feedback, response, ...item }) => item),
+  };
 });
