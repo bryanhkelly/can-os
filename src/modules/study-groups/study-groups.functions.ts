@@ -34,7 +34,7 @@ async function requireStudentGroupEnrollment(
  if(!enrolled)throw new AuthorizationError("active enrollment required for this study group");
 }
 
-export const getStudyGroupAvailability=createServerFn({method:"GET"}).handler(async()=>({enabled:isSyntheticAccessEnabled()}));
+export const getStudyGroupAvailability=createServerFn({method:"GET"}).handler(async()=>({enabled:true,writesEnabled:isSyntheticAccessEnabled()}));
 
 /** Sites and programs in which this teacher actually has an active class assignment. */
 export const listFacilitatorGroupScopes=createServerFn({method:"GET"}).handler(async()=>{
@@ -54,13 +54,32 @@ export const listFacilitatorGroupScopes=createServerFn({method:"GET"}).handler(a
 });
 
 export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
- assertSyntheticMutation("student");
  const actor=await groupActor("student");
  const {db,s}=await context();
- const rows=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,capacity:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,facilitator:s.studyGroups.facilitatorPersonId,status:s.studyGroups.status,membership:s.studyGroupMemberships.status}).from(s.studyGroups)
+ const enrolled=await db.selectDistinct({
+  siteId:s.programs.siteId,programId:s.programs.id
+ }).from(s.enrollments)
+ .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+ .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+ .where(and(eq(s.studentProfiles.personId,actor.actorPersonId!),
+  eq(s.enrollments.status,"active"),
+  inArray(s.programs.siteId,actor.sites),
+  inArray(s.programs.id,actor.scope.programIds??[])));
+ if(!enrolled.length)return [];
+ const rows=await db.select({
+  id:s.studyGroups.id,title:s.studyGroups.title,
+  description:s.studyGroups.description,kind:s.studyGroups.kind,
+  capacity:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,
+  facilitator:s.studyGroups.facilitatorPersonId,status:s.studyGroups.status,
+  siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,
+  membership:s.studyGroupMemberships.status
+ }).from(s.studyGroups)
  .leftJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroupMemberships.personId,actor.actorPersonId!)))
- .where(and(eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).orderBy(desc(s.studyGroups.createdAt)).limit(100);
- return rows;
+ .where(and(eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),
+  or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
+ .orderBy(desc(s.studyGroups.createdAt)).limit(100);
+ return rows.filter(group=>enrolled.some(row=>row.siteId===group.siteId&&
+  (!group.programId||row.programId===group.programId)));
 });
 export const createStudyGroup=createServerFn({method:"POST"})
  .validator((input:unknown)=>z.object({title:z.string(),description:z.string(),
@@ -168,7 +187,6 @@ export const leaveStudyGroup=createServerFn({method:"POST"}).validator(z.object(
  await db.update(s.studyGroupMemberships).set({status:"left",updatedAt:new Date()}).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!)));return {ok:true};
 });
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
- assertSyntheticMutation("student");
  const actor=await groupActor("student");
  const {db,s}=await context();
  const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).limit(1);
@@ -262,8 +280,7 @@ export const reportStudyGroupPost=createServerFn({method:"POST"}).validator(z.ob
  });
 });
 
-export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(async()=>{
- assertSyntheticMutation("teacher");const actor=await groupActor("teacher");
+export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(async()=>{const actor=await groupActor("teacher");
  const {db,s}=await context();
  return db.select({groupId:s.studyGroups.id,groupTitle:s.studyGroups.title,personId:s.studyGroupMemberships.personId,personName:s.people.legalFirstName,status:s.studyGroupMemberships.status})
  .from(s.studyGroupMemberships)
@@ -271,8 +288,7 @@ export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(as
  .innerJoin(s.people,eq(s.studyGroupMemberships.personId,s.people.id))
  .where(eq(s.studyGroupMemberships.status,"pending")).limit(100);
 });
-export const listStudyGroupReports=createServerFn({method:"GET"}).handler(async()=>{
- assertSyntheticMutation("teacher");const actor=await groupActor("teacher");
+export const listStudyGroupReports=createServerFn({method:"GET"}).handler(async()=>{const actor=await groupActor("teacher");
  const {db,s}=await context();
  return db.select({id:s.studyGroupReports.id,groupId:s.studyGroupReports.groupId,reason:s.studyGroupReports.reason,status:s.studyGroupReports.status,postId:s.studyGroupReports.postId})
  .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
@@ -339,8 +355,7 @@ export const recordStudyGroupAttendance=createServerFn({method:"POST"})
  });
 });
 export const listStudyGroupAttendance=createServerFn({method:"GET"})
-.validator(z.object({sessionId:z.string().min(1)}).parse).handler(async({data})=>{
- assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
+.validator(z.object({sessionId:z.string().min(1)}).parse).handler(async({data})=>{const actor=await groupActor("teacher");const {db,s}=await context();
  const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions)
  .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!)))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
