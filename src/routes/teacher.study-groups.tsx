@@ -6,10 +6,10 @@ import {getFacilitatorStudyGroups} from "@/modules/study-groups/facilitator-quer
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 const loadFacilitatorStudyGroups=async()=>{
- const {enabled,writesEnabled}=await getStudyGroupAvailability();
- if(!enabled)return {enabled,writesEnabled,queue:[],reports:[],groups:[],scopes:[]};
+ const {enabled,writesEnabled,membershipEnabled}=await getStudyGroupAvailability();
+ if(!enabled)return {enabled,writesEnabled,membershipEnabled,queue:[],reports:[],groups:[],scopes:[]};
  const [queue,reports,groups,scopes]=await Promise.all([listStudyGroupReviewQueue(),listStudyGroupReports(),getFacilitatorStudyGroups(),listFacilitatorGroupScopes()]);
- return {enabled,writesEnabled,queue,reports,groups,scopes};
+ return {enabled,writesEnabled,membershipEnabled,queue,reports,groups,scopes};
 };
 export const Route=createFileRoute("/teacher/study-groups")({
  loader:safeLoader(loadFacilitatorStudyGroups,{authMessage:"Sign in with an authorized teacher account to facilitate study groups."}),
@@ -21,7 +21,7 @@ function TeacherStudyGroups(){
  return <TeacherStudyGroupsView data={outcome.data}/>;
 }
 function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacilitatorStudyGroups>>}){
- const {enabled,writesEnabled,queue,reports,groups,scopes}=data,router=useRouter();
+ const {enabled,writesEnabled,membershipEnabled,queue,reports,groups,scopes}=data,router=useRouter();
  const [title,setTitle]=useState(""),[description,setDescription]=useState(""),[kind,setKind]=useState<"course"|"interest">("course");
  const [siteId,setSiteId]=useState(""),[programId,setProgramId]=useState("");
  const sites=[...new Map(scopes.map(s=>[s.siteId,{id:s.siteId,name:s.siteName}])).values()];
@@ -38,12 +38,12 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
  return <main className="mx-auto max-w-5xl space-y-6 px-6 py-10">
   <header><h1 className="font-serif text-4xl">Facilitate study groups</h1><p className="mt-2 text-muted-foreground">Review requests and moderate groups you facilitate.</p></header>
   {!enabled?<p role="status">Study groups are currently unavailable.</p>:<>
-  {!writesEnabled&&<p role="status" className="rounded-xl border p-4 text-sm text-muted-foreground">You can review authorized groups, sessions, membership requests and content reports. Changes remain disabled until consent and moderation write workflows are released.</p>}
+  {!writesEnabled&&<p role="status" className="rounded-xl border p-4 text-sm text-muted-foreground">You can review membership requests and make approval decisions after current guardian consent. Content moderation and session changes remain disabled until their full lifecycle is released.</p>}
   {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}
   <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Membership requests</h2>
    {queue.map(m=><div className="flex items-center justify-between gap-3 border-b py-3" key={m.groupId+m.personId}><span>{m.personName} · {m.groupTitle}</span><div className="flex gap-2">
-    <button disabled={busy||!writesEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>decideStudyGroupMembership({data:{groupId:m.groupId,personId:m.personId,approve:true}}))}>Approve</button>
-    <button disabled={busy||!writesEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>decideStudyGroupMembership({data:{groupId:m.groupId,personId:m.personId,approve:false}}))}>Decline</button>
+    <button disabled={busy||!membershipEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>decideStudyGroupMembership({data:{groupId:m.groupId,personId:m.personId,approve:true}}))}>Approve</button>
+    <button disabled={busy||!membershipEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>decideStudyGroupMembership({data:{groupId:m.groupId,personId:m.personId,approve:false}}))}>Decline</button>
    </div></div>)}{queue.length===0&&<p>No pending membership requests.</p>}
   </section>
   <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Content moderation</h2>
