@@ -8,314 +8,722 @@
     "fixtureRequired:false marks pages that legitimately render without seeded domain data (rationale required).",
     "Verification is STATIC_ONLY: this manifest proves declared coverage, not live execution. scripts/check-route-fixture-coverage.mjs enforces it in CI; unseeded routes are coverage failures."
   ],
-  "baseSeeds": ["student-s1-s4.sql", "identity-demo-accounts.sql"],
+  "baseSeeds": [
+    "student-s1-s4.sql",
+    "identity-demo-accounts.sql"
+  ],
   "routes": {
     "/": {
       "fixtureRequired": false,
       "persona": "public",
       "rationale": "Landing page; renders without domain data.",
-      "interactions": ["navigate to access request"],
+      "interactions": [
+        "navigate to access request"
+      ],
       "downstreamRecords": []
     },
     "/access": {
       "persona": "public",
       "seeds": [],
-      "recordCounts": { "access_accounts": 4 },
-      "interactions": ["request an access code for a synthetic account"],
-      "downstreamRecords": ["access_tokens"]
+      "recordCounts": {
+        "access_accounts": 4
+      },
+      "interactions": [
+        "request an access code for a synthetic account"
+      ],
+      "downstreamRecords": [
+        "access_tokens"
+      ]
     },
     "/access/verify": {
       "persona": "public",
       "seeds": [],
-      "recordCounts": { "access_accounts": 4 },
-      "interactions": ["verify an access code and land in the persona workspace"],
-      "downstreamRecords": ["access_sessions"]
+      "recordCounts": {
+        "access_accounts": 4
+      },
+      "interactions": [
+        "verify an access code and land in the persona workspace"
+      ],
+      "downstreamRecords": [
+        "access_sessions"
+      ]
     },
     "/admin": {
       "persona": "staff",
-      "seeds": ["staff-experiences-v1.sql"],
-      "recordCounts": { "insights": 1, "actions": 1 },
-      "interactions": ["review platform-level synthetic health and staff surfaces"],
+      "seeds": [
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "insights": 1,
+        "actions": 1
+      },
+      "interactions": [
+        "review platform-level synthetic health and staff surfaces"
+      ],
       "downstreamRecords": []
     },
     "/admissions": {
       "persona": "registrar",
-      "seeds": ["gf2-admissions-test.sql", "new-experiences-v1.sql"],
-      "recordCounts": { "applications": 1, "journeys": 1 },
-      "interactions": ["review pipeline stages", "open application detail", "issue an admission offer"],
-      "downstreamRecords": ["admission_offers", "domainEvents:AdmissionOfferIssued", "notifications:admission_offer_issued"]
+      "seeds": [
+        "gf2-admissions-test.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "applications": 1,
+        "journeys": 1
+      },
+      "interactions": [
+        "review pipeline stages",
+        "open application detail",
+        "issue an admission offer"
+      ],
+      "downstreamRecords": [
+        "admission_offers",
+        "domainEvents:AdmissionOfferIssued",
+        "notifications:admission_offer_issued"
+      ]
     },
     "/admissions/capacity": {
       "persona": "registrar",
-      "seeds": ["gf2-admissions-test.sql"],
-      "recordCounts": { "admission_seat_pools": 1 },
-      "interactions": ["review seat pool occupancy", "preview capacity before issuing offers"],
+      "seeds": [
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "admission_seat_pools": 1
+      },
+      "interactions": [
+        "review seat pool occupancy",
+        "preview capacity before issuing offers"
+      ],
       "downstreamRecords": []
     },
     "/admissions/families": {
       "persona": "registrar",
-      "seeds": ["gf2-admissions-test.sql"],
-      "recordCounts": { "households": 1, "household_memberships": 2 },
-      "interactions": ["review applicant household composition and readiness"],
+      "seeds": [
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "households": 1,
+        "household_memberships": 2
+      },
+      "interactions": [
+        "review applicant household composition and readiness"
+      ],
       "downstreamRecords": []
     },
     "/ask": {
       "persona": "guardian",
-      "seeds": ["new-experiences-v1.sql", "gf1-assignments-v2.sql"],
-      "recordCounts": { "guardian_relationships": 1 },
-      "interactions": ["ask about a student's progress", "request a missing-assignment watch", "confirm or decline the prepared watch", "view evidence-backed answer"],
-      "downstreamRecords": ["conversations", "conversation_messages", "agent_runs", "subscriptions"]
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "ask about a student's progress",
+        "request a missing-assignment watch",
+        "confirm or decline the prepared watch",
+        "view evidence-backed answer"
+      ],
+      "downstreamRecords": [
+        "conversations",
+        "conversation_messages",
+        "agent_runs",
+        "subscriptions"
+      ]
     },
     "/calendar": {
       "persona": "staff",
-      "seeds": ["staff-experiences-v1.sql", "student-calendar-comms-office-hours.sql"],
-      "recordCounts": { "calendar_events": 2 },
-      "interactions": ["browse scheduled events", "open event context"],
+      "seeds": [
+        "staff-experiences-v1.sql",
+        "student-calendar-comms-office-hours.sql"
+      ],
+      "recordCounts": {
+        "calendar_events": 2
+      },
+      "interactions": [
+        "browse scheduled events",
+        "open event context"
+      ],
       "downstreamRecords": []
     },
     "/calendar-export": {
       "persona": "student",
-      "seeds": ["gf1-assignments-v2.sql"],
-      "recordCounts": { "assessments": 1 },
-      "interactions": ["export assignment deadlines as ICS"],
+      "seeds": [
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "assessments": 1
+      },
+      "interactions": [
+        "export assignment deadlines as ICS"
+      ],
       "downstreamRecords": []
     },
     "/coach": {
       "persona": "specialist",
-      "seeds": ["staff-experiences-v1.sql", "gf41-support-referrals.sql"],
-      "recordCounts": { "insights": 1, "actions": 2, "support_referrals": 1 },
-      "interactions": ["review caseload", "open referral", "log outreach"],
-      "downstreamRecords": ["auditEvents:coach.outreach"]
+      "seeds": [
+        "staff-experiences-v1.sql",
+        "gf41-support-referrals.sql"
+      ],
+      "recordCounts": {
+        "insights": 1,
+        "actions": 2,
+        "support_referrals": 1
+      },
+      "interactions": [
+        "review caseload",
+        "open referral",
+        "log outreach"
+      ],
+      "downstreamRecords": [
+        "auditEvents:coach.outreach"
+      ]
     },
     "/demo-health": {
       "fixtureRequired": false,
       "persona": "staff",
       "rationale": "Meta page reporting fixture health; it is the coverage surface, not a consumer of it.",
-      "interactions": ["inspect fixture recommendations"],
+      "interactions": [
+        "inspect fixture recommendations"
+      ],
       "downstreamRecords": []
     },
     "/guardian": {
       "persona": "guardian",
-      "seeds": ["new-experiences-v1.sql", "gf1-assignments-v2.sql"],
-      "recordCounts": { "households": 1, "attendance_events": 1 },
-      "interactions": ["view child status cards", "open Needs You items"],
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "households": 1,
+        "attendance_events": 1
+      },
+      "interactions": [
+        "view child status cards",
+        "open Needs You items"
+      ],
       "downstreamRecords": []
     },
     "/guardian/academics": {
       "persona": "guardian",
-      "seeds": ["gf1-assignments-v2.sql", "new-experiences-v1.sql"],
-      "recordCounts": { "assessments": 1, "submissions": 1, "section_grades": 1 },
-      "interactions": ["review child assignments and grades"],
+      "seeds": [
+        "gf1-assignments-v2.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "assessments": 1,
+        "submissions": 1,
+        "section_grades": 1
+      },
+      "interactions": [
+        "review child assignments and grades"
+      ],
       "downstreamRecords": []
     },
     "/guardian/admission-offers": {
       "persona": "guardian",
-      "seeds": ["gf2-admissions-test.sql"],
-      "recordCounts": { "applications": 1 },
-      "interactions": ["view issued offer", "accept or decline offer"],
-      "downstreamRecords": ["domainEvents:AdmissionOfferAccepted", "domainEvents:AdmissionOfferDeclined"]
+      "seeds": [
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "applications": 1
+      },
+      "interactions": [
+        "view issued offer",
+        "accept or decline offer"
+      ],
+      "downstreamRecords": [
+        "domainEvents:AdmissionOfferAccepted",
+        "domainEvents:AdmissionOfferDeclined"
+      ]
     },
     "/guardian/attendance": {
       "persona": "guardian",
-      "seeds": ["new-experiences-v1.sql"],
-      "recordCounts": { "attendance_events": 1 },
-      "interactions": ["view absence", "submit excuse with note"],
-      "downstreamRecords": ["attendance_excuses", "domainEvents:AttendanceExcuseSubmitted"]
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "attendance_events": 1
+      },
+      "interactions": [
+        "view absence",
+        "submit excuse with note"
+      ],
+      "downstreamRecords": [
+        "attendance_excuses",
+        "domainEvents:AttendanceExcuseSubmitted"
+      ]
     },
     "/guardian/report-cards": {
       "persona": "guardian",
-      "seeds": ["new-experiences-v1.sql"],
-      "recordCounts": { "section_grades": 1, "grading_periods": 1 },
-      "interactions": ["view finalized grades per grading period"],
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_grades": 1,
+        "grading_periods": 1
+      },
+      "interactions": [
+        "view finalized grades per grading period"
+      ],
       "downstreamRecords": []
     },
     "/guardian/watching": {
       "persona": "guardian",
-      "seeds": ["new-experiences-v1.sql"],
-      "recordCounts": { "guardian_relationships": 1 },
-      "interactions": ["view watches", "pause watch", "resume watch", "turn off watch"],
-      "downstreamRecords": ["subscriptions"]
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "view watches",
+        "pause watch",
+        "resume watch",
+        "turn off watch"
+      ],
+      "downstreamRecords": [
+        "subscriptions"
+      ]
     },
     "/messages": {
       "persona": "guardian",
-      "seeds": ["new-experiences-v1.sql"],
-      "recordCounts": { "communication_threads": 1, "communication_messages": 1 },
-      "interactions": ["open contextual thread", "reply to teacher"],
-      "downstreamRecords": ["communication_messages", "domainEvents:CommunicationMessageSent"]
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "communication_threads": 1,
+        "communication_messages": 1
+      },
+      "interactions": [
+        "open contextual thread",
+        "reply to teacher"
+      ],
+      "downstreamRecords": [
+        "communication_messages",
+        "domainEvents:CommunicationMessageSent"
+      ]
     },
     "/operations": {
       "persona": "staff",
-      "seeds": ["new-experiences-v1.sql", "staff-experiences-v1.sql"],
-      "recordCounts": { "programs": 1, "journeys": 1 },
-      "interactions": ["review release health and program oversight"],
+      "seeds": [
+        "new-experiences-v1.sql",
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "journeys": 1
+      },
+      "interactions": [
+        "review release health and program oversight"
+      ],
       "downstreamRecords": []
     },
     "/operations/insights": {
       "persona": "staff",
-      "seeds": ["staff-experiences-v1.sql"],
-      "recordCounts": { "insights": 1 },
-      "interactions": ["triage insight", "accept recommendation into an Action"],
-      "downstreamRecords": ["actions", "domainEvents:ActionCreated"]
+      "seeds": [
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "insights": 1
+      },
+      "interactions": [
+        "triage insight",
+        "accept recommendation into an Action"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "domainEvents:ActionCreated"
+      ]
     },
     "/operations/launch": {
       "persona": "staff",
-      "seeds": ["new-experiences-v1.sql"],
-      "recordCounts": { "programs": 1, "journey_definitions": 1 },
-      "interactions": ["run launch wizard", "track launch journey requirements"],
-      "downstreamRecords": ["programs", "journeys", "journey_requirements"]
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "journey_definitions": 1
+      },
+      "interactions": [
+        "run launch wizard",
+        "track launch journey requirements"
+      ],
+      "downstreamRecords": [
+        "programs",
+        "journeys",
+        "journey_requirements"
+      ]
     },
     "/profiles": {
       "persona": "staff",
-      "seeds": ["synthetic-profiles-compliance.sql"],
-      "recordCounts": { "qualification_definitions": 1, "qualification_claims": 1, "compliance_frameworks": 1 },
-      "interactions": ["review person qualifications and compliance posture"],
+      "seeds": [
+        "synthetic-profiles-compliance.sql"
+      ],
+      "recordCounts": {
+        "qualification_definitions": 1,
+        "qualification_claims": 1,
+        "compliance_frameworks": 1
+      },
+      "interactions": [
+        "review person qualifications and compliance posture"
+      ],
       "downstreamRecords": []
     },
     "/readiness": {
       "persona": "registrar",
-      "seeds": ["gf2-admissions-test.sql", "new-experiences-v1.sql"],
-      "recordCounts": { "journeys": 1, "journey_requirements": 1 },
-      "interactions": ["review enrollment readiness and blocking requirements"],
+      "seeds": [
+        "gf2-admissions-test.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "journeys": 1,
+        "journey_requirements": 1
+      },
+      "interactions": [
+        "review enrollment readiness and blocking requirements"
+      ],
       "downstreamRecords": []
     },
     "/staff/attendance": {
       "persona": "staff",
-      "seeds": ["new-experiences-v1.sql"],
-      "recordCounts": { "attendance_events": 1 },
-      "interactions": ["mark attendance", "review pending excuses"],
-      "downstreamRecords": ["attendance_events", "domainEvents:StudentMarkedAbsent"]
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "attendance_events": 1
+      },
+      "interactions": [
+        "mark attendance",
+        "review pending excuses"
+      ],
+      "downstreamRecords": [
+        "attendance_events",
+        "domainEvents:StudentMarkedAbsent"
+      ]
     },
     "/staff/students": {
       "persona": "staff",
-      "seeds": ["staff-experiences-v1.sql"],
-      "recordCounts": { "student_profiles": 1 },
-      "interactions": ["search student directory", "open student record"],
+      "seeds": [
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "student_profiles": 1
+      },
+      "interactions": [
+        "search student directory",
+        "open student record"
+      ],
       "downstreamRecords": []
     },
     "/staff/students/$personId": {
       "persona": "staff",
-      "seeds": ["staff-experiences-v1.sql", "gf1-assignments-v2.sql"],
-      "recordCounts": { "student_profiles": 1, "submissions": 1 },
-      "interactions": ["review student academics, attendance, and support context"],
+      "seeds": [
+        "staff-experiences-v1.sql",
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "student_profiles": 1,
+        "submissions": 1
+      },
+      "interactions": [
+        "review student academics, attendance, and support context"
+      ],
       "downstreamRecords": []
     },
     "/staff/teachers": {
       "persona": "staff",
-      "seeds": ["staff-experiences-v1.sql"],
-      "recordCounts": { "section_teachers": 1 },
-      "interactions": ["review teaching assignments"],
+      "seeds": [
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_teachers": 1
+      },
+      "interactions": [
+        "review teaching assignments"
+      ],
       "downstreamRecords": []
     },
     "/student": {
       "persona": "student",
-      "seeds": ["gf1-assignments-v2.sql"],
-      "recordCounts": { "enrollments": 1, "assessments": 1 },
-      "interactions": ["view today schedule and due work"],
+      "seeds": [
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "enrollments": 1,
+        "assessments": 1
+      },
+      "interactions": [
+        "view today schedule and due work"
+      ],
       "downstreamRecords": []
     },
     "/student/assignments": {
       "persona": "student",
-      "seeds": ["gf1-assignments-v2.sql", "gf1-rubric-v4.sql", "gf40-rules-assignments.sql"],
-      "recordCounts": { "assessments": 2, "submissions": 2 },
-      "interactions": ["view assignment with rubric", "submit response", "resubmit after feedback"],
-      "downstreamRecords": ["submissions", "domainEvents:SubmissionReceived"]
+      "seeds": [
+        "gf1-assignments-v2.sql",
+        "gf1-rubric-v4.sql",
+        "gf40-rules-assignments.sql"
+      ],
+      "recordCounts": {
+        "assessments": 2,
+        "submissions": 2
+      },
+      "interactions": [
+        "view assignment with rubric",
+        "submit response",
+        "resubmit after feedback"
+      ],
+      "downstreamRecords": [
+        "submissions",
+        "domainEvents:SubmissionReceived"
+      ]
     },
     "/student/courses": {
       "persona": "student",
-      "seeds": ["gf40-course-registration.sql"],
-      "recordCounts": { "course_templates": 1, "sections": 1 },
-      "interactions": ["browse catalog", "request add/drop"],
-      "downstreamRecords": ["enrollments", "domainEvents"]
+      "seeds": [
+        "gf40-course-registration.sql"
+      ],
+      "recordCounts": {
+        "course_templates": 1,
+        "sections": 1
+      },
+      "interactions": [
+        "browse catalog",
+        "request add/drop"
+      ],
+      "downstreamRecords": [
+        "enrollments",
+        "domainEvents"
+      ]
     },
     "/student/discussions": {
       "persona": "student",
-      "seeds": ["gf40-course-discussions.sql"],
-      "recordCounts": { "communication_threads": 1, "communication_messages": 2 },
-      "interactions": ["read section discussion", "reply to a post"],
-      "downstreamRecords": ["communication_messages"]
+      "seeds": [
+        "gf40-course-discussions.sql"
+      ],
+      "recordCounts": {
+        "communication_threads": 1,
+        "communication_messages": 2
+      },
+      "interactions": [
+        "read section discussion",
+        "reply to a post"
+      ],
+      "downstreamRecords": [
+        "communication_messages"
+      ]
     },
     "/student/experiences": {
       "persona": "student",
-      "seeds": ["student-calendar-comms-office-hours.sql"],
-      "recordCounts": { "conference_series": 1, "conference_slots": 1 },
-      "interactions": ["book office hours", "view upcoming events"],
-      "downstreamRecords": ["conference_slot_registrations"]
+      "seeds": [
+        "student-calendar-comms-office-hours.sql"
+      ],
+      "recordCounts": {
+        "conference_series": 1,
+        "conference_slots": 1
+      },
+      "interactions": [
+        "book office hours",
+        "view upcoming events"
+      ],
+      "downstreamRecords": [
+        "conference_slot_registrations"
+      ]
     },
     "/student/notifications": {
       "persona": "student",
-      "seeds": ["new-experiences-v1.sql", "student-calendar-comms-office-hours.sql"],
-      "recordCounts": { "notifications": 1 },
-      "interactions": ["triage notification to its resource"],
+      "seeds": [
+        "new-experiences-v1.sql",
+        "student-calendar-comms-office-hours.sql"
+      ],
+      "recordCounts": {
+        "notifications": 1
+      },
+      "interactions": [
+        "triage notification to its resource"
+      ],
       "downstreamRecords": []
     },
     "/student/report-card": {
       "persona": "student",
-      "seeds": ["new-experiences-v1.sql"],
-      "recordCounts": { "section_grades": 1 },
-      "interactions": ["view finalized grades"],
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_grades": 1
+      },
+      "interactions": [
+        "view finalized grades"
+      ],
       "downstreamRecords": []
     },
     "/student/settings": {
       "persona": "student",
       "seeds": [],
-      "recordCounts": { "student_profiles": 1 },
-      "interactions": ["update display preferences"],
-      "downstreamRecords": ["student_profiles (preferences)"]
+      "recordCounts": {
+        "student_profiles": 1
+      },
+      "interactions": [
+        "update display preferences"
+      ],
+      "downstreamRecords": [
+        "student_profiles (preferences)"
+      ]
     },
     "/student/study-groups": {
       "persona": "student",
-      "seeds": ["gf26-study-groups.sql"],
-      "recordCounts": { "study_groups": 2, "study_group_sessions": 1 },
-      "interactions": ["join group", "post message", "RSVP to session", "report content"],
-      "downstreamRecords": ["study_group_memberships", "study_group_posts", "study_group_reports"]
+      "seeds": [
+        "gf26-study-groups.sql"
+      ],
+      "recordCounts": {
+        "study_groups": 2,
+        "study_group_sessions": 1
+      },
+      "interactions": [
+        "join group",
+        "post message",
+        "RSVP to session",
+        "report content"
+      ],
+      "downstreamRecords": [
+        "study_group_memberships",
+        "study_group_posts",
+        "study_group_reports"
+      ]
     },
     "/student/support": {
       "persona": "student",
-      "seeds": ["gf41-support-referrals.sql"],
-      "recordCounts": { "actions": 1 },
-      "interactions": ["view support plan status"],
+      "seeds": [
+        "gf41-support-referrals.sql"
+      ],
+      "recordCounts": {
+        "actions": 1
+      },
+      "interactions": [
+        "view support plan status"
+      ],
       "downstreamRecords": []
     },
     "/teacher": {
       "persona": "teacher",
-      "seeds": ["new-experiences-v1.sql", "gf1-assignments-v2.sql"],
-      "recordCounts": { "sections": 1, "assessments": 1 },
-      "interactions": ["view today across sections"],
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "sections": 1,
+        "assessments": 1
+      },
+      "interactions": [
+        "view today across sections"
+      ],
       "downstreamRecords": []
     },
     "/teacher/discussions": {
       "persona": "teacher",
-      "seeds": ["gf40-course-discussions.sql"],
-      "recordCounts": { "communication_threads": 1, "communication_messages": 2 },
-      "interactions": ["moderate reply", "hide message", "lock thread"],
-      "downstreamRecords": ["communication_messages (moderation metadata)", "auditEvents"]
+      "seeds": [
+        "gf40-course-discussions.sql"
+      ],
+      "recordCounts": {
+        "communication_threads": 1,
+        "communication_messages": 2
+      },
+      "interactions": [
+        "moderate reply",
+        "hide message",
+        "lock thread"
+      ],
+      "downstreamRecords": [
+        "communication_messages (moderation metadata)",
+        "auditEvents"
+      ]
     },
     "/teacher/gradebook": {
       "persona": "teacher",
-      "seeds": ["gf1-assignments-v2.sql", "gf1-rubric-v4.sql", "gf40-rules-assignments.sql"],
-      "recordCounts": { "assessments": 2, "submissions": 2 },
-      "interactions": ["grade submission with rubric", "create assessment"],
-      "downstreamRecords": ["submissions (graded)", "domainEvents:GradePosted"]
+      "seeds": [
+        "gf1-assignments-v2.sql",
+        "gf1-rubric-v4.sql",
+        "gf40-rules-assignments.sql"
+      ],
+      "recordCounts": {
+        "assessments": 2,
+        "submissions": 2
+      },
+      "interactions": [
+        "grade submission with rubric",
+        "create assessment"
+      ],
+      "downstreamRecords": [
+        "submissions (graded)",
+        "domainEvents:GradePosted"
+      ]
     },
     "/teacher/missing-work": {
       "persona": "teacher",
-      "seeds": ["gf1-assignments-v2.sql"],
-      "recordCounts": { "assessments": 1, "submissions": 1 },
-      "interactions": ["review overdue queue", "create missing-work follow-up"],
-      "downstreamRecords": ["actions", "notifications:missing_work_follow_up"]
+      "seeds": [
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "assessments": 1,
+        "submissions": 1
+      },
+      "interactions": [
+        "review overdue queue",
+        "create missing-work follow-up"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "notifications:missing_work_follow_up"
+      ]
     },
     "/teacher/notices": {
       "persona": "teacher",
-      "seeds": ["new-experiences-v1.sql"],
-      "recordCounts": { "notifications": 1 },
-      "interactions": ["review notices relevant to taught sections"],
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "notifications": 1
+      },
+      "interactions": [
+        "review notices relevant to taught sections"
+      ],
       "downstreamRecords": []
     },
     "/teacher/study-groups": {
       "persona": "teacher",
-      "seeds": ["gf26-study-groups.sql"],
-      "recordCounts": { "study_groups": 2, "study_group_reports": 1 },
-      "interactions": ["facilitate group", "review reported content"],
+      "seeds": [
+        "gf26-study-groups.sql"
+      ],
+      "recordCounts": {
+        "study_groups": 2,
+        "study_group_reports": 1
+      },
+      "interactions": [
+        "facilitate group",
+        "review reported content"
+      ],
+      "downstreamRecords": []
+    },
+    "/sites/$siteId": {
+      "persona": "staff",
+      "seeds": [
+        "staff-experiences-v1.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "programs": 1,
+        "actions": 1,
+        "calendar_events": 1
+      },
+      "interactions": [
+        "review Site Today indicators",
+        "review site actions and schedule",
+        "open related operating area"
+      ],
       "downstreamRecords": []
     }
   }
