@@ -1,7 +1,7 @@
 import {activateSectionEnrollment} from "@/modules/enrollment/section-allocation.service";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { actorSiteIds, assertProgramGranted, recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
@@ -86,9 +86,14 @@ export const requestCourseChange = createServerFn({ method:"POST" })
       if(data.operation==="drop" && today>policy.addDropEndsOn) throw new Error("Add/drop window has closed. Request withdrawal instead.");
       if(data.operation==="withdraw" && today>policy.withdrawalEndsOn) throw new Error("Withdrawal window has closed.");
       if(data.operation==="add" && today>policy.addDropEndsOn) throw new Error("Registration window has closed.");
+      if(data.operation==="add" && policy.guardianApprovalRequired)
+        throw new Error("Guardian consent is required for this class. Registration will open after a verified consent process is available.");
       const [membership]=await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,section.id),eq(s.enrollments.status,"active"))).limit(1);
       if(data.operation==="add" && membership) throw new Error("Already enrolled in this class");
       if(data.operation!=="add" && !membership) throw new Error("Not currently enrolled in this class");
+      // Serialize concurrent requests for the same student and section before
+      // looking for pending Actions; no new schema/unique constraint required.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"course-registration:"+studentId+":"+section.id}))`);
       const outstanding=await tx.select().from(s.actions).where(and(
         eq(s.actions.type,"course_registration_request"),eq(s.actions.ownerPersonId,actor.actorPersonId),
         eq(s.actions.subjectId,section.id),inArray(s.actions.status,["open","in_progress","waiting"])));
