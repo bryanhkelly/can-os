@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -86,6 +87,7 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
       id: attendanceEvents.id, programId: attendanceEvents.programId,
       studentProfileId: attendanceEvents.studentProfileId,
       occurrenceKey: attendanceEvents.occurrenceKey, status: attendanceEvents.status,
+      recordedAt: attendanceEvents.recordedAt,
     }).from(attendanceEvents).where(and(
       inArray(attendanceEvents.programId, ids), gte(attendanceEvents.expectedAt, since),
     )).orderBy(desc(attendanceEvents.recordedAt), desc(attendanceEvents.id)),
@@ -107,11 +109,7 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
 
   // The first row per occurrence is the latest recorded correction, not an
   // additive event. Original absences must not survive approved excuses in metrics.
-  const effectiveAttendance = new Map<string, (typeof attendanceRows)[number]>();
-  for (const event of attendanceRows) {
-    const key = [event.programId, event.studentProfileId, event.occurrenceKey].join(":");
-    if (!effectiveAttendance.has(key)) effectiveAttendance.set(key, event);
-  }
+  const effectiveAttendance = effectiveAttendanceEvents(attendanceRows);
   const latestSubmissions = new Map<string, (typeof submissionRows)[number]>();
   for (const submission of submissionRows) {
     const key = submission.assessmentId + ":" + submission.studentProfileId;
@@ -137,7 +135,7 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
         !activeProfiles.has(program.id + ":" + a.studentProfileId)).length;
       const grades = [...latestSubmissions.values()].filter(s =>
         assessmentProgram.get(s.assessmentId) === program.id);
-      const attendance = [...effectiveAttendance.values()].filter(e => e.programId === program.id);
+      const attendance = effectiveAttendance.filter(e => e.programId === program.id);
       const byStatus = (status: string) => attendance.filter(e => e.status === status).length;
 
       return {
