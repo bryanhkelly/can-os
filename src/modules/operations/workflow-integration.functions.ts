@@ -118,7 +118,9 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
   // The first row per occurrence is the latest recorded correction, not an
   // additive event. Original absences must not survive approved excuses in metrics.
   const effectiveAttendance = effectiveAttendanceEvents(attendanceRows);
-  const attendanceCoverage = await loadExpectedAttendanceCoverage(programRows, effectiveAttendance, now, 30);
+  const expectedOccurrenceKeys = new Map<string, Set<string>>();
+  const attendanceCoverage = await loadExpectedAttendanceCoverage(programRows, effectiveAttendance, now, 30,
+    undefined, expectedOccurrenceKeys);
   const latestSubmissions = new Map<string, (typeof submissionRows)[number]>();
   for (const submission of submissionRows) {
     const key = submission.assessmentId + ":" + submission.studentProfileId;
@@ -153,6 +155,14 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
       const attendance = effectiveAttendance.filter(e => e.programId === program.id &&
         e.expectedAt >= recordedSince);
       const byStatus = (status: string) => attendance.filter(e => e.status === status).length;
+      const configured = attendanceCoverage.get(program.id)!;
+      const validKeys = expectedOccurrenceKeys.get(program.id) ?? new Set<string>();
+      const uncoveredMarks = effectiveAttendance.filter(e =>
+        e.programId === program.id && e.occurrenceKey.endsWith(":site-day") &&
+        ["present", "absent", "tardy", "excused"].includes(e.status) &&
+        e.occurrenceKey.slice(0, 10) >= configured.windowStart &&
+        e.occurrenceKey.slice(0, 10) <= configured.windowThrough &&
+        !validKeys.has(e.studentProfileId + ":" + e.occurrenceKey));
 
       return {
         id: program.id, name: program.name, type: program.type, status: program.status,
@@ -184,7 +194,14 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
           present: byStatus("present"), absent: byStatus("absent"),
           tardy: byStatus("tardy"), excused: byStatus("excused"),
           pendingExcuses: excuseRows.filter(e => e.programId === program.id).length,
-          coverage: attendanceCoverage.get(program.id)!,
+          coverage: configured,
+          // Marks remain immutable history when a holiday/closure, schedule
+          // or enrollment policy changes. Surface them for human reconciliation.
+          outsideConfiguredExpectations: uncoveredMarks.length,
+          reconciliationCases: uncoveredMarks.slice(0, 12).map(e => ({
+            attendanceEventId: e.id, occurrenceKey: e.occurrenceKey,
+            status: e.status, studentProfileId: e.studentProfileId,
+          })),
         },
       };
     }),
