@@ -69,7 +69,7 @@ export const updateCoursePolicy=createServerFn({method:"POST"})
     (actor.scope.siteIds?.length&&(!section.siteId||!actor.scope.siteIds.includes(section.siteId))))
     throw new AuthorizationError("course policy scope");
    if(data.policy.addDropEndsOn>data.policy.withdrawalEndsOn||
-      data.policy.addDropEndsOn<section.startsOn||
+      data.policy.addDropEndsOn>section.endsOn||
       data.policy.withdrawalEndsOn>section.endsOn)
     throw new Error("Registration deadlines must be ordered and inside the academic term");
    if(data.policy.credits>data.policy.maxCreditsPerTerm)
