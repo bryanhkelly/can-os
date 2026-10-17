@@ -4,6 +4,7 @@
  */
 export type AgentPlan =
   | { intent: "ask"; kind: "student_summary"; studentQuery: string }
+  | { intent: "ask"; kind: "operations_overview" }
   | { intent: "watch"; studentQuery: string; eventTypes: string[]; remindAfterHours?: number }
   | { intent: "manage"; action: "list" | "pause" | "resume" | "revoke" }
   | { intent: "manage"; action: "create_digest"; studentQuery: string; weekday: number; hour: number }
