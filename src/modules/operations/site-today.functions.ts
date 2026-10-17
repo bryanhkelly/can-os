@@ -61,7 +61,8 @@ export const getSiteToday = createServerFn({ method: "GET" })
         priority: actions.priority, status: actions.status, dueAt: actions.dueAt,
         programId: actions.programId, type: actions.type,
       }).from(actions)
-        .where(and(eq(actions.siteId, site.id), inArray(actions.status, [...openStatuses])))
+        .where(and(eq(actions.siteId, site.id), inArray(actions.status, [...openStatuses]),
+          or(isNull(actions.programId),inArray(actions.programId,programIds))))
         .orderBy(asc(actions.dueAt)).limit(100),
       db.select({
         id: calendarEvents.id, title: calendarEvents.title, type: calendarEvents.type,
