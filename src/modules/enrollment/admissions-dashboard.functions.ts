@@ -2,17 +2,21 @@ import {createServerFn} from "@tanstack/react-start";
 import {eq,inArray,and} from "drizzle-orm";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
+import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import type {AdmissionsPipelineItem} from "@/domain/admissions-pipeline";
 /** Verified registrars see program-scoped applications and their canonical offer/enrollment state. */
-export const getAdmissionsDashboard=createServerFn({method:"GET"}).handler(async()=>{
+export const getAdmissionsDashboard=createServerFn({method:"GET"})
+ .validator((value:unknown)=>operationsSelectionSchema.parse(value??{}))
+ .handler(async({data})=>{
  const actor=await getCommandContext(getRequest());
  setResponseHeader("Cache-Control","private, no-store");
  if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.programIds?.length)throw new AuthorizationError("registrar admissions dashboard");
  assertCapability(actor,"enrollment.decide");
+ const scoped=await resolveOperationsSelection(actor,data);
  if(!process.env.DATABASE_URL)return [] as (AdmissionsPipelineItem & {offers:{id:string;status:string;expiresAt:string|null;schoolYearId:string}[];enrollments:{schoolYearId:string;status:string}[]})[];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const records=await db.select({id:s.applications.id,stage:s.applications.stage,submittedAt:s.applications.submittedAt,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.applications.programId,s.programs.id)).where(inArray(s.applications.programId,actor.scope.programIds)).limit(150);
+ const records=await db.select({id:s.applications.id,stage:s.applications.stage,submittedAt:s.applications.submittedAt,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.applications.programId,s.programs.id)).where(inArray(s.applications.programId,scoped.programIds)).limit(150);
  const synthetic=records;
  if(!synthetic.length)return [];
  const ids=synthetic.map(x=>x.id);
