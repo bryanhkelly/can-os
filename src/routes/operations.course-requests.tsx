@@ -52,6 +52,7 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
         <Link to="/operations/course-policies" className="rounded-lg border px-3 py-2 text-sm">
           Registration policies
         </Link>
+        <Link to="/operations/field-trips" className="rounded-lg border px-3 py-2 text-sm">Field trips</Link>
         <Link to="/operations" className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
       </div>}
     >
