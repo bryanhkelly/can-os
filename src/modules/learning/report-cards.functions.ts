@@ -667,12 +667,45 @@ export const getStudentReportCard = createServerFn({ method: "GET" })
   });
 
 /** All finalized grades ordered by school year/term, with the credit issuer per program. */
+/**
+ * Approved course withdrawals preserve their registrar-approved W notation in
+ * the canonical transcript projection, including subsequent official snapshots.
+ * No grade points or earned credit are awarded for a withdrawal.
+ */
+async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
+ const rows=await db.select({
+  enrollmentId:s.enrollments.id,sectionId:s.sections.id,sectionTitle:s.sections.title,
+  termId:s.terms.id,termName:s.terms.name,schoolYearId:s.schoolYears.id,
+  schoolYearName:s.schoolYears.name,programName:s.programs.name,
+  creditIssuingOrganizationId:s.programs.creditIssuingOrganizationId,
+  creditIssuingOrganization:s.organizations.name,metadata:s.enrollments.metadata,
+  endedAt:s.enrollments.endedAt,
+ }).from(s.enrollments)
+  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.terms.schoolYearId))
+  .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+  .innerJoin(s.organizations,eq(s.organizations.id,s.programs.creditIssuingOrganizationId))
+  .where(and(eq(s.enrollments.studentProfileId,viewer.studentProfileId),
+   eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"withdrawn"),
+   inArray(s.sections.siteId,viewer.siteIds)));
+ return rows.filter(row=>row.metadata.withdrawalNotation==="W").map(row=>({
+  sectionGradeId:"withdrawal:"+row.enrollmentId,
+  sectionId:row.sectionId,sectionTitle:row.sectionTitle,
+  gradingPeriodName:"Withdrawal",termId:row.termId,termName:row.termName,
+  schoolYearId:row.schoolYearId,schoolYearName:row.schoolYearName,
+  letterGrade:"W",percentage:null,score:null,programName:row.programName,
+  creditIssuingOrganizationId:row.creditIssuingOrganizationId,
+  creditIssuingOrganization:row.creditIssuingOrganization,
+  finalizedAt:row.endedAt?.toISOString()??null,
+ }));
+}
 export const getStudentTranscript = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1).optional() }).parse(value ?? {}))
   .handler(async ({ data }) => {
     const { db, s } = await stores();
     const viewer = await resolveStudentViewer(db, s, data.studentPersonId);
-    const rows = await finalizedGradeRows(db, s, viewer);
+    const rows = [...await finalizedGradeRows(db, s, viewer), ...await withdrawalTranscriptRows(db, s, viewer)];
     return {
       rows,
       issuances: await listIssuances(db, s, viewer.studentProfileId),
@@ -733,7 +766,7 @@ export const issueTranscript = createServerFn({ method: "POST" })
       studentProfileId: profile.id,
       siteIds: context.scope.siteIds,
     };
-    const rows = await finalizedGradeRows(db, s, viewer);
+    const rows = [...await finalizedGradeRows(db, s, viewer), ...await withdrawalTranscriptRows(db, s, viewer)];
     if (!rows.length) {
       throw new Error("No finalized grades available to issue a transcript");
     }
