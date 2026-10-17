@@ -262,41 +262,20 @@ export const saveAssignmentDraft=createServerFn({method:"POST"})
   });
  });
 
+/** Legacy assessment management delegates to canonical status and calendar events. */
 export const manageSyntheticAssignment=createServerFn({method:"POST"})
- .validator((value:unknown)=>z.object({assessmentId:z.string().min(1),action:z.enum(["close","reopen","reschedule"]),dueAt:z.string().optional()}).parse(value))
+ .validator((input:unknown)=>z.object({
+  assessmentId:z.string().uuid(),
+  action:z.enum(["close","reopen","reschedule"]),
+  dueAt:z.string().optional()
+ }).parse(input))
  .handler(async({data})=>{
-  assertSyntheticMutation("teacher");
-  const context=await teacherActor();
-  assertCapability(context,"assignments:create");
-  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
-  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  await teacherForAssessment(data.assessmentId);
-  const [assessment]=await db.select({id:s.assessments.id,metadata:s.assessments.metadata})
-   .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
-  if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Only synthetic assignments can be managed");
-  const due=data.action==="reschedule"?new Date(data.dueAt??""):undefined;
-  if(due&&Number.isNaN(due.getTime()))throw new Error("Invalid due date");
-  await db.transaction(async tx=>{
-   const [authorized]=await tx.select({id:s.assessments.id,metadata:s.assessments.metadata})
-    .from(s.assessments)
-    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-    .where(and(eq(s.assessments.id,assessment.id),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
-   if(!authorized||authorized.metadata.synthetic!==true)throw new AuthorizationError("assigned synthetic assessment");
-   const [updated]=await tx.update(s.assessments).set({
-    ...(data.action==="close"?{status:"closed" as const}:data.action==="reopen"?{status:"published" as const}:{}),
-    ...(due?{dueAt:due}:{}),updatedAt:new Date(),
-   }).where(eq(s.assessments.id,assessment.id)).returning({id:s.assessments.id});
-   if(!updated)throw new Error("Assessment unavailable");
-   await tx.insert(s.auditEvents).values({
-    actorPersonId:context.actorPersonId,action:"assignment."+data.action,
-    resourceType:"assessment",resourceId:updated.id,
-    after:{action:data.action,dueAt:due?.toISOString()??null},
-    context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true},
-   });
-  });
-  return {saved:true};
+  const dueAt=data.dueAt?new Date(data.dueAt):undefined;
+  if(dueAt&&!Number.isFinite(dueAt.getTime()))throw new Error("Invalid due date");
+  return manageAssessment({data:{
+   assessmentId:data.assessmentId,action:data.action,
+   ...(dueAt?{dueAt:dueAt.toISOString()}:{})
+  }});
  });
 
 /** Teacher grades a submitted synthetic attempt against the published rubric. */
