@@ -22,8 +22,8 @@ export const createCourseDiscussion=createServerFn({method:"POST"})
  return db.transaction(async tx=>{
   const [assigned]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,data.sectionId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assigned)throw new Error("Teacher is not assigned to this section");
-  const [site]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,data.sectionId)).limit(1);
-  if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId))throw new AuthorizationError("discussion section site");
+  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(eq(s.sections.id,data.sectionId)).limit(1);
+  if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId)||!actor.scope.programIds?.includes(site.programId))throw new AuthorizationError("discussion section site");
   const [thread]=await tx.insert(s.communicationThreads).values({subject,contextType:"section",contextId:data.sectionId,createdByPersonId:actor.actorPersonId!,metadata:{kind:"course_discussion",locked:false,graded:false}}).returning({id:s.communicationThreads.id});
   if(!thread)throw new Error("Unable to create discussion");
   await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:actor.actorPersonId!,body:prompt,metadata:{kind:"prompt"}});
