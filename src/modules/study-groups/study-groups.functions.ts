@@ -14,6 +14,11 @@ async function groupActor(role:"student"|"teacher"){
  return {...actor,sites};
 }
 async function context(){const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);return {db,s};}
+/** Unreleased discussion and session commands must never mutate authentic groups, even with demo mode enabled. */
+function requireLegacyGroup(metadata:Record<string,unknown>){
+ if(metadata.synthetic!==true)throw new AuthorizationError("live group discussion and session writes are not enabled");
+}
+
 
 /** A student may participate only while actively enrolled at this group's school/program. */
 async function requireStudentGroupEnrollment(
@@ -277,11 +282,12 @@ export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.obje
 export const postStudyGroupMessage=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1),body:z.string()}).parse).handler(async({data})=>{
  assertSyntheticMutation("student");const actor=await groupActor("student");const body=validateGroupPost(data.body);const {db,s}=await context();
  return db.transaction(async tx=>{
-  const [group]=await tx.select({siteId:s.studyGroups.siteId,programId:s.studyGroups.programId})
+  const [group]=await tx.select({siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,metadata:s.studyGroups.metadata})
     .from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),
     eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),
     or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).limit(1);
   if(!group)throw new AuthorizationError("study group scope");
+  requireLegacyGroup(group.metadata);
   await requireStudentGroupEnrollment(tx,s,actor,group);
   const [membership]=await tx.select({id:s.studyGroupMemberships.id})
     .from(s.studyGroupMemberships).where(and(
@@ -300,6 +306,7 @@ export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {start,end}=validateSession(data.startsAt,data.endsAt);const {db,s}=await context();
  const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active"))).limit(1);
  if(!group)throw new Error("Facilitator required");
+ requireLegacyGroup(group.metadata);
  if(data.title.trim().length<3||data.title.length>120||data.agenda.length>2000)throw new Error("Invalid session details");
  return db.transaction(async tx=>{
  const [session]=await tx.insert(s.studyGroupSessions).values({groupId:data.groupId,title:data.title.trim(),agenda:data.agenda,startsAt:start,endsAt:end}).returning({id:s.studyGroupSessions.id});
