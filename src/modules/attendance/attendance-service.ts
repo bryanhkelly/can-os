@@ -160,8 +160,29 @@ export async function submitAttendanceExcuse(
     if (!attendance) throw new Error("AttendanceEvent not found");
     assertProgramScope(context, attendance.programId);
     assertSiteScope(context, attendance.siteId);
-    if (attendance.status !== "absent" && attendance.status !== "tardy") {
-      throw new Error("Only absent or tardy attendance can be excused");
+    // This is the same student/occurrence lock used by staff revisions and
+    // excuse review. Freshness and the insert must share one transaction.
+    const [source] = await tx.select({ occurrenceKey: attendanceEvents.occurrenceKey })
+      .from(attendanceEvents).where(eq(attendanceEvents.id, attendance.id)).limit(1);
+    if (!source) throw new Error("AttendanceEvent not found");
+    const lockKey = "attendance:" + attendance.studentProfileId + ":" + source.occurrenceKey;
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    const [existing] = await tx
+      .select({ id: attendanceExcuses.id })
+      .from(attendanceExcuses)
+      .where(eq(attendanceExcuses.attendanceEventId, input.attendanceEventId))
+      .orderBy(desc(attendanceExcuses.createdAt))
+      .limit(1);
+    if (existing) return existing.id; // Idempotent retry after a later correction.
+    const [latest] = await tx.select({ id: attendanceEvents.id, status: attendanceEvents.status })
+      .from(attendanceEvents).where(and(
+        eq(attendanceEvents.studentProfileId, attendance.studentProfileId),
+        eq(attendanceEvents.programId, attendance.programId),
+        eq(attendanceEvents.occurrenceKey, source.occurrenceKey),
+      )).orderBy(desc(attendanceEvents.recordedAt), desc(attendanceEvents.id)).limit(1);
+    if (!latest || latest.id !== attendance.id ||
+        !["absent", "tardy"].includes(latest.status)) {
+      throw new Error("Attendance conflict: the record was corrected. Refresh before submitting an excuse.");
     }
 
     const [student] = await tx
@@ -187,14 +208,6 @@ export async function submitAttendanceExcuse(
     if (!guardian) {
       throw new Error("Actor is not authorized to submit this attendance excuse");
     }
-
-    const [existing] = await tx
-      .select({ id: attendanceExcuses.id })
-      .from(attendanceExcuses)
-      .where(eq(attendanceExcuses.attendanceEventId, input.attendanceEventId))
-      .limit(1);
-
-    if (existing) return existing.id;
 
     const [excuse] = await tx
       .insert(attendanceExcuses)
@@ -268,11 +281,18 @@ export async function reviewAttendanceExcuse(
     if (!record) throw new Error("AttendanceExcuse not found");
     assertProgramScope(context, record.programId);
     assertSiteScope(context, record.siteId);
-
-    if (
-      record.excuseStatus === "approved" ||
-      record.excuseStatus === "rejected"
-    ) {
+    const [source] = await tx.select({ occurrenceKey: attendanceEvents.occurrenceKey })
+      .from(attendanceEvents).where(eq(attendanceEvents.id, record.attendanceEventId)).limit(1);
+    if (!source) throw new Error("AttendanceEvent not found");
+    const lockKey = "attendance:" + record.studentProfileId + ":" + source.occurrenceKey;
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    const [lockedExcuse] = await tx.select({ status: attendanceExcuses.status })
+      .from(attendanceExcuses).where(eq(attendanceExcuses.id, record.excuseId))
+      .for("update").limit(1);
+    if (!lockedExcuse) throw new Error("AttendanceExcuse not found");
+    if (lockedExcuse.status === "approved" || lockedExcuse.status === "rejected") {
+      if (lockedExcuse.status !== input.decision)
+        throw new Error("Excuse has already been reviewed with a different decision");
       const [existingCorrection] = await tx
         .select({ id: attendanceEvents.id })
         .from(attendanceEvents)
@@ -291,6 +311,17 @@ export async function reviewAttendanceExcuse(
           }
         : { excuseId: record.excuseId };
     }
+    if (lockedExcuse.status !== "submitted")
+      throw new Error("Attendance excuse is no longer awaiting review");
+    const [latest] = await tx.select({ id: attendanceEvents.id, status: attendanceEvents.status })
+      .from(attendanceEvents).where(and(
+        eq(attendanceEvents.studentProfileId, record.studentProfileId),
+        eq(attendanceEvents.programId, record.programId),
+        eq(attendanceEvents.occurrenceKey, source.occurrenceKey),
+      )).orderBy(desc(attendanceEvents.recordedAt), desc(attendanceEvents.id)).limit(1);
+    if (!latest || latest.id !== record.attendanceEventId ||
+        !["absent", "tardy"].includes(latest.status))
+      throw new Error("Attendance conflict: school record changed after this excuse was submitted. Refresh and reconcile.");
 
     const reviewedAt = new Date();
 
@@ -315,13 +346,7 @@ export async function reviewAttendanceExcuse(
           programId: record.programId,
           siteId: record.siteId,
           sectionId: record.sectionId,
-          occurrenceKey: (
-            await tx
-              .select({ occurrenceKey: attendanceEvents.occurrenceKey })
-              .from(attendanceEvents)
-              .where(eq(attendanceEvents.id, record.attendanceEventId))
-              .limit(1)
-          )[0]!.occurrenceKey,
+          occurrenceKey: source.occurrenceKey,
           status: "excused",
           expectedAt: record.expectedAt,
           recordedAt: reviewedAt,
@@ -410,6 +435,8 @@ export async function recordAttendanceRevision(
   studentProfileId:string;programId:string;siteId?:string;sectionId?:string;
   occurrenceKey:string;status:"present"|"absent"|"tardy";
   expectedAt:Date;mutationId:string;note?:string;expectedPreviousEventId?:string|null;
+  /** Validated inside the same locked transaction as the canonical revision. */
+  requireExpectedOnsiteDate?:string;
  }):Promise<string>{
  assertCapability(context,"attendance.write");
  assertProgramScope(context,input.programId);
@@ -422,12 +449,21 @@ export async function recordAttendanceRevision(
   const [repeat]=await tx.select({id:attendanceEvents.id}).from(attendanceEvents)
    .where(eq(attendanceEvents.sourceKey,sourceKey)).limit(1);
   if(repeat)return repeat.id;
+  if(input.requireExpectedOnsiteDate){
+   const {assertExpectedOnsiteMarkInTransaction}=await import("./attendance-transaction-guards");
+   await assertExpectedOnsiteMarkInTransaction(tx,context,{
+    studentProfileId:input.studentProfileId,programId:input.programId,
+    siteId:input.siteId??null,sectionId:input.sectionId??null,
+    date:input.requireExpectedOnsiteDate,occurrenceKey:input.occurrenceKey,
+    expectedAt:input.expectedAt,
+   });
+  }
   const [prior]=await tx.select({id:attendanceEvents.id,status:attendanceEvents.status})
    .from(attendanceEvents).where(and(
     eq(attendanceEvents.studentProfileId,input.studentProfileId),
     eq(attendanceEvents.programId,input.programId),
     eq(attendanceEvents.occurrenceKey,input.occurrenceKey)))
-   .orderBy(desc(attendanceEvents.recordedAt),desc(attendanceEvents.createdAt))
+   .orderBy(desc(attendanceEvents.recordedAt),desc(attendanceEvents.id))
    .limit(1);
   if(input.expectedPreviousEventId!==undefined && (prior?.id??null)!==input.expectedPreviousEventId)
    throw new Error("Attendance conflict: the school record changed after this entry was prepared. Refresh and review.");
