@@ -13,7 +13,7 @@ type RosterStudent = Awaited<ReturnType<typeof listSiteAttendanceRoster>>["stude
 type PendingExcuse = Awaited<ReturnType<typeof listPendingExcuses>>["excuses"][number];
 
 const statusOptions = ["present", "absent", "tardy"] as const;
-type OfflineMark = {studentProfileId:string;date:string;status:"present"|"absent"|"tardy";mutationId:string;note:string};
+type OfflineMark = {studentProfileId:string;date:string;status:"present"|"absent"|"tardy";mutationId:string;note:string;expectedPreviousEventId?:string|null};
 const QUEUE_KEY="can-os:attendance:pending:v1";
 function readQueue():OfflineMark[]{
  try{
@@ -44,6 +44,7 @@ function StaffAttendancePage() {
   const [correctionNotes,setCorrectionNotes]=useState<Record<string,string>>({});
   const [queued,setQueued]=useState<OfflineMark[]>([]);
   const [syncing,setSyncing]=useState(false);
+  const [conflicts,setConflicts]=useState<OfflineMark[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -66,6 +67,8 @@ function StaffAttendancePage() {
         try{await markAttendance({data:mark});}
         catch(error){
           remaining.push(...pending.slice(i));
+          if(error instanceof Error&&error.message.includes("Attendance conflict"))
+           setConflicts(previous=>[...previous.filter(x=>x.mutationId!==mark.mutationId),mark]);
           writeQueue(remaining);setQueued(remaining);
           setError(error instanceof Error?error.message:"Some attendance entries could not be synchronized");
           return;
@@ -125,7 +128,8 @@ function StaffAttendancePage() {
 
   const mark = async (student: RosterStudent, status: (typeof statusOptions)[number]) => {
     const change:OfflineMark={studentProfileId:student.studentProfileId,date,status,
-      mutationId:crypto.randomUUID(),note:correctionNotes[student.studentProfileId]??""};
+      mutationId:crypto.randomUUID(),note:correctionNotes[student.studentProfileId]??"",
+      expectedPreviousEventId:student.attendanceEventId};
     setBusy(change.mutationId);setNotice("");
     try {
       if(!navigator.onLine){
@@ -180,6 +184,14 @@ function StaffAttendancePage() {
         />
       </label>
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+      {conflicts.length>0&&<div className="mt-4 rounded-lg border border-amber-500 p-3 text-sm">
+        <strong>Attendance conflicts require review</strong>
+        <p className="mt-1">A newer school record exists for {conflicts.length} offline
+          {conflicts.length===1?" entry":" entries"}. Refresh attendance before deciding
+          whether to create a new correction.</p>
+        <button type="button" onClick={()=>{setConflicts([]);void load(date);}}
+          className="mt-2 rounded border px-3 py-2 text-xs">Refresh school records</button>
+      </div>}
       {queued.length>0&&<div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm">
         <span>{queued.length} attendance {queued.length===1?"entry":"entries"} stored on this device pending synchronization.</span>
         <button type="button" disabled={syncing||!navigator.onLine} onClick={()=>void synchronize()}
