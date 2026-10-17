@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { activateLaunch } from "@/modules/programs/launch.functions";
-import { reconcileExpiredAdmissionOffers } from "@/modules/enrollment/admissions-offer-demo.functions";
+import { reconcileExpiredAdmissionOffers } from "@/modules/enrollment/admission-offer-reconciliation.functions";
 import { getWorkflowIntegration } from "@/modules/operations/workflow-integration.functions";
 
 export const Route = createFileRoute("/operations/workflows")({
