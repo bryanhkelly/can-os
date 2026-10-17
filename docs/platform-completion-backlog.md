@@ -19,6 +19,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [ ] Unify notification center routes and remove guardian→student notification route shortcut.
 - [ ] Remove local-only demo interactions from StudentExperience, not merely its fallback dataset.
 - [ ] Verify typecheck, build, unit tests and role-switch browser journeys before closing Phase 1.
+- [x] Align fixture manifest after removing `/demo-health` (previously blocked CI at route fixture coverage).
 - [ ] Build machine-verifiable inventory for every route and data-flow acceptance gate.
 - [ ] Audit all server functions for verified identity and per-record resource scopes.
 
