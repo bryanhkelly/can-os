@@ -3,16 +3,19 @@ import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {and,eq,inArray,desc} from "drizzle-orm";
+import {z} from "zod";
 
 /** Only offers for students whose enrollment this session's guardian can manage. */
-export const getGuardianAdmissionOffers=createServerFn({method:"GET"}).handler(async()=>{
+export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
+ .validator((input:unknown)=>z.object({studentPersonId:z.string().uuid().optional()}).parse(input??{}))
+ .handler(async({data})=>{
  const actor=await getCommandContext(getRequest());
  setResponseHeader("Cache-Control","private, no-store");
  if(actor.role!=="guardian"||!actor.actorPersonId)throw new AuthorizationError("guardian enrollment offers");
  assertCapability(actor,"enrollment.apply");
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const relations=await db.select({studentPersonId:s.guardianRelationships.studentPersonId}).from(s.guardianRelationships)
-  .where(and(eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(s.guardianRelationships.canManageEnrollment,true)));
+  .where(and(eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(s.guardianRelationships.canManageEnrollment,true),...(data.studentPersonId?[eq(s.guardianRelationships.studentPersonId,data.studentPersonId)]:[])));
  if(!relations.length)return [];
  const profiles=await db.select({id:s.studentProfiles.id,personId:s.studentProfiles.personId}).from(s.studentProfiles)
   .where(inArray(s.studentProfiles.personId,relations.map(r=>r.studentPersonId)));
