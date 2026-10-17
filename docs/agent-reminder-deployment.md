@@ -8,6 +8,8 @@
 - Guardian delivery history, channel/reminder settings, quiet hours, and revocable SMS consent
 - Twilio Verify phone confirmation and optional SMS provider support
 - Independent subscription event receipt/reconciliation after the GF1 event handler completes
+- Terminally failed delivery records automatically escalate to canonical operations Actions
+- Ask CAN conversation history reload and refresh while open
 
 ## Environment
 - `DATABASE_URL`: Neon connection configured for the intended deployment
@@ -46,6 +48,6 @@ For database tests use `TEST_DATABASE_URL` pointing to a disposable Neon branch 
 ## Outstanding production gates
 1. Run typecheck, build, unit tests and disposable-Neon integration tests and resolve any failures.
 2. Test Resend/Twilio sandbox acceptance and ambiguous-timeout behavior.
-3. Add signed provider delivery-status webhooks, SMS STOP reconciliation, and operational escalation of terminally failed messages.
+3. Add signed provider delivery-status webhooks and SMS STOP reconciliation. Terminal delivery failures already create operations Actions.
 4. Add message volume quotas, per-account abuse protection, delivery monitoring and retention policies.
 5. Validate notification content, consent and privacy procedures with real-school compliance reviewers before enabling real family data.
