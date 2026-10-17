@@ -176,7 +176,7 @@ export const listSiteAttendanceRoster = createServerFn({ method: "GET" })
 
 /** Mark a student present/absent/tardy; deterministic sourceKey keeps retries idempotent. */
 export const markAttendance = createServerFn({ method: "POST" })
-  .validator((value: unknown) => z.object({ studentProfileId: z.string().min(1), date: z.string().min(1), status: z.enum(["expected","present","absent","tardy","excused"]) }).parse(value))
+  .validator((value: unknown) => z.object({ studentProfileId: z.string().min(1), date: z.string().min(1), status: z.enum(["expected","present","absent","tardy","excused"]), mutationId:z.string().uuid().optional(),note:z.string().max(2000).optional() }).parse(value))
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.write");
     assertSyntheticMutation(context.role as DemoRole);
@@ -187,8 +187,8 @@ export const markAttendance = createServerFn({ method: "POST" })
     if (!enrollment) throw new AuthorizationError("active enrollment at your site");
     const { start } = dayBounds(data.date);
     const occurrenceKey = `${data.date}:site-day`;
-    const { recordAttendance } = await import("./attendance-service");
-    const attendanceEventId = await recordAttendance(context, {
+    const { recordAttendanceRevision } = await import("./attendance-service");
+    const attendanceEventId = await recordAttendanceRevision(context, {
       studentProfileId: enrollment.studentProfileId,
       programId: enrollment.programId,
       siteId: enrollment.siteId ?? undefined,
@@ -196,8 +196,8 @@ export const markAttendance = createServerFn({ method: "POST" })
       occurrenceKey,
       status: data.status,
       expectedAt: start,
-      sourceKey: `manual:${enrollment.studentProfileId}:${occurrenceKey}`,
-      metadata: { surface: "staff.attendance" },
+      mutationId: data.mutationId ?? crypto.randomUUID(),
+      note:data.note,
     });
     return { attendanceEventId };
   });
