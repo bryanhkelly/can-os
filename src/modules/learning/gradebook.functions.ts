@@ -6,6 +6,15 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, assertSiteScope, AuthorizationError } from "@/domain/command-context";
 import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { EventTypes } from "@/domain/event-types";
+import { readRubric, scoreRubric } from "@/modules/student-experience/rubric";
+
+/** Read a stored criterion-level breakdown from submission feedback. */
+function readRubricScores(value: unknown): Array<{ id: string; points: number }> {
+ if (!Array.isArray(value)) return [];
+ return value.filter((v): v is { id: string; points: number } =>
+  !!v && typeof v === "object" && typeof v.id === "string" &&
+  typeof v.points === "number" && Number.isFinite(v.points));
+}
 
 /**
  * Teacher gradebook server functions. Authorization mirrors the assignments
@@ -93,6 +102,7 @@ export const getGradebook = createServerFn({ method: "GET" })
    status: s.assessments.status,
    dueAt: s.assessments.dueAt,
    pointsPossible: s.assessments.pointsPossible,
+   metadata: s.assessments.metadata,
   })
    .from(s.assessments)
    .where(and(eq(s.assessments.sectionId, data.sectionId), inArray(s.assessments.status, ["published", "closed"])))
@@ -108,6 +118,7 @@ export const getGradebook = createServerFn({ method: "GET" })
     timeliness: s.submissions.timeliness,
     attemptNumber: s.submissions.attemptNumber,
     score: s.submissions.score,
+    feedback: s.submissions.feedback,
     submittedAt: s.submissions.submittedAt,
     gradedAt: s.submissions.gradedAt,
    })
@@ -136,6 +147,7 @@ export const getGradebook = createServerFn({ method: "GET" })
     status: row.status,
     dueAt: row.dueAt?.toISOString() ?? null,
     pointsPossible: row.pointsPossible,
+    rubric: readRubric(row.metadata?.rubricCriteria),
    })),
    cells: [...latest.values()].map(row => ({
     submissionId: row.id,
@@ -144,6 +156,10 @@ export const getGradebook = createServerFn({ method: "GET" })
     status: row.status,
     timeliness: row.timeliness,
     score: row.score,
+    feedbackComment: typeof row.feedback?.comment === "string" ? row.feedback.comment : "",
+    feedbackRubric: readRubricScores(
+      (row.feedback?.rubric as Record<string, unknown> | undefined)?.scores,
+    ),
     submittedAt: row.submittedAt?.toISOString() ?? null,
     gradedAt: row.gradedAt?.toISOString() ?? null,
    })),
@@ -154,15 +170,19 @@ export const getGradebook = createServerFn({ method: "GET" })
 export const gradeSubmission = createServerFn({ method: "POST" })
  .validator((value: unknown) => z.object({
   submissionId: z.string().min(1),
-  score: z.number().finite(),
+  score: z.number().finite().optional(),
   feedbackComment: z.string().max(4000).optional().default(""),
+  rubricScores: z.array(z.object({
+   id: z.string().min(1).max(100),
+   points: z.number().finite().min(0).max(1000),
+  })).max(20).optional(),
  }).parse(value))
  .handler(async ({ data }) => {
   assertSyntheticMutation("teacher");
   const context = await teacherForSubmission(data.submissionId);
   assertCapability(context, "assignments:grade");
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-  const [record] = await db.select({ status: s.submissions.status, points: s.assessments.pointsPossible })
+  const [record] = await db.select({ status: s.submissions.status, points: s.assessments.pointsPossible, metadata: s.assessments.metadata })
    .from(s.submissions)
    .innerJoin(s.assessments, eq(s.assessments.id, s.submissions.assessmentId))
    .where(eq(s.submissions.id, data.submissionId))
@@ -171,7 +191,24 @@ export const gradeSubmission = createServerFn({ method: "POST" })
   if (record.status !== "submitted") throw new Error("Only submitted work can be graded");
   const points = record.points === null ? null : Number(record.points);
   if (points === null || !Number.isFinite(points)) throw new Error("Assessment has no point value");
-  if (data.score < 0 || data.score > points) throw new Error(`Score must be from 0 to ${points}`);
+
+  // When criterion scores are supplied, the server derives the total from the
+  // stored rubric; a client-sent total is never trusted.
+  let finalScore = data.score;
+  const feedback: Record<string, unknown> = { comment: data.feedbackComment.trim() };
+  if (data.rubricScores?.length) {
+   const criteria = readRubric(record.metadata?.rubricCriteria);
+   if (!criteria.length) throw new Error("This assessment has no rubric");
+   const result = scoreRubric(criteria, data.rubricScores);
+   if (result.possible !== points) throw new Error(`Rubric total (${result.possible}) does not match the assessment point value (${points})`);
+   finalScore = result.earned;
+   feedback.rubric = {
+    version: typeof record.metadata?.rubricVersion === "number" ? record.metadata.rubricVersion : 1,
+    scores: data.rubricScores,
+   };
+  }
+  if (finalScore === undefined) throw new Error("Enter a numeric score.");
+  if (finalScore < 0 || finalScore > points) throw new Error(`Score must be from 0 to ${points}`);
   const gf1 = await import("./missing-work-service");
   // Teacher-of-section relationship and site scope are verified above; grant the
   // domain capability so the shared grading path runs its transaction with the
@@ -179,7 +216,7 @@ export const gradeSubmission = createServerFn({ method: "POST" })
   await gf1.gradeSubmission(
    { ...context, capabilities: new Set([...context.capabilities, "submission.grade"]) },
    data.submissionId,
-   { score: String(data.score), feedback: { comment: data.feedbackComment.trim() } },
+   { score: String(finalScore), feedback },
   );
   return { submissionId: data.submissionId };
  });
