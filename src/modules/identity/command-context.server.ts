@@ -1,6 +1,6 @@
 import {and,eq,gt,isNull,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,accountPersonGrants,programs} from "@/db/schema";
+import {accessAccounts,accessSessions,accountPersonGrants,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret} from "@/domain/access-tokens";
@@ -36,12 +36,20 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  },grants);
  // Program authorization derives from the verified active organization grant, not a browser claim.
  const organizations=context.scope.organizationIds??[];
- const sites=context.scope.siteIds??[];
- // Fail closed for a grant without an organization; site-specific grants must not inherit all organization programs.
+ const grantSites=context.scope.siteIds??[];
+ // An organization-wide membership can operate its own sites; a site-specific
+ // membership must NEVER broaden to sibling sites under the organization.
+ if(organizations.length && !grantSites.length){
+  const ownedSites=await db.select({id:schoolSites.id}).from(schoolSites)
+   .where(inArray(schoolSites.organizationId,organizations));
+  context.scope.siteIds=ownedSites.map(s=>s.id);
+ }
+ // Program scope is projected from the original grant breadth, not expanded
+ // site IDs: an organization-wide grant may also own a site-less program.
  context.scope.programIds=[];
  if(organizations.length){
   const permitted=await db.select({id:programs.id,siteId:programs.siteId}).from(programs).where(inArray(programs.organizationId,organizations));
-  context.scope.programIds=authorizedProgramIds(permitted,organizations,sites);
+  context.scope.programIds=authorizedProgramIds(permitted,organizations,grantSites);
  }
  return context;
 }
