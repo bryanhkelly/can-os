@@ -106,3 +106,10 @@ export const subscriptionDeliveries = pgTable(
     index("subscription_delivery_retry_idx").on(table.status, table.nextAttemptAt),
   ],
 );
+
+/** Independent subscriber-consumer checkpoint, recoverable after handler crashes. */
+export const subscriptionEventReceipts = pgTable("subscription_event_receipts", {
+  eventId: uuid("event_id").primaryKey()
+    .references(() => domainEvents.id, { onDelete: "cascade" }),
+  processedAt: timestamp("processed_at", { withTimezone: true }).defaultNow().notNull(),
+});
