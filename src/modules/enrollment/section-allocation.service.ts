@@ -2,6 +2,8 @@ import {and,eq,inArray,sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import * as s from "@/db/schema";
 import type {CommandContext} from "@/domain/command-context";
+import {getSectionRegistrationPolicy} from "@/modules/learning/section-registration-policy-service";
+import {findSectionScheduleConflicts} from "@/modules/academic-time/section-schedule-service";
 
 export type EnrollmentTransaction=Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type SectionPlacementInput={
@@ -37,34 +39,30 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
    eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.kind,"section"),
    eq(s.enrollments.status,"active"))).limit(1);
  if(already)return {enrollmentId:already.id,created:false};
- const raw=section.metadata.registrationPolicy;
- const policy=raw&&typeof raw==="object"&&!Array.isArray(raw)?raw as Record<string,unknown>:{};
+ const policy=await getSectionRegistrationPolicy(sectionId,tx);
  const today=new Date().toISOString().slice(0,10);
- const cutoff=typeof policy.addDropEndsOn==="string"?policy.addDropEndsOn:section.startsOn;
- if(today>cutoff)throw new Error("Add/drop deadline has passed");
- const capacity=typeof policy.capacity==="number"?policy.capacity:30;
- const [{total}]=await tx.select({total:sql<number>`count(*)::int`}).from(s.enrollments)
+ if(today>policy.addDropEndsOn)throw new Error("Add/drop deadline has passed");
+ const [rosterCount]=await tx.select({total:sql<number>`count(*)::int`}).from(s.enrollments)
   .where(and(eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.kind,"section"),
    eq(s.enrollments.status,"active")));
- if(total>=capacity)throw new Error("Section is full");
+ const total=rosterCount?.total??0;
+ if(total>=policy.enrollmentCapacity)throw new Error("Section is full");
  const current=await tx.select({id:s.enrollments.id,termId:s.sections.termId,
-  code:s.sections.code,metadata:s.sections.metadata,template:s.sections.courseTemplateVersionId})
-  .from(s.enrollments).innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  code:s.sections.code,metadata:s.sections.metadata,template:s.sections.courseTemplateVersionId,
+  sectionId:s.sections.id})
+  .from(s.enrollments).innerJoin(s.sections,eq(s.enrollments.sectionId,s.sections.id))
   .where(and(eq(s.enrollments.studentProfileId,studentProfileId),
    eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active")));
  const sameTerm=current.filter(row=>row.termId===section.termId);
- const credit=(meta:Record<string,unknown>)=>typeof meta.credits==="number"?meta.credits:1;
- const sum=sameTerm.reduce((n,row)=>n+credit(row.metadata),0);
- const limit=typeof section.metadata.maxCreditsPerTerm==="number"?section.metadata.maxCreditsPerTerm:7;
- if(sum+credit(section.metadata)>limit)throw new Error("Term credit limit exceeded");
- const meeting=typeof policy.meetingKey==="string"?policy.meetingKey:null;
- if(meeting&&sameTerm.some(row=>{
-  const item=row.metadata.registrationPolicy;
-  return item&&typeof item==="object"&&
-   (item as Record<string,unknown>).meetingKey===meeting;
- }))throw new Error("Schedule conflict");
- const prereqs=Array.isArray(policy.prerequisites)?policy.prerequisites
-  .filter((p):p is string=>typeof p==="string"):[];
+ const sum=await sameTerm.reduce(async(promise,row)=>{
+  const n=await promise;
+  const currentPolicy=await getSectionRegistrationPolicy(row.sectionId,tx);
+  return n+currentPolicy.credits;
+ },Promise.resolve(0));
+ if(sum+policy.credits>policy.maxCreditsPerTerm)throw new Error("Term credit limit exceeded");
+ const conflicts=await findSectionScheduleConflicts(sectionId,sameTerm.map(row=>row.sectionId),tx);
+ if(conflicts.length)throw new Error("Schedule conflict");
+ const prereqs=policy.prerequisites;
  if(prereqs.length){
   const grades=await tx.select({sectionCode:s.sections.code,courseCode:s.courseTemplates.code,
    grade:s.sectionGrades.letterGrade})

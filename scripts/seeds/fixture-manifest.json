@@ -821,6 +821,27 @@
         "open Site Today workspace"
       ],
       "downstreamRecords": []
+    },
+    "/operations/course-policies": {
+      "persona": "registrar",
+      "seeds": [
+        "gf40-course-registration.sql",
+        "gf40-rules-assignments.sql"
+      ],
+      "recordCounts": {
+        "sections": 2,
+        "enrollments": 1
+      },
+      "interactions": [
+        "review section registration rules",
+        "update enrollment capacity and deadlines",
+        "update prerequisites and credit limits"
+      ],
+      "downstreamRecords": [
+        "section_registration_policies",
+        "section_prerequisites",
+        "domainEvents:CourseRegistrationPolicyChanged"
+      ]
     }
   }
 }

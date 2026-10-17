@@ -25,7 +25,7 @@ function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
   finally{setSaving("");}
  }
  return <WorkspaceShell eyebrow="CAN OS · Academic operations" title="Course registration policies"
-  subtitle="Set the capacity, academic prerequisites, term credit limits, deadlines and timetable conflict group for each section."
+  subtitle="Set enrollment limits, academic prerequisites, credit rules and registration deadlines. Schedule conflicts use the section’s canonical timetable."
   actions={<Link to="/operations" className="rounded-lg border px-3 py-2 text-sm">Operations</Link>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
@@ -61,9 +61,6 @@ function CoursePolicyCard({row,save,disabled}:{
     onChange={e=>update("addDropEndsOn",e.target.value)} className="mt-1 block w-full rounded border bg-background p-2"/></label>
    <label className="text-sm">Withdrawal deadline<input type="date" value={value.withdrawalEndsOn}
     onChange={e=>update("withdrawalEndsOn",e.target.value)} className="mt-1 block w-full rounded border bg-background p-2"/></label>
-   <label className="text-sm">Meeting conflict key<input value={value.meetingKey??""}
-    onChange={e=>update("meetingKey",e.target.value||null)} placeholder="e.g. MWF-0930"
-    className="mt-1 block w-full rounded border bg-background p-2"/></label>
    <label className="text-sm sm:col-span-2 lg:col-span-3">Prerequisite course codes (comma-separated)
     <input value={prerequisites} onChange={e=>setPrerequisites(e.target.value)}
      placeholder="ALG-1, BIO-101"

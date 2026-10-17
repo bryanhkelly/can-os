@@ -4,10 +4,17 @@ import {and,asc,eq,inArray,isNull,or} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {auditEvents,courseTemplates,courseTemplateVersions,domainEvents,notifications,
- programs,roleAssignments,schoolYears,sectionTeachers,sections,terms,people} from "@/db/schema";
+ programs,roleAssignments,schoolYears,sectionTeachers,sections,terms,people,deliveryArrangements} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
+import {evaluateSectionReadiness} from "./section-readiness-service";
 const uuid=z.string().uuid();
+function launchModality(delivery:{onsite?:boolean;asynchronous?:boolean;liveOnline?:boolean}){
+ if(delivery.liveOnline&&delivery.onsite)return "hybrid";
+ if(delivery.liveOnline)return "live_online";
+ if(delivery.asynchronous&&!delivery.onsite)return "asynchronous";
+ return "onsite";
+}
 
 async function setupContext(programId:string){
  const actor=await getCommandContext(getRequest());
@@ -17,6 +24,7 @@ async function setupContext(programId:string){
  const [program]=await db.select({
   id:programs.id,name:programs.name,status:programs.status,siteId:programs.siteId,
   organizationId:programs.organizationId,academicProviderOrganizationId:programs.academicProviderOrganizationId,
+  deliveryModel:programs.deliveryModel,
  }).from(programs).where(eq(programs.id,programId)).limit(1);
  if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
   (actor.scope.siteIds?.length&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))
@@ -64,9 +72,11 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
    first:people.legalFirstName,last:people.legalLastName,
   }).from(sectionTeachers).innerJoin(people,eq(people.id,sectionTeachers.personId))
    .where(inArray(sectionTeachers.sectionId,sectionRows.map(s=>s.id))):[];
-  return {program,years,terms:termRows,catalog,teachingStaff,sections:sectionRows.map(row=>({
+  const sectionSnapshots=await Promise.all(sectionRows.map(async row=>({
    ...row,teachers:assignments.filter(a=>a.sectionId===row.id),
-  }))};
+   readiness:await evaluateSectionReadiness(row.id),
+  })));
+  return {program,years,terms:termRows,catalog,teachingStaff,sections:sectionSnapshots};
  });
 
 export const provisionLaunchSection=createServerFn({method:"POST"})
@@ -112,6 +122,11 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
      eq(sections.code,data.code))).limit(1);
    if(!existing)throw new Error("Section code collision");
    if(data.teacherPersonId){
+    await tx.insert(deliveryArrangements).values({
+     sectionId:existing.id,academicProviderOrganizationId:program.academicProviderOrganizationId,
+     instructorPersonId:data.teacherPersonId,modality:launchModality(program.deliveryModel),
+     status:"active",
+    });
     await tx.insert(sectionTeachers).values({sectionId:existing.id,
      personId:data.teacherPersonId,role:"teacher"}).onConflictDoNothing();
     await tx.insert(notifications).values({recipientPersonId:data.teacherPersonId,
@@ -144,6 +159,12 @@ export const assignLaunchTeacher=createServerFn({method:"POST"})
       [program.organizationId,program.academicProviderOrganizationId]))).limit(1);
   if(!section||!teacher)throw new AuthorizationError("section or teacher assignment");
   return db.transaction(async tx=>{
+   await tx.update(deliveryArrangements).set({status:"completed",updatedAt:new Date()})
+    .where(and(eq(deliveryArrangements.sectionId,section.id),eq(deliveryArrangements.status,"active")));
+   await tx.insert(deliveryArrangements).values({
+    sectionId:section.id,academicProviderOrganizationId:program.academicProviderOrganizationId,
+    instructorPersonId:data.teacherPersonId,modality:launchModality(program.deliveryModel),status:"active",
+   });
    const [created]=await tx.insert(sectionTeachers).values({
     sectionId:section.id,personId:data.teacherPersonId,role:"teacher",
    }).onConflictDoNothing().returning({id:sectionTeachers.id});

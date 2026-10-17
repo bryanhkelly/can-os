@@ -1,0 +1,3 @@
+-- Schema snapshot baseline only.
+-- DDL through educational capacity, teacher-assignment provenance, and connected
+-- section planning is already applied by migrations 0017, 0018, and 0019.

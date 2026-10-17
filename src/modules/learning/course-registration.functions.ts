@@ -6,6 +6,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { actorSiteIds, assertProgramGranted, recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
+import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
 
 async function studentProfileFor(actor: Actor) {
  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
@@ -13,18 +14,6 @@ async function studentProfileFor(actor: Actor) {
  if (!profile) throw new AuthorizationError("student profile");
  return profile.id;
 }
-function registrationPolicy(meta: Record<string, unknown>, termStart?: string, termEnd?: string) {
- const raw=meta.registrationPolicy;
- const p=raw && typeof raw==="object" && !Array.isArray(raw) ? raw as Record<string,unknown> : {};
- return {
-  capacity: typeof p.capacity==="number" ? p.capacity : 30,
-  prerequisites: Array.isArray(p.prerequisites) ? p.prerequisites.filter((v):v is string=>typeof v==="string") : [],
-  addDropEndsOn:typeof p.addDropEndsOn==="string" ? p.addDropEndsOn : (termStart ?? "0000-01-01"),
-  withdrawalEndsOn:typeof p.withdrawalEndsOn==="string" ? p.withdrawalEndsOn : (termEnd ?? "0000-01-01"),
-  meetingKey:typeof p.meetingKey==="string" ? p.meetingKey : null,
- };
-}
-
 /** Student/guardian course registration prototype for the synthetic tenant only. */
 export const getCourseRegistration = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await requireActor(["student", "registrar"]);
@@ -52,18 +41,23 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
   ]);
   const latest = new Map<string,(typeof memberships)[number]>();
   for (const membership of memberships) if (membership.sectionId) latest.set(membership.sectionId,membership);
+  const sectionsWithPolicy=await Promise.all(catalog.map(async course=>{
+    const policy=await getSectionRegistrationPolicy(course.id);
+    return {
+      id:course.id,title:course.title,code:course.code,subject:course.subject,description:course.description,
+      credits:policy.credits,
+      mode:typeof course.metadata.deliveryMode==="string"?course.metadata.deliveryMode:"hybrid",
+      policy:{capacity:policy.enrollmentCapacity,prerequisites:policy.prerequisites,
+       addDropEndsOn:policy.addDropEndsOn,withdrawalEndsOn:policy.withdrawalEndsOn,meetingKey:null},
+      enrollmentId:latest.get(course.id)?.id??null,
+      enrollmentStatus:latest.get(course.id)?.status??null,
+      withdrawalNotation:latest.get(course.id)?.metadata.withdrawalNotation??null,
+    };
+  }));
   return {
     connected:true,
     viewerRole,
-    sections:catalog.map(c=>({
-      id:c.id,title:c.title,code:c.code,subject:c.subject,description:c.description,
-      credits:typeof c.metadata.credits==="number"?c.metadata.credits:1,
-      mode:typeof c.metadata.deliveryMode==="string"?c.metadata.deliveryMode:"hybrid",
-      policy:registrationPolicy(c.metadata,c.termStartsOn,c.termEndsOn),
-      enrollmentId:latest.get(c.id)?.id??null,
-      enrollmentStatus:latest.get(c.id)?.status??null,
-      withdrawalNotation:latest.get(c.id)?.metadata.withdrawalNotation??null,
-    })),
+    sections:sectionsWithPolicy,
     requests:requests.map(r=>({id:r.id,sectionId:r.subjectId,status:r.status,operation:r.metadata.operation??"add",title:r.title})),
   };
 });
@@ -89,7 +83,7 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         eq(s.enrollments.schoolYearId,section.schoolYearId),
         eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"))).limit(1);
       if(!programMembership)throw new Error("Student must have an active enrollment in this school year and program");
-      const policy=registrationPolicy(section.metadata,section.termStartsOn,section.termEndsOn);
+      const policy=await getSectionRegistrationPolicy(section.id,tx);
       const today=new Date().toISOString().slice(0,10);
       if(data.operation==="drop" && today>policy.addDropEndsOn) throw new Error("Add/drop window has closed. Request withdrawal instead.");
       if(data.operation==="withdraw" && today>policy.withdrawalEndsOn) throw new Error("Withdrawal window has closed.");
@@ -143,14 +137,13 @@ export const decideCourseChange = createServerFn({method:"POST"})
           eq(s.enrollments.programId,programId),eq(s.enrollments.schoolYearId,schoolYearId),
           eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"))).limit(1);
         if(!activeProgram)throw new Error("Student program enrollment is no longer active");
-        const policyAtApproval=registrationPolicy(section.metadata,section.termStartsOn,section.termEndsOn);
+        const policyAtApproval=await getSectionRegistrationPolicy(section.id,tx);
         const today=new Date().toISOString().slice(0,10);
         if(operation==="add" && today>policyAtApproval.addDropEndsOn)throw new Error("Registration window closed before approval");
         if(operation==="drop" && today>policyAtApproval.addDropEndsOn)throw new Error("Drop deadline passed; submit withdrawal request");
         if(operation==="withdraw" && today>policyAtApproval.withdrawalEndsOn)throw new Error("Withdrawal deadline passed");
         if(operation==="add"){
-          await activateSectionEnrollment(tx,{studentProfileId,sectionId,actor,
-           source:"approved_registration",requestId:request.id});
+          await activateSectionEnrollment(tx,{studentProfileId,sectionId,actor,source:"gf40",requestId:request.id});
         } else {
           const [membership]=await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active"))).limit(1);
           if(!membership)throw new Error("Enrollment no longer active");

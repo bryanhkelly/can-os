@@ -134,6 +134,20 @@
       "when": 1792220000000,
       "tag": "0018_teacher_assignment_provenance",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792222200000,
+      "tag": "0019_connect_section_primitives",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792222017787,
+      "tag": "0020_purple_wolverine",
+      "breakpoints": true
     }
   ]
 }

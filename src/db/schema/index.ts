@@ -28,3 +28,4 @@ export * from "./conversations";
 export * from "./subscriptions";
 export * from "./notification-preferences";
 export * from "./educational-capacity";
+export * from "./section-planning";
