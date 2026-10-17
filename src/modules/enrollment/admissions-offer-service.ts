@@ -1,3 +1,4 @@
+import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
 import {and,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {admissionOffers,admissionSeatPools,applications,auditEvents,domainEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles,notifications} from "@/db/schema";
@@ -71,8 +72,9 @@ export async function issueSyntheticAdmissionOffer(context:CommandContext,input:
  if(!input.idempotencyKey.trim()||!Number.isFinite(input.expiresAt.getTime())||input.expiresAt.getTime()<=Date.now())throw new Error("Invalid offer issuance input");
  return db.transaction(async tx=>{
   const [app]=await tx.select().from(applications).where(eq(applications.id,input.applicationId)).limit(1);
-  if(!app||app.metadata.synthetic!==true)throw new Error("Synthetic application not found");
+  if(!app)throw new Error("Synthetic application not found");
   requireAdmissionsProgramScope(context,app.programId);
+  assertRecordWriteAllowed(app.metadata,"registrar");
   const {pool}=await lockPool(tx,app.programId,input.schoolYearId);
   await expireElapsedOffers(tx,context,app.programId,input.schoolYearId,new Date());
   const [retry]=await tx.select().from(admissionOffers).where(eq(admissionOffers.idempotencyKey,input.idempotencyKey)).limit(1);
@@ -112,8 +114,9 @@ export async function respondToSyntheticAdmissionOffer(context:CommandContext,of
   await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
-  if(!app||app.metadata.synthetic!==true||app.programId!==offer!.programId)throw new Error("Synthetic offer application mismatch");
+  if(!app||app.programId!==offer!.programId)throw new Error("Synthetic offer application mismatch");
   await assertGuardian(tx,context.actorPersonId,app.studentProfileId);
+  assertRecordWriteAllowed(app.metadata,context.role==="guardian"?"guardian":"registrar");
   if(offer!.status==="accepted"&&action==="accept")return offerId;
   if(offer!.status==="declined"&&action==="decline")return offerId;
   const changed=transitionAdmissionsOffer({status:offer!.status as OfferStatus,applicationId:app.id,schoolYearId:offer!.schoolYearId,expiresAt:offer!.expiresAt?.toISOString()??null},action,new Date());
@@ -144,7 +147,8 @@ export async function activateSyntheticOfferedEnrollment(context:CommandContext,
   if(offer!.status!=="accepted")throw new Error("Guardian must accept offer first");
   if(!offer!.respondedAt)throw new Error("Accepted offer must record a guardian response");
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
-  if(!app||app.metadata.synthetic!==true||app.programId!==offer!.programId||app.stage!=="accepted")throw new Error("Synthetic application not accepted for this offer");
+  if(!app||app.programId!==offer!.programId||app.stage!=="accepted")throw new Error("Synthetic application not accepted for this offer");
+  assertRecordWriteAllowed(app.metadata,context.role==="guardian"?"guardian":"registrar");
   const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(eq(enrollments.studentProfileId,app.studentProfileId),eq(enrollments.programId,offer!.programId),eq(enrollments.schoolYearId,offer!.schoolYearId),eq(enrollments.status,"active"),eq(enrollments.kind,"program"))).limit(1);
   if(existing)return existing.id;
   const journey=await ready(tx,app.id);
