@@ -31,7 +31,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
   };
 });
 export const bookSyntheticOfficeHour=createServerFn({method:"POST"})
-  .validator((value:unknown)=>z.object({slotId:z.string().uuid()}).parse(value))
+  .validator((value:unknown)=>z.object({slotId:z.string().uuid(),studentProfileId:z.string().uuid()}).parse(value))
   .handler(async({data})=>{
   assertSyntheticMutation("guardian");
     const actor=await requireActor(["guardian"]);
@@ -44,7 +44,7 @@ export const bookSyntheticOfficeHour=createServerFn({method:"POST"})
       assertSiteGranted(actor,slotSite.siteId);
       const [child]=await tx.select({studentProfileId:schema.studentProfiles.id}).from(schema.guardianRelationships)
         .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.personId,schema.guardianRelationships.studentPersonId))
-        .where(and(eq(schema.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(schema.guardianRelationships.canViewAcademics,true))).limit(1);
+        .where(and(eq(schema.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(schema.guardianRelationships.canViewAcademics,true),eq(schema.studentProfiles.id,data.studentProfileId))).limit(1);
       if(!child) throw new AuthorizationError("guardian relationship");
       const [slot]=await tx.update(schema.conferenceSlots).set({status:"booked",updatedAt:new Date()}).where(and(eq(schema.conferenceSlots.id,data.slotId),eq(schema.conferenceSlots.status,"available"))).returning({id:schema.conferenceSlots.id});
       if(!slot) throw new Error("Office-hour slot already taken");
