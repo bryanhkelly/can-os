@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Lightbulb, MessageCircle, Play, RotateCcw, Send, Sparkles,
   Target, Video, X,
 } from "lucide-react";
-import { demoStudent, type StudentWork, type StudentMoment } from "@/modules/_demo/demo-data";
+import type { StudentWork, StudentMoment } from "@/modules/_demo/demo-data";
 import type { StudentTodayData } from "@/modules/student-experience/student-today.server";
 
 type Area = "today" | "courses" | "progress";
@@ -56,11 +56,11 @@ function projectLiveStudent(snapshot: StudentTodayData) {
   const courseCount = snapshot.sections.length;
   const attention = new Set(work.filter(item => item.status === "missing").map(item => item.course));
   return { displayName: snapshot.student.preferredName ?? snapshot.student.firstName,
-    site: "CAN Academy · Live Neon data", onTrack: Math.max(0, courseCount - attention.size), courseCount, work, moments };
+    site: "CAN Academy", onTrack: Math.max(0, courseCount - attention.size), courseCount, work, moments };
 }
 
-export function StudentExperience({ liveData }: { liveData?: StudentTodayData }) {
-  const studentData = useMemo(() => liveData ? projectLiveStudent(liveData) : demoStudent, [liveData]);
+export function StudentExperience({ liveData }: { liveData: StudentTodayData }) {
+  const studentData = useMemo(() => projectLiveStudent(liveData), [liveData]);
   const [area, setArea] = useState<Area>("today");
   const [work, setWork] = useState<WorkState[]>(studentData.work);
   const [selected, setSelected] = useState<string | null>(null);
