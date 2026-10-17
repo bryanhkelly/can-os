@@ -355,6 +355,15 @@ export const manageAssessment = createServerFn({method:"POST"})
      payload:{sectionId:assessment.sectionId,assignedCount,dueAt:dueAt!.toISOString()}
     });
    }
+   if((data.action==="reschedule"||(data.action==="reopen"&&data.dueAt))&&
+     dueAt?.getTime()!==assessment.dueAt?.getTime()){
+    await tx.insert(s.domainEvents).values({
+     eventType:EventTypes.AcademicCalendarChanged,aggregateType:"assessment",
+     aggregateId:assessment.id,actorPersonId:context.actorPersonId,
+     payload:{previousDueAt:assessment.dueAt?.toISOString()??null,
+      newDueAt:dueAt?.toISOString()??null,action:data.action}
+    });
+   }
    await tx.insert(s.auditEvents).values({
     actorPersonId:context.actorPersonId,
     action:"assessment."+data.action,resourceType:"assessment",resourceId:assessment.id,
