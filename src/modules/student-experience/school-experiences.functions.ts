@@ -83,7 +83,7 @@ export const rescheduleOfficeHour=createServerFn({method:"POST"})
     .innerJoin(s.conferenceSeries,eq(s.conferenceSeries.id,s.conferenceSlots.conferenceSeriesId))
     .where(and(eq(s.conferenceBookings.id,data.bookingId),
       eq(s.conferenceBookings.guardianPersonId,actor.actorPersonId),
-      eq(s.conferenceBookings.status,"booked"))).limit(1);
+      eq(s.conferenceBookings.status,"booked"))).for("update").limit(1);
    if(!current||current.startsAt<=new Date())throw new AuthorizationError("future guardian booking");
    assertSiteGranted(actor,current.siteId);
    if(current.oldSlotId===data.newSlotId)return {saved:true};
