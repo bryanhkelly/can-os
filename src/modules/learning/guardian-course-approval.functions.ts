@@ -85,10 +85,18 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     isNull(consentRecords.revokedAt),
     inArray(consentRecords.subjectId, valid.map(row => row.id)),
   )).orderBy(desc(consentRecords.signedAt), desc(consentRecords.createdAt));
-  const latest = new Map<string, unknown>();
+  const latest = new Map<string, "approve" | "decline">();
+  const byRequest = new Map(valid.map(row => [row.id, row] as const));
   for (const decision of decisions) {
+    const request = byRequest.get(decision.subjectId);
+    if (!request || decision.evidence.studentProfileId !== request.studentProfileId ||
+        decision.evidence.sectionId !== request.sectionId ||
+        decision.evidence.schoolYearId !== request.schoolYearId) continue;
     const key = decision.subjectId + ":" + decision.signerPersonId;
-    if (!latest.has(key)) latest.set(key, decision.evidence.decision);
+    if (latest.has(key)) continue;
+    if (decision.evidence.decision === "decline") latest.set(key, "decline");
+    if (decision.evidence.decision === "approve" &&
+        decision.evidence.acknowledgedByGuardian === true) latest.set(key, "approve");
   }
   const result = await Promise.all(valid.map(async row => {
     if (!currentEnrollments.some(e =>
