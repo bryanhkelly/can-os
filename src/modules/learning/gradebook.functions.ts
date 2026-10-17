@@ -106,7 +106,7 @@ export const getGradebook = createServerFn({ method: "GET" })
    metadata: s.assessments.metadata,
   })
    .from(s.assessments)
-   .where(and(eq(s.assessments.sectionId, data.sectionId), inArray(s.assessments.status, ["published", "closed"])))
+   .where(and(eq(s.assessments.sectionId, data.sectionId), inArray(s.assessments.status, ["draft", "published", "closed"])))
    .orderBy(asc(s.assessments.dueAt));
 
   const assessmentIds = assessmentRows.map(row => row.id);
@@ -326,13 +326,13 @@ export const manageAssessment = createServerFn({method:"POST"})
    const dueAt=data.dueAt?new Date(data.dueAt):assessment.dueAt;
    if((data.action==="publish"||data.action==="reschedule")&&(!dueAt||dueAt<=now))
     throw new Error("A future due date is required");
-   if(data.action==="reopen"&&dueAt&&dueAt<=now)
+   if(data.action==="reopen"&&(!dueAt||dueAt<=now))
     throw new Error("Set a future due date before reopening this closed assessment");
    const status=data.action==="publish"||data.action==="reopen"?"published":
     data.action==="close"?"closed":assessment.status;
    const [updated]=await tx.update(s.assessments).set({
     status,
-    ...(data.action==="publish"||data.action==="reschedule"?{dueAt}:{}),
+    ...(data.action==="publish"||data.action==="reschedule"||(data.action==="reopen"&&data.dueAt)?{dueAt}:{}),
     ...(data.action==="publish"?{availableAt:now}:{}),
     updatedAt:now
    }).where(and(eq(s.assessments.id,assessment.id),eq(s.assessments.status,assessment.status)))
