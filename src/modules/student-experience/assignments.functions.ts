@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertCapability, assertSiteScope, AuthorizationError } from "@/domain/command-context";
+import { assertCapability, assertSiteScope, assertProgramScope, AuthorizationError } from "@/domain/command-context";
 import { and, eq, inArray, desc, sql } from "drizzle-orm";
 
 
@@ -26,11 +26,12 @@ async function teacherActor(sectionId?:string){
  if(!context.scope.siteIds?.length)throw new AuthorizationError("teacher site membership");
  const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  if(sectionId){
-  const [section]=await db.select({siteId:schema.sections.siteId})
+  const [section]=await db.select({siteId:schema.sections.siteId,programId:schema.sections.programId})
    .from(schema.sectionTeachers).innerJoin(schema.sections,eq(schema.sections.id,schema.sectionTeachers.sectionId))
    .where(and(eq(schema.sectionTeachers.personId,context.actorPersonId),eq(schema.sectionTeachers.sectionId,sectionId))).limit(1);
   if(!section)throw new AuthorizationError("assigned teacher");
   assertSiteScope(context,section.siteId);
+  assertProgramScope(context,section.programId);
  }
  return context;
 }
@@ -57,7 +58,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const enrollmentRows=await db.select({sectionId:s.enrollments.sectionId})
  .from(s.enrollments).innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
- .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.status,"active"),eq(s.enrollments.kind,"section"),inArray(s.sections.siteId,context.scope.siteIds!)));
+ .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.status,"active"),eq(s.enrollments.kind,"section"),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[])));
  const ids=enrollmentRows.map(e=>e.sectionId).filter((id):id is string=>id!==null);
  if(!ids.length)return {connected:true,assignments:[]};
  const rows=await db.select({
@@ -100,7 +101,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,dueAt:s.assessments.dueAt,metadata:s.assessments.metadata})
    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .where(and(eq(s.assessments.id,data.assessmentId),eq(s.assessments.status,"published"),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
+   .where(and(eq(s.assessments.id,data.assessmentId),eq(s.assessments.status,"published"),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
    if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Synthetic assessment not found");
    // Serialize this student/assessment across draft and final submission requests, 
    // including when no submission row exists to lock yet.
@@ -169,7 +170,7 @@ export const gradeSyntheticAssignment=createServerFn({method:"POST"})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-   .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.submissions.status,"submitted"))).limit(1);
+   .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]),eq(s.submissions.status,"submitted"))).limit(1);
   if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic submitted work not found");
   const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
   if(!student)throw new AuthorizationError("student profile");
@@ -201,7 +202,7 @@ export const returnSyntheticAssignment=createServerFn({method:"POST"})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-   .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
+   .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
   if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic graded submission not found");
   const [updated]=await tx.update(s.submissions).set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
    .where(and(eq(s.submissions.id,data.submissionId),eq(s.submissions.status,"graded"))).returning({id:s.submissions.id});
@@ -233,7 +234,7 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [section]=await tx.select({id:s.sections.id}).from(s.sections)
     .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-    .where(and(eq(s.sections.id,data.sectionId),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
+    .where(and(eq(s.sections.id,data.sectionId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
    if(!section)throw new Error("Section not found at synthetic Site");
    const [assessment]=await tx.insert(s.assessments).values({
     sectionId:section.id,title:data.title.trim(),instructions:data.instructions.trim(),
@@ -259,7 +260,7 @@ export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
    response:s.submissions.response,feedback:s.submissions.feedback})
    .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .where(and(eq(s.submissions.assessmentId,data.assessmentId),eq(s.submissions.studentProfileId,studentId),inArray(s.sections.siteId,context.scope.siteIds!)))
+   .where(and(eq(s.submissions.assessmentId,data.assessmentId),eq(s.submissions.studentProfileId,studentId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[])))
    .orderBy(desc(s.submissions.attemptNumber));
   return rows.map(row=>({attempt:row.attempt,status:row.status,
    submittedAt:row.submittedAt?.toISOString()??null,score:row.score,
@@ -279,7 +280,7 @@ export const saveSyntheticAssignmentDraft=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,metadata:s.assessments.metadata})
     .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-    .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.assessments.status,"published"))).limit(1);
+    .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]),eq(s.assessments.status,"published"))).limit(1);
    if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Synthetic assignment not available");
    // Serialize this student/assessment across draft and final submission requests, 
    // including when no submission row exists to lock yet.
@@ -323,7 +324,7 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
   await teacherForAssessment(data.assessmentId);
   const [assessment]=await db.select({id:s.assessments.id,metadata:s.assessments.metadata})
    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
+   .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
   if(!assessment||assessment.metadata.synthetic!==true)throw new Error("Only synthetic assignments can be managed");
   const due=data.action==="reschedule"?new Date(data.dueAt??""):undefined;
   if(due&&Number.isNaN(due.getTime()))throw new Error("Invalid due date");
@@ -332,7 +333,7 @@ export const manageSyntheticAssignment=createServerFn({method:"POST"})
     .from(s.assessments)
     .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
     .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-    .where(and(eq(s.assessments.id,assessment.id),inArray(s.sections.siteId,context.scope.siteIds!))).limit(1);
+    .where(and(eq(s.assessments.id,assessment.id),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
    if(!authorized||authorized.metadata.synthetic!==true)throw new AuthorizationError("assigned synthetic assessment");
    const [updated]=await tx.update(s.assessments).set({
     ...(data.action==="close"?{status:"closed" as const}:data.action==="reopen"?{status:"published" as const}:{}),
@@ -364,7 +365,7 @@ export const gradeSyntheticRubric=createServerFn({method:"POST"})
     .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
     .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-    .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),eq(s.submissions.status,"submitted"))).limit(1);
+    .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]),eq(s.submissions.status,"submitted"))).limit(1);
    if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic submitted assignment not found");
    const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
    if(!student)throw new AuthorizationError("student profile");
