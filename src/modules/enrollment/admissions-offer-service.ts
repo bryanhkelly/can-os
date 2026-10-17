@@ -3,12 +3,13 @@ import {db} from "@/db/client";
 import {admissionOffers,admissionSeatPools,applications,auditEvents,domainEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles,notifications} from "@/db/schema";
 import {assertCapability,assertProgramScope,AuthorizationError,type CommandContext} from "@/domain/command-context";
 import {EventTypes} from "@/domain/event-types";
-import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {transitionAdmissionsOffer,type OfferStatus} from "@/domain/admissions-offer-lifecycle";
 import {calculateSeatOccupancy} from "@/domain/admissions-seat-occupancy";
 
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
-const guarded=(role:"registrar"|"guardian")=>assertSyntheticMutation(role);
+const guarded=(context:CommandContext,role:"registrar"|"guardian")=>{
+ if(context.role!==role||!context.actorPersonId)throw new AuthorizationError("authorized "+role+" admission session");
+};
 type Transaction=Parameters<Parameters<typeof db.transaction>[0]>[0];
 function requireAdmissionsProgramScope(context:CommandContext,programId:string){
  if(!context.scope.programIds?.includes(programId))throw new AuthorizationError(`program scope: ${programId}`);
@@ -57,7 +58,7 @@ async function expireElapsedOffers(tx:Transaction,context:CommandContext,program
  return count;
 }
 export async function expireSyntheticAdmissionOffers(context:CommandContext,input:{programId:string;schoolYearId:string}){
- guarded("registrar");assertCapability(context,"enrollment.decide");requireAdmissionsProgramScope(context,input.programId);
+ guarded(context,"registrar");assertCapability(context,"enrollment.decide");requireAdmissionsProgramScope(context,input.programId);
  if(!context.actorPersonId)throw new Error("Registrar identity required");
  return db.transaction(async tx=>{
   await lockPool(tx,input.programId,input.schoolYearId);
@@ -65,7 +66,7 @@ export async function expireSyntheticAdmissionOffers(context:CommandContext,inpu
  });
 }
 export async function issueSyntheticAdmissionOffer(context:CommandContext,input:{applicationId:string;schoolYearId:string;idempotencyKey:string;expiresAt:Date}){
- guarded("registrar");assertCapability(context,"enrollment.decide");
+ guarded(context,"registrar");assertCapability(context,"enrollment.decide");
  if(!context.actorPersonId)throw new Error("Staff identity required");
  if(!input.idempotencyKey.trim()||!Number.isFinite(input.expiresAt.getTime())||input.expiresAt.getTime()<=Date.now())throw new Error("Invalid offer issuance input");
  return db.transaction(async tx=>{
@@ -103,7 +104,7 @@ export async function issueSyntheticAdmissionOffer(context:CommandContext,input:
  });
 }
 export async function respondToSyntheticAdmissionOffer(context:CommandContext,offerId:string,action:"accept"|"decline"){
- guarded("guardian");assertCapability(context,"enrollment.apply");
+ guarded(context,"guardian");assertCapability(context,"enrollment.apply");
  return db.transaction(async tx=>{
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
@@ -133,7 +134,7 @@ export async function respondToSyntheticAdmissionOffer(context:CommandContext,of
  });
 }
 export async function activateSyntheticOfferedEnrollment(context:CommandContext,offerId:string){
- guarded("registrar");assertCapability(context,"enrollment.activate");
+ guarded(context,"registrar");assertCapability(context,"enrollment.activate");
  return db.transaction(async tx=>{
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
