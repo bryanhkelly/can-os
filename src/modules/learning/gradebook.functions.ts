@@ -227,6 +227,7 @@ export const createAssessment = createServerFn({ method: "POST" })
   sectionId: z.string().min(1),
   title: z.string().trim().min(3).max(200),
   instructions: z.string().trim().max(20000).optional(),
+  rubric: z.string().trim().max(10000).optional(),
   pointsPossible: z.number().finite().min(1).max(1000),
   dueAt: z.string().refine(v => !Number.isNaN(new Date(v).getTime()), "dueAt must be an ISO date").optional(),
  }).parse(value))
@@ -250,6 +251,7 @@ export const createAssessment = createServerFn({ method: "POST" })
     sectionId: data.sectionId,
     title: data.title,
     instructions: data.instructions ?? null,
+    metadata: data.rubric ? {rubric:data.rubric} : {},
     status,
     pointsPossible: String(data.pointsPossible),
     dueAt,
