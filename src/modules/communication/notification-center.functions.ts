@@ -52,6 +52,17 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const referralIds=new Set(referralRows.map(r=>r.id));
  const missingIds=rows.filter(n=>n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId as string);
  const followUps=missingIds.length&&studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions).where(and(inArray(s.actions.id,missingIds),eq(s.actions.type,"missing_work_follow_up"),inArray(s.actions.subjectId,studentIds))):[];
+ const consentActionIds=rows.filter(n=>n.resourceType==="action"&&
+  n.resourceId&&n.type==="study_group_consent_requested").map(n=>n.resourceId as string);
+ const consentActions=consentActionIds.length?await db.select({
+  id:s.actions.id,programId:s.actions.programId
+ }).from(s.actions).where(and(inArray(s.actions.id,consentActionIds),
+  eq(s.actions.type,"study_group_consent"),eq(s.actions.status,"open"),
+  eq(s.actions.ownerPersonId,personId),
+  inArray(s.actions.siteId,context.scope.siteIds??[]))):[];
+ const permittedConsents=new Set(consentActions.filter(action=>
+  !action.programId||(context.scope.programIds??[]).includes(action.programId)
+ ).map(action=>action.id));
  const assignedActionIds=rows.filter(n=>n.resourceType==="action"&&n.resourceId&&n.type==="operations_action_assigned").map(n=>n.resourceId as string);
  const ownedActions=assignedActionIds.length?await db.select({id:s.actions.id,siteId:s.actions.siteId,programId:s.actions.programId})
    .from(s.actions).where(and(inArray(s.actions.id,assignedActionIds),eq(s.actions.ownerPersonId,personId),
@@ -68,6 +79,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:null):
    n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?"/guardian/admission-offers":
    n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&context.role==="registrar"?"/admissions/":
+   n.type==="study_group_consent_requested"&&n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)&&context.role==="guardian"?"/guardian/study-group-consent":
    n.type==="operations_action_assigned"&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&context.role==="registrar"?"/operations":
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"?"/teacher/study-groups":context.role==="student"?`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`:null):
    context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
