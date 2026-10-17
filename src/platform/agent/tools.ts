@@ -1,7 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  guardianRelationships,
   subscriptions,
   type EvidenceRef,
 } from "@/db/schema";
@@ -35,7 +34,7 @@ export type AgentTool = {
 export { resolveVisibleStudents, assertStudentAccess } from "@/modules/learning/academic-domain-api";
 import { resolveVisibleStudents } from "@/modules/learning/academic-domain-api";
 import { getStudentAcademicSummary as academicSummary } from "@/modules/learning/academic-domain-api";
-import { assertStudentAccess } from "@/modules/learning/academic-domain-api";
+import { assertStudentAccess, assertGuardianAcademicAccess } from "@/modules/learning/academic-domain-api";
 export type { VisibleStudent } from "@/modules/learning/academic-domain-api";
 
 export const getStudentAcademicSummary: AgentTool = {
@@ -184,13 +183,7 @@ export const createWeeklyDigest: AgentTool = {
   async execute(context, args) {
     const studentProfileId = String(args.studentProfileId ?? "");
     const student = await assertStudentAccess(context, studentProfileId);
-    const [guardian] = await db.select({ id: guardianRelationships.id })
-      .from(guardianRelationships).where(and(
-        eq(guardianRelationships.guardianPersonId, context.actorPersonId),
-        eq(guardianRelationships.studentPersonId, student.personId),
-        eq(guardianRelationships.canViewAcademics, true),
-      )).limit(1);
-    if (!guardian) throw new AuthorizationError("guardian academic relationship");
+    await assertGuardianAcademicAccess(context, studentProfileId);
     const weekday = Number(args.weekday ?? 5);
     const hour = Number(args.hour ?? 19);
     if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 ||
