@@ -78,6 +78,7 @@ function FamilyHomePage() {
        <a href={"/guardian/academics?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Academics</a>
        <a href={"/guardian/attendance?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</a>
        <a href={"/guardian/report-cards?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</a>
+       <a href={"/guardian/admission-offers?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Offers</a>
       </nav>
      </article>)}
     </div>}
