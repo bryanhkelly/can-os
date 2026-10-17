@@ -195,7 +195,7 @@ function scopedMatch(
   );
 }
 
-async function loadDemandContext(executor: typeof db, demandId: string) {
+async function loadDemandContext(executor: any, demandId: string) {
   const [row] = await executor
     .select({
       demandId: sectionCapacityDemands.id,
@@ -419,7 +419,7 @@ export async function reserveInstructionalCapacity(
   assertCapability(context, "capacity.reserve");
 
   return db.transaction(async (tx) => {
-    const demand = await loadDemandContext(tx as typeof db, input.demandId);
+    const demand = await loadDemandContext(tx, input.demandId);
     if (!demand) throw new Error("Section capacity demand not found");
     assertDemandScope(context, demand);
     if (demand.demandStatus !== "open") throw new Error("Section capacity demand is not open");
@@ -559,7 +559,7 @@ export async function releaseInstructionalCapacity(
       .limit(1);
     if (!reservation) throw new Error("Capacity reservation not found");
 
-    const demand = await loadDemandContext(tx as typeof db, reservation.demandId);
+    const demand = await loadDemandContext(tx, reservation.demandId);
     if (!demand) throw new Error("Section capacity demand not found");
     assertDemandScope(context, demand);
 
