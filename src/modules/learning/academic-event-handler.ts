@@ -85,8 +85,9 @@ export async function handleSubmissionReceivedEvent(eventId: string): Promise<vo
     // A late recovery is actionable for the teacher. On-time submissions do not
     // need a new notification because they already appear in the normal grading queue.
     if (timeliness === "late" && context.teacherPersonIds.length) {
+      const recipients: string[] = [...new Set<string>(context.teacherPersonIds as string[])];
       await tx.insert(notifications).values(
-        [...new Set(context.teacherPersonIds)].map((recipientPersonId) => ({
+        recipients.map((recipientPersonId: string) => ({
           recipientPersonId,
           type: "late_submission_received",
           title: `${context.studentName} submitted ${context.assessmentTitle}`,
@@ -119,9 +120,9 @@ export async function handleGradePostedEvent(eventId: string): Promise<void> {
     const context = await loadSubmissionContext(tx, event.aggregateId);
     if (!context) throw new Error("Missing submission context for GradePosted");
 
-    const recipients = new Set([
-      context.studentPersonId,
-      ...context.guardianPersonIds,
+    const recipients = new Set<string>([
+      String(context.studentPersonId),
+      ...(context.guardianPersonIds as string[]),
     ]);
 
     const scoreText = context.score === null ? "" : ` Score: ${context.score}.`;
