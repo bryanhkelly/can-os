@@ -468,13 +468,13 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
   const assessment=await requireEnrolledAssessment(tx,s,data.assessmentId,studentId,
     context.scope.siteIds??[],context.scope.programIds??[]);
-  const [latest]=await db.select({response:s.submissions.response})
+  const [latest]=await tx.select({response:s.submissions.response})
    .from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),
     eq(s.submissions.studentProfileId,studentId)))
    .orderBy(desc(s.submissions.attemptNumber)).limit(1);
   const ids=Array.isArray(latest?.response.attachments)?latest.response.attachments:[];
   if(!ids.includes(data.documentId))throw new AuthorizationError("attachment belongs to latest student submission");
-  const [document]=await db.select({
+  const [document]=await tx.select({
    storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt,
    mimeType:s.documents.mimeType
   }).from(s.documents).where(and(eq(s.documents.id,data.documentId),
@@ -499,13 +499,13 @@ export const getExcuseAttachmentDownload=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
   await requireGuardianEvent(tx,s,data.attendanceEventId,context.actorPersonId!,
     context.scope.programIds??[]);
-  const [excuse]=await db.select({documentIds:s.attendanceExcuses.documentIds})
+  const [excuse]=await tx.select({documentIds:s.attendanceExcuses.documentIds})
     .from(s.attendanceExcuses)
     .where(eq(s.attendanceExcuses.attendanceEventId,data.attendanceEventId))
     .orderBy(desc(s.attendanceExcuses.createdAt)).limit(1);
   if(!excuse?.documentIds.includes(data.documentId))
     throw new AuthorizationError("document not attached to latest excuse");
-  const [document]=await db.select({
+  const [document]=await tx.select({
    storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt
   }).from(s.documents).where(and(eq(s.documents.id,data.documentId),
     eq(s.documents.subjectType,"attendance_event"),
