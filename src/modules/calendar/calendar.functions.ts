@@ -55,10 +55,12 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
         eq(schema.enrollments.status, "active"),
         eq(schema.enrollments.kind, "section"),
       ))
+      .innerJoin(schema.sections, eq(schema.sections.id, schema.enrollments.sectionId))
       .where(and(
         eq(schema.guardianRelationships.guardianPersonId, actor.actorPersonId),
         eq(schema.guardianRelationships.canViewAcademics, true),
         inArray(schema.enrollments.programId, actor.scope.programIds ?? []),
+        inArray(schema.sections.siteId, sites),
       ));
     return rows.map((row) => row.sectionId).filter((id): id is string => Boolean(id));
   }
