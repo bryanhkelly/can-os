@@ -467,7 +467,6 @@ export const listGuardianStudyGroupConsents=createServerFn({method:"GET"}).handl
 export const decideGuardianStudyGroupConsent=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({actionId:z.string().uuid(),approve:z.boolean()}).parse(v))
  .handler(async({data})=>{
-  assertSyntheticMutation("guardian");
   const actor=await getCommandContext(getRequest());
   if(actor.role!=="guardian"||!actor.actorPersonId)throw new AuthorizationError("study group guardian");
   const {db,s}=await context();
@@ -503,6 +502,14 @@ export const decideGuardianStudyGroupConsent=createServerFn({method:"POST"})
       groupScope.programId?eq(s.enrollments.programId,groupScope.programId):undefined))
     .limit(1);
    if(!enrollment)throw new AuthorizationError("student group enrollment");
+   // Do not resolve a consent after the student cancelled or the facilitator
+   // declined the corresponding membership request.
+   const [pendingMember]=await tx.select({id:s.studyGroupMemberships.id})
+    .from(s.studyGroupMemberships)
+    .where(and(eq(s.studyGroupMemberships.groupId,action.subjectId),
+     eq(s.studyGroupMemberships.personId,studentPersonId),
+     eq(s.studyGroupMemberships.status,"pending"))).limit(1);
+   if(!pendingMember)throw new AuthorizationError("pending group membership");
    await tx.update(s.actions).set({status:"resolved",resolvedAt:new Date(),
     resolutionNote:data.approve?"Consent given":"Consent withheld",
     metadata:{...action.metadata,decision:data.approve?"approve":"decline"},updatedAt:new Date()})
@@ -519,7 +526,8 @@ export const decideGuardianStudyGroupConsent=createServerFn({method:"POST"})
    await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,
     action:"study_group.guardian_consent."+(data.approve?"approve":"decline"),
     resourceType:"action",resourceId:action.id,
-    before:{status:action.status},after:{decision:data.approve?"approve":"decline"}});
+    before:{status:action.status},after:{decision:data.approve?"approve":"decline"},
+    context:{accountId:actor.accountId,sessionId:actor.sessionId}});
    return {ok:true};
   });
  });
