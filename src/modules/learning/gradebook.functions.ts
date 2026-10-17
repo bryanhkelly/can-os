@@ -378,6 +378,7 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
    const [record]=await tx.select({
     id:s.submissions.id,status:s.submissions.status,
     assessmentId:s.assessments.id,sectionId:s.sections.id,
+    studentProfileId:s.submissions.studentProfileId,attemptNumber:s.submissions.attemptNumber,
     studentPersonId:s.studentProfiles.personId,
     siteId:s.sections.siteId,programId:s.sections.programId
    }).from(s.submissions)
@@ -392,6 +393,11 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
     .for("update").limit(1);
    if(!record)throw new AuthorizationError("graded submission in assigned section");
    if(record.status!=="graded")throw new Error("Only graded work can be returned for revision");
+   const [latest]=await tx.select({id:s.submissions.id})
+    .from(s.submissions).where(and(eq(s.submissions.assessmentId,record.assessmentId),
+      eq(s.submissions.studentProfileId,record.studentProfileId)))
+    .orderBy(desc(s.submissions.attemptNumber)).limit(1);
+   if(!latest||latest.id!==record.id)throw new Error("Only the latest attempt may be returned");
    const [updated]=await tx.update(s.submissions)
     .set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
     .where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"graded")))
