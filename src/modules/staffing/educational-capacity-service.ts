@@ -13,6 +13,10 @@ import {
   sections,
   sectionTeachers,
   scheduleTemplatePeriods,
+  roleAssignments,
+  auditEvents,
+  domainEvents,
+  notifications,
 } from "@/db/schema";
 import {
   assertCapability,
@@ -754,6 +758,10 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
     if(!(replacement.courseTemplateId===demand.courseTemplateId ||
       (!replacement.courseTemplateId && replacement.subject?.toLowerCase()===demand.courseSubject.toLowerCase())))
       throw new Error("Replacement instructor cannot teach this subject");
+    const [role]=await tx.select({id:roleAssignments.id}).from(roleAssignments).where(and(
+      eq(roleAssignments.personId,replacement.personId),eq(roleAssignments.roleKey,"teacher"),
+      inArray(roleAssignments.organizationId,[demand.organizationId,...(replacement.organizationId?[replacement.organizationId]:[])]))).limit(1);
+    if(!role)throw new Error("Replacement instructor has no active teaching authorization");
     if(!weeklyPatternCovers(replacement.pattern,await loadSectionPeriods(tx,demand.scheduleTemplateId)))
       throw new Error("Replacement is unavailable during this class schedule");
     const taken=await tx.select({seats:instructionalCapacityReservations.seats,status:instructionalCapacityReservations.status,
@@ -787,6 +795,21 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
         eq(instructionalCapacityReservations.status,"committed"))).limit(1);
     if(!remaining.length)await tx.delete(sectionTeachers).where(and(eq(sectionTeachers.sectionId,demand.sectionId),
       eq(sectionTeachers.personId,old.oldPersonId),eq(sectionTeachers.assignmentSource,"capacity")));
+    await tx.insert(notifications).values({
+      recipientPersonId:replacement.personId,type:"teaching_assignment",title:"Teaching assignment changed",
+      body:"You are now assigned to a section.",resourceType:"section",resourceId:demand.sectionId,
+    });
+    await tx.insert(auditEvents).values({
+      actorPersonId:context.actorPersonId,action:"capacity.instructor.replaced",
+      resourceType:"section",resourceId:demand.sectionId,
+      scope:{programId:demand.programId,siteId:demand.siteId,organizationId:demand.organizationId},
+      before:{offeringId:old.oldOfferingId,personId:old.oldPersonId},
+      after:{offeringId:replacement.id,personId:replacement.personId,reason:input.reason.trim()},
+    });
+    await tx.insert(domainEvents).values({
+      eventType:"InstructorCapacityReplaced",aggregateType:"section",aggregateId:demand.sectionId,
+      actorPersonId:context.actorPersonId,payload:{programId:demand.programId,oldPersonId:old.oldPersonId,newPersonId:replacement.personId},
+    });
     return {sectionId:demand.sectionId,replacementPersonId:replacement.personId};
   });
 }
