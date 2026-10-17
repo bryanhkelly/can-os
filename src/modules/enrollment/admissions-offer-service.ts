@@ -4,6 +4,7 @@ import {db} from "@/db/client";
 import {admissionOffers,admissionSeatPools,applications,auditEvents,domainEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles,notifications} from "@/db/schema";
 import {assertCapability,assertProgramScope,AuthorizationError,type CommandContext} from "@/domain/command-context";
 import {EventTypes} from "@/domain/event-types";
+import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
 import {transitionAdmissionsOffer,type OfferStatus} from "@/domain/admissions-offer-lifecycle";
 import {calculateSeatOccupancy} from "@/domain/admissions-seat-occupancy";
 
@@ -153,6 +154,11 @@ export async function activateSyntheticOfferedEnrollment(context:CommandContext,
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
   if(!app||app.programId!==offer!.programId||app.stage!=="accepted")throw new Error("Application not accepted for this offer");
   assertRecordWriteAllowed(app.metadata,"registrar");
+  const [programSite]=await tx.select({siteId:programs.siteId,organizationId:programs.organizationId})
+    .from(programs).where(eq(programs.id,offer!.programId)).limit(1);
+  if(!programSite?.siteId||programSite.organizationId!==organizationId)
+    throw new Error("Enrollment program must have a matching school site");
+  await lockAttendanceConfigurationAtSite(tx,programSite.siteId);
   const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(eq(enrollments.studentProfileId,app.studentProfileId),eq(enrollments.programId,offer!.programId),eq(enrollments.schoolYearId,offer!.schoolYearId),eq(enrollments.status,"active"),eq(enrollments.kind,"program"))).limit(1);
   if(existing)return existing.id;
   const journey=await ready(tx,app.id);
