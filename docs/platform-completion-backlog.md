@@ -10,10 +10,11 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Select active membership by verified grant ID (supports multiple grants with same role).
 - [x] Expose active grant organization/site/program scopes from verified session endpoint to the workspace shell.
 - [x] Add family-home child-specific deep links to academics and report cards; resolve requested child from the guardian's authorized roster, ignoring unauthorized IDs, with unit tests.
-- [ ] Implement consistent site/program and remaining child context across every route, including attendance and admissions; validate downstream route scope on the server.
+- [x] Show server-resolved site names and authorized program deep links in the workspace shell; do not treat UI selection as an authorization claim.
+- [ ] Implement consistent active site/program selection for all operational queries, and remaining child context across attendance and admissions; validate route scope server-side.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
 - [x] Delete legacy synthetic-only operations service after replacing its route consumer.
-- [x] Connect staff Action assignment UI to authorized per-site assignee directory and existing audited assignment command.
+- [x] Connect staff Action assignment UI to authorized per-site assignee directory and existing audited assignment command; exclude student/guardian grants from operational assignees.
 - [ ] Add integration tests for canonical action transitions, assignment and authorization (deferred by request).
 - [x] Restrict owned student Action completion to known student workflow types and emit ActionResolved event.
 - [ ] Verify Action owner completion guards and domain-event parity across both school and student workflows.
