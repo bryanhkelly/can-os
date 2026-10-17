@@ -12,12 +12,18 @@ import { getStudentAcademicSummary } from "@/platform/agent/tools";
  * The scheduler makes the last-run transition and notification atomically.
  */
 export async function processWeeklyDigests(now = new Date(), limit = 50): Promise<number> {
-  const rows = await db.select().from(subscriptions)
-    .where(and(eq(subscriptions.status, "active"),
-      arrayContains(subscriptions.eventTypes, ["WeeklyStudentDigest"])))
-    .limit(limit);
   let sent = 0;
-  for (const row of rows) {
+  let offset = 0;
+  for (;;) {
+    const rows = await db.select().from(subscriptions)
+      .where(and(eq(subscriptions.status, "active"),
+        arrayContains(subscriptions.eventTypes, ["WeeklyStudentDigest"])))
+      .orderBy(subscriptions.id)
+      .limit(limit).offset(offset);
+    if (!rows.length) break;
+    offset += rows.length;
+    for (const row of rows) {
+      try {
     const f = row.filter;
     if (f.kind !== "weekly_digest") continue;
     const tz = typeof f.timezone === "string" ? f.timezone : "UTC";
@@ -88,6 +94,11 @@ export async function processWeeklyDigests(now = new Date(), limit = 50): Promis
       });
       sent++;
     });
+      } catch (error) {
+        // One invalid subscription must not block every school's digests.
+        console.error("weekly-digest evaluation failed", row.id, error instanceof Error ? error.message : "unknown");
+      }
+    }
   }
   return sent;
 }
