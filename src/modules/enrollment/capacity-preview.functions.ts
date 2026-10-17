@@ -2,11 +2,15 @@ import {createServerFn} from "@tanstack/react-start";
 import {and,eq,inArray} from "drizzle-orm";
 import {z} from "zod";
 import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
+import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
 
 /** Counts actual active enrollments and unexpired held offers by school year. */
-export const getAdmissionsCapacity=createServerFn({method:"GET"}).handler(async()=>{
+export const getAdmissionsCapacity=createServerFn({method:"GET"})
+ .validator((input:unknown)=>operationsSelectionSchema.parse(input??{}))
+ .handler(async({data})=>{
  const actor=await requireActor(["registrar"],"enrollment.decide");
- const granted=actor.scope.programIds??[];
+ const scoped=await resolveOperationsSelection(actor,data);
+ const granted=scoped.programIds;
  if(!granted.length)return [];
  if(!process.env.DATABASE_URL)return [];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
