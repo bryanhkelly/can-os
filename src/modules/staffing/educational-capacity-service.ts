@@ -706,3 +706,87 @@ export async function getInstructorCapacity(
     };
   });
 }
+
+/**
+ * Atomically replace a committed instructor's seat allocation. The old teacher
+ * remains assigned until a compatible replacement is committed in the same transaction.
+ */
+export async function replaceCommittedCapacity(context: CommandContext, input: {
+  reservationId: string; replacementOfferingId: string; reason: string;
+}) {
+  assertCapability(context,"capacity.reserve");
+  if(input.reason.trim().length<5)throw new Error("Explain the staffing replacement");
+  return db.transaction(async tx=>{
+    const [old]=await tx.select({
+      id:instructionalCapacityReservations.id,demandId:instructionalCapacityReservations.demandId,
+      sectionId:instructionalCapacityReservations.sectionId,seats:instructionalCapacityReservations.seats,
+      status:instructionalCapacityReservations.status,oldOfferingId:instructionalCapacityReservations.offeringId,
+      oldPersonId:instructionalCapacityOfferings.personId,
+    }).from(instructionalCapacityReservations)
+      .innerJoin(instructionalCapacityOfferings,eq(instructionalCapacityOfferings.id,instructionalCapacityReservations.offeringId))
+      .where(eq(instructionalCapacityReservations.id,input.reservationId)).limit(1).for("update");
+    if(!old||old.status!=="committed")throw new Error("Current instructor does not have a committed reservation");
+    if(old.oldOfferingId===input.replacementOfferingId)throw new Error("Choose a different offering");
+    const demand=await loadDemandContext(tx,old.demandId);
+    if(!demand)throw new Error("Section demand not found");
+    assertDemandScope(context,demand);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`capacity-demand:${demand.demandId}`}))`);
+    const [replacement]=await tx.select({
+      id:instructionalCapacityOfferings.id,personId:instructionalCapacityOfferings.personId,
+      maxSeats:instructionalCapacityOfferings.maxSeats,status:instructionalCapacityOfferings.status,
+      modality:instructionalCapacityOfferings.modality,
+      organizationId:instructionalCapacityOfferings.organizationId,siteId:instructionalCapacityOfferings.siteId,
+      programId:instructionalCapacityOfferings.programId,jurisdictionId:instructionalCapacityOfferings.jurisdictionId,
+      subject:instructorCapabilities.subject,courseTemplateId:instructorCapabilities.courseTemplateId,
+      availableFrom:instructorAvailabilityWindows.startsAt,availableUntil:instructorAvailabilityWindows.endsAt,
+      pattern:instructorAvailabilityWindows.weeklyPattern,
+    }).from(instructionalCapacityOfferings)
+      .innerJoin(instructorCapabilities,eq(instructorCapabilities.id,instructionalCapacityOfferings.capabilityId))
+      .innerJoin(instructorAvailabilityWindows,eq(instructorAvailabilityWindows.id,instructionalCapacityOfferings.availabilityWindowId))
+      .where(and(eq(instructionalCapacityOfferings.id,input.replacementOfferingId),
+        eq(instructorCapabilities.active,true),eq(instructorAvailabilityWindows.active,true)))
+      .limit(1).for("update");
+    if(!replacement||replacement.status!=="open")throw new Error("Replacement offering unavailable");
+    if(replacement.personId===old.oldPersonId)throw new Error("Replacement must be a different instructor");
+    if(!scopedMatch(replacement,demand)||!modalityMatches(replacement.modality,demand.modality)||
+      replacement.availableFrom>demand.startsAt||replacement.availableUntil<demand.endsAt)
+      throw new Error("Replacement instructor scope, modality or availability is incompatible");
+    if(!(replacement.courseTemplateId===demand.courseTemplateId ||
+      (!replacement.courseTemplateId && replacement.subject?.toLowerCase()===demand.courseSubject.toLowerCase())))
+      throw new Error("Replacement instructor cannot teach this subject");
+    if(!weeklyPatternCovers(replacement.pattern,await loadSectionPeriods(tx,demand.scheduleTemplateId)))
+      throw new Error("Replacement is unavailable during this class schedule");
+    const taken=await tx.select({seats:instructionalCapacityReservations.seats,status:instructionalCapacityReservations.status,
+      expiresAt:instructionalCapacityReservations.expiresAt,demandId:instructionalCapacityReservations.demandId})
+      .from(instructionalCapacityReservations)
+      .where(eq(instructionalCapacityReservations.offeringId,replacement.id));
+    const used=taken.filter(row=>row.demandId!==demand.demandId &&
+      ACTIVE_RESERVATION_STATUSES.includes(row.status as (typeof ACTIVE_RESERVATION_STATUSES)[number]) &&
+      (!row.expiresAt||row.expiresAt>new Date())).reduce((sum,row)=>sum+row.seats,0);
+    if(used+old.seats>replacement.maxSeats)throw new Error("Replacement has insufficient seats");
+    const [existing]=await tx.select({id:instructionalCapacityReservations.id})
+      .from(instructionalCapacityReservations)
+      .where(and(eq(instructionalCapacityReservations.offeringId,replacement.id),
+        eq(instructionalCapacityReservations.demandId,demand.demandId))).limit(1);
+    if(existing)throw new Error("A reservation already exists for this replacement and class");
+    await tx.insert(instructionalCapacityReservations).values({
+      offeringId:replacement.id,demandId:demand.demandId,sectionId:demand.sectionId,seats:old.seats,
+      status:"committed",createdByPersonId:context.actorPersonId,
+      metadata:{replacedReservationId:old.id,reason:input.reason.trim()},
+    });
+    await tx.insert(sectionTeachers).values({sectionId:demand.sectionId,personId:replacement.personId,
+      role:"teacher",assignmentSource:"capacity"}).onConflictDoNothing();
+    await tx.update(instructionalCapacityReservations).set({status:"released",updatedAt:new Date(),
+      metadata:{replacedByOfferingId:replacement.id,reason:input.reason.trim()}})
+      .where(eq(instructionalCapacityReservations.id,old.id));
+    const remaining=await tx.select({id:instructionalCapacityReservations.id})
+      .from(instructionalCapacityReservations)
+      .innerJoin(instructionalCapacityOfferings,eq(instructionalCapacityOfferings.id,instructionalCapacityReservations.offeringId))
+      .where(and(eq(instructionalCapacityReservations.sectionId,demand.sectionId),
+        eq(instructionalCapacityOfferings.personId,old.oldPersonId),
+        eq(instructionalCapacityReservations.status,"committed"))).limit(1);
+    if(!remaining.length)await tx.delete(sectionTeachers).where(and(eq(sectionTeachers.sectionId,demand.sectionId),
+      eq(sectionTeachers.personId,old.oldPersonId),eq(sectionTeachers.assignmentSource,"capacity")));
+    return {sectionId:demand.sectionId,replacementPersonId:replacement.personId};
+  });
+}
