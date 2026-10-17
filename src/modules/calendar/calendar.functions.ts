@@ -1,7 +1,6 @@
-import { assertSyntheticMutation, type DemoRole } from "@/modules/_demo/demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq, gte, inArray, lt, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, or, isNull, ne, notExists } from "drizzle-orm";
 import { z } from "zod";
 import { actorSiteIds, recordAudit, requireActor, type ActorRole } from "@/modules/identity/actors.server";
 import { EventTypes } from "@/domain/event-types";
@@ -59,6 +58,7 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
       .where(and(
         eq(schema.guardianRelationships.guardianPersonId, actor.actorPersonId),
         eq(schema.guardianRelationships.canViewAcademics, true),
+        inArray(schema.enrollments.programId, actor.scope.programIds ?? []),
       ));
     return rows.map((row) => row.sectionId).filter((id): id is string => Boolean(id));
   }
@@ -91,6 +91,11 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
         eq(schema.calendarEventParticipants.participantId, actor.actorPersonId),
       ));
 
+    // A site or section membership does not reveal participant-restricted events.
+    // Only the named participant can read those events.
+    const hasExplicitParticipants = db.select({ id: schema.calendarEventParticipants.id })
+      .from(schema.calendarEventParticipants)
+      .where(eq(schema.calendarEventParticipants.calendarEventId, schema.calendarEvents.id));
     const events = await db
       .select()
       .from(schema.calendarEvents)
@@ -98,8 +103,12 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
         gte(schema.calendarEvents.startsAt, rangeStart),
         lt(schema.calendarEvents.startsAt, rangeEnd),
         or(
-          inArray(schema.calendarEvents.siteId, sites),
-          sectionIds.length ? inArray(schema.calendarEvents.sectionId, sectionIds) : undefined,
+          and(inArray(schema.calendarEvents.siteId, sites),
+            isNull(schema.calendarEvents.sectionId),
+            ne(schema.calendarEvents.type, "personal"),
+            notExists(hasExplicitParticipants)),
+          sectionIds.length ? and(inArray(schema.calendarEvents.sectionId, sectionIds),
+            notExists(hasExplicitParticipants)) : undefined,
           inArray(schema.calendarEvents.id, participantEventIds),
         ),
       ))
@@ -168,9 +177,10 @@ export const createPersonalEvent = createServerFn({ method: "POST" })
     }).parse(value))
   .handler(async ({ data }) => {
     const actor = await requireActor(allRoles, "calendar.event.create");
-    assertSyntheticMutation(actor.role as DemoRole);
     const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-    const siteId = actor.scope.siteIds?.[0] ?? null;
+    // Personal events must not inherit an arbitrary first school in multi-site accounts.
+    // Their owner participant record is the visibility authority.
+    const siteId = null;
     return db.transaction(async (tx) => {
       const [event] = await tx
         .insert(schema.calendarEvents)
@@ -211,7 +221,6 @@ export const moveAssessmentDueDate = createServerFn({ method: "POST" })
       newDueAt: z.string().datetime({ offset: true }),
     }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("teacher");
     const actor = await requireActor(["teacher"], "assignments:create");
     const sites = actorSiteIds(actor);
     const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
