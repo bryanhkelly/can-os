@@ -19,9 +19,12 @@ function requireAdmissionsProgramScope(context:CommandContext,programId:string){
 async function lockPool(tx:Transaction,programId:string,schoolYearId:string){
  const [pool]=await tx.select().from(admissionSeatPools).where(and(eq(admissionSeatPools.programId,programId),eq(admissionSeatPools.schoolYearId,schoolYearId))).for("update").limit(1);
  if(!pool)throw new Error("A configured seat pool is required");
- const [year]=await tx.select({programId:schoolYears.programId,organizationId:schoolYears.organizationId}).from(schoolYears).where(eq(schoolYears.id,schoolYearId)).limit(1);
- const [program]=await tx.select({organizationId:programs.organizationId}).from(programs).where(eq(programs.id,programId)).limit(1);
- if(!year||!program||year.programId!==programId||year.organizationId!==program.organizationId)throw new Error("School year does not belong to program");
+ const [year]=await tx.select({programId:schoolYears.programId,organizationId:schoolYears.organizationId,siteId:schoolYears.siteId}).from(schoolYears).where(eq(schoolYears.id,schoolYearId)).limit(1);
+ const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId}).from(programs).where(eq(programs.id,programId)).limit(1);
+ if(!year||!program||year.organizationId!==program.organizationId||
+  (year.programId!==null&&year.programId!==programId)||
+  (year.programId===null&&year.siteId!==program.siteId))
+  throw new Error("School year does not belong to this program or host site");
  return {pool,organizationId:program.organizationId};
 }
 async function occupancy(tx:Transaction,programId:string,schoolYearId:string,now:Date){
