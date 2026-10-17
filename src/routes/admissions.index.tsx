@@ -3,6 +3,7 @@ import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
 import { listMySites } from "@/modules/operations/site-directory.functions";
+import { listAdmissionsPrograms } from "@/modules/enrollment/admissions-program-directory.functions";
 import { getSyntheticAdmissionOfferOptions, issueSyntheticOfferFromDemo, activateSyntheticOfferFromDemo } from "@/modules/enrollment/admissions-offer-demo.functions";
 import { admissionsPipelineSummary } from "@/domain/admissions-pipeline";
 import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions-offer-selection";
@@ -14,6 +15,7 @@ const loadAdmissions = async (selection:{siteId?:string;programId?:string}={}) =
  rows: await getAdmissionsDashboard({data:selection}),
  options: await getSyntheticAdmissionOfferOptions({data:selection}),
  sites: await listMySites(),
+ programs: await listAdmissionsPrograms(),
 });
 
 export const Route = createFileRoute("/admissions/")({
@@ -36,9 +38,9 @@ function Admissions() {
 }
 
 function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissions>> }) {
-  const { rows, options, sites } = data;
+  const { rows, options, sites, programs } = data;
   const selected=Route.useSearch();
-  const programChoices=[...new Map(rows.map(row=>[row.programId,{id:row.programId,name:row.program}])).values()];
+  const programChoices=programs.filter(program=>!selected.siteId||program.siteId===selected.siteId);
   const familyScope=new URLSearchParams();
   if(selected.siteId)familyScope.set("siteId",selected.siteId);
   if(selected.programId)familyScope.set("programId",selected.programId);
