@@ -456,3 +456,61 @@ export const listExcuseAttachmentCounts = createServerFn({ method: "GET" })
     }
     return { counts: [...latest.entries()].map(([attendanceEventId, count]) => ({ attendanceEventId, count })) };
   });
+
+/** Return a short-lived private URL only for a verified file linked to this student's latest attempt. */
+export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({
+  assessmentId:z.string().uuid(),documentId:z.string().uuid()
+ }).parse(value))
+ .handler(async({data})=>{
+  const {context,studentId,studentPersonId}=await studentActor();
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const assessment=await requireEnrolledAssessment(db,s,data.assessmentId,studentId,
+    context.scope.siteIds??[],context.scope.programIds??[]);
+  const [latest]=await db.select({response:s.submissions.response})
+   .from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),
+    eq(s.submissions.studentProfileId,studentId)))
+   .orderBy(desc(s.submissions.attemptNumber)).limit(1);
+  const ids=Array.isArray(latest?.response.attachments)?latest.response.attachments:[];
+  if(!ids.includes(data.documentId))throw new AuthorizationError("attachment belongs to latest student submission");
+  const [document]=await db.select({
+   storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt,
+   mimeType:s.documents.mimeType
+  }).from(s.documents).where(and(eq(s.documents.id,data.documentId),
+   eq(s.documents.subjectType,"assessment"),eq(s.documents.subjectId,assessment.id),
+   eq(s.documents.category,"assignment_submission"),
+   eq(s.documents.uploadedByPersonId,studentPersonId),
+   eq(s.documents.storageProvider,"cloudflare_r2"))).limit(1);
+  if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/assignment/${assessment.id}/`))
+    throw new AuthorizationError("verified attachment scope");
+  return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
+ });
+
+/** Only the uploading guardian can fetch a verified file on a current child's excuse. */
+export const getExcuseAttachmentDownload=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({
+  attendanceEventId:z.string().uuid(),documentId:z.string().uuid()
+ }).parse(value))
+ .handler(async({data})=>{
+  const context=await guardianActor();
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  await requireGuardianEvent(db,s,data.attendanceEventId,context.actorPersonId!,
+    context.scope.programIds??[]);
+  const [excuse]=await db.select({documentIds:s.attendanceExcuses.documentIds})
+    .from(s.attendanceExcuses)
+    .where(eq(s.attendanceExcuses.attendanceEventId,data.attendanceEventId))
+    .orderBy(desc(s.attendanceExcuses.createdAt)).limit(1);
+  if(!excuse?.documentIds.includes(data.documentId))
+    throw new AuthorizationError("document not attached to latest excuse");
+  const [document]=await db.select({
+   storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt
+  }).from(s.documents).where(and(eq(s.documents.id,data.documentId),
+    eq(s.documents.subjectType,"attendance_event"),
+    eq(s.documents.subjectId,data.attendanceEventId),
+    eq(s.documents.category,"attendance_excuse"),
+    eq(s.documents.uploadedByPersonId,context.actorPersonId!),
+    eq(s.documents.storageProvider,"cloudflare_r2"))).limit(1);
+  if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/excuse/${data.attendanceEventId}/`))
+    throw new AuthorizationError("verified excuse document scope");
+  return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
+ });
