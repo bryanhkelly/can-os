@@ -327,6 +327,29 @@ integration("GF-A2 durable subscriptions", () => {
       .where(eq(schema.subscriptionDeliveries.domainEventId, event.id));
     expect(deliveriesAfterRerun).toHaveLength(deliveries.length);
 
+    // --- External delivery is durable and reports missing contact accurately ----
+    const [emailWatch] = await db.insert(schema.subscriptions).values({
+      subscriberPersonId: guardian!.id,
+      eventTypes: ["AssignmentBecameMissing"],
+      subjectType: "student_profile",
+      subjectId: student!.id,
+      channel: "email",
+    }).returning();
+    await subscriptionsPlatform.processEventSubscriptions(event.id);
+    const [queued] = await db.select().from(schema.subscriptionDeliveries)
+      .where(and(
+        eq(schema.subscriptionDeliveries.subscriptionId, emailWatch!.id),
+        eq(schema.subscriptionDeliveries.domainEventId, event.id),
+      ));
+    expect(queued?.status).toBe("pending");
+    const { processQueuedSubscriptionDeliveries } = await import("@/platform/subscriptions/delivery-worker");
+    await processQueuedSubscriptionDeliveries();
+    const [attempted] = await db.select().from(schema.subscriptionDeliveries)
+      .where(eq(schema.subscriptionDeliveries.id, queued!.id));
+    expect(attempted?.status).toBe("failed");
+    expect(attempted?.lastError).toBe("no_active_email");
+    expect(attempted?.attempts).toBe(1);
+
     // --- Reminder: fires once while the submission is still missing ------------
     // Events carry real wall-clock occurredAt, so the reminder window is
     // evaluated against a simulated future "now".
