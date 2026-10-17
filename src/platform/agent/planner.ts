@@ -14,7 +14,7 @@ const summaryVerb = /\b(?:how(?:'s| is| are)|how (?:has|did)|give me (?:an? )?(?
 const token = String.raw`[\p{L}][\p{L}'’.-]*`;
 const fullName = String.raw`${token}(?:\s+${token}){0,2}`;
 const nonNames = new Set(["my","our","the","a","an","me","any","all","their","his","her","child","kid","student","son","daughter","children","kids","students","assignment","assignments","homework","work","grades","grade","progress","school","class","classes","biology","math","english","science","history","teacher","when","if","you","can","please","someone","anyone"]);
-const trailingWords = /\s+(?:miss(?:es|ed|ing)?|has|is|gets|does|did|was|will|fails|forgets|falls|struggles|turns|hands|submits|in|at|with|on|about|from|again|today|tomorrow|yesterday|this|their|his|her|my|any|an|a|the)\b.*$/i;
+const trailingWords = /\s+(?:doing|miss(?:es|ed|ing)?|has|is|gets|does|did|was|will|fails|forgets|falls|struggles|turns|hands|submits|in|at|with|on|about|from|again|today|tomorrow|yesterday|this|their|his|her|my|any|an|a|the)\b.*$/i;
 const patterns = [
   new RegExp(String.raw`\b(?:when|if)\s+(${fullName})\s+(?:misses|missed|has|is|gets|does|fails|forgets|falls)\b`, "iu"),
   new RegExp(String.raw`\b(${fullName})['’]s\s+(?:assignments?|homework|schoolwork|grades?|progress)\b`, "iu"),
