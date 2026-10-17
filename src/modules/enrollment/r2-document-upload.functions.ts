@@ -8,21 +8,21 @@ import {db} from "@/db/client";
 import {applications,journeys,journeyRequirements,documents,auditEvents,programs,guardianRelationships,studentProfiles} from "@/db/schema";
 import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {newDocumentKey,signR2Object,validateDocumentUpload,r2Config} from "./r2-documents.server";
-async function uploadsEnabled(applicationId:string){
+async function uploadsEnabled(applicationId:string,mode:"upload"|"download"="upload"){
 
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId)throw new Error("Authenticated person required");
  const [app]=await db.select({programId:applications.programId,studentProfileId:applications.studentProfileId,metadata:applications.metadata}).from(applications).where(eq(applications.id,applicationId)).limit(1);
  if(!app)throw new Error("Application not found");
- if(app.metadata.synthetic===true){
+ if(mode==="upload"&&app.metadata.synthetic===true){
   assertR2DemoEnabled(process.env.CAN_R2_DEMO_UPLOADS_ENABLED);
   assertSyntheticMutation(context.role);
- }else if(process.env.CAN_R2_LIVE_UPLOADS_ENABLED!=="true"){
+ }else if(mode==="upload"&&process.env.CAN_R2_LIVE_UPLOADS_ENABLED!=="true"){
   throw new Error("Live enrollment document uploads are not enabled for this deployment");
  }
  const [programScope]=await db.select({siteId:programs.siteId,organizationId:programs.organizationId})
   .from(programs).where(eq(programs.id,app.programId)).limit(1);
- if(!programScope||!context.scope.programIds?.includes(app.programId)||
+ if(!programScope||!programScope.siteId||!context.scope.programIds?.includes(app.programId)||
   !context.scope.siteIds?.includes(programScope.siteId))
   throw new Error("Enrollment document outside authorized school or program");
  if(context.role==="registrar"){
@@ -122,7 +122,7 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
 export const getSyntheticR2DocumentDownload=createServerFn({method:"POST"})
  .validator((data:{applicationId:string;requirementId:string;documentId:string})=>data)
  .handler(async({data})=>{
-  await uploadsEnabled(data.applicationId);
+  await uploadsEnabled(data.applicationId,"download");
   await requirementScope(data.applicationId,data.requirementId);
   const [record]=await db.select({id:documents.id,storageKey:documents.storageKey,metadata:documents.metadata})
    .from(documents).where(and(eq(documents.id,data.documentId),eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageProvider,"cloudflare_r2"))).limit(1);
