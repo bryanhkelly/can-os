@@ -18,7 +18,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run audit:fixtures
+      - run: node scripts/check-route-fixture-coverage.mjs
       - run: npm run build
       - run: npm run typecheck
       - run: npx vitest run tests/unit/section-schedule-service.test.ts tests/unit/educational-capacity.test.ts
