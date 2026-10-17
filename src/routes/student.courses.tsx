@@ -28,7 +28,10 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
  const credits=active.reduce((n,s)=>n+s.credits,0);
  const today=new Date().toISOString().slice(0,10);
  return <main className="mx-auto max-w-5xl px-5 py-9 pb-20">
-  <Link to="/student" className="text-xs text-muted-foreground hover:underline">← Student Today</Link>
+  <nav className="flex flex-wrap items-center gap-4">
+   <Link to="/student" className="text-xs text-muted-foreground hover:underline">← Student Today</Link>
+   {role==="student"&&<Link to="/groups" className="text-xs font-semibold underline underline-offset-4">Study groups</Link>}
+  </nav>
   <p className="mt-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Course registration</p>
   <h1 className="mt-2 font-serif text-5xl">Choose your classes.</h1>
   <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">Review your school’s available classes and request a schedule change. A registrar reviews each request before enrollment changes. Drops and withdrawals have different deadlines and academic consequences.</p>
