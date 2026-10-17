@@ -667,15 +667,11 @@
       ]
     },
     "/teacher/notices": {
+      "fixtureRequired": false,
       "persona": "teacher",
-      "seeds": [
-        "new-experiences-v1.sql"
-      ],
-      "recordCounts": {
-        "notifications": 1
-      },
+      "rationale": "Backward-compatible redirect to shared authenticated /notifications",
       "interactions": [
-        "review notices relevant to taught sections"
+        "redirect to canonical notification center"
       ],
       "downstreamRecords": []
     },
