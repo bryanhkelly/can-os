@@ -11,6 +11,7 @@ import { db } from "@/db/client";
 import {
   domainEvents,
   conversationMessages,
+  subscriptionEventReceipts,
   subscriptionDeliveries,
   subscriptions,
 } from "@/db/schema";
@@ -33,15 +34,24 @@ export async function processEventSubscriptions(eventId: string): Promise<number
 
   const policy = getSubscriptionPolicy(event.eventType);
   if (!policy) return 0;
+  const [priorReceipt] = await db.select({ eventId: subscriptionEventReceipts.eventId })
+    .from(subscriptionEventReceipts).where(eq(subscriptionEventReceipts.eventId, eventId)).limit(1);
+  if (priorReceipt) return 0;
 
   let delivered = 0;
 
   await db.transaction(async (tx) => {
     const context = await policy.load(tx, event);
-    if (!context) return;
+    if (!context) {
+      await tx.insert(subscriptionEventReceipts).values({ eventId }).onConflictDoNothing();
+      return;
+    }
 
     const subjects = policy.subjects(context);
-    if (!subjects.length) return;
+    if (!subjects.length) {
+      await tx.insert(subscriptionEventReceipts).values({ eventId }).onConflictDoNothing();
+      return;
+    }
 
     const now = new Date();
     const matches = await tx
@@ -50,6 +60,7 @@ export async function processEventSubscriptions(eventId: string): Promise<number
       .where(
         and(
           eq(subscriptions.status, "active"),
+          lte(subscriptions.createdAt, event.occurredAt),
           arrayContains(subscriptions.eventTypes, [event.eventType]),
           or(
             ...subjects.map((subject) =>
@@ -137,6 +148,7 @@ export async function processEventSubscriptions(eventId: string): Promise<number
       }
       // Other channels stay pending for the independently retryable worker.
     }
+    await tx.insert(subscriptionEventReceipts).values({ eventId }).onConflictDoNothing();
   });
 
   return delivered;
