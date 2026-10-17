@@ -232,3 +232,19 @@ export async function getStudentAcademicSummary(context: AcademicReadContext, st
       data: { missingCount: missing.length },
     };
 }
+
+/** Domain-owned guardian check for academic digest enrollment. */
+export async function assertGuardianAcademicAccess(context: AcademicReadContext, studentProfileId: string) {
+  if (!context.capabilities.has("student:related-read")) {
+    throw new AuthorizationError("guardian academic capability");
+  }
+  const student = await assertStudentAccess(context, studentProfileId);
+  const [relationship] = await db.select({ id: guardianRelationships.id })
+    .from(guardianRelationships).where(and(
+      eq(guardianRelationships.guardianPersonId, context.actorPersonId),
+      eq(guardianRelationships.studentPersonId, student.personId),
+      eq(guardianRelationships.canViewAcademics, true),
+    )).limit(1);
+  if (!relationship) throw new AuthorizationError("guardian academic relationship");
+  return student;
+}
