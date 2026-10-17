@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   confirmAskCanAction,
   sendAskCanMessage,
+  getAskCanConversation,
+  listAskCanConversations,
 } from "@/modules/conversation/ask-can.functions";
 import { WorkspaceShell } from "@/components/workspace";
 
@@ -27,6 +29,27 @@ function AskCanPage() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [threads, setThreads] = useState<{ id: string; lastActiveAt: Date }[]>([]);
+  useEffect(() => {
+    let active = true;
+    listAskCanConversations().then(async rows => {
+      if (!active) return;
+      setThreads(rows.map(row => ({ id: row.id, lastActiveAt: row.lastActiveAt })));
+      const newest = rows[rows.length - 1];
+      if (newest) {
+        const history = await getAskCanConversation({ data: { conversationId: newest.id } });
+        if (active) { setConversationId(newest.id); setMessages(history as ChatMessage[]); }
+      }
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+  async function openThread(id: string) {
+    try {
+      const history = await getAskCanConversation({ data: { conversationId: id } });
+      setConversationId(id); setMessages(history as ChatMessage[]);
+      setError("");
+    } catch { setError("Could not reopen that conversation."); }
+  }
 
   async function send() {
     const body = input.trim();
@@ -79,6 +102,19 @@ function AskCanPage() {
       title="Ask CAN"
       subtitle="Answers and actions use your permissions. Anything that changes something asks for your confirmation first."
     >
+      {threads.length > 0 && <div className="mt-5 flex flex-wrap gap-2" aria-label="Conversation history">
+        {threads.slice(-8).reverse().map(thread => (
+          <button key={thread.id} type="button" onClick={() => void openThread(thread.id)}
+            className={"rounded-full border px-3 py-1 text-xs " +
+              (conversationId === thread.id ? "bg-muted" : "hover:bg-muted")}>
+            {new Date(thread.lastActiveAt).toLocaleString()}
+          </button>
+        ))}
+        <button type="button" className="rounded-full border px-3 py-1 text-xs"
+          onClick={() => { setConversationId(undefined); setMessages([]); }}>
+          New conversation
+        </button>
+      </div>}
       {error && (
         <p className="mt-6 rounded-lg border border-amber-500 p-3 text-sm text-amber-600">
           {error}
