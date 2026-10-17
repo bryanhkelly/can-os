@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { and, desc, eq } from "drizzle-orm";
+import { db } from "@/db/client";
+import { subscriptionDeliveries, subscriptions } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import {
@@ -80,6 +83,8 @@ export const getMyWatches = createServerFn({ method: "GET" }).handler(async () =
     subjectType: row.subjectType,
     subjectId: row.subjectId,
     reminderAfterHours: row.reminderPolicy.remindAfterHours ?? null,
+    repeatEveryHours: row.reminderPolicy.repeatEveryHours ?? null,
+    maxReminders: row.reminderPolicy.maxReminders ?? 1,
     channel: row.channel,
     status: row.status,
     createdVia: row.createdVia,
@@ -104,5 +109,61 @@ export const updateWatchStatus = createServerFn({ method: "POST" })
       data.status,
     );
     if (!updated) throw new AuthorizationError(`watch: ${data.subscriptionId}`);
+    return { ok: true };
+  });
+
+/** Read the signed-in subscriber's bounded delivery history. */
+export const getMyWatchDeliveries = createServerFn({ method: "GET" })
+  .validator((value: unknown) =>
+    z.object({ subscriptionId: z.string().uuid() }).parse(value))
+  .handler(async ({ data }) => {
+    const context = await actor();
+    const rows = await db.select({
+      id: subscriptionDeliveries.id,
+      kind: subscriptionDeliveries.kind,
+      channel: subscriptionDeliveries.channel,
+      status: subscriptionDeliveries.status,
+      attempts: subscriptionDeliveries.attempts,
+      lastError: subscriptionDeliveries.lastError,
+      createdAt: subscriptionDeliveries.createdAt,
+      deliveredAt: subscriptionDeliveries.deliveredAt,
+    }).from(subscriptionDeliveries)
+      .innerJoin(subscriptions, eq(subscriptions.id, subscriptionDeliveries.subscriptionId))
+      .where(and(
+        eq(subscriptions.id, data.subscriptionId),
+        eq(subscriptions.subscriberPersonId, context.actorPersonId),
+      ))
+      .orderBy(desc(subscriptionDeliveries.createdAt)).limit(50);
+    return rows.map(row => ({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      deliveredAt: row.deliveredAt?.toISOString() ?? null,
+    }));
+  });
+
+/** A subscriber can manage delivery options, but cannot change watched subjects. */
+export const updateWatchOptions = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    subscriptionId: z.string().uuid(),
+    channel: z.enum(["in_app", "email"]),
+    remindAfterHours: z.number().int().min(1).max(720).nullable(),
+    repeatEveryHours: z.number().int().min(1).max(720).nullable(),
+    maxReminders: z.number().int().min(1).max(30),
+  }).parse(value))
+  .handler(async ({ data }) => {
+    const context = await actor();
+    const result = await db.update(subscriptions).set({
+      channel: data.channel,
+      reminderPolicy: data.remindAfterHours === null ? {} : {
+        remindAfterHours: data.remindAfterHours,
+        ...(data.repeatEveryHours === null ? {} : { repeatEveryHours: data.repeatEveryHours }),
+        maxReminders: data.maxReminders,
+      },
+      updatedAt: new Date(),
+    }).where(and(eq(subscriptions.id, data.subscriptionId),
+      eq(subscriptions.subscriberPersonId, context.actorPersonId),
+      eq(subscriptions.status, "active")))
+      .returning({ id: subscriptions.id });
+    if (!result.length) throw new AuthorizationError("active watch");
     return { ok: true };
   });
