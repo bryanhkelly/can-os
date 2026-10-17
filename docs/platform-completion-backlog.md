@@ -18,6 +18,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Restrict active academic roster, guardian assignments and office-hour child eligibility to verified program IDs, in addition to site membership.
 - [x] Resolve program and site selections as one server-authorized pair, and apply the selection to the canonical operations Action queue, launch readiness, registrar admissions list and family readiness.
 - [x] Carry verified child context from guardian cards through attendance and admission-offer views.
+- [x] Converge admissions seat-pool capacity reads/updates across authentic and fixture records, preserving occupied and held-seat protections.
 - [ ] Review any remaining program/site selection requirements in insights, capacity and other retained operational pages.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
 - [x] Delete legacy synthetic-only operations service after replacing its route consumer.
@@ -25,6 +26,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [ ] Add integration tests for canonical action transitions, assignment and authorization (deferred by request).
 - [x] Restrict owned student Action completion to known student workflow types and emit ActionResolved event.
 - [x] Restrict student-owned Action completion to student grants and active program membership; write ActionCreated for student support requests and ActionResolved on completion.
+- [x] Emit canonical ActionCreated/ActionResolved for authenticated missing-work follow-ups, support referrals, coach outreach and referral closure.
 - [ ] Verify Action lifecycle event parity and cross-role behavior with deferred integration tests.
 - [x] Remove local-only StudentQuickWins from active experiences route and require canonical Student Today input (no fallback sample student).
 - [x] Remove fixture gating from authenticated student-owned action and display-preference commands.
@@ -57,7 +59,9 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Remove unconditional synthetic markers from shared domain audits and authenticated session audits.
 - [x] Replace demonstration-only messaging write gates after restricting contact discovery to verified site/program relationships and thread participation.
 - [x] Remove admissions/family-readiness fixture-only read filtering while leaving sensitive R2 demo-only document operations restricted.
-- [ ] Complete remaining service-by-service authorization audit; legacy fixture-only gates persist in learning, support, study groups, administrative and attachment workflows.
+- [x] Converge assigned-teacher gradebook and assessment creation, student missing-work queue and follow-ups, and support-referral/coach actions with verified student-school-program context rather than fixture-only gates.
+- [x] Replace the staff support demo persona switch and fictional student with the verified active staff role and a selectable authorized student; provide a separate authenticated student help-request and action screen.
+- [ ] Complete remaining service-by-service authorization audit; legacy fixture-only gates persist in some learning, study-group, admin, and attachment workflows.
 
 ## Phase 2 — connected school operation
 
