@@ -80,6 +80,12 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         .where(and(eq(s.sections.id,data.sectionId),inArray(s.sections.siteId,sites),eq(s.sections.active,true))).limit(1);
       if(!section) throw new Error("Section not offered at this Site");
       assertProgramGranted(actor,section.programId);
+      const [programMembership]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
+       .where(and(eq(s.enrollments.studentProfileId,studentId),
+        eq(s.enrollments.programId,section.programId),
+        eq(s.enrollments.schoolYearId,section.schoolYearId),
+        eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"))).limit(1);
+      if(!programMembership)throw new Error("Student must have an active enrollment in this school year and program");
       const policy=registrationPolicy(section.metadata);
       const today=new Date().toISOString().slice(0,10);
       if(data.operation==="drop" && today>policy.addDropEndsOn) throw new Error("Add/drop window has closed. Request withdrawal instead.");
@@ -129,6 +135,11 @@ export const decideCourseChange = createServerFn({method:"POST"})
       if(data.approve){
         const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata,termId:s.sections.termId,title:s.sections.title}).from(s.sections).where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,siteId),eq(s.sections.programId,programId),eq(s.sections.active,true))).limit(1).for("update");
         if(!section)throw new Error("Section unavailable");
+        const [activeProgram]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
+         .where(and(eq(s.enrollments.studentProfileId,studentProfileId),
+          eq(s.enrollments.programId,programId),eq(s.enrollments.schoolYearId,schoolYearId),
+          eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"))).limit(1);
+        if(!activeProgram)throw new Error("Student program enrollment is no longer active");
         const policyAtApproval=registrationPolicy(section.metadata);
         const today=new Date().toISOString().slice(0,10);
         if(operation==="add" && today>policyAtApproval.addDropEndsOn)throw new Error("Registration window closed before approval");
@@ -200,6 +211,22 @@ export const decideCourseChange = createServerFn({method:"POST"})
         resolutionNote:data.approve?"Approved enrollment change":"Declined enrollment change",updatedAt:new Date()}).where(eq(s.actions.id,request.id));
       if(request.ownerPersonId)await tx.insert(s.notifications).values({recipientPersonId:request.ownerPersonId,type:"course_registration_decision",status:"unread",
         title:data.approve?"Your class change was approved":"Your class change was declined",body:request.title,resourceType:"action",resourceId:request.id});
+      if(data.approve){
+       const [student]=await tx.select({personId:s.studentProfiles.personId})
+        .from(s.studentProfiles).where(eq(s.studentProfiles.id,studentProfileId)).limit(1);
+       if(student){
+        const guardians=await tx.select({personId:s.guardianRelationships.guardianPersonId})
+         .from(s.guardianRelationships).where(and(
+          eq(s.guardianRelationships.studentPersonId,student.personId),
+          eq(s.guardianRelationships.canViewAcademics,true)));
+        if(guardians.length)await tx.insert(s.notifications).values(
+         guardians.map(g=>({recipientPersonId:g.personId,
+          type:"course_registration_decision",status:"unread" as const,
+          title:"Course schedule updated",
+          body:request.title+" was approved by the school.",
+          resourceType:"action",resourceId:request.id})));
+       }
+      }
       await recordAudit(tx,actor,{action:data.approve?"course_registration.approve":"course_registration.decline",resourceType:"action",resourceId:request.id,before:{status:"open"},after:{status:data.approve?"resolved":"cancelled",operation:String(operation)},scope:{programId,siteId}});
       return {approved:data.approve};
     });
