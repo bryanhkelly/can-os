@@ -195,6 +195,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           title: s.sections.title,
           siteId: s.sections.siteId,
           programId: s.sections.programId,
+          termId:s.sections.termId,
         })
         .from(s.sections)
         .innerJoin(
@@ -226,6 +227,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         .where(eq(s.gradingPeriods.id, data.gradingPeriodId))
         .limit(1);
       if (!period) throw new Error("GradingPeriod not found");
+      if(section.termId!==period.termId)throw new AuthorizationError("grading period must belong to the section term");
       const [gradeScale]=await tx.select({configuration:s.gradeScales.configuration})
        .from(s.gradeScales).where(eq(s.gradeScales.id,period.gradeScaleId)).limit(1);
       if(!gradeScale?.configuration.entries.length)throw new Error("Active school grade scale is required");
@@ -730,11 +732,12 @@ export const getStudentTranscript = createServerFn({ method: "GET" })
     const rows = [...await finalizedGradeRows(db, s, viewer), ...await withdrawalTranscriptRows(db, s, viewer)];
     return {
       rows,
-      issuances: await listIssuances(db, s, viewer.studentProfileId),
+      issuances: await listIssuances(db, s, viewer.studentProfileId,[...new Set(rows.map(row=>row.creditIssuingOrganizationId))]),
     };
   });
 
-async function listIssuances(db: DbClient, s: Schema, studentProfileId: string) {
+async function listIssuances(db: DbClient, s: Schema, studentProfileId: string, authorizedIssuers:string[]) {
+  if(!authorizedIssuers.length)return [];
   const rows = await db
     .select({
       id: s.transcriptIssuances.id,
@@ -747,7 +750,7 @@ async function listIssuances(db: DbClient, s: Schema, studentProfileId: string) 
       s.organizations,
       eq(s.organizations.id, s.transcriptIssuances.issuingOrganizationId),
     )
-    .where(eq(s.transcriptIssuances.studentProfileId, studentProfileId))
+    .where(and(eq(s.transcriptIssuances.studentProfileId, studentProfileId),inArray(s.transcriptIssuances.issuingOrganizationId,authorizedIssuers)))
     .orderBy(desc(s.transcriptIssuances.issuedAt));
   return rows.map((row) => ({ ...row, issuedAt: row.issuedAt.toISOString() }));
 }
