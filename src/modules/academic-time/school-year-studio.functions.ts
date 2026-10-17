@@ -206,3 +206,58 @@ export const replaceStudioSchedulePeriods=createServerFn({method:"POST"})
    return {updated:true};
   });
  });
+
+/** Build the ordinary instructional calendar in one operation, preserving all
+ * existing overrides (closures, holidays and specially scheduled days). */
+export const populateStudioInstructionalDays=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({
+  academicCalendarId:uuid,weekdays:z.array(z.number().int().min(0).max(6)).min(1).max(7),
+  instructionalMinutes:z.number().int().min(1).max(1440),
+ }).parse(v))
+ .handler(async({data})=>{
+  const actor=await operator();
+  return db.transaction(async tx=>{
+   const [calendar]=await tx.select({
+    id:academicCalendars.id,startsOn:schoolYears.startsOn,
+    endsOn:schoolYears.endsOn,programId:schoolYears.programId,
+    siteId:schoolYears.siteId,organizationId:schoolYears.organizationId,
+   }).from(academicCalendars)
+    .innerJoin(schoolYears,eq(schoolYears.id,academicCalendars.schoolYearId))
+    .where(eq(academicCalendars.id,data.academicCalendarId)).limit(1);
+   if(!calendar||!actor.scope.organizationIds?.includes(calendar.organizationId)||
+    (actor.scope.siteIds?.length&&!actor.scope.siteIds.includes(calendar.siteId))||
+    (calendar.programId&&!actor.scope.programIds?.includes(calendar.programId)))
+    throw new AuthorizationError("calendar generation scope");
+   const weekdays=new Set(data.weekdays);
+   const start=new Date(calendar.startsOn+"T00:00:00.000Z");
+   const end=new Date(calendar.endsOn+"T00:00:00.000Z");
+   const rows:{academicCalendarId:string;calendarDate:string;
+    type:"instructional";instructionalMinutes:number}[]=[];
+   for(let at=start.getTime();at<=end.getTime();at+=86400000){
+    const instant=new Date(at);
+    if(!weekdays.has(instant.getUTCDay()))continue;
+    rows.push({academicCalendarId:calendar.id,
+     calendarDate:instant.toISOString().slice(0,10),
+     type:"instructional",instructionalMinutes:data.instructionalMinutes});
+   }
+   if(rows.length){
+    // Existing holiday and closure rows always win.
+    await tx.insert(academicCalendarDays).values(rows).onConflictDoNothing();
+   }
+   await tx.insert(domainEvents).values({
+    eventType:"AcademicCalendarChanged",aggregateType:"academic_calendar",
+    aggregateId:calendar.id,actorPersonId:actor.actorPersonId,
+    payload:{operation:"populate",weekdays:data.weekdays,scheduledDays:rows.length,
+     siteId:calendar.siteId},
+   });
+   await tx.insert(auditEvents).values({
+    actorPersonId:actor.actorPersonId,action:"academic_calendar.populate",
+    resourceType:"academic_calendar",resourceId:calendar.id,
+    scope:{organizationId:calendar.organizationId,siteId:calendar.siteId,
+     programId:calendar.programId},
+    after:{weekdays:data.weekdays,instructionalMinutes:data.instructionalMinutes,
+     scheduledDays:rows.length},
+   });
+   return {processedDays:rows.length};
+  });
+ });
