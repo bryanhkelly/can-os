@@ -2,6 +2,7 @@ import { listEnrollmentPlacements, placeEnrolledStudent } from "@/modules/enroll
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
+import { listMySites } from "@/modules/operations/site-directory.functions";
 import { getSyntheticAdmissionOfferOptions, issueSyntheticOfferFromDemo, activateSyntheticOfferFromDemo } from "@/modules/enrollment/admissions-offer-demo.functions";
 import { admissionsPipelineSummary } from "@/domain/admissions-pipeline";
 import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions-offer-selection";
@@ -9,10 +10,21 @@ import { WorkspaceShell, StatCard, EmptyState } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
-const loadAdmissions = async () => ({ rows: await getAdmissionsDashboard(), options: await getSyntheticAdmissionOfferOptions() });
+const loadAdmissions = async (selection:{siteId?:string;programId?:string}={}) => ({
+ rows: await getAdmissionsDashboard({data:selection}),
+ options: await getSyntheticAdmissionOfferOptions({data:selection}),
+ sites: await listMySites(),
+});
 
 export const Route = createFileRoute("/admissions/")({
-  loader: safeLoader(loadAdmissions, { authMessage: "Sign in with an authorized registrar account to view the admissions command center." }),
+  validateSearch:(search:Record<string,unknown>)=>({
+    siteId:typeof search.siteId==="string"?search.siteId:undefined,
+    programId:typeof search.programId==="string"?search.programId:undefined,
+  }),
+  loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
+  loader:({deps})=>safeLoader(()=>loadAdmissions(deps),{
+    authMessage:"Sign in with an authorized registrar account to view the admissions command center.",
+  })(),
   component: Admissions,
 });
 
@@ -24,7 +36,15 @@ function Admissions() {
 }
 
 function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissions>> }) {
-  const { rows, options } = data;
+  const { rows, options, sites } = data;
+  const selected=Route.useSearch();
+  const programChoices=[...new Map(rows.map(row=>[row.programId,{id:row.programId,name:row.program}])).values()];
+  const openScope=(siteId?:string,programId?:string)=>{
+    const query=new URLSearchParams();
+    if(siteId)query.set("siteId",siteId);
+    if(programId)query.set("programId",programId);
+    window.location.assign("/admissions"+(query.size?"?"+query.toString():""));
+  };
   const summary = admissionsPipelineSummary(rows);
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null), [error, setError] = useState(""), [notice, setNotice] = useState("");
@@ -45,6 +65,22 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
     >
       {error && <p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
       {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
+      <div className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4">
+        <label className="text-sm">School
+          <select aria-label="Admissions school" className="ml-2 rounded border bg-background p-2"
+           value={selected.siteId??""} onChange={event=>openScope(event.target.value||undefined)}>
+           <option value="">All permitted schools</option>
+           {sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+          </select>
+        </label>
+        <label className="text-sm">Program
+          <select aria-label="Admissions program" className="ml-2 rounded border bg-background p-2"
+           value={selected.programId??""} onChange={event=>openScope(selected.siteId,event.target.value||undefined)}>
+           <option value="">All permitted programs</option>
+           {programChoices.map(program=><option key={program.id} value={program.id}>{program.name}</option>)}
+          </select>
+        </label>
+      </div>
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <StatCard label="Applications" value={summary.total} />
         <StatCard label="Awaiting decision" value={summary.awaitingDecision} />
@@ -69,7 +105,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
             {latest?.status === "accepted" && !activated && <button disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => activateSyntheticOfferFromDemo({ data: { offerId: latest.id } }))}>Registrar: Activate enrollment</button>}
           </div>
           {x.enrollments.length > 0 && <CoursePlacement applicationId={x.id} />}
-          <Link to="/admissions/families" className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
+          <a href={"/admissions/families"+(selected.siteId||selected.programId?"?"+new URLSearchParams({...selected}).toString():"")} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</a>
         </article>;
       })}
         {!rows.length && <EmptyState title="No applications are available in your authorized programs." />}</div>
