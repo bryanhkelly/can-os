@@ -513,6 +513,8 @@ export async function reserveInstructionalCapacity(
     // the same last seats.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`capacity:${offering.id}`}))`);
 
+    // The demand row is the serialization point for allocations from different offerings.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`capacity-demand:${demand.demandId}`}))`);
     const existingRows = await tx
       .select({
         id: instructionalCapacityReservations.id,
@@ -537,6 +539,18 @@ export async function reserveInstructionalCapacity(
       throw new Error(`Only ${remainingSeats(offering.maxSeats, usedByOthers)} seats remain in this instructional capacity offering`);
     }
 
+    const demandRows = await tx.select({
+      offeringId: instructionalCapacityReservations.offeringId,
+      seats: instructionalCapacityReservations.seats,
+      status: instructionalCapacityReservations.status,
+      expiresAt: instructionalCapacityReservations.expiresAt,
+    }).from(instructionalCapacityReservations)
+      .where(eq(instructionalCapacityReservations.demandId,demand.demandId));
+    const usedDemandSeats = demandRows.filter(r=>r.offeringId!==offering.id &&
+      ACTIVE_RESERVATION_STATUSES.includes(r.status as (typeof ACTIVE_RESERVATION_STATUSES)[number]) &&
+      (!r.expiresAt||r.expiresAt>now)).reduce((sum,r)=>sum+r.seats,0);
+    if(usedDemandSeats+seats>demand.expectedSeats)
+      throw new Error("Reservations exceed the section's instructional demand");
     const [reservation] = await tx
       .insert(instructionalCapacityReservations)
       .values({
