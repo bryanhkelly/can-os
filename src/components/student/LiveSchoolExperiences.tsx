@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {getGuardianStudents} from "@/modules/family/guardian-assignments.functions";
 import { useRouter } from "@tanstack/react-router";
-import { bookOfficeHour } from "@/modules/student-experience/school-experiences.functions";
+import { bookOfficeHour, rescheduleOfficeHour } from "@/modules/student-experience/school-experiences.functions";
 import { readNotification } from "@/modules/communication/notification-center.functions";
 
 type Data={
@@ -9,13 +9,15 @@ type Data={
  viewerRole:"student"|"guardian"|"registrar"|"teacher";
  events:{id:string;title:string;startsAt:string;timezone:string;status:string}[];
  notices:{id:string;title:string;body:string;acknowledged:boolean}[];
- slots:{id:string;startsAt:string;endsAt:string;status:string}[];
+ slots:{id:string;seriesId:string;startsAt:string;endsAt:string;status:string}[];
+ bookings:{id:string;slotId:string;studentPersonId:string;seriesId:string;startsAt:string;endsAt:string}[];
 };
 export function LiveSchoolExperiences({data}:{data:Data}) {
  const router=useRouter();
  const [busy,setBusy]=useState(false);
  const [children,setChildren]=useState<{studentPersonId:string;firstName:string;lastName:string}[]>([]);
  const [selectedChild,setSelectedChild]=useState("");
+ const [replacementSlots,setReplacementSlots]=useState<Record<string,string>>({});
  useEffect(()=>{if(data.viewerRole!=="guardian")return;let active=true;getGuardianStudents().then(result=>{if(active){setChildren(result.students);setSelectedChild(result.students[0]?.studentPersonId??"");}}).catch(()=>{});return()=>{active=false};},[data.viewerRole]);
  const [message,setMessage]=useState("");
  const [error,setError]=useState("");
@@ -58,6 +60,20 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
     <div className="space-y-3">
      <h3 className="font-semibold">Teacher office hours</h3>
      {data.viewerRole==="guardian"&&<label className="block text-xs">Student<select className="mt-1 block w-full rounded border bg-background p-2" aria-label="Student for office-hour booking" value={selectedChild} onChange={e=>setSelectedChild(e.target.value)}><option value="">Choose student</option>{children.map(child=><option key={child.studentPersonId} value={child.studentPersonId}>{child.firstName} {child.lastName}</option>)}</select></label>}
+     {data.viewerRole==="guardian"&&data.bookings.length>0&&<div className="space-y-3">
+      <h4 className="text-sm font-semibold">Your upcoming appointments</h4>
+      {data.bookings.map(booking=><div key={booking.id} className="rounded-xl border p-3">
+       <p className="text-sm font-semibold">{format(booking.startsAt)}</p>
+       <p className="text-xs text-muted-foreground">{children.find(x=>x.studentPersonId===booking.studentPersonId)?.firstName??"Student"} · Confirmed</p>
+       <label className="mt-2 block text-xs">Reschedule to
+        <select className="mt-1 block w-full rounded border bg-background p-2" value={replacementSlots[booking.id]??""} onChange={event=>setReplacementSlots(value=>({...value,[booking.id]:event.target.value}))}>
+         <option value="">Choose another time</option>
+         {data.slots.filter(slot=>slot.seriesId===booking.seriesId).map(slot=><option key={slot.id} value={slot.id}>{format(slot.startsAt)}</option>)}
+        </select>
+       </label>
+       <button type="button" disabled={busy||!replacementSlots[booking.id]} className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>perform(()=>rescheduleOfficeHour({data:{bookingId:booking.id,newSlotId:replacementSlots[booking.id]}}),"Appointment rescheduled.")}>Save new time</button>
+      </div>)}
+     </div>}
      <p className="text-xs text-muted-foreground">Book an available teacher office-hour appointment.</p>
      {data.slots.map(slot=><div key={slot.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-4">
       <div className="flex-1"><p className="text-sm font-semibold">{format(slot.startsAt)}</p><p className="mt-1 text-xs text-muted-foreground">{slot.status}</p></div>
