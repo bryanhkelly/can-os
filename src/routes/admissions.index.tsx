@@ -39,6 +39,9 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
   const { rows, options, sites } = data;
   const selected=Route.useSearch();
   const programChoices=[...new Map(rows.map(row=>[row.programId,{id:row.programId,name:row.program}])).values()];
+  const familyScope=new URLSearchParams();
+  if(selected.siteId)familyScope.set("siteId",selected.siteId);
+  if(selected.programId)familyScope.set("programId",selected.programId);
   const openScope=(siteId?:string,programId?:string)=>{
     const query=new URLSearchParams();
     if(siteId)query.set("siteId",siteId);
@@ -105,7 +108,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
             {latest?.status === "accepted" && !activated && <button disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => activateSyntheticOfferFromDemo({ data: { offerId: latest.id } }))}>Registrar: Activate enrollment</button>}
           </div>
           {x.enrollments.length > 0 && <CoursePlacement applicationId={x.id} />}
-          <a href={"/admissions/families"+(selected.siteId||selected.programId?"?"+new URLSearchParams({...selected}).toString():"")} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</a>
+          <a href={"/admissions/families"+(selected.siteId||selected.programId?"?"+familyScope.toString():"")} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</a>
         </article>;
       })}
         {!rows.length && <EmptyState title="No applications are available in your authorized programs." />}</div>
