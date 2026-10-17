@@ -25,6 +25,7 @@ function StaffAttendancePage() {
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [excuses, setExcuses] = useState<PendingExcuse[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [correctionNotes,setCorrectionNotes]=useState<Record<string,string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -77,7 +78,8 @@ function StaffAttendancePage() {
     setBusy(`${student.studentProfileId}:${status}`);
     setNotice("");
     try {
-      await markAttendance({ data: { studentProfileId: student.studentProfileId, date, status } });
+      await markAttendance({ data: { studentProfileId: student.studentProfileId, date, status,
+        mutationId:crypto.randomUUID(),note:correctionNotes[student.studentProfileId]??"" } });
       setNotice(`${student.studentName} marked ${status}.`);
       await load(date);
     } catch (cause) {
@@ -139,6 +141,12 @@ function StaffAttendancePage() {
               </div>
               <span className="rounded-full border px-3 py-1 text-xs capitalize">{student.status}</span>
             </div>
+            {student.status!=="unmarked" && <label className="mt-3 block text-xs text-muted-foreground">Correction note (required to override an approved excuse)
+              <input value={correctionNotes[student.studentProfileId]??""}
+                onChange={e=>setCorrectionNotes(current=>({...current,[student.studentProfileId]:e.target.value}))}
+                placeholder="Reason for correction"
+                className="mt-1 w-full rounded-lg border bg-background p-2 text-sm"/>
+            </label>}
             <div className="mt-4 flex flex-wrap gap-2">
               {statusOptions.map(option => <button
                 key={option}
