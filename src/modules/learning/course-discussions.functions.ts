@@ -25,3 +25,6 @@ export const getCourseDiscussions=createServerFn({method:"GET"}).handler(async()
  const messages=await db.select({id:s.communicationMessages.id,threadId:s.communicationMessages.threadId,body:s.communicationMessages.body,senderPersonId:s.communicationMessages.senderPersonId,sentAt:s.communicationMessages.sentAt,metadata:s.communicationMessages.metadata}).from(s.communicationMessages).where(inArray(s.communicationMessages.threadId,allowed.map(x=>x.id))).orderBy(s.communicationMessages.sentAt).limit(250);
  return allowed.map(thread=>({id:thread.id,subject:thread.subject,sectionId:thread.contextId,locked:thread.metadata.locked===true,messages:discussionTree(messages.filter(m=>m.threadId===thread.id).map(m=>({id:m.id,body:m.metadata.hidden===true?"[Message hidden by teacher]":m.body,createdAt:m.sentAt.toISOString(),authorLabel:m.senderPersonId===actor.actorPersonId?"You":"Participant",parentMessageId:typeof m.metadata.parentMessageId==="string"?m.metadata.parentMessageId:null})))}));
 });
+
+/** Compatibility export until the remaining discussion routes are converged. */
+export const getSyntheticCourseDiscussions=getCourseDiscussions;
