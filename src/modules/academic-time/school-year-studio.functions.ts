@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import { academicCalendars, academicCalendarDays, scheduleTemplatePeriods, domainEvents, auditEvents, gradeScales, gradingPeriods, organizations, programs, scheduleTemplates, schoolYears, sites, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import { activateSchoolYear, createAcademicCalendar, createGradingPeriod, createScheduleTemplate, createSchoolYear, createTerm, setAcademicCalendarDay } from "./school-year-service";
 
 const uuid = z.string().uuid();
@@ -143,6 +144,7 @@ export const removeStudioCalendarDay=createServerFn({method:"POST"})
      (actor.scope.siteIds?.length&&!actor.scope.siteIds.includes(record.siteId))||
      (record.programId&&!actor.scope.programIds?.includes(record.programId)))
     throw new AuthorizationError("calendar day access");
+   await lockAttendanceConfigurationAtSite(tx,record.siteId);
    await tx.delete(academicCalendarDays).where(eq(academicCalendarDays.id,record.id));
    await tx.insert(domainEvents).values({
     eventType:"AcademicCalendarChanged",aggregateType:"academic_calendar",
@@ -191,6 +193,7 @@ export const replaceStudioSchedulePeriods=createServerFn({method:"POST"})
     (actor.scope.siteIds?.length&&!actor.scope.siteIds.includes(record.siteId))||
     (record.programId&&!actor.scope.programIds?.includes(record.programId)))
     throw new AuthorizationError("schedule edit");
+   await lockAttendanceConfigurationAtSite(tx,record.siteId);
    await tx.delete(scheduleTemplatePeriods)
     .where(eq(scheduleTemplatePeriods.scheduleTemplateId,record.id));
    await tx.insert(scheduleTemplatePeriods).values(data.periods.map(p=>({
@@ -228,6 +231,7 @@ export const populateStudioInstructionalDays=createServerFn({method:"POST"})
     (actor.scope.siteIds?.length&&!actor.scope.siteIds.includes(calendar.siteId))||
     (calendar.programId&&!actor.scope.programIds?.includes(calendar.programId)))
     throw new AuthorizationError("calendar generation scope");
+   await lockAttendanceConfigurationAtSite(tx,calendar.siteId);
    const weekdays=new Set(data.weekdays);
    const start=new Date(calendar.startsOn+"T00:00:00.000Z");
    const end=new Date(calendar.endsOn+"T00:00:00.000Z");
