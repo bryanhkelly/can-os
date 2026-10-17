@@ -164,8 +164,7 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
  return {ok:true};
  });
 });
-export const decideStudyGroupMembership=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1),personId:z.string().min(1),approve:z.boolean()}).parse).handler(async({data})=>{
- assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
+export const decideStudyGroupMembership=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().uuid(),personId:z.string().uuid(),approve:z.boolean()}).parse).handler(async({data})=>{const actor=await groupActor("teacher");const {db,s}=await context();
  return db.transaction(async tx=>{
  const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active"))).for("update").limit(1);
  if(!group||data.personId===actor.actorPersonId!)throw new Error("Not authorized to approve");
@@ -185,22 +184,24 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
     eq(s.guardianRelationships.studentPersonId,data.personId),
     eq(s.guardianRelationships.canManageEnrollment,true)));
   if(guardians.length){
-   const allConsents=await tx.select({status:s.actions.status,metadata:s.actions.metadata})
+   const allConsents=await tx.select({status:s.actions.status,ownerPersonId:s.actions.ownerPersonId,metadata:s.actions.metadata})
     .from(s.actions).where(and(eq(s.actions.type,"study_group_consent"),
      eq(s.actions.subjectId,data.groupId),
      inArray(s.actions.ownerPersonId,guardians.map(g=>g.personId))));
    const consentRows=allConsents.filter(row=>row.metadata.studentPersonId===data.personId);
    if(consentRows.some(row=>row.status==="resolved"&&row.metadata.decision==="decline"))
     throw new Error("A guardian withheld consent for this student's group participation");
-   if(!consentRows.some(row=>row.status==="resolved"&&row.metadata.decision==="approve"))
-    throw new Error("Guardian approval is required before this student joins the group");
+   if(!guardians.every(guardian=>consentRows.some(row=>
+    row.ownerPersonId===guardian.personId&&row.status==="resolved"&&
+    row.metadata.decision==="approve")))
+    throw new Error("Every listed enrollment guardian must approve before membership is activated");
   }
  const [count]=await tx.select({total:sql<number>`count(*)::int`}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.status,"approved")));
  if((count?.total??0)>=group.maxMembers)throw new Error("Study group is full");
  }
  await tx.update(s.studyGroupMemberships).set({status:data.approve?"approved":"declined",reviewedByPersonId:actor.actorPersonId!,joinedAt:data.approve?new Date():null,updatedAt:new Date()}).where(eq(s.studyGroupMemberships.id,member.id));
  await tx.insert(s.notifications).values({recipientPersonId:data.personId,type:"study_group_membership_decision",status:"unread",title:data.approve?"Study group membership approved":"Study group membership declined",body:data.approve?"You can now participate in "+group.title+".":"Your request to join "+group.title+" was declined.",resourceType:"study_group",resourceId:group.id});
- await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:data.approve?"study_group.membership.approve":"study_group.membership.decline",resourceType:"study_group",resourceId:group.id,after:{personId:data.personId,status:data.approve?"approved":"declined"},context:{synthetic:true}});
+ await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:data.approve?"study_group.membership.approve":"study_group.membership.decline",resourceType:"study_group",resourceId:group.id,after:{personId:data.personId,status:data.approve?"approved":"declined"},context:{accountId:actor.accountId,sessionId:actor.sessionId}});
  return {ok:true};
  });
 });
