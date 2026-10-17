@@ -1,3 +1,6 @@
+-- Remove the legacy text CHECK before converting status to a native PostgreSQL enum.
+-- The enum supplies the permitted status values after conversion.
+ALTER TABLE "admission_offers" DROP CONSTRAINT IF EXISTS "admission_offer_valid_status";--> statement-breakpoint
 CREATE TYPE "public"."activity_eligibility_check_status" AS ENUM('eligible', 'ineligible', 'conditional');--> statement-breakpoint
 CREATE TYPE "public"."activity_eligibility_status" AS ENUM('pending', 'eligible', 'ineligible', 'conditional');--> statement-breakpoint
 CREATE TYPE "public"."activity_registration_status" AS ENUM('pending', 'waitlisted', 'eligible', 'ineligible', 'conditional', 'withdrawn');--> statement-breakpoint
