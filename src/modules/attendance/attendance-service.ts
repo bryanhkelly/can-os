@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   attendanceEvents,
@@ -393,4 +393,79 @@ export async function reviewAttendanceExcuse(
     }
     return result;
   });
+}
+
+/**
+ * Staff marking/reconciliation with an append-only correction chain.
+ * The caller supplies a stable UUID for one user action so offline retries
+ * cannot create duplicate attendance entries or duplicate guardian notices.
+ */
+export async function recordAttendanceRevision(
+ context:CommandContext,
+ input:{
+  studentProfileId:string;programId:string;siteId?:string;sectionId?:string;
+  occurrenceKey:string;status:"present"|"absent"|"tardy";
+  expectedAt:Date;mutationId:string;note?:string;
+ }):Promise<string>{
+ assertCapability(context,"attendance.write");
+ assertProgramScope(context,input.programId);
+ assertSiteScope(context,input.siteId);
+ if(!context.actorPersonId)throw new Error("Attendance actor required");
+ return db.transaction(async tx=>{
+  const key="attendance:"+input.studentProfileId+":"+input.occurrenceKey;
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+  const sourceKey="manual-revision:"+input.mutationId;
+  const [repeat]=await tx.select({id:attendanceEvents.id}).from(attendanceEvents)
+   .where(eq(attendanceEvents.sourceKey,sourceKey)).limit(1);
+  if(repeat)return repeat.id;
+  const [prior]=await tx.select({id:attendanceEvents.id,status:attendanceEvents.status})
+   .from(attendanceEvents).where(and(
+    eq(attendanceEvents.studentProfileId,input.studentProfileId),
+    eq(attendanceEvents.programId,input.programId),
+    eq(attendanceEvents.occurrenceKey,input.occurrenceKey)))
+   .orderBy(desc(attendanceEvents.recordedAt),desc(attendanceEvents.createdAt))
+   .limit(1);
+  if(prior?.status===input.status)return prior.id;
+  if(prior?.status==="excused"&&!input.note?.trim())
+   throw new Error("Give a reason before changing excused attendance");
+  const now=new Date();
+  const [record]=await tx.insert(attendanceEvents).values({
+   studentProfileId:input.studentProfileId,programId:input.programId,
+   siteId:input.siteId,sectionId:input.sectionId,
+   occurrenceKey:input.occurrenceKey,status:input.status,
+   expectedAt:input.expectedAt,recordedAt:now,recordedByPersonId:context.actorPersonId,
+   sourceKey,supersedesAttendanceEventId:prior?.id,
+   metadata:{surface:"staff.attendance",reason:input.note??"",mutationId:input.mutationId},
+  }).returning({id:attendanceEvents.id});
+  if(!record)throw new Error("Unable to record attendance");
+  await emitEvent(tx,{eventType:input.status==="absent"?
+   EventTypes.StudentMarkedAbsent:"AttendanceCorrected",
+   aggregateType:"attendance_event",aggregateId:record.id,
+   actorPersonId:context.actorPersonId,payload:{
+    studentProfileId:input.studentProfileId,programId:input.programId,
+    siteId:input.siteId??null,previousEventId:prior?.id??null,
+    priorStatus:prior?.status??null,newStatus:input.status,
+   }});
+  if(input.status==="absent"){
+   const [student]=await tx.select({personId:studentProfiles.personId})
+    .from(studentProfiles).where(eq(studentProfiles.id,input.studentProfileId)).limit(1);
+   if(student){
+    const guardians=await tx.select({personId:guardianRelationships.guardianPersonId})
+     .from(guardianRelationships).where(eq(guardianRelationships.studentPersonId,student.personId));
+    for(const guardian of guardians){
+     await notify(tx,{recipientPersonId:guardian.personId,type:"student_absent",
+      title:"Attendance needs your attention",
+      body:"Your student was marked absent. Submit an excuse if appropriate.",
+      resourceType:"attendance_event",resourceId:record.id});
+    }
+   }
+  }
+  await writeAudit(tx,context,{action:prior?"attendance.correct":"attendance.record",
+   entityType:"attendance_event",entityId:record.id,
+   scope:{siteId:input.siteId??null,programId:input.programId},
+   before:prior?{status:prior.status,attendanceEventId:prior.id}:undefined,
+   after:{status:input.status,studentProfileId:input.studentProfileId},
+   contextExtras:{mutationId:input.mutationId,reason:input.note??null}});
+  return record.id;
+ });
 }
