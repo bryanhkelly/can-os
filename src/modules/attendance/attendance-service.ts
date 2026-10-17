@@ -167,24 +167,6 @@ export async function submitAttendanceExcuse(
     if (!source) throw new Error("AttendanceEvent not found");
     const lockKey = "attendance:" + attendance.studentProfileId + ":" + source.occurrenceKey;
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
-    const [existing] = await tx
-      .select({ id: attendanceExcuses.id })
-      .from(attendanceExcuses)
-      .where(eq(attendanceExcuses.attendanceEventId, input.attendanceEventId))
-      .orderBy(desc(attendanceExcuses.createdAt))
-      .limit(1);
-    if (existing) return existing.id; // Idempotent retry after a later correction.
-    const [latest] = await tx.select({ id: attendanceEvents.id, status: attendanceEvents.status })
-      .from(attendanceEvents).where(and(
-        eq(attendanceEvents.studentProfileId, attendance.studentProfileId),
-        eq(attendanceEvents.programId, attendance.programId),
-        eq(attendanceEvents.occurrenceKey, source.occurrenceKey),
-      )).orderBy(desc(attendanceEvents.recordedAt), desc(attendanceEvents.id)).limit(1);
-    if (!latest || latest.id !== attendance.id ||
-        !["absent", "tardy"].includes(latest.status)) {
-      throw new Error("Attendance conflict: the record was corrected. Refresh before submitting an excuse.");
-    }
-
     const [student] = await tx
       .select({ personId: studentProfiles.personId })
       .from(studentProfiles)
@@ -207,6 +189,24 @@ export async function submitAttendanceExcuse(
 
     if (!guardian) {
       throw new Error("Actor is not authorized to submit this attendance excuse");
+    }
+
+    const [existing] = await tx
+      .select({ id: attendanceExcuses.id })
+      .from(attendanceExcuses)
+      .where(eq(attendanceExcuses.attendanceEventId, input.attendanceEventId))
+      .orderBy(desc(attendanceExcuses.createdAt))
+      .limit(1);
+    if (existing) return existing.id; // Idempotent retry after a later correction.
+    const [latest] = await tx.select({ id: attendanceEvents.id, status: attendanceEvents.status })
+      .from(attendanceEvents).where(and(
+        eq(attendanceEvents.studentProfileId, attendance.studentProfileId),
+        eq(attendanceEvents.programId, attendance.programId),
+        eq(attendanceEvents.occurrenceKey, source.occurrenceKey),
+      )).orderBy(desc(attendanceEvents.recordedAt), desc(attendanceEvents.id)).limit(1);
+    if (!latest || latest.id !== attendance.id ||
+        !["absent", "tardy"].includes(latest.status)) {
+      throw new Error("Attendance conflict: the record was corrected. Refresh before submitting an excuse.");
     }
 
     const [excuse] = await tx
