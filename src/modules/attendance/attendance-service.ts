@@ -5,6 +5,8 @@ import {
   attendanceExcuses,
   guardianRelationships,
   people,
+  programs,
+  sectionTeachers,
   studentProfiles,
 } from "@/db/schema";
 import {
@@ -141,7 +143,8 @@ export async function submitAttendanceExcuse(
   },
 ): Promise<string> {
   assertCapability(context, "attendance.excuse.submit");
-  if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  if (context.role !== "guardian" || !context.actorPersonId)
+    throw new Error("Verified guardian identity is required");
   const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
@@ -253,7 +256,8 @@ export async function reviewAttendanceExcuse(
   },
 ): Promise<{ excuseId: string; correctionAttendanceEventId?: string }> {
   assertCapability(context, "attendance.excuse.review");
-  if (!context.actorPersonId) throw new Error("Reviewer identity is required");
+  if (!context.actorPersonId || !["registrar", "teacher"].includes(context.role))
+    throw new Error("Verified staff reviewer identity is required");
   const actorPersonId = context.actorPersonId;
   let submitterEmailNotice: { submittedByPersonId: string } | undefined;
 
@@ -281,6 +285,21 @@ export async function reviewAttendanceExcuse(
     if (!record) throw new Error("AttendanceExcuse not found");
     assertProgramScope(context, record.programId);
     assertSiteScope(context, record.siteId);
+    const [host] = await tx.select({
+      organizationId: programs.organizationId, siteId: programs.siteId,
+    }).from(programs).where(eq(programs.id, record.programId)).limit(1);
+    if (!host || !context.scope.organizationIds?.includes(host.organizationId) ||
+        !record.siteId || host.siteId !== record.siteId)
+      throw new Error("Excuse school and organization scope is not authorized");
+    if (context.role === "teacher") {
+      if (!record.sectionId) throw new Error("Excuse has no teaching section");
+      const [assignment] = await tx.select({ id: sectionTeachers.id })
+        .from(sectionTeachers).where(and(
+          eq(sectionTeachers.sectionId, record.sectionId),
+          eq(sectionTeachers.personId, actorPersonId),
+        )).limit(1);
+      if (!assignment) throw new Error("Reviewer is not assigned to the attendance section");
+    }
     const [source] = await tx.select({ occurrenceKey: attendanceEvents.occurrenceKey })
       .from(attendanceEvents).where(eq(attendanceEvents.id, record.attendanceEventId)).limit(1);
     if (!source) throw new Error("AttendanceEvent not found");
