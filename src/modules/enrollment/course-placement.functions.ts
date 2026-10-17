@@ -3,7 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { applications, enrollments, programs, sections, terms, auditEvents, domainEvents } from "@/db/schema";
+import { applications, assessments, submissions, studentProfiles, guardianRelationships, enrollments, programs, sections, terms, auditEvents, domainEvents, notifications } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 
@@ -84,6 +84,32 @@ export const placeEnrolledStudent = createServerFn({ method: "POST" })
        sectionId: section.id, schoolYearId: section.schoolYearId, startedAt: new Date(),
      }).returning({ id: enrollments.id });
      if (!record) throw new Error("Course placement failed");
+     // Enrollment into an existing section must provide every already-published
+     // assessment to the new student, without duplicating previous attempts.
+     const published = await tx.select({ id: assessments.id })
+       .from(assessments).where(and(eq(assessments.sectionId, section.id),
+         eq(assessments.status, "published")));
+     if (published.length) {
+       await tx.insert(submissions).values(published.map(a => ({
+         assessmentId: a.id, studentProfileId: app.studentProfileId,
+         status: "assigned" as const, timeliness: "on_time" as const,
+       }))).onConflictDoNothing();
+     }
+     const [learner] = await tx.select({ personId: studentProfiles.personId })
+       .from(studentProfiles).where(eq(studentProfiles.id, app.studentProfileId)).limit(1);
+     if (learner) {
+       const guardians = await tx.select({ personId: guardianRelationships.guardianPersonId })
+         .from(guardianRelationships).where(and(
+           eq(guardianRelationships.studentPersonId, learner.personId),
+           eq(guardianRelationships.canViewAcademics, true)));
+       const recipients = [...new Set([learner.personId, ...guardians.map(g => g.personId)])];
+       if (recipients.length) await tx.insert(notifications).values(recipients.map(personId => ({
+         recipientPersonId: personId, type: "course_placement", status: "unread" as const,
+         title: "A new class is ready",
+         body: "Course access has been activated. Visit your learning or family workspace.",
+         resourceType: "section", resourceId: section.id,
+       })));
+     }
      await tx.insert(domainEvents).values({ eventType: "SectionEnrollmentActivated",
        aggregateType: "enrollment", aggregateId: record.id, actorPersonId: actor.actorPersonId,
        payload: { applicationId: data.applicationId, sectionId: section.id,
