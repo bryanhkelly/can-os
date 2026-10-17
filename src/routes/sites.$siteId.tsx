@@ -27,7 +27,7 @@ function SiteTodayPage() {
         ["Operations", "/operations"], ["Launch", "/operations/launch"],
         ["Readiness", "/readiness"], ["Admissions", "/admissions"],
         ["People", "/profiles"], ["Ask CAN", "/ask"],
-      ].map(([name, href]) => <Link key={href} to={href}
+      ].map(([name, href]) => <Link key={href} to={href as "/operations"}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
     </nav>
     <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
