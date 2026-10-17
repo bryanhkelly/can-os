@@ -4,6 +4,7 @@ import * as s from "@/db/schema";
 import type {CommandContext} from "@/domain/command-context";
 import {getSectionRegistrationPolicy} from "@/modules/learning/section-registration-policy-service";
 import {findSectionScheduleConflicts} from "@/modules/academic-time/section-schedule-service";
+import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
 
 export type EnrollmentTransaction=Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type SectionPlacementInput={
@@ -13,6 +14,15 @@ export type SectionPlacementInput={
 export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:SectionPlacementInput){
  const {studentProfileId,sectionId,actor}=input;
  if(!actor.actorPersonId)throw new Error("Authenticated actor required");
+ // Staff and self-service registration share one site configuration lock.
+ // Acquire BEFORE section FOR UPDATE to avoid inversion with staff attendance.
+ const [sectionSite]=await tx.select({siteId:s.sections.siteId,
+  programId:s.sections.programId}).from(s.sections)
+  .where(eq(s.sections.id,sectionId)).limit(1);
+ if(!sectionSite || !actor.scope.siteIds?.includes(sectionSite.siteId) ||
+  !actor.scope.programIds?.includes(sectionSite.programId))
+  throw new Error("Section outside authorized school and program scope");
+ await lockAttendanceConfigurationAtSite(tx,sectionSite.siteId);
  const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata,
   termId:s.sections.termId,startsOn:s.terms.startsOn,endsOn:s.terms.endsOn,
   programId:s.sections.programId,siteId:s.sections.siteId,
