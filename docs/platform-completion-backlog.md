@@ -14,6 +14,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Wire site/program selectors into the operations Action queue and live readiness summary, validating both against the server-issued grant and program/site relationship.
 - [x] Expand organization-wide grants to their owned sites without broadening site-specific grants.
 - [x] Add child-specific attendance links from the family dashboard and resolve guardian attendance through relationship-scoped server queries.
+- [x] Replace fixture-only attendance write gates for staff marking, guardian excuse submission, and staff review with verified role, roster, program/site and guardian relationship authorization at the relevant service boundaries.
 - [x] Restrict active academic roster, guardian assignments and office-hour child eligibility to verified program IDs, in addition to site membership.
 - [ ] Carry active site/program selection through the remaining operational routes and child context through admissions.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
