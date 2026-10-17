@@ -465,7 +465,8 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
  .handler(async({data})=>{
   const {context,studentId,studentPersonId}=await studentActor();
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  const assessment=await requireEnrolledAssessment(db,s,data.assessmentId,studentId,
+  return db.transaction(async tx=>{
+  const assessment=await requireEnrolledAssessment(tx,s,data.assessmentId,studentId,
     context.scope.siteIds??[],context.scope.programIds??[]);
   const [latest]=await db.select({response:s.submissions.response})
    .from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),
@@ -484,6 +485,7 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
   if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/assignment/${assessment.id}/`))
     throw new AuthorizationError("verified attachment scope");
   return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
+  });
  });
 
 /** Only the uploading guardian can fetch a verified file on a current child's excuse. */
@@ -494,7 +496,8 @@ export const getExcuseAttachmentDownload=createServerFn({method:"POST"})
  .handler(async({data})=>{
   const context=await guardianActor();
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  await requireGuardianEvent(db,s,data.attendanceEventId,context.actorPersonId!,
+  return db.transaction(async tx=>{
+  await requireGuardianEvent(tx,s,data.attendanceEventId,context.actorPersonId!,
     context.scope.programIds??[]);
   const [excuse]=await db.select({documentIds:s.attendanceExcuses.documentIds})
     .from(s.attendanceExcuses)
@@ -513,4 +516,5 @@ export const getExcuseAttachmentDownload=createServerFn({method:"POST"})
   if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/excuse/${data.attendanceEventId}/`))
     throw new AuthorizationError("verified excuse document scope");
   return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
+  });
  });
