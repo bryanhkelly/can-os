@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   agentRuns,
@@ -81,7 +81,7 @@ function studentNotFoundMessage(query: string, visibleCount: number): string {
 }
 
 function studentAmbiguousMessage(matches: Array<{ displayName: string }>): string {
-  return `I found more than one match: ${matches.map((m) => m.displayName).join(", ")}. Which one did you mean?`;
+  return `I found more than one match: ${matches.map((m) => m.displayName).join(", ")}. Please reply with the full name of the student you mean.`;
 }
 
 export async function sendMessage(
@@ -124,7 +124,22 @@ export async function sendMessage(
       body,
     });
 
-    const plan: AgentPlan = planTurn(body);
+    let plan: AgentPlan = planTurn(body);
+    // Clarification may consist solely of a full name. Reuse only the
+    // immediately previous ambiguous plan in this same owned conversation.
+    if (input.conversationId && plan.intent === "ask" && plan.kind === "help") {
+      const [prior] = await tx.select({ plan: agentRuns.plan, result: agentRuns.result })
+        .from(agentRuns).where(eq(agentRuns.conversationId, conversationId))
+        .orderBy(desc(agentRuns.createdAt)).limit(1);
+      const previous = prior?.plan as AgentPlan | undefined;
+      if (prior?.result?.kind === "clarification" && previous &&
+          (previous.intent === "watch" ||
+           (previous.intent === "ask" && previous.kind === "student_summary"))) {
+        const visible = await resolveVisibleStudents(context);
+        const matching = visible.filter(s => s.displayName.toLocaleLowerCase() === body.trim().toLocaleLowerCase());
+        if (matching.length === 1) plan = { ...previous, studentQuery: matching[0]!.displayName };
+      }
+    }
 
     const [run] = await tx
       .insert(agentRuns)
@@ -165,7 +180,7 @@ export async function sendMessage(
           role: "agent",
           body:
             matches.length === 0
-              ? studentNotFoundMessage(plan.studentQuery, 0)
+              ? studentNotFoundMessage(plan.studentQuery, (await resolveVisibleStudents(context)).length)
               : studentAmbiguousMessage(matches),
           agentRunId: run!.id,
         });
