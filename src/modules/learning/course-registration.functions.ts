@@ -1,5 +1,4 @@
 import {activateSectionEnrollment} from "@/modules/enrollment/section-allocation.service";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, inArray } from "drizzle-orm";
@@ -71,7 +70,6 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
 export const requestCourseChange = createServerFn({ method:"POST" })
   .validator((value:unknown)=>z.object({sectionId:z.string().uuid(),operation:z.enum(["add","drop","withdraw"])}).parse(value))
   .handler(async({data})=>{
-  assertSyntheticMutation("student");
     const actor=await requireActor(["student"]);
     const sites=actorSiteIds(actor);
     if (!process.env.DATABASE_URL) throw new Error("Neon not configured");
@@ -117,7 +115,6 @@ export const requestCourseChange = createServerFn({ method:"POST" })
 export const decideCourseChange = createServerFn({method:"POST"})
   .validator((value:unknown)=>z.object({requestId:z.string().uuid(),approve:z.boolean()}).parse(value))
   .handler(async({data})=>{
-  assertSyntheticMutation("registrar");
     const actor=await requireActor(["registrar"],"registrations:approve");
     const sites=actorSiteIds(actor);
     if(!process.env.DATABASE_URL)throw new Error("Neon not configured");
