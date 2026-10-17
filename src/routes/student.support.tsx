@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { advanceSupportReferral, createSupportReferral, getSupportReferrals, listTeacherReferralStudents, saveSyntheticSupportPlan, scheduleSyntheticSupportService, completeSyntheticSupportService } from "@/modules/support/support-referrals.functions";
+import { advanceSupportReferral, createSupportReferral, getSupportReferrals, listTeacherReferralStudents, saveSupportPlan, scheduleSupportService, completeSupportService } from "@/modules/support/support-referrals.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
 const loadSupportReferrals=()=>getSupportReferrals();
 export const Route=createFileRoute("/student/support")({
- loader:safeLoader(loadSupportReferrals,{authMessage:"Sign in with an authorized student account to view student support."}),
+ loader:safeLoader(loadSupportReferrals,{authMessage:"Sign in with an authorized teacher or specialist account to manage support referrals."}),
  component:SupportPage,
 });
 const destinations=[
@@ -130,20 +130,20 @@ function SupportView({referrals}:{referrals:Awaited<ReturnType<typeof loadSuppor
       <label className="mt-3 block text-xs">Student goal<input value={goal} onChange={e=>setGoal(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
       <label className="mt-3 block text-xs">Intervention<textarea value={intervention} onChange={e=>setIntervention(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
       <label className="mt-3 block text-xs">Review target<input type="date" value={reviewDate} onChange={e=>setReviewDate(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
-      <button disabled={busy} onClick={()=>execute(()=>saveSyntheticSupportPlan({data:{referralId:chosen.id,goal,intervention,targetDate:reviewDate}}),"Support plan saved to Neon.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">Save support plan</button>
+      <button disabled={busy} onClick={()=>execute(()=>saveSupportPlan({data:{referralId:chosen.id,goal,intervention,targetDate:reviewDate}}),"Support plan saved.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">Save support plan</button>
      </div>}
      {chosen.plan&&<div className="mt-5 rounded-xl bg-stone-warm p-4 text-sm"><p className="font-semibold">Support plan</p><p className="mt-2">Goal: {chosen.plan.goal}</p><p className="mt-2">Intervention: {chosen.plan.intervention}</p><p className="mt-2 text-xs">Review: {chosen.plan.targetDate.slice(0,10)}</p></div>}
      {["plan_created","in_service"].includes(chosen.stage)&&<div className="mt-5 rounded-xl border border-border p-4">
        <h3 className="font-semibold">Schedule student support</h3>
        <label className="mt-3 block text-xs">Service type<select value={serviceKind} onChange={e=>setServiceKind(e.target.value as typeof serviceKind)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"><option value="coaching">Academic coaching</option><option value="tutoring">Tutoring</option><option value="learning_support">Learning support</option><option value="planning">College/career planning</option></select></label>
        <label className="mt-3 block text-xs">Meeting time<input type="datetime-local" value={serviceDate} onChange={e=>setServiceDate(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
-       <button disabled={busy} onClick={()=>execute(()=>scheduleSyntheticSupportService({data:{referralId:chosen.id,kind:serviceKind,scheduledAt:new Date(serviceDate).toISOString()}}),"Support service scheduled in Neon.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">Schedule service</button>
+       <button disabled={busy} onClick={()=>execute(()=>scheduleSupportService({data:{referralId:chosen.id,kind:serviceKind,scheduledAt:new Date(serviceDate).toISOString()}}),"Support service scheduled.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">Schedule service</button>
      </div>}
      {chosen.services.map(service=><div key={service.id} className="mt-3 rounded-xl border border-border p-4">
        <p className="text-sm font-semibold">{service.kind.replaceAll("_"," ")} · {service.status}</p>
        <p className="mt-1 text-xs text-muted-foreground">{new Date(service.scheduledAt).toLocaleString()}</p>
        {service.outcome&&<p className="mt-2 text-xs">Outcome: {service.outcome}</p>}
-       {service.status==="scheduled"&&<button disabled={busy||note.trim().length<3} onClick={()=>execute(()=>completeSyntheticSupportService({data:{referralId:chosen.id,serviceId:service.id,outcome:note}}),"Service completion documented.")} className="mt-3 rounded-lg border border-border px-3 py-2 text-xs">Record completed service using note</button>}
+       {service.status==="scheduled"&&<button disabled={busy||note.trim().length<3} onClick={()=>execute(()=>completeSupportService({data:{referralId:chosen.id,serviceId:service.id,outcome:note}}),"Service completion documented.")} className="mt-3 rounded-lg border border-border px-3 py-2 text-xs">Record completed service using note</button>}
      </div>)}
      {next&&next!=="plan_created"&&next!=="in_service"?<button disabled={busy||note.trim().length<3} onClick={()=>execute(()=>advanceSupportReferral({data:{referralId:chosen.id,nextStage:next,note,area}}),`Referral advanced to ${next.replaceAll("_"," ")}.`)} className="mt-4 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40">Move to {next.replaceAll("_"," ")}</button>:<p className="mt-4 text-sm font-semibold">Referral closed</p>}
     </>:<p className="mt-4 text-sm text-muted-foreground">Select a referral from your caseload to accept, plan, monitor or close it.</p>}
