@@ -1,4 +1,4 @@
-# Phase 2 — Canonical workflow integration (increment 1)
+# Phase 2 — Canonical workflow integration (in progress)
 
 ## Parent / dependency
 
@@ -31,13 +31,21 @@
 - The domain-event worker now acknowledges canonical GF2/GF3 lifecycle events through its established pass-through handler, including the new `AdmissionOfferExpired`. This allows ordinary subscription delivery rather than accumulating unhandled outbox events, without generating duplicate email/notification side effects.
 - Phase 1 PR #120 advanced after this branch was created. The changed file `admissions-offer-demo.functions.ts` was restored to the latest Phase 1 version, and Phase 2 reconciliation moved to its own module to eliminate direct file overlap. Reconcile/advance the stacked base before eventual merge; neither PR has been merged.
 
+## Implemented — increment 3: GF4 expected onsite attendance
+
+- Added the pure, provenance-neutral `src/domain/expected-attendance.ts` policy projection. For an **active program enrollment in its own active school year**, an expected student-day requires an explicitly onsite delivery model, a matching site, a declared instructional or makeup calendar day, and an effective active instructional schedule. Explicit makeup days may override the usual weekly pattern; closures, holidays, zero-minute instruction and purely online programs never create onsite absences.
+- Date comparisons use each school's timezone and consider the last 30 **completed local dates**. A program-specific effective schedule takes precedence over a site-wide schedule; an onsite-days-per-week mismatch is surfaced as a configuration issue rather than silently assuming a five-day schedule.
+- `src/modules/attendance/expected-attendance-queries.ts` obtains the inputs in grant-bounded batches and overlays the already canonical correction-aware attendance event reducer. Identical authentic and fixture records compute identically; no new attendance facts or duplicate workflow statuses are persisted.
+- Connected Workflows now shows expected student-days, unmarked expected days and the **record-completion percentage**, and warns if active calendar, schedule, enrollment or onsite pattern data is absent/incomplete. An unmarked expected day is **never automatically a recorded absence**.
+- The pre-existing recorded-event counters remain visibly distinct as a rolling event-log window rather than falsely presenting them as denominator-backed attendance rates.
+
 ## Scope limitations and follow-ups
 
 - This is an **integration slice**, not Phase 2 completion. Counts are read-time projections, not persisted workflow statuses.
 - GF3 still requires section readiness and configured academic calendars; an active year and sections are not a proof of launch readiness.
 - GF2 offer issuance, document verification and seat-pool enrollment activation remain separate transactional services. Follow-up: enforce a single cross-role path for household signature → activation → section placement. The legacy no-seat-pool path intentionally remains blocked when a seat pool is configured. Expiration reconciliation does not perform enrollment activation or document verification.
 - GF1: verify deadline handling, support/escalation resolution and cross-role notifications, including grade posting and report cards.
-- GF4: attendance metrics here cover **recorded occurrences in the last rolling 30 days**, not unmarked expected days. Follow-up: schedule-derived expected-day denominator and remaining guardian/staff attendance projections, which still compute some views independently.
+- GF4: the connected-operations projection now includes an **explicitly configured expected-day denominator and unmarked days** for the last 30 completed site-local dates. It intentionally does not infer attendance on unconfigured dates. The existing staff attendance roster/mark mutation and guardian attendance flows still use older projections and must be integrated with the same calendar/schedule policy at their server write boundary before GF4 can be called complete. Historical enrollment status changes also require an as-of enrollment model for authoritative historical rates.
 - Pending guardian excuses count all submitted records, including old records outside the 30-day attendance window.
 - Route-by-route and cross-persona acceptance remains pending; CI, typecheck, unit, integration, database and browser tests are **deferred by user instruction**, not passing or waived. Existing admission-offer unit fixture mocks assume old synthetic-only messages and incomplete site fixtures; revisit them when tests are reauthorized. Do not certify authentic-data readiness from this PR.
 
@@ -46,5 +54,5 @@
 1. GF3/23: strengthen transition gating and propagate school-calendar changes to schedule-dependent views.
 2. GF22/2: consolidate offer response, approved documents, seat-pool activation and automatic section placement.
 3. GF1: connect deadline/missing-work escalation, action closure, grading and family visibility.
-4. GF4: expected-day reconciliation and correction-aware daily metrics.
+4. GF4: integrate calendar-derived expected-day guards into staff roster/marking and guardian views; reconcile missing expected marks, review excuse chains and historic enrollment membership.
 5. Run shared-actor end-to-end journeys when CI and tests are reauthorized.
