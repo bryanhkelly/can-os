@@ -1,9 +1,10 @@
+import {activateSectionEnrollment} from "./section-allocation.service";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { applications, assessments, submissions, studentProfiles, guardianRelationships, enrollments, programs, sections, terms, auditEvents, domainEvents, notifications } from "@/db/schema";
+import { applications, enrollments, programs, sections, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 
@@ -65,59 +66,7 @@ export const placeEnrolledStudent = createServerFn({ method: "POST" })
      if (!section || section.programId !== app.programId ||
        (section.siteId && !actor.scope.siteIds?.includes(section.siteId)))
        throw new AuthorizationError("section placement scope");
-     const [programEnrollment] = await tx.select({ id: enrollments.id })
-       .from(enrollments).where(and(eq(enrollments.studentProfileId, app.studentProfileId),
-         eq(enrollments.programId, app.programId),
-         eq(enrollments.schoolYearId, section.schoolYearId),
-         eq(enrollments.kind, "program"), eq(enrollments.status, "active"))).limit(1);
-     if (!programEnrollment) throw new Error("Activate enrollment before assigning courses");
-     const key = "placement:" + app.studentProfileId + ":" + section.id;
-     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
-     const [existing] = await tx.select({ id: enrollments.id }).from(enrollments)
-       .where(and(eq(enrollments.studentProfileId, app.studentProfileId),
-         eq(enrollments.sectionId, section.id), eq(enrollments.kind, "section"),
-         eq(enrollments.status, "active"))).limit(1);
-     if (existing) return { enrollmentId: existing.id, created: false };
-     const [record] = await tx.insert(enrollments).values({
-       studentProfileId: app.studentProfileId, kind: "section", status: "active",
-       organizationId: section.organizationId, programId: app.programId,
-       sectionId: section.id, schoolYearId: section.schoolYearId, startedAt: new Date(),
-     }).returning({ id: enrollments.id });
-     if (!record) throw new Error("Course placement failed");
-     // Enrollment into an existing section must provide every already-published
-     // assessment to the new student, without duplicating previous attempts.
-     const published = await tx.select({ id: assessments.id })
-       .from(assessments).where(and(eq(assessments.sectionId, section.id),
-         eq(assessments.status, "published")));
-     if (published.length) {
-       await tx.insert(submissions).values(published.map(a => ({
-         assessmentId: a.id, studentProfileId: app.studentProfileId,
-         status: "assigned" as const, timeliness: "on_time" as const,
-       }))).onConflictDoNothing();
-     }
-     const [learner] = await tx.select({ personId: studentProfiles.personId })
-       .from(studentProfiles).where(eq(studentProfiles.id, app.studentProfileId)).limit(1);
-     if (learner) {
-       const guardians = await tx.select({ personId: guardianRelationships.guardianPersonId })
-         .from(guardianRelationships).where(and(
-           eq(guardianRelationships.studentPersonId, learner.personId),
-           eq(guardianRelationships.canViewAcademics, true)));
-       const recipients = [...new Set([learner.personId, ...guardians.map(g => g.personId)])];
-       if (recipients.length) await tx.insert(notifications).values(recipients.map(personId => ({
-         recipientPersonId: personId, type: "course_placement", status: "unread" as const,
-         title: "A new class is ready",
-         body: "Course access has been activated. Visit your learning or family workspace.",
-         resourceType: "section", resourceId: section.id,
-       })));
-     }
-     await tx.insert(domainEvents).values({ eventType: "SectionEnrollmentActivated",
-       aggregateType: "enrollment", aggregateId: record.id, actorPersonId: actor.actorPersonId,
-       payload: { applicationId: data.applicationId, sectionId: section.id,
-         studentProfileId: app.studentProfileId, programId: app.programId } });
-     await tx.insert(auditEvents).values({ actorPersonId: actor.actorPersonId,
-       action: "enrollment.section.assign", resourceType: "enrollment", resourceId: record.id,
-       scope: { organizationId: section.organizationId, programId: app.programId, siteId: section.siteId },
-       after: { sectionId: section.id, studentProfileId: app.studentProfileId, status: "active" } });
-     return { enrollmentId: record.id, created: true };
+     return activateSectionEnrollment(tx,{studentProfileId:app.studentProfileId,
+       sectionId:section.id,actor,source:"registrar_placement",applicationId:data.applicationId});
    });
  });
