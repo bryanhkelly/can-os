@@ -1,10 +1,10 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
-import {and,asc,eq,inArray,isNull,or,sql} from "drizzle-orm";
+import {and,asc,eq,inArray,isNull,or} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {auditEvents,courseTemplates,courseTemplateVersions,domainEvents,notifications,
- programs,roleAssignments,schoolYears,sectionTeachers,sections,sites,terms,people} from "@/db/schema";
+ programs,roleAssignments,schoolYears,sectionTeachers,sections,terms,people} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
