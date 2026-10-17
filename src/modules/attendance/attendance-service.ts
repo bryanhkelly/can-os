@@ -149,6 +149,8 @@ export async function submitAttendanceExcuse(
       .select({
         id: attendanceEvents.id,
         studentProfileId: attendanceEvents.studentProfileId,
+        programId: attendanceEvents.programId,
+        siteId: attendanceEvents.siteId,
         status: attendanceEvents.status,
       })
       .from(attendanceEvents)
@@ -156,6 +158,8 @@ export async function submitAttendanceExcuse(
       .limit(1);
 
     if (!attendance) throw new Error("AttendanceEvent not found");
+    assertProgramScope(context, attendance.programId);
+    assertSiteScope(context, attendance.siteId);
     if (attendance.status !== "absent" && attendance.status !== "tardy") {
       throw new Error("Only absent or tardy attendance can be excused");
     }
