@@ -184,7 +184,18 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
 });
 export const leaveStudyGroup=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
  assertSyntheticMutation("student");const actor=await groupActor("student");const {db,s}=await context();
- await db.update(s.studyGroupMemberships).set({status:"left",updatedAt:new Date()}).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!)));return {ok:true};
+ return db.transaction(async tx=>{
+  const [group]=await tx.select({id:s.studyGroups.id})
+   .from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),
+    inArray(s.studyGroups.siteId,actor.sites),
+    or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
+   .limit(1);
+  if(!group)throw new AuthorizationError("study group school and program scope");
+  await tx.update(s.studyGroupMemberships).set({status:"left",updatedAt:new Date()})
+   .where(and(eq(s.studyGroupMemberships.groupId,group.id),
+    eq(s.studyGroupMemberships.personId,actor.actorPersonId!)));
+  return {ok:true};
+ });
 });
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
  const actor=await groupActor("student");
