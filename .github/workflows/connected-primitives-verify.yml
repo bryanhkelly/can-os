@@ -1,0 +1,31 @@
+name: Connected Primitives Verification
+
+on:
+  push:
+    branches:
+      - connect-core-primitives
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:fixtures
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npx vitest run tests/unit/section-schedule-service.test.ts tests/unit/educational-capacity.test.ts
+      - run: npm run db:generate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: connected-primitives-drizzle
+          path: drizzle/
+          retention-days: 1
