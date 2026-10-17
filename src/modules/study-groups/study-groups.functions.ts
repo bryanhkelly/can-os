@@ -34,7 +34,7 @@ async function requireStudentGroupEnrollment(
  if(!enrolled)throw new AuthorizationError("active enrollment required for this study group");
 }
 
-export const getStudyGroupAvailability=createServerFn({method:"GET"}).handler(async()=>({enabled:true,writesEnabled:isSyntheticAccessEnabled(),membershipEnabled:true}));
+export const getStudyGroupAvailability=createServerFn({method:"GET"}).handler(async()=>({enabled:true,writesEnabled:isSyntheticAccessEnabled(),membershipEnabled:true,creationEnabled:true}));
 
 /** Sites and programs in which this teacher actually has an active class assignment. */
 export const listFacilitatorGroupScopes=createServerFn({method:"GET"}).handler(async()=>{
@@ -86,7 +86,6 @@ export const createStudyGroup=createServerFn({method:"POST"})
   kind:z.enum(["course","interest"]),maxMembers:z.number().int().positive(),
   siteId:z.string().uuid(),programId:z.string().uuid().nullish()}).parse(input))
  .handler(async({data})=>{
-  assertSyntheticMutation("teacher");
   const actor=await groupActor("teacher"),valid=validateGroupInput(data);
   if(!actor.sites.includes(data.siteId))throw new AuthorizationError("facilitator school");
   if(data.programId&&!actor.scope.programIds?.includes(data.programId))
@@ -104,13 +103,23 @@ export const createStudyGroup=createServerFn({method:"POST"})
       data.programId?eq(s.sections.programId,data.programId):undefined))
     .limit(1);
   if(!assignment)throw new AuthorizationError("active teaching assignment at selected school");
-  const [group]=await db.insert(s.studyGroups).values({
+  return db.transaction(async tx=>{
+   const [group]=await tx.insert(s.studyGroups).values({
     ...valid,siteId:data.siteId,programId:data.programId??null,
     facilitatorPersonId:actor.actorPersonId!,requiresApproval:true,
-    visibility:"site",metadata:{synthetic:true,fixture:"gf26",createdByPersonId:actor.actorPersonId!}
-  }).returning({id:s.studyGroups.id});
-  if(!group)throw new Error("Group creation failed");
-  return {id:group.id};
+    visibility:"site",metadata:{createdByPersonId:actor.actorPersonId!}
+   }).returning({id:s.studyGroups.id});
+   if(!group)throw new Error("Group creation failed");
+   await tx.insert(s.auditEvents).values({
+    actorPersonId:actor.actorPersonId!,
+    action:"study_group.create",
+    resourceType:"study_group",resourceId:group.id,
+    scope:{siteId:data.siteId,programId:data.programId??null},
+    after:{title:valid.title,kind:valid.kind,maxMembers:valid.maxMembers},
+    context:{accountId:actor.accountId,sessionId:actor.sessionId}
+   });
+   return {id:group.id};
+  });
  });
 export const requestStudyGroupMembership=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().uuid()}).parse).handler(async({data})=>{const actor=await groupActor("student");const {db,s}=await context();
  return db.transaction(async tx=>{
