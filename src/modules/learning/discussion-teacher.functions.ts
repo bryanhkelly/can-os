@@ -38,13 +38,13 @@ export const setSyntheticCourseDiscussionLock=createServerFn({method:"POST"})
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  return db.transaction(async tx=>{
   const [thread]=await tx.select({id:s.communicationThreads.id,contextId:s.communicationThreads.contextId,contextType:s.communicationThreads.contextType,metadata:s.communicationThreads.metadata}).from(s.communicationThreads).where(eq(s.communicationThreads.id,data.threadId)).for("update").limit(1);
-  if(!thread||thread.contextType!=="section"||!thread.contextId||thread.thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
+  if(!thread||thread.contextType!=="section"||!thread.contextId||thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
   const [assigned]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assigned)throw new Error("Teacher is not assigned to this section");
   const [site]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId))throw new AuthorizationError("discussion section site");
   await tx.update(s.communicationThreads).set({metadata:{...thread.metadata,locked:data.locked},updatedAt:new Date()}).where(eq(s.communicationThreads.id,thread.id));
-  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"discussion.lock",resourceType:"communication_thread",resourceId:thread.id,before:{locked:thread.metadata.locked===true},after:{locked:data.locked},context:{}});
+  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"discussion.lock",resourceType:"communication_thread",resourceId:thread.id,before:{locked:thread.metadata.locked===true},after:{locked:data.locked},context:{sessionId:actor.sessionId}});
   return {saved:true};
  });
 });
@@ -56,9 +56,9 @@ export const moderateSyntheticDiscussionMessage=createServerFn({method:"POST"})
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  return db.transaction(async tx=>{
   const [message]=await tx.select({id:s.communicationMessages.id,threadId:s.communicationMessages.threadId,metadata:s.communicationMessages.metadata}).from(s.communicationMessages).where(eq(s.communicationMessages.id,data.messageId)).for("update").limit(1);
-  if(!message||message.message.metadata.kind==="prompt")throw new Error("Post unavailable for moderation");
+  if(!message||message.metadata.kind==="prompt")throw new Error("Post unavailable for moderation");
   const [thread]=await tx.select({contextId:s.communicationThreads.contextId,contextType:s.communicationThreads.contextType,metadata:s.communicationThreads.metadata}).from(s.communicationThreads).where(eq(s.communicationThreads.id,message.threadId)).limit(1);
-  if(!thread||thread.contextType!=="section"||!thread.contextId||thread.thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
+  if(!thread||thread.contextType!=="section"||!thread.contextId||thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
   const [assignment]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assignment)throw new Error("Teacher is not assigned to this section");
   const [site]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
