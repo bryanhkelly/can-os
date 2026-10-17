@@ -26,7 +26,6 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
  const [siteId,setSiteId]=useState(""),[programId,setProgramId]=useState("");
  const sites=[...new Map(scopes.map(s=>[s.siteId,{id:s.siteId,name:s.siteName}])).values()];
  const sitePrograms=scopes.filter(scope=>scope.siteId===siteId);
- const [selectedSessionGroup,setSelectedSessionGroup]=useState("");
  const [error,setError]=useState(""),[busy,setBusy]=useState(false);
  const [groupId,setGroupId]=useState(""),[sessionTitle,setSessionTitle]=useState(""),[agenda,setAgenda]=useState(""),[startsAt,setStartsAt]=useState(""),[endsAt,setEndsAt]=useState("");
  const [attendance,setAttendance]=useState<Array<{personId:string;rsvp:string|null;attended:boolean|null}>>([]),[attendanceSession,setAttendanceSession]=useState("");
@@ -62,8 +61,8 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
       </div>)}
     </div>)}
     {attendanceSession&&<div className="space-y-2"><h3 className="font-semibold">Attendance</h3>{attendance.map(person=><div key={person.personId} className="flex gap-2 text-xs"><span>{person.personId.slice(0,8)} · {person.rsvp??"No RSVP"} · {person.attended===null?"Unrecorded":person.attended?"Present":"Absent"}</span>
-    <button disabled={busy||!writesEnabled} className="underline" onClick={()=>run(async()=>{await recordStudyGroupAttendance({data:{sessionId:attendanceSession,personId:person.personId,attended:true}});setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}))})}>Present</button>
-    <button disabled={busy||!writesEnabled} className="underline" onClick={()=>run(async()=>{await recordStudyGroupAttendance({data:{sessionId:attendanceSession,personId:person.personId,attended:false}});setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}))})}>Absent</button></div>)}</div>}
+    <button disabled={busy||!writesEnabled||!groups.some(g=>g.legacySessionWrites&&g.sessions.some(session=>session.id===attendanceSession))} className="underline" onClick={()=>run(async()=>{await recordStudyGroupAttendance({data:{sessionId:attendanceSession,personId:person.personId,attended:true}});setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}))})}>Present</button>
+    <button disabled={busy||!writesEnabled||!groups.some(g=>g.legacySessionWrites&&g.sessions.some(session=>session.id===attendanceSession))} className="underline" onClick={()=>run(async()=>{await recordStudyGroupAttendance({data:{sessionId:attendanceSession,personId:person.personId,attended:false}});setAttendance(await listStudyGroupAttendance({data:{sessionId:attendanceSession}}))})}>Absent</button></div>)}</div>}
     <h3 className="font-semibold">Schedule a session</h3><select className="w-full rounded border p-2" aria-label="Choose study group" value={groupId} onChange={e=>setGroupId(e.target.value)}><option value="">Choose a group</option>{groups.map(g=><option key={g.id} value={g.id}>{g.title}</option>)}</select>
     <input className="w-full rounded border p-2" placeholder="Session title" aria-label="Session title" value={sessionTitle} onChange={e=>setSessionTitle(e.target.value)}/>
     <textarea className="w-full rounded border p-2" placeholder="Agenda" aria-label="Agenda" value={agenda} onChange={e=>setAgenda(e.target.value)}/>
