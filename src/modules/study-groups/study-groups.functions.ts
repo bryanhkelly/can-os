@@ -427,29 +427,81 @@ export const listStudyGroupReports=createServerFn({method:"GET"}).handler(async(
  .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
  .where(eq(s.studyGroupReports.status,"open")).limit(100);
 });
-export const resolveStudyGroupReport=createServerFn({method:"POST"}).validator(z.object({reportId:z.string().min(1),hidePost:z.boolean()}).parse).handler(async({data})=>{
- assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
- return db.transaction(async tx=>{
- const [report]=await tx.select({id:s.studyGroupReports.id,postId:s.studyGroupReports.postId,groupId:s.studyGroupReports.groupId,reporterPersonId:s.studyGroupReports.reporterPersonId,groupMetadata:s.studyGroups.metadata})
- .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupReports.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
- .where(and(eq(s.studyGroupReports.id,data.reportId),eq(s.studyGroupReports.status,"open"))).limit(1);
- if(!report)throw new Error("Open report not found");
- requireLegacyGroup(report.groupMetadata);
- if(data.hidePost&&report.postId)await tx.update(s.studyGroupPosts).set({hidden:true,updatedAt:new Date()}).where(and(eq(s.studyGroupPosts.id,report.postId),eq(s.studyGroupPosts.groupId,report.groupId)));
- await tx.update(s.studyGroupReports).set({status:"resolved"}).where(eq(s.studyGroupReports.id,report.id));
- const moderationActions=await tx.select({id:s.actions.id,status:s.actions.status}).from(s.actions)
-  .where(and(eq(s.actions.type,"study_group_moderation"),
-   eq(s.actions.subjectType,"study_group_report"),eq(s.actions.subjectId,report.id)));
- for(const action of moderationActions.filter(a=>!["resolved","cancelled"].includes(a.status))){
-  await tx.update(s.actions).set({status:"resolved",resolvedAt:new Date(),
-   resolutionNote:data.hidePost?"Reported content hidden":"Report reviewed; no content removal",
-   updatedAt:new Date()}).where(eq(s.actions.id,action.id));
- }
- await tx.insert(s.notifications).values({recipientPersonId:report.reporterPersonId,type:"study_group_report_resolved",status:"unread",title:"Study group report reviewed",body:data.hidePost?"The reported post was hidden after review.":"Your report was reviewed by a facilitator.",resourceType:"study_group",resourceId:report.groupId});
- await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"study_group.report.resolve",resourceType:"study_group_report",resourceId:report.id,after:{hidden:data.hidePost,groupId:report.groupId},context:{synthetic:true}});
- return {ok:true};
+/** The assigned group facilitator reviews, hides, and closes reported content. */
+export const resolveStudyGroupReport=createServerFn({method:"POST"})
+ .validator((input:unknown)=>z.object({
+  reportId:z.string().uuid(),hidePost:z.boolean()
+ }).parse(input))
+ .handler(async({data})=>{
+  const actor=await groupActor("teacher");
+  const {db,s}=await context();
+  return db.transaction(async tx=>{
+   const [report]=await tx.select({
+    id:s.studyGroupReports.id,postId:s.studyGroupReports.postId,
+    groupId:s.studyGroupReports.groupId,
+    reporterPersonId:s.studyGroupReports.reporterPersonId,
+    siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,
+   }).from(s.studyGroupReports)
+    .innerJoin(s.studyGroups,and(
+     eq(s.studyGroups.id,s.studyGroupReports.groupId),
+     eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),
+     inArray(s.studyGroups.siteId,actor.sites),
+     or(isNull(s.studyGroups.programId),
+       inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
+    .where(and(eq(s.studyGroupReports.id,data.reportId),
+      eq(s.studyGroupReports.status,"open")))
+    .for("update").limit(1);
+   if(!report)throw new AuthorizationError("open report for assigned facilitator");
+   if(data.hidePost&&report.postId){
+    const [hidden]=await tx.update(s.studyGroupPosts)
+     .set({hidden:true,updatedAt:new Date()})
+     .where(and(eq(s.studyGroupPosts.id,report.postId),
+       eq(s.studyGroupPosts.groupId,report.groupId)))
+     .returning({id:s.studyGroupPosts.id});
+    if(!hidden)throw new Error("Reported post is no longer available");
+   }
+   const [resolved]=await tx.update(s.studyGroupReports).set({status:"resolved"})
+    .where(and(eq(s.studyGroupReports.id,report.id),
+      eq(s.studyGroupReports.status,"open")))
+    .returning({id:s.studyGroupReports.id});
+   if(!resolved)throw new Error("Report already handled");
+   const openActions=await tx.select({id:s.actions.id})
+    .from(s.actions).where(and(eq(s.actions.type,"study_group_moderation"),
+      eq(s.actions.subjectType,"study_group_report"),
+      eq(s.actions.subjectId,report.id),
+      inArray(s.actions.status,["open","in_progress","waiting"])));
+   for(const action of openActions){
+    const [closed]=await tx.update(s.actions).set({
+      status:"resolved",resolvedAt:new Date(),
+      resolutionNote:data.hidePost?"Reported content hidden":"Report reviewed; no content removal",
+      updatedAt:new Date()
+    }).where(and(eq(s.actions.id,action.id),
+      inArray(s.actions.status,["open","in_progress","waiting"])))
+     .returning({id:s.actions.id});
+    if(closed)await tx.insert(s.domainEvents).values({
+      eventType:EventTypes.ActionResolved,aggregateType:"action",
+      aggregateId:closed.id,actorPersonId:actor.actorPersonId!,
+      payload:{subjectType:"study_group_report",subjectId:report.id,
+        groupId:report.groupId,hidden:data.hidePost}
+    });
+   }
+   await tx.insert(s.notifications).values({
+    recipientPersonId:report.reporterPersonId,
+    type:"study_group_report_resolved",status:"unread",
+    title:"Study group report reviewed",
+    body:data.hidePost?"The reported content was hidden.":"Your report was reviewed by a facilitator.",
+    resourceType:"study_group",resourceId:report.groupId
+   });
+   await tx.insert(s.auditEvents).values({
+    actorPersonId:actor.actorPersonId!,action:"study_group.report.resolve",
+    resourceType:"study_group_report",resourceId:report.id,
+    scope:{siteId:report.siteId,programId:report.programId},
+    before:{status:"open"},after:{status:"resolved",hidden:data.hidePost},
+    context:{accountId:actor.accountId,sessionId:actor.sessionId}
+   });
+   return {ok:true};
+  });
  });
-});
 
 export const rsvpStudyGroupSession=createServerFn({method:"POST"})
 .validator(z.object({sessionId:z.string().min(1),rsvp:z.enum(["going","maybe","declined"])}).parse).handler(async({data})=>{
