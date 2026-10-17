@@ -4,7 +4,7 @@ import {Search} from "lucide-react";
 import {openPaletteEvent} from "@/lib/workspace-search";
 
 type Membership={id:string;role:string;firstName:string;lastName:string};
-type Session={authenticated:boolean;activeGrantId?:string;grants?:Membership[]};
+type Session={authenticated:boolean;activeGrantId?:string;grants?:Membership[];activeContext?:{organizationIds:string[];siteIds:string[];programIds:string[]}};
 export const workspaceHome:Record<string,string>={student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach"};
 export const workspaceLinks:Record<string,{title:string;path:string}[]>={
  student:[{title:"Today",path:"/student"},{title:"Assignments",path:"/student/assignments"},{title:"Courses",path:"/student/courses"},{title:"Support",path:"/student/support"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
@@ -42,6 +42,7 @@ export function WorkspaceNavigation(){
     {current&&(workspaceLinks[current.role]??[]).map(item=><a key={item.path} href={item.path} className="text-xs font-semibold text-muted-foreground hover:text-foreground">{item.title}</a>)}
    </div>
    {current&&<button type="button" aria-label="Search workspace" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))} className="rounded-lg border px-3 py-2 text-xs"><Search className="mr-1 inline size-3"/>Search</button>}
+   {current&&session.activeContext&&<span className="text-xs text-muted-foreground" title="Authorized school context">{session.activeContext.siteIds.length===1?"1 school":`${session.activeContext.siteIds.length} schools`}</span>}
    {current&&<Link to="/notifications" className="text-xs font-semibold">Notifications</Link>}
    {session.authenticated&&<label className="text-xs text-muted-foreground">Workspace
     <select aria-label="Active membership" value={session.activeGrantId??""} onChange={event=>{void switchGrant(event.target.value).catch(()=>window.alert("Unable to switch membership"));}} className="ml-2 rounded-lg border bg-background p-2">
