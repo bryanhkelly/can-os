@@ -81,6 +81,7 @@ export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async 
         eq(s.actions.type, "support_referral"),
         eq(s.actions.subjectType, "student_profile"),
         inArray(s.actions.siteId, sites),
+        inArray(s.actions.programId,actor.scope.programIds??[]),
         ne(s.supportReferrals.stage, "closed"),
         ne(s.actions.status, "cancelled"),
       )),
@@ -94,6 +95,7 @@ export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async 
       .where(and(
         eq(s.insights.subjectType, "student_profile"),
         inArray(s.insights.siteId, sites),
+        inArray(s.insights.programId,actor.scope.programIds??[]),
         eq(s.insights.status, "open"),
       )),
     db.select({
@@ -105,6 +107,7 @@ export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async 
       .where(and(
         eq(s.actions.subjectType, "student_profile"),
         inArray(s.actions.siteId, sites),
+        inArray(s.actions.programId,actor.scope.programIds??[]),
         inArray(s.actions.status, [...OPEN_ACTION_STATUSES]),
         ne(s.actions.type, "support_referral"),
       )),
@@ -257,7 +260,7 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
     setResponseHeader("Cache-Control", "no-store");
     const sites = actorSiteIds(actor);
     const { db, s } = await context();
-    await assertStudentInSiteScope(db, s, sites, data.studentProfileId);
+    await resolveStudentScope(db,s,actor,data.studentProfileId);
 
     const [referralRows, outreachRows, insightRows] = await Promise.all([
       db.select({
@@ -276,6 +279,7 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
           eq(s.actions.subjectType, "student_profile"),
           eq(s.actions.subjectId, data.studentProfileId),
           inArray(s.actions.siteId, sites),
+        inArray(s.actions.programId,actor.scope.programIds??[]),
         ))
         .orderBy(desc(s.actions.createdAt)),
       db.select({
@@ -292,6 +296,7 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
           eq(s.actions.subjectType, "student_profile"),
           eq(s.actions.subjectId, data.studentProfileId),
           inArray(s.actions.siteId, sites),
+        inArray(s.actions.programId,actor.scope.programIds??[]),
         ))
         .orderBy(desc(s.actions.createdAt)),
       db.select({
@@ -307,6 +312,7 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
           eq(s.insights.subjectType, "student_profile"),
           eq(s.insights.subjectId, data.studentProfileId),
           inArray(s.insights.siteId, sites),
+        inArray(s.insights.programId,actor.scope.programIds??[]),
         ))
         .orderBy(desc(s.insights.createdAt)),
     ]);
