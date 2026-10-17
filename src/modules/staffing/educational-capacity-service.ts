@@ -50,6 +50,123 @@ export function remainingSeats(maxSeats: number, reservedSeats: number): number 
   return Math.max(0, maxSeats - reservedSeats);
 }
 
+export async function createInstructorCapability(
+  context: CommandContext,
+  input: {
+    personId: string;
+    courseTemplateId?: string | null;
+    subject?: string | null;
+    gradeRange?: { min?: string; max?: string };
+    modalities?: string[];
+    metadata?: Record<string, unknown>;
+  },
+): Promise<string> {
+  assertCapability(context, "capacity.manage");
+  if (!input.courseTemplateId && !input.subject?.trim()) {
+    throw new Error("Instructor capability requires a course template or subject");
+  }
+
+  const [person] = await db.select({ id: people.id }).from(people)
+    .where(eq(people.id, input.personId)).limit(1);
+  if (!person) throw new Error("Instructor person not found");
+
+  const [capability] = await db.insert(instructorCapabilities).values({
+    personId: input.personId,
+    courseTemplateId: input.courseTemplateId ?? null,
+    subject: input.subject?.trim() || null,
+    gradeRange: input.gradeRange ?? {},
+    modalities: input.modalities ?? [],
+    metadata: input.metadata ?? {},
+  }).returning({ id: instructorCapabilities.id });
+
+  if (!capability) throw new Error("Unable to create instructor capability");
+  return capability.id;
+}
+
+export async function createInstructorAvailability(
+  context: CommandContext,
+  input: {
+    personId: string;
+    startsAt: Date;
+    endsAt: Date;
+    timezone: string;
+    weeklyPattern?: { days?: number[]; startTime?: string; endTime?: string } | null;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<string> {
+  assertCapability(context, "capacity.manage");
+  if (input.endsAt <= input.startsAt) throw new Error("Availability must end after it starts");
+
+  const [availability] = await db.insert(instructorAvailabilityWindows).values({
+    personId: input.personId,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    timezone: input.timezone,
+    weeklyPattern: input.weeklyPattern ?? null,
+    metadata: input.metadata ?? {},
+  }).returning({ id: instructorAvailabilityWindows.id });
+
+  if (!availability) throw new Error("Unable to create instructor availability");
+  return availability.id;
+}
+
+export async function createCapacityOffering(
+  context: CommandContext,
+  input: {
+    personId: string;
+    capabilityId: string;
+    availabilityWindowId: string;
+    modality: "onsite" | "live_online" | "asynchronous" | "hybrid";
+    maxSeats: number;
+    organizationId?: string | null;
+    siteId?: string | null;
+    programId?: string | null;
+    jurisdictionId?: string | null;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<string> {
+  assertCapability(context, "capacity.manage");
+  if (!Number.isInteger(input.maxSeats) || input.maxSeats < 1) {
+    throw new Error("Capacity offering max seats must be a positive integer");
+  }
+
+  const [capability] = await db.select({
+    id: instructorCapabilities.id,
+    personId: instructorCapabilities.personId,
+  }).from(instructorCapabilities).where(eq(instructorCapabilities.id, input.capabilityId)).limit(1);
+  if (!capability || capability.personId !== input.personId) {
+    throw new Error("Capability does not belong to instructor");
+  }
+
+  const [availability] = await db.select({
+    id: instructorAvailabilityWindows.id,
+    personId: instructorAvailabilityWindows.personId,
+  }).from(instructorAvailabilityWindows)
+    .where(eq(instructorAvailabilityWindows.id, input.availabilityWindowId)).limit(1);
+  if (!availability || availability.personId !== input.personId) {
+    throw new Error("Availability does not belong to instructor");
+  }
+
+  if (input.siteId) assertSiteScope(context, input.siteId);
+  if (input.programId) assertProgramScope(context, input.programId);
+
+  const [offering] = await db.insert(instructionalCapacityOfferings).values({
+    personId: input.personId,
+    capabilityId: input.capabilityId,
+    availabilityWindowId: input.availabilityWindowId,
+    modality: input.modality,
+    maxSeats: input.maxSeats,
+    organizationId: input.organizationId ?? null,
+    siteId: input.siteId ?? null,
+    programId: input.programId ?? null,
+    jurisdictionId: input.jurisdictionId ?? null,
+    metadata: input.metadata ?? {},
+  }).returning({ id: instructionalCapacityOfferings.id });
+
+  if (!offering) throw new Error("Unable to create instructional capacity offering");
+  return offering.id;
+}
+
 function modalityMatches(offered: string, requested: string): boolean {
   if (offered === requested) return true;
   if (offered === "hybrid") return requested === "onsite" || requested === "live_online" || requested === "hybrid";
