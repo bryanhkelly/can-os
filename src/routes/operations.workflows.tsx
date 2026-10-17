@@ -1,4 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useState } from "react";
+import { activateLaunch } from "@/modules/programs/launch.functions";
 import { getWorkflowIntegration } from "@/modules/operations/workflow-integration.functions";
 
 export const Route = createFileRoute("/operations/workflows")({
@@ -18,6 +20,20 @@ function Metric({label,value}:{label:string;value:number|string}) {
 
 function ConnectedWorkflowsPage() {
   const {data,error} = Route.useLoaderData();
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
+  async function activate(programId: string) {
+    setBusy(programId);
+    setNotice("");
+    try {
+      await activateLaunch({ data: { programId } });
+      await router.invalidate();
+      setNotice("Program activated after canonical readiness validation.");
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : "Program activation could not be completed.");
+    } finally { setBusy(null); }
+  }
   return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
     <div className="mx-auto max-w-6xl">
       <Link to="/operations" className="text-xs underline">← Operations</Link>
@@ -29,6 +45,7 @@ function ConnectedWorkflowsPage() {
         comes from the canonical domain records; use the linked workspaces to act.
       </p>
       {error && <p role="alert" className="mt-6 rounded-lg border p-4 text-sm">{error}</p>}
+      {notice && <p role="status" className="mt-6 rounded-lg border p-4 text-sm">{notice}</p>}
       {data && data.programs.length === 0 && <p className="mt-6 rounded-lg border p-4 text-sm">
         No programs are accessible to your active registrar grant.
       </p>}
@@ -41,10 +58,18 @@ function ConnectedWorkflowsPage() {
                 {program.type.replaceAll("_"," ")} · {program.status}
               </p>
             </div>
-            <Link to="/operations/launch/$programId" params={{programId:program.id}}
-              className="rounded-lg border px-3 py-2 text-xs font-semibold underline">
-              Open program setup
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/operations/launch/$programId" params={{programId:program.id}}
+                className="rounded-lg border px-3 py-2 text-xs font-semibold underline">
+                Open program setup
+              </Link>
+              {program.status !== "active" && program.launch.journeyStatus === "ready" &&
+                <button type="button" disabled={busy !== null}
+                  onClick={() => void activate(program.id)}
+                  className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                  {busy === program.id ? "Activating…" : "Activate through canonical validation"}
+                </button>}
+            </div>
           </div>
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
             <section className="rounded-xl border p-4">
