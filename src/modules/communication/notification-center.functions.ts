@@ -50,6 +50,12 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const referralIds=new Set(referralRows.map(r=>r.id));
  const missingIds=rows.filter(n=>n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId as string);
  const followUps=missingIds.length&&studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions).where(and(inArray(s.actions.id,missingIds),eq(s.actions.type,"missing_work_follow_up"),inArray(s.actions.subjectId,studentIds))):[];
+ const assignedActionIds=rows.filter(n=>n.resourceType==="action"&&n.resourceId&&n.type==="operations_action_assigned").map(n=>n.resourceId as string);
+ const ownedActions=assignedActionIds.length?await db.select({id:s.actions.id,siteId:s.actions.siteId,programId:s.actions.programId})
+   .from(s.actions).where(and(inArray(s.actions.id,assignedActionIds),eq(s.actions.ownerPersonId,personId),
+     inArray(s.actions.siteId,context.scope.siteIds??[]))):[];
+ const permittedAssignedActions=new Set(ownedActions.filter(action=>
+   !action.programId||(context.scope.programIds??[]).includes(action.programId)).map(action=>action.id));
  const missingAssessmentByAction=new Map(followUps.filter(a=>typeof a.metadata.assessmentId==="string").map(a=>[a.id,a.metadata.assessmentId as string]));
 
  return rows.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
@@ -60,6 +66,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:
    n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)?"/guardian/admission-offers":
    n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)?"/admissions/":
+   n.type==="operations_action_assigned"&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&context.role==="registrar"?"/operations":
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?((n.type==="study_group_membership_request"||n.type==="study_group_report_submitted")?"/teacher/study-groups":`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`):
    n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });
