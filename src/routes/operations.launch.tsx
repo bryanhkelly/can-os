@@ -387,6 +387,8 @@ function LaunchWizardPage() {
                       <h3 className="font-semibold">{launch.name}</h3>
                       <span className="text-xs uppercase text-muted-foreground">{launch.status}</span>
                     </div>
+                    <Link to="/operations/launch/$programId" params={{programId:launch.id}}
+                      className="mt-2 inline-block text-xs font-semibold underline">Configure classes and instructors →</Link>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {typeLabels[launch.type] ?? launch.type}
                       {launch.journey ? ` · Journey: ${launch.journey.status}` : " · No launch journey"}
