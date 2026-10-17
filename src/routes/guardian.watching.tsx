@@ -7,6 +7,7 @@ import {
   updateWatchStatus,
 } from "@/modules/conversation/ask-can.functions";
 import { WorkspaceShell, EmptyState, QueryState } from "@/components/workspace";
+import { NotificationPreferences } from "@/components/guardian/NotificationPreferences";
 
 export const Route = createFileRoute("/guardian/watching")({
   component: WatchingPage,
@@ -52,6 +53,7 @@ function WatchingPage() {
       title="Things CAN Is Watching"
       subtitle="Every standing instruction you've given CAN — inspect it, pause it, or turn it off."
     >
+      <NotificationPreferences />
       <QueryState loading={loading ? "Loading your watches…" : ""} error={error}>
         {watches.length === 0 && (
           <EmptyState
