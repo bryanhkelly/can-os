@@ -2,7 +2,7 @@ import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
-import{and,eq,desc,inArray,sql} from "drizzle-orm";
+import{and,eq,desc,inArray,sql,isNull,or} from "drizzle-orm";
 import{z} from "zod";
 import{assertSyntheticMutation,isSyntheticAccessEnabled} from "@/modules/_demo/demo-write-gate";
 import {canAccessGroup,validateGroupInput,validateGroupPost,validateSession} from "@/domain/study-groups";
@@ -20,7 +20,7 @@ export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
  const {db,s}=await context();
  const rows=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,capacity:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,facilitator:s.studyGroups.facilitatorPersonId,status:s.studyGroups.status,membership:s.studyGroupMemberships.status}).from(s.studyGroups)
  .leftJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroupMemberships.personId,actor.actorPersonId!)))
- .where(and(eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites))).orderBy(desc(s.studyGroups.createdAt)).limit(100);
+ .where(and(eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).orderBy(desc(s.studyGroups.createdAt)).limit(100);
  return rows;
 });
 export const createStudyGroup=createServerFn({method:"POST"}).validator(z.object({title:z.string(),description:z.string(),kind:z.enum(["course","interest"]),maxMembers:z.number().int().positive()}).parse).handler(async({data})=>{
@@ -31,7 +31,7 @@ export const createStudyGroup=createServerFn({method:"POST"}).validator(z.object
 export const requestStudyGroupMembership=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
  assertSyntheticMutation("student");const actor=await groupActor("student");const {db,s}=await context();
  return db.transaction(async tx=>{
- const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites))).for("update").limit(1);
+ const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).for("update").limit(1);
  if(!group)throw new Error("Group unavailable");
  const [existing]=await tx.select({status:s.studyGroupMemberships.status}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,group.id),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  if(existing?.status==="approved"||existing?.status==="pending")return {ok:true};
@@ -68,7 +68,7 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
 export const decideStudyGroupMembership=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1),personId:z.string().min(1),approve:z.boolean()}).parse).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
  return db.transaction(async tx=>{
- const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),eq(s.studyGroups.status,"active"))).for("update").limit(1);
+ const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active"))).for("update").limit(1);
  if(!group||data.personId===actor.actorPersonId!)throw new Error("Not authorized to approve");
  const [member]=await tx.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,data.personId),eq(s.studyGroupMemberships.status,"pending"))).limit(1);
  if(!member)throw new Error("Pending membership not found");
@@ -105,7 +105,7 @@ export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.obje
  assertSyntheticMutation("student");
  const actor=await groupActor("student");
  const {db,s}=await context();
- const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites))).limit(1);
+ const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).limit(1);
  if(!group)throw new Error("Group unavailable");
  const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  const permitted=canAccessGroup((membership?.status??null) as "pending"|"approved"|"declined"|"left"|null,"student");
@@ -123,7 +123,7 @@ export const postStudyGroupMessage=createServerFn({method:"POST"}).validator(z.o
 });
 export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1),title:z.string(),agenda:z.string(),startsAt:z.string(),endsAt:z.string()}).parse).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {start,end}=validateSession(data.startsAt,data.endsAt);const {db,s}=await context();
- const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),eq(s.studyGroups.status,"active"))).limit(1);
+ const [group]=await db.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active"))).limit(1);
  if(!group)throw new Error("Facilitator required");
  if(data.title.trim().length<3||data.title.length>120||data.agenda.length>2000)throw new Error("Invalid session details");
  return db.transaction(async tx=>{
@@ -163,7 +163,7 @@ export const reportStudyGroupPost=createServerFn({method:"POST"}).validator(z.ob
  const [existing]=await tx.select({id:s.studyGroupReports.id}).from(s.studyGroupReports).where(and(eq(s.studyGroupReports.groupId,data.groupId),eq(s.studyGroupReports.postId,data.postId),eq(s.studyGroupReports.reporterPersonId,actor.actorPersonId!),eq(s.studyGroupReports.status,"open"))).limit(1);
  if(existing)return {ok:true,created:false};
  const [createdReport]=await tx.insert(s.studyGroupReports).values({groupId:data.groupId,postId:data.postId,reporterPersonId:actor.actorPersonId!,reason:data.reason.trim()}).returning({id:s.studyGroupReports.id});
- const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title,siteId:s.studyGroups.siteId}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),eq(s.studyGroups.status,"active"))).limit(1);
+ const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title,siteId:s.studyGroups.siteId}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active"))).limit(1);
  if(!group)throw new Error("Group unavailable");
  await tx.insert(s.actions).values({type:"study_group_moderation",status:"open",
   priority:"high",title:"Review reported content: "+group.title,
@@ -184,7 +184,7 @@ export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(as
  const {db,s}=await context();
  return db.select({groupId:s.studyGroups.id,groupTitle:s.studyGroups.title,personId:s.studyGroupMemberships.personId,personName:s.people.legalFirstName,status:s.studyGroupMemberships.status})
  .from(s.studyGroupMemberships)
- .innerJoin(s.studyGroups,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites)))
+ .innerJoin(s.studyGroups,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
  .innerJoin(s.people,eq(s.studyGroupMemberships.personId,s.people.id))
  .where(eq(s.studyGroupMemberships.status,"pending")).limit(100);
 });
@@ -192,14 +192,14 @@ export const listStudyGroupReports=createServerFn({method:"GET"}).handler(async(
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");
  const {db,s}=await context();
  return db.select({id:s.studyGroupReports.id,groupId:s.studyGroupReports.groupId,reason:s.studyGroupReports.reason,status:s.studyGroupReports.status,postId:s.studyGroupReports.postId})
- .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites)))
+ .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroupReports.groupId,s.studyGroups.id),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
  .where(eq(s.studyGroupReports.status,"open")).limit(100);
 });
 export const resolveStudyGroupReport=createServerFn({method:"POST"}).validator(z.object({reportId:z.string().min(1),hidePost:z.boolean()}).parse).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
  return db.transaction(async tx=>{
  const [report]=await tx.select({id:s.studyGroupReports.id,postId:s.studyGroupReports.postId,groupId:s.studyGroupReports.groupId,reporterPersonId:s.studyGroupReports.reporterPersonId})
- .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupReports.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites)))
+ .from(s.studyGroupReports).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupReports.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
  .where(and(eq(s.studyGroupReports.id,data.reportId),eq(s.studyGroupReports.status,"open"))).limit(1);
  if(!report)throw new Error("Open report not found");
  if(data.hidePost&&report.postId)await tx.update(s.studyGroupPosts).set({hidden:true,updatedAt:new Date()}).where(and(eq(s.studyGroupPosts.id,report.postId),eq(s.studyGroupPosts.groupId,report.groupId)));
@@ -224,7 +224,7 @@ export const rsvpStudyGroupSession=createServerFn({method:"POST"})
  if(!["going","maybe","declined"].includes(data.rsvp))throw new Error("Invalid RSVP");
  const {db,s}=await context();
  const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId})
- .from(s.studyGroupSessions).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),inArray(s.studyGroups.siteId,actor.sites),eq(s.studyGroups.status,"active")))
+ .from(s.studyGroupSessions).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active")))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Session not found");
  return db.transaction(async tx=>{
@@ -242,7 +242,7 @@ export const recordStudyGroupAttendance=createServerFn({method:"POST"})
 .validator(z.object({sessionId:z.string().min(1),personId:z.string().min(1),attended:z.boolean()}).parse).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
  const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions)
- .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites)))
+ .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Not authorized for this session");
  return db.transaction(async tx=>{
@@ -259,7 +259,7 @@ export const listStudyGroupAttendance=createServerFn({method:"GET"})
 .validator(z.object({sessionId:z.string().min(1)}).parse).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
  const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions)
- .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),inArray(s.studyGroups.siteId,actor.sites),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!)))
+ .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!)))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Access denied");
  // The roster includes every approved member, even when they never RSVP'd.
@@ -280,7 +280,7 @@ export const reviseStudyGroupSession=createServerFn({method:"POST"})
  const times=data.action==="reschedule"?validateSession(data.startsAt??"",data.endsAt??""):null;
  return db.transaction(async tx=>{
   const [session]=await tx.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt}).from(s.studyGroupSessions)
-   .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),eq(s.studyGroups.status,"active")))
+   .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active")))
    .where(eq(s.studyGroupSessions.id,data.sessionId)).for("update").limit(1);
   if(!session)throw new Error("Facilitator session not found");
   const [event]=await tx.select().from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
