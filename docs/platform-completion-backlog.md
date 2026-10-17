@@ -71,3 +71,5 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 Return to Phase 0 CI/migrations/release baseline and Phase 4 security/performance/operability certification after functionality convergence. Existing CI failures and unknown production authorization safety remain explicit blockers to any real-data release.
 
 - [x] Canonicalize authenticated office-hour booking and protect published availability and related section enrollment.
+
+- [x] Guardian upcoming appointments and same-series rescheduling added; cancellation still pending.
