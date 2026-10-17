@@ -58,6 +58,6 @@
 
 ## Integration sequence
 
-- Keep this as a draft PR against `phase1/platform-convergence-foundation` to isolate Phase 3 file diffs. Coordinate and rebase onto Phase 1 after its review; do not merge this branch into main independently.
+- Keep this as a draft PR against `phase1/platform-convergence-foundation` to isolate Phase 3 file diffs. Phase 1 continues advancing while Phase 3 is developed; the branches currently diverge, so synchronize/rebase after the Phase 1 integration boundary is stable, and review any new conflicts before a change to the PR base. Do not merge this branch into main independently.
 - Align with Phase 2 school/year/section topology once GF3 is stable. No migration or release action is included.
 - Complete legal/school consent policy review, official transcript consequences, guardian notification deep links, teacher group navigation and replacement of legacy study-group routes when their Phase 1 owners are stable. Follow with cross-persona acceptance before a production release.
