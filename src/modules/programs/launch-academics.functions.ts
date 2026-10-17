@@ -8,6 +8,7 @@ import {auditEvents,courseTemplates,courseTemplateVersions,domainEvents,notifica
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {evaluateSectionReadiness} from "./section-readiness-service";
+import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
 const uuid=z.string().uuid();
 function launchModality(delivery:{onsite?:boolean;asynchronous?:boolean;liveOnline?:boolean}){
  if(delivery.liveOnline&&delivery.onsite)return "hybrid";
@@ -112,6 +113,7 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
    if(!assignment)throw new AuthorizationError("teacher role assignment");
   }
   return db.transaction(async tx=>{
+   await lockAttendanceConfigurationAtSite(tx,program.siteId!);
    const [created]=await tx.insert(sections).values({
     programId:program.id,siteId:program.siteId,termId:data.termId,
     courseTemplateVersionId:data.courseTemplateVersionId,
@@ -158,7 +160,9 @@ export const assignLaunchTeacher=createServerFn({method:"POST"})
     inArray(roleAssignments.organizationId,
       [program.organizationId,program.academicProviderOrganizationId]))).limit(1);
   if(!section||!teacher)throw new AuthorizationError("section or teacher assignment");
+  if(!program.siteId)throw new Error("Teaching assignment requires an onsite school site");
   return db.transaction(async tx=>{
+   await lockAttendanceConfigurationAtSite(tx,program.siteId!);
    await tx.update(deliveryArrangements).set({status:"completed",updatedAt:new Date()})
     .where(and(eq(deliveryArrangements.sectionId,section.id),eq(deliveryArrangements.status,"active")));
    await tx.insert(deliveryArrangements).values({
