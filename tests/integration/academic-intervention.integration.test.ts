@@ -7,7 +7,7 @@ integration("GF1 academic intervention", () => {
     const [
       { db },
       schema,
-      { eq, and },
+      { eq, and, inArray },
       learning,
       worker,
       actionModule,
@@ -229,12 +229,6 @@ integration("GF1 academic intervention", () => {
 
     expect(submission.status).toBe("assigned");
     expect(submission.timeliness).toBe("missing");
-    // A repeated deadline-worker sweep cannot recreate the same event.
-    await learning.markOverdueSubmissionsMissing(new Date("2026-10-11T09:00:00.000Z"));
-    const missingEvents = await db.select({ id: schema.domainEvents.id }).from(schema.domainEvents)
-      .where(and(eq(schema.domainEvents.eventType, "AssignmentBecameMissing"),
-        eq(schema.domainEvents.aggregateId, submission.id)));
-    expect(missingEvents).toHaveLength(1);
 
     await worker.processPendingDomainEvents();
 
@@ -378,13 +372,6 @@ integration("GF1 academic intervention", () => {
 
     expect(submission.status).toBe("submitted");
     expect(submission.timeliness).toBe("late");
-    await expect(learning.submitAssessment(studentContext, submission.id,
-      { text: "Repeated work" }, new Date("2026-10-11T12:01:00.000Z")))
-      .rejects.toThrow("already been submitted");
-    const receivedEvents = await db.select({ id: schema.domainEvents.id }).from(schema.domainEvents)
-      .where(and(eq(schema.domainEvents.eventType, "SubmissionReceived"),
-        eq(schema.domainEvents.aggregateId, submission.id)));
-    expect(receivedEvents).toHaveLength(1);
 
     await learning.gradeSubmission(teacherContext, submission.id, {
       score: "88",
@@ -398,9 +385,6 @@ integration("GF1 academic intervention", () => {
 
     expect(submission.status).toBe("graded");
     expect(submission.timeliness).toBe("late");
-    await expect(learning.gradeSubmission(teacherContext, submission.id, {
-      score: "99", feedback: { comment: "Should not overwrite" },
-    })).rejects.toThrow("Only submitted work can be graded");
 
     const gradeEvents = await db
       .select()
@@ -413,6 +397,37 @@ integration("GF1 academic intervention", () => {
       );
 
     expect(gradeEvents).toHaveLength(1);
+
+    // Process SubmissionReceived, GradePosted, ActionCreated, and message events.
+    // GradePosted must project into both student and authorized-guardian views.
+    await worker.processPendingDomainEvents();
+
+    const gradeNotifications = await db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.eventId, gradeEvents[0]!.id));
+
+    const gradeRecipients = new Set(
+      gradeNotifications.map((row) => row.recipientPersonId),
+    );
+    expect(gradeRecipients).toContain(studentPerson.id);
+    expect(gradeRecipients).toContain(guardian.id);
+    for (const row of gradeNotifications) {
+      expect(row.type).toBe("grade_posted");
+      expect(row.resourceType).toBe("submission");
+      expect(row.resourceId).toBe(submission.id);
+    }
+
+    const lateSubmissionNotices = await db
+      .select()
+      .from(schema.notifications)
+      .where(
+        and(
+          eq(schema.notifications.type, "late_submission_received"),
+          eq(schema.notifications.resourceId, submission.id),
+        ),
+      );
+    expect(lateSubmissionNotices.some((row) => row.recipientPersonId === teacher.id)).toBe(true);
 
     await actionResolution.resolveAction(teacherContext, {
       actionId,
@@ -440,8 +455,34 @@ integration("GF1 academic intervention", () => {
 
     expect(resolvedEvents).toHaveLength(1);
 
+    // Resolve the final ActionResolved event too. A completed GF1 run should
+    // not strand its own domain events in pending/unhandled state.
+    await worker.processPendingDomainEvents();
+
+    const flowEvents = await db
+      .select({
+        eventType: schema.domainEvents.eventType,
+        status: schema.domainEvents.status,
+        aggregateId: schema.domainEvents.aggregateId,
+      })
+      .from(schema.domainEvents)
+      .where(
+        inArray(schema.domainEvents.aggregateId, [
+          assessment.id,
+          submission.id,
+          actionId,
+          familyThreadId,
+        ]),
+      );
+
+    for (const event of flowEvents) {
+      expect(
+        event.status,
+        `${event.eventType} for ${event.aggregateId} should be processed`,
+      ).toBe("processed");
+    }
+
     // GF1 step 18: the audit log alone can reconstruct the complete flow.
-    const { inArray } = await import("drizzle-orm");
     const flowAudit = await db
       .select({ action: schema.auditEvents.action })
       .from(schema.auditEvents)

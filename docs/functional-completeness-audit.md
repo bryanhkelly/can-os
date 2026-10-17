@@ -10,7 +10,7 @@ States: Complete / Partially Complete / Foundation Only / Missing. No feature be
 
 | Golden flow | Assessment | Verified code capabilities | Unproven or missing acceptance evidence |
 | --- | --- | --- | --- |
-| GF1 Academic intervention | Partially Complete | Assignments/submissions, synthetic notifications, support referral | Teacher → student → guardian → specialist propagation; missing-work and late-submit end-to-end audit |
+| GF1 Academic intervention | Partially Complete | Implementation now covers missing-work detection, student/guardian notification, teacher queue, specialist Insight, Action + contextual family/teacher thread, late submission, real teacher gradebook posting, student/guardian grade propagation, resolution, processed GF1 event chain, and reconstructable audit. Build, typecheck, fixture coverage, authorization regressions, and unit tests pass on PR #117. | Release acceptance remains unproven until the dedicated GF1 workflow runs the integration test and student → guardian → teacher → specialist Playwright flow against an isolated synthetic Neon branch. The `integration-test` environment currently has no `CAN_ADMISSIONS_TEST_DATABASE_URL` or `CAN_APPLICATION_DB_HOST`, so the gate correctly refuses to write. |
 | GF2 Admissions → enrollment | Partially Complete | Household readiness writes, offer transactions, guardian responses, activation, admissions and family status views | Multi-person browser scenario; verification that section/course access, household and student workspaces update; event delivery |
 | GF3 Host/program launch | Foundation Only | Program and site services / launch journey model | Complete church host and K–8 extension launch flows across roles |
 | GF4 Attendance and excuse | Partially Complete | Attendance and family functions documented in golden flow | Full guardian-review lifecycle, metrics and offline duplicate rejection |
@@ -27,7 +27,7 @@ P0: Create a repeatable synthetic fixture manifest for every currently surfaced 
 
 P1: Link GF2 activation to authorized student Today, guardian household, course proposal and notifications; require canonical read-after-write consistency.
 
-P1: Close GF1 teacher missing work → notification → guardian → referral → grade → resolve workflow.
+P0: Configure an isolated Neon acceptance branch for GF1 (`CAN_ADMISSIONS_TEST_DATABASE_URL` plus `CAN_APPLICATION_DB_HOST`) and run the manual GF1 Neon Acceptance workflow; only then promote GF1 from Partially Complete to Complete.
 
 P1: Finish GF26 session reschedule/cancel propagation, RSVP and moderation review lifecycle.
 

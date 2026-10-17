@@ -37,11 +37,14 @@ jobs:
       - name: Admissions and authorization regressions
         run: npx vitest run tests/unit/admissions-session-roles.test.ts tests/unit/admissions-offer-events.test.ts tests/unit/admissions-seat-occupancy.test.ts
 
+      - name: Build
+        run: npm run build
+
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build
-        run: npm run build
+      - name: Test
+        run: npm test
 
       - name: Validate incremental migration generation
         run: |
@@ -60,6 +63,3 @@ jobs:
           name: drizzle-migration-review
           path: drizzle/
           retention-days: 7
-
-      - name: Test
-        run: npm test
