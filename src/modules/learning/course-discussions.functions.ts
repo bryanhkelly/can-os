@@ -4,7 +4,7 @@ import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {and,eq,inArray,desc} from "drizzle-orm";
 import {discussionTree} from "@/domain/course-discussions";
-/** Read-only preview of explicitly synthetic discussions belonging to the demo student's enrolled sections. */
+/** Read enrolled section discussions through verified student and program access. */
 export const getCourseDiscussions=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await getCommandContext(getRequest());
  setResponseHeader("Cache-Control","private, no-store");
@@ -16,7 +16,7 @@ export const getCourseDiscussions=createServerFn({method:"GET"}).handler(async()
  if(!profile)return [];
  const enrollments=await db.select({sectionId:s.enrollments.sectionId}).from(s.enrollments)
   .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
-  .where(and(eq(s.enrollments.studentProfileId,profile.id),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),inArray(s.sections.siteId,actor.scope.siteIds)));
+  .where(and(eq(s.enrollments.studentProfileId,profile.id),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),inArray(s.sections.siteId,actor.scope.siteIds),inArray(s.sections.programId,actor.scope.programIds??[])));
  const sectionIds=enrollments.map(x=>x.sectionId).filter((x):x is string=>Boolean(x));
  if(!sectionIds.length)return [];
  const rows=await db.select({id:s.communicationThreads.id,subject:s.communicationThreads.subject,contextId:s.communicationThreads.contextId,metadata:s.communicationThreads.metadata,lastMessageAt:s.communicationThreads.lastMessageAt}).from(s.communicationThreads).where(and(eq(s.communicationThreads.contextType,"section"),inArray(s.communicationThreads.contextId,sectionIds))).orderBy(desc(s.communicationThreads.createdAt)).limit(40);
