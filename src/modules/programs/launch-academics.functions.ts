@@ -7,7 +7,6 @@ import {auditEvents,courseTemplates,courseTemplateVersions,domainEvents,notifica
  programs,roleAssignments,schoolYears,sectionTeachers,sections,terms,people} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
-import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 const uuid=z.string().uuid();
 
 async function setupContext(programId:string){
@@ -77,7 +76,6 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
   teacherPersonId:uuid.optional(),
  }).parse(v))
  .handler(async({data})=>{
-  assertSyntheticMutation("registrar");
   const {actor,program}=await setupContext(data.programId);
   if(!program.siteId)throw new Error("Assign a school site before creating sections");
   const [term]=await db.select({
@@ -137,7 +135,6 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
 export const assignLaunchTeacher=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({programId:uuid,sectionId:uuid,teacherPersonId:uuid}).parse(v))
  .handler(async({data})=>{
-  assertSyntheticMutation("registrar");
   const {actor,program}=await setupContext(data.programId);
   const [section]=await db.select({id:sections.id}).from(sections)
    .where(and(eq(sections.id,data.sectionId),eq(sections.programId,program.id))).limit(1);
