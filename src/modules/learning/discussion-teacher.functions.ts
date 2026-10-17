@@ -41,8 +41,8 @@ export const setCourseDiscussionLock=createServerFn({method:"POST"})
   if(!thread||thread.contextType!=="section"||!thread.contextId||thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
   const [assigned]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assigned)throw new Error("Teacher is not assigned to this section");
-  const [site]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
-  if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId))throw new AuthorizationError("discussion section site");
+  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
+  if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId)||!actor.scope.programIds?.includes(site.programId))throw new AuthorizationError("discussion section scope");
   await tx.update(s.communicationThreads).set({metadata:{...thread.metadata,locked:data.locked},updatedAt:new Date()}).where(eq(s.communicationThreads.id,thread.id));
   await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"discussion.lock",resourceType:"communication_thread",resourceId:thread.id,before:{locked:thread.metadata.locked===true},after:{locked:data.locked},context:{sessionId:actor.sessionId}});
   return {saved:true};
@@ -61,8 +61,8 @@ export const moderateDiscussionMessage=createServerFn({method:"POST"})
   if(!thread||thread.contextType!=="section"||!thread.contextId||thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
   const [assignment]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assignment)throw new Error("Teacher is not assigned to this section");
-  const [site]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
-  if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId))throw new AuthorizationError("discussion section site");
+  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
+  if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId)||!actor.scope.programIds?.includes(site.programId))throw new AuthorizationError("discussion section scope");
   await tx.update(s.communicationMessages).set({metadata:{...message.metadata,hidden:data.hidden,moderatedBy:actor.actorPersonId!}}).where(eq(s.communicationMessages.id,message.id));
   await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"discussion.moderate",resourceType:"communication_message",resourceId:message.id,before:{hidden:message.metadata.hidden===true},after:{hidden:data.hidden},context:{sessionId:actor.sessionId,threadId:message.threadId}});
   return {saved:true};
