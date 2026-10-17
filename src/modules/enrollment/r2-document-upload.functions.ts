@@ -98,27 +98,27 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
    const versions=await tx.select({id:documents.id,metadata:documents.metadata}).from(documents)
     .where(and(eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageProvider,"cloudflare_r2")))
     .orderBy(desc(documents.createdAt)).for("update");
-   const owned=versions.filter(v=>v.metadata.synthetic===true&&v.metadata.applicationId===data.applicationId);
+   const owned=versions.filter(v=>v.metadata.applicationId===data.applicationId);
    const version=owned.reduce((max,v)=>Math.max(max,typeof v.metadata.version==="number"?v.metadata.version:1),0)+1;
    for(const old of owned){
     if(old.metadata.isCurrent===false)continue;
     await tx.update(documents).set({metadata:{...old.metadata,isCurrent:false,supersededAt:new Date().toISOString()},updatedAt:new Date()}).where(eq(documents.id,old.id));
    }
-   const [document]=await tx.insert(documents).values({subjectType:"journey_requirement",subjectId:data.requirementId,category:"enrollment",fileName:data.fileName,storageProvider:"cloudflare_r2",storageKey:data.key,mimeType:data.mimeType,sensitivityTier:"restricted",uploadedByPersonId:actorId,metadata:{synthetic:true,applicationId:data.applicationId,size:data.size,reviewStatus:"received",version,isCurrent:true}}).returning({id:documents.id});
+   const [document]=await tx.insert(documents).values({subjectType:"journey_requirement",subjectId:data.requirementId,category:"enrollment",fileName:data.fileName,storageProvider:"cloudflare_r2",storageKey:data.key,mimeType:data.mimeType,sensitivityTier:"restricted",uploadedByPersonId:actorId,metadata:{applicationId:data.applicationId,size:data.size,reviewStatus:"received",version,isCurrent:true}}).returning({id:documents.id});
    if(!document)throw new Error("Could not record document");
    const now=new Date();
    await tx.update(journeyRequirements).set({status:"needs_you",completedAt:null,updatedAt:now,
     evidence:[...requirement.evidence,{kind:"document_review",status:"received",documentId:document.id,
-     text:"New file uploaded; review required.",reviewedAt:now.toISOString(),synthetic:true}]}).where(eq(journeyRequirements.id,requirement.id));
+     text:"New file uploaded; review required.",reviewedAt:now.toISOString()}]}).where(eq(journeyRequirements.id,requirement.id));
    await tx.update(journeys).set({status:"in_progress",completedAt:null,updatedAt:now}).where(eq(journeys.id,journey.id));
-   await tx.insert(auditEvents).values({actorPersonId:actorId,action:"synthetic.enrollment.document.resubmitted",resourceType:"journey_requirement",resourceId:requirement.id,
-    before:{status:requirement.status},after:{status:"needs_you",documentId:document.id,version},context:{synthetic:true,applicationId:data.applicationId}});
-   await tx.insert(auditEvents).values({actorPersonId:actorId,action:"synthetic.enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{synthetic:true}});
+   await tx.insert(auditEvents).values({actorPersonId:actorId,action:"enrollment.document.resubmitted",resourceType:"journey_requirement",resourceId:requirement.id,
+    before:{status:requirement.status},after:{status:"needs_you",documentId:document.id,version},context:{applicationId:data.applicationId}});
+   await tx.insert(auditEvents).values({actorPersonId:actorId,action:"enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{synthetic:true}});
    return {documentId:document.id,created:true};
   });
  });
 
-/** Restricted synthetic registrar-only document retrieval; never expose raw R2 keys. */
+/** Short-lived document retrieval after application and guardian/registrar scope checks. */
 export const getSyntheticR2DocumentDownload=createServerFn({method:"POST"})
  .validator((data:{applicationId:string;requirementId:string;documentId:string})=>data)
  .handler(async({data})=>{
@@ -126,7 +126,7 @@ export const getSyntheticR2DocumentDownload=createServerFn({method:"POST"})
   await requirementScope(data.applicationId,data.requirementId);
   const [record]=await db.select({id:documents.id,storageKey:documents.storageKey,metadata:documents.metadata})
    .from(documents).where(and(eq(documents.id,data.documentId),eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageProvider,"cloudflare_r2"))).limit(1);
-  if(!record||record.metadata.synthetic!==true||record.metadata.applicationId!==data.applicationId)throw new Error("Document not found within synthetic enrollment scope");
+  if(!record||record.metadata.applicationId!==data.applicationId||record.metadata.isCurrent===false)throw new Error("Document not found within the current enrollment requirement");
   const expectedPrefix="enrollment/"+data.applicationId+"/"+data.requirementId+"/";
   if(!record.storageKey.startsWith(expectedPrefix))throw new Error("Document storage scope mismatch");
   return {downloadUrl:signR2Object("GET",record.storageKey,undefined,60),expiresInSeconds:60};
