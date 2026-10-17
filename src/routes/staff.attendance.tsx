@@ -2,25 +2,25 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   listPendingExcuses,
-  listSiteAttendanceRoster,
-  markAttendance,
   reviewExcuse,
 } from "@/modules/attendance/attendance.functions";
+import { listExpectedOnsiteRoster, markExpectedOnsiteAttendance } from "@/modules/attendance/onsite-attendance-workflow.functions";
 
 export const Route = createFileRoute("/staff/attendance")({ component: StaffAttendancePage });
 
-type RosterStudent = Awaited<ReturnType<typeof listSiteAttendanceRoster>>["students"][number];
+type RosterStudent = Awaited<ReturnType<typeof listExpectedOnsiteRoster>>["students"][number];
 type PendingExcuse = Awaited<ReturnType<typeof listPendingExcuses>>["excuses"][number];
 
 const statusOptions = ["present", "absent", "tardy"] as const;
-type OfflineMark = {studentProfileId:string;date:string;status:"present"|"absent"|"tardy";mutationId:string;note:string;expectedPreviousEventId?:string|null};
-const QUEUE_KEY="can-os:attendance:pending:v1";
+type OfflineMark = {studentProfileId:string;programId:string;date:string;status:"present"|"absent"|"tardy";mutationId:string;note:string;expectedPreviousEventId?:string|null};
+const QUEUE_KEY="can-os:attendance:pending:v2";
+const LEGACY_QUEUE_KEY="can-os:attendance:pending:v1";
 function readQueue():OfflineMark[]{
  try{
   const raw=window.localStorage.getItem(QUEUE_KEY);
   const data=raw?JSON.parse(raw):[];
   if(!Array.isArray(data))return [];
-  return data.filter((v):v is OfflineMark=>typeof v?.studentProfileId==="string"&&
+  return data.filter((v):v is OfflineMark=>typeof v?.studentProfileId==="string"&&typeof v.programId==="string"&&
     typeof v.date==="string"&&["present","absent","tardy"].includes(v.status)&&
     typeof v.mutationId==="string"&&typeof v.note==="string").slice(0,500);
  }catch{return [];}
@@ -39,6 +39,8 @@ function todayLocal(): string {
 function StaffAttendancePage() {
   const [date, setDate] = useState(todayLocal);
   const [students, setStudents] = useState<RosterStudent[]>([]);
+  const [programs, setPrograms] = useState<Awaited<ReturnType<typeof listExpectedOnsiteRoster>>["programs"]>([]);
+  const [legacyCount, setLegacyCount] = useState(0);
   const [excuses, setExcuses] = useState<PendingExcuse[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [correctionNotes,setCorrectionNotes]=useState<Record<string,string>>({});
@@ -50,7 +52,13 @@ function StaffAttendancePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  useEffect(()=>{setQueued(readQueue());},[]);
+  useEffect(()=>{
+    setQueued(readQueue());
+    try {
+      const stored=JSON.parse(window.localStorage.getItem(LEGACY_QUEUE_KEY)??"[]");
+      setLegacyCount(Array.isArray(stored)?stored.length:0);
+    } catch { setLegacyCount(0); }
+  },[]);
   const savePending=(mark:OfflineMark)=>{
     const next=[...readQueue().filter(item=>item.mutationId!==mark.mutationId),mark];
     writeQueue(next);setQueued(next);
@@ -64,7 +72,7 @@ function StaffAttendancePage() {
       const remaining:OfflineMark[]=[];
       for(let i=0;i<pending.length;i++){
         const mark=pending[i]!;
-        try{await markAttendance({data:mark});}
+        try{await markExpectedOnsiteAttendance({data:mark});}
         catch(error){
           remaining.push(...pending.slice(i));
           if(error instanceof Error&&error.message.includes("Attendance conflict"))
@@ -88,13 +96,15 @@ function StaffAttendancePage() {
     setError("");
     try {
       const [roster, pending] = await Promise.all([
-        listSiteAttendanceRoster({ data: { date: targetDate } }),
+        listExpectedOnsiteRoster({ data: { date: targetDate } }),
         listPendingExcuses(),
       ]);
       setStudents(roster.students);
+      setPrograms(roster.programs);
       setExcuses(pending.excuses);
     } catch {
       setStudents([]);
+      setPrograms([]);
       setExcuses([]);
       setError("Sign in with an authorized teacher or registrar account to run attendance.");
     } finally {
@@ -107,16 +117,19 @@ function StaffAttendancePage() {
     (async () => {
       try {
         const [roster, pending] = await Promise.all([
-          listSiteAttendanceRoster({ data: { date } }),
+          listExpectedOnsiteRoster({ data: { date } }),
           listPendingExcuses(),
         ]);
         if (!active) return;
         setStudents(roster.students);
+        setPrograms(roster.programs);
+      setPrograms(roster.programs);
         setExcuses(pending.excuses);
         setError("");
       } catch {
         if (!active) return;
         setStudents([]);
+        setPrograms([]);
         setExcuses([]);
         setError("Sign in with an authorized teacher or registrar account to run attendance.");
       } finally {
@@ -127,8 +140,8 @@ function StaffAttendancePage() {
   }, [date]);
 
   const mark = async (student: RosterStudent, status: (typeof statusOptions)[number]) => {
-    const change:OfflineMark={studentProfileId:student.studentProfileId,date,status,
-      mutationId:crypto.randomUUID(),note:correctionNotes[student.studentProfileId]??"",
+    const change:OfflineMark={studentProfileId:student.studentProfileId,programId:student.programId,date,status,
+      mutationId:crypto.randomUUID(),note:correctionNotes[student.programId+":"+student.studentProfileId]??"",
       expectedPreviousEventId:student.attendanceEventId};
     setBusy(change.mutationId);setNotice("");
     try {
@@ -136,7 +149,7 @@ function StaffAttendancePage() {
         savePending(change);
         setNotice("Offline: attendance entry saved on this device. It will synchronize when connected.");
       }else{
-        await markAttendance({data:change});
+        await markExpectedOnsiteAttendance({data:change});
         setNotice(student.studentName+" marked "+status+".");
         await load(date);
       }
@@ -156,8 +169,8 @@ function StaffAttendancePage() {
     setNotice("Conflicting attendance change discarded; school record preserved.");
   }
   async function overrideConflict(mark:OfflineMark){
-    const current=students.find(item=>item.studentProfileId===mark.studentProfileId);
-    const reason=correctionNotes[mark.studentProfileId]?.trim();
+    const current=students.find(item=>item.studentProfileId===mark.studentProfileId&&item.programId===mark.programId);
+    const reason=correctionNotes[mark.programId+":"+mark.studentProfileId]?.trim();
     if(!current||!reason){
       setError("Refresh attendance and enter a reason before correcting the newer school record.");
       return;
@@ -208,7 +221,7 @@ function StaffAttendancePage() {
           {conflicts.length===1?" entry":" entries"}. Refresh attendance before deciding
           whether to create a new correction.</p>
         {conflicts.map(item=><div key={item.mutationId} className="mt-3 flex flex-wrap items-center gap-2 border-t pt-2">
-         <span className="text-xs">{students.find(s=>s.studentProfileId===item.studentProfileId)?.studentName??item.studentProfileId}
+         <span className="text-xs">{students.find(s=>s.studentProfileId===item.studentProfileId&&s.programId===item.programId)?.studentName??item.studentProfileId}
           {" · "}{item.date}{" · pending "}{item.status}</span>
          <button type="button" onClick={()=>discardConflict(item)} className="rounded border px-2 py-1 text-xs">Discard local change</button>
          <button type="button" onClick={()=>void overrideConflict(item)} className="rounded border px-2 py-1 text-xs">Apply as reasoned correction</button>
@@ -216,6 +229,7 @@ function StaffAttendancePage() {
         <button type="button" onClick={()=>{setConflicts([]);void load(date);}}
           className="mt-2 rounded border px-3 py-2 text-xs">Refresh school records</button>
       </div>}
+      {legacyCount>0 && <p role="alert" className="mt-4 rounded-lg border border-amber-500 p-3 text-sm">{legacyCount} older offline attendance entries need review. They have no program identifier, so they will not be uploaded into an ambiguous student/program record. The previous device queue has been preserved.</p>}
       {queued.length>0&&<div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm">
         <span>{queued.length} attendance {queued.length===1?"entry":"entries"} stored on this device pending synchronization.</span>
         <button type="button" disabled={syncing||!navigator.onLine} onClick={()=>void synchronize()}
@@ -227,24 +241,31 @@ function StaffAttendancePage() {
       {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
       {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance roster…</p>}
       {!loading && !error && <>
+        {programs.some(p=>p.configuration!=="configured") && <div role="status" className="mt-4 rounded-xl border border-amber-500 p-4 text-sm">
+          <strong>Onsite attendance configuration needs attention</strong>
+          {programs.filter(p=>p.configuration!=="configured").map(p=><p key={p.id} className="mt-1">
+            {p.name}: {p.configuration.replaceAll("_"," ")}{p.missingCalendarDates?" · "+p.missingCalendarDates+" missing calendar dates":""}.
+            No attendance will be inferred where the school configuration is incomplete.
+          </p>)}
+        </div>}
         <div className="mt-6 grid grid-cols-3 gap-3" aria-label="Roster summary">
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Expected onsite</p><p className="mt-1 text-2xl font-semibold">{students.length}</p></div>
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Marked</p><p className="mt-1 text-2xl font-semibold">{marked}</p></div>
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Pending excuses</p><p className="mt-1 text-2xl font-semibold">{excuses.length}</p></div>
         </div>
-        {students.length === 0 && <p className="mt-8 text-sm">No actively enrolled students were found at your site.</p>}
+        {students.length === 0 && <p className="mt-8 text-sm">No students have a configured onsite attendance expectation for this date and your verified staff assignments.</p>}
         {students.length > 0 && <div className="mt-8 grid gap-4">
-          {students.map(student => <section key={student.studentProfileId} className="rounded-xl border bg-card p-5">
+          {students.map(student => <section key={student.programId+":"+student.studentProfileId} className="rounded-xl border bg-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">{student.studentName}</h2>
-                <p className="text-xs text-muted-foreground">{student.sectionTitle ?? "Program enrollment"}</p>
+                <p className="text-xs text-muted-foreground">{student.programName} · {student.sectionTitle ?? "Program enrollment"}</p>
               </div>
               <span className="rounded-full border px-3 py-1 text-xs capitalize">{student.status}</span>
             </div>
             {student.status!=="unmarked" && <label className="mt-3 block text-xs text-muted-foreground">Correction note (required to override an approved excuse)
-              <input value={correctionNotes[student.studentProfileId]??""}
-                onChange={e=>setCorrectionNotes(current=>({...current,[student.studentProfileId]:e.target.value}))}
+              <input value={correctionNotes[student.programId+":"+student.studentProfileId]??""}
+                onChange={e=>setCorrectionNotes(current=>({...current,[student.programId+":"+student.studentProfileId]:e.target.value}))}
                 placeholder="Reason for correction"
                 className="mt-1 w-full rounded-lg border bg-background p-2 text-sm"/>
             </label>}
