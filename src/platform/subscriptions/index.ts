@@ -11,6 +11,7 @@ export {
 export {
   listSubscriptionsForPerson,
   processEventSubscriptions,
+  recoverSubscriptionEventMatches,
   setSubscriptionStatus,
 } from "./matcher";
 export { processSubscriptionReminders } from "./reminders";
