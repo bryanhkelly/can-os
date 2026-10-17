@@ -18,7 +18,8 @@ export const Route = createFileRoute("/admissions/")({
 
 function Admissions() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Synthetic admissions" title="Admissions command center" outcome={outcome} />;
+  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Synthetic admissions" title="Admissions command center"
+      actions={<Link to="/admissions/intake" className="rounded-lg border px-3 py-2 text-sm font-semibold">Inquiries & decisions →</Link>} outcome={outcome} />;
   return <AdmissionsView data={outcome.data} />;
 }
 
