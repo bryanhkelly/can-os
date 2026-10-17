@@ -1,8 +1,20 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNull,
+  lte,
+  notInArray,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { db } from "@/db/client";
-import { domainEvents } from "@/db/schema";
+import { actions, domainEvents } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
 import { handleAcademicInterventionEvent } from "@/modules/learning/missing-assignment-event-handler";
+import { processEventSubscriptions } from "@/platform/subscriptions";
 
 export type DomainEventHandler = (eventId: string) => Promise<void>;
 
@@ -15,6 +27,123 @@ export function registerDomainEventHandler(eventType: string, handler: DomainEve
 
 registerDomainEventHandler(EventTypes.AssignmentBecameMissing, handleAcademicInterventionEvent);
 
+/** Bounded retry: after this many failed attempts an event escalates to an ops Action. */
+const MAX_ATTEMPTS = 5;
+/** Lease on a claimed event. A crashed worker's claims become reclaimable after this. */
+const LEASE_MS = 10 * 60_000;
+
+function backoffMs(attempts: number): number {
+  return Math.min(30_000 * 2 ** attempts, 30 * 60_000);
+}
+
+type ClaimedEvent = { id: string; eventType: string };
+
+/**
+ * Claim a batch of due, pending events by marking them processing with a
+ * lease. FOR UPDATE SKIP LOCKED lets concurrent workers claim disjoint
+ * batches without double-processing.
+ */
+async function claimBatch(handledTypes: string[], limit: number): Promise<ClaimedEvent[]> {
+  return db.transaction(async (tx) => {
+    const now = new Date();
+    const claimed = await tx
+      .select({ id: domainEvents.id, eventType: domainEvents.eventType })
+      .from(domainEvents)
+      .where(
+        and(
+          eq(domainEvents.status, "pending"),
+          inArray(domainEvents.eventType, handledTypes),
+          or(isNull(domainEvents.nextAttemptAt), lte(domainEvents.nextAttemptAt, now)),
+        ),
+      )
+      .orderBy(asc(domainEvents.occurredAt))
+      .limit(limit)
+      .for("update", { skipLocked: true });
+
+    if (!claimed.length) return [];
+
+    await tx
+      .update(domainEvents)
+      .set({ status: "processing", nextAttemptAt: new Date(now.getTime() + LEASE_MS) })
+      .where(
+        inArray(
+          domainEvents.id,
+          claimed.map((row) => row.id),
+        ),
+      );
+
+    return claimed;
+  });
+}
+
+/** Reclaim events whose worker crashed mid-processing (lease expired). */
+async function reclaimStaleClaims(): Promise<void> {
+  await db
+    .update(domainEvents)
+    .set({ status: "pending", nextAttemptAt: null })
+    .where(and(eq(domainEvents.status, "processing"), lte(domainEvents.nextAttemptAt, new Date())));
+}
+
+async function markSucceeded(eventId: string): Promise<void> {
+  // Handlers normally mark their own event processed inside their
+  // transaction; this covers handlers that return without doing so.
+  await db
+    .update(domainEvents)
+    .set({ status: "processed", processedAt: new Date(), nextAttemptAt: null })
+    .where(and(eq(domainEvents.id, eventId), eq(domainEvents.status, "processing")));
+}
+
+async function markFailed(eventId: string, error: unknown): Promise<void> {
+  const message = error instanceof Error ? error.message : "Unknown event error";
+
+  await db.transaction(async (tx) => {
+    const [event] = await tx
+      .select()
+      .from(domainEvents)
+      .where(eq(domainEvents.id, eventId))
+      .limit(1);
+    if (!event) return;
+
+    const attempts = event.attempts + 1;
+
+    if (attempts >= MAX_ATTEMPTS) {
+      await tx
+        .update(domainEvents)
+        .set({ status: "failed", attempts, lastError: message, nextAttemptAt: null })
+        .where(eq(domainEvents.id, eventId));
+
+      // Terminal failure must never be a silent drop: escalate to an ops
+      // Action. This is an infrastructure signal, not a business mutation,
+      // so it deliberately does not emit a domain event of its own.
+      const scope = event.payload as Record<string, unknown>;
+      await tx.insert(actions).values({
+        type: "outbox_event_failed",
+        status: "open",
+        priority: "high",
+        title: `Domain event ${event.eventType} failed after ${attempts} attempts`,
+        description: message,
+        organizationId: typeof scope.organizationId === "string" ? scope.organizationId : null,
+        siteId: typeof scope.siteId === "string" ? scope.siteId : null,
+        programId: typeof scope.programId === "string" ? scope.programId : null,
+        sectionId: typeof scope.sectionId === "string" ? scope.sectionId : null,
+        subjectType: "domain_event",
+        subjectId: event.id,
+      });
+      return;
+    }
+
+    await tx
+      .update(domainEvents)
+      .set({
+        status: "pending",
+        attempts,
+        lastError: message,
+        nextAttemptAt: new Date(Date.now() + backoffMs(attempts)),
+      })
+      .where(eq(domainEvents.id, eventId));
+  });
+}
+
 /**
  * Outbox processor. Invoked by the scheduled jobs endpoint (see src/routes/api.jobs.ts
  * and netlify/functions/scheduled-jobs.ts) and by integration tests.
@@ -22,34 +151,60 @@ registerDomainEventHandler(EventTypes.AssignmentBecameMissing, handleAcademicInt
 export async function processPendingDomainEvents(limit = 100): Promise<number> {
   const handledTypes = [...registry.keys()];
   if (!handledTypes.length) return 0;
-  // Only claim types with a registered handler: unhandled events must not
-  // occupy the batch window and starve processable events behind them.
-  const pending = await db
-    .select({ id: domainEvents.id, eventType: domainEvents.eventType })
-    .from(domainEvents)
-    .where(and(eq(domainEvents.status, "pending"), inArray(domainEvents.eventType, handledTypes)))
-    .orderBy(asc(domainEvents.occurredAt))
-    .limit(limit);
+
+  await reclaimStaleClaims();
+  const claimed = await claimBatch(handledTypes, limit);
 
   let processed = 0;
 
-  for (const event of pending) {
+  for (const event of claimed) {
     const handler = registry.get(event.eventType);
-    if (!handler) continue;
     try {
-      await handler(event.id);
+      if (handler) await handler(event.id);
+      await markSucceeded(event.id);
+      await processEventSubscriptions(event.id);
       processed += 1;
     } catch (error) {
-      await db
-        .update(domainEvents)
-        .set({
-          status: "failed",
-          attempts: sql`${domainEvents.attempts} + 1`,
-          lastError: error instanceof Error ? error.message : "Unknown event error",
-        })
-        .where(eq(domainEvents.id, event.id));
+      await markFailed(event.id, error);
     }
   }
 
   return processed;
+}
+
+export type OutboxHealth = {
+  /** Events terminally failed; each has an escalation Action. */
+  failed: number;
+  /** Pending events whose type has no registered handler — observable, not silently parked. */
+  pendingUnhandled: number;
+  /** Events currently leased by a worker. */
+  processing: number;
+};
+
+/** Operational view of the outbox for monitoring surfaces and alerts. */
+export async function getOutboxHealth(): Promise<OutboxHealth> {
+  const handledTypes = [...registry.keys()];
+
+  const countWhere = async (where: SQL | undefined): Promise<number> => {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(domainEvents)
+      .where(where);
+    return Number(row?.count ?? 0);
+  };
+
+  const [failed, pendingUnhandled, processing] = await Promise.all([
+    countWhere(eq(domainEvents.status, "failed")),
+    countWhere(
+      and(
+        eq(domainEvents.status, "pending"),
+        handledTypes.length
+          ? notInArray(domainEvents.eventType, handledTypes)
+          : undefined,
+      ),
+    ),
+    countWhere(eq(domainEvents.status, "processing")),
+  ]);
+
+  return { failed, pendingUnhandled, processing };
 }

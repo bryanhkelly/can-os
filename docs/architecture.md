@@ -115,6 +115,14 @@ Examples:
 
 Object access and field access are separate. Sensitive fields include medical, counseling, discipline, family financials, internal notes, and formation records.
 
+## Ask CAN agent platform
+
+Ask CAN is the primary interaction surface for CAN OS, not a late-stage feature. Natural-language conversation produces real domain objects — subscriptions, actions, communication threads — under the same authorization context as the UI.
+
+The platform is three modules inside the monolith: **Conversation** (durable threads, evidence, deep links, action previews), **Agent Runtime** (tool registry, planning, approvals, execution state, scoped memory), and **Event & Subscription** (standing instructions, triggers, recurring schedules, delivery). They share canonical identity, Actions, DomainEvents, and AuditEvents rather than creating parallel infrastructure, and they are the first extraction candidates if measured scale ever justifies services.
+
+Full design: [ask-can-agent-platform.md](./ask-can-agent-platform.md).
+
 ## Production build order
 
 1. Domain model + Neon migrations
@@ -131,7 +139,7 @@ Object access and field access are separate. Sensitive fields include medical, c
 12. Experience Flow S1 Student Today
 13. GF25 Report Card & Transcript
 14. GF26 Study Group / Peer Connection
-15. Ask CAN over real authorized data
+15. Ask CAN over real authorized data — GF-A1 Ask, GF-A2 Watch, GF-A3 Do (see [ask-can-agent-platform.md](./ask-can-agent-platform.md)); the Conversation / Agent Runtime / Event & Subscription foundations are platform primitives and may be built alongside the flows above, with each GF-A flow landing after the flow it observes
 
 Finance/ESA claim and disbursement workflows are intentionally deferred from the initial four-flow release.
 

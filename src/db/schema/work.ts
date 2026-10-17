@@ -150,6 +150,12 @@ export const domainEvents = pgTable(
     payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
     attempts: integer("attempts").default(0).notNull(),
     lastError: text("last_error"),
+    /**
+     * Dual-purpose scheduling column: while pending, the next time a worker
+     * may retry the event (backoff); while processing, the worker lease
+     * expiry after which a crashed claim may be reclaimed.
+     */
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     processedAt: timestamp("processed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },

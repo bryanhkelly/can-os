@@ -413,6 +413,92 @@ calendar participants, conflict-safe booking, guardian authorization, reminders,
 
 ---
 
+## GF-A1 — Ask CAN: Grounded Answer
+
+### Goal
+Prove Ask CAN answers questions over canonical records with the asking person's exact authorization — nothing more, nothing stale.
+
+### Flow
+1. Parent in the Family workspace asks: "How is Bobby doing in Biology?"
+2. Intent is classified as Ask; the Agent Runtime plans read-only tool calls.
+3. Every tool call is authorized as `capability + resource + scope + relationship` (GuardianRelationship with academic visibility for Bobby's Section).
+4. The answer is composed from current canonical records (Submissions, SectionGrades, AttendanceEvents), each claim carrying an evidence reference.
+5. Sensitive-tier fields the parent cannot access (counseling, discipline, staff-private notes) are absent from the answer and from the agent's context.
+6. A follow-up turn ("Has this happened before?") re-queries current records rather than relying on earlier generated text.
+7. Conversation and evidence persist server-side and reopen across sessions/devices.
+8. A guardian without academic visibility for a student receives a refusal that reveals nothing about the student's records.
+9. Every tool invocation writes an AuditEvent with the authorization context snapshot.
+
+### Proves
+Conversation durability, Agent Runtime tool calling, identical authorization for agent and UI, evidence-grounded answers, fresh-record rule, sensitive-field exclusion, agent audit.
+
+### Running the GF-A1 test
+
+`tests/integration/gf-a1-conversation.integration.test.ts` covers the flow against a disposable Neon database: evidence-grounded answers, the watch-confirmation flow producing a durable subscription that then delivers (the A1 → A2 loop), approval-gate enforcement (including cross-person approval attempts), and safe refusals that leak nothing.
+
+```sh
+node scripts/run-integration-tests.mjs gf-a1-conversation
+```
+
+The runtime lives in `src/platform/agent/` (planner, tools, runtime); the session-authenticated boundary is `src/modules/conversation/ask-can.functions.ts`; the UI is `src/routes/ask.tsx` with watch management at `src/routes/guardian.watching.tsx`. The planner is deterministic by design for v1 — an LLM planner can replace it behind the same `planTurn` contract without touching execution, authorization, or audit.
+
+---
+
+## GF-A2 — Ask CAN: Watch (Durable Subscription)
+
+### Goal
+Prove a spoken standing instruction becomes a durable, inspectable, revocation-safe subscription — not a chat promise.
+
+### Flow
+1. Parent says: "Let me know whenever Bobby misses an assignment. Remind me the next day if it's still missing."
+2. The agent prepares a Subscription (event type `AssignmentBecameMissing`, subject Bobby, reminder after 24h unresolved, channel per preference) and presents it for confirmation.
+3. Parent confirms; the Subscription is created with `createdVia: conversation` and appears under "Things CAN Is Watching," where it can be edited, paused, or revoked.
+4. A deadline passes without a valid Submission (GF1 steps 1–5); `AssignmentBecameMissing` commits with the mutation in one transaction.
+5. The outbox worker processes the event; the subscription matcher finds the parent's Subscription.
+6. Authorization is re-evaluated at delivery time against the current GuardianRelationship before anything is sent.
+7. The delivery arrives in the parent's existing conversation (with evidence and deep link), not as an orphaned alert.
+8. At +24h the reminder check re-reads current canonical state; because the Submission is still missing, exactly one reminder is delivered.
+9. When the student submits, no further reminders fire; delivery history is idempotent per `(subscriptionId, domainEventId)`.
+10. If the GuardianRelationship is revoked, subsequent deliveries are suppressed and the subscription is flagged — never delivered on stale permission.
+11. Audit reconstructs subscription creation, every delivery decision, and every approval.
+
+### Proves
+Subscription lifecycle, event-driven delivery over the outbox, delivery-time authorization re-check, reminder policy against current state, channel routing, idempotent delivery, user-visible management of agent behavior.
+
+### Running the GF-A2 test
+
+`tests/integration/gf-a2-subscriptions.integration.test.ts` covers the flow end to end against a disposable Neon database: delivery to authorized subscribers, suppression of unauthorized ones, idempotent reprocessing, reminder gating on current canonical state, revocation-safe delivery, outbox backoff/escalation, and lease reclaim.
+
+```sh
+node scripts/run-integration-tests.mjs gf-a2-subscriptions
+```
+
+Requires `TEST_DATABASE_URL` and `CAN_TEST_DB_WRITES_ENABLED=true` in `.env.local` (see scripts/run-integration-tests.mjs safeguards). The subscriptions schema lives in `src/db/schema/subscriptions.ts` (migration `drizzle/0011_charming_logan.sql`); the matcher, reminder processor, and per-event-type policies live in `src/platform/subscriptions/`.
+
+---
+
+## GF-A3 — Ask CAN: Act (Human-Approved Cross-Module Action)
+
+### Goal
+Prove an agent can coordinate across modules to prepare consequential work, while execution remains human-approved and fully audited.
+
+### Flow
+1. Within a subscription-triggered conversation, the parent asks: "Should I talk to the teacher?"
+2. The agent retrieves current authorized context (missing Submissions, Section, teacher) and offers: "I can prepare a message to Bobby's Biology teacher summarizing the missing work."
+3. Parent: "Do that."
+4. The agent presents an action preview — recipient, thread context, drafted body with evidence links — and waits for explicit approval.
+5. On approval, the Communication module creates a canonical CommunicationThread addressed to the section teacher; Ask CAN does not create a human conversation inside chat.
+6. Optionally, a follow-up Action is created for the parent ("Check for teacher reply by Friday") in the same approval.
+7. The teacher sees the message in their own workspace through the normal notification policy; nothing about the agent path changes the teacher's experience.
+8. The conversation records the preview, approval, tool invocations, and resulting thread reference.
+9. Audit reconstructs: who asked, what the agent planned, what was approved, what executed, and under which authorization context.
+10. If the parent navigates away without approving, nothing executes and the pending preview expires safely.
+
+### Proves
+Do-intent approval gates, cross-module coordination through shared capabilities, Communication/Ask CAN thread separation, delegated execution recorded as the person, expiry of unapproved actions, end-to-end audit.
+
+---
+
 ## Explicitly deferred
 
 The initial production release does **not** require the previous GF5 ESA funding-exception flow. Finance claim/disbursement depth comes after the four flows above are operational.

@@ -152,6 +152,54 @@ export const notificationStatus = pgEnum("notification_status", [
   "dismissed",
 ]);
 
+export const subscriptionStatus = pgEnum("subscription_status", [
+  "active",
+  "paused",
+  "revoked",
+  "expired",
+]);
+
+export const subscriptionChannel = pgEnum("subscription_channel", [
+  "in_app",
+  "email",
+  "sms",
+  "agent_webhook",
+]);
+
+export const subscriptionDeliveryStatus = pgEnum("subscription_delivery_status", [
+  "pending",
+  "delivered",
+  "suppressed",
+  "failed",
+]);
+
+export const conversationRole = pgEnum("conversation_role", [
+  "user",
+  "agent",
+  "system",
+]);
+
+export const conversationStatus = pgEnum("conversation_status", [
+  "active",
+  "archived",
+]);
+
+export const agentRunIntent = pgEnum("agent_run_intent", [
+  "ask",
+  "do",
+  "watch",
+  "manage",
+]);
+
+export const agentRunStatus = pgEnum("agent_run_status", [
+  "planning",
+  "awaiting_approval",
+  "executing",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
 export const communicationParticipantType = pgEnum("communication_participant_type", [
   "person",
   "household",

@@ -59,6 +59,13 @@
       "interactions": ["review applicant household composition and readiness"],
       "downstreamRecords": []
     },
+    "/ask": {
+      "persona": "guardian",
+      "seeds": ["new-experiences-v1.sql", "gf1-assignments-v2.sql"],
+      "recordCounts": { "guardian_relationships": 1 },
+      "interactions": ["ask about a student's progress", "request a missing-assignment watch", "confirm or decline the prepared watch", "view evidence-backed answer"],
+      "downstreamRecords": ["conversations", "conversation_messages", "agent_runs", "subscriptions"]
+    },
     "/calendar": {
       "persona": "staff",
       "seeds": ["staff-experiences-v1.sql", "student-calendar-comms-office-hours.sql"],
@@ -121,6 +128,13 @@
       "recordCounts": { "section_grades": 1, "grading_periods": 1 },
       "interactions": ["view finalized grades per grading period"],
       "downstreamRecords": []
+    },
+    "/guardian/watching": {
+      "persona": "guardian",
+      "seeds": ["new-experiences-v1.sql"],
+      "recordCounts": { "guardian_relationships": 1 },
+      "interactions": ["view watches", "pause watch", "resume watch", "turn off watch"],
+      "downstreamRecords": ["subscriptions"]
     },
     "/messages": {
       "persona": "guardian",
