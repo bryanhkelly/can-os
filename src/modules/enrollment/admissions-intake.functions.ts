@@ -22,6 +22,13 @@ async function registrar(){
  assertCapability(actor,"enrollment.decide");
  return actor;
 }
+export const listAdmissionsIntakePrograms=createServerFn({method:"GET"}).handler(async()=>{
+ const actor=await registrar();
+ return db.select({id:programs.id,name:programs.name}).from(programs)
+  .where(and(inArray(programs.id,actor.scope.programIds!),
+    inArray(programs.organizationId,actor.scope.organizationIds??[])))
+  .orderBy(programs.name);
+});
 export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await registrar();
  const rows=await db.select({id:applications.id,stage:applications.stage,metadata:applications.metadata,
