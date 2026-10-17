@@ -76,7 +76,7 @@ function FamilyHomePage() {
       </dl>
       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
        <a href={"/guardian/academics?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Academics</a>
-       <Link to="/guardian/attendance" className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</Link>
+       <a href={"/guardian/attendance?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</a>
        <a href={"/guardian/report-cards?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</a>
       </nav>
      </article>)}
