@@ -19,6 +19,7 @@ import {
   setWatchStatus,
   type AgentContext,
 } from "./tools";
+import { getSchoolOperationsCommandCenter } from "@/modules/operations/command-center-service";
 import { HELP_TEXT, planTurn, type AgentPlan } from "./planner";
 
 /**
@@ -173,6 +174,15 @@ export async function sendMessage(
         agentRunId: run!.id,
       });
       await finish("completed", { kind: "help" });
+    } else if (plan.intent === "ask" && plan.kind === "operations_overview") {
+      const overview = await getSchoolOperationsCommandCenter({ ...context, role: "registrar" });
+      const lines = [
+        `There are ${overview.summary.sections} active sections, ${overview.summary.unstaffed} without instructors, ${overview.summary.underCapacity} with instructional capacity gaps, and ${overview.summary.waitlisted} waitlisted students.`,
+        ...overview.issues.slice(0,10).map(issue=>`- ${issue.title}: ${issue.description}`),
+      ];
+      reply = await addMessage(tx,{conversationId,role:"agent",body:lines.join("\n"),
+        agentRunId:run!.id});
+      await finish("completed",{kind:"operations_overview"});
     } else if (plan.intent === "ask" && plan.kind === "student_summary") {
       const matches = await resolveVisibleStudents(context, plan.studentQuery);
       if (matches.length !== 1) {
