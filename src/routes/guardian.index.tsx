@@ -63,10 +63,10 @@ function FamilyHomePage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
        <div>
         <h3 className="text-lg font-semibold">{child.displayName} {child.lastName}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{child.sectionCount} active {child.sectionCount === 1 ? "class" : "classes"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{child.awaitingSections ? "Program enrollment active; classes not assigned yet" : `${child.sectionCount} active ${child.sectionCount === 1 ? "class" : "classes"}`}</p>
        </div>
        <span className={`rounded-full border px-3 py-1 text-xs ${child.status === "on_track" ? "" : "border-amber-500 text-amber-600"}`}>
-        {child.status === "on_track" ? "On track" : "Needs attention"}
+        {child.status === "awaiting_courses" ? "Enrolled · awaiting classes" : child.status === "on_track" ? "On track" : "Needs attention"}
        </span>
       </div>
       <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
