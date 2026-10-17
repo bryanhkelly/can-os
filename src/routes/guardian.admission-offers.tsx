@@ -1,11 +1,11 @@
 import {useState} from "react";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
-import {getGuardianSyntheticAdmissionOffers} from "@/modules/enrollment/guardian-admission-offers.functions";
+import {getGuardianAdmissionOffers} from "@/modules/enrollment/guardian-admission-offers.functions";
 import {respondSyntheticOfferFromDemo} from "@/modules/enrollment/admissions-offer-demo.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 
-const loadGuardianOffers=()=>getGuardianSyntheticAdmissionOffers();
+const loadGuardianOffers=()=>getGuardianAdmissionOffers();
 export const Route=createFileRoute("/guardian/admission-offers")({
  loader:safeLoader(loadGuardianOffers,{authMessage:"Sign in with an authorized guardian account to view enrollment offers."}),
  component:GuardianAdmissionOffers
@@ -35,7 +35,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
      {o.status==="issued"&&o.expiresAt&&new Date(o.expiresAt).getTime()<=Date.now()&&<p className="mt-2 text-sm" role="status">This offer has expired. Contact admissions for next steps.</p>}
     </div>)}{app.offers.length===0&&<p className="mt-3 text-sm">No offers yet.</p>}
   </section>)}
-  {applications.length===0&&<p className="rounded-lg border p-4">No synthetic enrollment offers are currently associated with your guardian session.</p>}
-  <Link to="/admissions/families" className="text-sm underline">Household enrollment readiness →</Link>
+  {applications.length===0&&<p className="rounded-lg border p-4">No enrollment offers are currently available for the children in your authorized programs.</p>}
+  <Link to="/guardian" className="text-sm underline">Back to family home →</Link>
  </main>;
 }
