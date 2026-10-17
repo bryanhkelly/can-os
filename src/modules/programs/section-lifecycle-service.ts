@@ -261,7 +261,8 @@ export async function promoteSectionWaitlist(context: LifecycleContext, actionId
  assertCapability(context,"program.launch.start");
  return db.transaction(async tx=>{
    const [item]=await tx.select().from(actions).where(and(eq(actions.id,actionId),eq(actions.type,"section_waitlist"))).limit(1).for("update");
-   if(!item||!item.sectionId||!["waiting","open"].includes(item.status))throw new Error("Pending waitlist record not found");
+   if(!item||!item.sectionId||!["waiting","open","in_progress"].includes(item.status))throw new Error("Pending waitlist record not found");
+   if(item.status==="in_progress" && (!item.dueAt||item.dueAt<=new Date()))throw new Error("Waitlist offer expired");
    const section=await authorizedSection(tx,context,item.sectionId);
    if(!section.active)throw new Error("Section closed");
    const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(
@@ -288,4 +289,52 @@ export async function promoteSectionWaitlist(context: LifecycleContext, actionId
      {waitlistActionId:item.id,enrollmentId:record!.id,studentProfileId:item.subjectId});
    return {enrollmentId:record!.id};
  });
+}
+
+/** Issue a time-bounded enrollment offer without creating enrollment prematurely. */
+export async function offerWaitlistSeat(context: LifecycleContext,actionId:string,expiresAt:Date) {
+ assertCapability(context,"program.launch.start");
+ if(expiresAt<=new Date()||expiresAt.getTime()>Date.now()+30*86400000)
+   throw new Error("Offer expiry must be within the next 30 days");
+ return db.transaction(async tx=>{
+  const [item]=await tx.select().from(actions).where(and(eq(actions.id,actionId),eq(actions.type,"section_waitlist")))
+   .limit(1).for("update");
+  if(!item||!item.sectionId||!["waiting","open"].includes(item.status))throw new Error("Waiting student not found");
+  const section=await authorizedSection(tx,context,item.sectionId);
+  if(!section.active)throw new Error("Class is closed");
+  await assertOpenEnrollmentSeat(tx,section.id);
+  await tx.update(actions).set({status:"in_progress",dueAt:expiresAt,
+    metadata:{...item.metadata,offerIssuedAt:new Date().toISOString(),offerExpiresAt:expiresAt.toISOString()},
+    updatedAt:new Date()}).where(eq(actions.id,item.id));
+  await journal(tx,context,section,"SectionWaitlistSeatOffered",{},
+    {actionId:item.id,studentProfileId:item.subjectId,expiresAt:expiresAt.toISOString()});
+  return {actionId:item.id,expiresAt:expiresAt.toISOString()};
+ });
+}
+
+/** Reopen unclaimed expired offers so the next student can be considered. */
+export async function expireWaitlistOffers(context: LifecycleContext,programId:string) {
+ assertCapability(context,"program.launch.start");
+ assertProgramScope(context,programId);
+ const [program]=await db.select({id:programs.id,organizationId:programs.organizationId}).from(programs)
+  .where(eq(programs.id,programId)).limit(1);
+ if(!program||!context.scope.organizationIds?.includes(program.organizationId))
+  throw new AuthorizationError("program");
+ const expired=await db.select({id:actions.id}).from(actions)
+  .where(and(eq(actions.programId,programId),eq(actions.type,"section_waitlist"),
+   eq(actions.status,"in_progress"),sql`due_at < now()`));
+ let count=0;
+ for(const item of expired){
+  await db.transaction(async tx=>{
+   const [current]=await tx.select().from(actions).where(eq(actions.id,item.id)).limit(1).for("update");
+   if(!current||current.status!=="in_progress"||!current.dueAt||current.dueAt>new Date()||!current.sectionId)return;
+   const section=await authorizedSection(tx,context,current.sectionId);
+   await tx.update(actions).set({status:"waiting",dueAt:null,
+    metadata:{...current.metadata,offerExpiredAt:new Date().toISOString()},updatedAt:new Date()})
+    .where(eq(actions.id,current.id));
+   await journal(tx,context,section,"SectionWaitlistOfferExpired",{}, {actionId:current.id});
+   count++;
+  });
+ }
+ return {expired:count};
 }
