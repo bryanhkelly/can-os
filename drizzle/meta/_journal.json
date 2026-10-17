@@ -99,6 +99,13 @@
       "when": 1792211000000,
       "tag": "0013_subscription_delivery_worker",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792212000000,
+      "tag": "0014_notification_preferences",
+      "breakpoints": true
     }
   ]
 }
