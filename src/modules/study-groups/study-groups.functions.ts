@@ -405,10 +405,11 @@ export const rsvpStudyGroupSession=createServerFn({method:"POST"})
  assertSyntheticMutation("student");const actor=await groupActor("student");
  if(!["going","maybe","declined"].includes(data.rsvp))throw new Error("Invalid RSVP");
  const {db,s}=await context();
- const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId})
+ const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,groupMetadata:s.studyGroups.metadata})
  .from(s.studyGroupSessions).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active")))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Session not found");
+ requireLegacyGroup(session.groupMetadata);
  return db.transaction(async tx=>{
  await requireStudentGroupEnrollment(tx,s,actor,session);
  const [calendar]=await tx.select({metadata:s.calendarEvents.metadata}).from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
@@ -424,10 +425,11 @@ export const rsvpStudyGroupSession=createServerFn({method:"POST"})
 export const recordStudyGroupAttendance=createServerFn({method:"POST"})
 .validator(z.object({sessionId:z.string().min(1),personId:z.string().min(1),attended:z.boolean()}).parse).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {db,s}=await context();
- const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId}).from(s.studyGroupSessions)
+ const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,groupMetadata:s.studyGroups.metadata}).from(s.studyGroupSessions)
  .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Not authorized for this session");
+ requireLegacyGroup(session.groupMetadata);
  return db.transaction(async tx=>{
  const [calendar]=await tx.select({metadata:s.calendarEvents.metadata}).from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
  if(!calendar||calendar.metadata.cancelled===true)throw new Error("Cannot record attendance for a cancelled or unlinked session");
@@ -461,10 +463,11 @@ export const reviseStudyGroupSession=createServerFn({method:"POST"})
  const {db,s}=await context();
  const times=data.action==="reschedule"?validateSession(data.startsAt??"",data.endsAt??""):null;
  return db.transaction(async tx=>{
-  const [session]=await tx.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt}).from(s.studyGroupSessions)
+  const [session]=await tx.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt,groupMetadata:s.studyGroups.metadata}).from(s.studyGroupSessions)
    .innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId!),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active")))
    .where(eq(s.studyGroupSessions.id,data.sessionId)).for("update").limit(1);
   if(!session)throw new Error("Facilitator session not found");
+  requireLegacyGroup(session.groupMetadata);
   const [event]=await tx.select().from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
   if(!event)throw new Error("Canonical calendar event missing");
   if(event.metadata.cancelled===true)throw new Error("Cancelled session cannot be changed");
