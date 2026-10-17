@@ -1,0 +1,374 @@
+import { createServerFn } from "@tanstack/react-start";
+import { and, eq, inArray, isNull, or, sql, desc } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@/db/client";
+import * as s from "@/db/schema";
+import { AuthorizationError } from "@/domain/command-context";
+import { recordAudit, requireActor, actorSiteIds } from "@/modules/identity/actors.server";
+import { validateGroupInput } from "@/domain/study-groups";
+
+const uuid = z.string().uuid();
+type Actor = Awaited<ReturnType<typeof requireActor>>;
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type GroupScope = { id: string; siteId: string | null; programId: string | null; sectionId: string | null };
+
+function assertGroupScope(actor: Actor, group: GroupScope) {
+  if (!group.siteId || !actorSiteIds(actor).includes(group.siteId) ||
+      (group.programId && !(actor.scope.programIds ?? []).includes(group.programId))) {
+    throw new AuthorizationError("study group school/program grant");
+  }
+}
+
+/** Active enrollment in the group's school/program and, for course groups, section. */
+async function eligibleStudent(tx: Tx, studentPersonId: string, group: GroupScope, grantedPrograms: string[]) {
+  if (!group.siteId) throw new AuthorizationError("group site");
+  const [membership] = await tx.select({ studentProfileId: s.studentProfiles.id })
+    .from(s.studentProfiles)
+    .innerJoin(s.enrollments, eq(s.enrollments.studentProfileId, s.studentProfiles.id))
+    .innerJoin(s.programs, eq(s.programs.id, s.enrollments.programId))
+    .where(and(
+      eq(s.studentProfiles.personId, studentPersonId),
+      eq(s.enrollments.kind, "program"), eq(s.enrollments.status, "active"),
+      eq(s.programs.siteId, group.siteId),
+      inArray(s.programs.id, grantedPrograms),
+      group.programId ? eq(s.enrollments.programId, group.programId) : undefined,
+    )).limit(1);
+  if (!membership) throw new AuthorizationError("active student program enrollment");
+  if (group.sectionId) {
+    const [section] = await tx.select({ id: s.enrollments.id }).from(s.enrollments)
+      .where(and(
+        eq(s.enrollments.studentProfileId, membership.studentProfileId),
+        eq(s.enrollments.sectionId, group.sectionId),
+        eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active"),
+      )).limit(1);
+    if (!section) throw new AuthorizationError("active course section enrollment");
+  }
+  return membership.studentProfileId;
+}
+
+export const createFacilitatedGroup = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    sectionId: uuid,
+    title: z.string().min(3).max(100),
+    description: z.string().min(10).max(2000),
+    maxMembers: z.number().int().min(2).max(50),
+  }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(["teacher"]);
+    const valid = validateGroupInput({ ...data, kind: "course" });
+    return db.transaction(async tx => {
+      const [section] = await tx.select({
+        id: s.sections.id, siteId: s.sections.siteId, programId: s.sections.programId,
+      }).from(s.sections)
+        .innerJoin(s.sectionTeachers, eq(s.sectionTeachers.sectionId, s.sections.id))
+        .where(and(eq(s.sections.id, data.sectionId),
+          eq(s.sectionTeachers.personId, actor.actorPersonId),
+          eq(s.sections.active, true))).limit(1);
+      if (!section || !section.siteId) throw new AuthorizationError("active teaching assignment");
+      assertGroupScope(actor, { ...section, sectionId: section.id });
+      const [group] = await tx.insert(s.studyGroups).values({
+        ...valid, sectionId: section.id, siteId: section.siteId, programId: section.programId,
+        facilitatorPersonId: actor.actorPersonId, visibility: "site", requiresApproval: true,
+      }).returning({ id: s.studyGroups.id });
+      if (!group) throw new Error("Unable to create study group");
+      await recordAudit(tx, actor, {
+        action: "study_group.create", resourceType: "study_group", resourceId: group.id,
+        scope: { siteId: section.siteId, programId: section.programId, sectionId: section.id },
+        after: { title: valid.title, maxMembers: valid.maxMembers },
+      });
+      await tx.insert(s.domainEvents).values({
+        eventType: "StudyGroupCreated", aggregateType: "study_group",
+        aggregateId: group.id, actorPersonId: actor.actorPersonId,
+        payload: { sectionId: section.id, siteId: section.siteId },
+      });
+      return { groupId: group.id };
+    });
+  });
+
+export const requestCanonicalGroupMembership = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({ groupId: uuid }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(["student"]);
+    return db.transaction(async tx => {
+      // All request/re-request and capacity decisions serialize on this group row.
+      const [group] = await tx.select().from(s.studyGroups)
+        .where(and(eq(s.studyGroups.id, data.groupId), eq(s.studyGroups.status, "active")))
+        .for("update").limit(1);
+      if (!group) throw new Error("Study group not available");
+      assertGroupScope(actor, group);
+      await eligibleStudent(tx, actor.actorPersonId, group, actor.scope.programIds ?? []);
+      const guardians = await tx.select({ guardianPersonId: s.guardianRelationships.guardianPersonId })
+        .from(s.guardianRelationships).where(and(
+          eq(s.guardianRelationships.studentPersonId, actor.actorPersonId),
+          eq(s.guardianRelationships.canManageEnrollment, true),
+        ));
+      // K-12 school groups fail closed when no authorized enrollment guardian exists.
+      if (!guardians.length) throw new Error("A linked guardian is required for study group participation.");
+      const [existing] = await tx.select().from(s.studyGroupMemberships)
+        .where(and(eq(s.studyGroupMemberships.groupId, group.id),
+          eq(s.studyGroupMemberships.personId, actor.actorPersonId))).limit(1);
+      if (existing?.status === "approved" || existing?.status === "pending") {
+        return { membershipId: existing.id, pending: existing.status === "pending" };
+      }
+      let membershipId: string;
+      if (existing) {
+        await tx.update(s.studyGroupMemberships).set({
+          status: "pending", reviewedByPersonId: null, joinedAt: null, updatedAt: new Date(),
+        }).where(eq(s.studyGroupMemberships.id, existing.id));
+        membershipId = existing.id;
+      } else {
+        const [created] = await tx.insert(s.studyGroupMemberships).values({
+          groupId: group.id, personId: actor.actorPersonId, role: "student", status: "pending",
+        }).returning({ id: s.studyGroupMemberships.id });
+        if (!created) throw new Error("Unable to request membership");
+        membershipId = created.id;
+      }
+      for (const guardian of guardians) {
+        const prior = await tx.select().from(s.actions)
+          .where(and(eq(s.actions.type, "study_group_consent"),
+            eq(s.actions.subjectType, "study_group"),
+            eq(s.actions.subjectId, group.id),
+            eq(s.actions.ownerPersonId, guardian.guardianPersonId)));
+        const matching = prior.find(a => a.metadata.studentPersonId === actor.actorPersonId);
+        if (matching) {
+          await tx.update(s.actions).set({
+            status: "open", resolvedAt: null, resolutionNote: null,
+            metadata: { ...matching.metadata, studentPersonId: actor.actorPersonId,
+              membershipId, decision: null }, updatedAt: new Date(),
+          }).where(eq(s.actions.id, matching.id));
+        } else {
+          await tx.insert(s.actions).values({
+            type: "study_group_consent", status: "open", priority: "normal",
+            title: "Study group permission: " + group.title,
+            ownerPersonId: guardian.guardianPersonId, siteId: group.siteId,
+            programId: group.programId, subjectType: "study_group", subjectId: group.id,
+            metadata: { studentPersonId: actor.actorPersonId, membershipId },
+          });
+        }
+      }
+      await tx.insert(s.notifications).values([
+        ...[...new Set(guardians.map(g => g.guardianPersonId))].map(recipientPersonId => ({
+          recipientPersonId, type: "study_group_consent_requested", status: "unread" as const,
+          title: "Study group permission requested", body: "Review a student's group request.",
+          resourceType: "study_group", resourceId: group.id,
+        })),
+        { recipientPersonId: group.facilitatorPersonId,
+          type: "study_group_membership_request", status: "unread" as const,
+          title: "Study group membership requested", body: "A student requested to join " + group.title,
+          resourceType: "study_group", resourceId: group.id },
+      ]);
+      await recordAudit(tx, actor, {
+        action: "study_group.membership.request", resourceType: "study_group_membership",
+        resourceId: membershipId, scope: { siteId: group.siteId, programId: group.programId },
+        after: { status: "pending", studentPersonId: actor.actorPersonId },
+      });
+      await tx.insert(s.domainEvents).values({
+        eventType: "StudyGroupMembershipRequested", aggregateType: "study_group_membership",
+        aggregateId: membershipId, actorPersonId: actor.actorPersonId, payload: { groupId: group.id },
+      });
+      return { membershipId, pending: true };
+    });
+  });
+
+export const decideCanonicalGroupConsent = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    actionId: uuid, approve: z.boolean(), acknowledged: z.boolean().default(false),
+  }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(["guardian"]);
+    if (data.approve && !data.acknowledged) throw new Error("Confirm the student's participation.");
+    return db.transaction(async tx => {
+      const [action] = await tx.select().from(s.actions)
+        .where(and(eq(s.actions.id, data.actionId), eq(s.actions.ownerPersonId, actor.actorPersonId),
+          eq(s.actions.type, "study_group_consent"), eq(s.actions.subjectType, "study_group"),
+          eq(s.actions.status, "open"))).for("update").limit(1);
+      if (!action || !action.subjectId) throw new AuthorizationError("pending guardian group consent");
+      const studentPersonId = action.metadata.studentPersonId;
+      const membershipId = action.metadata.membershipId;
+      if (typeof studentPersonId !== "string") throw new AuthorizationError("consent subject");
+      const [relationship] = await tx.select({ id: s.guardianRelationships.id })
+        .from(s.guardianRelationships).where(and(
+          eq(s.guardianRelationships.studentPersonId, studentPersonId),
+          eq(s.guardianRelationships.guardianPersonId, actor.actorPersonId),
+          eq(s.guardianRelationships.canManageEnrollment, true))).limit(1);
+      if (!relationship) throw new AuthorizationError("guardian permission");
+      const [group] = await tx.select().from(s.studyGroups)
+        .where(and(eq(s.studyGroups.id, action.subjectId), eq(s.studyGroups.status, "active")))
+        .limit(1);
+      if (!group) throw new AuthorizationError("active study group");
+      assertGroupScope(actor, group);
+      const [member] = await tx.select({ id: s.studyGroupMemberships.id })
+        .from(s.studyGroupMemberships)
+        .where(and(eq(s.studyGroupMemberships.groupId, group.id),
+          eq(s.studyGroupMemberships.personId, studentPersonId),
+          eq(s.studyGroupMemberships.status, "pending"))).limit(1);
+      if (!member || (membershipId && membershipId !== member.id))
+        throw new AuthorizationError("pending student membership");
+      await eligibleStudent(tx, studentPersonId, group, actor.scope.programIds ?? []);
+      const [consent] = await tx.insert(s.consentRecords).values({
+        subjectType: "study_group_membership", subjectId: member.id,
+        consentType: "study_group_participation", signerPersonId: actor.actorPersonId,
+        version: "study-group/v1", signatureEvidence: {
+          decision: data.approve ? "approve" : "decline", groupId: group.id,
+          studentPersonId, acknowledged: data.approve && data.acknowledged,
+          accountId: actor.accountId, sessionId: actor.sessionId,
+        },
+      }).returning({ id: s.consentRecords.id });
+      if (!consent) throw new Error("Unable to record consent");
+      await tx.update(s.actions).set({
+        status: "resolved", resolvedAt: new Date(),
+        resolutionNote: data.approve ? "Guardian approved" : "Guardian declined",
+        metadata: { ...action.metadata, membershipId: member.id,
+          decision: data.approve ? "approve" : "decline", consentRecordId: consent.id },
+        updatedAt: new Date(),
+      }).where(eq(s.actions.id, action.id));
+      await tx.insert(s.notifications).values({
+        recipientPersonId: group.facilitatorPersonId,
+        type: "study_group_guardian_consent", status: "unread",
+        title: data.approve ? "Guardian approved group participation" : "Guardian declined group participation",
+        body: "A guardian decision was recorded for " + group.title,
+        resourceType: "study_group", resourceId: group.id,
+      });
+      await recordAudit(tx, actor, {
+        action: data.approve ? "study_group.guardian.approve" : "study_group.guardian.decline",
+        resourceType: "study_group_membership", resourceId: member.id,
+        scope: { siteId: group.siteId, programId: group.programId },
+        after: { consentRecordId: consent.id, approved: data.approve },
+      });
+      await tx.insert(s.domainEvents).values({
+        eventType: "StudyGroupGuardianConsentDecided", aggregateType: "study_group_membership",
+        aggregateId: member.id, actorPersonId: actor.actorPersonId,
+        payload: { groupId: group.id, approved: data.approve, consentRecordId: consent.id },
+      });
+      return { saved: true };
+    });
+  });
+
+export const decideCanonicalGroupMembership = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    groupId: uuid, studentPersonId: uuid, approve: z.boolean(),
+  }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(["teacher"]);
+    return db.transaction(async tx => {
+      const [group] = await tx.select().from(s.studyGroups)
+        .where(and(eq(s.studyGroups.id, data.groupId), eq(s.studyGroups.status, "active"),
+          eq(s.studyGroups.facilitatorPersonId, actor.actorPersonId))).for("update").limit(1);
+      if (!group || data.studentPersonId === actor.actorPersonId)
+        throw new AuthorizationError("facilitator group membership approval");
+      assertGroupScope(actor, group);
+      if (group.sectionId) {
+        const [assignment] = await tx.select({ id: s.sectionTeachers.id }).from(s.sectionTeachers)
+          .innerJoin(s.sections, eq(s.sections.id, s.sectionTeachers.sectionId))
+          .where(and(eq(s.sectionTeachers.sectionId, group.sectionId),
+            eq(s.sectionTeachers.personId, actor.actorPersonId),
+            eq(s.sections.active, true))).limit(1);
+        if (!assignment) throw new AuthorizationError("current teaching assignment");
+      }
+      const [member] = await tx.select().from(s.studyGroupMemberships)
+        .where(and(eq(s.studyGroupMemberships.groupId, group.id),
+          eq(s.studyGroupMemberships.personId, data.studentPersonId),
+          eq(s.studyGroupMemberships.status, "pending"))).for("update").limit(1);
+      if (!member) throw new Error("Pending membership not found");
+      if (data.approve) {
+        await eligibleStudent(tx, data.studentPersonId, group, actor.scope.programIds ?? []);
+        const guardians = await tx.select({ personId: s.guardianRelationships.guardianPersonId })
+          .from(s.guardianRelationships).where(and(
+            eq(s.guardianRelationships.studentPersonId, data.studentPersonId),
+            eq(s.guardianRelationships.canManageEnrollment, true),
+          ));
+        if (!guardians.length) throw new Error("Guardian consent is required.");
+        const guardianActions = await tx.select().from(s.actions)
+          .where(and(eq(s.actions.type, "study_group_consent"),
+            eq(s.actions.subjectType, "study_group"),
+            eq(s.actions.subjectId, group.id),
+            inArray(s.actions.ownerPersonId, guardians.map(g => g.personId))));
+        const decisions = guardians.map(g => guardianActions
+          .find(a => a.ownerPersonId === g.personId &&
+            a.metadata.studentPersonId === data.studentPersonId &&
+            a.metadata.membershipId === member.id));
+        if (decisions.some(a => !a || a.status !== "resolved" ||
+            a.metadata.decision !== "approve"))
+          throw new Error("Every current enrollment guardian must approve this membership.");
+        const approvals = await tx.select({
+          signerPersonId: s.consentRecords.signerPersonId,
+          evidence: s.consentRecords.signatureEvidence,
+        }).from(s.consentRecords).where(and(
+          eq(s.consentRecords.subjectType, "study_group_membership"),
+          eq(s.consentRecords.subjectId, member.id),
+          eq(s.consentRecords.consentType, "study_group_participation"),
+          eq(s.consentRecords.version, "study-group/v1"), isNull(s.consentRecords.revokedAt),
+        )).orderBy(desc(s.consentRecords.signedAt), desc(s.consentRecords.createdAt));
+        for (const guardian of guardians) {
+          const approved = approvals.find(a => a.signerPersonId === guardian.personId &&
+            a.evidence.studentPersonId === data.studentPersonId && a.evidence.groupId === group.id);
+          if (!approved || approved.evidence.decision !== "approve" ||
+              approved.evidence.acknowledged !== true)
+            throw new Error("Missing current guardian consent evidence.");
+        }
+        const [occupied] = await tx.select({ total: sql<number>`count(*)::int` })
+          .from(s.studyGroupMemberships).where(and(
+            eq(s.studyGroupMemberships.groupId, group.id),
+            eq(s.studyGroupMemberships.status, "approved")));
+        if ((occupied?.total ?? 0) >= group.maxMembers) throw new Error("Study group is full");
+      }
+      await tx.update(s.studyGroupMemberships).set({
+        status: data.approve ? "approved" : "declined",
+        reviewedByPersonId: actor.actorPersonId,
+        joinedAt: data.approve ? new Date() : null, updatedAt: new Date(),
+      }).where(eq(s.studyGroupMemberships.id, member.id));
+      await tx.insert(s.notifications).values({
+        recipientPersonId: data.studentPersonId, status: "unread",
+        type: "study_group_membership_decision",
+        title: data.approve ? "Study group membership approved" : "Study group membership declined",
+        body: data.approve ? "You may now participate in " + group.title : "Your request was declined.",
+        resourceType: "study_group", resourceId: group.id,
+      });
+      await recordAudit(tx, actor, {
+        action: data.approve ? "study_group.membership.approve" : "study_group.membership.decline",
+        resourceType: "study_group_membership", resourceId: member.id,
+        scope: { siteId: group.siteId, programId: group.programId },
+        before: { status: "pending" }, after: { status: data.approve ? "approved" : "declined" },
+      });
+      await tx.insert(s.domainEvents).values({
+        eventType: "StudyGroupMembershipDecided", aggregateType: "study_group_membership",
+        aggregateId: member.id, actorPersonId: actor.actorPersonId,
+        payload: { groupId: group.id, approved: data.approve },
+      });
+      return { saved: true };
+    });
+  });
+
+export const leaveCanonicalGroup = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({ groupId: uuid }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(["student"]);
+    return db.transaction(async tx => {
+      const [group] = await tx.select().from(s.studyGroups)
+        .where(eq(s.studyGroups.id, data.groupId)).for("update").limit(1);
+      if (!group) throw new Error("Group not found");
+      assertGroupScope(actor, group);
+      const [member] = await tx.select().from(s.studyGroupMemberships)
+        .where(and(eq(s.studyGroupMemberships.groupId, group.id),
+          eq(s.studyGroupMemberships.personId, actor.actorPersonId))).limit(1);
+      if (!member || member.status === "left") return { saved: true };
+      await tx.update(s.studyGroupMemberships).set({
+        status: "left", updatedAt: new Date(),
+      }).where(eq(s.studyGroupMemberships.id, member.id));
+      const consents = await tx.select().from(s.actions).where(and(
+        eq(s.actions.type, "study_group_consent"),
+        eq(s.actions.subjectId, group.id), eq(s.actions.status, "open"),
+      ));
+      for (const action of consents.filter(a => a.metadata.studentPersonId === actor.actorPersonId)) {
+        await tx.update(s.actions).set({ status: "cancelled", resolvedAt: new Date(),
+          resolutionNote: "Student left group", updatedAt: new Date() })
+          .where(eq(s.actions.id, action.id));
+      }
+      await recordAudit(tx, actor, {
+        action: "study_group.membership.leave", resourceType: "study_group_membership",
+        resourceId: member.id, scope: { siteId: group.siteId, programId: group.programId },
+        before: { status: member.status }, after: { status: "left" },
+      });
+      return { saved: true };
+    });
+  });
