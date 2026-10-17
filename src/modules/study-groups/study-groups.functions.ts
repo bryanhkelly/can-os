@@ -34,7 +34,7 @@ async function requireStudentGroupEnrollment(
  if(!enrolled)throw new AuthorizationError("active enrollment required for this study group");
 }
 
-export const getStudyGroupAvailability=createServerFn({method:"GET"}).handler(async()=>({enabled:true,writesEnabled:isSyntheticAccessEnabled()}));
+export const getStudyGroupAvailability=createServerFn({method:"GET"}).handler(async()=>({enabled:true,writesEnabled:isSyntheticAccessEnabled(),membershipEnabled:true}));
 
 /** Sites and programs in which this teacher actually has an active class assignment. */
 export const listFacilitatorGroupScopes=createServerFn({method:"GET"}).handler(async()=>{
