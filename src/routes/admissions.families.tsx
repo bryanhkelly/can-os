@@ -4,8 +4,18 @@ import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
 import {getFamilyReadiness,setFamilyRequirement,addRequirementReviewNote,reviewSyntheticRequirementDocument} from "@/modules/enrollment/family-readiness.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-const loadFamilyReadiness=()=>getFamilyReadiness();
-export const Route=createFileRoute("/admissions/families")({loader:safeLoader(loadFamilyReadiness,{authMessage:"Sign in with an authorized registrar account to view family enrollment readiness."}),component:Families});
+const loadFamilyReadiness=(selection:{siteId?:string;programId?:string}={})=>getFamilyReadiness({data:selection});
+export const Route=createFileRoute("/admissions/families")({
+ validateSearch:(search:Record<string,unknown>)=>({
+  siteId:typeof search.siteId==="string"?search.siteId:undefined,
+  programId:typeof search.programId==="string"?search.programId:undefined,
+ }),
+ loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
+ loader:({deps})=>safeLoader(()=>loadFamilyReadiness(deps),{
+  authMessage:"Sign in with an authorized registrar account to view family enrollment readiness.",
+ })(),
+ component:Families
+});
 function Families(){
  const outcome=Route.useLoaderData();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Enrollment" title="Family enrollment readiness" outcome={outcome}/>;
