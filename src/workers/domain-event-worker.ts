@@ -54,6 +54,7 @@ for (const eventType of [
   EventTypes.SchoolYearCreated,
   EventTypes.SchoolYearActivated,
   EventTypes.AcademicCalendarChanged,
+  EventTypes.ScheduleTemplateChanged,
   EventTypes.StudentMarkedAbsent,
   EventTypes.AttendanceCorrected,
   EventTypes.AttendanceExcuseSubmitted,
