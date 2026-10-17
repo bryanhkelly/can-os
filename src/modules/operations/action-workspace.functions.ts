@@ -20,17 +20,19 @@ export const getOperationsActions=createServerFn({method:"GET"}).handler(async()
  const actor=await operator();
  const records=await db.select({
   id:actions.id,title:actions.title,description:actions.description,type:actions.type,
+  siteId:actions.siteId,ownerPersonId:actions.ownerPersonId,
   status:actions.status,priority:actions.priority,createdAt:actions.createdAt
  }).from(actions).where(and(inArray(actions.siteId,actor.scope.siteIds!),inArray(actions.status,["open","in_progress","waiting"]))).orderBy(desc(actions.createdAt)).limit(100);
  const items=dedupeQueue(records.map(record=>({
-  id:record.id,kind:"action" as const,title:record.title,
+  id:record.id,kind:"action" as const,title:record.title,siteId:record.siteId,ownerPersonId:record.ownerPersonId,
   detail:record.description??record.type.replaceAll("_"," "),
   priority:record.priority==="urgent"?"critical" as const:record.priority==="high"?"high" as const:"normal" as const,
   createdAt:record.createdAt.toISOString(),
   href:record.type==="support_referral"?"/student/support?referral="+encodeURIComponent(record.id):"/operations",
   needsResponse:record.status==="open",
  })));
- return {items,summary:notificationSummary(items)};
+ const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role}).from(accountPersonGrants).where(and(inArray(accountPersonGrants.siteId,actor.scope.siteIds!),eq(accountPersonGrants.active,true)));
+ return {items,assignees,summary:notificationSummary(items)};
 });
 
 /** Generic Actions only: domain-owned referrals must use their own state machine. */
