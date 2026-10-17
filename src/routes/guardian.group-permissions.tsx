@@ -30,6 +30,7 @@ function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuard
   subtitle="Decide whether your student may participate in a teacher-facilitated group. The facilitator must also approve membership."
   actions={<div className="flex flex-wrap gap-2">
    <Link to="/guardian/course-approvals" className="rounded-lg border px-3 py-2 text-sm">Course approvals</Link>
+   <Link to="/guardian/field-trips" className="rounded-lg border px-3 py-2 text-sm">Field trips</Link>
    <Link to="/guardian/" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>
   </div>}>
   {notice&&<p className="mt-5 rounded-lg border p-3 text-sm" role="status">{notice}</p>}
