@@ -4,6 +4,7 @@ import { and, eq, desc, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { actorSiteIds, recordAudit, requireActor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
+import {EventTypes} from "@/domain/event-types";
 
 const anyone = () => requireActor(["student", "guardian", "registrar", "teacher", "specialist"]);
 
@@ -12,7 +13,7 @@ export const getQuickWinActions = createServerFn({ method: "GET" }).handler(asyn
   setResponseHeader("Cache-Control", "private, no-store");
   const sites = actorSiteIds(actor);
   if (!process.env.DATABASE_URL) return { connected: false as const, actions: [] };
-  const [{ db }, { actions }] = await Promise.all([
+  const [{ db }, { actions, domainEvents }] = await Promise.all([
     import("@/db/client"), import("@/db/schema"),
   ]);
   const rows = await db.select({
@@ -36,6 +37,9 @@ export const finishQuickWinAction = createServerFn({ method: "POST" })
       import("@/db/client"), import("@/db/schema"),
     ]);
     return db.transaction(async tx => {
+      const [current] = await tx.select({id:actions.id,type:actions.type,subjectType:actions.subjectType,subjectId:actions.subjectId}).from(actions).where(and(eq(actions.id,data.actionId),eq(actions.ownerPersonId,actor.actorPersonId),inArray(actions.siteId,sites),eq(actions.status,"open"))).for("update").limit(1);
+      if(!current)throw new AuthorizationError("open owned action");
+      if(!["student_recovery","student_support","student_support_request","conference_follow_up"].includes(current.type))throw new AuthorizationError("Action requires its owning workflow");
       const [result] = await tx.update(actions).set({
         status: "resolved", resolvedAt: new Date(), resolutionNote: "Completed by owner",
         updatedAt: new Date(),
@@ -46,6 +50,7 @@ export const finishQuickWinAction = createServerFn({ method: "POST" })
         eq(actions.status, "open"),
       )).returning({ id: actions.id });
       if (!result) throw new Error("Action not found or already completed");
+      await tx.insert(domainEvents).values({eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:result.id,actorPersonId:actor.actorPersonId,payload:{subjectType:current.subjectType,subjectId:current.subjectId}});
       await recordAudit(tx, actor, { action: "action.complete", resourceType: "action", resourceId: result.id, before: { status: "open" }, after: { status: "resolved" } });
       return { id: result.id };
     });
