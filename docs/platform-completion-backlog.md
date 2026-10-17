@@ -6,16 +6,20 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 
 - [x] Establish integration/capability/route inventory baseline.
 - [x] Stop using URL/localStorage demo persona as the application navigation authority.
-- [ ] Rename DemoNavigation and remove stale demo persona helper/tests once migrated.
+- [x] Replace DemoNavigation with WorkspaceNavigation and canonical route registry; migrate command palette and route tests from browser-local demo persona; delete obsolete component/tests.
 - [x] Select active membership by verified grant ID (supports multiple grants with same role).
 - [ ] Introduce verified active-account/site/program/child context shared across all routes.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
-- [ ] Consolidate duplicate legacy operations service and migrate remaining consumers before deleting it; add complete action transition tests.
+- [x] Delete legacy synthetic-only operations service after replacing its route consumer.
+- [ ] Add integration tests for canonical action transitions, assignment and authorization.
+- [x] Restrict owned student Action completion to known student workflow types and emit ActionResolved event.
 - [ ] Verify Action owner completion guards and domain-event parity across both school and student workflows.
 - [x] Remove local-only StudentQuickWins from active experiences route and require canonical Student Today input (no fallback sample student).
 - [x] Remove fixture gating from authenticated student-owned action and display-preference commands.
-- [ ] Replace simulated calendar-status metadata mutation with real calendar lifecycle service and remove its unused server command.
-- [ ] Audit school-experience event reads for role/section visibility before real-data access.
+- [x] Remove simulated calendar-status metadata command from school-experience service.
+- [ ] Build canonical school calendar edit/reschedule/cancel commands with downstream propagation in Phase 2.
+- [x] Restrict non-registrar school-experience calendar queries to site-level events, leaving section events to authorized student/teacher read models.
+- [ ] Verify calendar visibility and office-hour child/site selection with multi-role tests.
 - [x] Remove `/demo-health` from the application routes; retain fixture diagnostics only in test tooling.
 - [x] Replace showcase home with session-based workspace redirection.
 - [x] Remove synthetic metadata dependency from recipient-scoped notification deep-link resolution.
