@@ -43,11 +43,10 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
    eq(s.guardianRelationships.studentPersonId,actor.actorPersonId!),
    eq(s.guardianRelationships.canManageEnrollment,true)));
  for(const guardian of guardians){
-  const [existingConsent]=await tx.select({id:s.actions.id}).from(s.actions)
+  const consentRecords=await tx.select({id:s.actions.id,metadata:s.actions.metadata}).from(s.actions)
    .where(and(eq(s.actions.ownerPersonId,guardian.personId),
-    eq(s.actions.type,"study_group_consent"),eq(s.actions.subjectId,group.id)))
-   .limit(1);
-  if(existingConsent)continue;
+    eq(s.actions.type,"study_group_consent"),eq(s.actions.subjectId,group.id)));
+  if(consentRecords.some(a=>a.metadata.studentPersonId===actor.actorPersonId))continue;
   const [consent]=await tx.insert(s.actions).values({
    type:"study_group_consent",status:"open",priority:"normal",
    title:"Approve study group participation: "+group.title,
@@ -79,10 +78,13 @@ export const decideStudyGroupMembership=createServerFn({method:"POST"}).validato
     eq(s.guardianRelationships.studentPersonId,data.personId),
     eq(s.guardianRelationships.canManageEnrollment,true)));
   if(guardians.length){
-   const consentRows=await tx.select({status:s.actions.status,metadata:s.actions.metadata})
+   const allConsents=await tx.select({status:s.actions.status,metadata:s.actions.metadata})
     .from(s.actions).where(and(eq(s.actions.type,"study_group_consent"),
      eq(s.actions.subjectId,data.groupId),
      inArray(s.actions.ownerPersonId,guardians.map(g=>g.personId))));
+   const consentRows=allConsents.filter(row=>row.metadata.studentPersonId===data.personId);
+   if(consentRows.some(row=>row.status==="resolved"&&row.metadata.decision==="decline"))
+    throw new Error("A guardian withheld consent for this student's group participation");
    if(!consentRows.some(row=>row.status==="resolved"&&row.metadata.decision==="approve"))
     throw new Error("Guardian approval is required before this student joins the group");
   }
