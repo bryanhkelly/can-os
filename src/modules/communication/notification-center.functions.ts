@@ -60,15 +60,15 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
 
  return rows.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
   date:n.createdAt.toISOString(),href:n.resourceType==="submission"&&n.resourceId&&bySubmission.has(n.resourceId)?
-   `/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:
+   (context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:null):
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
-   `/student/support?referral=${encodeURIComponent(n.resourceId)}`:
-   n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:
-   n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)?"/guardian/admission-offers":
-   n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)?"/admissions/":
+   (context.role==="student"?`/student/support?referral=${encodeURIComponent(n.resourceId)}`:null):
+   n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:null):
+   n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?"/guardian/admission-offers":
+   n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&context.role==="registrar"?"/admissions/":
    n.type==="operations_action_assigned"&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&context.role==="registrar"?"/operations":
-   n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?((n.type==="study_group_membership_request"||n.type==="study_group_report_submitted")?"/teacher/study-groups":`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`):
-   n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
+   n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"?"/teacher/study-groups":context.role==="student"?`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`:null):
+   context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });
 export const readNotification=createServerFn({method:"POST"})
  .validator((data:{id:string})=>data).handler(async({data})=>{
