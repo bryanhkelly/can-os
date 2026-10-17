@@ -154,6 +154,32 @@ function ConnectedWorkflowsPage() {
                 year, its calendar and effective onsite schedule, and the student's active enrollment.
                 Unmarked days are <strong>not</strong> automatically absences.
               </p>
+              {program.attendance.outsideConfiguredExpectations > 0 &&
+                <div role="alert" className="mt-3 rounded-lg border border-amber-500 p-3 text-sm">
+                  <p className="font-semibold">
+                    {program.attendance.outsideConfiguredExpectations} recorded onsite mark(s)
+                    {" "}no longer match configured expected student-days.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    These historical records are preserved. Review the school calendar,
+                    schedule and student enrollment before reconciling; changing configuration
+                    never silently deletes or reclassifies recorded attendance.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    <Link to="/operations/school-years" className="text-xs underline">Review calendar and schedule</Link>
+                    <Link to="/staff/attendance" className="text-xs underline">Open attendance</Link>
+                  </div>
+                  <details className="mt-2 text-xs">
+                    <summary className="cursor-pointer">Recorded occurrences needing review</summary>
+                    <ul className="mt-2 space-y-1">
+                      {program.attendance.reconciliationCases.map(entry=>
+                        <li key={entry.attendanceEventId}>
+                          {entry.occurrenceKey.slice(0,10)} · {entry.status}
+                          {" "}· student {entry.studentProfileId.slice(0,8)}…
+                        </li>)}
+                    </ul>
+                  </details>
+                </div>}
               {program.attendance.coverage.configuration !== "configured" &&
                 <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
                   Coverage limitation: {program.attendance.coverage.configuration.replaceAll("_"," ")}
