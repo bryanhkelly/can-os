@@ -59,12 +59,14 @@ export function DemoNavigation(){
  const [role,setRole]=useState<DemoPersona>("student");
  const [memberships,setMemberships]=useState<Array<{id:string;role:string;firstName:string;lastName:string}>>([]);
  const [signedIn,setSignedIn]=useState(false);
+ const [activeGrantId,setActiveGrantId]=useState("");
 
  useEffect(()=>{let canceled=false;fetch("/access/session",{credentials:"same-origin"})
   .then(async response=>response.ok?response.json():null)
   .then(data=>{if(canceled||!data?.authenticated)return;
    setSignedIn(true);
    setMemberships(data.grants??[]);
+   setActiveGrantId(data.activeGrantId??"");
    const active=(data.grants??[]).find((g:{id:string})=>g.id===data.activeGrantId);
    if(active&&demoRoles.includes(active.role)){setRole(active.role);}
   }).catch(()=>{});return()=>{canceled=true};},[]);
@@ -73,18 +75,14 @@ export function DemoNavigation(){
   if(response.ok)window.location.assign("/access");
   else window.alert("Sign out failed. Please try again.");
  };
- const changePersona=(next:DemoPersona)=>{
-  if(memberships.length){
-   const grant=memberships.find(x=>x.role===next);
-   if(!grant)return;
-   void fetch("/access/session",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({grantId:grant.id})})
-    .then(response=>{if(!response.ok)throw new Error("Membership unavailable");window.location.assign(demoPersonaHome[next]);})
-    .catch(()=>window.alert("Unable to switch profile"));
-   return;
-  }
-  // Signed-out visitors cannot select an operational persona.
-  window.location.assign("/access");
+ const changeMembership=(grantId:string)=>{
+  const grant=memberships.find(x=>x.id===grantId);
+  if(!grant)return;
+  void fetch("/access/session",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({grantId})})
+   .then(response=>{if(!response.ok)throw new Error("Membership unavailable");window.location.assign(demoPersonaHome[grant.role as DemoPersona]??"/");})
+   .catch(()=>window.alert("Unable to switch membership"));
  };
+
  return <nav aria-label="CAN OS primary navigation" className="border-b border-border bg-card px-5 py-3">
   <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3">
    <Link to="/" className="font-serif text-xl font-semibold">CAN OS</Link>
@@ -93,8 +91,8 @@ export function DemoNavigation(){
     <Search className="size-3.5" aria-hidden/> Search <kbd className="rounded border border-border px-1 text-[10px]">Ctrl+K</kbd>
    </button>
    {signedIn&&<label className="flex items-center gap-2 text-xs text-muted-foreground">Active membership
-    <select aria-label="Active membership" value={role} onChange={event=>changePersona(getDemoPersona(event.target.value))} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
-     {demoRoles.filter(r=>memberships.some(g=>g.role===r)).map(r=><option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>)}
+    <select aria-label="Active membership" value={activeGrantId} onChange={event=>changeMembership(event.target.value)} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
+     {memberships.map(g=><option key={g.id} value={g.id}>{g.firstName} {g.lastName} · {g.role}</option>)}
     </select>
    </label>}
    {signedIn?<button type="button" onClick={()=>void logout()} className="text-xs font-semibold text-muted-foreground hover:text-foreground">Sign out</button>:<Link to="/access" className="text-xs font-semibold text-muted-foreground hover:text-foreground">Sign in</Link>}
