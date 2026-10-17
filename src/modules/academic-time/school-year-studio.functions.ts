@@ -3,7 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { academicCalendars, auditEvents, gradeScales, gradingPeriods, organizations, programs, scheduleTemplates, schoolYears, sites, terms } from "@/db/schema";
+import { academicCalendars, academicCalendarDays, scheduleTemplatePeriods, domainEvents, auditEvents, gradeScales, gradingPeriods, organizations, programs, scheduleTemplates, schoolYears, sites, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { activateSchoolYear, createAcademicCalendar, createGradingPeriod, createScheduleTemplate, createSchoolYear, createTerm, setAcademicCalendarDay } from "./school-year-service";
@@ -44,10 +44,23 @@ export const getSchoolYearStudio = createServerFn({method:"GET"}).handler(async 
    db.select({id:scheduleTemplates.id,name:scheduleTemplates.name}).from(scheduleTemplates)
     .where(eq(scheduleTemplates.schoolYearId,y.id)),
   ]);
+  const dayRows=calendarRows.length?await db.select({
+    id:academicCalendarDays.id,academicCalendarId:academicCalendarDays.academicCalendarId,
+    calendarDate:academicCalendarDays.calendarDate,type:academicCalendarDays.type,
+    title:academicCalendarDays.title,instructionalMinutes:academicCalendarDays.instructionalMinutes,
+  }).from(academicCalendarDays).where(inArray(academicCalendarDays.academicCalendarId,
+    calendarRows.map(c=>c.id))).orderBy(asc(academicCalendarDays.calendarDate)):[];
+  const schedulePeriods=scheduleRows.length?await db.select({
+    scheduleTemplateId:scheduleTemplatePeriods.scheduleTemplateId,
+    dayOfWeek:scheduleTemplatePeriods.dayOfWeek,sequence:scheduleTemplatePeriods.sequence,
+    label:scheduleTemplatePeriods.label,startsAtLocal:scheduleTemplatePeriods.startsAtLocal,
+    endsAtLocal:scheduleTemplatePeriods.endsAtLocal,type:scheduleTemplatePeriods.type,
+  }).from(scheduleTemplatePeriods).where(inArray(scheduleTemplatePeriods.scheduleTemplateId,
+    scheduleRows.map(s=>s.id))):[];
   const periods = termRows.length ? await db.select({termId:gradingPeriods.termId,id:gradingPeriods.id,name:gradingPeriods.name})
     .from(gradingPeriods).where(inArray(gradingPeriods.termId,termRows.map(t=>t.id))) : [];
   return {...y,terms:termRows.map(t=>({...t,periods:periods.filter(p=>p.termId===t.id)})),
-   calendars:calendarRows,schedules:scheduleRows};
+   calendars:calendarRows.map(cal=>({...cal,days:dayRows.filter(d=>d.academicCalendarId===cal.id)})),schedules:scheduleRows.map(s=>({...s,periods:schedulePeriods.filter(p=>p.scheduleTemplateId===s.id)}))};
  }));
  const programRows = actor.scope.programIds?.length ? await db.select({id:programs.id,name:programs.name,siteId:programs.siteId,organizationId:programs.organizationId})
   .from(programs).where(inArray(programs.id,actor.scope.programIds)) : [];
@@ -111,3 +124,85 @@ export const addStudioSchedule = createServerFn({method:"POST"})
  }))})}));
 export const activateStudioYear = createServerFn({method:"POST"}).validator(id.parse)
  .handler(async({data})=>{await activateSchoolYear(await operator("academic_year.activate"),data.schoolYearId);return {ok:true}});
+
+/** Delete only a specifically scoped calendar override; other dates remain untouched. */
+export const removeStudioCalendarDay=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({dayId:uuid}).parse(v))
+ .handler(async({data})=>{
+  const actor=await operator();
+  return db.transaction(async tx=>{
+   const [record]=await tx.select({
+    id:academicCalendarDays.id,date:academicCalendarDays.calendarDate,
+    calendarId:academicCalendars.id,organizationId:schoolYears.organizationId,
+    siteId:schoolYears.siteId,programId:schoolYears.programId,
+   }).from(academicCalendarDays)
+    .innerJoin(academicCalendars,eq(academicCalendars.id,academicCalendarDays.academicCalendarId))
+    .innerJoin(schoolYears,eq(schoolYears.id,academicCalendars.schoolYearId))
+    .where(eq(academicCalendarDays.id,data.dayId)).limit(1);
+   if(!record||!actor.scope.organizationIds?.includes(record.organizationId)||
+     (actor.scope.siteIds?.length&&!actor.scope.siteIds.includes(record.siteId))||
+     (record.programId&&!actor.scope.programIds?.includes(record.programId)))
+    throw new AuthorizationError("calendar day access");
+   await tx.delete(academicCalendarDays).where(eq(academicCalendarDays.id,record.id));
+   await tx.insert(domainEvents).values({
+    eventType:"AcademicCalendarChanged",aggregateType:"academic_calendar",
+    aggregateId:record.calendarId,actorPersonId:actor.actorPersonId,
+    payload:{calendarDate:record.date,operation:"delete",siteId:record.siteId},
+   });
+   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+    action:"academic_calendar.day.remove",resourceType:"academic_calendar_day",
+    resourceId:record.id,scope:{organizationId:record.organizationId,siteId:record.siteId},
+    before:{calendarDate:record.date}});
+   return {removed:true};
+  });
+ });
+export const replaceStudioSchedulePeriods=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({scheduleTemplateId:uuid,periods:z.array(z.object({
+  dayOfWeek:z.number().int().min(0).max(6),sequence:z.number().int().positive(),
+  label:z.string().trim().min(1).max(80),
+  startsAtLocal:z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),
+  endsAtLocal:z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),
+  type:z.enum(["instruction","break","lunch","chapel","advisory"]),
+ })).min(1).max(80)}).parse(v))
+ .handler(async({data})=>{
+  const actor=await operator();
+  const keys=new Set<string>();
+  for(const p of data.periods){
+   if(p.startsAtLocal>=p.endsAtLocal)throw new Error("Period must end after it starts");
+   const key=p.dayOfWeek+":"+p.sequence;
+   if(keys.has(key))throw new Error("Duplicate day and sequence");
+   keys.add(key);
+  }
+  for(const dayOfWeek of new Set(data.periods.map(p=>p.dayOfWeek))){
+   const rows=data.periods.filter(p=>p.dayOfWeek===dayOfWeek)
+    .sort((a,b)=>a.startsAtLocal.localeCompare(b.startsAtLocal));
+   for(let i=1;i<rows.length;i++)
+    if(rows[i]!.startsAtLocal<rows[i-1]!.endsAtLocal)
+     throw new Error("Schedule periods overlap on day "+dayOfWeek);
+  }
+  return db.transaction(async tx=>{
+   const [record]=await tx.select({
+    id:scheduleTemplates.id,siteId:scheduleTemplates.siteId,
+    programId:scheduleTemplates.programId,organizationId:schoolYears.organizationId,
+   }).from(scheduleTemplates).innerJoin(schoolYears,
+     eq(schoolYears.id,scheduleTemplates.schoolYearId))
+    .where(eq(scheduleTemplates.id,data.scheduleTemplateId)).limit(1);
+   if(!record||!actor.scope.organizationIds?.includes(record.organizationId)||
+    (actor.scope.siteIds?.length&&!actor.scope.siteIds.includes(record.siteId))||
+    (record.programId&&!actor.scope.programIds?.includes(record.programId)))
+    throw new AuthorizationError("schedule edit");
+   await tx.delete(scheduleTemplatePeriods)
+    .where(eq(scheduleTemplatePeriods.scheduleTemplateId,record.id));
+   await tx.insert(scheduleTemplatePeriods).values(data.periods.map(p=>({
+    ...p,scheduleTemplateId:record.id,
+   })));
+   await tx.insert(domainEvents).values({eventType:"ScheduleTemplateChanged",
+    aggregateType:"schedule_template",aggregateId:record.id,actorPersonId:actor.actorPersonId,
+    payload:{siteId:record.siteId,programId:record.programId,periodCount:data.periods.length}});
+   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+    action:"schedule.periods.replace",resourceType:"schedule_template",resourceId:record.id,
+    scope:{organizationId:record.organizationId,siteId:record.siteId,programId:record.programId},
+    after:{periods:data.periods}});
+   return {updated:true};
+  });
+ });
