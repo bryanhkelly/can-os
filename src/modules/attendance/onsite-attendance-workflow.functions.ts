@@ -317,7 +317,11 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
           const history = allByOccurrence.get(key) ?? [];
           const earliest = [...history].sort((a, b) =>
             a.recordedAt.getTime() - b.recordedAt.getTime())[0]!;
-          const excuse = excuses.find(e => history.some(r => r.id === e.attendanceEventId));
+          // A later absence after an approved excuse is a NEW case: do not
+          // mask it behind the historical approval for the earlier mark.
+          const excuse = excuses.find(e => e.attendanceEventId === f.id) ??
+            (f.status === "excused" ? excuses.find(e => e.status === "approved" &&
+              history.some(r => r.id === e.attendanceEventId)) : undefined);
           const eventId = excuse?.attendanceEventId ?? f.id;
           return {
             attendanceEventId: eventId,
