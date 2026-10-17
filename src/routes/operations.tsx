@@ -1,16 +1,17 @@
+import { getLiveOperationsCommandCenter } from "@/modules/operations/command-center.functions";
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
 import {getOperationsPreview,updateSyntheticOperationsAction,triageSyntheticOperationsAction} from "@/modules/operations/operations.functions";
 export const Route=createFileRoute("/operations")({loader:async()=>{
  try{
-  return {operations:await getOperationsPreview(),health:await getReleaseHealth(),authError:""};
+  return {operations:await getOperationsPreview(),health:await getReleaseHealth(),commandCenter:await getLiveOperationsCommandCenter().catch(()=>null),authError:""};
  }catch{
-  return {operations:null,health:null,authError:"Sign in with an authorized staff account to view school operations."};
+  return {operations:null,health:null,commandCenter:null,authError:"Sign in with an authorized staff account to view school operations."};
  }
 },component:OperationsPage});
 function OperationsPage(){
- const {operations:data,health,authError}=Route.useLoaderData();
+ const {operations:data,health,commandCenter,authError}=Route.useLoaderData();
  const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null);
  const [error,setError]=useState("");
@@ -38,6 +39,23 @@ function OperationsPage(){
   <p className="mt-3 max-w-2xl text-sm text-muted-foreground">One starting place for school operations. These records are synthetic; no public user is authorized to perform production mutations.</p>
   <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p>
   {error&&<p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>}
+  {commandCenter&&<section className="mt-7 rounded-xl border bg-card p-5">
+    <h2 className="font-serif text-2xl">Live school operations</h2>
+    <div className="mt-3 flex flex-wrap gap-4 text-sm">
+     <span>{commandCenter.summary.sections} active sections</span>
+     <span>{commandCenter.summary.unstaffed} unstaffed</span>
+     <span>{commandCenter.summary.underCapacity} capacity gaps</span>
+     <span>{commandCenter.summary.waitlisted} waiting students</span>
+    </div>
+    <div className="mt-4 space-y-2">
+     {commandCenter.issues.map(issue=><div key={issue.kind+issue.sectionId} className="rounded border p-3 text-sm">
+       <strong>{issue.title}</strong><p className="text-muted-foreground">{issue.description}</p>
+       <Link className="mt-2 inline-block underline" to="/operations/launch/$programId"
+        params={{programId:issue.programId}}>Review lifecycle →</Link>
+     </div>)}
+     {!commandCenter.issues.length&&<p className="text-sm">No staffing or capacity exceptions detected.</p>}
+    </div>
+   </section>}
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
   {[["Open items",data.summary.total],["Urgent",data.summary.urgent],["Needs response",data.summary.needsResponse]].map(([label,num])=><div key={label} className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 font-serif text-3xl">{num}</p></div>)}
   </div>
