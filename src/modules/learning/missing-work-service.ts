@@ -126,6 +126,7 @@ export async function markOverdueSubmissionsMissing(
           and(
             eq(submissions.id, row.submissionId),
             eq(submissions.status, "assigned"),
+            eq(submissions.timeliness, "on_time"),
           ),
         )
         .returning({ id: submissions.id });
@@ -194,10 +195,14 @@ export async function submitAssessment(
       throw new Error("Submission actor must be the enrolled student");
     }
 
+    if (current.status !== "assigned") {
+      throw new Error("Submission has already been submitted or graded");
+    }
+
     const timeliness =
       current.dueAt && submittedAt > current.dueAt ? "late" : "on_time";
 
-    await tx
+    const submitted = await tx
       .update(submissions)
       .set({
         status: "submitted",
@@ -206,7 +211,10 @@ export async function submitAssessment(
         response,
         updatedAt: submittedAt,
       })
-      .where(eq(submissions.id, submissionId));
+      .where(and(eq(submissions.id, submissionId), eq(submissions.status, "assigned")))
+      .returning({ id: submissions.id });
+
+    if (!submitted.length) throw new Error("Submission was already processed");
 
     await tx.insert(domainEvents).values({
       eventType: EventTypes.SubmissionReceived,
@@ -264,10 +272,13 @@ export async function gradeSubmission(
 
     if (!current) throw new Error("Submission not found");
     assertSectionScope(context, current.sectionId);
+    if (current.status !== "submitted") {
+      throw new Error("Only submitted work can be graded");
+    }
 
     const gradedAt = new Date();
 
-    await tx
+    const graded = await tx
       .update(submissions)
       .set({
         status: "graded",
@@ -277,7 +288,10 @@ export async function gradeSubmission(
         gradedAt,
         updatedAt: gradedAt,
       })
-      .where(eq(submissions.id, submissionId));
+      .where(and(eq(submissions.id, submissionId), eq(submissions.status, "submitted")))
+      .returning({ id: submissions.id });
+
+    if (!graded.length) throw new Error("Submission grading was already processed");
 
     await tx.insert(domainEvents).values({
       eventType: EventTypes.GradePosted,
