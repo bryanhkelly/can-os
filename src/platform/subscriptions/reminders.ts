@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { domainEvents, subscriptionDeliveries } from "@/db/schema";
+import { domainEvents, subscriptionDeliveries, conversationMessages } from "@/db/schema";
 import { notify } from "@/platform/mutation";
 import { getSubscriptionPolicy } from "./policy";
 
@@ -12,6 +12,7 @@ type ReminderCandidate = {
   subscriber_person_id: string;
   channel: string;
   next_kind: string;
+  source_conversation_id: string | null;
 };
 
 /**
@@ -29,6 +30,7 @@ export async function processSubscriptionReminders(now = new Date()): Promise<nu
       e.event_type,
       s.subscriber_person_id,
       s.channel,
+      s.source_conversation_id,
       case when count(r.id) = 0 then 'reminder' else 'reminder:' || (count(r.id) + 1)::text end as next_kind
     from subscription_deliveries d
     join subscriptions s on s.id = d.subscription_id
@@ -40,7 +42,7 @@ export async function processSubscriptionReminders(now = new Date()): Promise<nu
       and (s.expires_at is null or s.expires_at > ${now})
       and (s.reminder_policy->>'remindAfterHours') is not null
       and e.occurred_at <= ${now}::timestamptz - ((s.reminder_policy->>'remindAfterHours')::int * interval '1 hour')
-    group by d.id, d.subscription_id, d.domain_event_id, e.event_type, e.occurred_at, s.subscriber_person_id, s.channel, s.reminder_policy, d.created_at
+    group by d.id, d.subscription_id, d.domain_event_id, e.event_type, e.occurred_at, s.subscriber_person_id, s.channel, s.source_conversation_id, s.reminder_policy, d.created_at
     having count(r.id) < greatest(1, least(30, coalesce((s.reminder_policy->>'maxReminders')::int, 1)))
       and ${now}::timestamptz >= e.occurred_at +
         (coalesce((s.reminder_policy->>'remindAfterHours')::int, 24) +
@@ -126,6 +128,16 @@ export async function processSubscriptionReminders(now = new Date()): Promise<nu
           updatedAt: now,
         })
         .where(eq(subscriptionDeliveries.id, reminder.id));
+      if (candidate.source_conversation_id) {
+        await tx.insert(conversationMessages).values({
+          conversationId: candidate.source_conversation_id,
+          role: "agent",
+          body: content.body ?? content.title,
+          evidenceRefs: content.resourceType && content.resourceId
+            ? [{ type: content.resourceType, id: content.resourceId, label: content.title }]
+            : [],
+        });
+      }
       sent += 1;
     });
   }
