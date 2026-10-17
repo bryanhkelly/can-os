@@ -6,6 +6,7 @@ import {applications,admissionOffers,admissionSeatPools,guardianRelationships,st
 import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment} from "./admissions-offer-service";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
+import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
 import {assertCapability,assertProgramScope,AuthorizationError} from "@/domain/command-context";
 
 async function authorizedActor(role:"registrar"|"guardian",capability:string,programId:string){
@@ -17,16 +18,19 @@ async function authorizedActor(role:"registrar"|"guardian",capability:string,pro
  return actor;
 }
 
-export const getSyntheticAdmissionOfferOptions=createServerFn({method:"GET"}).handler(async()=>{
+export const getSyntheticAdmissionOfferOptions=createServerFn({method:"GET"})
+ .validator((value:unknown)=>operationsSelectionSchema.parse(value??{}))
+ .handler(async({data})=>{
  const actor=await getCommandContext(getRequest());
  setResponseHeader("Cache-Control","private, no-store");
  if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.programIds?.length)throw new AuthorizationError("registrar offer options");
  assertCapability(actor,"enrollment.decide");
+ const scoped=await resolveOperationsSelection(actor,data);
  if(!process.env.DATABASE_URL)return [];
- const apps=await db.select({id:applications.id,programId:applications.programId,metadata:applications.metadata}).from(applications).where(inArray(applications.programId,actor.scope.programIds)).limit(150);
+ const apps=await db.select({id:applications.id,programId:applications.programId,metadata:applications.metadata}).from(applications).where(inArray(applications.programId,scoped.programIds)).limit(150);
  const synthetic=apps;
  if(!synthetic.length)return [];
- const pools=await db.select({programId:admissionSeatPools.programId,schoolYearId:admissionSeatPools.schoolYearId,capacity:admissionSeatPools.capacity,name:schoolYears.name}).from(admissionSeatPools).innerJoin(schoolYears,eq(schoolYears.id,admissionSeatPools.schoolYearId)).where(inArray(admissionSeatPools.programId,actor.scope.programIds));
+ const pools=await db.select({programId:admissionSeatPools.programId,schoolYearId:admissionSeatPools.schoolYearId,capacity:admissionSeatPools.capacity,name:schoolYears.name}).from(admissionSeatPools).innerJoin(schoolYears,eq(schoolYears.id,admissionSeatPools.schoolYearId)).where(inArray(admissionSeatPools.programId,scoped.programIds));
  return synthetic.map(app=>({applicationId:app.id,years:pools.filter(p=>p.programId===app.programId).map(p=>({id:p.schoolYearId,name:p.name,capacity:p.capacity}))}));
 });
 
