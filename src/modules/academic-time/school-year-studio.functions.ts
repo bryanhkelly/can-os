@@ -29,7 +29,7 @@ export const getSchoolYearStudio = createServerFn({method:"GET"}).handler(async 
    organizationId:schoolYears.organizationId,programId:schoolYears.programId,startsOn:schoolYears.startsOn,endsOn:schoolYears.endsOn})
    .from(schoolYears).where(and(inArray(schoolYears.siteId,siteIds),inArray(schoolYears.organizationId,orgIds)))
    .orderBy(asc(schoolYears.startsOn)),
-  db.select({id:gradeScales.id,name:gradeScales.name,organizationId:gradeScales.organizationId}).from(gradeScales)
+  db.select({id:gradeScales.id,name:gradeScales.name,organizationId:gradeScales.owningOrganizationId}).from(gradeScales)
    .where(inArray(gradeScales.organizationId,orgIds)),
  ]);
  const years = await Promise.all(yearRows.filter(y=> !y.programId || actor.scope.programIds?.includes(y.programId)).map(async y => {
