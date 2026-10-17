@@ -53,7 +53,11 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
       eyebrow="CAN OS · Family"
       title="Course approvals"
       subtitle="Review student requests to add classes that require your permission. Your decision is recorded with the request for the school registrar."
-      actions={<Link to="/guardian/" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}
+      actions={<div className="flex flex-wrap gap-2">
+        <Link to="/guardian/group-permissions" className="rounded-lg border px-3 py-2 text-sm">Group permissions</Link>
+        <Link to="/guardian/field-trips" className="rounded-lg border px-3 py-2 text-sm">Field trip permissions</Link>
+        <Link to="/guardian/" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>
+      </div>}
     >
       {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
       {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
