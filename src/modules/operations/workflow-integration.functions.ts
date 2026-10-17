@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
+import { loadExpectedAttendanceCoverage } from "@/modules/attendance/expected-attendance-queries";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -29,6 +30,7 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
 
   const programRows = await db.select({
     id: programs.id, name: programs.name, type: programs.type, status: programs.status,
+    deliveryModel: programs.deliveryModel,
     siteId: programs.siteId, organizationId: programs.organizationId,
   }).from(programs).where(and(
     inArray(programs.id, permittedIds),
@@ -39,7 +41,8 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
   const ids = programRows.map(p => p.id);
   const siteIds = [...new Set(programRows.map(p => p.siteId).filter((id): id is string => !!id))];
   const now = new Date();
-  const since = new Date(now.getTime() - 30 * 86400000);
+  const since = new Date(now.getTime() - 34 * 86400000);
+  const recordedSince = new Date(now.getTime() - 30 * 86400000);
 
   const [
     yearRows, sectionRows, launchJourneys, launchRequirements,
@@ -91,6 +94,7 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
       studentProfileId: attendanceEvents.studentProfileId,
       occurrenceKey: attendanceEvents.occurrenceKey, status: attendanceEvents.status,
       recordedAt: attendanceEvents.recordedAt,
+      expectedAt: attendanceEvents.expectedAt,
     }).from(attendanceEvents).where(and(
       inArray(attendanceEvents.programId, ids), gte(attendanceEvents.expectedAt, since),
       lte(attendanceEvents.expectedAt, now),
@@ -114,6 +118,7 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
   // The first row per occurrence is the latest recorded correction, not an
   // additive event. Original absences must not survive approved excuses in metrics.
   const effectiveAttendance = effectiveAttendanceEvents(attendanceRows);
+  const attendanceCoverage = await loadExpectedAttendanceCoverage(programRows, effectiveAttendance, now, 30);
   const latestSubmissions = new Map<string, (typeof submissionRows)[number]>();
   for (const submission of submissionRows) {
     const key = submission.assessmentId + ":" + submission.studentProfileId;
@@ -145,7 +150,8 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
         ].join(":"))).length;
       const grades = [...latestSubmissions.values()].filter(s =>
         assessmentProgram.get(s.assessmentId) === program.id);
-      const attendance = effectiveAttendance.filter(e => e.programId === program.id);
+      const attendance = effectiveAttendance.filter(e => e.programId === program.id &&
+        e.expectedAt >= recordedSince);
       const byStatus = (status: string) => attendance.filter(e => e.status === status).length;
 
       return {
@@ -178,6 +184,7 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
           present: byStatus("present"), absent: byStatus("absent"),
           tardy: byStatus("tardy"), excused: byStatus("excused"),
           pendingExcuses: excuseRows.filter(e => e.programId === program.id).length,
+          coverage: attendanceCoverage.get(program.id)!,
         },
       };
     }),
