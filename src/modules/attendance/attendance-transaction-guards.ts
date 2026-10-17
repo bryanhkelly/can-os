@@ -34,9 +34,12 @@ export async function assertExpectedOnsiteMarkInTransaction(
     expectedAt: Date;
   },
 ): Promise<void> {
+  // CommandContext is the shared capability interface; the verified session
+  // carries the active persona as an additional field.
+  const role = (context as CommandContext & { role?: string }).role;
   if (input.occurrenceKey !== input.date + ":site-day" ||
       !input.siteId || !context.actorPersonId ||
-      !["registrar", "teacher"].includes(context.role) ||
+      !["registrar", "teacher"].includes(role ?? "") ||
       !context.scope.programIds?.includes(input.programId) ||
       !context.scope.siteIds?.includes(input.siteId))
     throw new AuthorizationError("attendance occurrence, staff and site scope");
@@ -90,7 +93,7 @@ export async function assertExpectedOnsiteMarkInTransaction(
     y.startsOn <= input.date && y.endsOn >= input.date);
   if (!matchingYears.length) throw new AuthorizationError("active school year at program site");
 
-  if (input.sectionId || context.role === "teacher") {
+  if (input.sectionId || role === "teacher") {
     if (!input.sectionId) throw new AuthorizationError("teacher section assignment");
     const [section] = await tx.select({
       id: sections.id, active: sections.active, programId: sections.programId,
@@ -108,7 +111,7 @@ export async function assertExpectedOnsiteMarkInTransaction(
         eq(enrollments.sectionId, input.sectionId),
       )).for("share").limit(1);
     if (!seat) throw new AuthorizationError("student not assigned to section");
-    if (context.role === "teacher") {
+    if (role === "teacher") {
       const [teacher] = await tx.select({ id: sectionTeachers.id })
         .from(sectionTeachers).where(and(
           eq(sectionTeachers.sectionId, input.sectionId),
