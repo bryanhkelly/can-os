@@ -11,6 +11,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
   quietEnd: text("quiet_end"),
   smsOptedIn: boolean("sms_opted_in").default(false).notNull(),
   smsConsentAt: timestamp("sms_consent_at", { withTimezone: true }),
+  smsVerificationRequestedAt: timestamp("sms_verification_requested_at", { withTimezone: true }),
   smsVerifiedPhone: text("sms_verified_phone"),
   smsVerifiedAt: timestamp("sms_verified_at", { withTimezone: true }),
   createdAt: createdAt(),
