@@ -62,7 +62,7 @@ export function planTurn(message: string): AgentPlan {
   if (/\b(?:resume|restart|unpause) (?:that|the|my|this)?\s*(?:watch|monitoring|alert)\b/i.test(text))
     return { intent: "manage", action: "resume" };
 
-  const weekly = /every\\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/i.exec(text);
+  const weekly = /every\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/i.exec(text);
   if (weekly && /summar|digest|progress|update/i.test(text)) {
     const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
     return { intent: "manage", action: "create_digest",
