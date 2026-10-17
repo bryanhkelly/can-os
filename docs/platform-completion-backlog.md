@@ -37,7 +37,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Redirect teacher-only notices into the canonical notification center and delete duplicate notification handlers.
 - [ ] Tighten every resource-specific notification deep-link permission for cross-role data.
 - [x] Allow enrolled students to read course discussions independent of fixture metadata; preserve legacy route export until mutation consolidation.
-- [ ] Consolidate discussion write and moderation paths only after complete domain and authorization review.
+- [x] Converge enrolled-student discussion posting and teacher discussion creation, locking and moderation on records independent of fixture markers; maintain verified section membership and relationship guards.
+- [ ] Run deferred integration and authorization testing for discussion lifecycle before production release.
 - [x] Replace local-only StudentExperience with canonical read-only student work/schedule/action projection and real workflow deep links.
 - [ ] Verify typecheck, build, unit tests and role-switch browser journeys before closing Phase 1.
 - [x] Align fixture manifest after removing `/demo-health` (previously blocked CI at route fixture coverage).
