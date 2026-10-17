@@ -13,6 +13,27 @@ async function groupActor(role:"student"|"teacher"){
  return {...actor,sites};
 }
 async function context(){const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);return {db,s};}
+
+/** A student may participate only while actively enrolled at this group's school/program. */
+async function requireStudentGroupEnrollment(
+ tx:any,s:any,actor:Awaited<ReturnType<typeof groupActor>>,
+ group:{siteId:string|null;programId:string|null},
+){
+ if(!group.siteId||!actor.sites.includes(group.siteId)||
+   (group.programId&&!actor.scope.programIds?.includes(group.programId)))
+  throw new AuthorizationError("study group school or program");
+ const [enrolled]=await tx.select({id:s.enrollments.id})
+  .from(s.enrollments)
+  .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+  .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+  .where(and(eq(s.studentProfiles.personId,actor.actorPersonId!),
+    eq(s.enrollments.status,"active"),
+    eq(s.programs.siteId,group.siteId),
+    inArray(s.programs.id,actor.scope.programIds??[]),
+    group.programId?eq(s.enrollments.programId,group.programId):undefined)).limit(1);
+ if(!enrolled)throw new AuthorizationError("active enrollment required for this study group");
+}
+
 export const getStudyGroupAvailability=createServerFn({method:"GET"}).handler(async()=>({enabled:isSyntheticAccessEnabled()}));
 
 /** Sites and programs in which this teacher actually has an active class assignment. */
@@ -77,6 +98,7 @@ export const requestStudyGroupMembership=createServerFn({method:"POST"}).validat
  return db.transaction(async tx=>{
  const [group]=await tx.select().from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).for("update").limit(1);
  if(!group)throw new Error("Group unavailable");
+ await requireStudentGroupEnrollment(tx,s,actor,group);
  const [existing]=await tx.select({status:s.studyGroupMemberships.status}).from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,group.id),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  if(existing?.status==="approved"||existing?.status==="pending")return {ok:true};
  await tx.insert(s.studyGroupMemberships).values({groupId:group.id,personId:actor.actorPersonId!,role:"student",status:"pending"}).onConflictDoUpdate({target:[s.studyGroupMemberships.groupId,s.studyGroupMemberships.personId],set:{status:"pending",reviewedByPersonId:null,joinedAt:null,updatedAt:new Date()}});
@@ -151,6 +173,7 @@ export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.obje
  const {db,s}=await context();
  const [group]=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,description:s.studyGroups.description,kind:s.studyGroups.kind,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,sectionId:s.studyGroups.sectionId,facilitatorPersonId:s.studyGroups.facilitatorPersonId,maxMembers:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,createdAt:s.studyGroups.createdAt}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).limit(1);
  if(!group)throw new Error("Group unavailable");
+ await requireStudentGroupEnrollment(db,s,actor,group);
  const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!))).limit(1);
  const permitted=canAccessGroup((membership?.status??null) as "pending"|"approved"|"declined"|"left"|null,"student");
  if(!permitted)return {group,memberStatus:membership?.status??null,posts:[],sessions:[]};
@@ -161,9 +184,25 @@ export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.obje
 });
 export const postStudyGroupMessage=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1),body:z.string()}).parse).handler(async({data})=>{
  assertSyntheticMutation("student");const actor=await groupActor("student");const body=validateGroupPost(data.body);const {db,s}=await context();
- const [membership]=await db.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
- if(!membership)throw new Error("Approved membership required");
- const [post]=await db.insert(s.studyGroupPosts).values({groupId:data.groupId,body,authorPersonId:actor.actorPersonId!}).returning({id:s.studyGroupPosts.id});if(!post)throw new Error('Post creation failed');return {id:post.id};
+ return db.transaction(async tx=>{
+  const [group]=await tx.select({siteId:s.studyGroups.siteId,programId:s.studyGroups.programId})
+    .from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),
+    eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),
+    or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).limit(1);
+  if(!group)throw new AuthorizationError("study group scope");
+  await requireStudentGroupEnrollment(tx,s,actor,group);
+  const [membership]=await tx.select({id:s.studyGroupMemberships.id})
+    .from(s.studyGroupMemberships).where(and(
+    eq(s.studyGroupMemberships.groupId,data.groupId),
+    eq(s.studyGroupMemberships.personId,actor.actorPersonId!),
+    eq(s.studyGroupMemberships.status,"approved"))).limit(1);
+  if(!membership)throw new AuthorizationError("approved group membership");
+  const [post]=await tx.insert(s.studyGroupPosts).values({
+    groupId:data.groupId,body,authorPersonId:actor.actorPersonId!
+  }).returning({id:s.studyGroupPosts.id});
+  if(!post)throw new Error("Post creation failed");
+  return {id:post.id};
+ });
 });
 export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1),title:z.string(),agenda:z.string(),startsAt:z.string(),endsAt:z.string()}).parse).handler(async({data})=>{
  assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const {start,end}=validateSession(data.startsAt,data.endsAt);const {db,s}=await context();
