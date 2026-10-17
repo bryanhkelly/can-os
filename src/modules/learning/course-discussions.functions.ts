@@ -5,7 +5,7 @@ import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {and,eq,inArray,desc} from "drizzle-orm";
 import {discussionTree} from "@/domain/course-discussions";
 /** Read-only preview of explicitly synthetic discussions belonging to the demo student's enrolled sections. */
-export const getSyntheticCourseDiscussions=createServerFn({method:"GET"}).handler(async()=>{
+export const getCourseDiscussions=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await getCommandContext(getRequest());
  setResponseHeader("Cache-Control","private, no-store");
  if(actor.role!=="student"||!actor.actorPersonId||!actor.scope.siteIds?.length)throw new AuthorizationError("student discussion access");
@@ -20,8 +20,8 @@ export const getSyntheticCourseDiscussions=createServerFn({method:"GET"}).handle
  const sectionIds=enrollments.map(x=>x.sectionId).filter((x):x is string=>Boolean(x));
  if(!sectionIds.length)return [];
  const rows=await db.select({id:s.communicationThreads.id,subject:s.communicationThreads.subject,contextId:s.communicationThreads.contextId,metadata:s.communicationThreads.metadata,lastMessageAt:s.communicationThreads.lastMessageAt}).from(s.communicationThreads).where(and(eq(s.communicationThreads.contextType,"section"),inArray(s.communicationThreads.contextId,sectionIds))).orderBy(desc(s.communicationThreads.createdAt)).limit(40);
- const allowed=rows.filter(x=>x.metadata.synthetic===true&&x.metadata.kind==="course_discussion");
+ const allowed=rows.filter(x=>x.metadata.kind==="course_discussion");
  if(!allowed.length)return [];
  const messages=await db.select({id:s.communicationMessages.id,threadId:s.communicationMessages.threadId,body:s.communicationMessages.body,senderPersonId:s.communicationMessages.senderPersonId,sentAt:s.communicationMessages.sentAt,metadata:s.communicationMessages.metadata}).from(s.communicationMessages).where(inArray(s.communicationMessages.threadId,allowed.map(x=>x.id))).orderBy(s.communicationMessages.sentAt).limit(250);
- return allowed.map(thread=>({id:thread.id,subject:thread.subject,sectionId:thread.contextId,locked:thread.metadata.locked===true,messages:discussionTree(messages.filter(m=>m.threadId===thread.id&&m.metadata.synthetic===true).map(m=>({id:m.id,body:m.metadata.hidden===true?"[Message hidden by teacher]":m.body,createdAt:m.sentAt.toISOString(),authorLabel:m.senderPersonId===actor.actorPersonId?"You":"Participant",parentMessageId:typeof m.metadata.parentMessageId==="string"?m.metadata.parentMessageId:null})))}));
+ return allowed.map(thread=>({id:thread.id,subject:thread.subject,sectionId:thread.contextId,locked:thread.metadata.locked===true,messages:discussionTree(messages.filter(m=>m.threadId===thread.id).map(m=>({id:m.id,body:m.metadata.hidden===true?"[Message hidden by teacher]":m.body,createdAt:m.sentAt.toISOString(),authorLabel:m.senderPersonId===actor.actorPersonId?"You":"Participant",parentMessageId:typeof m.metadata.parentMessageId==="string"?m.metadata.parentMessageId:null})))}));
 });
