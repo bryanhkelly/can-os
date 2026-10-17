@@ -209,6 +209,14 @@ integration("GF-A2 durable subscriptions", () => {
       })
       .returning();
 
+    const [emailWatch] = await db.insert(schema.subscriptions).values({
+      subscriberPersonId: guardian!.id,
+      eventTypes: ["AssignmentBecameMissing"],
+      subjectType: "student_profile",
+      subjectId: student!.id,
+      channel: "email",
+    }).returning();
+
     await db.insert(schema.subscriptions).values({
       subscriberPersonId: studentPerson!.id,
       eventTypes: ["AssignmentBecameMissing"],
@@ -328,14 +336,6 @@ integration("GF-A2 durable subscriptions", () => {
     expect(deliveriesAfterRerun).toHaveLength(deliveries.length);
 
     // --- External delivery is durable and reports missing contact accurately ----
-    const [emailWatch] = await db.insert(schema.subscriptions).values({
-      subscriberPersonId: guardian!.id,
-      eventTypes: ["AssignmentBecameMissing"],
-      subjectType: "student_profile",
-      subjectId: student!.id,
-      channel: "email",
-    }).returning();
-    await subscriptionsPlatform.processEventSubscriptions(event.id);
     const [queued] = await db.select().from(schema.subscriptionDeliveries)
       .where(and(
         eq(schema.subscriptionDeliveries.subscriptionId, emailWatch!.id),
