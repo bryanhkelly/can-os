@@ -49,8 +49,10 @@ export const listInsights = createServerFn({ method: "GET" })
   const context = await getCommandContext(getRequest());
   assertCapability(context, "insights:read");
   if (!context.actorPersonId) throw new AuthorizationError("insights actor");
-  const selection=await resolveOperationsSelection(context,{siteId:data.siteId,programId:data.programId});
   if (!process.env.DATABASE_URL) return { insights: [] };
+  const selection=data.siteId||data.programId
+   ?await resolveOperationsSelection(context,{siteId:data.siteId,programId:data.programId})
+   :{siteIds:context.scope.siteIds??[],programIds:context.scope.programIds??[]};
   const server = await loadServer();
   const { db, s, ops } = server;
   const scope = await readScope("insights", context, server);
