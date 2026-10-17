@@ -265,13 +265,16 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
     [account]=await tx.insert(accessAccounts).values({emailNormalized:email})
      .returning({id:accessAccounts.id,disabled:accessAccounts.disabled});
    }
-   const [grant]=await tx.select({id:accountPersonGrants.id})
+   const [grant]=await tx.select({id:accountPersonGrants.id,active:accountPersonGrants.active})
     .from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,account!.id),
      eq(accountPersonGrants.personId,contact.id),eq(accountPersonGrants.role,"guardian"),
      eq(accountPersonGrants.organizationId,program.organizationId),
      program.siteId?eq(accountPersonGrants.siteId,program.siteId):isNull(accountPersonGrants.siteId)))
     .limit(1);
-   if(grant)return {created:false,email,accountId:account!.id};
+   if(grant){
+    if(!grant.active)throw new Error("A revoked guardian grant requires a separate reauthorization");
+    return {created:false,email,accountId:account!.id};
+   }
    const [newGrant]=await tx.insert(accountPersonGrants).values({
     accountId:account!.id,personId:contact.id,role:"guardian",
     organizationId:program.organizationId,siteId:program.siteId,isSynthetic:false,
