@@ -16,12 +16,12 @@
 ## Implemented slice — GF40: course change request and registrar decision
 
 - Removes `fixture: gf40` and `synthetic` as mandatory business-state gates. Existing fixture requests can follow the same rules if their canonical ownership and scope checks pass. New requests carry only operation, student, academic-year and enrollment identifiers plus a non-authorizing origin label.
-- Requires the signed-in student to be actively enrolled in the relevant program and year when requesting the change. Validates the section belongs to the authorized site/program and rejects duplicate pending changes.
+- Requires the signed-in student to be actively enrolled in the relevant program and year when requesting the change. Validates the section belongs to the authorized site/program and serializes same-student/same-section requests with a transaction-level advisory lock to reject concurrent duplicate pending changes.
 - Locks the registrar decision Action, checks the registrar capability, program/site/organization scope, the Action's actual student owner, and the academic year, school and program on approval. No request metadata may be treated as authority by itself.
 - Rechecks deadline and active program enrollment at approval. Approved adds flow through the existing transactional `activateSectionEnrollment`, which enforces capacity, finalized-grade prerequisites, term credits and scheduled-section conflicts and assigns published assessments.
 - Records request/decision audit entries and domain events in the same transactions as writes. Existing student/guardian decision notices and add/drop/withdrawal enrollment events remain.
 - Removes invented `synthetic:true` metadata on withdrawal, preserves prior enrollment metadata, and makes the course UI reflect configured deadlines, prerequisites and known consent requirements.
-- **Fail closed:** when `guardianApprovalRequired` is configured for an add, registrar approval is rejected pending a real guardian-consent capture/verification path. A banner in the UI communicates this; do not override with a fixture flag.
+- **Fail closed:** when `guardianApprovalRequired` is configured for an add, the student request button is unavailable and server request/registrar approval are rejected pending real guardian-consent capture/verification. The UI makes this limitation explicit; do not override with a fixture flag.
 
 ## Known remaining gaps / not release-ready
 
