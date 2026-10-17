@@ -1,6 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
 import {eq} from "drizzle-orm";
-import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {parseStudentDisplayPreferences,studentDisplayPreferences} from "@/domain/student-display-preferences";
 import {recordAudit,requireActor} from "@/modules/identity/actors.server";
 export const getSyntheticStudentPreferences=createServerFn({method:"GET"}).handler(async()=>{
@@ -13,7 +12,6 @@ export const getSyntheticStudentPreferences=createServerFn({method:"GET"}).handl
 export const saveSyntheticStudentPreferences=createServerFn({method:"POST"})
  .validator((input:unknown)=>studentDisplayPreferences.parse(input))
  .handler(async({data})=>{
-  assertSyntheticMutation("student");
   const actor=await requireActor(["student"]);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
