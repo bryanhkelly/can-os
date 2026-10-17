@@ -20,6 +20,7 @@ export const EventTypes = {
   SchoolYearCreated: "SchoolYearCreated",
   SchoolYearActivated: "SchoolYearActivated",
   AcademicCalendarChanged: "AcademicCalendarChanged",
+  ScheduleTemplateChanged: "ScheduleTemplateChanged",
   ProgramLaunchStarted: "ProgramLaunchStarted",
   CalendarEventCreated: "CalendarEventCreated",
   ProgramActivated: "ProgramActivated",
