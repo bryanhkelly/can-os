@@ -18,15 +18,26 @@
 - Every lane leads to the existing authorized write workspace. The view also invokes the existing `activateLaunch` command when a launch journey is ready, leaving full activation validation and audit/event writes to the canonical service. No parallel workflow state machine or synthetic-data switch was introduced.
 - Linked from the existing program launch wizard without touching Phase 1 shell, navigation, Action, admission or attendance command functions.
 
+## Implemented — increment 2: GF22 → GF2 lifecycle and guardian activation
+
+- Canonical admissions offer issuance/response/activation keeps **verified registrar/guardian grants, guardian-to-student relationship checks, the site/program/year seat-pool lock, journey readiness, idempotency, notifications, domain events and audit**. The existing fixture-only write opt-in remains intact; authentic records are already eligible under the same domain rules.
+- Issuance requires a school year at the program's host site (shared site year or explicit program year). Site-less virtual programs may use an explicitly program-scoped year; no unrelated site-wide year can be borrowed.
+- Input validators on existing offer server functions now require UUIDs and a typed decision. Existing Phase 1 callers retain the legacy export names; these are compatibility aliases for the same authorized lifecycle.
+- Reconciliation of elapsed issued offers is now a registrar-authorized action in Connected Workflows. It processes only elapsed offers, locks each relevant pool, and writes `AdmissionOfferExpired` plus audit in the transaction. Issued offers whose expiration has elapsed no longer count as actionable.
+- A real registrar intake inquiry now marks its StudentProfile as authentic, rather than contradicting the authentic Person/Application provenance. Newly provisioned guardian grants likewise no longer identify as synthetic.
+- Guardian login provisioning now requires the **existing independently verified guardian/student relationship** with enrollment permission. The invitation path independently checks the verification and a role grant for the correct organization and compatible site.
+- Admissions intake presents verification → account provisioning → secure invitation in that order, and disables steps until the prior verified condition exists. A staff-entered email is never taken as proof of guardianship.
+- All changes use the existing schema and audited domain commands. Restricted enrollment documents still require their separate R2 controls; this work does not bypass upload review or create an alternative identity path.
+
 ## Scope limitations and follow-ups
 
 - This is an **integration slice**, not Phase 2 completion. Counts are read-time projections, not persisted workflow statuses.
 - GF3 still requires section readiness and configured academic calendars; an active year and sections are not a proof of launch readiness.
-- GF2 offer issuance, document verification and seat-pool enrollment activation remain separate transactional services. Follow-up: enforce a single cross-role path for household signature → activation → section placement. The legacy no-seat-pool path intentionally remains blocked when a seat pool is configured.
+- GF2 offer issuance, document verification and seat-pool enrollment activation remain separate transactional services. Follow-up: enforce a single cross-role path for household signature → activation → section placement. The legacy no-seat-pool path intentionally remains blocked when a seat pool is configured. Expiration reconciliation does not perform enrollment activation or document verification.
 - GF1: verify deadline handling, support/escalation resolution and cross-role notifications, including grade posting and report cards.
 - GF4: attendance metrics here cover **recorded occurrences in the last rolling 30 days**, not unmarked expected days. Follow-up: schedule-derived expected-day denominator and remaining guardian/staff attendance projections, which still compute some views independently.
 - Pending guardian excuses count all submitted records, including old records outside the 30-day attendance window.
-- Route-by-route and cross-persona acceptance remains pending; CI, typecheck, unit, integration, database and browser tests are **deferred by user instruction**, not passing or waived. Do not certify authentic-data readiness from this PR.
+- Route-by-route and cross-persona acceptance remains pending; CI, typecheck, unit, integration, database and browser tests are **deferred by user instruction**, not passing or waived. Existing admission-offer unit fixture mocks assume old synthetic-only messages and incomplete site fixtures; revisit them when tests are reauthorized. Do not certify authentic-data readiness from this PR.
 
 ## Next code slices
 
