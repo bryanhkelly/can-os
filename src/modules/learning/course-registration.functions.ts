@@ -127,7 +127,7 @@ export const decideCourseChange = createServerFn({method:"POST"})
       const sectionId=request.subjectId;
       if(!studentProfileId||!sectionId||!["add","drop","withdraw"].includes(String(operation)))throw new Error("Invalid request");
       if(data.approve){
-        const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata}).from(s.sections).where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,siteId),eq(s.sections.programId,programId),eq(s.sections.active,true))).limit(1).for("update");
+        const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata,termId:s.sections.termId,title:s.sections.title}).from(s.sections).where(and(eq(s.sections.id,sectionId),eq(s.sections.siteId,siteId),eq(s.sections.programId,programId),eq(s.sections.active,true))).limit(1).for("update");
         if(!section)throw new Error("Section unavailable");
         const policyAtApproval=registrationPolicy(section.metadata);
         const today=new Date().toISOString().slice(0,10);
@@ -138,20 +138,62 @@ export const decideCourseChange = createServerFn({method:"POST"})
           const policy=registrationPolicy(section.metadata);
           const roster=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active")));
           if(roster.length>=policy.capacity)throw new Error("Class is full");
-          const current=await tx.select({code:s.sections.code,metadata:s.sections.metadata,status:s.enrollments.status})
+          const current=await tx.select({code:s.sections.code,metadata:s.sections.metadata,status:s.enrollments.status,termId:s.sections.termId})
             .from(s.enrollments).innerJoin(s.sections,eq(s.enrollments.sectionId,s.sections.id))
             .where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active")));
-          if(policy.prerequisites.length)throw new Error("Prerequisite completion cannot yet be verified automatically; registrar verification required");
+          // Finalized historical grades, not user-asserted checkboxes, establish prerequisites.
+          if(policy.prerequisites.length){
+            const prior=await tx.select({code:s.sections.code,courseCode:s.courseTemplates.code,
+              letterGrade:s.sectionGrades.letterGrade})
+              .from(s.sectionGrades)
+              .innerJoin(s.sections,eq(s.sections.id,s.sectionGrades.sectionId))
+              .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
+              .innerJoin(s.courseTemplates,eq(s.courseTemplates.id,s.courseTemplateVersions.courseTemplateId))
+              .where(and(eq(s.sectionGrades.studentProfileId,studentProfileId),
+                eq(s.sectionGrades.status,"finalized")));
+            const completed=new Set(prior.filter(g=>["A","B","C","D","P","Pass"].includes(g.letterGrade??""))
+              .flatMap(g=>[g.code,g.courseCode]));
+            const missing=policy.prerequisites.filter(code=>!completed.has(code));
+            if(missing.length)throw new Error("Prerequisites not met: "+missing.join(", "));
+          }
+          const maxCredits=typeof section.metadata.maxCreditsPerTerm==="number"
+            ? section.metadata.maxCreditsPerTerm : 7;
+          const proposedCredits=typeof section.metadata.credits==="number"?section.metadata.credits:1;
+          const currentCredits=current.filter(e=>e.termId===section.termId)
+            .reduce((sum,e)=>sum+(typeof e.metadata.credits==="number"?e.metadata.credits:1),0);
+          if(currentCredits+proposedCredits>maxCredits)throw new Error(
+            "Term credit limit exceeded: "+(currentCredits+proposedCredits)+" / "+maxCredits);
           if(policy.meetingKey && current.some(x=>x.status==="active"&&registrationPolicy(x.metadata).meetingKey===policy.meetingKey))throw new Error("Schedule conflict");
           const existing=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active")));
           if(existing.length)throw new Error("Already enrolled");
-          await tx.insert(s.enrollments).values({studentProfileId,kind:"section",status:"active",organizationId,programId,schoolYearId,sectionId,startedAt:new Date(),metadata:{synthetic:true,source:"gf40"}});
+          const [placement]=await tx.insert(s.enrollments).values({studentProfileId,kind:"section",status:"active",
+            organizationId,programId,schoolYearId,sectionId,startedAt:new Date(),
+            metadata:{synthetic:true,source:"gf40"}}).returning({id:s.enrollments.id});
+          const published=await tx.select({id:s.assessments.id}).from(s.assessments)
+            .where(and(eq(s.assessments.sectionId,sectionId),eq(s.assessments.status,"published")));
+          if(published.length)await tx.insert(s.submissions).values(published.map(item=>({
+            assessmentId:item.id,studentProfileId,status:"assigned" as const,timeliness:"on_time" as const
+          }))).onConflictDoNothing();
+          await tx.insert(s.domainEvents).values({eventType:"SectionEnrollmentActivated",
+            aggregateType:"enrollment",aggregateId:placement!.id,actorPersonId:actor.actorPersonId,
+            payload:{studentProfileId,sectionId,programId,schoolYearId}});
+          await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,
+            action:"course_registration.section.activate",resourceType:"enrollment",
+            resourceId:placement!.id,scope:{siteId,programId},
+            after:{studentProfileId,sectionId,status:"active"}});
         } else {
           const [membership]=await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentProfileId),eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.status,"active"))).limit(1);
           if(!membership)throw new Error("Enrollment no longer active");
           await tx.update(s.enrollments).set({status:operation==="drop"?"cancelled":"withdrawn",endedAt:new Date(),updatedAt:new Date(),
             metadata:{...membership.metadata,synthetic:true,withdrawalNotation:operation==="withdraw"?"W":null,changeRequestId:request.id}
           }).where(eq(s.enrollments.id,membership.id));
+          await tx.insert(s.domainEvents).values({eventType:operation==="drop"?"SectionEnrollmentDropped":"SectionEnrollmentWithdrawn",
+            aggregateType:"enrollment",aggregateId:membership.id,actorPersonId:actor.actorPersonId,
+            payload:{studentProfileId,sectionId,programId,schoolYearId,transcriptNotation:operation==="withdraw"?"W":null}});
+          await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,
+            action:"course_registration.section."+operation,resourceType:"enrollment",
+            resourceId:membership.id,scope:{siteId,programId},
+            before:{status:membership.status},after:{status:operation==="drop"?"cancelled":"withdrawn"}});
         }
       }
       await tx.update(s.actions).set({status:data.approve?"resolved":"cancelled",resolvedAt:new Date(),
