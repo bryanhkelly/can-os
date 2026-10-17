@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { activateLaunch } from "@/modules/programs/launch.functions";
+import { reconcileExpiredAdmissionOffers } from "@/modules/enrollment/admissions-offer-demo.functions";
 import { getWorkflowIntegration } from "@/modules/operations/workflow-integration.functions";
 
 export const Route = createFileRoute("/operations/workflows")({
@@ -32,6 +33,17 @@ function ConnectedWorkflowsPage() {
       setNotice("Program activated after canonical readiness validation.");
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : "Program activation could not be completed.");
+    } finally { setBusy(null); }
+  }
+  async function reconcile(programId: string) {
+    setBusy("offers:" + programId);
+    setNotice("");
+    try {
+      const result = await reconcileExpiredAdmissionOffers({ data: { programId } });
+      await router.invalidate();
+      setNotice(result.expired + " elapsed offer(s) reconciled.");
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : "Could not reconcile elapsed offers.");
     } finally { setBusy(null); }
   }
   return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
@@ -102,6 +114,13 @@ function ConnectedWorkflowsPage() {
                 {program.enrollment.activeProgramEnrollments} active program enrollments across school years.
                 Activation remains governed by the enrollment/seat-pool transaction.
               </p>
+              {program.enrollment.expiredOffersAwaitingReconciliation > 0 && <div className="mt-3 flex flex-wrap items-center gap-3">
+                <span className="text-xs text-muted-foreground">{program.enrollment.expiredOffersAwaitingReconciliation} elapsed offer(s) awaiting reconciliation.</span>
+                <button type="button" className="rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                  disabled={busy !== null} onClick={() => void reconcile(program.id)}>
+                  {busy === "offers:" + program.id ? "Reconciling…" : "Expire elapsed offers"}
+                </button>
+              </div>}
             </section>
             <section className="rounded-xl border p-4">
               <div className="flex items-center justify-between gap-3">
