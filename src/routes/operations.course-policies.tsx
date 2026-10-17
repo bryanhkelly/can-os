@@ -67,6 +67,12 @@ function CoursePolicyCard({row,save,disabled}:{
      className="mt-1 block w-full rounded border bg-background p-2"/>
    </label>
   </div>
+  <label className="mt-4 flex items-start gap-3 rounded-lg border p-3 text-sm">
+    <input type="checkbox" checked={value.guardianApprovalRequired}
+      onChange={e=>update("guardianApprovalRequired",e.target.checked)} className="mt-1"/>
+    <span>Require verified guardian approval before a registrar may approve this class addition.
+      Student requests remain pending until an authorized guardian records their decision.</span>
+  </label>
   <button type="button" disabled={disabled}
    onClick={()=>save({...value,prerequisites:prerequisites.split(",").map(s=>s.trim()).filter(Boolean)})}
    className="mt-4 rounded bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
