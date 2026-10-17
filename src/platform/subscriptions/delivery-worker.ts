@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, lte, or, asc } from "drizzle-orm";
 import { db } from "@/db/client";
-import { domainEvents, subscriptionDeliveries, subscriptions } from "@/db/schema";
+import { domainEvents, subscriptionDeliveries, subscriptions, conversationMessages } from "@/db/schema";
 import { emailNotificationRecipients, sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { getSubscriptionPolicy } from "./policy";
 import { getNotificationPreferences, nextAllowedDelivery, sendOptedInSms } from "./preferences";
@@ -71,6 +71,7 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
         return {
           channel: row.channel, attempt: row.attempts + 1,
           personId: subscription.subscriberPersonId,
+          sourceConversationId: subscription.sourceConversationId,
           content: policy!.content(context!, row.kind === "initial" ? "initial" : "reminder"),
         };
       });
@@ -107,17 +108,30 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
         }
       }
       const attempt = delivery.attempt;
-      await db.update(subscriptionDeliveries).set({
-        status: ok ? "delivered" : "failed",
-        attempts: attempt,
-        deliveredAt: ok ? new Date() : null,
-        lastError: ok ? null : error,
-        nextAttemptAt: ok || attempt >= MAX_ATTEMPTS || ["channel_not_supported", "sms_consent_required"].includes(error)
-          ? null : new Date(Date.now() + RETRY_MS(attempt)),
-        leaseUntil: null,
-        updatedAt: new Date(),
-      }).where(and(eq(subscriptionDeliveries.id, id), eq(subscriptionDeliveries.status, "processing")));
-      if (ok) accepted++;
+      await db.transaction(async tx => {
+        const rows = await tx.update(subscriptionDeliveries).set({
+          status: ok ? "delivered" : "failed",
+          attempts: attempt,
+          deliveredAt: ok ? new Date() : null,
+          lastError: ok ? null : error,
+          nextAttemptAt: ok || attempt >= MAX_ATTEMPTS || ["channel_not_supported", "sms_consent_required"].includes(error)
+            ? null : new Date(Date.now() + RETRY_MS(attempt)),
+          leaseUntil: null,
+          updatedAt: new Date(),
+        }).where(and(eq(subscriptionDeliveries.id, id), eq(subscriptionDeliveries.status, "processing")))
+          .returning({ id: subscriptionDeliveries.id });
+        if (rows.length && ok && delivery.sourceConversationId) {
+          await tx.insert(conversationMessages).values({
+            conversationId: delivery.sourceConversationId,
+            role: "agent",
+            body: delivery.content.body ?? delivery.content.title,
+            evidenceRefs: delivery.content.resourceType && delivery.content.resourceId
+              ? [{ type: delivery.content.resourceType, id: delivery.content.resourceId, label: delivery.content.title }]
+              : [],
+          });
+        }
+        if (rows.length && ok) accepted++;
+      });
     } catch (error) {
       const [row] = await db.select({ attempts: subscriptionDeliveries.attempts }).from(subscriptionDeliveries)
         .where(eq(subscriptionDeliveries.id, id)).limit(1);
