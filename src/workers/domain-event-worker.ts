@@ -38,6 +38,26 @@ registerDomainEventHandler(EventTypes.CommunicationMessageSent, handleAcademicPa
 registerDomainEventHandler(EventTypes.ActionCreated, handleAcademicPassThroughEvent);
 registerDomainEventHandler(EventTypes.ActionResolved, handleAcademicPassThroughEvent);
 
+// Phase 2 lifecycle facts already have their own transactional audit and
+// recipient notifications. Pass through to shared subscriptions and complete
+// the outbox instead of leaving these canonical events indefinitely pending.
+for (const eventType of [
+  EventTypes.ApplicationStarted,
+  EventTypes.ApplicationAccepted,
+  EventTypes.AdmissionOfferIssued,
+  EventTypes.AdmissionOfferAccepted,
+  EventTypes.AdmissionOfferDeclined,
+  EventTypes.AdmissionOfferExpired,
+  EventTypes.EnrollmentActivated,
+  EventTypes.ProgramLaunchStarted,
+  EventTypes.ProgramActivated,
+  EventTypes.SchoolYearCreated,
+  EventTypes.SchoolYearActivated,
+  EventTypes.AcademicCalendarChanged,
+] as const) {
+  registerDomainEventHandler(eventType, handleAcademicPassThroughEvent);
+}
+
 /** Bounded retry: after this many failed attempts an event escalates to an ops Action. */
 const MAX_ATTEMPTS = 5;
 /** Lease on a claimed event. A crashed worker's claims become reclaimable after this. */
