@@ -381,7 +381,7 @@ export async function destroyGf1Fixture(
     ...[fixture.studentGrantId, fixture.teacherGrantId, fixture.guardianGrantId, fixture.specialistGrantId].map(
       (id) => one(`delete from account_person_grants where id = $1`, id),
     ),
-    ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId].map(
+    ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId, fixture.specialistAccountId].map(
       (id) => one(`delete from access_accounts where id = $1`, id),
     ),
     // Academic graph, children before parents.
