@@ -27,3 +27,20 @@ Release of instructional capacity and manual teacher assignment currently share 
 ## Release verification
 
 Run `npm run typecheck` and `npm run build`, then validate end-to-end against a nonproduction database and school persona. The implementation is committed but not certified by a completed build in this session.
+
+## 2026-10-17 operational improvements
+
+- Seat allocations must not exceed the same section demand across instructors. Section transfer and waitlist promotion share a capacity guard requiring open demand and committed seats.
+- Section teaching assignments now track `assignment_source` (`manual` or `capacity`). Capacity release only removes capacity-owned assignments and preserves manual appointments. Apply `0018_teacher_assignment_provenance.sql` before using the updated workflow.
+- A committed instructor can be replaced with another compatible offering as a single staffing transaction, with role verification, reason, notifications, audit and a domain event.
+- Waitlist entry verifies program/year membership; registrars can issue three-day offers, promote students or let overdue offers return to waiting automatically through scheduled maintenance.
+- The operations landing page now includes real staffing, demand and waitlist exceptions, separate from synthetic fixtures. Ask CAN can read these exceptions if the actor holds `program.launch.start` in their scoped organizations.
+- Section closure cancels unresolved waitlist items; lifecycle snapshots enforce site and section scope.
+
+## Important incomplete areas
+
+- A proper production build/typecheck and migration-generation verification have not been run.
+- Academic qualification/compliance beyond verified teacher role is not yet enforced by the replacement orchestrator.
+- School-timezone-aware schedule editing, cross-course conflict detection, automatic family offer acceptance/decline, and comprehensive enrollment prereq/credit policy reconciliation are not yet complete.
+- The existing migration-history snapshots predate the latest schema migration; reconcile generated Drizzle snapshots and validate against a disposable Neon branch before deploying.
+- Do not enable the feature for real student data until privacy, authorization and end-to-end operation are verified.
