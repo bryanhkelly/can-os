@@ -451,7 +451,7 @@ export async function recordAttendanceRevision(
   if(repeat)return repeat.id;
   // Even legacy callers must pass the same calendar/section entitlement
   // check for site-day events: no alternate server function may bypass it.
-  const inferredSiteDay=/^(\\d{4}-\\d{2}-\\d{2}):site-day$/.exec(input.occurrenceKey)?.[1];
+  const inferredSiteDay=/^(\d{4}-\d{2}-\d{2}):site-day$/.exec(input.occurrenceKey)?.[1];
   const onsiteDate=input.requireExpectedOnsiteDate??inferredSiteDay;
   if(onsiteDate){
    const {assertExpectedOnsiteMarkInTransaction}=await import("./attendance-transaction-guards");
