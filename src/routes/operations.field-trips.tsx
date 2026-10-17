@@ -66,7 +66,10 @@ function FieldTripOperationsView({ data }: { data: Data }) {
   return (
     <WorkspaceShell eyebrow="CAN OS · Academic operations" title="Field trips"
       subtitle="Plan school trips, publish the school's permission language, invite actively enrolled students, and track signed permissions."
-      actions={<Link to="/operations" className="rounded-lg border px-3 py-2 text-sm">Operations</Link>}>
+      actions={<div className="flex flex-wrap gap-2">
+        <Link to="/operations/course-requests" className="rounded-lg border px-3 py-2 text-sm">Course approvals</Link>
+        <Link to="/operations" className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
+      </div>}>
       {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
       {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
       <section className="mt-7 rounded-xl border bg-card p-5">
