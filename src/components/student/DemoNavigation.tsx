@@ -68,12 +68,8 @@ export function DemoNavigation(){
  useEffect(()=>{
   // Once signed in, the verified server grant—not URL or localStorage—owns navigation.
   if(signedIn)return;
-  const params=new URLSearchParams(window.location.search);
-  const requested=params.get("persona");
-  const stored=window.localStorage.getItem(demoPersonaStorageKey);
-  const next=getDemoPersona(requested ?? stored);
-  setRole(next);
-  window.localStorage.setItem(demoPersonaStorageKey,next);
+  // The visible workspace is never selected from URL or localStorage.
+  // Server-issued grants are the only source of workspace navigation.
  },[location.pathname,signedIn]);
  useEffect(()=>{let canceled=false;fetch("/access/session",{credentials:"same-origin"})
   .then(async response=>response.ok?response.json():null)
@@ -97,25 +93,23 @@ export function DemoNavigation(){
     .catch(()=>window.alert("Unable to switch profile"));
    return;
   }
-  window.localStorage.setItem(demoPersonaStorageKey,next);
-  setRole(next);
-  // Go to a valid landing screen instead of retaining the previous persona's route.
-  window.location.assign(demoPersonaHome[next]+"?persona="+next);
+  // Signed-out visitors cannot select an operational persona.
+  window.location.assign("/access");
  };
  return <nav aria-label="CAN OS primary navigation" className="border-b border-border bg-card px-5 py-3">
   <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3">
    <Link to="/" className="font-serif text-xl font-semibold">CAN OS</Link>
-   <div className="flex flex-1 flex-wrap gap-x-4 gap-y-2">{visibleDemoLinks(role).map(x=><Link key={x.to} to={x.to} className="text-xs font-semibold text-muted-foreground hover:text-foreground">{x.label}</Link>)}</div>
+   <div className="flex flex-1 flex-wrap gap-x-4 gap-y-2">{(signedIn?visibleDemoLinks(role):[]).map(x=><Link key={x.to} to={x.to} className="text-xs font-semibold text-muted-foreground hover:text-foreground">{x.label}</Link>)}</div>
    <button type="button" aria-label="Search workspace" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))} className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
     <Search className="size-3.5" aria-hidden/> Search <kbd className="rounded border border-border px-1 text-[10px]">Ctrl+K</kbd>
    </button>
-   <label className="flex items-center gap-2 text-xs text-muted-foreground">{signedIn?"Active membership":"Demo persona"}
+   {signedIn&&<label className="flex items-center gap-2 text-xs text-muted-foreground">{signedIn?"Active membership":"Demo persona"}
     <select aria-label="Demo persona" value={role} onChange={event=>changePersona(getDemoPersona(event.target.value))} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
-     {(memberships.length?demoRoles.filter(r=>memberships.some(g=>g.role===r)):demoRoles).map(r=><option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>)}
+     {demoRoles.filter(r=>memberships.some(g=>g.role===r)).map(r=><option key={r} value={r}>{r.charAt(0).toUpperCase()+r.slice(1)}</option>)}
     </select>
-   </label>
+   </label>}
    {signedIn?<button type="button" onClick={()=>void logout()} className="text-xs font-semibold text-muted-foreground hover:text-foreground">Sign out</button>:<Link to="/access" className="text-xs font-semibold text-muted-foreground hover:text-foreground">Sign in</Link>}
   </div>
-  <p className="mx-auto mt-1 max-w-6xl text-[10px] text-muted-foreground">Shared synthetic demonstration · Persona switching changes the visible workflow, not server authorization. Do not enter real student data.</p>
+  <p className="mx-auto mt-1 max-w-6xl text-[10px] text-muted-foreground">Workspaces and navigation follow verified account permissions.</p>
  </nav>;
 }
