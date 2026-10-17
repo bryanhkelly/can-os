@@ -95,8 +95,9 @@ export const listFieldTripOperations = createServerFn({ method: "GET" }).handler
       returnsAt: trip.returnsAt.toISOString(), deadline: trip.permissionDueAt?.toISOString() ?? null,
       feeAmountCents: trip.feeAmountCents ?? 0,
       hasPublishedPermission: !!publishedTripPermission(trip.metadata),
-      students: candidates.filter(student => student.siteId === trip.siteId &&
+      students: [...new Map(candidates.filter(student => student.siteId === trip.siteId &&
         (!trip.programId || trip.programId === student.programId))
+        .map(student => [student.studentProfileId, student] as const)).values()]
         .map(student => ({
           id: student.studentProfileId,
           name: student.firstName + " " + student.lastName,
@@ -179,7 +180,10 @@ export const approveCanonicalFieldTrip = createServerFn({ method: "POST" })
         .where(eq(s.fieldTrips.id, data.tripId)).for("update").limit(1);
       if (!trip) throw new Error("Field trip not found");
       assertTripScope(actor, trip);
-      if (trip.status === "approved") return { approved: true };
+      if (trip.status === "approved") {
+        if (!trip.calendarEventId) throw new Error("Approved trip is missing its canonical calendar event.");
+        return { approved: true };
+      }
       if (trip.status !== "proposed" || trip.calendarEventId)
         throw new Error("Trip is not eligible for approval.");
       if (!publishedTripPermission(trip.metadata))
@@ -226,12 +230,13 @@ export const inviteCanonicalFieldTripStudent = createServerFn({ method: "POST" }
         siteId: s.fieldTrips.siteId, programId: s.fieldTrips.programId,
         organizationId: s.sites.organizationId, permissionDueAt: s.fieldTrips.permissionDueAt,
         departsAt: s.fieldTrips.departsAt, metadata: s.fieldTrips.metadata,
+        calendarEventId: s.fieldTrips.calendarEventId,
         feeAmountCents: s.fieldTrips.feeAmountCents,
       }).from(s.fieldTrips).innerJoin(s.sites, eq(s.sites.id, s.fieldTrips.siteId))
         .where(eq(s.fieldTrips.id, data.tripId)).for("update").limit(1);
       if (!trip) throw new Error("Field trip not found");
       assertTripScope(actor, trip);
-      if (trip.status !== "approved" || trip.departsAt <= new Date() ||
+      if (trip.status !== "approved" || !trip.calendarEventId || trip.departsAt <= new Date() ||
         (trip.permissionDueAt && trip.permissionDueAt <= new Date()) ||
         !publishedTripPermission(trip.metadata))
         throw new Error("Trip is not open to invitations.");
