@@ -263,6 +263,7 @@ export async function acceptApplication(
       .select()
       .from(applications)
       .where(eq(applications.id, applicationId))
+      .for("update")
       .limit(1);
 
     if (!current) throw new Error("Application not found");
