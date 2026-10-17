@@ -4,6 +4,7 @@ import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { subscriptionDeliveries, subscriptions } from "@/db/schema";
+import { beginSmsVerification, confirmSmsVerification, revokeSmsConsent, updateQuietHours, getNotificationPreferences } from "@/platform/subscriptions/preferences";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import {
@@ -145,7 +146,7 @@ export const getMyWatchDeliveries = createServerFn({ method: "GET" })
 export const updateWatchOptions = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
     subscriptionId: z.string().uuid(),
-    channel: z.enum(["in_app", "email"]),
+    channel: z.enum(["in_app", "email", "sms"]),
     remindAfterHours: z.number().int().min(1).max(720).nullable(),
     repeatEveryHours: z.number().int().min(1).max(720).nullable(),
     maxReminders: z.number().int().min(1).max(30),
@@ -167,3 +168,53 @@ export const updateWatchOptions = createServerFn({ method: "POST" })
     if (!result.length) throw new AuthorizationError("active watch");
     return { ok: true };
   });
+
+export const getMyNotificationPreferences = createServerFn({ method: "GET" }).handler(async () => {
+  const context = await actor();
+  const prefs = await getNotificationPreferences(context.actorPersonId);
+  return {
+    timezone: prefs?.timezone ?? "UTC",
+    quietStart: prefs?.quietStart ?? null,
+    quietEnd: prefs?.quietEnd ?? null,
+    smsOptedIn: prefs?.smsOptedIn ?? false,
+    smsVerifiedPhone: prefs?.smsVerifiedPhone ?? null,
+  };
+});
+
+export const saveMyQuietHours = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    timezone: z.string().min(1).max(80),
+    quietStart: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/).nullable(),
+    quietEnd: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/).nullable(),
+  }).parse(value))
+  .handler(async ({ data }) => {
+    const context = await actor();
+    await updateQuietHours(context.actorPersonId, data.timezone, data.quietStart, data.quietEnd);
+    return { ok: true };
+  });
+
+export const requestMySmsVerification = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({ phone: z.string().regex(/^\\+[1-9]\\d{7,14}$/) }).parse(value))
+  .handler(async ({ data }) => {
+    const context = await actor();
+    await beginSmsVerification(context.actorPersonId, data.phone);
+    return { ok: true };
+  });
+
+export const verifyMySmsConsent = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    phone: z.string().regex(/^\\+[1-9]\\d{7,14}$/),
+    code: z.string().regex(/^\\d{4,10}$/),
+    consent: z.literal(true),
+  }).parse(value))
+  .handler(async ({ data }) => {
+    const context = await actor();
+    await confirmSmsVerification(context.actorPersonId, data.phone, data.code);
+    return { ok: true };
+  });
+
+export const disableMySms = createServerFn({ method: "POST" }).handler(async () => {
+  const context = await actor();
+  await revokeSmsConsent(context.actorPersonId);
+  return { ok: true };
+});
