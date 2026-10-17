@@ -19,6 +19,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const programs=data.programs;
  const [programId,setProgramId]=useState(programs[0]?.id??"");
  const [requestId,setRequestId]=useState(()=>crypto.randomUUID());
+ const [existingApplicationId,setExistingApplicationId]=useState("");
  const [studentFirstName,setStudentFirstName]=useState(""),[studentLastName,setStudentLastName]=useState("");
  const [guardianFirstName,setGuardianFirstName]=useState(""),[guardianLastName,setGuardianLastName]=useState("");
  const [guardianEmail,setGuardianEmail]=useState(""),[gradeLevel,setGradeLevel]=useState("9"),[source,setSource]=useState("school_direct");
@@ -36,12 +37,23 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   <section className="mt-8 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">New inquiry</h2>
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void perform(
-    async()=>{await createAdmissionsInquiry({data:{requestId,programId,studentFirstName,studentLastName,
+    async()=>{await createAdmissionsInquiry({data:{requestId,programId,...(existingApplicationId?{existingApplicationId}:{}),studentFirstName,studentLastName,
      guardianFirstName,guardianLastName,guardianEmail,gradeLevel,source,notes}});
-     setRequestId(crypto.randomUUID());},"Inquiry created.");}}>
-    <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required value={programId} onChange={e=>setProgramId(e.target.value)}>
+     setRequestId(crypto.randomUUID());setExistingApplicationId("");},"Inquiry created.");}}>
+    <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");}}>
      <option value="">Choose program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
     </select></label>
+    <label className="text-sm sm:col-span-2">Existing household (optional, for siblings)
+      <select className="mt-1 block w-full rounded border bg-background p-2"
+        value={existingApplicationId} onChange={e=>setExistingApplicationId(e.target.value)}>
+        <option value="">Create new household</option>
+        {data.records.filter(r=>r.programId===programId).map(r=>
+          <option value={r.id} key={r.id}>{r.studentFirst} {r.studentLast} — same guardian</option>)}
+      </select>
+      <span className="mt-1 block text-xs text-muted-foreground">
+        Reuses the existing household and guardian only when the contact email matches.
+      </span>
+    </label>
     <label className="text-sm">Student first name<input required value={studentFirstName} onChange={e=>setStudentFirstName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
     <label className="text-sm">Student last name<input required value={studentLastName} onChange={e=>setStudentLastName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
     <label className="text-sm">Guardian first name<input required value={guardianFirstName} onChange={e=>setGuardianFirstName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
