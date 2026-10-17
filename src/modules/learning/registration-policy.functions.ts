@@ -1,9 +1,9 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
-import {and,asc,eq,inArray} from "drizzle-orm";
+import {and,asc,eq,inArray,sql} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
-import {sections,terms,programs,auditEvents,domainEvents} from "@/db/schema";
+import {sections,terms,programs,enrollments,auditEvents,domainEvents} from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 const uuid=z.string().uuid(),date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -74,6 +74,12 @@ export const updateCoursePolicy=createServerFn({method:"POST"})
     throw new Error("Registration deadlines must be ordered and inside the academic term");
    if(data.policy.credits>data.policy.maxCreditsPerTerm)
     throw new Error("Course credit exceeds the allowed term maximum");
+   const [roster]=await tx.select({count:sql<number>`count(*)::int`})
+    .from(enrollments).where(and(eq(enrollments.sectionId,section.id),
+     eq(enrollments.kind,"section"),eq(enrollments.status,"active")));
+   if((roster?.count??0)>data.policy.capacity)
+    throw new Error("Cannot set capacity below the existing active roster ("+
+      roster!.count+" students)");
    const before=section.metadata;
    const after={...before,credits:data.policy.credits,maxCreditsPerTerm:data.policy.maxCreditsPerTerm,
     registrationPolicy:{
