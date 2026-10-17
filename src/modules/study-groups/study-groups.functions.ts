@@ -335,32 +335,83 @@ export const scheduleStudyGroupSession=createServerFn({method:"POST"}).validator
  return session;
  });
 });
-export const reportStudyGroupPost=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1),postId:z.string().min(1),reason:z.string()}).parse).handler(async({data})=>{
- assertSyntheticMutation("student");const actor=await groupActor("student");const {db,s}=await context();
- if(data.reason.trim().length<5||data.reason.length>1000)throw new Error("Please provide a reason");
- return db.transaction(async tx=>{
- const [member]=await tx.select().from(s.studyGroupMemberships).where(and(eq(s.studyGroupMemberships.groupId,data.groupId),eq(s.studyGroupMemberships.personId,actor.actorPersonId!),eq(s.studyGroupMemberships.status,"approved"))).limit(1);
- const [post]=await tx.select().from(s.studyGroupPosts).where(and(eq(s.studyGroupPosts.groupId,data.groupId),eq(s.studyGroupPosts.id,data.postId),eq(s.studyGroupPosts.hidden,false))).for("update").limit(1);
- if(!member||!post)throw new Error("Cannot report this content");
- const [existing]=await tx.select({id:s.studyGroupReports.id}).from(s.studyGroupReports).where(and(eq(s.studyGroupReports.groupId,data.groupId),eq(s.studyGroupReports.postId,data.postId),eq(s.studyGroupReports.reporterPersonId,actor.actorPersonId!),eq(s.studyGroupReports.status,"open"))).limit(1);
- if(existing)return {ok:true,created:false};
- const [createdReport]=await tx.insert(s.studyGroupReports).values({groupId:data.groupId,postId:data.postId,reporterPersonId:actor.actorPersonId!,reason:data.reason.trim()}).returning({id:s.studyGroupReports.id});
- const [group]=await tx.select({facilitatorPersonId:s.studyGroups.facilitatorPersonId,title:s.studyGroups.title,siteId:s.studyGroups.siteId,metadata:s.studyGroups.metadata}).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active"))).limit(1);
- if(!group)throw new Error("Group unavailable");
- requireLegacyGroup(group.metadata);
- await tx.insert(s.actions).values({type:"study_group_moderation",status:"open",
-  priority:"high",title:"Review reported content: "+group.title,
-  description:"A student report requires a moderator decision.",
-  ownerPersonId:group.facilitatorPersonId,siteId:group.siteId,
-  subjectType:"study_group_report",subjectId:createdReport!.id,
-  dueAt:new Date(Date.now()+24*60*60*1000),
-  metadata:{synthetic:true,fixture:"gf26",groupId:data.groupId,postId:data.postId,reportId:createdReport!.id},
+/** Verified enrolled members can report visible group content for facilitator review. */
+export const reportStudyGroupPost=createServerFn({method:"POST"})
+ .validator((input:unknown)=>z.object({
+  groupId:z.string().uuid(),postId:z.string().uuid(),
+  reason:z.string().trim().min(5).max(1000)
+ }).parse(input))
+ .handler(async({data})=>{
+  const actor=await groupActor("student");
+  const {db,s}=await context();
+  return db.transaction(async tx=>{
+   const [group]=await tx.select({
+    id:s.studyGroups.id,siteId:s.studyGroups.siteId,
+    programId:s.studyGroups.programId,
+    title:s.studyGroups.title,facilitator:s.studyGroups.facilitatorPersonId
+   }).from(s.studyGroups).where(and(eq(s.studyGroups.id,data.groupId),
+    eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),
+    or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
+    .limit(1);
+   if(!group)throw new AuthorizationError("active study group scope");
+   await requireStudentGroupEnrollment(tx,s,actor,group);
+   const [member]=await tx.select({id:s.studyGroupMemberships.id})
+    .from(s.studyGroupMemberships).where(and(
+     eq(s.studyGroupMemberships.groupId,group.id),
+     eq(s.studyGroupMemberships.personId,actor.actorPersonId!),
+     eq(s.studyGroupMemberships.status,"approved"))).limit(1);
+   if(!member)throw new AuthorizationError("approved membership to report content");
+   const [post]=await tx.select({id:s.studyGroupPosts.id})
+    .from(s.studyGroupPosts).where(and(eq(s.studyGroupPosts.id,data.postId),
+     eq(s.studyGroupPosts.groupId,group.id),eq(s.studyGroupPosts.hidden,false)))
+    .for("update").limit(1);
+   if(!post)throw new Error("Post is not available");
+   const [prior]=await tx.select({id:s.studyGroupReports.id})
+    .from(s.studyGroupReports).where(and(eq(s.studyGroupReports.groupId,group.id),
+     eq(s.studyGroupReports.postId,post.id),
+     eq(s.studyGroupReports.reporterPersonId,actor.actorPersonId!),
+     eq(s.studyGroupReports.status,"open"))).limit(1);
+   if(prior)return {ok:true,created:false};
+   const [report]=await tx.insert(s.studyGroupReports).values({
+    groupId:group.id,postId:post.id,reporterPersonId:actor.actorPersonId!,
+    reason:data.reason
+   }).returning({id:s.studyGroupReports.id});
+   if(!report)throw new Error("Could not report post");
+   const [site]=await tx.select({organizationId:s.sites.organizationId})
+    .from(s.sites).where(eq(s.sites.id,group.siteId!)).limit(1);
+   if(!site)throw new Error("Study group site unavailable");
+   const [action]=await tx.insert(s.actions).values({
+    type:"study_group_moderation",status:"open",priority:"high",
+    title:"Review reported content: "+group.title,
+    description:"A student report requires a facilitator decision.",
+    ownerPersonId:group.facilitator,organizationId:site.organizationId,
+    siteId:group.siteId,programId:group.programId,
+    subjectType:"study_group_report",subjectId:report.id,
+    dueAt:new Date(Date.now()+24*60*60*1000),
+    metadata:{source:"study_group_report",groupId:group.id,postId:post.id}
+   }).returning({id:s.actions.id});
+   if(!action)throw new Error("Moderation Action could not be created");
+   await tx.insert(s.domainEvents).values({
+    eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,
+    actorPersonId:actor.actorPersonId!,
+    payload:{subjectType:"study_group_report",subjectId:report.id,groupId:group.id}
+   });
+   await tx.insert(s.notifications).values({
+    recipientPersonId:group.facilitator,type:"study_group_report_submitted",
+    status:"unread",title:"Study group content reported",
+    body:"A post in "+group.title+" requires moderation.",
+    resourceType:"study_group",resourceId:group.id
+   });
+   await tx.insert(s.auditEvents).values({
+    actorPersonId:actor.actorPersonId!,action:"study_group.report.submit",
+    resourceType:"study_group_report",resourceId:report.id,
+    scope:{siteId:group.siteId,programId:group.programId},
+    after:{groupId:group.id,postId:post.id,actionId:action.id},
+    context:{accountId:actor.accountId,sessionId:actor.sessionId}
+   });
+   return {ok:true,created:true};
+  });
  });
- await tx.insert(s.notifications).values({recipientPersonId:group.facilitatorPersonId,type:"study_group_report_submitted",status:"unread",title:"Study group content reported",body:"A post in "+group.title+" requires moderation.",resourceType:"study_group",resourceId:data.groupId});
- await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"study_group.report.submit",resourceType:"study_group_post",resourceId:data.postId,after:{groupId:data.groupId},context:{synthetic:true}});
- return {ok:true,created:true};
- });
-});
 
 export const listStudyGroupReviewQueue=createServerFn({method:"GET"}).handler(async()=>{const actor=await groupActor("teacher");
  const {db,s}=await context();
