@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   agentRuns,
@@ -11,6 +11,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { writeAudit } from "@/platform/mutation";
 import {
   createWatch,
+  createWeeklyDigest,
   getAgentTool,
   getStudentAcademicSummary,
   listWatches,
@@ -18,6 +19,7 @@ import {
   setWatchStatus,
   type AgentContext,
 } from "./tools";
+import { getSchoolOperationsCommandCenter } from "@/modules/operations/command-center-service";
 import { HELP_TEXT, planTurn, type AgentPlan } from "./planner";
 
 /**
@@ -81,7 +83,7 @@ function studentNotFoundMessage(query: string, visibleCount: number): string {
 }
 
 function studentAmbiguousMessage(matches: Array<{ displayName: string }>): string {
-  return `I found more than one match: ${matches.map((m) => m.displayName).join(", ")}. Which one did you mean?`;
+  return `I found more than one match: ${matches.map((m) => m.displayName).join(", ")}. Please reply with the full name of the student you mean.`;
 }
 
 export async function sendMessage(
@@ -124,7 +126,22 @@ export async function sendMessage(
       body,
     });
 
-    const plan: AgentPlan = planTurn(body);
+    let plan: AgentPlan = planTurn(body);
+    // Clarification may consist solely of a full name. Reuse only the
+    // immediately previous ambiguous plan in this same owned conversation.
+    if (input.conversationId && plan.intent === "ask" && plan.kind === "help") {
+      const [prior] = await tx.select({ plan: agentRuns.plan, result: agentRuns.result })
+        .from(agentRuns).where(eq(agentRuns.conversationId, conversationId))
+        .orderBy(desc(agentRuns.createdAt)).limit(1);
+      const previous = prior?.plan as AgentPlan | undefined;
+      if (prior?.result?.kind === "clarification" && previous &&
+          (previous.intent === "watch" ||
+           (previous.intent === "ask" && previous.kind === "student_summary"))) {
+        const visible = await resolveVisibleStudents(context);
+        const matching = visible.filter(s => s.displayName.toLocaleLowerCase() === body.trim().toLocaleLowerCase());
+        if (matching.length === 1) plan = { ...previous, studentQuery: matching[0]!.displayName };
+      }
+    }
 
     const [run] = await tx
       .insert(agentRuns)
@@ -157,6 +174,15 @@ export async function sendMessage(
         agentRunId: run!.id,
       });
       await finish("completed", { kind: "help" });
+    } else if (plan.intent === "ask" && plan.kind === "operations_overview") {
+      const overview = await getSchoolOperationsCommandCenter(context);
+      const lines = [
+        `There are ${overview.summary.sections} active sections, ${overview.summary.unstaffed} without instructors, ${overview.summary.underCapacity} with instructional capacity gaps, and ${overview.summary.waitlisted} waitlisted students.`,
+        ...overview.issues.slice(0,10).map(issue=>`- ${issue.title}: ${issue.description}`),
+      ];
+      reply = await addMessage(tx,{conversationId,role:"agent",body:lines.join("\n"),
+        agentRunId:run!.id});
+      await finish("completed",{kind:"operations_overview"});
     } else if (plan.intent === "ask" && plan.kind === "student_summary") {
       const matches = await resolveVisibleStudents(context, plan.studentQuery);
       if (matches.length !== 1) {
@@ -165,7 +191,7 @@ export async function sendMessage(
           role: "agent",
           body:
             matches.length === 0
-              ? studentNotFoundMessage(plan.studentQuery, 0)
+              ? studentNotFoundMessage(plan.studentQuery, (await resolveVisibleStudents(context)).length)
               : studentAmbiguousMessage(matches),
           agentRunId: run!.id,
         });
@@ -225,6 +251,36 @@ export async function sendMessage(
           agentRunId: run!.id,
         });
         await finish("awaiting_approval", { tool: createWatch.name, args });
+      }
+    } else if (plan.intent === "manage" && plan.action === "create_digest") {
+      const matches = await resolveVisibleStudents(context, plan.studentQuery);
+      if (matches.length !== 1) {
+        reply = await addMessage(tx, {
+          conversationId, role: "agent",
+          body: matches.length ? studentAmbiguousMessage(matches)
+            : studentNotFoundMessage(plan.studentQuery, 0),
+          agentRunId: run!.id,
+        });
+        await finish("completed", { kind: "clarification" });
+      } else {
+        const student = matches[0]!;
+        const args = {
+          studentProfileId: student.studentProfileId,
+          weekday: plan.weekday, hour: plan.hour,
+          sourceConversationId: conversationId,
+        };
+        const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+        const preview: ActionPreview = {
+          runId: run!.id, tool: createWeeklyDigest.name,
+          summary: `Send a weekly progress digest for ${student.displayName} every ${days[plan.weekday]} at ${plan.hour}:00 in your notification timezone.`,
+          args,
+        };
+        reply = await addMessage(tx, {
+          conversationId, role: "agent",
+          body: "I can schedule that weekly academic digest. Confirm the details below.",
+          actionPreview: preview, agentRunId: run!.id,
+        });
+        await finish("awaiting_approval", { tool: createWeeklyDigest.name, args });
       }
     } else if (plan.intent === "manage" && plan.action === "list") {
       const result = await listWatches.execute(context, {});
@@ -319,13 +375,25 @@ export async function confirmRun(
       .select()
       .from(agentRuns)
       .where(eq(agentRuns.id, input.runId))
-      .limit(1);
+      .limit(1)
+      .for("update");
 
     if (!run || run.personId !== context.actorPersonId) {
       throw new AuthorizationError(`agent run: ${input.runId}`);
     }
     if (run.status !== "awaiting_approval") {
       throw new Error(`Agent run is not awaiting approval (status: ${run.status})`);
+    }
+
+    if (Date.now() - run.createdAt.getTime() > 10 * 60_000) {
+      await tx.update(agentRuns).set({ status: "cancelled", updatedAt: new Date() })
+        .where(eq(agentRuns.id, run.id));
+      const message = await addMessage(tx, {
+        conversationId: run.conversationId, role: "agent",
+        body: "This approval expired. Ask me again to prepare a fresh action.",
+        agentRunId: run.id,
+      });
+      return { conversationId: run.conversationId, runId: run.id, runStatus: "cancelled", message };
     }
 
     if (!input.approve) {

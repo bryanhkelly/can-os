@@ -63,10 +63,10 @@ function FamilyHomePage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
        <div>
         <h3 className="text-lg font-semibold">{child.displayName} {child.lastName}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{child.sectionCount} active {child.sectionCount === 1 ? "class" : "classes"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{child.awaitingSections ? "Program enrollment active; classes not assigned yet" : `${child.sectionCount} active ${child.sectionCount === 1 ? "class" : "classes"}`}</p>
        </div>
        <span className={`rounded-full border px-3 py-1 text-xs ${child.status === "on_track" ? "" : "border-amber-500 text-amber-600"}`}>
-        {child.status === "on_track" ? "On track" : "Needs attention"}
+        {child.status === "awaiting_courses" ? "Enrolled · awaiting classes" : child.status === "on_track" ? "On track" : "Needs attention"}
        </span>
       </div>
       <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
@@ -75,9 +75,10 @@ function FamilyHomePage() {
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground">Next due</dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Date(child.nextDueAt).toLocaleDateString() : "—"}</dd></div>
       </dl>
       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
-       <Link to="/guardian/academics" className="rounded-full border px-3 py-1 hover:bg-muted">Academics</Link>
-       <Link to="/guardian/attendance" className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</Link>
-       <Link to="/guardian/report-cards" className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</Link>
+       <a href={"/guardian/academics?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Academics</a>
+       <a href={"/guardian/attendance?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</a>
+       <a href={"/guardian/report-cards?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</a>
+       <a href={"/guardian/admission-offers?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Offers</a>
       </nav>
      </article>)}
     </div>}
@@ -87,10 +88,11 @@ function FamilyHomePage() {
     <h2 className="text-lg font-semibold">Family</h2>
     <div className="mt-4 flex flex-wrap gap-3 text-sm">
      <Link to="/ask" className="rounded-full border px-4 py-2 hover:bg-muted">Ask CAN</Link>
+     <Link to="/guardian/study-group-consent" className="rounded-full border px-4 py-2 hover:bg-muted">Study group permissions</Link>
      <Link to="/guardian/watching" className="rounded-full border px-4 py-2 hover:bg-muted">Things CAN Is Watching</Link>
      <Link to="/guardian/admission-offers" className="rounded-full border px-4 py-2 hover:bg-muted">Admission offers</Link>
      <Link to="/messages" className="rounded-full border px-4 py-2 hover:bg-muted">Messages</Link>
-     <Link to="/student/notifications" className="rounded-full border px-4 py-2 hover:bg-muted">Notifications</Link>
+     <Link to="/notifications" className="rounded-full border px-4 py-2 hover:bg-muted">Notifications</Link>
     </div>
    </section>
   </QueryState>

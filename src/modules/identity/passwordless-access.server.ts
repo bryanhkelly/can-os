@@ -83,7 +83,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
   if(!member)throw new Error("Membership unavailable");
-  await tx.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.session.started",resourceType:"account",resourceId:account.id,context:{synthetic:true,method:"email_link",sessionId:session.id,grantId:activeGrant.id}});
+  await tx.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.session.started",resourceType:"account",resourceId:account.id,context:{method:"email_link",sessionId:session.id,grantId:activeGrant.id}});
   return {accountId:account.id,role:activeGrant.role,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
@@ -93,7 +93,7 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),isNull(accessSessions.revokedAt))).returning({activeGrantId:accessSessions.activeGrantId});
   if(row?.activeGrantId){
    const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,row.activeGrantId)).limit(1);
-   if(member)await tx.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.session.revoked",resourceType:"account",resourceId:accountId,context:{synthetic:true,sessionId}});
+   if(member)await tx.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.session.revoked",resourceType:"account",resourceId:accountId,context:{sessionId}});
   }
  });
  return clearSessionCookieHeader();
@@ -111,6 +111,6 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
    .returning({id:accessSessions.id});
   if(!changed)throw new Error("Session expired");
   await tx.insert(auditEvents).values({actorPersonId:grant.personId,action:"identity.membership.selected",
-   resourceType:"account",resourceId:accountId,context:{synthetic:true,sessionId,grantId}});
+   resourceType:"account",resourceId:accountId,context:{sessionId,grantId}});
  });
 }

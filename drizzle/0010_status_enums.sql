@@ -1,3 +1,7 @@
+-- Remove the legacy text CHECK before converting status to a native PostgreSQL enum.
+-- The enum supplies the permitted status values after conversion.
+ALTER TABLE "admission_offers" DROP CONSTRAINT IF EXISTS "admission_offer_valid_status";--> statement-breakpoint
+DROP INDEX IF EXISTS "admission_offer_one_active_per_application_uq";--> statement-breakpoint
 CREATE TYPE "public"."activity_eligibility_check_status" AS ENUM('eligible', 'ineligible', 'conditional');--> statement-breakpoint
 CREATE TYPE "public"."activity_eligibility_status" AS ENUM('pending', 'eligible', 'ineligible', 'conditional');--> statement-breakpoint
 CREATE TYPE "public"."activity_registration_status" AS ENUM('pending', 'waitlisted', 'eligible', 'ineligible', 'conditional', 'withdrawn');--> statement-breakpoint
@@ -89,4 +93,5 @@ ALTER TABLE "support_referral_stage_events" ALTER COLUMN "stage" SET DATA TYPE "
 ALTER TABLE "support_referrals" ALTER COLUMN "stage" SET DEFAULT 'submitted'::"public"."support_referral_stage";--> statement-breakpoint
 ALTER TABLE "support_referrals" ALTER COLUMN "stage" SET DATA TYPE "public"."support_referral_stage" USING "stage"::"public"."support_referral_stage";--> statement-breakpoint
 ALTER TABLE "support_services" ALTER COLUMN "status" SET DEFAULT 'scheduled'::"public"."support_service_status";--> statement-breakpoint
-ALTER TABLE "support_services" ALTER COLUMN "status" SET DATA TYPE "public"."support_service_status" USING "status"::"public"."support_service_status";
+ALTER TABLE "support_services" ALTER COLUMN "status" SET DATA TYPE "public"."support_service_status" USING "status"::"public"."support_service_status"; 
+CREATE UNIQUE INDEX IF NOT EXISTS "admission_offer_one_active_per_application_uq" ON "admission_offers" ("application_id", "school_year_id") WHERE "status" IN ('draft', 'issued', 'accepted');

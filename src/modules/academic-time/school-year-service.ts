@@ -59,12 +59,15 @@ export async function createSchoolYear(
 
   return db.transaction(async (tx) => {
     const [gradeScale] = await tx
-      .select({ id: gradeScales.id })
+      .select({ id: gradeScales.id, organizationId:gradeScales.owningOrganizationId,
+        active:gradeScales.active })
       .from(gradeScales)
       .where(eq(gradeScales.id, input.gradeScaleId))
       .limit(1);
 
-    if (!gradeScale) throw new Error("GradeScale not found");
+    if (!gradeScale || !gradeScale.active ||
+        gradeScale.organizationId !== input.organizationId)
+      throw new Error("Select an active grading scale owned by this school organization");
 
     if (input.programId) {
       const [program] = await tx

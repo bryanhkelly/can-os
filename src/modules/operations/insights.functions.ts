@@ -6,6 +6,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { readScope } from "@/platform/scope";
 import { assertInsightManageScope } from "@/modules/operations/insights.scope";
+import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
 
 /**
  * Insight read scoping is registered in ./insights.scope; teachers see insights for
@@ -27,13 +28,31 @@ async function loadServer() {
  return { db, s, ops };
 }
 
+/** Read-only site/program selector projected from the active insight-viewer grant. */
+export const listInsightScopeOptions=createServerFn({method:"GET"}).handler(async()=>{
+ const context=await getCommandContext(getRequest());
+ assertCapability(context,"insights:read");
+ if(!context.actorPersonId)throw new AuthorizationError("insights actor");
+ const siteIds=context.scope.siteIds??[],programIds=context.scope.programIds??[];
+ if(!siteIds.length||!programIds.length)return [];
+ const {db,s,ops}=await loadServer();
+ return db.select({id:s.programs.id,name:s.programs.name,
+  siteId:s.sites.id,siteName:s.sites.name})
+  .from(s.programs).innerJoin(s.sites,ops.eq(s.sites.id,s.programs.siteId))
+  .where(ops.and(ops.inArray(s.programs.id,programIds),ops.inArray(s.sites.id,siteIds)))
+  .orderBy(ops.asc(s.sites.name),ops.asc(s.programs.name));
+});
+
 export const listInsights = createServerFn({ method: "GET" })
- .validator((value: unknown) => z.object({ status: z.enum(insightStatuses).optional() }).parse(value ?? {}))
+ .validator((value: unknown) => operationsSelectionSchema.extend({status:z.enum(insightStatuses).optional()}).parse(value ?? {}))
  .handler(async ({ data }) => {
   const context = await getCommandContext(getRequest());
   assertCapability(context, "insights:read");
   if (!context.actorPersonId) throw new AuthorizationError("insights actor");
   if (!process.env.DATABASE_URL) return { insights: [] };
+  const selection=data.siteId||data.programId
+   ?await resolveOperationsSelection(context,{siteId:data.siteId,programId:data.programId})
+   :{siteIds:context.scope.siteIds??[],programIds:context.scope.programIds??[]};
   const server = await loadServer();
   const { db, s, ops } = server;
   const scope = await readScope("insights", context, server);
@@ -56,7 +75,9 @@ export const listInsights = createServerFn({ method: "GET" })
    .leftJoin(s.sections, ops.eq(s.sections.id, s.insights.sectionId))
    .leftJoin(s.studentProfiles, ops.eq(s.studentProfiles.id, s.insights.subjectId))
    .leftJoin(s.people, ops.eq(s.people.id, s.studentProfiles.personId))
-   .where(ops.and(scope, data.status ? ops.eq(s.insights.status, data.status) : undefined))
+   .where(ops.and(scope, data.status ? ops.eq(s.insights.status, data.status) : undefined,
+    data.siteId||data.programId?ops.inArray(s.insights.siteId,selection.siteIds):undefined,
+    data.programId?ops.eq(s.insights.programId,data.programId):undefined))
    .orderBy(ops.desc(s.insights.createdAt))
    .limit(50);
   return {
@@ -102,6 +123,22 @@ export const acceptInsight = createServerFn({ method: "POST" })
    if (!insight) throw new Error("Insight not found");
    if (insight.status !== "open") throw new Error("Insight has already been handled");
    await assertInsightManageScope(server, tx, context, insight);
+   if(data.actionOwnerPersonId){
+    if(!insight.siteId||!insight.organizationId)
+     throw new AuthorizationError("site-specific insight required for assignment");
+    // A caller-supplied person ID is never authority. The assignee must hold a
+    // current staff grant at the insight's school and organization.
+    const [assignee]=await tx.select({id:s.accountPersonGrants.id})
+     .from(s.accountPersonGrants)
+     .where(ops.and(
+      ops.eq(s.accountPersonGrants.personId,data.actionOwnerPersonId),
+      ops.eq(s.accountPersonGrants.organizationId,insight.organizationId),
+      ops.eq(s.accountPersonGrants.siteId,insight.siteId),
+      ops.eq(s.accountPersonGrants.active,true),
+      ops.inArray(s.accountPersonGrants.role,["registrar","teacher","specialist"])
+     )).limit(1);
+    if(!assignee)throw new AuthorizationError("active school staff assignee");
+   }
    const [action] = await tx.insert(s.actions).values({
     type: "academic_intervention",
     title: data.actionTitle ?? insight.recommendedActions[0]?.title ?? insight.title,
@@ -117,6 +154,15 @@ export const acceptInsight = createServerFn({ method: "POST" })
     metadata: { sourceInsightId: insight.id },
    }).returning({ id: s.actions.id });
    if (!action) throw new Error("Failed to create Action");
+   if(data.actionOwnerPersonId){
+    await tx.insert(s.notifications).values({
+     recipientPersonId:data.actionOwnerPersonId,
+     type:"operations_action_assigned",
+     title:"Action assigned from school insight",
+     body:"An Action has been assigned for review.",
+     resourceType:"action",resourceId:action.id,
+    });
+   }
    await tx.update(s.insights).set({
     status: "acknowledged",
     acknowledgedByPersonId: context.actorPersonId,

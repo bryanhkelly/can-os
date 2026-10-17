@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { StudentQuickWins } from "@/components/student/StudentQuickWins";
 import { LiveQuickWins } from "@/components/student/LiveQuickWins";
 import { LiveSchoolExperiences } from "@/components/student/LiveSchoolExperiences";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
-import { getQuickWinActions } from "@/modules/_demo/quick-wins.functions";
+import { getQuickWinActions } from "@/modules/actions/student-actions.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
@@ -16,8 +15,8 @@ export const Route = createFileRoute("/student/experiences")({
 
 function StudentExperiencesPage() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Synthetic student" title="Student experiences" outcome={outcome} />;
+  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Student" title="Student experiences" outcome={outcome} />;
   const { quickWins, school } = outcome.data;
   const { connected, actions } = quickWins;
-  return <><LiveQuickWins connected={connected} actions={actions}/><LiveSchoolExperiences data={school}/><StudentQuickWins /></>;
+  return <><LiveQuickWins connected={connected} actions={actions}/><LiveSchoolExperiences data={school}/></>;
 }

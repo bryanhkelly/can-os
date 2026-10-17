@@ -5,27 +5,20 @@ import {
   gt,
   inArray,
   isNull,
+  lte,
   or,
+  sql,
 } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   domainEvents,
+  conversationMessages,
+  subscriptionEventReceipts,
   subscriptionDeliveries,
   subscriptions,
 } from "@/db/schema";
 import { notify } from "@/platform/mutation";
-import {
-  emailNotificationRecipients,
-  sendNotificationEmail,
-} from "@/modules/communication/notification-email.server";
 import { getSubscriptionPolicy } from "./policy";
-
-type PendingEmail = {
-  deliveryId: string;
-  recipientPersonId: string;
-  subject: string;
-  text: string;
-};
 
 /**
  * Match a processed domain event against active subscriptions and deliver to
@@ -43,16 +36,24 @@ export async function processEventSubscriptions(eventId: string): Promise<number
 
   const policy = getSubscriptionPolicy(event.eventType);
   if (!policy) return 0;
+  const [priorReceipt] = await db.select({ eventId: subscriptionEventReceipts.eventId })
+    .from(subscriptionEventReceipts).where(eq(subscriptionEventReceipts.eventId, eventId)).limit(1);
+  if (priorReceipt) return 0;
 
-  const emailsToSend: PendingEmail[] = [];
   let delivered = 0;
 
   await db.transaction(async (tx) => {
     const context = await policy.load(tx, event);
-    if (!context) return;
+    if (!context) {
+      await tx.insert(subscriptionEventReceipts).values({ eventId }).onConflictDoNothing();
+      return;
+    }
 
     const subjects = policy.subjects(context);
-    if (!subjects.length) return;
+    if (!subjects.length) {
+      await tx.insert(subscriptionEventReceipts).values({ eventId }).onConflictDoNothing();
+      return;
+    }
 
     const now = new Date();
     const matches = await tx
@@ -61,6 +62,7 @@ export async function processEventSubscriptions(eventId: string): Promise<number
       .where(
         and(
           eq(subscriptions.status, "active"),
+          lte(subscriptions.createdAt, event.occurredAt),
           arrayContains(subscriptions.eventTypes, [event.eventType]),
           or(
             ...subjects.map((subject) =>
@@ -134,61 +136,22 @@ export async function processEventSubscriptions(eventId: string): Promise<number
             updatedAt: now,
           })
           .where(eq(subscriptionDeliveries.id, delivery.id));
+        if (subscription.sourceConversationId) {
+          await tx.insert(conversationMessages).values({
+            conversationId: subscription.sourceConversationId,
+            role: "agent",
+            body: content.body ?? content.title,
+            evidenceRefs: content.resourceType && content.resourceId
+              ? [{ type: content.resourceType, id: content.resourceId, label: content.title }]
+              : [],
+          });
+        }
         delivered += 1;
-      } else if (subscription.channel === "email") {
-        emailsToSend.push({
-          deliveryId: delivery.id,
-          recipientPersonId: subscription.subscriberPersonId,
-          subject: content.title,
-          text: content.body ?? content.title,
-        });
-      } else {
-        // sms / agent_webhook routes are not built yet; fail explicitly
-        // rather than leaving a permanently pending delivery.
-        await tx
-          .update(subscriptionDeliveries)
-          .set({
-            status: "failed",
-            attempts: 1,
-            lastError: "channel_not_supported",
-            updatedAt: now,
-          })
-          .where(eq(subscriptionDeliveries.id, delivery.id));
       }
+      // Other channels stay pending for the independently retryable worker.
     }
+    await tx.insert(subscriptionEventReceipts).values({ eventId }).onConflictDoNothing();
   });
-
-  if (emailsToSend.length > 0) {
-    const emails = await emailNotificationRecipients(
-      emailsToSend.map((mail) => mail.recipientPersonId),
-    );
-    const origin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
-    const actionUrl = origin ? `${new URL(origin).origin}/guardian` : undefined;
-
-    for (const mail of emailsToSend) {
-      const to = emails.get(mail.recipientPersonId);
-      const sent = Boolean(to);
-      if (to) {
-        await sendNotificationEmail({
-          to,
-          subject: mail.subject,
-          text: mail.text,
-          actionUrl,
-        });
-      }
-      await db
-        .update(subscriptionDeliveries)
-        .set({
-          status: sent ? "delivered" : "failed",
-          attempts: 1,
-          lastError: sent ? null : "no_active_email",
-          deliveredAt: sent ? new Date() : null,
-          updatedAt: new Date(),
-        })
-        .where(eq(subscriptionDeliveries.id, mail.deliveryId));
-      if (sent) delivered += 1;
-    }
-  }
 
   return delivered;
 }
@@ -218,4 +181,29 @@ export async function setSubscriptionStatus(
     )
     .returning({ id: subscriptions.id });
   return rows.length > 0;
+}
+
+/**
+ * Reconcile subscription matching separately from the primary academic handler.
+ * A crash after the academic event is processed but before matching watches
+ * must not drop an alert. Receipt writes happen in the same transaction as
+ * the new subscription delivery queue records.
+ */
+export async function recoverSubscriptionEventMatches(limit = 100): Promise<number> {
+  const candidates = await db.select({ id: domainEvents.id }).from(domainEvents)
+    .where(and(
+      eq(domainEvents.status, "processed"),
+      eq(domainEvents.eventType, "AssignmentBecameMissing"),
+      sql`NOT EXISTS (SELECT 1 FROM subscription_event_receipts r WHERE r.event_id = ${domainEvents.id})`,
+    )).limit(limit);
+  let recovered = 0;
+  for (const event of candidates) {
+    try {
+      await processEventSubscriptions(event.id);
+      recovered++;
+    } catch (error) {
+      console.error("subscription event recovery failed", event.id, error instanceof Error ? error.message : "unknown");
+    }
+  }
+  return recovered;
 }

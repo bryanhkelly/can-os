@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import {resolveGuardianChild} from "@/domain/guardian-child-context";
 import { useEffect, useState } from "react";
 import {
   getStudentReportCard,
@@ -27,7 +28,8 @@ function GuardianReportCardsPage() {
     getGuardianStudents().then(result => {
       if (!active) return;
       setStudents(result.students);
-      setSelected(result.students[0]?.studentPersonId ?? "");
+      const requested = new URLSearchParams(window.location.search).get("student");
+   setSelected(resolveGuardianChild(result.students,requested));
       setLoadingStudents(false);
     }).catch(() => {
       if (active) {

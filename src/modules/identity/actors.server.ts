@@ -76,7 +76,6 @@ export async function recordAudit(
       accountId: actor.accountId,
       sessionId: actor.sessionId,
       role: actor.role,
-      synthetic: true,
     },
   } as never);
 }

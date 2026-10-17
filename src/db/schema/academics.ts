@@ -117,6 +117,7 @@ export const sectionTeachers = pgTable(
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
     role: text("role").default("teacher").notNull(),
+    assignmentSource: text("assignment_source").default("manual").notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

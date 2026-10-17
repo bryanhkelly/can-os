@@ -3,15 +3,19 @@ import { useCallback, useEffect, useState } from "react";
 import { listGuardianAbsences, submitExcuse } from "@/modules/attendance/attendance.functions";
 import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachmentCounts } from "@/modules/learning/submission-attachments.functions";
 
-const excuseAttachmentAccept = ".pdf,.docx,.txt,.png,.jpg,.jpeg,.md";
+const excuseAttachmentAccept = ".pdf,.png,.jpg,.jpeg";
 const excuseMimes: Record<string, string> = { pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", txt: "text/plain", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", md: "text/markdown" };
 const excuseAttachmentMime = (name: string) => excuseMimes[name.split(".").pop()?.toLowerCase() ?? ""] ?? null;
 
-export const Route = createFileRoute("/guardian/attendance")({ component: GuardianAttendancePage });
+export const Route = createFileRoute("/guardian/attendance")({
+ validateSearch:(search:Record<string,unknown>)=>({student:typeof search.student==="string"?search.student:undefined}),
+ component: GuardianAttendancePage,
+});
 
 type Absence = Awaited<ReturnType<typeof listGuardianAbsences>>["absences"][number];
 
 function GuardianAttendancePage() {
+  const {student}=Route.useSearch();
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -25,7 +29,7 @@ function GuardianAttendancePage() {
     setLoading(true);
     setError("");
     try {
-      const result = await listGuardianAbsences();
+      const result = await listGuardianAbsences({data:{studentPersonId:student}});
       setAbsences(result.absences);
       const excusedIds = result.absences.filter(absence => absence.excuse).map(absence => absence.attendanceEventId);
       if (excusedIds.length) {
@@ -40,7 +44,7 @@ function GuardianAttendancePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [student]);
 
   useEffect(() => {
     void load();
@@ -70,7 +74,7 @@ function GuardianAttendancePage() {
     try {
       const contentType = excuseAttachmentMime(file.name);
       if (!contentType) throw new Error("Unsupported file type. Use PDF, DOCX, TXT, PNG, JPG or MD.");
-      if (file.size < 1 || file.size > 10 * 1024 * 1024) throw new Error("Document must be 1 byte to 10 MB");
+      if (file.size < 16 || file.size > 10 * 1024 * 1024) throw new Error("Document must be 16 bytes to 10 MB");
       const upload = await createExcuseAttachmentUpload({
         data: { attendanceEventId: absence.attendanceEventId, fileName: file.name, contentType, sizeBytes: file.size },
       });
@@ -94,7 +98,7 @@ function GuardianAttendancePage() {
       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Attendance</p>
       <h1 className="mt-2 font-serif text-4xl">Attendance & excuses</h1>
       <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-        Review recent absences for your students and submit an excuse for the school to review.
+        Review recent absences for your students and submit an excuse for the school to review.{student?" Showing the selected child.":""}
       </p>
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
       {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}

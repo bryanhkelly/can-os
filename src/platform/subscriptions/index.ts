@@ -11,6 +11,10 @@ export {
 export {
   listSubscriptionsForPerson,
   processEventSubscriptions,
+  recoverSubscriptionEventMatches,
   setSubscriptionStatus,
 } from "./matcher";
 export { processSubscriptionReminders } from "./reminders";
+export { processQueuedSubscriptionDeliveries } from "./delivery-worker";
+export { processWeeklyDigests } from "./digests";
+export { escalateTerminalDeliveryFailures } from "./delivery-failure-actions";

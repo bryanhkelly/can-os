@@ -3,7 +3,6 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { assertSyntheticMutation, type DemoRole } from "../_demo/demo-write-gate";
 import { z } from "zod";
 
 /**
@@ -17,10 +16,26 @@ const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 type AttendanceStatus = "present" | "absent" | "tardy";
 
-function dayBounds(date: string): { start: Date; end: Date } {
-  const start = new Date(`${date}T00:00:00.000Z`);
-  if (Number.isNaN(start.getTime())) throw new Error("Invalid attendance date");
-  return { start, end: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
+/** Resolve site-local midnight to an instant, including DST changes. */
+function siteDayStart(date:string,timeZone:string):Date {
+ if(!datePattern.test(date))throw new Error("Invalid attendance date");
+ const target=Date.parse(date+"T00:00:00.000Z");
+ if(Number.isNaN(target))throw new Error("Invalid attendance date");
+ const formatter=new Intl.DateTimeFormat("en-US",{
+  timeZone,year:"numeric",month:"2-digit",day:"2-digit",
+  hour:"2-digit",minute:"2-digit",hourCycle:"h23",
+ });
+ let instant=target;
+ for(let pass=0;pass<4;pass++){
+  const values=Object.fromEntries(formatter.formatToParts(new Date(instant))
+   .filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+  const wall=Date.UTC(Number(values.year),Number(values.month)-1,Number(values.day),
+   Number(values.hour),Number(values.minute));
+  const delta=target-wall;
+  if(delta===0)break;
+  instant+=delta;
+ }
+ return new Date(instant);
 }
 
 /** Teachers and registrars run site attendance; identity comes from the session. */
@@ -84,6 +99,7 @@ async function loadScopedRoster(
       eq(s.enrollments.status, "active"),
       eq(s.sections.active, true),
       inArray(s.sections.siteId, siteIds),
+      inArray(s.sections.programId, context.scope.programIds ?? []),
       ...(studentProfileId ? [eq(s.enrollments.studentProfileId, studentProfileId)] : []),
     ));
   const programRows = await db
@@ -101,6 +117,7 @@ async function loadScopedRoster(
       eq(s.enrollments.kind, "program"),
       eq(s.enrollments.status, "active"),
       inArray(s.programs.siteId, siteIds),
+      inArray(s.programs.id, context.scope.programIds ?? []),
       ...(studentProfileId ? [eq(s.enrollments.studentProfileId, studentProfileId)] : []),
     ));
   const roster = new Map<string, RosterEntry>();
@@ -134,7 +151,6 @@ export const listSiteAttendanceRoster = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.write");
     if (!datePattern.test(data.date ?? "")) throw new Error("Date must be YYYY-MM-DD");
-    const { start, end } = dayBounds(data.date);
     const roster = await loadScopedRoster(context);
     if (!roster.length) return { date: data.date, students: [] };
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
@@ -148,8 +164,7 @@ export const listSiteAttendanceRoster = createServerFn({ method: "GET" })
       .from(s.attendanceEvents)
       .where(and(
         inArray(s.attendanceEvents.studentProfileId, roster.map(row => row.studentProfileId)),
-        gte(s.attendanceEvents.expectedAt, start),
-        lt(s.attendanceEvents.expectedAt, end),
+        eq(s.attendanceEvents.occurrenceKey, `${data.date}:site-day`),
       ))
       .orderBy(desc(s.attendanceEvents.recordedAt));
     const effective = new Map<string, (typeof events)[number]>();
@@ -176,19 +191,21 @@ export const listSiteAttendanceRoster = createServerFn({ method: "GET" })
 
 /** Mark a student present/absent/tardy; deterministic sourceKey keeps retries idempotent. */
 export const markAttendance = createServerFn({ method: "POST" })
-  .validator((value: unknown) => z.object({ studentProfileId: z.string().min(1), date: z.string().min(1), status: z.enum(["expected","present","absent","tardy","excused"]) }).parse(value))
+  .validator((value: unknown) => z.object({ studentProfileId: z.string().min(1), date: z.string().min(1), status: z.enum(["expected","present","absent","tardy","excused"]), mutationId:z.string().uuid().optional(),expectedPreviousEventId:z.string().uuid().nullable().optional(),note:z.string().max(2000).optional() }).parse(value))
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.write");
-    assertSyntheticMutation(context.role as DemoRole);
     if (!uuidPattern.test(data.studentProfileId ?? "")) throw new Error("Invalid student identifier");
     if (!datePattern.test(data.date ?? "")) throw new Error("Date must be YYYY-MM-DD");
     if (!["present", "absent", "tardy"].includes(data.status)) throw new Error("Invalid attendance status");
     const [enrollment] = await loadScopedRoster(context, data.studentProfileId);
     if (!enrollment) throw new AuthorizationError("active enrollment at your site");
-    const { start } = dayBounds(data.date);
+    const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+    const [site]=enrollment.siteId?await db.select({timezone:s.sites.timezone})
+      .from(s.sites).where(eq(s.sites.id,enrollment.siteId)).limit(1):[];
+    const start=siteDayStart(data.date,site?.timezone??"UTC");
     const occurrenceKey = `${data.date}:site-day`;
-    const { recordAttendance } = await import("./attendance-service");
-    const attendanceEventId = await recordAttendance(context, {
+    const { recordAttendanceRevision } = await import("./attendance-service");
+    const attendanceEventId = await recordAttendanceRevision(context, {
       studentProfileId: enrollment.studentProfileId,
       programId: enrollment.programId,
       siteId: enrollment.siteId ?? undefined,
@@ -196,14 +213,17 @@ export const markAttendance = createServerFn({ method: "POST" })
       occurrenceKey,
       status: data.status,
       expectedAt: start,
-      sourceKey: `manual:${enrollment.studentProfileId}:${occurrenceKey}`,
-      metadata: { surface: "staff.attendance" },
+      mutationId: data.mutationId ?? crypto.randomUUID(),
+      expectedPreviousEventId:data.expectedPreviousEventId,
+      note:data.note,
     });
     return { attendanceEventId };
   });
 
 /** Recent absences/tardies for students the verified guardian may view, plus excuse state. */
-export const listGuardianAbsences = createServerFn({ method: "GET" }).handler(async () => {
+export const listGuardianAbsences = createServerFn({ method: "GET" })
+ .validator((value:unknown)=>z.object({studentPersonId:z.string().uuid().optional()}).parse(value??{}))
+ .handler(async ({data}) => {
   const context = await guardianActor();
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const relationships = await db
@@ -218,6 +238,7 @@ export const listGuardianAbsences = createServerFn({ method: "GET" }).handler(as
     .where(and(
       eq(s.guardianRelationships.guardianPersonId, context.actorPersonId!),
       eq(s.guardianRelationships.canViewAcademics, true),
+      ...(data.studentPersonId?[eq(s.guardianRelationships.studentPersonId,data.studentPersonId)]:[]),
     ));
   if (!relationships.length) return { absences: [] };
   const studentNames = new Map(
@@ -305,7 +326,6 @@ export const submitExcuse = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ attendanceEventId: z.string().min(1), reason: z.string() }).parse(value))
   .handler(async ({ data }) => {
     const context = await guardianActor();
-    assertSyntheticMutation("guardian");
     if (!uuidPattern.test(data.attendanceEventId ?? "")) throw new Error("Invalid attendance event");
     const reason = (data.reason ?? "").trim();
     if (reason.length < 3 || reason.length > 2000) throw new Error("Reason must be 3-2,000 characters");
@@ -379,7 +399,6 @@ export const reviewExcuse = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ excuseId: z.string().min(1), decision: z.enum(["approved","rejected"]), note: z.string().optional() }).parse(value))
   .handler(async ({ data }) => {
     const context = await staffActor("attendance.excuse.review");
-    assertSyntheticMutation(context.role as DemoRole);
     if (!uuidPattern.test(data.excuseId ?? "")) throw new Error("Invalid excuse identifier");
     if (data.decision !== "approved" && data.decision !== "rejected") throw new Error("Invalid review decision");
     const note = (data.note ?? "").trim();

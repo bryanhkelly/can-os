@@ -1,11 +1,11 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { getSyntheticTeacherMissingWork, createSyntheticMissingWorkFollowUp } from "@/modules/learning/teacher-missing-work.functions";
+import { getTeacherMissingWork, createMissingWorkFollowUp } from "@/modules/learning/teacher-missing-work.functions";
 import { WorkspaceShell, StatCard, EmptyState } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
-const loadMissingWork = () => getSyntheticTeacherMissingWork();
+const loadMissingWork = () => getTeacherMissingWork();
 
 export const Route = createFileRoute("/teacher/missing-work")({
   loader: safeLoader(loadMissingWork, { authMessage: "Sign in with an authorized teacher account to view missing work." }),
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/teacher/missing-work")({
 
 function TeacherMissingWork() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Synthetic teacher" title="Missing work" outcome={outcome} />;
+  if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Teacher" title="Missing work" outcome={outcome} />;
   return <TeacherMissingWorkView data={outcome.data} />;
 }
 
@@ -27,9 +27,9 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
 
   return (
     <WorkspaceShell
-      eyebrow="CAN OS · Synthetic teacher"
+      eyebrow="CAN OS · Teacher"
       title="Missing work"
-      subtitle="Overdue work across active students in the demo teacher's assigned sections. Only explicitly synthetic student records are included. This is not an authenticated teacher view."
+      subtitle="Overdue work for actively enrolled students in the classes you teach, within your authorized school and program."
       actions={<p className="mt-2 text-xs"><Link to="/teacher/notices" className="underline">Teacher notifications →</Link></p>}
     >
       {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
@@ -44,14 +44,14 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
             <p className="text-xs text-muted-foreground">{x.course} · due {new Date(x.dueAt).toLocaleDateString()}</p>
             <h2 className="mt-2 font-semibold">{x.title}</h2>
             <p className="mt-1 text-sm">{x.studentName} · {x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
-            <Link to={"/student/assignments?assessment=" + encodeURIComponent(x.assessmentId)} className="mt-3 inline-block text-xs font-semibold underline">Open student assignment demo →</Link>
+            <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
             <button
               disabled={busy}
               className="ml-4 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
               onClick={async () => {
                 setBusy(true);
                 try {
-                  const result = await createSyntheticMissingWorkFollowUp({ data: { assessmentId: x.assessmentId, studentProfileId: x.studentProfileId } });
+                  const result = await createMissingWorkFollowUp({ data: { assessmentId: x.assessmentId, studentProfileId: x.studentProfileId } });
                   setNotice(result.created ? "Follow-up added to Operations." : "An open follow-up already exists.");
                   await router.invalidate();
                 } catch (e) {
@@ -63,7 +63,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
             >Create follow-up</button>
           </article>
         ))}
-        {connected && !items.length && <EmptyState title="No overdue missing work in the assigned synthetic sections." />}
+        {connected && !items.length && <EmptyState title="No overdue missing work in your assigned classes." />}
       </section>
     </WorkspaceShell>
   );

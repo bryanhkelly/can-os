@@ -3,8 +3,9 @@ import {getRequest} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,assertSiteScope,AuthorizationError} from "@/domain/command-context";
 import {and,eq,inArray,lt} from "drizzle-orm";
+import {EventTypes} from "@/domain/event-types";
 import {z} from "zod";
-async function assertDemoTeacher(){
+async function verifiedTeacher(){
  const context=await getCommandContext(getRequest());
  if(context.role!=="teacher"||!context.actorPersonId)throw new AuthorizationError("teacher identity required");
  assertCapability(context,"assignments:grade");
@@ -12,13 +13,13 @@ async function assertDemoTeacher(){
  return context;
 }
 
-/** A real enrolled-roster queue restricted to synthetic students in the demo teacher's assigned sections. */
-export const getSyntheticTeacherMissingWork=createServerFn({method:"GET"}).handler(async()=>{
- const context=await assertDemoTeacher();
+/** Missing work for students actively enrolled in sections taught in the verified program scope. */
+export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async()=>{
+ const context=await verifiedTeacher();
  if(!process.env.DATABASE_URL)return {connected:false,items:[]};
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const assigned=await db.select({sectionId:s.sectionTeachers.sectionId}).from(s.sectionTeachers)
-  .innerJoin(s.sections,and(eq(s.sections.id,s.sectionTeachers.sectionId),inArray(s.sections.siteId,context.scope.siteIds!)))
+  .innerJoin(s.sections,and(eq(s.sections.id,s.sectionTeachers.sectionId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[])))
   .where(eq(s.sectionTeachers.personId,context.actorPersonId!));
  const sectionIds=[...new Set(assigned.map(x=>x.sectionId))];
  if(!sectionIds.length)return {connected:true,items:[]};
@@ -27,11 +28,11 @@ export const getSyntheticTeacherMissingWork=createServerFn({method:"GET"}).handl
   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
   .where(and(inArray(s.assessments.sectionId,sectionIds),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,now)));
  if(!due.length)return {connected:true,items:[]};
- const roster=await db.select({sectionId:s.enrollments.sectionId,studentId:s.studentProfiles.id,studentName:s.people.legalFirstName,studentLastName:s.people.legalLastName,studentSynthetic:s.people.metadata}).from(s.enrollments)
+ const roster=await db.select({sectionId:s.enrollments.sectionId,studentId:s.studentProfiles.id,studentName:s.people.legalFirstName,studentLastName:s.people.legalLastName}).from(s.enrollments)
   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
   .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
   .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),inArray(s.enrollments.sectionId,sectionIds)));
- const eligible=roster.filter(x=>x.studentSynthetic.synthetic===true);
+ const eligible=roster;
  const submissions=await db.select({assessmentId:s.submissions.assessmentId,studentId:s.submissions.studentProfileId,status:s.submissions.status,attempt:s.submissions.attemptNumber}).from(s.submissions).where(inArray(s.submissions.assessmentId,due.map(x=>x.id)));
  const latest=new Map<string,(typeof submissions)[number]>();
  for(const sub of submissions){const key=sub.assessmentId+":"+sub.studentId;const prev=latest.get(key);if(!prev||sub.attempt>prev.attempt)latest.set(key,sub);}
@@ -43,38 +44,41 @@ export const getSyntheticTeacherMissingWork=createServerFn({method:"GET"}).handl
  return {connected:true,items};
 });
 
-export const createSyntheticMissingWorkFollowUp=createServerFn({method:"POST"})
+export const createMissingWorkFollowUp=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({assessmentId:z.string().uuid(),studentProfileId:z.string().uuid()}).parse(data))
  .handler(async({data})=>{
-  const {assertSyntheticMutation}=await import("@/modules/_demo/demo-write-gate");
-  assertSyntheticMutation("teacher");
   const context=await assertDemoTeacher();
   const [{db},s,{and,eq,lt,sql,inArray}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
   return db.transaction(async tx=>{
    const key="missing-work:"+data.assessmentId+":"+data.studentProfileId;
    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
-   const [assessment]=await tx.select({id:s.assessments.id,title:s.assessments.title,sectionId:s.assessments.sectionId,siteId:s.sections.siteId,organizationId:s.programs.organizationId})
+   const [assessment]=await tx.select({id:s.assessments.id,title:s.assessments.title,sectionId:s.assessments.sectionId,siteId:s.sections.siteId,programId:s.sections.programId,organizationId:s.programs.organizationId})
     .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
     .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
     .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-    .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,new Date()))).limit(1);
+    .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,new Date()))).limit(1);
    if(!assessment)throw new Error("Overdue teacher-assigned assessment not found");
-   const [student]=await tx.select({id:s.studentProfiles.id,personId:s.people.id,name:s.people.legalFirstName,metadata:s.people.metadata})
+   const [student]=await tx.select({id:s.studentProfiles.id,personId:s.people.id,name:s.people.legalFirstName})
     .from(s.enrollments).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
     .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
     .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.studentProfiles.id,data.studentProfileId))).limit(1);
-   if(!student||student.metadata.synthetic!==true)throw new Error("Synthetic student not actively enrolled");
+   if(!student)throw new Error("Student not actively enrolled in this section");
    const attempts=await tx.select({status:s.submissions.status}).from(s.submissions)
     .where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,student.id)));
    if(attempts.some(a=>a.status!=="assigned"))throw new Error("Work has already been submitted");
    const existing=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata}).from(s.actions)
-    .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,student.id),inArray(s.actions.siteId,context.scope.siteIds!)));
-   const open=existing.find(a=>a.metadata.synthetic===true&&a.metadata.assessmentId===assessment.id&&!["resolved","cancelled"].includes(a.status));
+    .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,student.id),eq(s.actions.siteId,assessment.siteId),eq(s.actions.programId,assessment.programId)));
+   const open=existing.find(a=>a.metadata.assessmentId===assessment.id&&!["resolved","cancelled"].includes(a.status));
    if(open)return {actionId:open.id,created:false};
-   const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:context.actorPersonId!,organizationId:assessment.organizationId,siteId:assessment.siteId,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{synthetic:true,fixture:"gf1",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});
+   const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:context.actorPersonId!,organizationId:assessment.organizationId,siteId:assessment.siteId,programId:assessment.programId,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{source:"teacher_missing_work",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});
    if(!action)throw new Error("Unable to create follow-up");
    await tx.insert(s.notifications).values({recipientPersonId:student.personId,type:"missing_work_follow_up",status:"unread",title:"Teacher follow-up: "+assessment.title,body:"Your teacher flagged overdue work. Open the assignment to review and submit it.",resourceType:"action",resourceId:action.id});
-   await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId!,action:"synthetic.missing_work.follow_up",resourceType:"action",resourceId:action.id,after:{assessmentId:assessment.id,studentProfileId:student.id},context:{synthetic:true}});
+   await tx.insert(s.domainEvents).values({eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,actorPersonId:context.actorPersonId!,payload:{assessmentId:assessment.id,studentProfileId:student.id}});
+   await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId!,action:"missing_work.follow_up",resourceType:"action",resourceId:action.id,scope:{siteId:assessment.siteId,programId:assessment.programId,sectionId:assessment.sectionId},after:{assessmentId:assessment.id,studentProfileId:student.id},context:{accountId:context.accountId,sessionId:context.sessionId}});
    return {actionId:action.id,created:true};
   });
  });
+
+/** Existing route consumers can migrate without losing behavior. */
+export const getSyntheticTeacherMissingWork=getTeacherMissingWork;
+export const createSyntheticMissingWorkFollowUp=createMissingWorkFollowUp;

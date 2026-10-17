@@ -1,77 +1,82 @@
 /**
- * Deterministic intent planner. This implements the same contract an LLM
- * planner will later fill (message + context in, typed plan out); keeping it
- * rule-based for v1 means every Golden Flow test runs without external AI,
- * and tool execution is always deterministic and authorized regardless.
+ * Deterministic, conservative v1 planner. An LLM may propose plans later, but
+ * an unrecognized utterance must never silently become a consequential action.
  */
 export type AgentPlan =
   | { intent: "ask"; kind: "student_summary"; studentQuery: string }
-  | {
-      intent: "watch";
-      studentQuery: string;
-      eventTypes: string[];
-      remindAfterHours?: number;
-    }
+  | { intent: "ask"; kind: "operations_overview" }
+  | { intent: "watch"; studentQuery: string; eventTypes: string[]; remindAfterHours?: number }
   | { intent: "manage"; action: "list" | "pause" | "resume" | "revoke" }
+  | { intent: "manage"; action: "create_digest"; studentQuery: string; weekday: number; hour: number }
   | { intent: "ask"; kind: "help" };
 
-const WATCH_VERB = /(tell me|let me know|notify me|alert me|watch|monitor|keep an eye)/i;
-const MISSING_TOPIC = /(miss|missing|late|overdue|assignment|homework)/i;
-
-const NAME_PATTERNS = [
-  /(?:when|if)\s+(\w+?)\s+(?:misses|has|is|gets)/i,
-  /(?:watch|monitor|for)\s+(\w+)(?:'s)?(?:\s|$)/i,
-  /how(?:'s| is)\s+(\w+)/i,
+const missing = /\b(miss(?:ed|es|ing)?|late|overdue|past[ -]due|unsubmitted|not turned in|not handed in|assignment(?:s)?|homework|coursework|schoolwork)\b/i;
+const watchVerb = /\b(?:tell me|let me know|notify me|alert me|watch|monitor|keep an eye|give me (?:a |an )?(?:heads[ -]up|alert)|send me (?:a |an )?(?:notification|alert)|ping me)\b/i;
+const summaryVerb = /\b(?:how(?:'s| is| are)|how (?:has|did)|give me (?:an? )?(?:update|summary|overview)|(?:show|check|review|summarize|tell me about) (?:the )?(?:progress|grades|performance|status|schoolwork|academic)|(?:what|where) (?:are|is) .*?(?:grades|progress)|is .*?doing (?:in|at) school)\b/i;
+const token = String.raw`[\p{L}][\p{L}'’.-]*`;
+const fullName = String.raw`${token}(?:\s+${token}){0,2}`;
+const nonNames = new Set(["my","our","the","a","an","me","any","all","their","his","her","child","kid","student","son","daughter","children","kids","students","assignment","assignments","homework","work","grades","grade","progress","school","class","classes","biology","math","english","science","history","teacher","when","if","you","can","please","someone","anyone"]);
+const trailingWords = /\s+(?:for|doing|missing|overdue|late|miss(?:es|ed|ing)?|has|is|gets|does|did|was|will|fails|forgets|falls|struggles|turns|hands|submits|in|at|with|on|about|from|again|today|tomorrow|yesterday|this|their|his|her|my|any|an|a|the)\b.*$/i;
+const patterns = [
+  new RegExp(String.raw`\b(?:when|if)\s+(${fullName})\s+(?:misses|missed|has|is|gets|does|fails|forgets|falls)\b`, "iu"),
+  new RegExp(String.raw`\b(${fullName})['’]s\s+(?:assignments?|homework|schoolwork|grades?|progress)\b`, "iu"),
+  new RegExp(String.raw`\b(?:for|about|watch|monitor|on|regarding)\s+(${fullName})(?=\s|[?.!,]|$)`, "iu"),
+  new RegExp(String.raw`\bhow(?:'s| is| has)\s+(${fullName})(?=\s|[?.!,]|$)`, "iu"),
+  new RegExp(String.raw`\b(?:is|are)\s+(${fullName})\s+doing\b`, "iu"),
+  new RegExp(String.raw`\b(?:tell me|let me know|notify me|alert me|ping me)\s+(?:when|if)\s+(${fullName})\s+(?:misses|missed|has|is|gets|does)\b`, "iu"),
 ];
 
-function extractName(message: string): string | null {
-  for (const pattern of NAME_PATTERNS) {
-    const match = message.match(pattern);
-    if (match?.[1] && !/^(my|the|a|an|me)$/i.test(match[1])) return match[1];
+function cleanName(value: string): string {
+  return value.replace(trailingWords, "").replace(/[?.!,]+$/, "").trim();
+}
+export function extractStudentQuery(message: string): string {
+  for (const pattern of patterns) {
+    const m = pattern.exec(message);
+    if (!m?.[1]) continue;
+    const candidate = cleanName(m[1]);
+    const words = candidate.split(/\s+/);
+    if (!candidate || words.some(w => nonNames.has(w.toLowerCase())) || words.length > 3) continue;
+    return candidate;
   }
-  return null;
+  return "";
 }
 
-function extractReminderHours(message: string): number | undefined {
-  if (/next day|following day|daily/i.test(message)) return 24;
-  const hours = message.match(/(?:after|every)\s+(\d+)\s*hours?/i);
-  if (hours?.[1]) return Number(hours[1]);
-  if (/weekly|every friday/i.test(message)) return 24 * 7;
+function reminderHours(message: string): number | undefined {
+  if (/\b(?:next day|following day|tomorrow|daily)\b/i.test(message)) return 24;
+  const match = /\b(?:after|every|in)\s+(\d{1,3})\s*(hours?|days?)\b/i.exec(message);
+  if (match) {
+    const value = Number(match[1]) * (/day/i.test(match[2]) ? 24 : 1);
+    return value > 0 && value <= 720 ? value : undefined;
+  }
+  if (/\bweekly\b|\bevery friday\b/i.test(message)) return 168;
   return undefined;
 }
 
 export function planTurn(message: string): AgentPlan {
-  const text = message.trim();
-
-  if (WATCH_VERB.test(text) && MISSING_TOPIC.test(text)) {
-    const studentQuery = extractName(text) ?? "";
-    return {
-      intent: "watch",
-      studentQuery,
-      eventTypes: ["AssignmentBecameMissing"],
-      remindAfterHours: extractReminderHours(text),
-    };
-  }
-
-  const askMatch = text.match(/how(?:'s| is| are)\s+(\w+)/i);
-  if (askMatch?.[1]) {
-    return { intent: "ask", kind: "student_summary", studentQuery: askMatch[1] };
-  }
-
-  if (/(what are you watching|my (watches|agents|subscriptions)|things can is watching)/i.test(text)) {
+  const text = message.trim().replace(/[‘’]/g, "'");
+  if (/\b(?:what (?:are|is) (?:you|can) watching|show (?:me )?my watches|my (?:watches|subscriptions)|things can is watching|list (?:my )?watches)\b/i.test(text))
     return { intent: "manage", action: "list" };
-  }
-
-  if (/(turn off|stop watching|revoke|cancel that watch)/i.test(text)) {
+  if (/\b(?:turn off|stop watching|revoke|cancel (?:that|the|my) watch|delete (?:that|the|my) watch)\b/i.test(text))
     return { intent: "manage", action: "revoke" };
-  }
-  if (/^pause|pause (that|the|my) watch/i.test(text)) {
+  if (/\b(?:pause|suspend) (?:that|the|my|this)?\s*(?:watch|monitoring|alert)\b/i.test(text))
     return { intent: "manage", action: "pause" };
-  }
-  if (/^resume|resume (that|the|my) watch/i.test(text)) {
+  if (/\b(?:resume|restart|unpause) (?:that|the|my|this)?\s*(?:watch|monitoring|alert)\b/i.test(text))
     return { intent: "manage", action: "resume" };
-  }
 
+  const weekly = /every\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/i.exec(text);
+  if (weekly && /summar|digest|progress|update/i.test(text)) {
+    const days = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+    return { intent: "manage", action: "create_digest",
+      studentQuery: extractStudentQuery(text),
+      weekday: days.indexOf(weekly[1]!.toLowerCase()), hour: 19 };
+  }
+  if (watchVerb.test(text) && missing.test(text)) {
+    return { intent: "watch", studentQuery: extractStudentQuery(text),
+      eventTypes: ["AssignmentBecameMissing"], remindAfterHours: reminderHours(text) };
+  }
+  if (summaryVerb.test(text)) {
+    return { intent: "ask", kind: "student_summary", studentQuery: extractStudentQuery(text) };
+  }
   return { intent: "ask", kind: "help" };
 }
 
@@ -80,5 +85,6 @@ export const HELP_TEXT = [
   "- Ask about a student's progress: “How is Bobby doing?”",
   "- Watch for missing work: “Tell me when Bobby misses an assignment.”",
   "- Manage watches: “What are you watching for me?” or “Turn off that watch.”",
+  "For shared names, use the student's full name. I won't choose a student without your confirmation.",
   "Everything I do uses your permissions, and anything that changes something asks for your confirmation first.",
 ].join("\n");

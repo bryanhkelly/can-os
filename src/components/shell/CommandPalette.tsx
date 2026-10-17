@@ -2,12 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { searchWorkspace, type SearchHit } from "@/modules/search/global-search.functions";
-import {
-  demoPersonaStorageKey,
-  demoNavigationLinks,
-  getDemoPersona,
-  visibleDemoLinks,
-} from "@/components/student/DemoNavigation";
+import { workspaceLinks } from "@/components/shell/WorkspaceNavigation";
 import {
   filterDestinations,
   flattenGroups,
@@ -32,6 +27,7 @@ const GROUP_ORDER: Array<{ key: "courses" | "assignments" | "students" | "messag
 export function CommandPalette() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [activeRole, setActiveRole] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
@@ -66,14 +62,23 @@ export function CommandPalette() {
     inputRef.current?.focus();
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    fetch("/access/session", {credentials:"same-origin",cache:"no-store"})
+      .then(async response => response.ok ? response.json() : null)
+      .then(session => {
+        if (!active) return;
+        const grant = (session?.grants ?? []).find((g:{id:string})=>g.id===session.activeGrantId);
+        setActiveRole(grant?.role ?? null);
+      }).catch(() => {if(active)setActiveRole(null)});
+    return ()=>{active=false};
+  }, [open]);
+
   const destinations = useMemo(() => {
-    const persona = getDemoPersona(
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(demoPersonaStorageKey)
-        : null,
-    );
-    return filterDestinations(query, visibleDemoLinks(persona)).slice(0, 6);
-  }, [query]);
+    const authorized = activeRole ? (workspaceLinks[activeRole] ?? []) : [];
+    return filterDestinations(query, authorized.map(item=>({to:item.path,label:item.title}))).slice(0, 6);
+  }, [query, activeRole]);
 
   useEffect(() => {
     const term = query.trim();

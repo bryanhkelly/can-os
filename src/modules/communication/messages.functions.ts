@@ -5,11 +5,7 @@ import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import {
-  assertSyntheticMutation,
-  demoAllowedRoles,
-  type DemoRole,
-} from "@/modules/_demo/demo-write-gate";
+import {roleCapabilities} from "@/domain/access-context";
 
 /**
  * Contextual messaging surface (GF1 step 12, Experience Flow N1).
@@ -62,6 +58,8 @@ async function listAllowedThreadContacts(
   s: Schema,
   role: string,
   actorPersonId: string,
+  siteIds: string[],
+  programIds: string[],
 ): Promise<ThreadContact[]> {
   const relationships = new Map<string, Set<string>>();
   const add = (personId: string, relationship: string) => {
@@ -75,13 +73,18 @@ async function listAllowedThreadContacts(
     const studentRows = await db
       .select({ studentPersonId: s.guardianRelationships.studentPersonId })
       .from(s.guardianRelationships)
-      .where(
-        and(
-          eq(s.guardianRelationships.guardianPersonId, actorPersonId),
-          eq(s.guardianRelationships.canViewAcademics, true),
-        ),
-      );
-    const studentIds = studentRows.map((row) => row.studentPersonId);
+      .innerJoin(s.studentProfiles,
+        eq(s.studentProfiles.personId,s.guardianRelationships.studentPersonId))
+      .innerJoin(s.enrollments,eq(s.enrollments.studentProfileId,s.studentProfiles.id))
+      .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+      .where(and(
+        eq(s.guardianRelationships.guardianPersonId,actorPersonId),
+        eq(s.guardianRelationships.canViewAcademics,true),
+        eq(s.enrollments.status,"active"),
+        inArray(s.programs.siteId,siteIds),
+        inArray(s.programs.id,programIds),
+      ));
+    const studentIds = [...new Set(studentRows.map(row=>row.studentPersonId))];
     if (studentIds.length) {
       const teacherRows = await db
         .select({
@@ -102,6 +105,8 @@ async function listAllowedThreadContacts(
           and(
             inArray(s.studentProfiles.personId, studentIds),
             eq(s.enrollments.status, "active"),
+            inArray(s.sections.siteId,siteIds),
+            inArray(s.sections.programId,programIds),
           ),
         );
       for (const row of teacherRows) add(row.personId, `${row.sectionTitle} teacher`);
@@ -126,7 +131,8 @@ async function listAllowedThreadContacts(
       .select({ id: s.sections.id, title: s.sections.title })
       .from(s.sectionTeachers)
       .innerJoin(s.sections, eq(s.sections.id, s.sectionTeachers.sectionId))
-      .where(eq(s.sectionTeachers.personId, actorPersonId));
+      .where(and(eq(s.sectionTeachers.personId, actorPersonId),
+        inArray(s.sections.siteId,siteIds),inArray(s.sections.programId,programIds)));
     const sectionIds = sectionRows.map((row) => row.id);
     if (sectionIds.length) {
       const titleBySection = new Map(sectionRows.map((row) => [row.id, row.title]));
@@ -194,7 +200,8 @@ async function listAllowedThreadContacts(
         s.sectionTeachers,
         eq(s.sectionTeachers.sectionId, s.sections.id),
       )
-      .where(eq(s.enrollments.status, "active"));
+      .where(and(eq(s.enrollments.status,"active"),
+        inArray(s.sections.siteId,siteIds),inArray(s.sections.programId,programIds)));
     for (const row of teacherRows) add(row.personId, `${row.sectionTitle} teacher`);
 
     const guardianRows = await db
@@ -222,11 +229,11 @@ export const listThreadContacts = createServerFn({ method: "GET" }).handler(asyn
   setResponseHeader("Cache-Control", "private, no-store");
   const actorPersonId = requireActorPerson(context.actorPersonId);
   const role = context.role;
-  if (!role || !(demoAllowedRoles as readonly string[]).includes(role)) {
+  if (!role || !Object.hasOwn(roleCapabilities,role)) {
     return { contacts: [] as ThreadContact[] };
   }
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-  const contacts = await listAllowedThreadContacts(db, s, role, actorPersonId);
+  const contacts = await listAllowedThreadContacts(db, s, role, actorPersonId, context.scope.siteIds??[], context.scope.programIds??[]);
   return { contacts };
 });
 
@@ -252,16 +259,15 @@ export const startThread = createServerFn({ method: "POST" })
     const context = await getCommandContext(getRequest());
     assertCapability(context, "communication.send");
     const role = context.role;
-    if (!role || !(demoAllowedRoles as readonly string[]).includes(role)) {
-      throw new AuthorizationError("demo role");
+    if (!role || !Object.hasOwn(roleCapabilities,role)) {
+      throw new AuthorizationError("authorized messaging role");
     }
-    assertSyntheticMutation(role as DemoRole);
     const actorPersonId = requireActorPerson(context.actorPersonId);
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
 
     // Re-derive the allowed contact set server-side; fail closed if the
     // requested recipient is not reachable through a real relationship.
-    const contacts = await listAllowedThreadContacts(db, s, role, actorPersonId);
+    const contacts = await listAllowedThreadContacts(db, s, role, actorPersonId, context.scope.siteIds??[], context.scope.programIds??[]);
     if (!contacts.some((contact) => contact.personId === data.recipientPersonId)) {
       throw new AuthorizationError("communication thread recipient");
     }
@@ -481,10 +487,9 @@ export const replyToThread = createServerFn({ method: "POST" })
     const context = await getCommandContext(getRequest());
     assertCapability(context, "communication.send");
     const role = context.role;
-    if (!role || !(demoAllowedRoles as readonly string[]).includes(role)) {
-      throw new AuthorizationError("demo role");
+    if (!role || !Object.hasOwn(roleCapabilities,role)) {
+      throw new AuthorizationError("authorized messaging role");
     }
-    assertSyntheticMutation(role as DemoRole);
     const actorPersonId = requireActorPerson(context.actorPersonId);
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
 

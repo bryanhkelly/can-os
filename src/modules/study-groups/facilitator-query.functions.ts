@@ -10,13 +10,13 @@ export const getFacilitatorStudyGroups=createServerFn({method:"GET"}).handler(as
  setResponseHeader("Cache-Control","private, no-store");
  if(actor.role!=="teacher"||!actor.actorPersonId||!actor.scope.siteIds?.length)throw new AuthorizationError("facilitator group access");
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const groups=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,status:s.studyGroups.status,siteId:s.studyGroups.siteId})
+ const groups=await db.select({id:s.studyGroups.id,title:s.studyGroups.title,status:s.studyGroups.status,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,metadata:s.studyGroups.metadata})
   .from(s.studyGroups).where(and(eq(s.studyGroups.facilitatorPersonId,actor.actorPersonId),eq(s.studyGroups.status,"active")))
   .orderBy(desc(s.studyGroups.createdAt)).limit(100);
- const permitted=groups.filter(g=>g.siteId&&actor.scope.siteIds?.includes(g.siteId));
+ const permitted=groups.filter(g=>g.siteId&&actor.scope.siteIds?.includes(g.siteId)&&(!g.programId||actor.scope.programIds?.includes(g.programId)));
  if(!permitted.length)return [];
  const sessions=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,title:s.studyGroupSessions.title,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt,metadata:s.calendarEvents.metadata})
   .from(s.studyGroupSessions).leftJoin(s.calendarEvents,and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,s.studyGroupSessions.id)))
   .where(and(inArray(s.studyGroupSessions.groupId,permitted.map(g=>g.id)))).limit(100);
- return permitted.map(group=>({id:group.id,title:group.title,sessions:sessions.filter(session=>session.groupId===group.id).map(session=>({id:session.id,title:session.title,startsAt:session.startsAt.toISOString(),endsAt:session.endsAt.toISOString(),cancelled:session.metadata?.cancelled===true}))}));
+ return permitted.map(group=>({id:group.id,title:group.title,legacySessionWrites:group.metadata.synthetic===true,sessions:sessions.filter(session=>session.groupId===group.id).map(session=>({id:session.id,title:session.title,startsAt:session.startsAt.toISOString(),endsAt:session.endsAt.toISOString(),cancelled:session.metadata?.cancelled===true}))}));
 });

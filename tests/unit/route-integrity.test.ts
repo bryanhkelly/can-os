@@ -3,9 +3,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
-  demoNavigationLinks,
-  demoPersonaHome,
-} from "@/components/student/DemoNavigation";
+  workspaceLinks,
+  workspaceHome,
+} from "@/components/shell/WorkspaceNavigation";
 
 /**
  * Route wiring integrity. Two failure classes this guards against:
@@ -54,14 +54,14 @@ describe("route tree freshness", () => {
 
 describe("navigation link targets", () => {
   it("every primary navigation link resolves to a route", () => {
-    const broken = demoNavigationLinks
-      .map((link) => link.to)
+    const broken = Object.values(workspaceLinks).flat()
+      .map((link) => link.path)
       .filter((to) => !routePaths.has(linkPath(to)));
     expect(broken, `nav links with no matching route file: ${broken.join(", ")}`).toEqual([]);
   });
 
   it("every persona home resolves to a route", () => {
-    const broken = Object.values(demoPersonaHome).filter(
+    const broken = Object.values(workspaceHome).filter(
       (to) => !routePaths.has(linkPath(to)),
     );
     expect(broken).toEqual([]);

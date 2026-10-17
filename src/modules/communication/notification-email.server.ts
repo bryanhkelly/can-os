@@ -32,14 +32,15 @@ function resolveActionUrl(actionUrl: string | undefined): string | undefined {
 
 export async function sendNotificationEmail(
   message: NotificationEmailMessage,
-): Promise<void> {
+  idempotencyKey?: string,
+): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   const from =
     process.env.CAN_NOTIFICATIONS_FROM_EMAIL ??
     process.env.CAN_ACCESS_FROM_EMAIL;
   if (!apiKey || !from) {
     console.log("[notification-email] Resend not configured; skipping email");
-    return;
+    return false;
   }
 
   const actionUrl = resolveActionUrl(message.actionUrl);
@@ -53,6 +54,7 @@ export async function sendNotificationEmail(
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       },
       body: JSON.stringify({
         from,
@@ -65,11 +67,14 @@ export async function sendNotificationEmail(
       console.log(
         `[notification-email] Resend delivery failed with status ${response.status}`,
       );
+      return false;
     }
+    return true;
   } catch (error) {
     console.log(
       `[notification-email] Delivery error: ${error instanceof Error ? error.message : "unknown"}`,
     );
+    return false;
   }
 }
 

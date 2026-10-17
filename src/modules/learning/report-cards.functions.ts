@@ -6,10 +6,10 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import {
   assertCapability,
   assertSiteScope,
+  assertProgramScope,
   AuthorizationError,
   type CommandContext,
 } from "@/domain/command-context";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { EventTypes } from "@/domain/event-types";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,16 +25,16 @@ async function stores() {
   return { db, s };
 }
 
-/** Simple letter bands; historical rows retain the GradeScale version finalized with. */
-function letterFor(percentage: number): string {
-  if (percentage >= 90) return "A";
-  if (percentage >= 80) return "B";
-  if (percentage >= 70) return "C";
-  if (percentage >= 60) return "D";
-  return "F";
+/** Resolve the published, school-specific GradeScale rather than fixed A–F bands. */
+function letterFor(percentage:number,entries:Array<{
+ label:string;minPercent?:number;maxPercent?:number
+}>):string{
+ const matched=entries.find(e=>percentage>=(e.minPercent??0)&&percentage<=(e.maxPercent??100));
+ if(!matched)throw new Error("Percentage does not fit the school grading scale");
+ return matched.label;
 }
 
-type Viewer = { context: CommandContext; studentProfileId: string; siteIds: string[] };
+type Viewer = { context: CommandContext; studentProfileId: string; siteIds: string[]; programIds: string[] };
 
 /**
  * Report cards and transcripts are visible to the student themselves or to a
@@ -61,7 +61,7 @@ async function resolveStudentViewer(
       .where(eq(s.studentProfiles.personId, context.actorPersonId))
       .limit(1);
     if (!profile) throw new AuthorizationError("student profile");
-    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds };
+    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds,programIds:context.scope.programIds??[] };
   }
   if (context.role === "guardian") {
     assertCapability(context, "student:related-read");
@@ -89,7 +89,7 @@ async function resolveStudentViewer(
       .where(eq(s.studentProfiles.personId, studentPersonId))
       .limit(1);
     if (!profile) throw new AuthorizationError("student profile");
-    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds };
+    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds,programIds:context.scope.programIds??[] };
   }
   throw new AuthorizationError("report card access");
 }
@@ -106,7 +106,9 @@ async function finalizedGradeRows(
       sectionGradeId: s.sectionGrades.id,
       sectionId: s.sectionGrades.sectionId,
       sectionTitle: s.sections.title,
+      sectionMetadata:s.sections.metadata,
       gradingPeriodId: s.sectionGrades.gradingPeriodId,
+      gradingPeriodSequence:s.gradingPeriods.sequence,
       gradingPeriodName: s.gradingPeriods.name,
       termId: s.sectionGrades.termId,
       termName: s.terms.name,
@@ -133,6 +135,7 @@ async function finalizedGradeRows(
         eq(s.sectionGrades.studentProfileId, viewer.studentProfileId),
         eq(s.sectionGrades.status, "finalized"),
         inArray(s.sections.siteId, viewer.siteIds),
+        inArray(s.sections.programId,viewer.programIds),
         gradingPeriodId ? eq(s.sectionGrades.gradingPeriodId, gradingPeriodId) : undefined,
       ),
     )
@@ -142,9 +145,19 @@ async function finalizedGradeRows(
       asc(s.gradingPeriods.sequence),
       asc(s.sections.title),
     );
+  const periodRows=rows.length?await db.select({termId:s.gradingPeriods.termId,
+    sequence:s.gradingPeriods.sequence}).from(s.gradingPeriods)
+    .where(inArray(s.gradingPeriods.termId,[...new Set(rows.map(row=>row.termId))])):[];
+  const lastPeriod=new Map<string,number>();
+  for(const p of periodRows)lastPeriod.set(p.termId,Math.max(lastPeriod.get(p.termId)??0,p.sequence));
   return rows.map((row) => ({
     ...row,
     finalizedAt: row.finalizedAt?.toISOString() ?? null,
+    creditsAttempted:row.gradingPeriodSequence===lastPeriod.get(row.termId)?
+      (typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1):0,
+    creditsEarned:row.gradingPeriodSequence===lastPeriod.get(row.termId)&&
+      ["A","B","C","D","P","Pass"].includes(row.letterGrade??"")?
+      (typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1):0,
   }));
 }
 
@@ -160,7 +173,6 @@ export type FinalizedGradeRow = Awaited<ReturnType<typeof finalizedGradeRows>>[n
 export const finalizeSectionGrades = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ sectionId: z.string().min(1), gradingPeriodId: z.string().min(1) }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("teacher");
     const context = await getCommandContext(getRequest());
     assertCapability(context, "assignments:grade");
     if (context.role !== "teacher" || !context.actorPersonId) {
@@ -183,6 +195,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           title: s.sections.title,
           siteId: s.sections.siteId,
           programId: s.sections.programId,
+          termId:s.sections.termId,
         })
         .from(s.sections)
         .innerJoin(
@@ -196,6 +209,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         .limit(1);
       if (!section) throw new AuthorizationError("assigned teacher");
       assertSiteScope(context, section.siteId);
+      assertProgramScope(context,section.programId);
 
       const [period] = await tx
         .select({
@@ -213,6 +227,10 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         .where(eq(s.gradingPeriods.id, data.gradingPeriodId))
         .limit(1);
       if (!period) throw new Error("GradingPeriod not found");
+      if(section.termId!==period.termId)throw new AuthorizationError("grading period must belong to the section term");
+      const [gradeScale]=await tx.select({configuration:s.gradeScales.configuration})
+       .from(s.gradeScales).where(eq(s.gradeScales.id,period.gradeScaleId)).limit(1);
+      if(!gradeScale?.configuration.entries.length)throw new Error("Active school grade scale is required");
 
       // Window is [startsOn, endsOn] inclusive in the school-year timezone's dates.
       const windowStart = new Date(`${period.startsOn}T00:00:00.000Z`);
@@ -321,7 +339,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           continue;
         }
         const percentage = Math.round((total.earned / total.possible) * 10000) / 100;
-        const letterGrade = letterFor(percentage);
+        const letterGrade = letterFor(percentage,gradeScale.configuration.entries);
         const values = {
           status: "finalized" as const,
           score: String(Math.round(total.earned * 100) / 100),
@@ -486,7 +504,6 @@ type GradeCorrection = {
 export const correctSectionGrade = createServerFn({ method: "POST" })
   .validator((value: unknown) => correctSectionGradeSchema.parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("teacher");
     const context = await getCommandContext(getRequest());
     assertCapability(context, "assignments:grade");
     if (context.role !== "teacher" || !context.actorPersonId) {
@@ -511,6 +528,7 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
           percentage: s.sectionGrades.percentage,
           letterGrade: s.sectionGrades.letterGrade,
           correctionOfId: s.sectionGrades.correctionOfId,
+          gradeScaleId:s.sectionGrades.gradeScaleId,
           metadata: s.sectionGrades.metadata,
         })
         .from(s.sectionGrades)
@@ -541,13 +559,16 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
         .limit(1);
       if (!section) throw new AuthorizationError("assigned teacher");
       assertSiteScope(context, section.siteId);
+      assertProgramScope(context,section.programId);
 
+      const [gradeScale]=grade.gradeScaleId?await tx.select({configuration:s.gradeScales.configuration})
+       .from(s.gradeScales).where(eq(s.gradeScales.id,grade.gradeScaleId)).limit(1):[];
       const now = new Date();
       const newPercentage =
         data.percentage !== undefined ? String(data.percentage) : grade.percentage;
       const newLetterGrade =
         data.letterGrade ??
-        (data.percentage !== undefined ? letterFor(data.percentage) : grade.letterGrade);
+        (data.percentage !== undefined ? letterFor(data.percentage,gradeScale?.configuration.entries??[]) : grade.letterGrade);
 
       const priorCorrections = Array.isArray(grade.metadata?.corrections)
         ? (grade.metadata.corrections as GradeCorrection[])
@@ -667,19 +688,56 @@ export const getStudentReportCard = createServerFn({ method: "GET" })
   });
 
 /** All finalized grades ordered by school year/term, with the credit issuer per program. */
+/**
+ * Approved course withdrawals preserve their registrar-approved W notation in
+ * the canonical transcript projection, including subsequent official snapshots.
+ * No grade points or earned credit are awarded for a withdrawal.
+ */
+async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
+ const rows=await db.select({
+  enrollmentId:s.enrollments.id,sectionId:s.sections.id,sectionTitle:s.sections.title,
+  sectionMetadata:s.sections.metadata,
+  termId:s.terms.id,termName:s.terms.name,schoolYearId:s.schoolYears.id,
+  schoolYearName:s.schoolYears.name,programName:s.programs.name,
+  creditIssuingOrganizationId:s.programs.creditIssuingOrganizationId,
+  creditIssuingOrganization:s.organizations.name,metadata:s.enrollments.metadata,
+  endedAt:s.enrollments.endedAt,
+ }).from(s.enrollments)
+  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.terms.schoolYearId))
+  .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+  .innerJoin(s.organizations,eq(s.organizations.id,s.programs.creditIssuingOrganizationId))
+  .where(and(eq(s.enrollments.studentProfileId,viewer.studentProfileId),
+   eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"withdrawn"),
+   inArray(s.sections.siteId,viewer.siteIds),inArray(s.sections.programId,viewer.programIds)));
+ return rows.filter(row=>row.metadata.withdrawalNotation==="W").map(row=>({
+  sectionGradeId:"withdrawal:"+row.enrollmentId,
+  sectionId:row.sectionId,sectionTitle:row.sectionTitle,
+  gradingPeriodName:"Withdrawal",termId:row.termId,termName:row.termName,
+  schoolYearId:row.schoolYearId,schoolYearName:row.schoolYearName,
+  letterGrade:"W",percentage:null,score:null,programName:row.programName,
+  creditsAttempted:typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1,
+  creditsEarned:0,
+  creditIssuingOrganizationId:row.creditIssuingOrganizationId,
+  creditIssuingOrganization:row.creditIssuingOrganization,
+  finalizedAt:row.endedAt?.toISOString()??null,
+ }));
+}
 export const getStudentTranscript = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1).optional() }).parse(value ?? {}))
   .handler(async ({ data }) => {
     const { db, s } = await stores();
     const viewer = await resolveStudentViewer(db, s, data.studentPersonId);
-    const rows = await finalizedGradeRows(db, s, viewer);
+    const rows = [...await finalizedGradeRows(db, s, viewer), ...await withdrawalTranscriptRows(db, s, viewer)];
     return {
       rows,
-      issuances: await listIssuances(db, s, viewer.studentProfileId),
+      issuances: await listIssuances(db, s, viewer.studentProfileId,[...new Set(rows.map(row=>row.creditIssuingOrganizationId))]),
     };
   });
 
-async function listIssuances(db: DbClient, s: Schema, studentProfileId: string) {
+async function listIssuances(db: DbClient, s: Schema, studentProfileId: string, authorizedIssuers:string[]) {
+  if(!authorizedIssuers.length)return [];
   const rows = await db
     .select({
       id: s.transcriptIssuances.id,
@@ -692,7 +750,7 @@ async function listIssuances(db: DbClient, s: Schema, studentProfileId: string) 
       s.organizations,
       eq(s.organizations.id, s.transcriptIssuances.issuingOrganizationId),
     )
-    .where(eq(s.transcriptIssuances.studentProfileId, studentProfileId))
+    .where(and(eq(s.transcriptIssuances.studentProfileId, studentProfileId),inArray(s.transcriptIssuances.issuingOrganizationId,authorizedIssuers)))
     .orderBy(desc(s.transcriptIssuances.issuedAt));
   return rows.map((row) => ({ ...row, issuedAt: row.issuedAt.toISOString() }));
 }
@@ -706,7 +764,6 @@ async function listIssuances(db: DbClient, s: Schema, studentProfileId: string) 
 export const issueTranscript = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1), purpose: z.string().optional() }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const context = await getCommandContext(getRequest());
     assertCapability(context, "enrollment:manage");
     if (context.role !== "registrar" || !context.actorPersonId) {
@@ -732,12 +789,15 @@ export const issueTranscript = createServerFn({ method: "POST" })
       context,
       studentProfileId: profile.id,
       siteIds: context.scope.siteIds,
+      programIds:context.scope.programIds??[],
     };
-    const rows = await finalizedGradeRows(db, s, viewer);
+    const rows = [...await finalizedGradeRows(db, s, viewer), ...await withdrawalTranscriptRows(db, s, viewer)];
     if (!rows.length) {
       throw new Error("No finalized grades available to issue a transcript");
     }
     const issuingOrganizationId = rows[0]!.creditIssuingOrganizationId;
+    if(rows.some(row=>row.creditIssuingOrganizationId!==issuingOrganizationId))
+      throw new AuthorizationError("A single official transcript cannot combine credits issued by separate organizations without a transfer-credit agreement");
     const issuingOrganization = rows[0]!.creditIssuingOrganization;
 
     return db.transaction(async (tx) => {

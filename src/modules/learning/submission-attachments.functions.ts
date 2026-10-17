@@ -5,7 +5,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
+import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { r2Config } from "@/modules/enrollment/r2-documents.server";
 
 /**
@@ -20,12 +20,9 @@ const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 const attachmentMimeByExtension: Record<string, string> = {
   pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  txt: "text/plain",
   png: "image/png",
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
-  md: "text/markdown",
 };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,13 +34,13 @@ function validateAttachmentUpload(fileName: string, contentType: string, sizeByt
   }
   const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
   if (!attachmentMimeByExtension[extension]) {
-    throw new Error("Only PDF, DOCX, TXT, PNG, JPG, JPEG and MD files are supported");
+    throw new Error("Only verified PDF, PNG and JPEG attachments are supported");
   }
   if (attachmentMimeByExtension[extension] !== contentType) {
     throw new Error("File content type does not match its extension");
   }
-  if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > MAX_ATTACHMENT_BYTES) {
-    throw new Error("Attachments must be 1 byte to 10 MB");
+  if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 16 || sizeBytes > MAX_ATTACHMENT_BYTES) {
+    throw new Error("Attachments must be 16 bytes to 10 MB");
   }
 }
 
@@ -85,6 +82,48 @@ function signLearningObject(method: "PUT" | "HEAD" | "GET", key: string, content
   return "https://" + host + path + "?" + query + "&X-Amz-Signature=" + signature;
 }
 
+/** Confirm that the private object was actually uploaded before linking it to a student record. */
+async function assertUploadedLearningObject(
+ key:string,contentType:string|null,expectedSize:unknown,
+):Promise<void>{
+ if(!learningKeyPattern.test(key)||typeof contentType!=="string"||
+  !Number.isSafeInteger(expectedSize)||Number(expectedSize)<1||
+  Number(expectedSize)>MAX_ATTACHMENT_BYTES)
+  throw new Error("Invalid attachment storage record");
+ const head=await fetch(signLearningObject("HEAD",key,undefined,30),{method:"HEAD"});
+ if(!head.ok)throw new Error("Attachment upload could not be verified");
+ if(Number(head.headers.get("content-length"))!==expectedSize)
+  throw new Error("Uploaded attachment size does not match the expected size");
+ const actualType=head.headers.get("content-type");
+ if(actualType?.split(";")[0]?.toLowerCase()!==contentType.toLowerCase())
+  throw new Error("Uploaded attachment type does not match the expected format");
+ // The supported image/PDF formats have recognizable magic bytes. Request
+ // exactly 16 bytes and reject any storage server that ignores the Range.
+ if(["application/pdf","image/jpeg","image/png"].includes(contentType)){
+  if(Number(expectedSize)<16)throw new Error("Uploaded file is too small");
+  const sample=await fetch(signLearningObject("GET",key,undefined,30),{
+   headers:{Range:"bytes=0-15"}
+  });
+  if(sample.status!==206||
+   sample.headers.get("content-range")!==`bytes 0-15/${expectedSize}`)
+   throw new Error("Storage did not honor the bounded signature request");
+  const reader=sample.body?.getReader();
+  if(!reader)throw new Error("Attachment signature response missing");
+  const bytes=new Uint8Array(16);
+  let offset=0;
+  try{
+   while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    if(offset+value.length>16)throw new Error("Signature response exceeded 16 bytes");
+    bytes.set(value,offset);offset+=value.length;
+   }
+  }finally{await reader.cancel().catch(()=>{});}
+  if(offset!==16||!matchesEnrollmentDocumentSignature(contentType,bytes))
+   throw new Error("File signature does not match the declared format");
+ }
+}
+
 /** Verified student actor; identity always comes from the server session. */
 async function studentActor() {
   const context = await getCommandContext(getRequest());
@@ -112,11 +151,11 @@ type DbSchema = typeof import("@/db/schema");
 type Tx = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
 /** Published synthetic assessment at a scoped site where the student is actively enrolled. */
-async function requireEnrolledAssessment(tx: Tx, s: DbSchema, assessmentId: string, studentId: string, siteIds: string[]) {
+async function requireEnrolledAssessment(tx: Tx, s: DbSchema, assessmentId: string, studentId: string, siteIds: string[], programIds: string[]) {
   const [assessment] = await tx.select({ id: s.assessments.id, sectionId: s.assessments.sectionId, metadata: s.assessments.metadata })
     .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
-    .where(and(eq(s.assessments.id, assessmentId), eq(s.assessments.status, "published"), inArray(s.sections.siteId, siteIds))).limit(1);
-  if (!assessment || assessment.metadata.synthetic !== true) throw new Error("Synthetic assessment not found");
+    .where(and(eq(s.assessments.id, assessmentId), eq(s.assessments.status, "published"), inArray(s.sections.siteId, siteIds),inArray(s.sections.programId,programIds))).limit(1);
+  if (!assessment) throw new AuthorizationError("published assessment in authorized school and program");
   const [enrollment] = await tx.select({ id: s.enrollments.id }).from(s.enrollments).where(and(
     eq(s.enrollments.studentProfileId, studentId), eq(s.enrollments.sectionId, assessment.sectionId), eq(s.enrollments.status, "active"))).limit(1);
   if (!enrollment) throw new Error("Student is not enrolled");
@@ -151,13 +190,12 @@ export const createSubmissionAttachmentUpload = createServerFn({ method: "POST" 
     sizeBytes: z.number(),
   }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("student");
     const { context, studentId, studentPersonId } = await studentActor();
     validateAttachmentUpload(data.fileName, data.contentType, data.sizeBytes);
     const key = newAttachmentKey("assignment", data.assessmentId);
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async (tx) => {
-      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!);
+      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!,context.scope.programIds??[]);
       const [document] = await tx.insert(s.documents).values({
         subjectType: "assessment",
         subjectId: assessment.id,
@@ -168,7 +206,8 @@ export const createSubmissionAttachmentUpload = createServerFn({ method: "POST" 
         mimeType: data.contentType,
         sensitivityTier: "restricted",
         uploadedByPersonId: studentPersonId,
-        metadata: { synthetic: true, assessmentId: assessment.id, sizeBytes: data.sizeBytes },
+        metadata: { assessmentId: assessment.id, sizeBytes: data.sizeBytes, uploadState: "pending" },
+        expiresAt: new Date(Date.now()+24*60*60*1000),
       }).returning({ id: s.documents.id });
       if (!document) throw new Error("Could not record attachment");
       await tx.insert(s.auditEvents).values({
@@ -177,7 +216,7 @@ export const createSubmissionAttachmentUpload = createServerFn({ method: "POST" 
         resourceType: "document",
         resourceId: document.id,
         after: { assessmentId: assessment.id, storageProvider: "cloudflare_r2" },
-        context: { accountId: context.accountId, sessionId: context.sessionId, synthetic: true },
+        context: { accountId: context.accountId, sessionId: context.sessionId },
       });
       return { documentId: document.id, key, uploadUrl: signLearningObject("PUT", key, data.contentType, 180), expiresInSeconds: 180 };
     });
@@ -190,14 +229,13 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
     documentId: z.string().min(1),
   }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("student");
     const { context, studentId, studentPersonId } = await studentActor();
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async (tx) => {
-      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!);
+      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!,context.scope.programIds??[]);
       // Serialize with draft/submit writes for this student+assessment.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);
-      const [document] = await tx.select({ id: s.documents.id }).from(s.documents).where(and(
+      const [document] = await tx.select({ id: s.documents.id,storageKey:s.documents.storageKey,mimeType:s.documents.mimeType,metadata:s.documents.metadata,verifiedAt:s.documents.verifiedAt,expiresAt:s.documents.expiresAt }).from(s.documents).where(and(
         eq(s.documents.id, data.documentId),
         eq(s.documents.subjectType, "assessment"),
         eq(s.documents.subjectId, assessment.id),
@@ -205,6 +243,15 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
         eq(s.documents.uploadedByPersonId, studentPersonId),
       )).limit(1);
       if (!document) throw new Error("Attachment not found for this assignment");
+      if(!document.storageKey.startsWith(`learning/assignment/${assessment.id}/`))
+        throw new AuthorizationError("attachment assignment object scope");
+      if(document.expiresAt&&document.expiresAt<=new Date())
+        throw new Error("Attachment upload authorization has expired");
+      await assertUploadedLearningObject(document.storageKey,document.mimeType,document.metadata.sizeBytes);
+      if(!document.verifiedAt)await tx.update(s.documents).set({
+        verifiedAt:new Date(),verifiedByPersonId:context.actorPersonId!,
+        expiresAt:null,metadata:{...document.metadata,uploadState:"verified"}
+      }).where(eq(s.documents.id,document.id));
       const [latest] = await tx.select().from(s.submissions)
         .where(and(eq(s.submissions.assessmentId, assessment.id), eq(s.submissions.studentProfileId, studentId)))
         .orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
@@ -234,7 +281,7 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
           resourceType: "submission",
           resourceId: updated.id,
           after: { documentId: document.id, status: latest.status },
-          context: { accountId: context.accountId, sessionId: context.sessionId, synthetic: true },
+          context: { accountId: context.accountId, sessionId: context.sessionId },
         });
         return { submissionId: updated.id, attached: true, alreadyAttached: false };
       }
@@ -251,7 +298,7 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
         resourceType: "submission",
         resourceId: created.id,
         after: { documentId: document.id, status: "assigned" },
-        context: { accountId: context.accountId, sessionId: context.sessionId, synthetic: true },
+        context: { accountId: context.accountId, sessionId: context.sessionId },
       });
       return { submissionId: created.id, attached: true, alreadyAttached: false };
     });
@@ -265,7 +312,7 @@ export const listSubmissionAttachments = createServerFn({ method: "GET" })
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const [assessment] = await db.select({ id: s.assessments.id, sectionId: s.assessments.sectionId })
       .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
-      .where(and(eq(s.assessments.id, data.assessmentId), inArray(s.sections.siteId, context.scope.siteIds!))).limit(1);
+      .where(and(eq(s.assessments.id, data.assessmentId), inArray(s.sections.siteId, context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
     if (!assessment) return { attachments: [] };
     const [enrollment] = await db.select({ id: s.enrollments.id }).from(s.enrollments).where(and(
       eq(s.enrollments.studentProfileId, studentId), eq(s.enrollments.sectionId, assessment.sectionId), eq(s.enrollments.status, "active"))).limit(1);
@@ -293,7 +340,6 @@ export const createExcuseAttachmentUpload = createServerFn({ method: "POST" })
     sizeBytes: z.number(),
   }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("guardian");
     const context = await guardianActor();
     if (!uuidPattern.test(data.attendanceEventId)) throw new Error("Invalid attendance event");
     validateAttachmentUpload(data.fileName, data.contentType, data.sizeBytes);
@@ -311,7 +357,8 @@ export const createExcuseAttachmentUpload = createServerFn({ method: "POST" })
         mimeType: data.contentType,
         sensitivityTier: "restricted",
         uploadedByPersonId: context.actorPersonId!,
-        metadata: { synthetic: true, attendanceEventId: data.attendanceEventId, sizeBytes: data.sizeBytes },
+        metadata: { attendanceEventId: data.attendanceEventId, sizeBytes: data.sizeBytes, uploadState: "pending" },
+        expiresAt: new Date(Date.now()+24*60*60*1000),
       }).returning({ id: s.documents.id });
       if (!document) throw new Error("Could not record attachment");
       await tx.insert(s.auditEvents).values({
@@ -320,7 +367,7 @@ export const createExcuseAttachmentUpload = createServerFn({ method: "POST" })
         resourceType: "document",
         resourceId: document.id,
         after: { attendanceEventId: data.attendanceEventId, storageProvider: "cloudflare_r2" },
-        context: { accountId: context.accountId, sessionId: context.sessionId, synthetic: true },
+        context: { accountId: context.accountId, sessionId: context.sessionId },
       });
       return { documentId: document.id, key, uploadUrl: signLearningObject("PUT", key, data.contentType, 180), expiresInSeconds: 180 };
     });
@@ -333,13 +380,12 @@ export const attachDocumentToExcuse = createServerFn({ method: "POST" })
     documentId: z.string().min(1),
   }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("guardian");
     const context = await guardianActor();
     if (!uuidPattern.test(data.attendanceEventId)) throw new Error("Invalid attendance event");
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async (tx) => {
       await requireGuardianEvent(tx, s, data.attendanceEventId, context.actorPersonId!, context.scope.programIds ?? []);
-      const [document] = await tx.select({ id: s.documents.id }).from(s.documents).where(and(
+      const [document] = await tx.select({ id: s.documents.id,storageKey:s.documents.storageKey,mimeType:s.documents.mimeType,metadata:s.documents.metadata,verifiedAt:s.documents.verifiedAt,expiresAt:s.documents.expiresAt }).from(s.documents).where(and(
         eq(s.documents.id, data.documentId),
         eq(s.documents.subjectType, "attendance_event"),
         eq(s.documents.subjectId, data.attendanceEventId),
@@ -347,6 +393,15 @@ export const attachDocumentToExcuse = createServerFn({ method: "POST" })
         eq(s.documents.uploadedByPersonId, context.actorPersonId!),
       )).limit(1);
       if (!document) throw new Error("Document not found for this attendance event");
+      if(!document.storageKey.startsWith(`learning/excuse/${data.attendanceEventId}/`))
+        throw new AuthorizationError("attachment attendance object scope");
+      if(document.expiresAt&&document.expiresAt<=new Date())
+        throw new Error("Attachment upload authorization has expired");
+      await assertUploadedLearningObject(document.storageKey,document.mimeType,document.metadata.sizeBytes);
+      if(!document.verifiedAt)await tx.update(s.documents).set({
+        verifiedAt:new Date(),verifiedByPersonId:context.actorPersonId!,
+        expiresAt:null,metadata:{...document.metadata,uploadState:"verified"}
+      }).where(eq(s.documents.id,document.id));
       const [excuse] = await tx.select().from(s.attendanceExcuses)
         .where(eq(s.attendanceExcuses.attendanceEventId, data.attendanceEventId))
         .orderBy(desc(s.attendanceExcuses.createdAt)).limit(1).for("update");
@@ -366,7 +421,7 @@ export const attachDocumentToExcuse = createServerFn({ method: "POST" })
         resourceType: "attendance_excuse",
         resourceId: updated.id,
         after: { documentId: document.id, attendanceEventId: data.attendanceEventId },
-        context: { accountId: context.accountId, sessionId: context.sessionId, synthetic: true },
+        context: { accountId: context.accountId, sessionId: context.sessionId },
       });
       return { excuseId: updated.id, attached: true, alreadyAttached: false };
     });
@@ -401,3 +456,65 @@ export const listExcuseAttachmentCounts = createServerFn({ method: "GET" })
     }
     return { counts: [...latest.entries()].map(([attendanceEventId, count]) => ({ attendanceEventId, count })) };
   });
+
+/** Return a short-lived private URL only for a verified file linked to this student's latest attempt. */
+export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({
+  assessmentId:z.string().uuid(),documentId:z.string().uuid()
+ }).parse(value))
+ .handler(async({data})=>{
+  const {context,studentId,studentPersonId}=await studentActor();
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+  const assessment=await requireEnrolledAssessment(tx,s,data.assessmentId,studentId,
+    context.scope.siteIds??[],context.scope.programIds??[]);
+  const [latest]=await tx.select({response:s.submissions.response})
+   .from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),
+    eq(s.submissions.studentProfileId,studentId)))
+   .orderBy(desc(s.submissions.attemptNumber)).limit(1);
+  const ids=Array.isArray(latest?.response.attachments)?latest.response.attachments:[];
+  if(!ids.includes(data.documentId))throw new AuthorizationError("attachment belongs to latest student submission");
+  const [document]=await tx.select({
+   storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt,
+   mimeType:s.documents.mimeType
+  }).from(s.documents).where(and(eq(s.documents.id,data.documentId),
+   eq(s.documents.subjectType,"assessment"),eq(s.documents.subjectId,assessment.id),
+   eq(s.documents.category,"assignment_submission"),
+   eq(s.documents.uploadedByPersonId,studentPersonId),
+   eq(s.documents.storageProvider,"cloudflare_r2"))).limit(1);
+  if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/assignment/${assessment.id}/`))
+    throw new AuthorizationError("verified attachment scope");
+  return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
+  });
+ });
+
+/** Only the uploading guardian can fetch a verified file on a current child's excuse. */
+export const getExcuseAttachmentDownload=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({
+  attendanceEventId:z.string().uuid(),documentId:z.string().uuid()
+ }).parse(value))
+ .handler(async({data})=>{
+  const context=await guardianActor();
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+  await requireGuardianEvent(tx,s,data.attendanceEventId,context.actorPersonId!,
+    context.scope.programIds??[]);
+  const [excuse]=await tx.select({documentIds:s.attendanceExcuses.documentIds})
+    .from(s.attendanceExcuses)
+    .where(eq(s.attendanceExcuses.attendanceEventId,data.attendanceEventId))
+    .orderBy(desc(s.attendanceExcuses.createdAt)).limit(1);
+  if(!excuse?.documentIds.includes(data.documentId))
+    throw new AuthorizationError("document not attached to latest excuse");
+  const [document]=await tx.select({
+   storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt
+  }).from(s.documents).where(and(eq(s.documents.id,data.documentId),
+    eq(s.documents.subjectType,"attendance_event"),
+    eq(s.documents.subjectId,data.attendanceEventId),
+    eq(s.documents.category,"attendance_excuse"),
+    eq(s.documents.uploadedByPersonId,context.actorPersonId!),
+    eq(s.documents.storageProvider,"cloudflare_r2"))).limit(1);
+  if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/excuse/${data.attendanceEventId}/`))
+    throw new AuthorizationError("verified excuse document scope");
+  return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
+  });
+ });

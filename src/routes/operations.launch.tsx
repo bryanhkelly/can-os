@@ -6,6 +6,8 @@ import {
   listLaunches,
   listLaunchOptions,
   startLaunch,
+  createLaunchSite,
+  scheduleLaunchOrientation,
 } from "@/modules/programs/launch.functions";
 
 const programTypes = [
@@ -74,6 +76,34 @@ function LaunchWizardPage() {
   const [academicProviderOrganizationId, setAcademicProviderOrganizationId] = useState("");
   const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState("");
   const [siteId, setSiteId] = useState("");
+  const [newSiteName,setNewSiteName]=useState("");
+  const [newSiteSlug,setNewSiteSlug]=useState("");
+  const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
+  const [orientationFor,setOrientationFor]=useState("");
+  const [orientationStart,setOrientationStart]=useState("");
+  const [orientationEnd,setOrientationEnd]=useState("");
+  const [orientationTitle,setOrientationTitle]=useState("Student and family orientation");
+  async function addOrientation(programId:string){
+    setBusy(true);setError("");
+    try {
+      if(!orientationStart||!orientationEnd)throw new Error("Choose orientation start and end times");
+      await scheduleLaunchOrientation({data:{programId,title:orientationTitle,
+        startsAt:new Date(orientationStart).toISOString(),
+        endsAt:new Date(orientationEnd).toISOString(),timezone:"America/Los_Angeles"}});
+      setOrientationFor("");await router.invalidate();
+    } catch(e){setError(e instanceof Error?e.message:"Unable to schedule orientation");}
+    finally{setBusy(false);}
+  }
+  async function addSite(){
+    if(!hostOrganizationId)return;
+    setBusy(true);setError("");
+    try{
+      await createLaunchSite({data:{organizationId:hostOrganizationId,name:newSiteName,
+        slug:newSiteSlug,timezone:newSiteTimezone}});
+      await router.invalidate();setNewSiteName("");setNewSiteSlug("");
+    }catch(e){setError(e instanceof Error?e.message:"Unable to create site");}
+    finally{setBusy(false);}
+  }
 
   const hostSites = options?.sites.filter((site) => site.organizationId === hostOrganizationId) ?? [];
 
@@ -289,6 +319,15 @@ function LaunchWizardPage() {
                       ))}
                     </select>
                   </label>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold">New host site</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <input aria-label="New site name" placeholder="Campus name" className={inputClass} value={newSiteName} onChange={e=>setNewSiteName(e.target.value)}/>
+                      <input aria-label="New site slug" placeholder="campus-slug" className={inputClass} value={newSiteSlug} onChange={e=>setNewSiteSlug(e.target.value)}/>
+                      <input aria-label="New site timezone" placeholder="Timezone" className={inputClass} value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}/>
+                    </div>
+                    <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Create site</button>
+                  </div>
                   <label className="block text-xs">
                     Jurisdiction
                     <select aria-label="Jurisdiction" className={selectClass} value={jurisdictionId} onChange={(e) => setJurisdictionId(e.target.value)} required>
@@ -348,6 +387,8 @@ function LaunchWizardPage() {
                       <h3 className="font-semibold">{launch.name}</h3>
                       <span className="text-xs uppercase text-muted-foreground">{launch.status}</span>
                     </div>
+                    <Link to="/operations/launch/$programId" params={{programId:launch.id}}
+                      className="mt-2 inline-block text-xs font-semibold underline">Configure classes and instructors →</Link>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {typeLabels[launch.type] ?? launch.type}
                       {launch.journey ? ` · Journey: ${launch.journey.status}` : " · No launch journey"}
@@ -382,6 +423,18 @@ function LaunchWizardPage() {
                         <li className="text-xs text-muted-foreground">No launch requirements configured.</li>
                       )}
                     </ul>
+                    <div className="mt-4 rounded-lg border p-3">
+                      <button type="button" onClick={()=>setOrientationFor(orientationFor===launch.id?"":launch.id)}
+                        className="text-xs font-semibold underline">Schedule family orientation</button>
+                      {orientationFor===launch.id && <div className="mt-3 grid gap-2">
+                        <label className="text-xs">Title<input className={inputClass} value={orientationTitle} onChange={e=>setOrientationTitle(e.target.value)}/></label>
+                        <label className="text-xs">Start<input type="datetime-local" className={inputClass} value={orientationStart} onChange={e=>setOrientationStart(e.target.value)}/></label>
+                        <label className="text-xs">End<input type="datetime-local" className={inputClass} value={orientationEnd} onChange={e=>setOrientationEnd(e.target.value)}/></label>
+                        <p className="text-xs text-muted-foreground">Times are entered in your local browser timezone and saved with an explicit offset.</p>
+                        <button type="button" disabled={busy||!orientationStart||!orientationEnd}
+                          onClick={()=>addOrientation(launch.id)} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Save orientation</button>
+                      </div>}
+                    </div>
                     <div className="mt-4">
                       <button
                         type="button"

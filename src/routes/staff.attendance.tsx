@@ -13,6 +13,22 @@ type RosterStudent = Awaited<ReturnType<typeof listSiteAttendanceRoster>>["stude
 type PendingExcuse = Awaited<ReturnType<typeof listPendingExcuses>>["excuses"][number];
 
 const statusOptions = ["present", "absent", "tardy"] as const;
+type OfflineMark = {studentProfileId:string;date:string;status:"present"|"absent"|"tardy";mutationId:string;note:string;expectedPreviousEventId?:string|null};
+const QUEUE_KEY="can-os:attendance:pending:v1";
+function readQueue():OfflineMark[]{
+ try{
+  const raw=window.localStorage.getItem(QUEUE_KEY);
+  const data=raw?JSON.parse(raw):[];
+  if(!Array.isArray(data))return [];
+  return data.filter((v):v is OfflineMark=>typeof v?.studentProfileId==="string"&&
+    typeof v.date==="string"&&["present","absent","tardy"].includes(v.status)&&
+    typeof v.mutationId==="string"&&typeof v.note==="string").slice(0,500);
+ }catch{return [];}
+}
+function writeQueue(items:OfflineMark[]){
+ window.localStorage.setItem(QUEUE_KEY,JSON.stringify(items));
+}
+
 
 function todayLocal(): string {
   const now = new Date();
@@ -25,11 +41,48 @@ function StaffAttendancePage() {
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [excuses, setExcuses] = useState<PendingExcuse[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [correctionNotes,setCorrectionNotes]=useState<Record<string,string>>({});
+  const [queued,setQueued]=useState<OfflineMark[]>([]);
+  const [syncing,setSyncing]=useState(false);
+  const [conflicts,setConflicts]=useState<OfflineMark[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  useEffect(()=>{setQueued(readQueue());},[]);
+  const savePending=(mark:OfflineMark)=>{
+    const next=[...readQueue().filter(item=>item.mutationId!==mark.mutationId),mark];
+    writeQueue(next);setQueued(next);
+  };
+  const synchronize=useCallback(async()=>{
+    if(typeof navigator!=="undefined"&&!navigator.onLine)return;
+    const pending=readQueue();
+    if(!pending.length)return;
+    setSyncing(true);
+    try{
+      const remaining:OfflineMark[]=[];
+      for(let i=0;i<pending.length;i++){
+        const mark=pending[i]!;
+        try{await markAttendance({data:mark});}
+        catch(error){
+          remaining.push(...pending.slice(i));
+          if(error instanceof Error&&error.message.includes("Attendance conflict"))
+           setConflicts(previous=>[...previous.filter(x=>x.mutationId!==mark.mutationId),mark]);
+          writeQueue(remaining);setQueued(remaining);
+          setError(error instanceof Error?error.message:"Some attendance entries could not be synchronized");
+          return;
+        }
+      }
+      writeQueue([]);setQueued([]);setNotice("All offline attendance entries synchronized.");
+      setError("");
+    }finally{setSyncing(false);}
+  },[]);
+  useEffect(()=>{
+    window.addEventListener("online",synchronize);
+    if(navigator.onLine)void synchronize();
+    return ()=>window.removeEventListener("online",synchronize);
+  },[synchronize]);
   const load = useCallback(async (targetDate: string) => {
     setLoading(true);
     setError("");
@@ -74,19 +127,47 @@ function StaffAttendancePage() {
   }, [date]);
 
   const mark = async (student: RosterStudent, status: (typeof statusOptions)[number]) => {
-    setBusy(`${student.studentProfileId}:${status}`);
-    setNotice("");
+    const change:OfflineMark={studentProfileId:student.studentProfileId,date,status,
+      mutationId:crypto.randomUUID(),note:correctionNotes[student.studentProfileId]??"",
+      expectedPreviousEventId:student.attendanceEventId};
+    setBusy(change.mutationId);setNotice("");
     try {
-      await markAttendance({ data: { studentProfileId: student.studentProfileId, date, status } });
-      setNotice(`${student.studentName} marked ${status}.`);
-      await load(date);
-    } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Unable to record attendance");
-    } finally {
-      setBusy("");
-    }
+      if(!navigator.onLine){
+        savePending(change);
+        setNotice("Offline: attendance entry saved on this device. It will synchronize when connected.");
+      }else{
+        await markAttendance({data:change});
+        setNotice(student.studentName+" marked "+status+".");
+        await load(date);
+      }
+    }catch(cause){
+      if(!navigator.onLine){
+        savePending(change);
+        setNotice("Offline: entry saved locally for synchronization.");
+      }else{
+        setError(cause instanceof Error?cause.message:"Unable to record attendance");
+      }
+    }finally{setBusy("");}
   };
 
+  function discardConflict(mark:OfflineMark){
+    const next=readQueue().filter(entry=>entry.mutationId!==mark.mutationId);
+    writeQueue(next);setQueued(next);setConflicts(current=>current.filter(entry=>entry.mutationId!==mark.mutationId));
+    setNotice("Conflicting attendance change discarded; school record preserved.");
+  }
+  async function overrideConflict(mark:OfflineMark){
+    const current=students.find(item=>item.studentProfileId===mark.studentProfileId);
+    const reason=correctionNotes[mark.studentProfileId]?.trim();
+    if(!current||!reason){
+      setError("Refresh attendance and enter a reason before correcting the newer school record.");
+      return;
+    }
+    const revised={...mark,expectedPreviousEventId:current.attendanceEventId,
+      mutationId:crypto.randomUUID(),note:reason};
+    const next=readQueue().map(entry=>entry.mutationId===mark.mutationId?revised:entry);
+    writeQueue(next);setQueued(next);setConflicts(items=>items.filter(entry=>entry.mutationId!==mark.mutationId));
+    await synchronize();
+  }
   const review = async (excuse: PendingExcuse, decision: "approved" | "rejected") => {
     setBusy(`excuse:${excuse.excuseId}`);
     setNotice("");
@@ -121,6 +202,28 @@ function StaffAttendancePage() {
         />
       </label>
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+      {conflicts.length>0&&<div className="mt-4 rounded-lg border border-amber-500 p-3 text-sm">
+        <strong>Attendance conflicts require review</strong>
+        <p className="mt-1">A newer school record exists for {conflicts.length} offline
+          {conflicts.length===1?" entry":" entries"}. Refresh attendance before deciding
+          whether to create a new correction.</p>
+        {conflicts.map(item=><div key={item.mutationId} className="mt-3 flex flex-wrap items-center gap-2 border-t pt-2">
+         <span className="text-xs">{students.find(s=>s.studentProfileId===item.studentProfileId)?.studentName??item.studentProfileId}
+          {" · "}{item.date}{" · pending "}{item.status}</span>
+         <button type="button" onClick={()=>discardConflict(item)} className="rounded border px-2 py-1 text-xs">Discard local change</button>
+         <button type="button" onClick={()=>void overrideConflict(item)} className="rounded border px-2 py-1 text-xs">Apply as reasoned correction</button>
+        </div>)}
+        <button type="button" onClick={()=>{setConflicts([]);void load(date);}}
+          className="mt-2 rounded border px-3 py-2 text-xs">Refresh school records</button>
+      </div>}
+      {queued.length>0&&<div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm">
+        <span>{queued.length} attendance {queued.length===1?"entry":"entries"} stored on this device pending synchronization.</span>
+        <button type="button" disabled={syncing||!navigator.onLine} onClick={()=>void synchronize()}
+          className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+          {syncing?"Synchronizing…":"Synchronize now"}
+        </button>
+      </div>}
+
       {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
       {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance roster…</p>}
       {!loading && !error && <>
@@ -139,6 +242,12 @@ function StaffAttendancePage() {
               </div>
               <span className="rounded-full border px-3 py-1 text-xs capitalize">{student.status}</span>
             </div>
+            {student.status!=="unmarked" && <label className="mt-3 block text-xs text-muted-foreground">Correction note (required to override an approved excuse)
+              <input value={correctionNotes[student.studentProfileId]??""}
+                onChange={e=>setCorrectionNotes(current=>({...current,[student.studentProfileId]:e.target.value}))}
+                placeholder="Reason for correction"
+                className="mt-1 w-full rounded-lg border bg-background p-2 text-sm"/>
+            </label>}
             <div className="mt-4 flex flex-wrap gap-2">
               {statusOptions.map(option => <button
                 key={option}

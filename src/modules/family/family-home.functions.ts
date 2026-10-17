@@ -37,14 +37,14 @@ async function guardianStudents(s: Schema, guardianPersonId: string, siteIds: st
   ));
  const unique = Array.from(new Map(rows.map(row => [row.studentProfileId, row])).values());
  if (!unique.length) return [];
- const withEnrollment = await db.select({ studentProfileId: s.studentProfiles.id })
-  .from(s.studentProfiles)
-  .innerJoin(s.enrollments, eq(s.enrollments.studentProfileId, s.studentProfiles.id))
-  .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+ const withEnrollment = await db.select({ studentProfileId: s.enrollments.studentProfileId })
+  .from(s.enrollments)
+  .innerJoin(s.programs, eq(s.programs.id, s.enrollments.programId))
   .where(and(
-   inArray(s.studentProfiles.id, unique.map(row => row.studentProfileId)),
+   inArray(s.enrollments.studentProfileId, unique.map(row => row.studentProfileId)),
    eq(s.enrollments.status, "active"),
-   inArray(s.sections.siteId, siteIds),
+   inArray(s.enrollments.kind, ["program", "school_year", "section"]),
+   inArray(s.programs.siteId, siteIds),
   ));
  const enrolledIds = new Set(withEnrollment.map(row => row.studentProfileId));
  return unique.filter(row => enrolledIds.has(row.studentProfileId));
@@ -124,10 +124,11 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
    displayName: student.firstName ?? student.legalFirstName,
    lastName: student.lastName,
    sectionCount: sectionIds.length,
+   awaitingSections: sectionIds.length === 0,
    missingCount,
    unexcusedAbsences,
    nextDueAt,
-   status: missingCount > 0 || unexcusedAbsences > 0 ? "needs_attention" as const : "on_track" as const,
+   status: sectionIds.length === 0 ? "awaiting_courses" as const : missingCount > 0 || unexcusedAbsences > 0 ? "needs_attention" as const : "on_track" as const,
   };
  }));
  return { children };

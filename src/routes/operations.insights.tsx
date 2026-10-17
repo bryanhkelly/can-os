@@ -1,8 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { acceptInsight, dismissInsight, listInsights } from "@/modules/operations/insights.functions";
+import { acceptInsight, dismissInsight, listInsights,listInsightScopeOptions } from "@/modules/operations/insights.functions";
 
-export const Route = createFileRoute("/operations/insights")({ component: InsightsPage });
+export const Route = createFileRoute("/operations/insights")({
+ validateSearch:(search:Record<string,unknown>)=>({
+  siteId:typeof search.siteId==="string"?search.siteId:undefined,
+  programId:typeof search.programId==="string"?search.programId:undefined,
+ }),
+ component:InsightsPage
+});
 
 type Insight = Awaited<ReturnType<typeof listInsights>>["insights"][number];
 type StatusFilter = "open" | "acknowledged" | "dismissed";
@@ -19,6 +25,16 @@ function evidenceLabel(entry: Record<string, unknown>): string {
 }
 
 function InsightsPage() {
+ const selection=Route.useSearch();
+ const [scopes,setScopes]=useState<Awaited<ReturnType<typeof listInsightScopeOptions>>>([]);
+ const sites=[...new Map(scopes.map(s=>[s.siteId,{id:s.siteId,name:s.siteName}])).values()];
+ const programOptions=scopes.filter(s=>!selection.siteId||s.siteId===selection.siteId);
+ const selectScope=(siteId?:string,programId?:string)=>{
+  const qs=new URLSearchParams();
+  if(siteId)qs.set("siteId",siteId);
+  if(programId)qs.set("programId",programId);
+  window.location.assign("/operations/insights"+(qs.size?"?"+qs.toString():""));
+ };
  const [status, setStatus] = useState<StatusFilter>("open");
  const [insights, setInsights] = useState<Insight[]>([]);
  const [loading, setLoading] = useState(true);
@@ -30,7 +46,7 @@ function InsightsPage() {
   setLoading(true);
   setError("");
   try {
-   const result = await listInsights({ data: { status: filter } });
+   const result = await listInsights({ data: { status: filter,siteId:selection.siteId,programId:selection.programId } });
    setInsights(result.insights);
   } catch {
    setInsights([]);
@@ -38,8 +54,9 @@ function InsightsPage() {
   } finally {
    setLoading(false);
   }
- }, []);
+ }, [selection.siteId,selection.programId]);
 
+ useEffect(()=>{let active=true;void listInsightScopeOptions().then(rows=>{if(active)setScopes(rows)}).catch(()=>{});return()=>{active=false};},[]);
  useEffect(() => {
   void load(status);
  }, [status, load]);
@@ -81,6 +98,22 @@ function InsightsPage() {
    <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
     Signals surfaced from school activity, with the evidence behind each one. Review the evidence chain before accepting an insight as an Action or dismissing it.
    </p>
+   <div className="mt-5 flex flex-wrap gap-4 rounded-xl border p-4">
+    <label className="text-sm">School
+     <select aria-label="Insight school" className="ml-2 rounded border bg-background p-2"
+      value={selection.siteId??""} onChange={e=>selectScope(e.target.value||undefined)}>
+      <option value="">All permitted schools</option>
+      {sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+     </select>
+    </label>
+    <label className="text-sm">Program
+     <select aria-label="Insight program" className="ml-2 rounded border bg-background p-2"
+      value={selection.programId??""} onChange={e=>selectScope(selection.siteId,e.target.value||undefined)}>
+      <option value="">All permitted programs</option>
+      {programOptions.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+     </select>
+    </label>
+   </div>
    {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
    {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
    {!error && <>

@@ -156,3 +156,25 @@ The two must share the same primitives:
 - Parent and Student home experiences are read models over canonical domain state; they do not own duplicate workflow state.
 - Student Today reads the canonical SchoolYear/Term/Calendar/Schedule/Assessment data.
 - Family Home aggregates each child's canonical status rather than maintaining a separate family dashboard state.
+
+
+## Agent-to-academic service boundary
+
+The Agent Runtime does **not** query academic tables directly. Its tool
+`get_student_academic_summary` delegates to the Learning module's
+`academic-domain-api.ts`, which owns student resolution, guardian/teacher/self
+relationship checks, enrollment-scoped section visibility, grade/assignment
+queries and evidence generation.
+
+```text
+Agent Runtime
+  -> Typed Agent Tool (platform/agent/tools.ts)
+  -> Academic Domain API (modules/learning/academic-domain-api.ts)
+  -> Academic queries and authorization (Learning module)
+  -> Canonical academic tables
+```
+
+A future external academic service can replace the implementation behind this
+contract without changing Ask CAN's planner, approval logic, tool registry, or
+chat UI. New academic capabilities should be introduced as module contracts
+rather than direct cross-module SQL.

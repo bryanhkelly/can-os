@@ -1,7 +1,6 @@
-import { assertSyntheticMutation, type DemoRole } from "@/modules/_demo/demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq, gte, inArray, lt, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, or, isNull, ne, notExists } from "drizzle-orm";
 import { z } from "zod";
 import { actorSiteIds, recordAudit, requireActor, type ActorRole } from "@/modules/identity/actors.server";
 import { EventTypes } from "@/domain/event-types";
@@ -35,6 +34,7 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
         eq(schema.enrollments.status, "active"),
         eq(schema.enrollments.kind, "section"),
         inArray(schema.sections.siteId, sites),
+        inArray(schema.sections.programId, actor.scope.programIds ?? []),
       ));
     return rows.map((row) => row.sectionId).filter((id): id is string => Boolean(id));
   }
@@ -43,7 +43,7 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
       .select({ sectionId: schema.sectionTeachers.sectionId })
       .from(schema.sectionTeachers)
       .innerJoin(schema.sections, eq(schema.sections.id, schema.sectionTeachers.sectionId))
-      .where(and(eq(schema.sectionTeachers.personId, actor.actorPersonId), inArray(schema.sections.siteId, sites)));
+      .where(and(eq(schema.sectionTeachers.personId, actor.actorPersonId), inArray(schema.sections.siteId, sites), inArray(schema.sections.programId, actor.scope.programIds ?? [])));
     return rows.map((row) => row.sectionId);
   }
   if (actor.role === "guardian") {
@@ -56,9 +56,13 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
         eq(schema.enrollments.status, "active"),
         eq(schema.enrollments.kind, "section"),
       ))
+      .innerJoin(schema.sections, eq(schema.sections.id, schema.enrollments.sectionId))
       .where(and(
         eq(schema.guardianRelationships.guardianPersonId, actor.actorPersonId),
         eq(schema.guardianRelationships.canViewAcademics, true),
+        inArray(schema.enrollments.programId, actor.scope.programIds ?? []),
+        inArray(schema.sections.siteId, sites),
+        inArray(schema.sections.programId, actor.scope.programIds ?? []),
       ));
     return rows.map((row) => row.sectionId).filter((id): id is string => Boolean(id));
   }
@@ -91,15 +95,26 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
         eq(schema.calendarEventParticipants.participantId, actor.actorPersonId),
       ));
 
+    // A site or section membership does not reveal participant-restricted events.
+    // Only the named participant can read those events.
+    const hasExplicitParticipants = db.select({ id: schema.calendarEventParticipants.id })
+      .from(schema.calendarEventParticipants)
+      .where(eq(schema.calendarEventParticipants.calendarEventId, schema.calendarEvents.id));
     const events = await db
       .select()
       .from(schema.calendarEvents)
       .where(and(
         gte(schema.calendarEvents.startsAt, rangeStart),
         lt(schema.calendarEvents.startsAt, rangeEnd),
+        ne(schema.calendarEvents.type, "study_group"),
         or(
-          inArray(schema.calendarEvents.siteId, sites),
-          sectionIds.length ? inArray(schema.calendarEvents.sectionId, sectionIds) : undefined,
+          and(inArray(schema.calendarEvents.siteId, sites),
+            isNull(schema.calendarEvents.sectionId),
+            or(isNull(schema.calendarEvents.programId),inArray(schema.calendarEvents.programId,actor.scope.programIds??[])),
+            ne(schema.calendarEvents.type, "personal"),
+            notExists(hasExplicitParticipants)),
+          sectionIds.length ? and(inArray(schema.calendarEvents.sectionId, sectionIds),
+            notExists(hasExplicitParticipants)) : undefined,
           inArray(schema.calendarEvents.id, participantEventIds),
         ),
       ))
@@ -168,9 +183,10 @@ export const createPersonalEvent = createServerFn({ method: "POST" })
     }).parse(value))
   .handler(async ({ data }) => {
     const actor = await requireActor(allRoles, "calendar.event.create");
-    assertSyntheticMutation(actor.role as DemoRole);
     const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-    const siteId = actor.scope.siteIds?.[0] ?? null;
+    // Personal events must not inherit an arbitrary first school in multi-site accounts.
+    // Their owner participant record is the visibility authority.
+    const siteId = null;
     return db.transaction(async (tx) => {
       const [event] = await tx
         .insert(schema.calendarEvents)
@@ -211,18 +227,20 @@ export const moveAssessmentDueDate = createServerFn({ method: "POST" })
       newDueAt: z.string().datetime({ offset: true }),
     }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("teacher");
     const actor = await requireActor(["teacher"], "assignments:create");
     const sites = actorSiteIds(actor);
     const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const newDueAt = new Date(data.newDueAt);
+    if(newDueAt<=new Date())throw new Error("Choose a future assessment due date");
     return db.transaction(async (tx) => {
       const [assessment] = await tx
         .select({
           id: schema.assessments.id,
           sectionId: schema.assessments.sectionId,
           dueAt: schema.assessments.dueAt,
+          status:schema.assessments.status,
           siteId: schema.sections.siteId,
+          programId:schema.sections.programId,
         })
         .from(schema.assessments)
         .innerJoin(schema.sections, eq(schema.sections.id, schema.assessments.sectionId))
@@ -230,10 +248,11 @@ export const moveAssessmentDueDate = createServerFn({ method: "POST" })
           eq(schema.sectionTeachers.sectionId, schema.sections.id),
           eq(schema.sectionTeachers.personId, actor.actorPersonId),
         ))
-        .where(and(eq(schema.assessments.id, data.assessmentId), inArray(schema.sections.siteId, sites)))
+        .where(and(eq(schema.assessments.id, data.assessmentId), inArray(schema.sections.siteId, sites), inArray(schema.sections.programId,actor.scope.programIds??[])))
         .for("update")
         .limit(1);
       if (!assessment) throw new AuthorizationError("assessment teaching relationship");
+      if(!["published","closed"].includes(assessment.status))throw new Error("Only published or closed assessments can be rescheduled");
       const previousDueAt = assessment.dueAt ? assessment.dueAt.toISOString() : null;
       await tx
         .update(schema.assessments)
@@ -245,7 +264,7 @@ export const moveAssessmentDueDate = createServerFn({ method: "POST" })
         resourceId: assessment.id,
         before: { dueAt: previousDueAt },
         after: { dueAt: newDueAt.toISOString() },
-        scope: { siteId: assessment.siteId, sectionId: assessment.sectionId },
+        scope: { siteId: assessment.siteId, programId:assessment.programId, sectionId: assessment.sectionId },
       });
       await tx.insert(schema.domainEvents).values({
         eventType: EventTypes.AcademicCalendarChanged,

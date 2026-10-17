@@ -3,17 +3,25 @@ import { and, eq, ilike, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
-import { roleCapabilities } from "@/domain/access-context";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
-
-const assignableRoles = Object.keys(roleCapabilities);
+// The staff-invite flow must not grant student or guardian identities.
+const assignableRoles = ["teacher", "registrar", "specialist"] as const;
 
 /** Every admin function requires the registrar role, admin.manage, and a non-empty organization scope. */
-async function requireRegistrar(): Promise<Actor & { organizationIds: string[] }> {
+async function requireRegistrar(): Promise<Actor & { organizationIds: string[]; grantSiteId: string | null }> {
   const actor = await requireActor(["registrar"], "admin.manage");
   const organizationIds = actor.scope.organizationIds ?? [];
   if (organizationIds.length === 0) throw new AuthorizationError("organization scope");
-  return { ...actor, organizationIds };
+  // Do not infer organization-wide authority from expanded read scopes:
+  // a site-bound membership has only its own original grant authority.
+  const {db}=await import("@/db/client");
+  const {accountPersonGrants}=await import("@/db/schema");
+  const [grant]=await db.select({siteId:accountPersonGrants.siteId})
+   .from(accountPersonGrants).where(and(
+    eq(accountPersonGrants.id,actor.grantId),
+    eq(accountPersonGrants.accountId,actor.accountId),
+    eq(accountPersonGrants.active,true))).limit(1);
+  if(!grant)throw new AuthorizationError("active registrar grant");
+  return { ...actor, organizationIds, grantSiteId:grant.siteId };
 }
 
 /** Site select options for the invite form: all sites of the scoped organizations. */
@@ -26,9 +34,9 @@ export const listScopedSites = createServerFn({ method: "GET" }).handler(async (
     id: sites.id, name: sites.name, organizationId: sites.organizationId,
   }).from(sites).where(and(
     inArray(sites.organizationId, actor.organizationIds),
-    scopedSiteIds.length ? inArray(sites.id, scopedSiteIds) : undefined,
+    inArray(sites.id, scopedSiteIds),
   ));
-  return { sites: rows };
+  return { sites: rows, requireSiteSelection:actor.grantSiteId!==null };
 });
 
 /**
@@ -53,7 +61,7 @@ export const listPeople = createServerFn({ method: "GET" })
     const personRows = await db.selectDistinct({ personId: accountPersonGrants.personId })
       .from(accountPersonGrants)
       .innerJoin(people, eq(people.id, accountPersonGrants.personId))
-      .where(and(inArray(accountPersonGrants.organizationId, actor.organizationIds), nameFilter))
+      .where(and(inArray(accountPersonGrants.organizationId, actor.organizationIds),actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined,nameFilter))
       .limit(50);
     const personIds = personRows.map(row => row.personId);
     if (personIds.length === 0) return { people: [] };
@@ -76,6 +84,7 @@ export const listPeople = createServerFn({ method: "GET" })
       .where(and(
         inArray(accountPersonGrants.personId, personIds),
         inArray(accountPersonGrants.organizationId, actor.organizationIds),
+        actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined,
       ));
     const byPerson = new Map<string, {
       personId: string; firstName: string; lastName: string; preferredName: string | null; active: boolean;
@@ -115,7 +124,7 @@ export const listAccessAccounts = createServerFn({ method: "GET" }).handler(asyn
   }).from(accountPersonGrants)
     .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
     .innerJoin(people, eq(people.id, accountPersonGrants.personId))
-    .where(inArray(accountPersonGrants.organizationId, actor.organizationIds));
+    .where(and(inArray(accountPersonGrants.organizationId, actor.organizationIds),actor.grantSiteId?eq(accountPersonGrants.siteId,actor.grantSiteId):undefined));
   const byAccount = new Map<string, {
     accountId: string; email: string; disabled: boolean;
     grants: { grantId: string; personId: string; personName: string; role: string; organizationId: string | null; siteId: string | null; active: boolean }[];
@@ -144,22 +153,23 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     email: z.string().trim().email(),
     firstName: z.string().trim().min(1).max(80),
     lastName: z.string().trim().min(1).max(80),
-    role: z.string().refine(role => assignableRoles.includes(role), { message: "Unknown role" }),
+    role: z.enum(assignableRoles),
     siteId: z.string().uuid().optional(),
   }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const actor = await requireRegistrar();
     const { db } = await import("@/db/client");
     const { people, accessAccounts, accountPersonGrants, sites } = await import("@/db/schema");
     const organizationId = actor.organizationIds[0]!;
+    if(actor.grantSiteId && data.siteId!==actor.grantSiteId)
+      throw new AuthorizationError("site-limited registrar cannot create organization-wide or sibling school grants");
     let siteId: string | null = null;
     if (data.siteId) {
       const [site] = await db.select({ id: sites.id }).from(sites)
         .where(and(eq(sites.id, data.siteId), inArray(sites.organizationId, actor.organizationIds)))
         .limit(1);
       const scopedSiteIds = actor.scope.siteIds ?? [];
-      if (!site || (scopedSiteIds.length > 0 && !scopedSiteIds.includes(site.id))) {
+      if (!site || !scopedSiteIds.includes(site.id)) {
         throw new AuthorizationError("site scope");
       }
       siteId = site.id;
@@ -216,7 +226,6 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
 export const setGrantActive = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ grantId: z.string().uuid(), active: z.boolean() }).parse(value))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const actor = await requireRegistrar();
     if (!data.active && data.grantId === actor.grantId) {
       throw new AuthorizationError("cannot deactivate your own active grant");
@@ -226,9 +235,11 @@ export const setGrantActive = createServerFn({ method: "POST" })
     return db.transaction(async tx => {
       const [grant] = await tx.select({
         id: accountPersonGrants.id, organizationId: accountPersonGrants.organizationId,
+        siteId:accountPersonGrants.siteId,
         active: accountPersonGrants.active, role: accountPersonGrants.role,
       }).from(accountPersonGrants).where(eq(accountPersonGrants.id, data.grantId)).limit(1);
-      if (!grant || !grant.organizationId || !actor.organizationIds.includes(grant.organizationId)) {
+      if (!grant || !grant.organizationId || !actor.organizationIds.includes(grant.organizationId) ||
+          (actor.grantSiteId && grant.siteId!==actor.grantSiteId)) {
         throw new AuthorizationError("grant organization scope");
       }
       const [updated] = await tx.update(accountPersonGrants)
@@ -239,7 +250,7 @@ export const setGrantActive = createServerFn({ method: "POST" })
       await recordAudit(tx, actor, {
         action: "admin.grant.set_active", resourceType: "account_person_grant", resourceId: grant.id,
         before: { active: grant.active }, after: { active: data.active },
-        scope: { organizationId: grant.organizationId },
+        scope: { organizationId: grant.organizationId,siteId:grant.siteId },
       });
       return { grantId: grant.id, active: data.active };
     });

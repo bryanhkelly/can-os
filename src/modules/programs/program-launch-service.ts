@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   auditEvents,
@@ -8,6 +8,9 @@ import {
   organizations,
   programs,
   sites,
+  schoolYears,
+  sections,
+  terms,
 } from "@/db/schema";
 import {
   assertCapability,
@@ -19,6 +22,7 @@ import {
 import { EventTypes } from "@/domain/event-types";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { evaluateSectionReadiness } from "./section-readiness-service";
 
 export async function startProgramLaunch(
   context: CommandContext,
@@ -249,6 +253,32 @@ export async function activateProgram(
       throw new Error("Launch Journey must be ready before Program activation");
     }
 
+    // A checked-off Journey alone does not establish instructional readiness.
+    // Prevent activation of an onsite school without its academic timetable.
+    if(program.deliveryModel.onsite && !program.siteId)
+      throw new Error("Onsite program requires a host site before activation");
+    if(program.siteId){
+      const activeYears=await tx.select({id:schoolYears.id})
+       .from(schoolYears).where(and(eq(schoolYears.siteId,program.siteId),
+        eq(schoolYears.organizationId,program.organizationId),
+        eq(schoolYears.status,"active"),
+        or(isNull(schoolYears.programId),eq(schoolYears.programId,program.id))));
+      if(!activeYears.length)throw new Error(
+        "Activate a school year in School-Year Studio before activating this program");
+      const academicTerms=await tx.select({id:terms.id}).from(terms)
+       .where(inArray(terms.schoolYearId,activeYears.map(y=>y.id)));
+      const sectionRows=academicTerms.length?await tx.select({id:sections.id})
+       .from(sections).where(and(eq(sections.programId,program.id),
+        eq(sections.active,true),inArray(sections.termId,academicTerms.map(t=>t.id)))):[];
+      if(!sectionRows.length)throw new Error(
+        "Provision at least one section in the active school year before launch");
+      for (const section of sectionRows) {
+        const readiness=await evaluateSectionReadiness(section.id,tx);
+        const blockers=readiness.items.filter(item=>item.state==="blocked");
+        if(blockers.length)throw new Error(
+          "Section is not ready: "+blockers.map(item=>item.message).join(" "));
+      }
+    }
     const activatedAt = new Date();
 
     await tx

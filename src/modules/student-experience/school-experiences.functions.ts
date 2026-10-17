@@ -1,7 +1,6 @@
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, asc, inArray } from "drizzle-orm";
+import { and, eq, asc, inArray, isNull, ne, notExists, gte, or } from "drizzle-orm";
 import { z } from "zod";
 import { actorSiteIds, assertSiteGranted, recordAudit, requireActor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
@@ -15,63 +14,50 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
   setResponseHeader("Cache-Control","private, no-store");
   const sites=actorSiteIds(actor);
   const viewerRole=actor.role as "student"|"guardian"|"registrar"|"teacher";
-  if(!process.env.DATABASE_URL) return {connected:false,viewerRole,events:[],notices:[],slots:[]};
+  if(!process.env.DATABASE_URL) return {connected:false,viewerRole,events:[],notices:[],slots:[],bookings:[]};
   const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  const [events,notices,slots]=await Promise.all([
-    db.select().from(schema.calendarEvents).where(inArray(schema.calendarEvents.siteId,sites)).orderBy(asc(schema.calendarEvents.startsAt)).limit(50),
+  const [events,notices,slots,bookings]=await Promise.all([
+    db.select().from(schema.calendarEvents).where(and(inArray(schema.calendarEvents.siteId,sites),gte(schema.calendarEvents.startsAt,new Date()),isNull(schema.calendarEvents.sectionId),ne(schema.calendarEvents.type,"personal"),ne(schema.calendarEvents.type,"study_group"),or(isNull(schema.calendarEvents.programId),inArray(schema.calendarEvents.programId,actor.scope.programIds??[])),notExists(db.select({id:schema.calendarEventParticipants.id}).from(schema.calendarEventParticipants).where(eq(schema.calendarEventParticipants.calendarEventId,schema.calendarEvents.id))))).orderBy(asc(schema.calendarEvents.startsAt)).limit(50),
     db.select().from(schema.notifications).where(eq(schema.notifications.recipientPersonId,actor.actorPersonId)),
-    db.select({id:schema.conferenceSlots.id,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status})
+    viewerRole==="guardian" ? db.select({id:schema.conferenceSlots.id,seriesId:schema.conferenceSlots.conferenceSeriesId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status})
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
-      .where(inArray(schema.conferenceSeries.siteId,sites)).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25),
+      .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
+    viewerRole==="guardian" ? db.select({id:schema.conferenceBookings.id,slotId:schema.conferenceBookings.conferenceSlotId,studentPersonId:schema.studentProfiles.personId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,seriesId:schema.conferenceSlots.conferenceSeriesId}).from(schema.conferenceBookings)
+      .innerJoin(schema.conferenceSlots,eq(schema.conferenceSlots.id,schema.conferenceBookings.conferenceSlotId))
+      .innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
+      .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.id,schema.conferenceBookings.studentProfileId))
+      .where(and(eq(schema.conferenceBookings.guardianPersonId,actor.actorPersonId),eq(schema.conferenceBookings.status,"booked"),inArray(schema.conferenceSeries.siteId,sites),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(30) : Promise.resolve([]),
   ]);
   return {connected:true,viewerRole,
-    events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:typeof e.metadata.demoStatus==="string"?e.metadata.demoStatus:"scheduled"})),
+    events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:"scheduled"})),
     notices:notices.map(n=>({id:n.id,title:n.title,body:n.body??"",acknowledged:n.status==="read"})),
-    slots:slots.map(s=>({id:s.id,startsAt:s.startsAt.toISOString(),endsAt:s.endsAt.toISOString(),status:s.status})),
+    slots:slots.map(s=>({id:s.id,seriesId:s.seriesId,startsAt:s.startsAt.toISOString(),endsAt:s.endsAt.toISOString(),status:s.status})),
+    bookings:bookings.map(b=>({...b,startsAt:b.startsAt.toISOString(),endsAt:b.endsAt.toISOString()})),
   };
 });
-export const setSyntheticCalendarStatus=createServerFn({method:"POST"})
-  .validator((value:unknown)=>z.object({eventId:z.string().uuid(),status:z.enum(["scheduled","moved","cancelled"])}).parse(value))
+export const bookOfficeHour=createServerFn({method:"POST"})
+  .validator((value:unknown)=>z.object({slotId:z.string().uuid(),studentPersonId:z.string().uuid()}).parse(value))
   .handler(async({data})=>{
-  assertSyntheticMutation("registrar");
-    const actor=await requireActor(["registrar"]);
-   const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-    return db.transaction(async tx=>{
-      const [current]=await tx.select({metadata:schema.calendarEvents.metadata,siteId:schema.calendarEvents.siteId}).from(schema.calendarEvents).where(eq(schema.calendarEvents.id,data.eventId)).for("update").limit(1);
-      if(!current) throw new Error("Event not found");
-      assertSiteGranted(actor,current.siteId);
-      const before=typeof current.metadata.demoStatus==="string"?current.metadata.demoStatus:"scheduled";
-      await tx.update(schema.calendarEvents).set({metadata:{...current.metadata,demoStatus:data.status},updatedAt:new Date()}).where(eq(schema.calendarEvents.id,data.eventId));
-      await recordAudit(tx,actor,{action:"calendar.status.set",resourceType:"calendar_event",resourceId:data.eventId,before:{status:before},after:{status:data.status},scope:{siteId:current.siteId}});
-      return {saved:true};
-    });
-  });
-export const acknowledgeSyntheticNotice=createServerFn({method:"POST"})
-  .validator((value:unknown)=>z.object({noticeId:z.string().uuid()}).parse(value))
-  .handler(async({data})=>{
-  assertSyntheticMutation("student");
-    const actor=await anyone();
-   const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-    const rows=await db.update(schema.notifications).set({status:"read",readAt:new Date(),updatedAt:new Date()}).where(and(eq(schema.notifications.id,data.noticeId),eq(schema.notifications.recipientPersonId,actor.actorPersonId))).returning({id:schema.notifications.id});
-    if(!rows.length) throw new Error("Notice not found");
-    return {saved:true};
-  });
-export const bookSyntheticOfficeHour=createServerFn({method:"POST"})
-  .validator((value:unknown)=>z.object({slotId:z.string().uuid()}).parse(value))
-  .handler(async({data})=>{
-  assertSyntheticMutation("guardian");
     const actor=await requireActor(["guardian"]);
    const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
-      const [slotSite]=await tx.select({siteId:schema.conferenceSeries.siteId}).from(schema.conferenceSlots)
+      const [slotSite]=await tx.select({siteId:schema.conferenceSeries.siteId,seriesStatus:schema.conferenceSeries.status,sectionId:schema.conferenceSeries.sectionId,startsAt:schema.conferenceSlots.startsAt}).from(schema.conferenceSlots)
         .innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
         .where(eq(schema.conferenceSlots.id,data.slotId)).limit(1);
-      if(!slotSite) throw new Error("Office-hour slot not found");
+      if(!slotSite||slotSite.seriesStatus!=="published"||slotSite.startsAt<=new Date()) throw new Error("Office-hour slot not available");
       assertSiteGranted(actor,slotSite.siteId);
       const [child]=await tx.select({studentProfileId:schema.studentProfiles.id}).from(schema.guardianRelationships)
         .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.personId,schema.guardianRelationships.studentPersonId))
-        .where(and(eq(schema.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(schema.guardianRelationships.canViewAcademics,true))).limit(1);
+        .where(and(eq(schema.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(schema.guardianRelationships.canViewAcademics,true),eq(schema.guardianRelationships.studentPersonId,data.studentPersonId))).limit(1);
       if(!child) throw new AuthorizationError("guardian relationship");
+      const [siteEnrollment]=await tx.select({id:schema.enrollments.id}).from(schema.enrollments)
+        .innerJoin(schema.programs,eq(schema.programs.id,schema.enrollments.programId))
+        .where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.status,"active"),eq(schema.programs.siteId,slotSite.siteId),inArray(schema.programs.id,actor.scope.programIds??[]))).limit(1);
+      if(!siteEnrollment)throw new AuthorizationError("child enrollment at selected school");
+      if(slotSite.sectionId){
+        const [sectionEnrollment]=await tx.select({id:schema.enrollments.id}).from(schema.enrollments).where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.sectionId,slotSite.sectionId),eq(schema.enrollments.status,"active"),eq(schema.enrollments.kind,"section"),inArray(schema.enrollments.programId,actor.scope.programIds??[]))).limit(1);
+        if(!sectionEnrollment)throw new AuthorizationError("child is not enrolled in the appointment section");
+      }
       const [slot]=await tx.update(schema.conferenceSlots).set({status:"booked",updatedAt:new Date()}).where(and(eq(schema.conferenceSlots.id,data.slotId),eq(schema.conferenceSlots.status,"available"))).returning({id:schema.conferenceSlots.id});
       if(!slot) throw new Error("Office-hour slot already taken");
       const [booking]=await tx.insert(schema.conferenceBookings).values({conferenceSlotId:slot.id,studentProfileId:child.studentProfileId,guardianPersonId:actor.actorPersonId,status:"booked"}).returning({id:schema.conferenceBookings.id});
@@ -79,3 +65,67 @@ export const bookSyntheticOfficeHour=createServerFn({method:"POST"})
       return {bookingId:booking!.id};
     });
   });
+
+
+/** Move a guardian-owned future booking within its published conference series. */
+export const rescheduleOfficeHour=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({bookingId:z.string().uuid(),newSlotId:z.string().uuid()}).parse(value))
+ .handler(async({data})=>{
+  const actor=await requireActor(["guardian"]);
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [current]=await tx.select({
+    id:s.conferenceBookings.id,oldSlotId:s.conferenceSlots.id,
+    seriesId:s.conferenceSlots.conferenceSeriesId,startsAt:s.conferenceSlots.startsAt,
+    siteId:s.conferenceSeries.siteId,sectionId:s.conferenceSeries.sectionId,
+    seriesStatus:s.conferenceSeries.status,studentProfileId:s.conferenceBookings.studentProfileId,
+   }).from(s.conferenceBookings)
+    .innerJoin(s.conferenceSlots,eq(s.conferenceSlots.id,s.conferenceBookings.conferenceSlotId))
+    .innerJoin(s.conferenceSeries,eq(s.conferenceSeries.id,s.conferenceSlots.conferenceSeriesId))
+    .where(and(eq(s.conferenceBookings.id,data.bookingId),
+      eq(s.conferenceBookings.guardianPersonId,actor.actorPersonId),
+      eq(s.conferenceBookings.status,"booked"))).for("update").limit(1);
+   if(!current||current.startsAt<=new Date()||current.seriesStatus!=="published")
+    throw new AuthorizationError("future published guardian booking");
+   assertSiteGranted(actor,current.siteId);
+   const [linkedChild]=await tx.select({id:s.studentProfiles.id})
+    .from(s.studentProfiles)
+    .innerJoin(s.guardianRelationships,eq(s.guardianRelationships.studentPersonId,s.studentProfiles.personId))
+    .where(and(eq(s.studentProfiles.id,current.studentProfileId),
+     eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),
+     eq(s.guardianRelationships.canViewAcademics,true))).limit(1);
+   if(!linkedChild)throw new AuthorizationError("current guardian relationship");
+   const [activeProgram]=await tx.select({id:s.enrollments.id})
+    .from(s.enrollments).innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+    .where(and(eq(s.enrollments.studentProfileId,current.studentProfileId),
+      eq(s.enrollments.status,"active"),eq(s.programs.siteId,current.siteId),
+      inArray(s.programs.id,actor.scope.programIds??[]))).limit(1);
+   if(!activeProgram)throw new AuthorizationError("current school enrollment");
+   if(current.sectionId){
+    const [section]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
+     .where(and(eq(s.enrollments.studentProfileId,current.studentProfileId),
+      eq(s.enrollments.sectionId,current.sectionId),eq(s.enrollments.kind,"section"),
+      eq(s.enrollments.status,"active"),
+      inArray(s.enrollments.programId,actor.scope.programIds??[]))).limit(1);
+    if(!section)throw new AuthorizationError("current class enrollment");
+   }
+   if(current.oldSlotId===data.newSlotId)return {saved:true};
+   const [next]=await tx.update(s.conferenceSlots)
+    .set({status:"booked",updatedAt:new Date()})
+    .where(and(eq(s.conferenceSlots.id,data.newSlotId),
+      eq(s.conferenceSlots.conferenceSeriesId,current.seriesId),
+      eq(s.conferenceSlots.status,"available"),gte(s.conferenceSlots.startsAt,new Date())))
+    .returning({id:s.conferenceSlots.id});
+   if(!next)throw new Error("Replacement slot is no longer available");
+   await tx.update(s.conferenceBookings)
+    .set({conferenceSlotId:next.id,updatedAt:new Date()})
+    .where(and(eq(s.conferenceBookings.id,current.id),
+      eq(s.conferenceBookings.conferenceSlotId,current.oldSlotId)));
+   await tx.update(s.conferenceSlots).set({status:"available",updatedAt:new Date()})
+    .where(eq(s.conferenceSlots.id,current.oldSlotId));
+   await recordAudit(tx,actor,{action:"conference.reschedule",
+    resourceType:"conference_booking",resourceId:current.id,
+    before:{slotId:current.oldSlotId},after:{slotId:next.id},scope:{siteId:current.siteId}});
+   return {saved:true};
+  });
+ });

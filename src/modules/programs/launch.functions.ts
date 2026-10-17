@@ -3,8 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
-import { startProgramLaunch, activateProgram } from "./program-launch-service";
+import { startProgramLaunch, activateProgram, createProgramOrientation } from "./program-launch-service";
 import { completeJourneyRequirement } from "@/modules/journeys/complete-requirement";
 
 const programTypes = [
@@ -103,15 +102,20 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
 export const startLaunch = createServerFn({ method: "POST" })
   .validator((data: unknown) => startLaunchInput.parse(data))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const context = await registrarContext("program.launch.start");
     if (!context.scope.organizationIds?.includes(data.hostOrganizationId)) {
       throw new AuthorizationError("host organization scope");
     }
-    if (data.siteId && !context.scope.siteIds?.includes(data.siteId)) {
+    const organizationWide = !context.scope.siteIds?.length;
+    if (data.siteId && !organizationWide && !context.scope.siteIds?.includes(data.siteId)) {
       throw new AuthorizationError("site scope");
     }
-    return startProgramLaunch(context, data);
+    // Organization-wide grants have no site filter. The domain service checks
+    // that the target site belongs to the selected host organization.
+    const permittedContext = organizationWide
+      ? { ...context, scope: { ...context.scope, siteIds: undefined } }
+      : context;
+    return startProgramLaunch(permittedContext, data);
   });
 
 /** Programs in pre-active states with their Launch Journey and requirement checklist. */
@@ -191,7 +195,6 @@ export const completeLaunchRequirement = createServerFn({ method: "POST" })
     z.object({ journeyRequirementId: uuid }).parse(data),
   )
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const context = await registrarContext("journey.requirement.complete");
     const journeyStatus = await completeJourneyRequirement(
       context,
@@ -204,8 +207,48 @@ export const completeLaunchRequirement = createServerFn({ method: "POST" })
 export const activateLaunch = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ programId: uuid }).parse(data))
   .handler(async ({ data }) => {
-    assertSyntheticMutation("registrar");
     const context = await registrarContext("program.activate");
     await activateProgram(context, data.programId);
     return { programId: data.programId, status: "active" as const };
   });
+
+/** Create a host site inside an organization-wide registrar grant. */
+export const createLaunchSite = createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({
+  organizationId:uuid,name:z.string().trim().min(2).max(160),
+  slug:z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  timezone:z.string().trim().min(3).max(80),
+ }).parse(v))
+ .handler(async({data})=>{
+  const actor=await registrarContext("program.launch.start");
+  if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.scope.siteIds?.length)
+   throw new AuthorizationError("organization-wide site creation");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [site]=await tx.insert(s.sites).values({...data}).returning({id:s.sites.id});
+   await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,
+    action:"site.create",resourceType:"site",resourceId:site!.id,
+    scope:{organizationId:data.organizationId,siteId:site!.id},
+    after:{name:data.name,timezone:data.timezone}});
+   return {siteId:site!.id};
+  });
+ });
+/** Create a unique orientation event and expose it to site/program calendars. */
+export const scheduleLaunchOrientation=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({programId:uuid,
+  title:z.string().trim().min(2).max(160),startsAt:z.string().datetime({offset:true}),
+  endsAt:z.string().datetime({offset:true}),timezone:z.string().min(3)}).parse(v))
+ .handler(async({data})=>{
+  const actor=await registrarContext("calendar.event.create");
+  if(!actor.scope.programIds?.includes(data.programId))throw new AuthorizationError("orientation program");
+  const start=new Date(data.startsAt),end=new Date(data.endsAt);
+  if(end<=start)throw new Error("Orientation end must follow start");
+  const [{db},s,{eq}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
+  const [program]=await db.select({siteId:s.programs.siteId})
+   .from(s.programs).where(eq(s.programs.id,data.programId)).limit(1);
+  const [site]=program?.siteId?await db.select({timezone:s.sites.timezone}).from(s.sites)
+   .where(eq(s.sites.id,program.siteId)).limit(1):[];
+  const eventId=await createProgramOrientation(actor,{programId:data.programId,title:data.title,
+   startsAt:start,endsAt:end,timezone:site?.timezone??data.timezone});
+  return {eventId};
+ });

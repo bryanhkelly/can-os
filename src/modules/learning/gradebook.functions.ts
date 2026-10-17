@@ -3,8 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertCapability, assertSiteScope, AuthorizationError } from "@/domain/command-context";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
+import { assertCapability, assertSiteScope, assertProgramScope, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { readRubric, scoreRubric } from "@/modules/student-experience/rubric";
 
@@ -28,13 +27,14 @@ async function teacherActor(sectionId?: string) {
  if (!context.scope.siteIds?.length) throw new AuthorizationError("teacher site membership");
  const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
  if (sectionId) {
-  const [section] = await db.select({ siteId: schema.sections.siteId })
+  const [section] = await db.select({ siteId: schema.sections.siteId, programId: schema.sections.programId })
    .from(schema.sectionTeachers)
    .innerJoin(schema.sections, eq(schema.sections.id, schema.sectionTeachers.sectionId))
    .where(and(eq(schema.sectionTeachers.personId, context.actorPersonId), eq(schema.sectionTeachers.sectionId, sectionId)))
    .limit(1);
   if (!section) throw new AuthorizationError("assigned teacher");
   assertSiteScope(context, section.siteId);
+  assertProgramScope(context, section.programId);
  }
  return context;
 }
@@ -61,6 +61,7 @@ export const getGradebookSections = createServerFn({ method: "GET" }).handler(as
   .where(and(
    eq(s.sectionTeachers.personId, context.actorPersonId!),
    inArray(s.sections.siteId, context.scope.siteIds!),
+   inArray(s.sections.programId, context.scope.programIds??[]),
    eq(s.sections.active, true),
   ))
   .orderBy(asc(s.sections.title));
@@ -76,7 +77,7 @@ export const getGradebook = createServerFn({ method: "GET" })
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const [section] = await db.select({ id: s.sections.id, code: s.sections.code, title: s.sections.title })
    .from(s.sections)
-   .where(and(eq(s.sections.id, data.sectionId), inArray(s.sections.siteId, context.scope.siteIds!)))
+   .where(and(eq(s.sections.id, data.sectionId), inArray(s.sections.siteId, context.scope.siteIds!), inArray(s.sections.programId,context.scope.programIds??[])))
    .limit(1);
   if (!section) throw new AuthorizationError("section");
 
@@ -105,7 +106,7 @@ export const getGradebook = createServerFn({ method: "GET" })
    metadata: s.assessments.metadata,
   })
    .from(s.assessments)
-   .where(and(eq(s.assessments.sectionId, data.sectionId), inArray(s.assessments.status, ["published", "closed"])))
+   .where(and(eq(s.assessments.sectionId, data.sectionId), inArray(s.assessments.status, ["draft", "published", "closed"])))
    .orderBy(asc(s.assessments.dueAt));
 
   const assessmentIds = assessmentRows.map(row => row.id);
@@ -178,7 +179,6 @@ export const gradeSubmission = createServerFn({ method: "POST" })
   })).max(20).optional(),
  }).parse(value))
  .handler(async ({ data }) => {
-  assertSyntheticMutation("teacher");
   const context = await teacherForSubmission(data.submissionId);
   assertCapability(context, "assignments:grade");
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
@@ -227,21 +227,31 @@ export const createAssessment = createServerFn({ method: "POST" })
   sectionId: z.string().min(1),
   title: z.string().trim().min(3).max(200),
   instructions: z.string().trim().max(20000).optional(),
+  rubric: z.string().trim().max(10000).optional(),
   pointsPossible: z.number().finite().min(1).max(1000),
   dueAt: z.string().refine(v => !Number.isNaN(new Date(v).getTime()), "dueAt must be an ISO date").optional(),
  }).parse(value))
  .handler(async ({ data }) => {
-  assertSyntheticMutation("teacher");
   const context = await teacherActor(data.sectionId);
   assertCapability(context, "assignments:create");
   const dueAt = data.dueAt ? new Date(data.dueAt) : null;
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   return db.transaction(async tx => {
+   const [teachingSection]=await tx.select({id:s.sections.id})
+    .from(s.sectionTeachers)
+    .innerJoin(s.sections,eq(s.sections.id,s.sectionTeachers.sectionId))
+    .where(and(eq(s.sectionTeachers.personId,context.actorPersonId!),
+     eq(s.sections.id,data.sectionId),eq(s.sections.active,true),
+     inArray(s.sections.siteId,context.scope.siteIds??[]),
+     inArray(s.sections.programId,context.scope.programIds??[])))
+    .limit(1);
+   if(!teachingSection)throw new AuthorizationError("active teaching assignment in authorized school/program");
    const status = dueAt ? "published" as const : "draft" as const;
    const [assessment] = await tx.insert(s.assessments).values({
     sectionId: data.sectionId,
     title: data.title,
     instructions: data.instructions ?? null,
+    metadata: data.rubric ? {rubric:data.rubric} : {},
     status,
     pointsPossible: String(data.pointsPossible),
     dueAt,
@@ -286,5 +296,146 @@ export const createAssessment = createServerFn({ method: "POST" })
     context: { accountId: context.accountId, sessionId: context.sessionId, requestId: context.requestId ?? null },
    });
    return { assessmentId: assessment.id, status };
+  });
+ });
+
+
+/** Canonical teacher assessment state transitions with roster assignment on publish. */
+export const manageAssessment = createServerFn({method:"POST"})
+ .validator((input:unknown)=>z.object({
+  assessmentId:z.string().uuid(),
+  action:z.enum(["publish","close","reopen","reschedule"]),
+  dueAt:z.string().datetime({offset:true}).optional()
+ }).parse(input))
+ .handler(async({data})=>{
+  const context=await teacherActor();
+  assertCapability(context,"assignments:create");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [assessment]=await tx.select({
+    id:s.assessments.id,sectionId:s.assessments.sectionId,
+    status:s.assessments.status,dueAt:s.assessments.dueAt,
+    availableAt:s.assessments.availableAt,siteId:s.sections.siteId,
+    programId:s.sections.programId
+   }).from(s.assessments)
+    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+    .innerJoin(s.sectionTeachers,and(
+     eq(s.sectionTeachers.sectionId,s.sections.id),
+     eq(s.sectionTeachers.personId,context.actorPersonId!)))
+    .where(and(eq(s.assessments.id,data.assessmentId),
+     inArray(s.sections.siteId,context.scope.siteIds??[]),
+     inArray(s.sections.programId,context.scope.programIds??[])))
+    .for("update").limit(1);
+   if(!assessment)throw new AuthorizationError("assigned assessment in authorized program");
+   const transitions:Record<typeof data.action,readonly string[]>={
+    publish:["draft"],close:["published"],reopen:["closed"],
+    reschedule:["published","closed"],
+   };
+   if(!transitions[data.action].includes(assessment.status))
+    throw new Error("This assessment cannot be "+data.action+"d from its current status");
+   const now=new Date();
+   const dueAt=data.dueAt?new Date(data.dueAt):assessment.dueAt;
+   if((data.action==="publish"||data.action==="reschedule")&&(!dueAt||dueAt<=now))
+    throw new Error("A future due date is required");
+   if(data.action==="reopen"&&(!dueAt||dueAt<=now))
+    throw new Error("Set a future due date before reopening this closed assessment");
+   const status=data.action==="publish"||data.action==="reopen"?"published":
+    data.action==="close"?"closed":assessment.status;
+   const [updated]=await tx.update(s.assessments).set({
+    status,
+    ...(data.action==="publish"||data.action==="reschedule"||(data.action==="reopen"&&data.dueAt)?{dueAt}:{}),
+    ...(data.action==="publish"?{availableAt:now}:{}),
+    updatedAt:now
+   }).where(and(eq(s.assessments.id,assessment.id),eq(s.assessments.status,assessment.status)))
+    .returning({id:s.assessments.id});
+   if(!updated)throw new Error("Assessment status changed, refresh before retrying");
+   let assignedCount=0;
+   if(data.action==="publish"){
+    const enrolled=await tx.select({studentProfileId:s.enrollments.studentProfileId})
+     .from(s.enrollments).where(and(eq(s.enrollments.kind,"section"),
+      eq(s.enrollments.sectionId,assessment.sectionId),
+      eq(s.enrollments.status,"active")));
+    assignedCount=enrolled.length;
+    if(enrolled.length)await tx.insert(s.submissions)
+     .values(enrolled.map(row=>({assessmentId:assessment.id,studentProfileId:row.studentProfileId,
+      status:"assigned" as const,timeliness:"on_time" as const})))
+     .onConflictDoNothing();
+    await tx.insert(s.domainEvents).values({
+     eventType:EventTypes.AssessmentPublished,aggregateType:"assessment",
+     aggregateId:assessment.id,actorPersonId:context.actorPersonId,
+     payload:{sectionId:assessment.sectionId,assignedCount,dueAt:dueAt!.toISOString()}
+    });
+   }
+   if((data.action==="reschedule"||(data.action==="reopen"&&data.dueAt))&&
+     dueAt?.getTime()!==assessment.dueAt?.getTime()){
+    await tx.insert(s.domainEvents).values({
+     eventType:EventTypes.AcademicCalendarChanged,aggregateType:"assessment",
+     aggregateId:assessment.id,actorPersonId:context.actorPersonId,
+     payload:{previousDueAt:assessment.dueAt?.toISOString()??null,
+      newDueAt:dueAt?.toISOString()??null,action:data.action}
+    });
+   }
+   await tx.insert(s.auditEvents).values({
+    actorPersonId:context.actorPersonId,
+    action:"assessment."+data.action,resourceType:"assessment",resourceId:assessment.id,
+    scope:{siteId:assessment.siteId,programId:assessment.programId,sectionId:assessment.sectionId},
+    before:{status:assessment.status,dueAt:assessment.dueAt?.toISOString()??null},
+    after:{status,dueAt:dueAt?.toISOString()??null,assignedCount},
+    context:{accountId:context.accountId,sessionId:context.sessionId}
+   });
+   return {assessmentId:assessment.id,status,assignedCount};
+  });
+ });
+
+/** Return a graded student submission for a new attempt without resetting its grade history. */
+export const returnSubmissionForRevision=createServerFn({method:"POST"})
+ .validator((input:unknown)=>z.object({submissionId:z.string().uuid()}).parse(input))
+ .handler(async({data})=>{
+  const context=await teacherForSubmission(data.submissionId);
+  assertCapability(context,"assignments:grade");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [record]=await tx.select({
+    id:s.submissions.id,status:s.submissions.status,
+    assessmentId:s.assessments.id,sectionId:s.sections.id,
+    studentProfileId:s.submissions.studentProfileId,attemptNumber:s.submissions.attemptNumber,
+    studentPersonId:s.studentProfiles.personId,
+    siteId:s.sections.siteId,programId:s.sections.programId
+   }).from(s.submissions)
+    .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.submissions.studentProfileId))
+    .innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
+    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+    .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),
+     eq(s.sectionTeachers.personId,context.actorPersonId!)))
+    .where(and(eq(s.submissions.id,data.submissionId),
+     inArray(s.sections.siteId,context.scope.siteIds??[]),
+     inArray(s.sections.programId,context.scope.programIds??[])))
+    .for("update").limit(1);
+   if(!record)throw new AuthorizationError("graded submission in assigned section");
+   if(record.status!=="graded")throw new Error("Only graded work can be returned for revision");
+   const [latest]=await tx.select({id:s.submissions.id})
+    .from(s.submissions).where(and(eq(s.submissions.assessmentId,record.assessmentId),
+      eq(s.submissions.studentProfileId,record.studentProfileId)))
+    .orderBy(desc(s.submissions.attemptNumber)).limit(1);
+   if(!latest||latest.id!==record.id)throw new Error("Only the latest attempt may be returned");
+   const [updated]=await tx.update(s.submissions)
+    .set({status:"returned",returnedAt:new Date(),updatedAt:new Date()})
+    .where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"graded")))
+    .returning({id:s.submissions.id});
+   if(!updated)throw new Error("Submission status changed before return");
+   await tx.insert(s.auditEvents).values({
+    actorPersonId:context.actorPersonId,action:"assignment.return",
+    resourceType:"submission",resourceId:updated.id,
+    scope:{siteId:record.siteId,programId:record.programId,sectionId:record.sectionId},
+    before:{status:"graded"},after:{status:"returned"},
+    context:{accountId:context.accountId,sessionId:context.sessionId}
+   });
+   await tx.insert(s.notifications).values({
+    recipientPersonId:record.studentPersonId,type:"assignment_feedback",
+    status:"unread",title:"Assignment returned for revision",
+    body:"Your teacher returned your work. Review feedback and submit a revision.",
+    resourceType:"submission",resourceId:updated.id
+   });
+   return {submissionId:updated.id};
   });
  });

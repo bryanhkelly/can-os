@@ -2,8 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { z } from "zod";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
-import { actorSiteIds, recordAudit, requireActor } from "@/modules/identity/actors.server";
+import { actorSiteIds, recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 
@@ -16,20 +15,37 @@ async function context() {
 }
 
 /** A specialist's reach is site-wide: enrollments at scoped sections, or any scoped work item. */
-async function assertStudentInSiteScope(db: any, s: any, sites: string[], studentProfileId: string): Promise<void> {
-  const [enrolled] = await db.select({ id: s.enrollments.id }).from(s.enrollments)
-    .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
-    .where(and(eq(s.enrollments.studentProfileId, studentProfileId), inArray(s.sections.siteId, sites)))
-    .limit(1);
-  if (enrolled) return;
-  const [workItem] = await db.select({ id: s.actions.id }).from(s.actions)
-    .where(and(eq(s.actions.subjectType, "student_profile"), eq(s.actions.subjectId, studentProfileId), inArray(s.actions.siteId, sites)))
-    .limit(1);
-  if (workItem) return;
-  const [insight] = await db.select({ id: s.insights.id }).from(s.insights)
-    .where(and(eq(s.insights.subjectType, "student_profile"), eq(s.insights.subjectId, studentProfileId), inArray(s.insights.siteId, sites)))
-    .limit(1);
-  if (!insight) throw new AuthorizationError("student site scope");
+async function resolveStudentScope(db:any,s:any,actor:Actor,studentProfileId:string){
+ const sites=actor.scope.siteIds??[],programs=actor.scope.programIds??[];
+ if(!sites.length||!programs.length)throw new AuthorizationError("specialist school and program grant");
+ const [enrolled]=await db.select({
+  siteId:s.sections.siteId,programId:s.sections.programId,
+  organizationId:s.programs.organizationId
+ }).from(s.enrollments)
+ .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+ .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+ .where(and(eq(s.enrollments.studentProfileId,studentProfileId),
+  eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+  inArray(s.sections.siteId,sites),inArray(s.sections.programId,programs))).limit(1);
+ if(enrolled)return enrolled;
+ // Historical caseload entries may exist after section enrollment ends, but
+ // they must still belong to a currently authorized program and school.
+ const [workItem]=await db.select({
+  siteId:s.actions.siteId,programId:s.actions.programId,
+  organizationId:s.actions.organizationId
+ }).from(s.actions)
+ .where(and(eq(s.actions.subjectType,"student_profile"),
+  eq(s.actions.subjectId,studentProfileId),
+  inArray(s.actions.siteId,sites),inArray(s.actions.programId,programs))).limit(1);
+ if(workItem&&workItem.siteId&&workItem.programId)return workItem;
+ const [insight]=await db.select({
+  siteId:s.insights.siteId,programId:s.insights.programId,
+  organizationId:s.insights.organizationId
+ }).from(s.insights).where(and(eq(s.insights.subjectType,"student_profile"),
+  eq(s.insights.subjectId,studentProfileId),
+  inArray(s.insights.siteId,sites),inArray(s.insights.programId,programs))).limit(1);
+ if(insight&&insight.siteId&&insight.programId)return insight;
+ throw new AuthorizationError("student specialist program scope");
 }
 
 type CaseloadEntry = {
@@ -65,6 +81,7 @@ export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async 
         eq(s.actions.type, "support_referral"),
         eq(s.actions.subjectType, "student_profile"),
         inArray(s.actions.siteId, sites),
+        inArray(s.actions.programId,actor.scope.programIds??[]),
         ne(s.supportReferrals.stage, "closed"),
         ne(s.actions.status, "cancelled"),
       )),
@@ -78,6 +95,7 @@ export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async 
       .where(and(
         eq(s.insights.subjectType, "student_profile"),
         inArray(s.insights.siteId, sites),
+        inArray(s.insights.programId,actor.scope.programIds??[]),
         eq(s.insights.status, "open"),
       )),
     db.select({
@@ -89,6 +107,7 @@ export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async 
       .where(and(
         eq(s.actions.subjectType, "student_profile"),
         inArray(s.actions.siteId, sites),
+        inArray(s.actions.programId,actor.scope.programIds??[]),
         inArray(s.actions.status, [...OPEN_ACTION_STATUSES]),
         ne(s.actions.type, "support_referral"),
       )),
@@ -186,11 +205,10 @@ export const logCoachOutreach = createServerFn({ method: "POST" })
     outcome: z.enum(outreachOutcomes),
   }).parse)
   .handler(async ({ data }) => {
-    assertSyntheticMutation("specialist");
     const actor = await requireActor(["specialist"], "referrals:manage");
     const sites = actorSiteIds(actor);
     const { db, s } = await context();
-    await assertStudentInSiteScope(db, s, sites, data.studentProfileId);
+    const placement=await resolveStudentScope(db,s,actor,data.studentProfileId);
     return db.transaction(async (tx: any) => {
       const now = new Date();
       const [action] = await tx.insert(s.actions).values({
@@ -200,14 +218,14 @@ export const logCoachOutreach = createServerFn({ method: "POST" })
         title: "Coach outreach",
         description: data.note,
         ownerPersonId: actor.actorPersonId,
-        organizationId: actor.scope.organizationIds?.[0] ?? null,
-        siteId: sites[0],
-        programId: actor.scope.programIds?.[0] ?? null,
+        organizationId: placement.organizationId,
+        siteId: placement.siteId,
+        programId: placement.programId,
         subjectType: "student_profile",
         subjectId: data.studentProfileId,
         resolutionNote: data.note,
         resolvedAt: now,
-        metadata: { outcome: data.outcome, synthetic: true },
+        metadata: { outcome: data.outcome, source: "coach_outreach" },
       }).returning({ id: s.actions.id });
       if (!action) throw new Error("Outreach not recorded");
       await recordAudit(tx, actor, {
@@ -215,7 +233,7 @@ export const logCoachOutreach = createServerFn({ method: "POST" })
         resourceType: "action",
         resourceId: action.id,
         after: { outcome: data.outcome, subjectId: data.studentProfileId },
-        scope: { siteId: sites[0] },
+        scope: { siteId: placement.siteId,programId:placement.programId },
       });
       await tx.insert(s.domainEvents).values({
         eventType: EventTypes.ActionCreated,
@@ -242,7 +260,7 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
     setResponseHeader("Cache-Control", "no-store");
     const sites = actorSiteIds(actor);
     const { db, s } = await context();
-    await assertStudentInSiteScope(db, s, sites, data.studentProfileId);
+    await resolveStudentScope(db,s,actor,data.studentProfileId);
 
     const [referralRows, outreachRows, insightRows] = await Promise.all([
       db.select({
@@ -261,6 +279,7 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
           eq(s.actions.subjectType, "student_profile"),
           eq(s.actions.subjectId, data.studentProfileId),
           inArray(s.actions.siteId, sites),
+        inArray(s.actions.programId,actor.scope.programIds??[]),
         ))
         .orderBy(desc(s.actions.createdAt)),
       db.select({
@@ -277,6 +296,7 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
           eq(s.actions.subjectType, "student_profile"),
           eq(s.actions.subjectId, data.studentProfileId),
           inArray(s.actions.siteId, sites),
+        inArray(s.actions.programId,actor.scope.programIds??[]),
         ))
         .orderBy(desc(s.actions.createdAt)),
       db.select({
@@ -292,6 +312,7 @@ export const getCoachStudentHistory = createServerFn({ method: "GET" })
           eq(s.insights.subjectType, "student_profile"),
           eq(s.insights.subjectId, data.studentProfileId),
           inArray(s.insights.siteId, sites),
+        inArray(s.insights.programId,actor.scope.programIds??[]),
         ))
         .orderBy(desc(s.insights.createdAt)),
     ]);
