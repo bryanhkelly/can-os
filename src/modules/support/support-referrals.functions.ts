@@ -108,15 +108,32 @@ export const createSupportReferral = createServerFn({ method: "POST" })
     const subjectId = data.studentProfileId ?? students[0];
     if (!subjectId || !students.includes(subjectId)) throw new AuthorizationError("referral student relationship");
     const created = await db.transaction(async (tx: any) => {
+      // Derive the referral's owning school and program from the student's
+      // actual active enrollment in a section taught by this teacher.
+      const [placement]=await tx.select({
+        siteId:s.sections.siteId,programId:s.sections.programId,
+        organizationId:s.programs.organizationId,
+      }).from(s.enrollments)
+       .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+       .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+       .innerJoin(s.sectionTeachers,and(
+         eq(s.sectionTeachers.sectionId,s.sections.id),
+         eq(s.sectionTeachers.personId,actor.actorPersonId)))
+       .where(and(eq(s.enrollments.studentProfileId,subjectId),
+         eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+         inArray(s.sections.siteId,actor.scope.siteIds??[]),
+         inArray(s.sections.programId,actor.scope.programIds??[])))
+       .limit(1);
+      if(!placement)throw new AuthorizationError("student enrollment in a taught section");
       const [action] = await tx.insert(s.actions).values({
         type: "support_referral", status: "open", priority: data.priority,
         title: `Student support · ${data.category}`, description: observations,
         ownerPersonId: null,
-        organizationId: actor.scope.organizationIds?.[0] ?? null,
-        siteId: sites[0],
-        programId: actor.scope.programIds?.[0] ?? null,
+        organizationId: placement.organizationId,
+        siteId: placement.siteId,
+        programId: placement.programId,
         subjectType: "student_profile", subjectId,
-        metadata: { synthetic: true, fixture: "gf41" },
+        metadata: { source: "teacher_referral" },
       }).returning({ id: s.actions.id });
       if (!action) throw new Error("Referral not created");
       const [referral] = await tx.insert(s.supportReferrals).values({
@@ -125,7 +142,8 @@ export const createSupportReferral = createServerFn({ method: "POST" })
         includeEvidence: data.includeEvidence, notes: observations, reporterPersonId: actor.actorPersonId,
       }).returning({ id: s.supportReferrals.id });
       await tx.insert(s.supportReferralStageEvents).values({ referralId: referral!.id, stage: "submitted", actorPersonId: actor.actorPersonId });
-      await recordAudit(tx, actor, { action: "support_referral.create", resourceType: "action", resourceId: action.id, after: { category: data.category, subjectId, stage: "submitted" }, scope: { siteId: sites[0] } });
+      await tx.insert(s.domainEvents).values({eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,actorPersonId:actor.actorPersonId,payload:{subjectType:"student_profile",subjectId,referralId:referral!.id}});
+      await recordAudit(tx, actor, { action: "support_referral.create", resourceType: "action", resourceId: action.id, after: { category: data.category, subjectId, stage: "submitted" }, scope: { siteId: placement.siteId,programId:placement.programId } });
       return action;
     });
     return { referralId: created.id };
