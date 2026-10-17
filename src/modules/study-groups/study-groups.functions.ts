@@ -341,11 +341,12 @@ export const rsvpStudyGroupSession=createServerFn({method:"POST"})
  assertSyntheticMutation("student");const actor=await groupActor("student");
  if(!["going","maybe","declined"].includes(data.rsvp))throw new Error("Invalid RSVP");
  const {db,s}=await context();
- const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId})
+ const [session]=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,siteId:s.studyGroups.siteId,programId:s.studyGroups.programId})
  .from(s.studyGroupSessions).innerJoin(s.studyGroups,and(eq(s.studyGroups.id,s.studyGroupSessions.groupId),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])),eq(s.studyGroups.status,"active")))
  .where(eq(s.studyGroupSessions.id,data.sessionId)).limit(1);
  if(!session)throw new Error("Session not found");
  return db.transaction(async tx=>{
+ await requireStudentGroupEnrollment(tx,s,actor,session);
  const [calendar]=await tx.select({metadata:s.calendarEvents.metadata}).from(s.calendarEvents).where(and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,session.id))).for("update").limit(1);
  if(!calendar||calendar.metadata.cancelled===true)throw new Error("Session is cancelled or missing its calendar event");
  const [member]=await tx.select({id:s.studyGroupMemberships.id}).from(s.studyGroupMemberships)
