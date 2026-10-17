@@ -15,7 +15,10 @@ async function operator(capability = "academic_year.manage") {
  const context = await getCommandContext(getRequest());
  if (!context.actorPersonId || context.role !== "registrar" || !context.scope.organizationIds?.length) throw new AuthorizationError("academic year operator");
  assertCapability(context, capability);
- return context;
+ // A verified organization-wide grant has no site filter. Preserve narrow
+ // site-scoped grants unchanged, but do not treat an empty list as denial.
+ return context.scope.siteIds?.length ? context :
+  {...context,scope:{...context.scope,siteIds:undefined}};
 }
 export const getSchoolYearStudio = createServerFn({method:"GET"}).handler(async () => {
  const actor = await operator();
