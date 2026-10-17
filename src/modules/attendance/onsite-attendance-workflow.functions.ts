@@ -12,7 +12,7 @@ import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { loadExpectedAttendanceCoverage } from "./expected-attendance-queries";
-import { recordAttendanceRevision, submitAttendanceExcuse } from "./attendance-service";
+import { recordAttendanceRevision, submitAttendanceExcuse, reviewAttendanceExcuse } from "./attendance-service";
 
 const uuid = z.string().uuid();
 const dateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
@@ -134,6 +134,8 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
   }
   for (const row of sectionsAtSite) {
     if (!expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
+    const host = activePrograms.find(p => p.id === row.programId);
+    if (!host || host.siteId !== row.siteId) continue;
     const key = row.programId + ":" + row.studentProfileId;
     const old = byKey.get(key);
     byKey.set(key, {
@@ -372,4 +374,118 @@ export const submitEffectiveAttendanceExcuse = createServerFn({ method: "POST" }
       throw new Error("This attendance record was corrected. Refresh before submitting an excuse");
     const excuseId = await submitAttendanceExcuse(actor, data);
     return { excuseId };
+  });
+
+
+/**
+ * Read and review the same current correction chain as a guardian sees.
+ * The queue is scoped by the caller's school and teacher-section assignment,
+ * unlike the legacy program-only pending-excuse aggregation.
+ */
+export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const actor = await staff("attendance.excuse.review");
+    const base = db.select({
+      excuseId: attendanceExcuses.id,
+      attendanceEventId: attendanceExcuses.attendanceEventId,
+      studentProfileId: attendanceEvents.studentProfileId,
+      programId: attendanceEvents.programId,
+      occurrenceKey: attendanceEvents.occurrenceKey,
+      reason: attendanceExcuses.reason,
+      submittedAt: attendanceExcuses.createdAt,
+      eventStatus: attendanceEvents.status,
+      expectedAt: attendanceEvents.expectedAt,
+      preferredName: people.preferredName,
+      legalFirstName: people.legalFirstName, legalLastName: people.legalLastName,
+    }).from(attendanceExcuses)
+      .innerJoin(attendanceEvents, eq(attendanceEvents.id, attendanceExcuses.attendanceEventId))
+      .innerJoin(studentProfiles, eq(studentProfiles.id, attendanceEvents.studentProfileId))
+      .innerJoin(people, eq(people.id, studentProfiles.personId))
+      .innerJoin(programs, eq(programs.id, attendanceEvents.programId));
+    const rows = actor.role === "teacher" ? await base
+      .innerJoin(sectionTeachers, eq(sectionTeachers.sectionId, attendanceEvents.sectionId))
+      .where(and(
+        eq(attendanceExcuses.status, "submitted"),
+        eq(sectionTeachers.personId, actor.actorPersonId!),
+        inArray(attendanceEvents.programId, actor.scope.programIds!),
+        inArray(attendanceEvents.siteId, actor.scope.siteIds!),
+        inArray(programs.organizationId, actor.scope.organizationIds!),
+      )).orderBy(attendanceExcuses.createdAt).limit(100) :
+      await base.where(and(
+        eq(attendanceExcuses.status, "submitted"),
+        inArray(attendanceEvents.programId, actor.scope.programIds!),
+        inArray(attendanceEvents.siteId, actor.scope.siteIds!),
+        inArray(programs.organizationId, actor.scope.organizationIds!),
+      )).orderBy(attendanceExcuses.createdAt).limit(100);
+    if (!rows.length) return { excuses: [] };
+    const events = await db.select({
+      id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
+      programId: attendanceEvents.programId, occurrenceKey: attendanceEvents.occurrenceKey,
+      status: attendanceEvents.status, recordedAt: attendanceEvents.recordedAt,
+    }).from(attendanceEvents).where(and(
+      inArray(attendanceEvents.programId, [...new Set(rows.map(r => r.programId))]),
+      inArray(attendanceEvents.studentProfileId, [...new Set(rows.map(r => r.studentProfileId))]),
+    ));
+    const effective = new Map(effectiveAttendanceEvents(events).map(r =>
+      [[r.studentProfileId, r.programId, r.occurrenceKey].join(":"), r]));
+    return { excuses: rows.map(r => {
+      const current = effective.get([r.studentProfileId, r.programId, r.occurrenceKey].join(":"));
+      return {
+        excuseId: r.excuseId, attendanceEventId: r.attendanceEventId,
+        studentName: r.preferredName ?? r.legalFirstName + " " + r.legalLastName,
+        expectedAt: r.expectedAt.toISOString(), eventStatus: current?.status ?? r.eventStatus,
+        reason: r.reason, submittedAt: r.submittedAt.toISOString(),
+        canReview: current?.id === r.attendanceEventId &&
+          (current?.status === "absent" || current?.status === "tardy"),
+      };
+    }) };
+  });
+
+export const reviewCurrentAttendanceExcuse = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    excuseId: uuid, decision: z.enum(["approved", "rejected"]),
+    note: z.string().max(2000).optional(),
+  }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await staff("attendance.excuse.review");
+    const [record] = await db.select({
+      attendanceEventId: attendanceExcuses.attendanceEventId,
+      programId: attendanceEvents.programId, siteId: attendanceEvents.siteId,
+      sectionId: attendanceEvents.sectionId,
+      studentProfileId: attendanceEvents.studentProfileId,
+      occurrenceKey: attendanceEvents.occurrenceKey,
+    }).from(attendanceExcuses)
+      .innerJoin(attendanceEvents, eq(attendanceEvents.id, attendanceExcuses.attendanceEventId))
+      .where(and(eq(attendanceExcuses.id, data.excuseId),
+        eq(attendanceExcuses.status, "submitted"))).limit(1);
+    if (!record || !record.siteId || !actor.scope.siteIds?.includes(record.siteId) ||
+      !actor.scope.programIds?.includes(record.programId))
+      throw new AuthorizationError("pending excuse and site/program grant");
+    const [host] = await db.select({ organizationId: programs.organizationId })
+      .from(programs).where(eq(programs.id, record.programId)).limit(1);
+    if (!host || !actor.scope.organizationIds?.includes(host.organizationId))
+      throw new AuthorizationError("excuse organization scope");
+    if (actor.role === "teacher") {
+      const [assignment] = record.sectionId ? await db.select({ id: sectionTeachers.id })
+        .from(sectionTeachers).where(and(
+          eq(sectionTeachers.sectionId, record.sectionId),
+          eq(sectionTeachers.personId, actor.actorPersonId!))).limit(1) : [];
+      if (!assignment) throw new AuthorizationError("teacher excuse section assignment");
+    }
+    const chain = await db.select({
+      id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
+      programId: attendanceEvents.programId, occurrenceKey: attendanceEvents.occurrenceKey,
+      status: attendanceEvents.status, recordedAt: attendanceEvents.recordedAt,
+    }).from(attendanceEvents).where(and(
+      eq(attendanceEvents.studentProfileId, record.studentProfileId),
+      eq(attendanceEvents.programId, record.programId),
+      eq(attendanceEvents.occurrenceKey, record.occurrenceKey)));
+    const [current] = effectiveAttendanceEvents(chain);
+    if (!current || current.id !== record.attendanceEventId ||
+      !["absent", "tardy"].includes(current.status))
+      throw new Error("Attendance changed after the guardian's excuse. Reconcile the school mark before reviewing this excuse");
+    return reviewAttendanceExcuse(actor, {
+      excuseId: data.excuseId, decision: data.decision,
+      reviewNote: data.note?.trim() || undefined,
+    });
   });
