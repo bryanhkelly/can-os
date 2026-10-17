@@ -1,7 +1,7 @@
 import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, asc, inArray } from "drizzle-orm";
+import { and, eq, asc, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { actorSiteIds, assertSiteGranted, recordAudit, requireActor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
@@ -18,7 +18,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
   if(!process.env.DATABASE_URL) return {connected:false,viewerRole,events:[],notices:[],slots:[]};
   const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   const [events,notices,slots]=await Promise.all([
-    db.select().from(schema.calendarEvents).where(inArray(schema.calendarEvents.siteId,sites)).orderBy(asc(schema.calendarEvents.startsAt)).limit(50),
+    db.select().from(schema.calendarEvents).where(and(inArray(schema.calendarEvents.siteId,sites),...(viewerRole==="registrar"?[]:[isNull(schema.calendarEvents.sectionId)]))).orderBy(asc(schema.calendarEvents.startsAt)).limit(50),
     db.select().from(schema.notifications).where(eq(schema.notifications.recipientPersonId,actor.actorPersonId)),
     db.select({id:schema.conferenceSlots.id,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status})
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
@@ -33,7 +33,6 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
 export const acknowledgeSyntheticNotice=createServerFn({method:"POST"})
   .validator((value:unknown)=>z.object({noticeId:z.string().uuid()}).parse(value))
   .handler(async({data})=>{
-  assertSyntheticMutation("student");
     const actor=await anyone();
    const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     const rows=await db.update(schema.notifications).set({status:"read",readAt:new Date(),updatedAt:new Date()}).where(and(eq(schema.notifications.id,data.noticeId),eq(schema.notifications.recipientPersonId,actor.actorPersonId))).returning({id:schema.notifications.id});
