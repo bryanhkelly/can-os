@@ -1,3 +1,4 @@
+import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
 import {normalizeAccessEmail} from "@/domain/access-tokens";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
@@ -40,7 +41,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
   .innerJoin(people,eq(people.id,studentProfiles.personId))
   .where(inArray(applications.programId,actor.scope.programIds!))
   .orderBy(desc(applications.updatedAt)).limit(300);
- return rows.filter(r=>r.metadata.synthetic===true).map(r=>({
+ return rows.map(r=>({
   ...r,createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
   disposition:r.metadata.admissionsDisposition==="waitlisted"?"waitlisted":r.metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
  }));
@@ -68,7 +69,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
      organizationId:programs.organizationId})
      .from(applications).innerJoin(programs,eq(programs.id,applications.programId))
      .where(eq(applications.id,data.existingApplicationId)).limit(1);
-    if(!prior||prior.metadata.synthetic!==true||
+    if(!prior||
      !actor.scope.programIds?.includes(prior.programId)||
      prior.organizationId!==program.organizationId)
      throw new AuthorizationError("existing family scope");
@@ -84,7 +85,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     // created until a registrar explicitly provisions guardian access.
     const [guardian]=await tx.insert(people).values({
      legalFirstName:data.guardianFirstName,legalLastName:data.guardianLastName,email:data.guardianEmail,
-     metadata:{synthetic:true,origin:"registrar_intake"},
+     metadata:{synthetic:false,origin:"registrar_intake"},
     }).returning({id:people.id});
     const [household]=await tx.insert(households).values({
      displayName:data.guardianLastName+" Household",primaryEmail:data.guardianEmail,
@@ -96,7 +97,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
    }
    const [studentPerson]=await tx.insert(people).values({
     legalFirstName:data.studentFirstName,legalLastName:data.studentLastName,
-    metadata:{synthetic:true,origin:"registrar_intake"},
+    metadata:{synthetic:false,origin:"registrar_intake"},
    }).returning({id:people.id});
    const [student]=await tx.insert(studentProfiles).values({
     personId:studentPerson!.id,gradeLevel:data.gradeLevel||null,metadata:{synthetic:true},
@@ -113,7 +114,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     householdId,studentProfileId:student!.id,programId:data.programId,
     submittedByPersonId:actor.actorPersonId!,stage:"inquiry",
     idempotencyKey,
-    metadata:{synthetic:true,source:data.source,notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardianPersonId},
+    metadata:{synthetic:false,source:data.source,notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardianPersonId},
    }).returning({id:applications.id});
    await tx.insert(domainEvents).values({eventType:"AdmissionsInquiryCreated",aggregateType:"application",
     aggregateId:application!.id,actorPersonId:actor.actorPersonId,
@@ -134,8 +135,9 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [app]=await tx.select().from(applications).where(eq(applications.id,data.applicationId))
     .for("update").limit(1);
-   if(!app||app.metadata.synthetic!==true||!actor.scope.programIds?.includes(app.programId))
+   if(!app||!actor.scope.programIds?.includes(app.programId))
     throw new AuthorizationError("admissions application");
+   assertRecordWriteAllowed(app.metadata,"registrar");
    const waitlisted=app.metadata.admissionsDisposition==="waitlisted";
    const expected:Record<string,string[]>={
     application:["inquiry"],eligibility:["application"],accept:["eligibility"],
@@ -197,13 +199,14 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    const [app]=await tx.select({
     id:applications.id,programId:applications.programId,metadata:applications.metadata,
    }).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
-   if(!app||app.metadata.synthetic!==true||!actor.scope.programIds?.includes(app.programId))
+   if(!app||!actor.scope.programIds?.includes(app.programId))
     throw new AuthorizationError("admissions guardian provisioning");
    const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
     .from(programs).where(eq(programs.id,app.programId)).limit(1);
    if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
     (actor.scope.siteIds?.length&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))
     throw new AuthorizationError("guardian membership scope");
+   assertRecordWriteAllowed(app.metadata,"registrar");
    const contactId=String(app.metadata.contactPersonId??"");
    const [contact]=await tx.select({id:people.id,email:people.email})
     .from(people).where(eq(people.id,contactId)).limit(1);
