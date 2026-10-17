@@ -21,6 +21,7 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 
 function assertDateRange(startsOn: string, endsOn: string, label: string) {
   if (startsOn > endsOn) {
@@ -279,6 +280,8 @@ export async function createAcademicCalendar(
     if (!year) throw new Error("SchoolYear not found");
     assertOrganizationScope(context, year.organizationId);
     assertProgramScope(context, year.programId);
+    assertSiteScope(context, year.siteId);
+    await lockAttendanceConfigurationAtSite(tx, year.siteId);
 
     const [calendar] = await tx
       .insert(academicCalendars)
@@ -338,6 +341,7 @@ export async function setAcademicCalendarDay(
     ) {
       throw new Error("Calendar day must fit within SchoolYear");
     }
+    await lockAttendanceConfigurationAtSite(tx, record.siteId);
 
     const [existing] = await tx
       .select({ id: academicCalendarDays.id })
@@ -429,6 +433,7 @@ export async function createScheduleTemplate(
     if (!year) throw new Error("SchoolYear not found");
     assertOrganizationScope(context, year.organizationId);
     assertProgramScope(context, input.programId ?? year.programId);
+    assertSiteScope(context, year.siteId);
 
     if (
       input.effectiveFrom < year.startsOn ||
@@ -436,6 +441,7 @@ export async function createScheduleTemplate(
     ) {
       throw new Error("ScheduleTemplate must fit within SchoolYear");
     }
+    await lockAttendanceConfigurationAtSite(tx, year.siteId);
 
     const [template] = await tx
       .insert(scheduleTemplates)
@@ -488,6 +494,9 @@ export async function activateSchoolYear(
     assertProgramScope(context, year.programId);
     assertSiteScope(context, year.siteId);
 
+    // Even activation changes the eligible year set; a live attendance
+    // transaction must never observe a half-activated site/year.
+    await lockAttendanceConfigurationAtSite(tx, year.siteId);
     if (year.status === "active") return;
 
     const yearTerms = await tx
