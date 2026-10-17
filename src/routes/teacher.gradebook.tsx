@@ -241,7 +241,7 @@ function TeacherGradebookPage() {
      <button disabled={busy} onClick={submitAssessment} className="mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Create assessment</button>
     </section>
 
-    {gradebook.assessments.length === 0 && <p className="mt-8 text-sm">No published assessments yet. Create one above to start grading.</p>}
+    {gradebook.assessments.length === 0 && <p className="mt-8 text-sm">No assessments yet. Create one above to begin.</p>}
     {gradebook.assessments.length > 0 && <div ref={gridRef} className="mt-8 overflow-x-auto rounded-xl border bg-card">
      <table className="w-full border-collapse text-sm">
       <thead>
@@ -252,7 +252,20 @@ function TeacherGradebookPage() {
          <span className="block text-xs font-normal text-muted-foreground">
           {assessment.dueAt ? `Due ${new Date(assessment.dueAt).toLocaleDateString()}` : "No due date"} · {assessment.pointsPossible ?? "—"} pts
           {assessment.rubric.length > 0 && ` · ${assessment.rubric.length} criteria`}
+          {" · "+assessment.status}
          </span>
+         <label className="mt-2 block text-xs font-normal">New due date
+          <input aria-label={"Due date for "+assessment.title} type="date"
+           value={assessmentDueDates[assessment.id]??""}
+           onChange={event=>setAssessmentDueDates(current=>({...current,[assessment.id]:event.target.value}))}
+           className="mt-1 w-full rounded border bg-background p-1.5 text-xs"/>
+         </label>
+         <div className="mt-2 flex flex-wrap gap-1">
+          {assessment.status==="draft"&&<button disabled={busy} onClick={()=>changeAssessment(assessment.id,"publish")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Publish</button>}
+          {assessment.status==="published"&&<button disabled={busy} onClick={()=>changeAssessment(assessment.id,"close")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Close</button>}
+          {assessment.status==="closed"&&<button disabled={busy} onClick={()=>changeAssessment(assessment.id,"reopen")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Reopen</button>}
+          {assessment.status!=="draft"&&<button disabled={busy||!assessmentDueDates[assessment.id]} onClick={()=>changeAssessment(assessment.id,"reschedule")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Change deadline</button>}
+         </div>
         </th>)}
        </tr>
       </thead>
@@ -306,6 +319,7 @@ function TeacherGradebookPage() {
             })}
            </ul>}
            {cell.feedbackComment && <p className="text-muted-foreground">“{cell.feedbackComment}”</p>}
+           {cell.status==="graded"&&<button disabled={busy} onClick={()=>returnForRevision(cell.submissionId)} className="mt-2 w-fit rounded-lg border px-3 py-1 text-xs font-semibold disabled:opacity-40">Return for revision</button>}
            <button onClick={() => setDetailKey("")} className="mt-1 w-fit rounded-lg border px-3 py-1 text-xs">Close</button>
           </div> : cell ? <button
            data-cell={`${rowIndex}:${colIndex}`}
