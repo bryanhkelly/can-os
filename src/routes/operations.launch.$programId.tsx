@@ -4,6 +4,7 @@ import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher} from 
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
+import {SectionLifecycleWorkspace} from "@/components/operations/SectionLifecycleManager";
 export const Route=createFileRoute("/operations/launch/$programId")({
  loader:({params})=>safeLoader(()=>getLaunchAcademicSetup({data:{programId:params.programId}}),
   {authMessage:"Sign in with a registrar grant for this program."}),
@@ -83,6 +84,7 @@ function Setup({data}:{data:Snapshot}){
      programId:data.program.id,sectionId:section.id,teacherPersonId:personId}}),"Instructor assigned.")}/>)}
    {!data.sections.length&&<p className="rounded-lg border p-4 text-sm text-muted-foreground">No sections have been provisioned for this program.</p>}
   </section>
+  <SectionLifecycleWorkspace programId={data.program.id} staff={data.teachingStaff}/>
  </WorkspaceShell>;
 }
 function SectionRow({section,staff,busy,assign}:{
