@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
@@ -164,7 +164,7 @@ export const rsvpCanonicalGroupSession = createServerFn({ method: "POST" })
     return db.transaction(async tx => {
       const [row] = await tx.select({
         sessionId: s.studyGroupSessions.id, startsAt: s.studyGroupSessions.startsAt,
-        groupId: s.studyGroups.id, siteId: s.studyGroups.siteId,
+        id: s.studyGroups.id, groupId: s.studyGroups.id, siteId: s.studyGroups.siteId,
         programId: s.studyGroups.programId, sectionId: s.studyGroups.sectionId,
       }).from(s.studyGroupSessions)
         .innerJoin(s.studyGroups, eq(s.studyGroups.id, s.studyGroupSessions.groupId))
