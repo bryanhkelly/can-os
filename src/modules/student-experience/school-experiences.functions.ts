@@ -52,10 +52,10 @@ export const bookOfficeHour=createServerFn({method:"POST"})
       if(!child) throw new AuthorizationError("guardian relationship");
       const [siteEnrollment]=await tx.select({id:schema.enrollments.id}).from(schema.enrollments)
         .innerJoin(schema.programs,eq(schema.programs.id,schema.enrollments.programId))
-        .where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.status,"active"),eq(schema.programs.siteId,slotSite.siteId))).limit(1);
+        .where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.status,"active"),eq(schema.programs.siteId,slotSite.siteId),inArray(schema.programs.id,actor.scope.programIds??[]))).limit(1);
       if(!siteEnrollment)throw new AuthorizationError("child enrollment at selected school");
       if(slotSite.sectionId){
-        const [sectionEnrollment]=await tx.select({id:schema.enrollments.id}).from(schema.enrollments).where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.sectionId,slotSite.sectionId),eq(schema.enrollments.status,"active"),eq(schema.enrollments.kind,"section"))).limit(1);
+        const [sectionEnrollment]=await tx.select({id:schema.enrollments.id}).from(schema.enrollments).where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.sectionId,slotSite.sectionId),eq(schema.enrollments.status,"active"),eq(schema.enrollments.kind,"section"),inArray(schema.enrollments.programId,actor.scope.programIds??[]))).limit(1);
         if(!sectionEnrollment)throw new AuthorizationError("child is not enrolled in the appointment section");
       }
       const [slot]=await tx.update(schema.conferenceSlots).set({status:"booked",updatedAt:new Date()}).where(and(eq(schema.conferenceSlots.id,data.slotId),eq(schema.conferenceSlots.status,"available"))).returning({id:schema.conferenceSlots.id});
