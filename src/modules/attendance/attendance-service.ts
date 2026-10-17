@@ -143,7 +143,7 @@ export async function submitAttendanceExcuse(
   },
 ): Promise<string> {
   assertCapability(context, "attendance.excuse.submit");
-  if (context.role !== "guardian" || !context.actorPersonId)
+  if ((context as CommandContext & { role?: string }).role !== "guardian" || !context.actorPersonId)
     throw new Error("Verified guardian identity is required");
   const actorPersonId = context.actorPersonId;
 
@@ -256,7 +256,8 @@ export async function reviewAttendanceExcuse(
   },
 ): Promise<{ excuseId: string; correctionAttendanceEventId?: string }> {
   assertCapability(context, "attendance.excuse.review");
-  if (!context.actorPersonId || !["registrar", "teacher"].includes(context.role))
+  const reviewerRole = (context as CommandContext & { role?: string }).role;
+  if (!context.actorPersonId || !["registrar", "teacher"].includes(reviewerRole ?? ""))
     throw new Error("Verified staff reviewer identity is required");
   const actorPersonId = context.actorPersonId;
   let submitterEmailNotice: { submittedByPersonId: string } | undefined;
@@ -291,7 +292,7 @@ export async function reviewAttendanceExcuse(
     if (!host || !context.scope.organizationIds?.includes(host.organizationId) ||
         !record.siteId || host.siteId !== record.siteId)
       throw new Error("Excuse school and organization scope is not authorized");
-    if (context.role === "teacher") {
+    if (reviewerRole === "teacher") {
       if (!record.sectionId) throw new Error("Excuse has no teaching section");
       const [assignment] = await tx.select({ id: sectionTeachers.id })
         .from(sectionTeachers).where(and(
