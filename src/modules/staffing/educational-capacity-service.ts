@@ -12,6 +12,7 @@ import {
   sectionCapacityDemands,
   sections,
   sectionTeachers,
+  scheduleTemplatePeriods,
 } from "@/db/schema";
 import {
   assertCapability,
@@ -173,6 +174,38 @@ function modalityMatches(offered: string, requested: string): boolean {
   return false;
 }
 
+function normalizeLocalTime(value: string): string {
+  return /^\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
+}
+
+function weeklyPatternCovers(
+  pattern: { days?: number[]; startTime?: string; endTime?: string } | null,
+  periods: readonly { dayOfWeek: number; startsAtLocal: string; endsAtLocal: string }[],
+): boolean {
+  if (!pattern || periods.length === 0) return true;
+  const days = pattern.days ?? [];
+  const start = pattern.startTime ? normalizeLocalTime(pattern.startTime) : null;
+  const end = pattern.endTime ? normalizeLocalTime(pattern.endTime) : null;
+  return periods.every((period) => {
+    if (days.length > 0 && !days.includes(period.dayOfWeek)) return false;
+    if (start && normalizeLocalTime(period.startsAtLocal) < start) return false;
+    if (end && normalizeLocalTime(period.endsAtLocal) > end) return false;
+    return true;
+  });
+}
+
+async function loadSectionPeriods(executor: any, scheduleTemplateId: string | null) {
+  if (!scheduleTemplateId) return [];
+  return executor
+    .select({
+      dayOfWeek: scheduleTemplatePeriods.dayOfWeek,
+      startsAtLocal: scheduleTemplatePeriods.startsAtLocal,
+      endsAtLocal: scheduleTemplatePeriods.endsAtLocal,
+    })
+    .from(scheduleTemplatePeriods)
+    .where(eq(scheduleTemplatePeriods.scheduleTemplateId, scheduleTemplateId));
+}
+
 function scopedMatch(
   offering: {
     organizationId: string | null;
@@ -212,6 +245,7 @@ async function loadDemandContext(executor: any, demandId: string) {
       courseTemplateId: courseTemplates.id,
       courseSubject: courseTemplates.subject,
       courseTitle: courseTemplates.title,
+      scheduleTemplateId: sections.scheduleTemplateId,
     })
     .from(sectionCapacityDemands)
     .innerJoin(sections, eq(sections.id, sectionCapacityDemands.sectionId))
@@ -297,6 +331,8 @@ export async function findCapacityCandidates(
   if (!demand) throw new Error("Section capacity demand not found");
   assertDemandScope(context, demand);
 
+  const sectionPeriods = await loadSectionPeriods(db, demand.scheduleTemplateId);
+
   const rows = await db
     .select({
       offeringId: instructionalCapacityOfferings.id,
@@ -341,7 +377,8 @@ export async function findCapacityCandidates(
     return (
       subjectMatches &&
       modalityMatches(row.modality, demand.modality) &&
-      scopedMatch(row, demand)
+      scopedMatch(row, demand) &&
+      weeklyPatternCovers(row.weeklyPattern, sectionPeriods)
     );
   });
 
@@ -440,6 +477,7 @@ export async function reserveInstructionalCapacity(
         capabilitySubject: instructorCapabilities.subject,
         availabilityStartsAt: instructorAvailabilityWindows.startsAt,
         availabilityEndsAt: instructorAvailabilityWindows.endsAt,
+        weeklyPattern: instructorAvailabilityWindows.weeklyPattern,
       })
       .from(instructionalCapacityOfferings)
       .innerJoin(instructorCapabilities, eq(instructorCapabilities.id, instructionalCapacityOfferings.capabilityId))
@@ -460,6 +498,10 @@ export async function reserveInstructionalCapacity(
     if (!scopedMatch(offering, demand)) throw new Error("Capacity offering is outside the section delivery scope");
     if (offering.availabilityStartsAt > demand.startsAt || offering.availabilityEndsAt < demand.endsAt) {
       throw new Error("Instructor availability does not cover the section demand window");
+    }
+    const sectionPeriods = await loadSectionPeriods(tx, demand.scheduleTemplateId);
+    if (!weeklyPatternCovers(offering.weeklyPattern, sectionPeriods)) {
+      throw new Error("Instructor weekly availability does not cover the section schedule");
     }
 
     const seats = input.seats ?? demand.expectedSeats;
