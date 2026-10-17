@@ -14,19 +14,25 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
   setResponseHeader("Cache-Control","private, no-store");
   const sites=actorSiteIds(actor);
   const viewerRole=actor.role as "student"|"guardian"|"registrar"|"teacher";
-  if(!process.env.DATABASE_URL) return {connected:false,viewerRole,events:[],notices:[],slots:[]};
+  if(!process.env.DATABASE_URL) return {connected:false,viewerRole,events:[],notices:[],slots:[],bookings:[]};
   const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  const [events,notices,slots]=await Promise.all([
+  const [events,notices,slots,bookings]=await Promise.all([
     db.select().from(schema.calendarEvents).where(and(inArray(schema.calendarEvents.siteId,sites),isNull(schema.calendarEvents.sectionId),ne(schema.calendarEvents.type,"personal"),notExists(db.select({id:schema.calendarEventParticipants.id}).from(schema.calendarEventParticipants).where(eq(schema.calendarEventParticipants.calendarEventId,schema.calendarEvents.id))))).orderBy(asc(schema.calendarEvents.startsAt)).limit(50),
     db.select().from(schema.notifications).where(eq(schema.notifications.recipientPersonId,actor.actorPersonId)),
     viewerRole==="guardian" ? db.select({id:schema.conferenceSlots.id,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status})
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
       .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
+    viewerRole==="guardian" ? db.select({id:schema.conferenceBookings.id,slotId:schema.conferenceBookings.conferenceSlotId,studentPersonId:schema.studentProfiles.personId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,seriesId:schema.conferenceSlots.conferenceSeriesId}).from(schema.conferenceBookings)
+      .innerJoin(schema.conferenceSlots,eq(schema.conferenceSlots.id,schema.conferenceBookings.conferenceSlotId))
+      .innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
+      .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.id,schema.conferenceBookings.studentProfileId))
+      .where(and(eq(schema.conferenceBookings.guardianPersonId,actor.actorPersonId),eq(schema.conferenceBookings.status,"booked"),inArray(schema.conferenceSeries.siteId,sites),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(30) : Promise.resolve([]),
   ]);
   return {connected:true,viewerRole,
     events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:"scheduled"})),
     notices:notices.map(n=>({id:n.id,title:n.title,body:n.body??"",acknowledged:n.status==="read"})),
     slots:slots.map(s=>({id:s.id,startsAt:s.startsAt.toISOString(),endsAt:s.endsAt.toISOString(),status:s.status})),
+    bookings:bookings.map(b=>({...b,startsAt:b.startsAt.toISOString(),endsAt:b.endsAt.toISOString()})),
   };
 });
 export const bookOfficeHour=createServerFn({method:"POST"})
