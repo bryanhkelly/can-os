@@ -43,6 +43,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test
+        run: npm test
+
       - name: Validate incremental migration generation
         run: |
           npm run db:generate
@@ -60,6 +63,3 @@ jobs:
           name: drizzle-migration-review
           path: drizzle/
           retention-days: 7
-
-      - name: Test
-        run: npm test
