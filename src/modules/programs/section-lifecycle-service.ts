@@ -43,6 +43,10 @@ export async function sectionLifecycleSnapshot(context: LifecycleContext, progra
     throw new AuthorizationError("program lifecycle");
   const rows=await db.select().from(sections).where(eq(sections.programId,programId));
   const ids=rows.map(r=>r.id);
+  const schedules=await db.select({scheduleId:scheduleTemplates.id,name:scheduleTemplates.name,schoolYearId:scheduleTemplates.schoolYearId}).from(scheduleTemplates);
+  const termYears=rows.length?await db.select({termId:terms.id,schoolYearId:terms.schoolYearId}).from(terms)
+    .where(inArray(terms.id,[...new Set(rows.map(r=>r.termId))])):[];
+  const yearByTerm=new Map(termYears.map(t=>[t.termId,t.schoolYearId]));
   const [staff, students, waits, allocations]=await Promise.all([
     ids.length?db.select({sectionId:sectionTeachers.sectionId,personId:sectionTeachers.personId})
       .from(sectionTeachers).where(inArray(sectionTeachers.sectionId,ids)):[],
@@ -57,6 +61,8 @@ export async function sectionLifecycleSnapshot(context: LifecycleContext, progra
     id:row.id,title:row.title,code:row.code,active:row.active,
     startsAt:row.startsAt?.toISOString()??null,endsAt:row.endsAt?.toISOString()??null,
     scheduleTemplateId:row.scheduleTemplateId,
+    scheduleOptions:schedules.filter(s=>s.schoolYearId===yearByTerm.get(row.termId))
+      .map(s=>({id:s.scheduleId,name:s.name})),
     teachers:staff.filter(t=>t.sectionId===row.id),
     students:students.filter(e=>e.sectionId===row.id),
     waitlist:waits.filter(w=>w.sectionId===row.id),
