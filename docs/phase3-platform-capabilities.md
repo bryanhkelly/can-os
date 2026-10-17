@@ -21,19 +21,28 @@
 - Rechecks deadline and active program enrollment at approval. Approved adds flow through the existing transactional `activateSectionEnrollment`, which enforces capacity, finalized-grade prerequisites, term credits and scheduled-section conflicts and assigns published assessments.
 - Records request/decision audit entries and domain events in the same transactions as writes. Existing student/guardian decision notices and add/drop/withdrawal enrollment events remain.
 - Removes invented `synthetic:true` metadata on withdrawal, preserves prior enrollment metadata, and makes the course UI reflect configured deadlines, prerequisites and known consent requirements.
-- **Fail closed:** when `guardianApprovalRequired` is configured for an add, the student request button is unavailable and server request/registrar approval are rejected pending real guardian-consent capture/verification. The UI makes this limitation explicit; do not override with a fixture flag.
+- **Fail closed:** when `guardianApprovalRequired` is configured for an add, the student can submit an ordinary pending request, but registrar approval is refused until an eligible guardian approves through the authenticated decision route and no eligible guardian has an outstanding decline. No fixture flag can satisfy this authorization.
+
+## Implemented slice — GF40 guardian consent and registrar review
+
+- Added a session-authorized guardian course approval queue at `/guardian/course-approvals`, reachable from the family's existing permissions surface, and a registrar review queue at `/operations/course-requests`, reachable from registrar course policies.
+- A student now submits an ordinary course-add Action when school policy requires guardian permission. The same transaction notifies guardians with current `canManageEnrollment` authority; no fixture-only code path or extra schema is needed.
+- Guardian decisions are appended to canonical `consent_records`, keyed by the request Action ID and signed by the verified guardian person. Evidence binds the subject student, course, academic year, account and session; writes also append audit and domain event records and notify the student. Guardians may revise their decision until the request closes.
+- The registrar review view shows authorized requests, active program membership, deadline status and guardian-consent readiness. Registrar approval re-verifies the *latest* still-valid decisions from currently authorized guardians under the same Action row lock. A declined guardian blocks the change; at least one approval and no current declines are required.
+- Registrar course policy editing now exposes/preserves `guardianApprovalRequired` instead of silently resetting it during updates. The student UI offers consent-required requests and displays the guardian path.
+- The pure resolver `course-guardian-consent.ts` is shared by the view and the transactional command so the consent conditions do not drift. No changes to Phase 1 or Phase 2 owned services, Drizzle models or migrations.
 
 ## Known remaining gaps / not release-ready
 
-1. Guardian approval evidence and a verified guardian decision path must precede approvals for sections that require it. Registrar policy UI currently does not expose that flag, although the canonical policy table supports it.
+1. Guardian course-add decision path and configurable policy control are implemented, but the format and legal sufficiency of guardian consent evidence require school/legal review before deployment. The current flow intentionally requires one approval and no active declines; multi-guardian and custody-specific policies may demand stronger rules.
 2. Transcript-grade interpretation, credit accounting after withdrawal and policy-specific refund handling need authoritative school rules; `W` remains provisional enrollment metadata.
-3. Pending-request UI is not yet linked into the canonical Operations Action queue with a dedicated, registrar-only program view; registrar decisions remain on the course page.
+3. Registrar course-change review now uses a dedicated scoped view over the canonical Actions table. It must eventually be linked into the Phase 2 operations workspace navigation after coordinating route and menu ownership; no duplicate workflow state was created.
 4. The section allocator already enforces capacity, conflict, prerequisite and credit rules on **add**, but cross-workflow placement (Phase 2) and acceptance testing are prerequisites before relying on those guards in production.
 5. Phase 1 must pass its authorization/route acceptance gate; Phase 2 must establish active academic configuration and student roster guarantees.
-6. CI/build/typecheck/integration/browser testing have deliberately **not** run. This PR is implementation evidence, not production certification.
+6. CI/build/typecheck/integration/browser testing have deliberately **not** run. The guardian/registrar workflow, Action locking, consent ordering and real cross-persona permissions remain unverified; this PR is implementation evidence, not production certification.
 
 ## Integration sequence
 
 - Keep this as a draft PR against `phase1/platform-convergence-foundation` to isolate Phase 3 file diffs. Coordinate and rebase onto Phase 1 after its review; do not merge this branch into main independently.
 - Align with Phase 2 school/year/section topology once GF3 is stable. No migration or release action is included.
-- After permission and consent modeling is agreed, complete the guardian approval and official transcript consequences in a separate, reviewed Phase 3 slice.
+- Complete legal/school consent policy review, official transcript consequences, guardian notification deep-link integration with the Phase 1 notification router, and cross-persona acceptance in a separate, reviewed Phase 3 slice.
