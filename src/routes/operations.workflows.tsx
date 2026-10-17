@@ -143,15 +143,32 @@ function ConnectedWorkflowsPage() {
                 <Link to="/staff/attendance" className="text-xs underline">Review attendance</Link>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
-                <Metric label="Effective absences" value={program.attendance.absent} />
-                <Metric label="Effective excused" value={program.attendance.excused} />
-                <Metric label="Excuses awaiting review" value={program.attendance.pendingExcuses} />
+                <Metric label="Expected student-days" value={program.attendance.coverage.expectedDays} />
+                <Metric label="Unmarked expected days" value={program.attendance.coverage.unmarkedExpectedDays} />
+                <Metric label="Record completion" value={program.attendance.coverage.recordCompletionPercent === null
+                  ? "—" : program.attendance.coverage.recordCompletionPercent + "%"} />
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                Last {data.windowDays} rolling days: {program.attendance.recordedOccurrences} recorded
-                occurrences after corrections ({program.attendance.present} present,
-                {" "}{program.attendance.tardy} tardy). Not an expected-day attendance rate;
-                unmarked expected days are not included.
+                Expected onsite days: {program.attendance.coverage.windowStart} to
+                {" "}{program.attendance.coverage.windowThrough}, derived from each active school
+                year, its calendar and effective onsite schedule, and the student's active enrollment.
+                Unmarked days are <strong>not</strong> automatically absences.
+              </p>
+              {program.attendance.coverage.configuration !== "configured" &&
+                <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                  Coverage limitation: {program.attendance.coverage.configuration.replaceAll("_"," ")}
+                  {program.attendance.coverage.daysWithoutCalendarConfiguration > 0
+                    ? " · " + program.attendance.coverage.daysWithoutCalendarConfiguration + " scheduled dates lack calendar entries"
+                    : ""}. The denominator may be incomplete.
+                </p>}
+              <p className="mt-2 text-xs text-muted-foreground">
+                Last {data.windowDays} rolling days in the attendance event log:
+                {" "}{program.attendance.recordedOccurrences} effective recorded occurrences,
+                including {program.attendance.absent} absent,
+                {" "}{program.attendance.excused} excused and
+                {" "}{program.attendance.tardy} tardy.
+                {program.attendance.pendingExcuses} excuse(s) await review.
+                This event-log window is separate from the completed-day expected denominator.
               </p>
             </section>
           </div>
