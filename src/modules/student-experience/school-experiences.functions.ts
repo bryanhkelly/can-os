@@ -77,15 +77,38 @@ export const rescheduleOfficeHour=createServerFn({method:"POST"})
    const [current]=await tx.select({
     id:s.conferenceBookings.id,oldSlotId:s.conferenceSlots.id,
     seriesId:s.conferenceSlots.conferenceSeriesId,startsAt:s.conferenceSlots.startsAt,
-    siteId:s.conferenceSeries.siteId,
+    siteId:s.conferenceSeries.siteId,sectionId:s.conferenceSeries.sectionId,
+    seriesStatus:s.conferenceSeries.status,studentProfileId:s.conferenceBookings.studentProfileId,
    }).from(s.conferenceBookings)
     .innerJoin(s.conferenceSlots,eq(s.conferenceSlots.id,s.conferenceBookings.conferenceSlotId))
     .innerJoin(s.conferenceSeries,eq(s.conferenceSeries.id,s.conferenceSlots.conferenceSeriesId))
     .where(and(eq(s.conferenceBookings.id,data.bookingId),
       eq(s.conferenceBookings.guardianPersonId,actor.actorPersonId),
       eq(s.conferenceBookings.status,"booked"))).for("update").limit(1);
-   if(!current||current.startsAt<=new Date())throw new AuthorizationError("future guardian booking");
+   if(!current||current.startsAt<=new Date()||current.seriesStatus!=="published")
+    throw new AuthorizationError("future published guardian booking");
    assertSiteGranted(actor,current.siteId);
+   const [linkedChild]=await tx.select({id:s.studentProfiles.id})
+    .from(s.studentProfiles)
+    .innerJoin(s.guardianRelationships,eq(s.guardianRelationships.studentPersonId,s.studentProfiles.personId))
+    .where(and(eq(s.studentProfiles.id,current.studentProfileId),
+     eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),
+     eq(s.guardianRelationships.canViewAcademics,true))).limit(1);
+   if(!linkedChild)throw new AuthorizationError("current guardian relationship");
+   const [activeProgram]=await tx.select({id:s.enrollments.id})
+    .from(s.enrollments).innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+    .where(and(eq(s.enrollments.studentProfileId,current.studentProfileId),
+      eq(s.enrollments.status,"active"),eq(s.programs.siteId,current.siteId),
+      inArray(s.programs.id,actor.scope.programIds??[]))).limit(1);
+   if(!activeProgram)throw new AuthorizationError("current school enrollment");
+   if(current.sectionId){
+    const [section]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
+     .where(and(eq(s.enrollments.studentProfileId,current.studentProfileId),
+      eq(s.enrollments.sectionId,current.sectionId),eq(s.enrollments.kind,"section"),
+      eq(s.enrollments.status,"active"),
+      inArray(s.enrollments.programId,actor.scope.programIds??[]))).limit(1);
+    if(!section)throw new AuthorizationError("current class enrollment");
+   }
    if(current.oldSlotId===data.newSlotId)return {saved:true};
    const [next]=await tx.update(s.conferenceSlots)
     .set({status:"booked",updatedAt:new Date()})
