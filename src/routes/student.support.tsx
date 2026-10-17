@@ -1,14 +1,70 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { advanceSupportReferral, createSupportReferral, getSupportReferrals, listTeacherReferralStudents, saveSupportPlan, scheduleSupportService, completeSupportService } from "@/modules/support/support-referrals.functions";
+import { advanceSupportReferral, createSupportReferral, getSupportReferrals, getSupportViewerRole, listTeacherReferralStudents, saveSupportPlan, scheduleSupportService, completeSupportService } from "@/modules/support/support-referrals.functions";
 import { safeLoader } from "@/lib/safe-loader";
+import {getQuickWinActions,requestQuickWinHelp} from "@/modules/actions/student-actions.functions";
 import { LoaderFailure } from "@/lib/loader-failure";
 
-const loadSupportReferrals=()=>getSupportReferrals();
+const loadSupportReferrals=async()=>{
+ const viewer=await getSupportViewerRole();
+ if(viewer.role==="student"){
+  const data=await getQuickWinActions();
+  return {viewerRole:"student" as const,actions:data.actions};
+ }
+ return {viewerRole:"staff" as const,referrals:await getSupportReferrals()};
+};
 export const Route=createFileRoute("/student/support")({
- loader:safeLoader(loadSupportReferrals,{authMessage:"Sign in with an authorized teacher or specialist account to manage support referrals."}),
+ loader:safeLoader(loadSupportReferrals,{authMessage:"Sign in with an authorized student, teacher, or specialist account to view support."}),
  component:SupportPage,
 });
+function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuickWinActions>>["actions"]}){
+ const router=useRouter();
+ const [message,setMessage]=useState("");
+ const [busy,setBusy]=useState(false);
+ const [notice,setNotice]=useState("");
+ const [error,setError]=useState("");
+ const relevant=actions.filter(action=>
+  ["student_recovery","student_support","student_support_request","conference_follow_up"].includes(action.type));
+ async function askForHelp(){
+  setBusy(true);setError("");setNotice("");
+  try{
+   await requestQuickWinHelp({data:{message}});
+   setMessage("");
+   await router.invalidate();
+   setNotice("Your support request has been recorded.");
+  }catch(cause){
+   setError(cause instanceof Error?cause.message:"Unable to request support");
+  }finally{setBusy(false);}
+ }
+ return <main className="mx-auto max-w-4xl px-5 py-10">
+  <Link to="/student" className="text-xs font-semibold underline">← Student Today</Link>
+  <p className="mt-7 text-xs font-bold uppercase tracking-wider text-muted-foreground">CAN OS · Student support</p>
+  <h1 className="mt-2 font-serif text-4xl">Get help and follow through.</h1>
+  <p className="mt-3 text-sm text-muted-foreground">Your open support requests and recovery actions appear here. Teachers and support staff manage the private referral and service records in their own workspaces.</p>
+  {error&&<p role="alert" className="mt-4 rounded border p-3 text-sm">{error}</p>}
+  {notice&&<p role="status" className="mt-4 rounded border p-3 text-sm">{notice}</p>}
+  <section className="mt-7 rounded-xl border bg-card p-5">
+   <h2 className="font-semibold">Ask your school for help</h2>
+   <label className="mt-3 block text-sm">What do you need help with?
+    <textarea value={message} onChange={event=>setMessage(event.target.value)}
+      rows={4} maxLength={1000} className="mt-2 w-full rounded border bg-background p-3"
+      placeholder="Describe the schoolwork, learning, or support concern"/>
+   </label>
+   <button type="button" disabled={busy||message.trim().length<3}
+     onClick={askForHelp} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-40">Send request</button>
+  </section>
+  <section className="mt-7">
+   <h2 className="font-serif text-2xl">Your support actions</h2>
+   {relevant.length===0&&<p className="mt-3 rounded-xl border p-4 text-sm text-muted-foreground">No support actions recorded yet.</p>}
+   <div className="mt-3 space-y-3">{relevant.map(action=><article key={action.id} className="rounded-xl border bg-card p-4">
+    <p className="font-semibold">{action.title}</p>
+    <p className="mt-2 text-sm text-muted-foreground">{action.description}</p>
+    <p className="mt-2 text-xs capitalize">Status: {action.status.replaceAll("_"," ")}</p>
+   </article>)}</div>
+  </section>
+ </main>;
+}
+
 const destinations=[
  {value:"academic",label:"Academic coaching"},{value:"attendance",label:"Attendance and engagement"},
  {value:"learning",label:"Learning specialist"},{value:"personal",label:"School counselor"},
@@ -18,9 +74,10 @@ const stages=["submitted","accepted","plan_created","in_service","review","close
 function SupportPage(){
  const outcome=Route.useLoaderData();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Student support" title="Student support that follows through." outcome={outcome}/>;
- return <SupportView referrals={outcome.data}/>;
+ if(outcome.data.viewerRole==="student")return <StudentSupportView actions={outcome.data.actions}/>;
+ return <SupportView referrals={outcome.data.referrals}/>;
 }
-function SupportView({referrals}:{referrals:Awaited<ReturnType<typeof loadSupportReferrals>>}){
+function SupportView({referrals}:{referrals:Awaited<ReturnType<typeof getSupportReferrals>>}){
  const router=useRouter();
  const [role,setRole]=useState<"teacher"|"specialist"|null>(null);
  const [students,setStudents]=useState<{id:string;name:string;sectionTitle:string}[]>([]);
