@@ -8,7 +8,7 @@ const loadNotifications=()=>getSyntheticNotifications();
 export const Route=createFileRoute("/student/notifications")({loader:safeLoader(loadNotifications,{authMessage:"Sign in with an authorized student account to view your notifications."}),component:NotificationsPage});
 function NotificationsPage(){
  const outcome=Route.useLoaderData();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic student" title="Notification center" outcome={outcome}/>;
+ if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Notifications" title="Notification center" outcome={outcome}/>;
  return <NotificationsView notices={outcome.data}/>;
 }
 function NotificationsView({notices}:{notices:Awaited<ReturnType<typeof loadNotifications>>}){
@@ -35,9 +35,9 @@ function NotificationsView({notices}:{notices:Awaited<ReturnType<typeof loadNoti
   finally{setBusy(null);}
  }
  return <main className="mx-auto max-w-4xl px-5 py-10">
- <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Synthetic student</p>
+ <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Notifications</p>
  <h1 className="mt-2 font-serif text-4xl">Notification center</h1>
- <p className="mt-3 text-sm text-muted-foreground">Updates stay linked to their related records. Changes to notification status persist in the synthetic database.</p>
+ <p className="mt-3 text-sm text-muted-foreground">Updates stay linked to their related records. Changes to notification status persist in your account.</p>
  {error&&<p role="alert" className="mt-4 rounded-xl border border-red-400 p-3 text-sm">{error}</p>}
  <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border bg-card p-4"><span className="font-semibold">Unread notifications: {center.unreadCount}</span><button type="button" disabled={!center.unreadCount||busy!==null} onClick={markAllRead} className="rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">{busy==="all"?"Saving…":"Mark all as read"}</button></div>
  {([{label:"Needs attention",items:center.unread},{label:"Earlier updates",items:center.earlier}] as const).map(section=><section key={section.label} className="mt-8"><h2 className="font-serif text-2xl">{section.label}</h2>
