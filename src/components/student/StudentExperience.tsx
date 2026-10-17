@@ -172,7 +172,12 @@ export function StudentExperience({ liveData }: { liveData?: StudentTodayData })
                     ) : liveData ? (
                       <div className="rounded-2xl border border-border bg-card p-6">
                         <h2 className="text-sm font-bold">Assignment from Neon</h2>
-                        <p className="mt-2 text-sm leading-6 text-muted-foreground">This live student view is read-only until a verified student session can authorize submissions. Nothing entered here will change your records.</p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">Your school records are live. Open the secure coursework workspace to submit or revise work and view teacher feedback.</p>
+                        <a href={"/student/assignments?assessment="+encodeURIComponent(
+                          liveData.coursework.find(item=>item.submissionId===focused.id)?.assessmentId??"")}
+                          className="mt-4 inline-block rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
+                          Open assignment and submit →
+                        </a>
                       </div>
                     ) : (
                       <div className="rounded-2xl border border-border bg-card p-6">
