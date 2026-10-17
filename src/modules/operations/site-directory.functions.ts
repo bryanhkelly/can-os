@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { asc, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { organizations, sites } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -19,7 +19,7 @@ export const listMySites = createServerFn({ method: "GET" }).handler(async () =>
     id: sites.id, name: sites.name, timezone: sites.timezone,
     organizationName: organizations.name,
   }).from(sites)
-    .innerJoin(organizations, inArray(organizations.id, organizationIds))
-    .where(inArray(sites.id, siteIds))
+    .innerJoin(organizations, eq(organizations.id, sites.organizationId))
+    .where(and(inArray(sites.id, siteIds), inArray(sites.organizationId, organizationIds)))
     .orderBy(asc(sites.name));
 });
