@@ -39,12 +39,6 @@ function siteDayStart(date:string,timeZone:string):Date {
  return new Date(instant);
 }
 
-function dayBounds(date: string): { start: Date; end: Date } {
-  const start = new Date(`${date}T00:00:00.000Z`);
-  if (Number.isNaN(start.getTime())) throw new Error("Invalid attendance date");
-  return { start, end: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
-}
-
 /** Teachers and registrars run site attendance; identity comes from the session. */
 async function staffActor(capability: string) {
   const context = await getCommandContext(getRequest());
