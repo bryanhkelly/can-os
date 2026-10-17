@@ -95,9 +95,10 @@ function ConnectedWorkflowsPage() {
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <Metric label="Applications" value={program.enrollment.applications} />
                 <Metric label="Offers awaiting response" value={program.enrollment.offersAwaitingResponse} />
-                <Metric label="Accepted, not yet active" value={program.enrollment.acceptedAwaitingActivation} />
+                <Metric label="Accepted offers awaiting activation" value={program.enrollment.acceptedAwaitingActivation} />
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
+                {program.enrollment.acceptedApplications} accepted applications;{" "}
                 {program.enrollment.activeProgramEnrollments} active program enrollments across school years.
                 Activation remains governed by the enrollment/seat-pool transaction.
               </p>
