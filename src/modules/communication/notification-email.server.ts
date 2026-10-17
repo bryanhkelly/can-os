@@ -32,6 +32,7 @@ function resolveActionUrl(actionUrl: string | undefined): string | undefined {
 
 export async function sendNotificationEmail(
   message: NotificationEmailMessage,
+  idempotencyKey?: string,
 ): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   const from =
@@ -53,6 +54,7 @@ export async function sendNotificationEmail(
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       },
       body: JSON.stringify({
         from,
