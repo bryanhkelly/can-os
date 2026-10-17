@@ -9,7 +9,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Replace DemoNavigation with WorkspaceNavigation and canonical route registry; migrate command palette and route tests from browser-local demo persona; delete obsolete component/tests.
 - [x] Select active membership by verified grant ID (supports multiple grants with same role).
 - [x] Expose active grant organization/site/program scopes from verified session endpoint to the workspace shell.
-- [ ] Implement context-aware site/program/child selection where multiple authorized records exist; validate downstream route scope on the server.
+- [x] Add family-home child-specific deep links to academics and report cards; resolve requested child from the guardian's authorized roster, ignoring unauthorized IDs, with unit tests.
+- [ ] Implement consistent site/program and remaining child context across every route, including attendance and admissions; validate downstream route scope on the server.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
 - [x] Delete legacy synthetic-only operations service after replacing its route consumer.
 - [ ] Add integration tests for canonical action transitions, assignment and authorization.
