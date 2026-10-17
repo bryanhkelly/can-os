@@ -16,13 +16,16 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Add child-specific attendance links from the family dashboard and resolve guardian attendance through relationship-scoped server queries.
 - [x] Replace fixture-only attendance write gates for staff marking, guardian excuse submission, and staff review with verified role, roster, program/site and guardian relationship authorization at the relevant service boundaries.
 - [x] Restrict active academic roster, guardian assignments and office-hour child eligibility to verified program IDs, in addition to site membership.
-- [ ] Carry active site/program selection through the remaining operational routes and child context through admissions.
+- [x] Resolve program and site selections as one server-authorized pair, and apply the selection to the canonical operations Action queue, launch readiness, registrar admissions list and family readiness.
+- [x] Carry verified child context from guardian cards through attendance and admission-offer views.
+- [ ] Review any remaining program/site selection requirements in insights, capacity and other retained operational pages.
 - [x] Switch the operations workspace to canonical scoped Action listing and state changes; add authorization-checked assignee command without hard-coded IDs.
 - [x] Delete legacy synthetic-only operations service after replacing its route consumer.
 - [x] Connect staff Action assignment UI to authorized per-site assignee directory and existing audited assignment command; exclude student/guardian grants from operational assignees.
 - [ ] Add integration tests for canonical action transitions, assignment and authorization (deferred by request).
 - [x] Restrict owned student Action completion to known student workflow types and emit ActionResolved event.
-- [ ] Verify Action owner completion guards and domain-event parity across both school and student workflows.
+- [x] Restrict student-owned Action completion to student grants and active program membership; write ActionCreated for student support requests and ActionResolved on completion.
+- [ ] Verify Action lifecycle event parity and cross-role behavior with deferred integration tests.
 - [x] Remove local-only StudentQuickWins from active experiences route and require canonical Student Today input (no fallback sample student).
 - [x] Remove fixture gating from authenticated student-owned action and display-preference commands.
 - [x] Remove simulated calendar-status metadata command from school-experience service.
@@ -40,7 +43,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Redirect teacher-only notices into the canonical notification center and delete duplicate notification handlers.
 - [x] Route operational Action notices only when the recipient still owns the Action within the active school and program grant.
 - [x] Hide links into student, teacher and guardian screens when another workspace role is active.
-- [ ] Complete remaining notification target permission audits.
+- [x] Restrict admissions-offer and study-group notification destinations to active program/site grants and approved group membership, in addition to recipient identity.
+- [ ] Audit remaining notification resource categories and target-route guards.
 - [x] Complete verified program checks for teacher discussion locking and moderation, not only discussion creation.
 - [x] Allow enrolled students to read course discussions independent of fixture metadata; preserve legacy route export until mutation consolidation.
 - [x] Converge enrolled-student discussion posting and teacher discussion creation, locking and moderation on records independent of fixture markers; maintain verified section membership and relationship guards.
@@ -48,9 +52,12 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Replace local-only StudentExperience with canonical read-only student work/schedule/action projection and real workflow deep links.
 - [ ] Verify typecheck, build, unit tests and role-switch browser journeys before closing Phase 1 (user deferred, so Phase 1 cannot be marked verified).
 - [x] Align fixture manifest after removing `/demo-health` (previously blocked CI at route fixture coverage).
-- [ ] Build machine-verifiable inventory for every route and data-flow acceptance gate.
+- [x] Capture 58 source route owners and pending read/write/role acceptance fields in docs/platform-route-contracts.json with a source-drift and acceptance checker.
+- [ ] Run the route-contract checker and resolve all pending acceptance fields when verification is authorized.
 - [x] Remove unconditional synthetic markers from shared domain audits and authenticated session audits.
-- [ ] Audit all server functions for verified identity and per-record resource scopes; legacy synthetic write gates remain in multiple unreviewed workflows.
+- [x] Replace demonstration-only messaging write gates after restricting contact discovery to verified site/program relationships and thread participation.
+- [x] Remove admissions/family-readiness fixture-only read filtering while leaving sensitive R2 demo-only document operations restricted.
+- [ ] Complete remaining service-by-service authorization audit; legacy fixture-only gates persist in learning, support, study groups, administrative and attachment workflows.
 
 ## Phase 2 — connected school operation
 
