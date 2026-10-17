@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { programs } from "@/db/schema";
@@ -28,6 +28,7 @@ export async function resolveOperationsSelection(
   if (selection.programId && !authorizedPrograms.includes(selection.programId)) {
     throw new AuthorizationError("selected program");
   }
+  let selectedProgramSite: string | undefined;
   if (selection.programId) {
     const [program] = await db.select({ siteId: programs.siteId })
       .from(programs).where(eq(programs.id, selection.programId)).limit(1);
@@ -35,9 +36,19 @@ export async function resolveOperationsSelection(
         (selection.siteId && selection.siteId !== program.siteId)) {
       throw new AuthorizationError("program and school scope");
     }
+    selectedProgramSite = program.siteId;
   }
+  const siteIds = selection.siteId ? [selection.siteId] :
+    selectedProgramSite ? [selectedProgramSite] : authorizedSites;
+  // Selecting a school narrows BOTH scopes, not just the site filter. Other
+  // operations services can safely reuse this resolved selection.
+  const sitePrograms = selection.siteId && authorizedPrograms.length
+    ? await db.select({ id: programs.id }).from(programs)
+      .where(and(eq(programs.siteId, selection.siteId), inArray(programs.id, authorizedPrograms)))
+    : [];
   return {
-    siteIds: selection.siteId ? [selection.siteId] : authorizedSites,
-    programIds: selection.programId ? [selection.programId] : authorizedPrograms,
+    siteIds,
+    programIds: selection.programId ? [selection.programId] :
+      selection.siteId ? sitePrograms.map(program => program.id) : authorizedPrograms,
   };
 }
