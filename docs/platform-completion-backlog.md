@@ -75,6 +75,8 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Reset stale guardian approvals on a new membership request after leaving; require affirmative current consent from every linked enrollment guardian before facilitating approval.
 - [x] Permit verified guardian consent decisions only on pending memberships with current child enrollment; cancel outstanding consent actions when students leave and emit ActionCreated/ActionResolved for the consent lifecycle.
 - [x] Link authorized guardian consent notifications to the actual consent screen, including the selected child’s name.
+- [x] Keep seven unreleased study-group mutations (posting, sessions, reporting, moderation, RSVP, attendance recording, session revision) behind the demo flag **and** a server-side legacy synthetic-record guard; newly created authentic groups cannot enter those paths even if demo writes are on.
+- [x] Add pending-request withdrawal to the student UI, so students can withdraw and re-request with fresh guardian consent after a decline.
 - [ ] Converge remaining study-group posting, reporting, moderation, RSVP, attendance and session WRITE lifecycles, including safe content handling and notification/audit integration.
 - [x] Extend attachment read/upload scoping to authorized programs; keep restricted R2 fixture-only mutation gates until complete document verification and storage review.
 - [x] Remove the obsolete fixture-only write restriction from canonical teacher assessment creation, including published roster assignment and audit/domain events.
