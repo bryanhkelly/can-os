@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { domainEvents, subscriptionDeliveries } from "@/db/schema";
 import { notify } from "@/platform/mutation";
+import { emailNotificationRecipients, sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { getSubscriptionPolicy } from "./policy";
 
 type ReminderCandidate = {
@@ -48,6 +49,7 @@ export async function processSubscriptionReminders(now = new Date()): Promise<nu
   `);
 
   let sent = 0;
+  const pendingEmails: Array<{ deliveryId: string; personId: string; title: string; body: string }> = [];
 
   for (const candidate of result.rows ?? []) {
     const policy = getSubscriptionPolicy(candidate.event_type);
@@ -103,9 +105,21 @@ export async function processSubscriptionReminders(now = new Date()): Promise<nu
 
       if (!reminder) return;
 
-      // Reminders currently deliver in-app only; other channels stay pending
-      // for the future delivery worker rather than silently degrading.
-      if (candidate.channel !== "in_app") return;
+      if (candidate.channel === "email") {
+        pendingEmails.push({
+          deliveryId: reminder.id,
+          personId: candidate.subscriber_person_id,
+          title: content.title,
+          body: content.body ?? content.title,
+        });
+        return;
+      }
+      if (candidate.channel !== "in_app") {
+        await tx.update(subscriptionDeliveries).set({
+          status: "failed", attempts: 1, lastError: "channel_not_supported", updatedAt: now,
+        }).where(eq(subscriptionDeliveries.id, reminder.id));
+        return;
+      }
 
       const notificationId = await notify(tx, {
         recipientPersonId: candidate.subscriber_person_id,
@@ -129,5 +143,23 @@ export async function processSubscriptionReminders(now = new Date()): Promise<nu
     });
   }
 
+  // External delivery must happen outside the database transaction.
+  if (pendingEmails.length) {
+    const recipientEmails = await emailNotificationRecipients(pendingEmails.map((item) => item.personId));
+    for (const item of pendingEmails) {
+      const email = recipientEmails.get(item.personId);
+      const accepted = email
+        ? await sendNotificationEmail({ to: email, subject: item.title, text: item.body })
+        : false;
+      await db.update(subscriptionDeliveries).set({
+        status: accepted ? "delivered" : "failed",
+        attempts: 1,
+        lastError: accepted ? null : email ? "email_provider_failed" : "no_active_email",
+        deliveredAt: accepted ? new Date() : null,
+        updatedAt: new Date(),
+      }).where(eq(subscriptionDeliveries.id, item.deliveryId));
+      if (accepted) sent += 1;
+    }
+  }
   return sent;
 }
