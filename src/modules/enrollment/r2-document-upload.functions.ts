@@ -9,27 +9,35 @@ import {applications,journeys,journeyRequirements,documents,auditEvents,programs
 import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {newDocumentKey,signR2Object,validateDocumentUpload,r2Config} from "./r2-documents.server";
 async function uploadsEnabled(applicationId:string){
- assertR2DemoEnabled(process.env.CAN_R2_DEMO_UPLOADS_ENABLED);
+
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId)throw new Error("Authenticated person required");
- const [app]=await db.select({programId:applications.programId,studentProfileId:applications.studentProfileId}).from(applications).where(eq(applications.id,applicationId)).limit(1);
+ const [app]=await db.select({programId:applications.programId,studentProfileId:applications.studentProfileId,metadata:applications.metadata}).from(applications).where(eq(applications.id,applicationId)).limit(1);
  if(!app)throw new Error("Application not found");
+ if(app.metadata.synthetic===true){
+  assertR2DemoEnabled(process.env.CAN_R2_DEMO_UPLOADS_ENABLED);
+  assertSyntheticMutation(context.role);
+ }else if(process.env.CAN_R2_LIVE_UPLOADS_ENABLED!=="true"){
+  throw new Error("Live enrollment document uploads are not enabled for this deployment");
+ }
+ const [programScope]=await db.select({siteId:programs.siteId,organizationId:programs.organizationId})
+  .from(programs).where(eq(programs.id,app.programId)).limit(1);
+ if(!programScope||!context.scope.programIds?.includes(app.programId)||
+  !context.scope.siteIds?.includes(programScope.siteId))
+  throw new Error("Enrollment document outside authorized school or program");
  if(context.role==="registrar"){
-  const [program]=await db.select({organizationId:programs.organizationId}).from(programs).where(eq(programs.id,app.programId)).limit(1);
-  if(!program)throw new Error("Program not found");
-  assertR2DocumentGrant({role:context.role,actorPersonId:context.actorPersonId,organizationIds:context.scope.organizationIds},{organizationId:program.organizationId,guardianCanManage:false});
+   assertR2DocumentGrant({role:context.role,actorPersonId:context.actorPersonId,organizationIds:context.scope.organizationIds},{organizationId:programScope.organizationId,guardianCanManage:false});
  }else if(context.role==="guardian"){
   const [student]=await db.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
   if(!student)throw new Error("Student missing");
   const [relationship]=await db.select({id:guardianRelationships.id}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,student.personId),eq(guardianRelationships.guardianPersonId,context.actorPersonId),eq(guardianRelationships.canManageEnrollment,true))).limit(1);
   assertR2DocumentGrant({role:context.role,actorPersonId:context.actorPersonId},{organizationId:"",guardianCanManage:Boolean(relationship)});
  }else throw new Error("Enrollment documents require registrar or guardian access");
- assertSyntheticMutation(context.role);
  return context.actorPersonId;
 }
 async function requirementScope(applicationId:string,requirementId:string){
- const [app]=await db.select({id:applications.id,metadata:applications.metadata}).from(applications).where(eq(applications.id,applicationId)).limit(1);
- if(!app||app.metadata.synthetic!==true)throw new Error("Synthetic application not found");
+ const [app]=await db.select({id:applications.id}).from(applications).where(eq(applications.id,applicationId)).limit(1);
+ if(!app)throw new Error("Application not found");
  const [journey]=await db.select({id:journeys.id,status:journeys.status}).from(journeys).where(and(eq(journeys.participantType,"application"),eq(journeys.participantId,app.id))).limit(1);
  if(!journey||["active","complete","cancelled"].includes(journey.status))throw new Error("Enrollment journey is closed");
  const [requirement]=await db.select({id:journeyRequirements.id}).from(journeyRequirements).where(and(eq(journeyRequirements.id,requirementId),eq(journeyRequirements.journeyId,journey.id))).limit(1);
