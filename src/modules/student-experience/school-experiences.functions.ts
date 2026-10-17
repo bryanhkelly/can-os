@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, asc, inArray, isNull, ne, notExists } from "drizzle-orm";
+import { and, eq, asc, inArray, isNull, ne, notExists, gte } from "drizzle-orm";
 import { z } from "zod";
 import { actorSiteIds, assertSiteGranted, recordAudit, requireActor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
@@ -21,7 +21,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
     db.select().from(schema.notifications).where(eq(schema.notifications.recipientPersonId,actor.actorPersonId)),
     viewerRole==="guardian" ? db.select({id:schema.conferenceSlots.id,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status})
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
-      .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
+      .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
   ]);
   return {connected:true,viewerRole,
     events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:"scheduled"})),
@@ -35,10 +35,10 @@ export const bookOfficeHour=createServerFn({method:"POST"})
     const actor=await requireActor(["guardian"]);
    const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
     return db.transaction(async tx=>{
-      const [slotSite]=await tx.select({siteId:schema.conferenceSeries.siteId,seriesStatus:schema.conferenceSeries.status,sectionId:schema.conferenceSeries.sectionId}).from(schema.conferenceSlots)
+      const [slotSite]=await tx.select({siteId:schema.conferenceSeries.siteId,seriesStatus:schema.conferenceSeries.status,sectionId:schema.conferenceSeries.sectionId,startsAt:schema.conferenceSlots.startsAt}).from(schema.conferenceSlots)
         .innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
         .where(eq(schema.conferenceSlots.id,data.slotId)).limit(1);
-      if(!slotSite||slotSite.seriesStatus!=="published") throw new Error("Office-hour slot not available");
+      if(!slotSite||slotSite.seriesStatus!=="published"||slotSite.startsAt<=new Date()) throw new Error("Office-hour slot not available");
       assertSiteGranted(actor,slotSite.siteId);
       const [child]=await tx.select({studentProfileId:schema.studentProfiles.id}).from(schema.guardianRelationships)
         .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.personId,schema.guardianRelationships.studentPersonId))
