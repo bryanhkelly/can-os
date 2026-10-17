@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {
   deliveryArrangements,
   instructionalCapacityOfferings,
@@ -45,6 +46,7 @@ export async function createDeliveryArrangement(
     assertSectionScope(context, section.id);
     assertProgramScope(context, section.programId);
     assertSiteScope(context, section.siteId);
+    await lockAttendanceConfigurationAtSite(tx, section.siteId);
 
     let instructorPersonId = input.instructorPersonId ?? null;
 
@@ -140,6 +142,7 @@ export async function activateDeliveryArrangement(
     assertSectionScope(context, arrangement.sectionId);
     assertProgramScope(context, section.programId);
     assertSiteScope(context, section.siteId);
+    await lockAttendanceConfigurationAtSite(tx, section.siteId);
 
     if (arrangement.capacityReservationId) {
       const [reservation] = await tx
