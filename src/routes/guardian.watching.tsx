@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getMyWatches,
   getMyWatchDeliveries,
+  updateWatchOptions,
   updateWatchStatus,
 } from "@/modules/conversation/ask-can.functions";
 import { WorkspaceShell, EmptyState, QueryState } from "@/components/workspace";
@@ -127,6 +128,7 @@ function WatchingPage() {
                   </button>
                 )}
               </div>
+              {watch.status === "active" && <WatchSettings watch={watch} onSaved={load} />}
               {historyFor === watch.id && <div className="mt-4 border-t pt-3 text-xs">
                 <p className="mb-2 font-semibold">Recent reminder deliveries</p>
                 {history.length === 0 && <p>No history yet.</p>}
@@ -141,4 +143,53 @@ function WatchingPage() {
       </QueryState>
     </WorkspaceShell>
   );
+}
+
+function WatchSettings({ watch, onSaved }: { watch: Watch; onSaved: () => Promise<void> }) {
+  const [channel, setChannel] = useState<"in_app" | "email">(
+    watch.channel === "email" ? "email" : "in_app");
+  const [first, setFirst] = useState(watch.reminderAfterHours ?? 24);
+  const [repeat, setRepeat] = useState(watch.repeatEveryHours ?? 24);
+  const [maximum, setMaximum] = useState(watch.maxReminders);
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState("");
+  async function save() {
+    setSaving(true); setNote("");
+    try {
+      await updateWatchOptions({ data: {
+        subscriptionId: watch.id, channel, remindAfterHours: first,
+        repeatEveryHours: repeat, maxReminders: maximum,
+      } });
+      await onSaved(); setNote("Saved.");
+    } catch { setNote("Could not save reminder settings."); }
+    finally { setSaving(false); }
+  }
+  return <div className="mt-4 grid gap-3 border-t pt-3 text-sm sm:grid-cols-2">
+    <label>Channel
+      <select value={channel} onChange={e => setChannel(e.target.value as "in_app" | "email")}
+        className="mt-1 block w-full rounded-md border bg-background p-2">
+        <option value="in_app">In-app</option><option value="email">Email</option>
+      </select>
+    </label>
+    <label>First reminder after (hours)
+      <input type="number" min={1} max={720} value={first}
+        onChange={e => setFirst(Number(e.target.value))}
+        className="mt-1 block w-full rounded-md border bg-background p-2"/>
+    </label>
+    <label>Repeat every (hours)
+      <input type="number" min={1} max={720} value={repeat}
+        onChange={e => setRepeat(Number(e.target.value))}
+        className="mt-1 block w-full rounded-md border bg-background p-2"/>
+    </label>
+    <label>Maximum reminders
+      <input type="number" min={1} max={30} value={maximum}
+        onChange={e => setMaximum(Number(e.target.value))}
+        className="mt-1 block w-full rounded-md border bg-background p-2"/>
+    </label>
+    <div className="flex items-center gap-2">
+      <button type="button" disabled={saving} onClick={() => void save()}
+        className="rounded-full bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">Save</button>
+      <span role="status" className="text-muted-foreground">{note}</span>
+    </div>
+  </div>;
 }
