@@ -44,6 +44,12 @@ async function firstSpecialistAtSites(tx: any, s: any, sites: string[]): Promise
   return owner?.personId ?? null;
 }
 
+/** Determine the current authenticated support workspace without a demo role toggle. */
+export const getSupportViewerRole=createServerFn({method:"GET"}).handler(async()=>{
+ const actor=await requireActor(["student","teacher","specialist"]);
+ return {role:actor.role as "student"|"teacher"|"specialist"};
+});
+
 export const getSupportReferrals = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await requireActor(["teacher", "specialist"]);
   setResponseHeader("Cache-Control", "no-store");
