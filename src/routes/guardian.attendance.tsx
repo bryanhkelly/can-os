@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { listGuardianAbsences, submitExcuse } from "@/modules/attendance/attendance.functions";
 import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachmentCounts } from "@/modules/learning/submission-attachments.functions";
 
-const excuseAttachmentAccept = ".pdf,.docx,.txt,.png,.jpg,.jpeg,.md";
+const excuseAttachmentAccept = ".pdf,.png,.jpg,.jpeg";
 const excuseMimes: Record<string, string> = { pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", txt: "text/plain", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", md: "text/markdown" };
 const excuseAttachmentMime = (name: string) => excuseMimes[name.split(".").pop()?.toLowerCase() ?? ""] ?? null;
 
@@ -74,7 +74,7 @@ function GuardianAttendancePage() {
     try {
       const contentType = excuseAttachmentMime(file.name);
       if (!contentType) throw new Error("Unsupported file type. Use PDF, DOCX, TXT, PNG, JPG or MD.");
-      if (file.size < 1 || file.size > 10 * 1024 * 1024) throw new Error("Document must be 1 byte to 10 MB");
+      if (file.size < 16 || file.size > 10 * 1024 * 1024) throw new Error("Document must be 16 bytes to 10 MB");
       const upload = await createExcuseAttachmentUpload({
         data: { attendanceEventId: absence.attendanceEventId, fileName: file.name, contentType, sizeBytes: file.size },
       });
