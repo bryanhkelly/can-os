@@ -14,6 +14,24 @@ async function groupActor(role:"student"|"teacher"){
 }
 async function context(){const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);return {db,s};}
 export const getStudyGroupAvailability=createServerFn({method:"GET"}).handler(async()=>({enabled:isSyntheticAccessEnabled()}));
+
+/** Sites and programs in which this teacher actually has an active class assignment. */
+export const listFacilitatorGroupScopes=createServerFn({method:"GET"}).handler(async()=>{
+ const actor=await groupActor("teacher");
+ const {db,s}=await context();
+ const rows=await db.selectDistinct({siteId:s.sections.siteId,programId:s.sections.programId,
+  siteName:s.sites.name,programName:s.programs.name})
+  .from(s.sectionTeachers)
+  .innerJoin(s.sections,eq(s.sections.id,s.sectionTeachers.sectionId))
+  .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+  .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
+  .where(and(eq(s.sectionTeachers.personId,actor.actorPersonId!),
+    eq(s.sections.active,true),
+    inArray(s.sections.siteId,actor.sites),
+    inArray(s.sections.programId,actor.scope.programIds??[])));
+ return rows;
+});
+
 export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
  assertSyntheticMutation("student");
  const actor=await groupActor("student");
@@ -23,11 +41,37 @@ export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
  .where(and(eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[])))).orderBy(desc(s.studyGroups.createdAt)).limit(100);
  return rows;
 });
-export const createStudyGroup=createServerFn({method:"POST"}).validator(z.object({title:z.string(),description:z.string(),kind:z.enum(["course","interest"]),maxMembers:z.number().int().positive()}).parse).handler(async({data})=>{
- assertSyntheticMutation("teacher");const actor=await groupActor("teacher");const valid=validateGroupInput(data);const {db,s}=await context();
- const [group]=await db.insert(s.studyGroups).values({...valid,siteId:actor.sites[0],facilitatorPersonId:actor.actorPersonId!,requiresApproval:true,visibility:"site",metadata:{synthetic:true,fixture:"gf26",createdByPersonId:actor.actorPersonId!}}).returning({id:s.studyGroups.id});
- if(!group)throw new Error('Group creation failed');return {id:group.id};
-});
+export const createStudyGroup=createServerFn({method:"POST"})
+ .validator((input:unknown)=>z.object({title:z.string(),description:z.string(),
+  kind:z.enum(["course","interest"]),maxMembers:z.number().int().positive(),
+  siteId:z.string().uuid(),programId:z.string().uuid().nullish()}).parse(input))
+ .handler(async({data})=>{
+  assertSyntheticMutation("teacher");
+  const actor=await groupActor("teacher"),valid=validateGroupInput(data);
+  if(!actor.sites.includes(data.siteId))throw new AuthorizationError("facilitator school");
+  if(data.programId&&!actor.scope.programIds?.includes(data.programId))
+   throw new AuthorizationError("facilitator program");
+  if(data.kind==="course"&&!data.programId)throw new Error("Course study groups require a program");
+  const {db,s}=await context();
+  // A teacher must actively teach at the chosen school/program. An unrelated
+  // membership or a client-provided site ID never confers facilitator authority.
+  const [assignment]=await db.select({id:s.sectionTeachers.id})
+    .from(s.sectionTeachers)
+    .innerJoin(s.sections,eq(s.sections.id,s.sectionTeachers.sectionId))
+    .where(and(eq(s.sectionTeachers.personId,actor.actorPersonId!),
+      eq(s.sections.active,true),eq(s.sections.siteId,data.siteId),
+      inArray(s.sections.programId,actor.scope.programIds??[]),
+      data.programId?eq(s.sections.programId,data.programId):undefined))
+    .limit(1);
+  if(!assignment)throw new AuthorizationError("active teaching assignment at selected school");
+  const [group]=await db.insert(s.studyGroups).values({
+    ...valid,siteId:data.siteId,programId:data.programId??null,
+    facilitatorPersonId:actor.actorPersonId!,requiresApproval:true,
+    visibility:"site",metadata:{synthetic:true,fixture:"gf26",createdByPersonId:actor.actorPersonId!}
+  }).returning({id:s.studyGroups.id});
+  if(!group)throw new Error("Group creation failed");
+  return {id:group.id};
+ });
 export const requestStudyGroupMembership=createServerFn({method:"POST"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
  assertSyntheticMutation("student");const actor=await groupActor("student");const {db,s}=await context();
  return db.transaction(async tx=>{
