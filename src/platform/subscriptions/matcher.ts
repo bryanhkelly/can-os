@@ -10,6 +10,7 @@ import {
 import { db } from "@/db/client";
 import {
   domainEvents,
+  conversationMessages,
   subscriptionDeliveries,
   subscriptions,
 } from "@/db/schema";
@@ -122,6 +123,16 @@ export async function processEventSubscriptions(eventId: string): Promise<number
             updatedAt: now,
           })
           .where(eq(subscriptionDeliveries.id, delivery.id));
+        if (subscription.sourceConversationId) {
+          await tx.insert(conversationMessages).values({
+            conversationId: subscription.sourceConversationId,
+            role: "agent",
+            body: content.body ?? content.title,
+            evidenceRefs: content.resourceType && content.resourceId
+              ? [{ type: content.resourceType, id: content.resourceId, label: content.title }]
+              : [],
+          });
+        }
         delivered += 1;
       }
       // Other channels stay pending for the independently retryable worker.
