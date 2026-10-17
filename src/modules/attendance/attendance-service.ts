@@ -405,7 +405,7 @@ export async function recordAttendanceRevision(
  input:{
   studentProfileId:string;programId:string;siteId?:string;sectionId?:string;
   occurrenceKey:string;status:"present"|"absent"|"tardy";
-  expectedAt:Date;mutationId:string;note?:string;
+  expectedAt:Date;mutationId:string;note?:string;expectedPreviousEventId?:string|null;
  }):Promise<string>{
  assertCapability(context,"attendance.write");
  assertProgramScope(context,input.programId);
@@ -425,6 +425,8 @@ export async function recordAttendanceRevision(
     eq(attendanceEvents.occurrenceKey,input.occurrenceKey)))
    .orderBy(desc(attendanceEvents.recordedAt),desc(attendanceEvents.createdAt))
    .limit(1);
+  if(input.expectedPreviousEventId!==undefined && (prior?.id??null)!==input.expectedPreviousEventId)
+   throw new Error("Attendance conflict: the school record changed after this entry was prepared. Refresh and review.");
   if(prior?.status===input.status)return prior.id;
   if(prior?.status==="excused"&&!input.note?.trim())
    throw new Error("Give a reason before changing excused attendance");
