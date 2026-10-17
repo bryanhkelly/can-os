@@ -1,7 +1,7 @@
 import {activateSectionEnrollment} from "@/modules/enrollment/section-allocation.service";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { actorSiteIds, assertProgramGranted, recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
@@ -86,8 +86,13 @@ export const requestCourseChange = createServerFn({ method:"POST" })
       if(data.operation==="drop" && today>policy.addDropEndsOn) throw new Error("Add/drop window has closed. Request withdrawal instead.");
       if(data.operation==="withdraw" && today>policy.withdrawalEndsOn) throw new Error("Withdrawal window has closed.");
       if(data.operation==="add" && today>policy.addDropEndsOn) throw new Error("Registration window has closed.");
-      if(data.operation==="add" && policy.guardianApprovalRequired)
-        throw new Error("Guardian consent is required for this class. Registration will open after a verified consent process is available.");
+      const guardianDecisionRequired=data.operation==="add"&&policy.guardianApprovalRequired;
+      const guardians=guardianDecisionRequired?await tx.select({personId:s.guardianRelationships.guardianPersonId})
+        .from(s.guardianRelationships).where(and(
+          eq(s.guardianRelationships.studentPersonId,actor.actorPersonId),
+          eq(s.guardianRelationships.canManageEnrollment,true))) : [];
+      if(guardianDecisionRequired&&!guardians.length)
+        throw new Error("This class requires a connected guardian with enrollment approval permission.");
       const [membership]=await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,section.id),eq(s.enrollments.status,"active"))).limit(1);
       if(data.operation==="add" && membership) throw new Error("Already enrolled in this class");
       if(data.operation!=="add" && !membership) throw new Error("Not currently enrolled in this class");
@@ -103,9 +108,18 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         title:`${data.operation==="add"?"Add":data.operation==="drop"?"Drop":"Withdraw from"} ${section.title}`,
         description:data.operation==="withdraw"?"Withdrawal requires review of transcript consequences.":"Requested by the student.",
         ownerPersonId:actor.actorPersonId,organizationId:section.organizationId,siteId:section.siteId,programId:section.programId,subjectType:"section",subjectId:section.id,
-        metadata:{operation:data.operation,studentProfileId:studentId,schoolYearId:section.schoolYearId,enrollmentId:membership?.id??null,requestOrigin:"student"},
+        metadata:{operation:data.operation,studentProfileId:studentId,schoolYearId:section.schoolYearId,enrollmentId:membership?.id??null,requestOrigin:"student",guardianConsentRequired:guardianDecisionRequired},
       }).returning({id:s.actions.id});
       if(!request)throw new Error("Unable to create course request");
+      if(guardianDecisionRequired){
+        const recipients=[...new Set(guardians.map(g=>g.personId))];
+        await tx.insert(s.notifications).values(recipients.map(recipientPersonId=>({
+          recipientPersonId,status:"unread" as const,type:"course_registration_guardian_review",
+          title:"Course addition needs your approval",
+          body:"Your student requested a class that requires guardian permission.",
+          resourceType:"action",resourceId:request.id,
+        })));
+      }
       await recordAudit(tx,actor,{action:"course_registration.request",resourceType:"action",resourceId:request.id,after:{operation:data.operation,sectionId:section.id},scope:{programId:section.programId,siteId:section.siteId}});
       await tx.insert(s.domainEvents).values({eventType:"CourseRegistrationRequested",aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId:studentId,sectionId:section.id,programId:section.programId,operation:data.operation}});
       return {requestId:request.id};
@@ -158,8 +172,38 @@ export const decideCourseChange = createServerFn({method:"POST"})
         if(!activeProgram)throw new Error("Student program enrollment is no longer active");
         const policyAtApproval=await getSectionRegistrationPolicy(section.id,tx);
         const today=new Date().toISOString().slice(0,10);
-        if(operation==="add" && policyAtApproval.guardianApprovalRequired)
-          throw new Error("This class requires guardian approval. Approval cannot proceed until guardian consent has been recorded.");
+        if(operation==="add" && policyAtApproval.guardianApprovalRequired){
+          const eligibleGuardians=await tx.select({personId:s.guardianRelationships.guardianPersonId})
+            .from(s.guardianRelationships).where(and(
+              eq(s.guardianRelationships.studentPersonId,request.ownerPersonId),
+              eq(s.guardianRelationships.canManageEnrollment,true)));
+          const authorized=new Set(eligibleGuardians.map(g=>g.personId));
+          if(!authorized.size)throw new Error("The student has no authorized enrollment guardian.");
+          const consentRows=await tx.select({
+            signerPersonId:s.consentRecords.signerPersonId,evidence:s.consentRecords.signatureEvidence,
+          }).from(s.consentRecords).where(and(
+            eq(s.consentRecords.subjectType,"course_registration_request"),
+            eq(s.consentRecords.subjectId,request.id),
+            eq(s.consentRecords.consentType,"course_registration_add_decision"),
+            eq(s.consentRecords.version,"course-registration/v1"),
+            isNull(s.consentRecords.revokedAt),
+          )).orderBy(desc(s.consentRecords.signedAt),desc(s.consentRecords.createdAt));
+          const decisions=new Map<string,string>();
+          for(const row of consentRows){
+            if(!authorized.has(row.signerPersonId)||decisions.has(row.signerPersonId)||
+               row.evidence.studentProfileId!==studentProfileId||
+               row.evidence.sectionId!==section.id||
+               row.evidence.schoolYearId!==schoolYearId)continue;
+            const decision=row.evidence.decision;
+            if(decision!=="approve"&&decision!=="decline")continue;
+            if(decision==="approve"&&row.evidence.acknowledgedByGuardian!==true)continue;
+            decisions.set(row.signerPersonId,decision);
+          }
+          if([...decisions.values()].includes("decline"))
+            throw new Error("A guardian declined this course addition.");
+          if(![...decisions.values()].includes("approve"))
+            throw new Error("Guardian approval is pending for this course addition.");
+        }
         if(operation==="add" && today>policyAtApproval.addDropEndsOn)throw new Error("Registration window closed before approval");
         if(operation==="drop" && today>policyAtApproval.addDropEndsOn)throw new Error("Drop deadline passed; submit withdrawal request");
         if(operation==="withdraw" && today>policyAtApproval.withdrawalEndsOn)throw new Error("Withdrawal deadline passed");
