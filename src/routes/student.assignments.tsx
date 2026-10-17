@@ -159,12 +159,16 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
         className="mt-2 block w-full rounded-xl border bg-background p-3 text-sm" placeholder="Write your response…"/>
       </label>
       <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">Draft: {draftStatus==="saving"?"Saving…":draftStatus==="saved"?"Saved":draftStatus==="error"?"Could not autosave":"Ready"}</p>
-      <label className="mt-4 block text-sm font-semibold">Attachments (optional; maximum 10 MB each)
-       <input type="file" multiple accept={attachmentAccept} disabled={busy}
-        onChange={event=>setPendingFiles(Array.from(event.target.files??[]))}
-        className="mt-2 block w-full rounded-lg border p-2 text-xs"/>
-      </label>
-      {pendingFiles.length>0&&<p className="mt-2 text-xs text-muted-foreground">Selected: {pendingFiles.map(file=>file.name).join(", ")}</p>}
+      {chosen.metadata.synthetic===true?
+       <>
+        <label className="mt-4 block text-sm font-semibold">Attachments (development records; maximum 10 MB each)
+         <input type="file" multiple accept={attachmentAccept} disabled={busy}
+          onChange={event=>setPendingFiles(Array.from(event.target.files??[]))}
+          className="mt-2 block w-full rounded-lg border p-2 text-xs"/>
+        </label>
+        {pendingFiles.length>0&&<p className="mt-2 text-xs text-muted-foreground">Selected: {pendingFiles.map(file=>file.name).join(", ")}</p>}
+       </>:
+       <p className="mt-3 text-xs text-muted-foreground">File attachments for live records are not yet enabled. You can submit your written response.</p>}
       <button type="button" disabled={busy||draft.trim().length<3} onClick={submit}
        className="mt-4 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit assignment</button>
      </div>:<p className="mt-5 rounded-lg bg-muted p-4 text-sm">Your submission is not currently editable. Review its status and feedback above.</p>}
