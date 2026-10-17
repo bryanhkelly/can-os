@@ -85,6 +85,23 @@ function signLearningObject(method: "PUT" | "HEAD" | "GET", key: string, content
   return "https://" + host + path + "?" + query + "&X-Amz-Signature=" + signature;
 }
 
+/** Confirm that the private object was actually uploaded before linking it to a student record. */
+async function assertUploadedLearningObject(
+ key:string,contentType:string|null,expectedSize:unknown,
+):Promise<void>{
+ if(!learningKeyPattern.test(key)||typeof contentType!=="string"||
+  !Number.isSafeInteger(expectedSize)||Number(expectedSize)<1||
+  Number(expectedSize)>MAX_ATTACHMENT_BYTES)
+  throw new Error("Invalid attachment storage record");
+ const head=await fetch(signLearningObject("HEAD",key,undefined,30),{method:"HEAD"});
+ if(!head.ok)throw new Error("Attachment upload could not be verified");
+ if(Number(head.headers.get("content-length"))!==expectedSize)
+  throw new Error("Uploaded attachment size does not match the expected size");
+ const actualType=head.headers.get("content-type");
+ if(actualType?.split(";")[0]?.toLowerCase()!==contentType.toLowerCase())
+  throw new Error("Uploaded attachment type does not match the expected format");
+}
+
 /** Verified student actor; identity always comes from the server session. */
 async function studentActor() {
   const context = await getCommandContext(getRequest());
@@ -197,7 +214,7 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
       const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!,context.scope.programIds??[]);
       // Serialize with draft/submit writes for this student+assessment.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);
-      const [document] = await tx.select({ id: s.documents.id }).from(s.documents).where(and(
+      const [document] = await tx.select({ id: s.documents.id,storageKey:s.documents.storageKey,mimeType:s.documents.mimeType,metadata:s.documents.metadata }).from(s.documents).where(and(
         eq(s.documents.id, data.documentId),
         eq(s.documents.subjectType, "assessment"),
         eq(s.documents.subjectId, assessment.id),
@@ -205,6 +222,9 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
         eq(s.documents.uploadedByPersonId, studentPersonId),
       )).limit(1);
       if (!document) throw new Error("Attachment not found for this assignment");
+      if(!document.storageKey.startsWith(`learning/assignment/${assessment.id}/`))
+        throw new AuthorizationError("attachment assignment object scope");
+      await assertUploadedLearningObject(document.storageKey,document.mimeType,document.metadata.sizeBytes);
       const [latest] = await tx.select().from(s.submissions)
         .where(and(eq(s.submissions.assessmentId, assessment.id), eq(s.submissions.studentProfileId, studentId)))
         .orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
@@ -339,7 +359,7 @@ export const attachDocumentToExcuse = createServerFn({ method: "POST" })
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async (tx) => {
       await requireGuardianEvent(tx, s, data.attendanceEventId, context.actorPersonId!, context.scope.programIds ?? []);
-      const [document] = await tx.select({ id: s.documents.id }).from(s.documents).where(and(
+      const [document] = await tx.select({ id: s.documents.id,storageKey:s.documents.storageKey,mimeType:s.documents.mimeType,metadata:s.documents.metadata }).from(s.documents).where(and(
         eq(s.documents.id, data.documentId),
         eq(s.documents.subjectType, "attendance_event"),
         eq(s.documents.subjectId, data.attendanceEventId),
@@ -347,6 +367,9 @@ export const attachDocumentToExcuse = createServerFn({ method: "POST" })
         eq(s.documents.uploadedByPersonId, context.actorPersonId!),
       )).limit(1);
       if (!document) throw new Error("Document not found for this attendance event");
+      if(!document.storageKey.startsWith(`learning/excuse/${data.attendanceEventId}/`))
+        throw new AuthorizationError("attachment attendance object scope");
+      await assertUploadedLearningObject(document.storageKey,document.mimeType,document.metadata.sizeBytes);
       const [excuse] = await tx.select().from(s.attendanceExcuses)
         .where(eq(s.attendanceExcuses.attendanceEventId, data.attendanceEventId))
         .orderBy(desc(s.attendanceExcuses.createdAt)).limit(1).for("update");
