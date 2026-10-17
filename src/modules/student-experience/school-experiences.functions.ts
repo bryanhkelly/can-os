@@ -46,6 +46,10 @@ export const bookSyntheticOfficeHour=createServerFn({method:"POST"})
         .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.personId,schema.guardianRelationships.studentPersonId))
         .where(and(eq(schema.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(schema.guardianRelationships.canViewAcademics,true),eq(schema.guardianRelationships.studentPersonId,data.studentPersonId))).limit(1);
       if(!child) throw new AuthorizationError("guardian relationship");
+      const [siteEnrollment]=await tx.select({id:schema.enrollments.id}).from(schema.enrollments)
+        .innerJoin(schema.programs,eq(schema.programs.id,schema.enrollments.programId))
+        .where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.status,"active"),eq(schema.programs.siteId,slotSite.siteId))).limit(1);
+      if(!siteEnrollment)throw new AuthorizationError("child enrollment at selected school");
       const [slot]=await tx.update(schema.conferenceSlots).set({status:"booked",updatedAt:new Date()}).where(and(eq(schema.conferenceSlots.id,data.slotId),eq(schema.conferenceSlots.status,"available"))).returning({id:schema.conferenceSlots.id});
       if(!slot) throw new Error("Office-hour slot already taken");
       const [booking]=await tx.insert(schema.conferenceBookings).values({conferenceSlotId:slot.id,studentProfileId:child.studentProfileId,guardianPersonId:actor.actorPersonId,status:"booked"}).returning({id:schema.conferenceBookings.id});
