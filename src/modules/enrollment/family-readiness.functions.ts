@@ -4,14 +4,18 @@ import {z} from "zod";
 import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
 import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
 import {enrollmentReadiness} from "@/domain/enrollment-readiness";
+import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
 const registrar=()=>requireActor(["registrar"],"enrollment.decide");
 const requirementInput=z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid()});
-export const getFamilyReadiness=createServerFn({method:"GET"}).handler(async()=>{
+export const getFamilyReadiness=createServerFn({method:"GET"})
+ .validator((value:unknown)=>operationsSelectionSchema.parse(value??{}))
+ .handler(async({data})=>{
  const actor=await registrar();
- if(!actor.scope.programIds?.length)return [];
+ const scoped=await resolveOperationsSelection(actor,data);
+ if(!scoped.programIds.length)return [];
  if(!process.env.DATABASE_URL)return [];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,metadata:s.applications.metadata,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).where(inArray(s.applications.programId,actor.scope.programIds)).limit(150);
+ const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,metadata:s.applications.metadata,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).where(inArray(s.applications.programId,scoped.programIds)).limit(150);
  const synthetic=apps;
  if(!synthetic.length)return [];
  const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId,status:s.journeys.status}).from(s.journeys).where(inArray(s.journeys.participantId,synthetic.map(x=>x.id)));
