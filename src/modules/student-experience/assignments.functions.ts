@@ -1,5 +1,4 @@
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
-import { readRubric, scoreRubric, type CriterionGrade } from "./rubric";
+import { readRubric, scoreRubric } from "./rubric";
 import {gradeSubmission,returnSubmissionForRevision,createAssessment,manageAssessment} from "@/modules/learning/gradebook.functions";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
@@ -42,13 +41,6 @@ async function teacherForSubmission(submissionId:string){
   .from(schema.submissions).innerJoin(schema.assessments,eq(schema.assessments.id,schema.submissions.assessmentId))
   .where(eq(schema.submissions.id,submissionId)).limit(1);
  if(!row||!row.sectionId)throw new AuthorizationError("submission section");
- return teacherActor(row.sectionId);
-}
-async function teacherForAssessment(assessmentId:string){
- const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const [row]=await db.select({sectionId:schema.assessments.sectionId})
-  .from(schema.assessments).where(eq(schema.assessments.id,assessmentId)).limit(1);
- if(!row||!row.sectionId)throw new AuthorizationError("assessment section");
  return teacherActor(row.sectionId);
 }
 /** Assignment flows are scoped to an authenticated student and active enrollments. */
