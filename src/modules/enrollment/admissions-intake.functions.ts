@@ -34,6 +34,8 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
  const actor=await registrar();
  const rows=await db.select({id:applications.id,stage:applications.stage,metadata:applications.metadata,
   createdAt:applications.createdAt,updatedAt:applications.updatedAt,programId:applications.programId,
+  organizationId:programs.organizationId,siteId:programs.siteId,
+  studentPersonId:studentProfiles.personId,
   programName:programs.name,studentFirst:people.legalFirstName,studentLast:people.legalLastName})
   .from(applications)
   .innerJoin(programs,eq(programs.id,applications.programId))
@@ -41,10 +43,35 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
   .innerJoin(people,eq(people.id,studentProfiles.personId))
   .where(inArray(applications.programId,actor.scope.programIds!))
   .orderBy(desc(applications.updatedAt)).limit(300);
- return rows.map(r=>({
-  ...r,createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
-  disposition:r.metadata.admissionsDisposition==="waitlisted"?"waitlisted":r.metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
- }));
+ const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+ const contactIds=[...new Set(rows.map(r=>String(r.metadata.contactPersonId??""))
+  .filter(id=>uuidPattern.test(id)))];
+ const relations=rows.length?await db.select({
+  guardianPersonId:guardianRelationships.guardianPersonId,
+  studentPersonId:guardianRelationships.studentPersonId,
+  metadata:guardianRelationships.metadata,
+  canManageEnrollment:guardianRelationships.canManageEnrollment,
+ }).from(guardianRelationships).where(
+  inArray(guardianRelationships.studentPersonId,rows.map(r=>r.studentPersonId))):[];
+ const grants=contactIds.length?await db.select({
+  personId:accountPersonGrants.personId,organizationId:accountPersonGrants.organizationId,
+  siteId:accountPersonGrants.siteId,
+ }).from(accountPersonGrants).where(and(
+  inArray(accountPersonGrants.personId,contactIds),eq(accountPersonGrants.role,"guardian"),
+  eq(accountPersonGrants.active,true))):[];
+ return rows.map(r=>{
+  const contactId=String(r.metadata.contactPersonId??"");
+  const verified=relations.some(rel=>rel.guardianPersonId===contactId&&
+   rel.studentPersonId===r.studentPersonId&&rel.metadata.verification==="verified"&&
+   rel.canManageEnrollment);
+  const loginProvisioned=verified&&grants.some(g=>g.personId===contactId&&
+   g.organizationId===r.organizationId&&(!g.siteId||g.siteId===r.siteId));
+  return {
+   ...r,guardianVerified:verified,guardianLoginProvisioned:loginProvisioned,
+   createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
+   disposition:r.metadata.admissionsDisposition==="waitlisted"?"waitlisted":r.metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
+  };
+ });
 });
 export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((v:unknown)=>applicant.parse(v))
  .handler(async({data})=>{
