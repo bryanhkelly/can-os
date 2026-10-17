@@ -24,6 +24,7 @@ export const EventTypes = {
   CalendarEventCreated: "CalendarEventCreated",
   ProgramActivated: "ProgramActivated",
   StudentMarkedAbsent: "StudentMarkedAbsent",
+  AttendanceCorrected: "AttendanceCorrected",
   AttendanceExcuseSubmitted: "AttendanceExcuseSubmitted",
   AttendanceExcuseApproved: "AttendanceExcuseApproved",
   AttendanceExcuseRejected: "AttendanceExcuseRejected",
