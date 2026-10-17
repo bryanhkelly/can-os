@@ -2,7 +2,7 @@ import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
 import {normalizeAccessEmail} from "@/domain/access-tokens";
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray,isNull} from "drizzle-orm";
+import {and,desc,eq,inArray,isNull,or} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {accessAccounts,accountPersonGrants,applications,auditEvents,domainEvents,guardianRelationships,householdMemberships,households,journeys,journeyRequirements,people,programs,studentProfiles} from "@/db/schema";
@@ -294,7 +294,7 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
    .where(and(eq(accountPersonGrants.personId,contactId),
     eq(accountPersonGrants.role,"guardian"),eq(accountPersonGrants.active,true),
     eq(accountPersonGrants.organizationId,application.organizationId),
-    ...(application.siteId?[eq(accountPersonGrants.siteId,application.siteId)]:[isNull(accountPersonGrants.siteId)]),
+    ...(application.siteId?[or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,application.siteId))]:[isNull(accountPersonGrants.siteId)]),
     eq(accessAccounts.emailNormalized,normalizeAccessEmail(contact.email)))).limit(1);
   if(!grant)throw new Error("Provision the guardian's identity-bound access first");
   const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
