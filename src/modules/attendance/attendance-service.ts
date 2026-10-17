@@ -469,9 +469,19 @@ export async function recordAttendanceRevision(
   const key="attendance:"+input.studentProfileId+":"+input.occurrenceKey;
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
   const sourceKey="manual-revision:"+input.mutationId;
-  const [repeat]=await tx.select({id:attendanceEvents.id}).from(attendanceEvents)
-   .where(eq(attendanceEvents.sourceKey,sourceKey)).limit(1);
-  if(repeat)return repeat.id;
+  const [repeat]=await tx.select({
+   id:attendanceEvents.id,studentProfileId:attendanceEvents.studentProfileId,
+   programId:attendanceEvents.programId,occurrenceKey:attendanceEvents.occurrenceKey,
+   status:attendanceEvents.status,
+  }).from(attendanceEvents).where(eq(attendanceEvents.sourceKey,sourceKey)).limit(1);
+  if(repeat){
+   if(repeat.studentProfileId!==input.studentProfileId ||
+      repeat.programId!==input.programId ||
+      repeat.occurrenceKey!==input.occurrenceKey ||
+      repeat.status!==input.status)
+    throw new Error("Attendance mutation ID has already been used for a different attendance fact");
+   return repeat.id;
+  }
   // Even legacy callers must pass the same calendar/section entitlement
   // check for site-day events: no alternate server function may bypass it.
   const inferredSiteDay=/^(\d{4}-\d{2}-\d{2}):site-day$/.exec(input.occurrenceKey)?.[1];
