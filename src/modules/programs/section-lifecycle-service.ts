@@ -177,3 +177,84 @@ export async function resolveSectionWaitlist(context: LifecycleContext, actionId
     await journal(tx,context,section,"SectionWaitlistResolved",{}, {waitlistActionId:record.id,reason:reason.trim()});
   });
 }
+
+/** Move a student between sections of one program and academic term as one transaction. */
+export async function transferSectionEnrollment(context: LifecycleContext,input:{enrollmentId:string;destinationSectionId:string;reason:string}) {
+  assertCapability(context,"program.launch.start");
+  if(input.reason.trim().length<5)throw new Error("Provide a transfer reason");
+  return db.transaction(async tx=>{
+    const [sourceEnrollment]=await tx.select().from(enrollments).where(eq(enrollments.id,input.enrollmentId)).limit(1).for("update");
+    if(!sourceEnrollment||sourceEnrollment.kind!=="section"||sourceEnrollment.status!=="active"||!sourceEnrollment.sectionId)
+      throw new Error("Active section enrollment not found");
+    // Lock in deterministic order to serialize concurrent section transitions.
+    const ids=[sourceEnrollment.sectionId,input.destinationSectionId].sort();
+    const scoped=await Promise.all(ids.map(id=>authorizedSection(tx,context,id)));
+    const source=scoped.find(s=>s.id===sourceEnrollment.sectionId)!;
+    const destination=scoped.find(s=>s.id===input.destinationSectionId)!;
+    if(source.id===destination.id)throw new Error("Source and destination must differ");
+    if(!destination.active||source.programId!==destination.programId||source.termId!==destination.termId)
+      throw new Error("Transfer requires an active section in the same program and academic term");
+    const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(
+      eq(enrollments.studentProfileId,sourceEnrollment.studentProfileId),
+      eq(enrollments.sectionId,destination.id),eq(enrollments.status,"active"))).limit(1);
+    if(existing)throw new Error("Student is already enrolled in destination section");
+    const [capacity]=await tx.select({expectedSeats:sectionCapacityDemands.expectedSeats}).from(sectionCapacityDemands)
+      .where(eq(sectionCapacityDemands.sectionId,destination.id)).limit(1);
+    const [countRow]=await tx.select({count:sql<number>`count(*)::int`}).from(enrollments)
+      .where(and(eq(enrollments.sectionId,destination.id),eq(enrollments.status,"active")));
+    if(capacity&&Number(countRow?.count??0)>=capacity.expectedSeats)
+      throw new Error("Destination section has reached its planned capacity");
+    const now=new Date();
+    await tx.update(enrollments).set({
+      status:"transferred",endedAt:now,updatedAt:now,
+      metadata:{...sourceEnrollment.metadata,transferReason:input.reason.trim(),destinationSectionId:destination.id},
+    }).where(eq(enrollments.id,sourceEnrollment.id));
+    const [newEnrollment]=await tx.insert(enrollments).values({
+      kind:"section",status:"active",organizationId:sourceEnrollment.organizationId,
+      programId:sourceEnrollment.programId,schoolYearId:sourceEnrollment.schoolYearId,
+      sectionId:destination.id,studentProfileId:sourceEnrollment.studentProfileId,
+      startedAt:now,metadata:{transferredFromEnrollmentId:sourceEnrollment.id,reason:input.reason.trim()},
+    }).returning({id:enrollments.id});
+    await journal(tx,context,source,"SectionStudentTransferred",
+      {enrollmentId:sourceEnrollment.id},{destinationSectionId:destination.id,newEnrollmentId:newEnrollment!.id,reason:input.reason.trim()});
+    return {newEnrollmentId:newEnrollment!.id};
+  });
+}
+
+/** A waitlist promotion validates section availability, student eligibility and available seats. */
+export async function promoteSectionWaitlist(context: LifecycleContext, actionId:string) {
+ assertCapability(context,"program.launch.start");
+ return db.transaction(async tx=>{
+   const [item]=await tx.select().from(actions).where(and(eq(actions.id,actionId),eq(actions.type,"section_waitlist"))).limit(1).for("update");
+   if(!item||!item.sectionId||!["waiting","open"].includes(item.status))throw new Error("Pending waitlist record not found");
+   const section=await authorizedSection(tx,context,item.sectionId);
+   if(!section.active)throw new Error("Section closed");
+   const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(
+     eq(enrollments.studentProfileId,item.subjectId),eq(enrollments.sectionId,section.id),eq(enrollments.status,"active"))).limit(1);
+   if(existing)throw new Error("Student already enrolled");
+   const [term]=await tx.select({schoolYearId:terms.schoolYearId}).from(terms).where(eq(terms.id,section.termId)).limit(1);
+   if(!term)throw new Error("Academic term not found");
+   const [member]=await tx.select().from(enrollments).where(and(
+     eq(enrollments.studentProfileId,item.subjectId),eq(enrollments.programId,section.programId),
+     eq(enrollments.schoolYearId,term.schoolYearId),eq(enrollments.kind,"program"),eq(enrollments.status,"active"))).limit(1);
+   if(!member)throw new Error("Student needs active enrollment in this program/year");
+   const [demand]=await tx.select({expectedSeats:sectionCapacityDemands.expectedSeats}).from(sectionCapacityDemands)
+     .where(eq(sectionCapacityDemands.sectionId,section.id)).limit(1);
+   const [roster]=await tx.select({count:sql<number>`count(*)::int`}).from(enrollments)
+     .where(and(eq(enrollments.sectionId,section.id),eq(enrollments.status,"active")));
+   if(demand && Number(roster?.count??0)>=demand.expectedSeats)throw new Error("Section capacity reached");
+   const [record]=await tx.insert(enrollments).values({
+     studentProfileId:item.subjectId,kind:"section",status:"active",
+     organizationId:section.organizationId,programId:section.programId,
+     sectionId:section.id,schoolYearId:term.schoolYearId,startedAt:new Date(),
+     metadata:{promotedFromWaitlistActionId:item.id},
+   }).returning({id:enrollments.id});
+   await tx.update(actions).set({
+     status:"resolved",resolvedAt:new Date(),resolutionNote:"Promoted to active enrollment",
+     updatedAt:new Date(),
+   }).where(eq(actions.id,item.id));
+   await journal(tx,context,section,"SectionWaitlistPromoted",{},
+     {waitlistActionId:item.id,enrollmentId:record!.id,studentProfileId:item.subjectId});
+   return {enrollmentId:record!.id};
+ });
+}
