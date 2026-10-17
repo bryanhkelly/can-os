@@ -23,7 +23,8 @@ async function lockPool(tx:Transaction,programId:string,schoolYearId:string){
  const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId}).from(programs).where(eq(programs.id,programId)).limit(1);
  if(!year||!program||year.organizationId!==program.organizationId||
   (year.programId!==null&&year.programId!==programId)||
-  !program.siteId||year.siteId!==program.siteId)
+  (program.siteId!==null&&year.siteId!==program.siteId)||
+  (year.programId===null&&(!program.siteId||year.siteId!==program.siteId)))
   throw new Error("School year does not belong to this program or host site");
  return {pool,organizationId:program.organizationId};
 }
