@@ -14,7 +14,7 @@
     },
     {
       "file": "src/routes/access.index.tsx",
-      "route": "/access",
+      "route": "/access/",
       "owner": "identity",
       "verification": "pending",
       "roleJourney": "pending",
@@ -86,7 +86,7 @@
     },
     {
       "file": "src/routes/admissions.index.tsx",
-      "route": "/admissions",
+      "route": "/admissions/",
       "owner": "enrollment",
       "verification": "pending",
       "roleJourney": "pending",
@@ -132,7 +132,7 @@
     {
       "file": "src/routes/calendar-export.tsx",
       "route": "/calendar-export",
-      "owner": "unassigned",
+      "owner": "calendar",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -185,7 +185,7 @@
     },
     {
       "file": "src/routes/guardian.index.tsx",
-      "route": "/guardian",
+      "route": "/guardian/",
       "owner": "family",
       "verification": "pending",
       "roleJourney": "pending",
@@ -329,7 +329,7 @@
     },
     {
       "file": "src/routes/sites.index.tsx",
-      "route": "/sites",
+      "route": "/sites/",
       "owner": "operations",
       "verification": "pending",
       "roleJourney": "pending",
@@ -410,7 +410,7 @@
     },
     {
       "file": "src/routes/student.index.tsx",
-      "route": "/student",
+      "route": "/student/",
       "owner": "student-experience",
       "verification": "pending",
       "roleJourney": "pending",
@@ -491,7 +491,7 @@
     },
     {
       "file": "src/routes/teacher.index.tsx",
-      "route": "/teacher",
+      "route": "/teacher/",
       "owner": "learning",
       "verification": "pending",
       "roleJourney": "pending",
