@@ -150,6 +150,24 @@ function StaffAttendancePage() {
     }finally{setBusy("");}
   };
 
+  function discardConflict(mark:OfflineMark){
+    const next=readQueue().filter(entry=>entry.mutationId!==mark.mutationId);
+    writeQueue(next);setQueued(next);setConflicts(current=>current.filter(entry=>entry.mutationId!==mark.mutationId));
+    setNotice("Conflicting attendance change discarded; school record preserved.");
+  }
+  async function overrideConflict(mark:OfflineMark){
+    const current=students.find(item=>item.studentProfileId===mark.studentProfileId);
+    const reason=correctionNotes[mark.studentProfileId]?.trim();
+    if(!current||!reason){
+      setError("Refresh attendance and enter a reason before correcting the newer school record.");
+      return;
+    }
+    const revised={...mark,expectedPreviousEventId:current.attendanceEventId,
+      mutationId:crypto.randomUUID(),note:reason};
+    const next=readQueue().map(entry=>entry.mutationId===mark.mutationId?revised:entry);
+    writeQueue(next);setQueued(next);setConflicts(items=>items.filter(entry=>entry.mutationId!==mark.mutationId));
+    await synchronize();
+  }
   const review = async (excuse: PendingExcuse, decision: "approved" | "rejected") => {
     setBusy(`excuse:${excuse.excuseId}`);
     setNotice("");
@@ -189,6 +207,12 @@ function StaffAttendancePage() {
         <p className="mt-1">A newer school record exists for {conflicts.length} offline
           {conflicts.length===1?" entry":" entries"}. Refresh attendance before deciding
           whether to create a new correction.</p>
+        {conflicts.map(item=><div key={item.mutationId} className="mt-3 flex flex-wrap items-center gap-2 border-t pt-2">
+         <span className="text-xs">{students.find(s=>s.studentProfileId===item.studentProfileId)?.studentName??item.studentProfileId}
+          {" · "}{item.date}{" · pending "}{item.status}</span>
+         <button type="button" onClick={()=>discardConflict(item)} className="rounded border px-2 py-1 text-xs">Discard local change</button>
+         <button type="button" onClick={()=>void overrideConflict(item)} className="rounded border px-2 py-1 text-xs">Apply as reasoned correction</button>
+        </div>)}
         <button type="button" onClick={()=>{setConflicts([]);void load(date);}}
           className="mt-2 rounded border px-3 py-2 text-xs">Refresh school records</button>
       </div>}
