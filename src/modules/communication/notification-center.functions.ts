@@ -3,6 +3,7 @@ import { eq, desc, and, inArray, isNull, or } from "drizzle-orm";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability } from "@/domain/command-context";
+import {z} from "zod";
 async function notificationActor(){
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId)throw new Error("Authenticated person required");
@@ -112,7 +113,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });
 export const readNotification=createServerFn({method:"POST"})
- .validator((data:{id:string})=>data).handler(async({data})=>{
+ .validator((data:unknown)=>z.object({id:z.string().uuid()}).parse(data)).handler(async({data})=>{
   const context=await notificationActor();
   assertCapability(context,"notifications:manage");
   const personId=context.actorPersonId!;
@@ -143,7 +144,7 @@ export const readAllNotifications=createServerFn({method:"POST"}).handler(async(
 
 /** Status updates remain scoped to the authenticated notification recipient. */
 export const setNotificationStatus=createServerFn({method:"POST"})
- .validator((data:{id:string;status:"unread"|"read"|"dismissed"})=>data)
+ .validator((data:unknown)=>z.object({id:z.string().uuid(),status:z.enum(["unread","read","dismissed"])}).parse(data))
  .handler(async({data})=>{
   const context=await notificationActor();
   assertCapability(context,"notifications:manage");
