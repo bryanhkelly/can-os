@@ -796,6 +796,8 @@ export const issueTranscript = createServerFn({ method: "POST" })
       throw new Error("No finalized grades available to issue a transcript");
     }
     const issuingOrganizationId = rows[0]!.creditIssuingOrganizationId;
+    if(rows.some(row=>row.creditIssuingOrganizationId!==issuingOrganizationId))
+      throw new AuthorizationError("A single official transcript cannot combine credits issued by separate organizations without a transfer-credit agreement");
     const issuingOrganization = rows[0]!.creditIssuingOrganization;
 
     return db.transaction(async (tx) => {
