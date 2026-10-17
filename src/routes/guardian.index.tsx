@@ -75,9 +75,9 @@ function FamilyHomePage() {
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground">Next due</dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Date(child.nextDueAt).toLocaleDateString() : "—"}</dd></div>
       </dl>
       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
-       <Link to="/guardian/academics" className="rounded-full border px-3 py-1 hover:bg-muted">Academics</Link>
+       <a href={"/guardian/academics?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Academics</a>
        <Link to="/guardian/attendance" className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</Link>
-       <Link to="/guardian/report-cards" className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</Link>
+       <a href={"/guardian/report-cards?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</a>
       </nav>
      </article>)}
     </div>}
