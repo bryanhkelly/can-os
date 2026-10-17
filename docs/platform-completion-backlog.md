@@ -71,7 +71,12 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Keep study-group session metadata out of broadly visible school, Site Today and month calendar feeds until the calendar supports membership-aware study-group events.
 - [ ] Converge remaining study-group membership, moderation, consent and session WRITE lifecycles after verifying school/program record ownership, audit events and guardian safeguards.
 - [x] Extend attachment read/upload scoping to authorized programs; keep restricted R2 fixture-only mutation gates until complete document verification and storage review.
-- [ ] Complete remaining service-by-service authorization audit; fixture-only gates persist in alternative teacher grading/management, study group creation, document uploads and other unreviewed workflows.
+- [x] Remove the obsolete fixture-only write restriction from canonical teacher assessment creation, including published roster assignment and audit/domain events.
+- [x] Add canonical teacher assessment publication, close, reopen, deadline changes, and latest-graded-attempt returns; expose controls in the authenticated teacher gradebook.
+- [x] Connect standalone rubric grading UI to the canonical grading service instead of an alternative synthetic submission grader.
+- [x] Tighten calendar month and shared School Experience program filtering, including student/teacher section visibility and teacher due-date changes; emit canonical calendar-change domain events when deadlines move.
+- [ ] Remove or retire still-exported fixture-only legacy teacher assignment mutation endpoints after inventorying all callers; do not open duplicate grading paths without equivalent transactional rules.
+- [ ] Complete remaining service-by-service authorization audit; fixture-only gates persist in alternative teacher grading/management, study group writes, document uploads and other unreviewed workflows.
 
 ## Phase 2 — connected school operation
 
