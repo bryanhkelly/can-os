@@ -104,6 +104,7 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
       .where(and(
         gte(schema.calendarEvents.startsAt, rangeStart),
         lt(schema.calendarEvents.startsAt, rangeEnd),
+        ne(schema.calendarEvents.type, "study_group"),
         or(
           and(inArray(schema.calendarEvents.siteId, sites),
             isNull(schema.calendarEvents.sectionId),
