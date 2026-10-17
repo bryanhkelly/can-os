@@ -6,6 +6,7 @@ import { z } from "zod";
 import { actorSiteIds, assertProgramGranted, recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
+import { resolveCourseGuardianConsent } from "./course-guardian-consent";
 
 async function studentProfileFor(actor: Actor) {
  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
@@ -177,8 +178,6 @@ export const decideCourseChange = createServerFn({method:"POST"})
             .from(s.guardianRelationships).where(and(
               eq(s.guardianRelationships.studentPersonId,request.ownerPersonId),
               eq(s.guardianRelationships.canManageEnrollment,true)));
-          const authorized=new Set(eligibleGuardians.map(g=>g.personId));
-          if(!authorized.size)throw new Error("The student has no authorized enrollment guardian.");
           const consentRows=await tx.select({
             signerPersonId:s.consentRecords.signerPersonId,evidence:s.consentRecords.signatureEvidence,
           }).from(s.consentRecords).where(and(
@@ -188,20 +187,14 @@ export const decideCourseChange = createServerFn({method:"POST"})
             eq(s.consentRecords.version,"course-registration/v1"),
             isNull(s.consentRecords.revokedAt),
           )).orderBy(desc(s.consentRecords.signedAt),desc(s.consentRecords.createdAt));
-          const decisions=new Map<string,string>();
-          for(const row of consentRows){
-            if(!authorized.has(row.signerPersonId)||decisions.has(row.signerPersonId)||
-               row.evidence.studentProfileId!==studentProfileId||
-               row.evidence.sectionId!==section.id||
-               row.evidence.schoolYearId!==schoolYearId)continue;
-            const decision=row.evidence.decision;
-            if(decision!=="approve"&&decision!=="decline")continue;
-            if(decision==="approve"&&row.evidence.acknowledgedByGuardian!==true)continue;
-            decisions.set(row.signerPersonId,decision);
-          }
-          if([...decisions.values()].includes("decline"))
+          const consentState=resolveCourseGuardianConsent({
+            eligibleGuardianPersonIds:eligibleGuardians.map(g=>g.personId),
+            decisionsNewestFirst:consentRows,
+            studentProfileId,sectionId:section.id,schoolYearId,
+          });
+          if(consentState==="declined")
             throw new Error("A guardian declined this course addition.");
-          if(![...decisions.values()].includes("approve"))
+          if(consentState!=="approved")
             throw new Error("Guardian approval is pending for this course addition.");
         }
         if(operation==="add" && today>policyAtApproval.addDropEndsOn)throw new Error("Registration window closed before approval");
