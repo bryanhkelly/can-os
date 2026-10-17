@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { gradeSyntheticRubric } from "@/modules/student-experience/assignments.functions";
+import { gradeSubmission } from "@/modules/learning/gradebook.functions";
 import type { RubricCriterion } from "@/modules/student-experience/rubric";
 export function RubricGrader({submissionId,criteria,onSaved}:{submissionId:string;criteria:RubricCriterion[];onSaved:()=>Promise<unknown>}) {
  const [points,setPoints]=useState<Record<string,number>>({});
@@ -12,7 +12,12 @@ export function RubricGrader({submissionId,criteria,onSaved}:{submissionId:strin
  async function post() {
   setBusy(true);setError("");
   try {
-   await gradeSyntheticRubric({data:{submissionId,grades:criteria.map(c=>({id:c.id,points:points[c.id]??0,comment:comments[c.id]??""})),comment:overall}});
+   const rubricNotes=criteria.map(criterion=>comments[criterion.id]?.trim()
+    ?criterion.label+": "+comments[criterion.id].trim():"").filter(Boolean).join("\n");
+   await gradeSubmission({data:{
+    submissionId,rubricScores:criteria.map(c=>({id:c.id,points:points[c.id]??0})),
+    feedbackComment:[overall.trim(),rubricNotes].filter(Boolean).join("\n").slice(0,4000)
+   }});
    await onSaved();
   } catch(e) {setError(e instanceof Error?e.message:"Unable to post rubric grade");}
   finally {setBusy(false);}
