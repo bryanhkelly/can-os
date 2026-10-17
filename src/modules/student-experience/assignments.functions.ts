@@ -1,5 +1,6 @@
 import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { readRubric, scoreRubric, type CriterionGrade } from "./rubric";
+import {gradeSubmission,returnSubmissionForRevision,createAssessment,manageAssessment} from "@/modules/learning/gradebook.functions";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -154,37 +155,28 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
   });
  });
 
+/** Compatibility endpoint: all scoring goes through the canonical gradebook service. */
 export const gradeSyntheticAssignment=createServerFn({method:"POST"})
- .validator((value:unknown)=>z.object({submissionId:z.string().min(1),score:z.number().finite().min(0).max(100),comment:z.string()}).parse(value))
+ .validator((input:unknown)=>z.object({
+  submissionId:z.string().uuid(),score:z.number().finite().min(0).max(100),
+  comment:z.string().max(4000)
+ }).parse(input))
  .handler(async({data})=>{
-  assertSyntheticMutation("teacher");
-  const context=await teacherActor();
-  assertCapability(context,"assignments:grade");
-  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
-  if(!Number.isFinite(data.score)||data.score<0||data.score>100)throw new Error("Score must be from 0 to 100");
-  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  // Legacy clients send a percentage; the canonical service takes points.
+  // Verify the teaching relationship before looking up assessment details.
   await teacherForSubmission(data.submissionId);
-  return db.transaction(async tx=>{
-  const [record]=await tx.select({id:s.submissions.id,points:s.assessments.pointsPossible,studentProfileId:s.submissions.studentProfileId,metadata:s.assessments.metadata})
-   .from(s.submissions).innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
-   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-   .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-   .where(and(eq(s.submissions.id,data.submissionId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]),eq(s.submissions.status,"submitted"))).limit(1);
-  if(!record||record.metadata.synthetic!==true)throw new Error("Synthetic submitted work not found");
-  const [student]=await tx.select({personId:s.studentProfiles.personId}).from(s.studentProfiles).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
-  if(!student)throw new AuthorizationError("student profile");
-  const studentPersonId=student.personId;
-  const points=Number(record.points??100);
-  const [updated]=await tx.update(s.submissions).set({status:"graded",score:String(data.score*points/100),feedback:{comment:data.comment.slice(0,4000)},graderPersonId:context.actorPersonId,gradedAt:new Date(),updatedAt:new Date()})
-  .where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"submitted"))).returning({id:s.submissions.id});
-  if(!updated)throw new Error("Submission already graded");
-  await tx.insert(s.domainEvents).values({eventType:"GradePosted",aggregateType:"submission",
-   aggregateId:updated.id,actorPersonId:context.actorPersonId,payload:{
-    studentProfileId:record.studentProfileId,score:data.score}});
-  await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.grade",resourceType:"submission",resourceId:updated.id,before:{status:"submitted"},after:{status:"graded",score:data.score},context:{accountId:context.accountId,sessionId:context.sessionId,synthetic:true}});
-  await tx.insert(s.notifications).values({recipientPersonId:studentPersonId,type:"assignment_feedback",status:"unread",title:"New feedback on your work",body:data.comment.slice(0,500)||"Your teacher posted a grade.",resourceType:"submission",resourceId:updated.id});
-  return {submissionId:updated.id};
-  });
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const [item]=await db.select({points:s.assessments.pointsPossible})
+   .from(s.submissions)
+   .innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
+   .where(eq(s.submissions.id,data.submissionId)).limit(1);
+  const points=Number(item?.points);
+  if(!Number.isFinite(points)||points<=0)throw new Error("Assessment points unavailable");
+  return gradeSubmission({data:{
+   submissionId:data.submissionId,
+   score:Math.round(points*data.score)/100,
+   feedbackComment:data.comment
+  }});
  });
 
 export const returnSyntheticAssignment=createServerFn({method:"POST"})
