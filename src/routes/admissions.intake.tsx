@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {createAdmissionsInquiry,listAdmissionsIntake,listAdmissionsIntakePrograms,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
+import {createAdmissionsInquiry,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
@@ -60,11 +60,19 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
      <p className="mt-1 text-xs text-muted-foreground">{r.programName} · {r.disposition??r.stage} · Last updated {new Date(r.updatedAt).toLocaleDateString()}</p></div>
      <span className="rounded-full border px-3 py-1 text-xs">{r.disposition??r.stage}</span>
     </div>
+    <div className="mt-3 flex flex-wrap gap-2">
+      <button disabled={busy} onClick={()=>perform(()=>provisionInquiryGuardianAccount({data:{applicationId:r.id}}),
+        "Guardian sign-in membership provisioned. The guardian can request an email access link at sign-in.")}
+        className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Provision guardian login</button>
+      {r.disposition==="ready_for_offer" && <Link to="/admissions"
+        className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background">Issue enrollment offer →</Link>}
+    </div>
     <div className="mt-4 flex flex-wrap gap-2">
      {(r.stage==="inquiry"?[["application","Start application"],["decline","Decline"],["withdraw","Withdraw"]]:
        r.stage==="application"?[["eligibility","Begin eligibility review"],["decline","Decline"],["withdraw","Withdraw"]]:
        r.stage==="eligibility"?(r.disposition==="waitlisted"?[["restore","Restore to review"],["decline","Decline"],["withdraw","Withdraw"]]:
-        [["accept","Accept"],["waitlist","Waitlist"],["decline","Decline"],["withdraw","Withdraw"]]):[]).map(([decision,label])=>
+        r.disposition==="ready_for_offer"?[["waitlist","Waitlist"],["decline","Decline"],["withdraw","Withdraw"]]:
+        [["accept","Approve for offer"],["waitlist","Waitlist"],["decline","Decline"],["withdraw","Withdraw"]]):[]).map(([decision,label])=>
        <button key={decision} disabled={busy} onClick={()=>perform(()=>transitionAdmissionsStage({data:{applicationId:r.id,decision:decision as "application"|"eligibility"|"accept"|"decline"|"withdraw"|"waitlist"|"restore"}}),label+" saved.")}
         className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">{label}</button>)}
     </div>
