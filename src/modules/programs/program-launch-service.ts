@@ -10,7 +10,6 @@ import {
   sites,
   schoolYears,
   sections,
-  sectionTeachers,
   terms,
 } from "@/db/schema";
 import {
@@ -23,6 +22,7 @@ import {
 import { EventTypes } from "@/domain/event-types";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { evaluateSectionReadiness } from "./section-readiness-service";
 
 export async function startProgramLaunch(
   context: CommandContext,
@@ -272,10 +272,12 @@ export async function activateProgram(
         eq(sections.active,true),inArray(sections.termId,academicTerms.map(t=>t.id)))):[];
       if(!sectionRows.length)throw new Error(
         "Provision at least one section in the active school year before launch");
-      const assigned=await tx.select({id:sectionTeachers.id}).from(sectionTeachers)
-       .where(inArray(sectionTeachers.sectionId,sectionRows.map(s=>s.id))).limit(1);
-      if(!assigned.length)throw new Error(
-        "Assign at least one qualified instructor before activating the program");
+      for (const section of sectionRows) {
+        const readiness=await evaluateSectionReadiness(section.id,tx);
+        const blockers=readiness.items.filter(item=>item.state==="blocked");
+        if(blockers.length)throw new Error(
+          "Section is not ready: "+blockers.map(item=>item.message).join(" "));
+      }
     }
     const activatedAt = new Date();
 
