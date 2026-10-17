@@ -26,8 +26,8 @@ export const postDiscussionMessage=createServerFn({method:"POST"})
   if(!profile)throw new AuthorizationError("student profile");
   const [enrolled]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,profile.id),eq(s.enrollments.sectionId,thread.contextId),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"))).limit(1);
   if(!enrolled)throw new Error("Student is not enrolled in this section");
-  const [section]=await tx.select({siteId:s.sections.siteId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
-  if(!section?.siteId||!actor.scope.siteIds?.includes(section.siteId))throw new AuthorizationError("discussion section site");
+  const [section]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
+  if(!section?.siteId||!actor.scope.siteIds?.includes(section.siteId)||!actor.scope.programIds?.includes(section.programId))throw new AuthorizationError("discussion section site");
   if(data.parentMessageId){
    const [parent]=await tx.select({id:s.communicationMessages.id,metadata:s.communicationMessages.metadata}).from(s.communicationMessages).where(and(eq(s.communicationMessages.id,data.parentMessageId),eq(s.communicationMessages.threadId,thread.id))).limit(1);
    if(!parent||parent.metadata?.hidden===true)throw new Error("Reply target is unavailable");
