@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import {resolveGuardianChild} from "@/domain/guardian-child-context";
 import { useEffect, useState } from "react";
 import { getGuardianAssignments, getGuardianStudents } from "@/modules/family/guardian-assignments.functions";
 import { guardianAssignmentSummary } from "@/domain/guardian-academics";
@@ -22,7 +23,7 @@ function GuardianAcademicsPage() {
    if (!active) return;
    setStudents(result.students);
    const requested = new URLSearchParams(window.location.search).get("student");
-   setSelected(result.students.find(student => student.studentPersonId === requested)?.studentPersonId ?? result.students[0]?.studentPersonId ?? "");
+   setSelected(resolveGuardianChild(result.students,requested));
    setLoadingStudents(false);
   }).catch(() => {
    if (active) { setError("Sign in with an authorized guardian account to view academic progress."); setLoadingStudents(false); setLoading(false); }
