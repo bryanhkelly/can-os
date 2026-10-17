@@ -94,8 +94,11 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
       className="mt-1 w-full rounded border bg-background p-2"/></label>
     <label className="mt-2 block text-xs">End <input type="datetime-local" value={end} onChange={e=>setEnd(e.target.value)}
       className="mt-1 w-full rounded border bg-background p-2"/></label>
-    <label className="mt-2 block text-xs">Schedule template ID (optional)
-     <input value={schedule} onChange={e=>setSchedule(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/>
+    <label className="mt-2 block text-xs">School bell schedule
+     <select value={schedule} onChange={e=>setSchedule(e.target.value)} className="mt-1 w-full rounded border bg-background p-2">
+      <option value="">No bell schedule</option>
+      {section.scheduleOptions.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+     </select>
     </label>
     <button type="button" disabled={busy||!section.active} onClick={()=>void run(section.id,
       ()=>updateSectionLifecycleSchedule({data:{sectionId:section.id,scheduleTemplateId:schedule||null,
