@@ -175,7 +175,7 @@ export async function sendMessage(
       });
       await finish("completed", { kind: "help" });
     } else if (plan.intent === "ask" && plan.kind === "operations_overview") {
-      const overview = await getSchoolOperationsCommandCenter({ ...context, role: "registrar" });
+      const overview = await getSchoolOperationsCommandCenter(context);
       const lines = [
         `There are ${overview.summary.sections} active sections, ${overview.summary.unstaffed} without instructors, ${overview.summary.underCapacity} with instructional capacity gaps, and ${overview.summary.waitlisted} waitlisted students.`,
         ...overview.issues.slice(0,10).map(issue=>`- ${issue.title}: ${issue.description}`),
