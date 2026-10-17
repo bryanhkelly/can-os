@@ -277,7 +277,8 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    }
    const [newGrant]=await tx.insert(accountPersonGrants).values({
     accountId:account!.id,personId:contact.id,role:"guardian",
-    organizationId:program.organizationId,siteId:program.siteId,isSynthetic:false,
+    organizationId:program.organizationId,siteId:program.siteId,
+    isSynthetic:app.metadata.synthetic===true,
    }).returning({id:accountPersonGrants.id});
    await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
     action:"admissions.guardian_access.provision",resourceType:"account_person_grant",
