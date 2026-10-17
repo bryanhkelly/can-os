@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, isNull, or } from "drizzle-orm";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability } from "@/domain/command-context";
@@ -21,13 +21,15 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const groupBySession=new Map(sessions.map(s=>[s.id,s.groupId]));
  const groupIds=rows.filter(n=>n.resourceType==="study_group"&&n.resourceId).map(n=>n.resourceId as string);
  const groupRows=groupIds.length?await db.select({id:s.studyGroups.id,facilitator:s.studyGroups.facilitatorPersonId})
-  .from(s.studyGroups).where(inArray(s.studyGroups.id,groupIds)):[];
+  .from(s.studyGroups).where(and(inArray(s.studyGroups.id,groupIds),
+   inArray(s.studyGroups.siteId,context.scope.siteIds??[]),
+   or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,context.scope.programIds??[])))):[];
  const memberRows=groupIds.length?await db.select({groupId:s.studyGroupMemberships.groupId})
-  .from(s.studyGroupMemberships).where(and(inArray(s.studyGroupMemberships.groupId,groupIds),eq(s.studyGroupMemberships.personId,personId))):[];
+  .from(s.studyGroupMemberships).where(and(inArray(s.studyGroupMemberships.groupId,groupIds),eq(s.studyGroupMemberships.personId,personId),eq(s.studyGroupMemberships.status,"approved"))):[];
  const permittedGroups=new Set(groupRows.filter(g=>g.facilitator===personId).map(g=>g.id));
- for(const row of memberRows)permittedGroups.add(row.groupId);
+ for(const row of memberRows)if(groupRows.some(group=>group.id===row.groupId))permittedGroups.add(row.groupId);
  const admissionOfferIds=rows.filter(n=>n.resourceType==="admission_offer"&&n.resourceId).map(n=>n.resourceId as string);
- const admissionOffers=admissionOfferIds.length?await db.select({id:s.admissionOffers.id,applicationId:s.admissionOffers.applicationId,issuedByPersonId:s.admissionOffers.issuedByPersonId,studentProfileId:s.applications.studentProfileId})
+ const admissionOffers=admissionOfferIds.length?await db.select({id:s.admissionOffers.id,applicationId:s.admissionOffers.applicationId,issuedByPersonId:s.admissionOffers.issuedByPersonId,programId:s.admissionOffers.programId,studentProfileId:s.applications.studentProfileId})
   .from(s.admissionOffers).innerJoin(s.applications,eq(s.applications.id,s.admissionOffers.applicationId))
   .where(inArray(s.admissionOffers.id,admissionOfferIds)):[];
  const relatedStudentPeople=admissionOffers.length?await db.select({id:s.studentProfiles.id,personId:s.studentProfiles.personId})
@@ -36,8 +38,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   .from(s.guardianRelationships).where(and(eq(s.guardianRelationships.guardianPersonId,personId),eq(s.guardianRelationships.canManageEnrollment,true))):[];
  const manageableStudents=new Set(guardianLinks.map(g=>g.studentPersonId));
  const personByProfile=new Map(relatedStudentPeople.map(p=>[p.id,p.personId]));
- const permittedGuardianOffers=new Set(admissionOffers.filter(o=>manageableStudents.has(personByProfile.get(o.studentProfileId)??"")).map(o=>o.id));
- const permittedRegistrarOffers=new Set(admissionOffers.filter(o=>o.issuedByPersonId===personId).map(o=>o.id));
+ const permittedGuardianOffers=new Set(admissionOffers.filter(o=>manageableStudents.has(personByProfile.get(o.studentProfileId)??"")&&(context.scope.programIds??[]).includes(o.programId)).map(o=>o.id));
+ const permittedRegistrarOffers=new Set(admissionOffers.filter(o=>o.issuedByPersonId===personId&&(context.scope.programIds??[]).includes(o.programId)).map(o=>o.id));
  const submissionIds=rows.filter(n=>n.resourceType==="submission"&&n.resourceId).map(n=>n.resourceId as string);
  const studentProfiles=await db.select({id:s.studentProfiles.id}).from(s.studentProfiles).where(eq(s.studentProfiles.personId,personId));
  const studentIds=studentProfiles.map(p=>p.id);
