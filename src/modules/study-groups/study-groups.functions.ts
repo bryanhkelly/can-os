@@ -486,10 +486,18 @@ export const listGuardianStudyGroupConsents=createServerFn({method:"GET"}).handl
   .from(s.guardianRelationships).where(and(
    eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),
    eq(s.guardianRelationships.canManageEnrollment,true)));
- const allowed=new Set(linked.map(x=>x.studentPersonId));
- return rows.filter(r=>typeof r.metadata.studentPersonId==="string"&&allowed.has(r.metadata.studentPersonId))
+ const allowed=[...new Set(linked.map(x=>x.studentPersonId))];
+ const children=allowed.length?await db.select({
+  id:s.people.id,firstName:s.people.legalFirstName,lastName:s.people.legalLastName
+ }).from(s.people).where(inArray(s.people.id,allowed)):[];
+ const childNames=new Map(children.map(child=>[child.id,
+  [child.firstName,child.lastName].filter(Boolean).join(" ")]));
+ return rows.filter(r=>["open","resolved"].includes(r.status)&&
+   typeof r.metadata.studentPersonId==="string"&&allowed.includes(r.metadata.studentPersonId))
   .map(r=>({id:r.id,status:r.status,groupTitle:r.groupTitle,groupId:r.groupId,
-   studentPersonId:String(r.metadata.studentPersonId),decision:r.metadata.decision??null}));
+   studentPersonId:String(r.metadata.studentPersonId),
+   studentName:childNames.get(String(r.metadata.studentPersonId))??"Linked student",
+   decision:r.metadata.decision??null}));
 });
 export const decideGuardianStudyGroupConsent=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({actionId:z.string().uuid(),approve:z.boolean()}).parse(v))
