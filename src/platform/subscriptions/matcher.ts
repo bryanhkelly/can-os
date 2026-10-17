@@ -7,6 +7,7 @@ import {
   isNull,
   lte,
   or,
+  sql,
 } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -180,4 +181,29 @@ export async function setSubscriptionStatus(
     )
     .returning({ id: subscriptions.id });
   return rows.length > 0;
+}
+
+/**
+ * Reconcile subscription matching separately from the primary academic handler.
+ * A crash after the academic event is processed but before matching watches
+ * must not drop an alert. Receipt writes happen in the same transaction as
+ * the new subscription delivery queue records.
+ */
+export async function recoverSubscriptionEventMatches(limit = 100): Promise<number> {
+  const candidates = await db.select({ id: domainEvents.id }).from(domainEvents)
+    .where(and(
+      eq(domainEvents.status, "processed"),
+      eq(domainEvents.eventType, "AssignmentBecameMissing"),
+      sql`NOT EXISTS (SELECT 1 FROM subscription_event_receipts r WHERE r.event_id = ${domainEvents.id})`,
+    )).limit(limit);
+  let recovered = 0;
+  for (const event of candidates) {
+    try {
+      await processEventSubscriptions(event.id);
+      recovered++;
+    } catch (error) {
+      console.error("subscription event recovery failed", event.id, error instanceof Error ? error.message : "unknown");
+    }
+  }
+  return recovered;
 }
