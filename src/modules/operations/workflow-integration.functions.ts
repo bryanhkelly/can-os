@@ -68,7 +68,8 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
       studentProfileId: applications.studentProfileId, stage: applications.stage,
     }).from(applications).where(inArray(applications.programId, ids)),
     db.select({ programId: admissionOffers.programId, applicationId: admissionOffers.applicationId,
-      schoolYearId: admissionOffers.schoolYearId, status: admissionOffers.status })
+      schoolYearId: admissionOffers.schoolYearId, status: admissionOffers.status,
+      expiresAt: admissionOffers.expiresAt })
       .from(admissionOffers).where(inArray(admissionOffers.programId, ids)),
     db.select({
       programId: enrollments.programId, studentProfileId: enrollments.studentProfileId,
@@ -159,7 +160,10 @@ export const getWorkflowIntegration = createServerFn({ method: "GET" }).handler(
         enrollment: {
           applications: programApplications.length,
           acceptedApplications: accepted.length,
-          offersAwaitingResponse: offerRows.filter(o => o.programId === program.id && o.status === "issued").length,
+          offersAwaitingResponse: offerRows.filter(o => o.programId === program.id &&
+            o.status === "issued" && (!o.expiresAt || o.expiresAt > now)).length,
+          expiredOffersAwaitingReconciliation: offerRows.filter(o => o.programId === program.id &&
+            o.status === "issued" && !!o.expiresAt && o.expiresAt <= now).length,
           activeProgramEnrollments: enrolled,
           acceptedAwaitingActivation: pendingActivation,
         },
