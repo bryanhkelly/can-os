@@ -22,8 +22,8 @@ integration("synthetic admissions offer concurrency",()=>{
   await db.insert(s.journeyDefinitions).values({key:journeyKey,version:"1",owningOrganizationId:network.id,audience:"family",title:"Synthetic Admissions",configuration:{requirements:[]}});
   const [guardian]=await db.insert(s.people).values({legalFirstName:"Synthetic",legalLastName:"Guardian"}).returning();
   const [registrarPerson]=await db.insert(s.people).values({legalFirstName:"Synthetic",legalLastName:"Registrar"}).returning();
-  const registrar={actorPersonId:registrarPerson.id,capabilities:new Set(["enrollment.decide","enrollment.activate"]),scope:{programIds:[program.id]}};
-  const family={actorPersonId:guardian.id,capabilities:new Set(["enrollment.apply"]),scope:{programIds:[program.id]}};
+  const registrar={actorPersonId:registrarPerson.id,role:"registrar",capabilities:new Set(["enrollment.decide","enrollment.activate"]),scope:{programIds:[program.id]}};
+  const family={actorPersonId:guardian.id,role:"guardian",capabilities:new Set(["enrollment.apply"]),scope:{programIds:[program.id]}};
   const records=[];
   let sharedHouseholdId: string | undefined;
   for(let i=0;i<2;i++){
@@ -54,7 +54,7 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(await db.select().from(s.applications).where(eq(s.applications.householdId,sharedHouseholdId!))).toHaveLength(2);
   const expiry=new Date(Date.now()+7*24*60*60*1000);
   // First verify that a declined offer actually releases the sole seat for a sibling.
-  const wrongProgramRegistrar={actorPersonId:registrarPerson.id,capabilities:new Set(["enrollment.decide"]),scope:{programIds:[crypto.randomUUID()]}};
+  const wrongProgramRegistrar={actorPersonId:registrarPerson.id,role:"registrar",capabilities:new Set(["enrollment.decide"]),scope:{programIds:[crypto.randomUUID()]}};
   await expect(svc.issueSyntheticAdmissionOffer(wrongProgramRegistrar,{
    applicationId:records[0]!.applicationId,schoolYearId:calendar.schoolYear.id,
    idempotencyKey:`unauthorized-program-${suffix}`,expiresAt:expiry
@@ -100,7 +100,7 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(guardianNotices.filter(n=>n.type==="admission_offer_issued"&&n.resourceId===offerId)).toHaveLength(1);
 
   // A person with the guardian capability but without the student relationship must be denied.
-  const unrelatedGuardian={actorPersonId:registrarPerson.id,capabilities:new Set(["enrollment.apply"]),scope:{programIds:[program.id]}};
+  const unrelatedGuardian={actorPersonId:registrarPerson.id,role:"guardian",capabilities:new Set(["enrollment.apply"]),scope:{programIds:[program.id]}};
   await expect(svc.respondToSyntheticAdmissionOffer(unrelatedGuardian,offerId,"accept")).rejects.toThrow("Guardian is not authorized");
   const [beforeDecision]=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.id,offerId));
   expect(beforeDecision.status).toBe("issued");

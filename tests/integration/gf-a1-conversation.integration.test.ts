@@ -271,14 +271,18 @@ integration("GF-A1 Ask CAN conversation", () => {
       .where(eq(schema.auditEvents.resourceId, turn.runId));
     expect(audit.map((row) => row.action)).toContain("agent.run");
 
-    // The same question from an unrelated person finds nothing and leaks nothing.
-    const outsiderTurn = await agent.sendMessage(contextFor(outsider.id, []), {
-      body: "How is Bobby doing?",
-    });
-    expect(outsiderTurn.runStatus).toBe("completed");
-    expect(outsiderTurn.message.body).not.toContain("Bobby");
-    expect(outsiderTurn.message.body).not.toContain("78");
-    expect(outsiderTurn.message.evidenceRefs).toHaveLength(0);
+    // The same question from an unrelated person is refused by the shared
+    // authorization layer: no answer, no evidence, no leak.
+    await expect(
+      agent.sendMessage(contextFor(outsider.id, []), {
+        body: "How is Bobby doing?",
+      }),
+    ).rejects.toThrow("student:related-read");
+    const outsiderConversations = await db
+      .select()
+      .from(schema.conversations)
+      .where(eq(schema.conversations.personId, outsider.id));
+    expect(outsiderConversations).toHaveLength(0);
   });
 
   it("turns a watch request into a confirmed subscription that then delivers (A1 -> A2)", async () => {
@@ -369,13 +373,13 @@ integration("GF-A1 Ask CAN conversation", () => {
 
     const outsiderContext = contextFor(outsider.id, []);
 
-    // An outsider asking to watch Bobby gets a safe refusal, not a preview.
-    const refused = await agent.sendMessage(outsiderContext, {
-      body: "Tell me when Bobby misses an assignment.",
-    });
-    expect(refused.runStatus).toBe("completed");
-    expect(refused.message.actionPreview).toBeNull();
-    expect(refused.message.body).not.toContain("Bobby");
+    // An outsider asking to watch Bobby is refused by the shared
+    // authorization layer before any run or preview is persisted.
+    await expect(
+      agent.sendMessage(outsiderContext, {
+        body: "Tell me when Bobby misses an assignment.",
+      }),
+    ).rejects.toThrow("student:related-read");
 
     // A guardian's parked run cannot be approved by someone else.
     const guardianContext = contextFor(guardian.id, ["student:related-read"]);

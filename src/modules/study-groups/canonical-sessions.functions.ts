@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { recordAudit, requireActor } from "@/modules/identity/actors.server";
+import { recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { validateSession } from "@/domain/study-groups";
 import { assertGroupScope, eligibleStudent, facilitatedGroup } from "./canonical-membership.server";
 
@@ -71,14 +71,12 @@ export const createCanonicalGroupSession = createServerFn({ method: "POST" })
     });
   });
 
-export const reviseCanonicalGroupSession = createServerFn({ method: "POST" })
-  .validator((value: unknown) => z.discriminatedUnion("action", [
-    z.object({ action: z.literal("cancel"), sessionId: uuid }),
-    z.object({ action: z.literal("reschedule"), sessionId: uuid,
-      startsAt: time, endsAt: time }),
-  ]).parse(value))
-  .handler(async ({ data }) => {
-    const actor = await requireActor(["teacher"]);
+export type ReviseGroupSessionInput =
+  | { action: "cancel"; sessionId: string }
+  | { action: "reschedule"; sessionId: string; startsAt: string; endsAt: string };
+
+/** Session reschedule/cancel core, callable by the server boundary and by integration tests with a verified actor. */
+export async function reviseGroupSessionForActor(actor: Actor, data: ReviseGroupSessionInput) {
     const times = data.action === "reschedule"
       ? validateSession(data.startsAt, data.endsAt) : null;
     if (times && times.start <= new Date()) throw new Error("Choose a future session.");
@@ -132,7 +130,16 @@ export const reviseCanonicalGroupSession = createServerFn({ method: "POST" })
       });
       return { saved: true };
     });
-  });
+}
+
+export const reviseCanonicalGroupSession = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.discriminatedUnion("action", [
+    z.object({ action: z.literal("cancel"), sessionId: uuid }),
+    z.object({ action: z.literal("reschedule"), sessionId: uuid,
+      startsAt: time, endsAt: time }),
+  ]).parse(value))
+  .handler(async ({ data }) =>
+    reviseGroupSessionForActor(await requireActor(["teacher"]), data));
 
 export const rsvpCanonicalGroupSession = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({

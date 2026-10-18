@@ -107,11 +107,13 @@ integration("GF4 attendance + parent excuse", () => {
 
     const siteContext = {
       actorPersonId: siteOperator.id,
+      role: "registrar",
       capabilities: new Set([
         "attendance.write",
         "attendance.excuse.review",
       ]),
       scope: {
+        organizationIds: [hostOrg.id],
         siteIds: [site.id],
         programIds: [program.id],
       },
@@ -166,6 +168,7 @@ integration("GF4 attendance + parent excuse", () => {
 
     const guardianContext = {
       actorPersonId: guardian.id,
+      role: "guardian",
       capabilities: new Set(["attendance.excuse.submit"]),
       scope: { programIds: [program.id] },
       requestId: `gf4-guardian-${suffix}`,

@@ -12,6 +12,7 @@ integration("GF3 host / program launch", () => {
         import("@/modules/programs/program-launch-service"),
         import("@/modules/journeys/complete-requirement"),
       ]);
+    const { createAcademicTimeFixture } = await import("./helpers/academic-time");
 
     const suffix = crypto.randomUUID().slice(0, 8);
 
@@ -65,17 +66,20 @@ integration("GF3 host / program launch", () => {
       })
       .returning();
 
-    const context = {
-      actorPersonId: operator.id,
+    const contextFor = (hostId: string, siteId: string | null) => ({
+      actorPersonId: operator!.id,
       capabilities: new Set([
         "program.launch.start",
         "journey.requirement.complete",
         "calendar.event.create",
         "program.activate",
       ]),
-      scope: {},
+      scope: {
+        organizationIds: [hostId],
+        ...(siteId ? { siteIds: [siteId] } : {}),
+      },
       requestId: `gf3-${suffix}`,
-    };
+    });
 
     const scenarios = [
       {
@@ -113,6 +117,8 @@ integration("GF3 host / program launch", () => {
           timezone: "America/Los_Angeles",
         })
         .returning();
+
+      const context = contextFor(host.id, site.id);
 
       const launch = await programsModule.startProgramLaunch(context, {
         hostOrganizationId: host.id,
@@ -159,6 +165,56 @@ integration("GF3 host / program launch", () => {
           [{ fact: `${requirement.key}_complete` }],
         );
       }
+
+      // Activation also requires an active school year with at least one
+      // ready section for the program (Phase 2 launch gating).
+      const academicTime = await createAcademicTimeFixture({
+        organizationId: host.id,
+        programId: launch.programId,
+        siteId: site.id,
+        suffix: `${suffix}-${index}`,
+      });
+      const [course] = await db
+        .insert(schema.courseTemplates)
+        .values({
+          owningOrganizationId: host.id,
+          code: `LAUNCH-${suffix}-${index}`,
+          title: "Launch Readiness Course",
+          subject: "General",
+        })
+        .returning();
+      const [version] = await db
+        .insert(schema.courseTemplateVersions)
+        .values({
+          courseTemplateId: course!.id,
+          version: 1,
+          status: "published",
+        })
+        .returning();
+      const [section] = await db
+        .insert(schema.sections)
+        .values({
+          programId: launch.programId,
+          siteId: site.id,
+          courseTemplateVersionId: version!.id,
+          code: "LAUNCH-1",
+          title: "Launch Readiness",
+          termId: academicTime.term.id,
+        })
+        .returning();
+      await db.insert(schema.sectionRegistrationPolicies).values({
+        sectionId: section!.id,
+        enrollmentCapacity: 24,
+        addDropEndsOn: "2027-10-01",
+        withdrawalEndsOn: "2027-12-01",
+      });
+      await db.insert(schema.deliveryArrangements).values({
+        sectionId: section!.id,
+        academicProviderOrganizationId: canOrg.id,
+        facilitatorPersonId: operator.id,
+        modality: "onsite",
+        status: "active",
+      });
 
       const orientationId = await programsModule.createProgramOrientation(
         context,

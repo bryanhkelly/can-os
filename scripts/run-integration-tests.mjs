@@ -59,8 +59,10 @@ if (process.argv.includes("--preflight")) {
 const targeted = mode === "study-groups" || mode === "study-group-lifecycle" || mode === "admissions-offers" || mode === "gf1";
 const suite = mode === "study-groups" ? ["tests/integration/study-group-fixture-integrity.test.ts"] : mode === "study-group-lifecycle" ? ["tests/integration/study-group-session-lifecycle.test.ts"] : mode === "admissions-offers" ? ["tests/integration/admissions-offers.integration.test.ts"] : mode === "gf1" ? ["tests/integration/academic-intervention.integration.test.ts"] : ["tests/integration"];
 const args = targeted ? process.argv.slice(3) : process.argv.slice(2);
+// Integration files share one disposable database; running them in parallel
+// lets one file's outbox worker claim another file's fixtures mid-assertion.
 const result = spawnSync(process.execPath, [
-  "node_modules/vitest/vitest.mjs", "run", ...suite, ...args,
+  "node_modules/vitest/vitest.mjs", "run", "--no-file-parallelism", ...suite, ...args,
 ], {
   stdio: "inherit",
   env: { ...process.env, DATABASE_URL: testUrl, APP_ENV: "test", NODE_ENV: "test" },

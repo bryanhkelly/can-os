@@ -63,15 +63,16 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
   let journeyB: { id: string };
   let blockingReqB: { id: string };
 
-  const ctx = (actorPersonId: string, capability: string): CommandContext => ({
+  const ctx = (actorPersonId: string, capability: string, role: "registrar" | "guardian"): CommandContext & { role: string } => ({
     actorPersonId,
+    role,
     capabilities: new Set([capability]),
     scope: { programIds: [program.id] },
     requestId: `gf2-${suffix}`,
   });
-  const registrarCtx = () => ctx(registrar.id, "enrollment.decide");
-  const activateCtx = () => ctx(registrar.id, "enrollment.activate");
-  const guardianCtx = (personId: string) => ctx(personId, "enrollment.apply");
+  const registrarCtx = () => ctx(registrar.id, "enrollment.decide", "registrar");
+  const activateCtx = () => ctx(registrar.id, "enrollment.activate", "registrar");
+  const guardianCtx = (personId: string) => ctx(personId, "enrollment.apply", "guardian");
 
   async function createSyntheticApplication(input: {
     householdId: string;
@@ -518,33 +519,57 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
     expect(journey!.status).toBe("active");
   }, 60000);
 
-  it("scenario 4: commands on a non-synthetic application are rejected before any mutation", async () => {
-    await expect(
-      issueSyntheticAdmissionOffer(registrarCtx(), {
+  it("scenario 4: the demo kill switch rejects synthetic records while authentic applications proceed", async () => {
+    // The synthetic write gate protects fixture records whenever demo writes
+    // are disabled; authentic (non-synthetic) applications are canonical and
+    // unaffected by the demo flag.
+    process.env.CAN_DEMO_WRITES_ENABLED = "false";
+    let authenticOfferId: string;
+    try {
+      await expect(
+        issueSyntheticAdmissionOffer(registrarCtx(), {
+          applicationId: appA.id,
+          schoolYearId: year1.id,
+          idempotencyKey: `gf2-offer-killswitch-${suffix}`,
+          expiresAt: expires(),
+        }),
+      ).rejects.toThrow("Synthetic writes are disabled");
+
+      authenticOfferId = await issueSyntheticAdmissionOffer(registrarCtx(), {
         applicationId: appNonSynthetic.id,
         schoolYearId: year1.id,
         idempotencyKey: `gf2-offer-ns-${suffix}`,
         expiresAt: expires(),
-      }),
-    ).rejects.toThrow("Synthetic application not found");
+      });
+    } finally {
+      process.env.CAN_DEMO_WRITES_ENABLED = "true";
+    }
 
-    const offers = await db
+    const blocked = await db
       .select()
       .from(admissionOffers)
-      .where(eq(admissionOffers.applicationId, appNonSynthetic.id));
-    expect(offers).toHaveLength(0);
+      .where(eq(admissionOffers.idempotencyKey, `gf2-offer-killswitch-${suffix}`));
+    expect(blocked).toHaveLength(0);
 
-    const audit = await db
+    const blockedAudit = await db
       .select()
       .from(auditEvents)
-      .where(
-        and(
-          eq(auditEvents.action, "admissions.offer.issue"),
-          eq(auditEvents.resourceType, "admission_offer"),
-        ),
-      );
-    const related = audit.filter((row) => offers.some((o) => o.id === row.resourceId));
-    expect(related).toHaveLength(0);
+      .where(eq(auditEvents.action, "admissions.offer.issue"));
+    expect(
+      blockedAudit.filter((row) => blocked.some((o) => o.id === row.resourceId)),
+    ).toHaveLength(0);
+
+    // Leave no held seat behind for the later capacity scenarios.
+    await respondToSyntheticAdmissionOffer(
+      guardianCtx(guardian1.id),
+      authenticOfferId!,
+      "decline",
+    );
+    const [declined] = await db
+      .select()
+      .from(admissionOffers)
+      .where(eq(admissionOffers.id, authenticOfferId!));
+    expect(declined!.status).toBe("declined");
   }, 60000);
 
   it("scenario 7b/8: incomplete blocking requirements block issuance; a declined offer cannot be resurrected by its key", async () => {
