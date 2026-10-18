@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import {
   correctSectionGrade,
+  finalizeSectionGrades,
   getStudentReportCard,
   getStudentTranscript,
   issueTranscript,
@@ -82,17 +83,18 @@ integration("GF25 report card and transcript", () => {
       programId: program!.id,
       suffix,
     });
-    const [teacher, registrar, student, guardian, unrelatedGuardian] = await db.insert(s.people).values([
+    const [teacher, registrar, student, finalizationStudent, guardian, unrelatedGuardian] = await db.insert(s.people).values([
       { legalFirstName: "Teacher", legalLastName: suffix },
       { legalFirstName: "Registrar", legalLastName: suffix },
       { legalFirstName: "Student", legalLastName: suffix },
+      { legalFirstName: "Finalization", legalLastName: suffix },
       { legalFirstName: "Guardian", legalLastName: suffix },
       { legalFirstName: "Unrelated", legalLastName: suffix },
     ]).returning();
-    const [profile] = await db.insert(s.studentProfiles).values({
-      personId: student!.id,
-      gradeLevel: "10",
-    }).returning();
+    const [profile, finalizationProfile] = await db.insert(s.studentProfiles).values([
+      { personId: student!.id, gradeLevel: "10" },
+      { personId: finalizationStudent!.id, gradeLevel: "10" },
+    ]).returning();
     await db.insert(s.guardianRelationships).values({
       guardianPersonId: guardian!.id,
       studentPersonId: student!.id,
@@ -123,6 +125,30 @@ integration("GF25 report card and transcript", () => {
       sectionId: section!.id,
       personId: teacher!.id,
     });
+    await db.insert(s.enrollments).values([profile!, finalizationProfile!].map(studentProfile => ({
+      studentProfileId: studentProfile.id,
+      kind: "section" as const,
+      status: "active" as const,
+      organizationId: host!.id,
+      programId: program!.id,
+      sectionId: section!.id,
+      schoolYearId: academicTime.schoolYear.id,
+    })));
+    const [assessment] = await db.insert(s.assessments).values({
+      sectionId: section!.id,
+      title: "Quarter assessment",
+      status: "published",
+      pointsPossible: "100",
+      dueAt: new Date("2027-09-01T12:00:00.000Z"),
+      createdByPersonId: teacher!.id,
+    }).returning();
+    await db.insert(s.submissions).values([profile!, finalizationProfile!].map(studentProfile => ({
+      assessmentId: assessment!.id,
+      studentProfileId: studentProfile.id,
+      status: "graded" as const,
+      score: "84",
+      graderPersonId: teacher!.id,
+    })));
     const [grade] = await db.insert(s.sectionGrades).values({
       sectionId: section!.id,
       studentProfileId: profile!.id,
@@ -154,6 +180,30 @@ integration("GF25 report card and transcript", () => {
       percentage: 84,
       reason: "Verified scoring error",
     };
+    await expect(finalizeSectionGrades({ data: {
+      sectionId: section!.id,
+      gradingPeriodId: academicTime.gradingPeriod.id,
+    } })).resolves.toEqual({ finalized: 1, skipped: 1 });
+    await expect(finalizeSectionGrades({ data: {
+      sectionId: section!.id,
+      gradingPeriodId: academicTime.gradingPeriod.id,
+    } })).resolves.toEqual({ finalized: 0, skipped: 2 });
+    const [finalized] = await db.select().from(s.sectionGrades).where(and(
+      eq(s.sectionGrades.studentProfileId, finalizationProfile!.id),
+      eq(s.sectionGrades.sectionId, section!.id),
+      eq(s.sectionGrades.gradingPeriodId, academicTime.gradingPeriod.id),
+    ));
+    expect(finalized).toMatchObject({
+      status: "finalized",
+      percentage: "84.00",
+      letterGrade: "B",
+    });
+    const publishedNotices = await db.select().from(s.notifications).where(and(
+      eq(s.notifications.recipientPersonId, finalizationStudent!.id),
+      eq(s.notifications.type, "report_card_published"),
+      eq(s.notifications.resourceId, finalized!.id),
+    ));
+    expect(publishedNotices).toHaveLength(1);
 
     state.context = {
       ...state.context,
