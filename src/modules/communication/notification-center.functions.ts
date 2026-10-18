@@ -107,7 +107,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:null):
    n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?"/guardian/admission-offers":
    n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&context.role==="registrar"?"/admissions/":
-   n.type==="study_group_consent_requested"&&n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)&&context.role==="guardian"?"/guardian/study-group-consent":
+   n.type==="study_group_consent_requested"&&context.role==="guardian"&&(
+    n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)||
+    n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?"/guardian/group-permissions":
    n.type==="operations_action_assigned"&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&context.role==="registrar"?"/operations":
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"?"/teacher/study-groups":context.role==="student"?`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`:null):
    context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));

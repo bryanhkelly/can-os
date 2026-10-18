@@ -17,7 +17,7 @@
     "test:integration:study-group-lifecycle": "node scripts/run-integration-tests.mjs study-group-lifecycle",
     "test:integration:admissions": "node scripts/run-integration-tests.mjs admissions-offers",
     "test:e2e": "playwright test",
-    "test:integration:gf1": "node scripts/run-integration-tests.mjs gf1"
+    "test:integration:academic-intervention": "node scripts/run-integration-tests.mjs academic-intervention"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

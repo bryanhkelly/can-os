@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   actions,
@@ -8,20 +8,29 @@ import {
   conferenceNotes,
   conferenceSeries,
   conferenceSlots,
+  enrollments,
   guardianRelationships,
+  programs,
   sites,
   studentProfiles,
 } from "@/db/schema";
 import {
   assertCapability,
   assertSiteScope,
+  AuthorizationError,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent, writeAudit } from "@/platform/mutation";
-import { claimAvailableSlot } from "@/platform/scheduling/booking";
+import {
+  claimAvailableSlot,
+  releaseClaimedSlot,
+} from "@/platform/scheduling/booking";
 import { scheduleReminder } from "@/platform/scheduling/reminders";
 import { materializeSlots } from "@/platform/scheduling/slots";
+import { conferenceWindowProblem } from "./eligibility";
+
+type ConferenceTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function createConferenceSeries(
   context: CommandContext,
@@ -79,12 +88,128 @@ export async function createConferenceSeries(
   });
 }
 
+/**
+ * Guardian-portal preconditions that guard the write: an active enrollment at
+ * the slot's site (and in the series section, when section-scoped) whose
+ * program is within the actor's authorized program ids.
+ */
+export type ConferenceEnrollmentScope = {
+  enrollmentScope?: { programIds: string[] };
+};
+
+async function assertEnrollmentEligibility(
+  tx: ConferenceTx,
+  input: {
+    studentProfileId: string;
+    siteId: string;
+    sectionId: string | null;
+    programIds: string[];
+  },
+): Promise<void> {
+  const [siteEnrollment] = await tx
+    .select({ id: enrollments.id })
+    .from(enrollments)
+    .innerJoin(programs, eq(programs.id, enrollments.programId))
+    .where(
+      and(
+        eq(enrollments.studentProfileId, input.studentProfileId),
+        eq(enrollments.status, "active"),
+        eq(programs.siteId, input.siteId),
+        inArray(programs.id, input.programIds),
+      ),
+    )
+    .limit(1);
+
+  if (!siteEnrollment) {
+    throw new AuthorizationError("child enrollment at selected school");
+  }
+
+  if (input.sectionId) {
+    const [sectionEnrollment] = await tx
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .where(
+        and(
+          eq(enrollments.studentProfileId, input.studentProfileId),
+          eq(enrollments.sectionId, input.sectionId),
+          eq(enrollments.status, "active"),
+          eq(enrollments.kind, "section"),
+          inArray(enrollments.programId, input.programIds),
+        ),
+      )
+      .limit(1);
+
+    if (!sectionEnrollment) {
+      throw new AuthorizationError(
+        "child is not enrolled in the appointment section",
+      );
+    }
+  }
+}
+
+/** Project a booking onto the shared calendar: event + teacher/guardian/student participants. */
+async function createConferenceCalendarEvent(
+  tx: ConferenceTx,
+  input: {
+    bookingId: string;
+    title: string;
+    startsAt: Date;
+    endsAt: Date;
+    timezone: string;
+    siteId: string;
+    teacherPersonId: string;
+    guardianPersonId: string;
+    studentPersonId: string;
+  },
+): Promise<string> {
+  const [event] = await tx
+    .insert(calendarEvents)
+    .values({
+      type: "parent_teacher_conference",
+      title: input.title,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      timezone: input.timezone,
+      siteId: input.siteId,
+      sourceType: "conference_booking",
+      sourceId: input.bookingId,
+      createdByPersonId: input.guardianPersonId,
+    })
+    .returning({ id: calendarEvents.id });
+
+  if (!event) throw new Error("Failed to create Conference calendar event");
+
+  await tx.insert(calendarEventParticipants).values([
+    {
+      calendarEventId: event.id,
+      participantType: "person",
+      participantId: input.teacherPersonId,
+      role: "teacher",
+    },
+    {
+      calendarEventId: event.id,
+      participantType: "person",
+      participantId: input.guardianPersonId,
+      role: "guardian",
+    },
+    {
+      calendarEventId: event.id,
+      participantType: "person",
+      participantId: input.studentPersonId,
+      role: "student",
+    },
+  ]);
+
+  return event.id;
+}
+
 export async function bookConference(
   context: CommandContext,
   input: {
     conferenceSlotId: string;
     studentProfileId: string;
   },
+  options?: ConferenceEnrollmentScope,
 ): Promise<string> {
   assertCapability(context, "conference.book");
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
@@ -98,6 +223,8 @@ export async function bookConference(
         startsAt: conferenceSlots.startsAt,
         endsAt: conferenceSlots.endsAt,
         seriesId: conferenceSeries.id,
+        seriesStatus: conferenceSeries.status,
+        sectionId: conferenceSeries.sectionId,
         teacherPersonId: conferenceSeries.teacherPersonId,
         siteId: conferenceSeries.siteId,
         title: conferenceSeries.title,
@@ -112,6 +239,10 @@ export async function bookConference(
 
     if (!slot) throw new Error("Conference slot not found");
     if (slot.status !== "available") throw new Error("Conference slot is not available");
+    if (conferenceWindowProblem(slot)) {
+      throw new Error("Office-hour slot not available");
+    }
+    assertSiteScope(context, slot.siteId);
 
     const [student] = await tx
       .select({ personId: studentProfiles.personId })
@@ -128,11 +259,21 @@ export async function bookConference(
         and(
           eq(guardianRelationships.guardianPersonId, actorPersonId),
           eq(guardianRelationships.studentPersonId, student.personId),
+          eq(guardianRelationships.canViewAcademics, true),
         ),
       )
       .limit(1);
 
     if (!guardian) throw new Error("Actor is not an authorized guardian");
+
+    if (options?.enrollmentScope) {
+      await assertEnrollmentEligibility(tx, {
+        studentProfileId: input.studentProfileId,
+        siteId: slot.siteId,
+        sectionId: slot.sectionId,
+        programIds: options.enrollmentScope.programIds,
+      });
+    }
 
     const [site] = await tx
       .select({ timezone: sites.timezone })
@@ -154,46 +295,20 @@ export async function bookConference(
 
     if (!booking) throw new Error("Failed to book Conference");
 
-    const [event] = await tx
-      .insert(calendarEvents)
-      .values({
-        type: "parent_teacher_conference",
-        title: slot.title,
-        startsAt: slot.startsAt,
-        endsAt: slot.endsAt,
-        timezone: site.timezone,
-        siteId: slot.siteId,
-        sourceType: "conference_booking",
-        sourceId: booking.id,
-        createdByPersonId: actorPersonId,
-      })
-      .returning({ id: calendarEvents.id });
-
-    if (!event) throw new Error("Failed to create Conference calendar event");
-
-    await tx.insert(calendarEventParticipants).values([
-      {
-        calendarEventId: event.id,
-        participantType: "person",
-        participantId: slot.teacherPersonId,
-        role: "teacher",
-      },
-      {
-        calendarEventId: event.id,
-        participantType: "person",
-        participantId: actorPersonId,
-        role: "guardian",
-      },
-      {
-        calendarEventId: event.id,
-        participantType: "person",
-        participantId: student.personId,
-        role: "student",
-      },
-    ]);
+    const eventId = await createConferenceCalendarEvent(tx, {
+      bookingId: booking.id,
+      title: slot.title,
+      startsAt: slot.startsAt,
+      endsAt: slot.endsAt,
+      timezone: site.timezone,
+      siteId: slot.siteId,
+      teacherPersonId: slot.teacherPersonId,
+      guardianPersonId: actorPersonId,
+      studentPersonId: student.personId,
+    });
 
     await claimAvailableSlot(tx, input.conferenceSlotId, {
-      calendarEventId: event.id,
+      calendarEventId: eventId,
     });
 
     await emitEvent(tx, {
@@ -204,7 +319,7 @@ export async function bookConference(
       payload: {
         studentProfileId: input.studentProfileId,
         slotId: input.conferenceSlotId,
-        calendarEventId: event.id,
+        calendarEventId: eventId,
       },
     });
 
@@ -221,6 +336,206 @@ export async function bookConference(
     });
 
     return booking.id;
+  });
+}
+
+/**
+ * Move a guardian-owned future booking to another slot in the same published
+ * series. Rescheduling is a re-booking, so it requires the same
+ * "conference.book" capability. The calendar projection moves with the
+ * booking: the old slot is released and the new slot claimed with the same
+ * calendar event (created for legacy bookings that predate the projection).
+ */
+export async function rescheduleConferenceBooking(
+  context: CommandContext,
+  input: {
+    bookingId: string;
+    newSlotId: string;
+  },
+  options?: ConferenceEnrollmentScope,
+): Promise<void> {
+  assertCapability(context, "conference.book");
+  if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  const actorPersonId = context.actorPersonId;
+
+  await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({
+        bookingId: conferenceBookings.id,
+        studentProfileId: conferenceBookings.studentProfileId,
+        oldSlotId: conferenceSlots.id,
+        startsAt: conferenceSlots.startsAt,
+        seriesId: conferenceSlots.conferenceSeriesId,
+        seriesStatus: conferenceSeries.status,
+        seriesTitle: conferenceSeries.title,
+        sectionId: conferenceSeries.sectionId,
+        teacherPersonId: conferenceSeries.teacherPersonId,
+        siteId: conferenceSeries.siteId,
+      })
+      .from(conferenceBookings)
+      .innerJoin(
+        conferenceSlots,
+        eq(conferenceSlots.id, conferenceBookings.conferenceSlotId),
+      )
+      .innerJoin(
+        conferenceSeries,
+        eq(conferenceSeries.id, conferenceSlots.conferenceSeriesId),
+      )
+      .where(
+        and(
+          eq(conferenceBookings.id, input.bookingId),
+          eq(conferenceBookings.guardianPersonId, actorPersonId),
+          eq(conferenceBookings.status, "booked"),
+        ),
+      )
+      .for("update")
+      .limit(1);
+
+    if (
+      !current ||
+      conferenceWindowProblem({
+        seriesStatus: current.seriesStatus,
+        startsAt: current.startsAt,
+      })
+    ) {
+      throw new AuthorizationError("future published guardian booking");
+    }
+    assertSiteScope(context, current.siteId);
+
+    const [student] = await tx
+      .select({ personId: studentProfiles.personId })
+      .from(studentProfiles)
+      .where(eq(studentProfiles.id, current.studentProfileId))
+      .limit(1);
+
+    if (!student) throw new Error("StudentProfile not found");
+
+    const [linkedChild] = await tx
+      .select({ id: guardianRelationships.id })
+      .from(guardianRelationships)
+      .where(
+        and(
+          eq(guardianRelationships.guardianPersonId, actorPersonId),
+          eq(guardianRelationships.studentPersonId, student.personId),
+          eq(guardianRelationships.canViewAcademics, true),
+        ),
+      )
+      .limit(1);
+
+    if (!linkedChild) {
+      throw new AuthorizationError("current guardian relationship");
+    }
+
+    if (options?.enrollmentScope) {
+      await assertEnrollmentEligibility(tx, {
+        studentProfileId: current.studentProfileId,
+        siteId: current.siteId,
+        sectionId: current.sectionId,
+        programIds: options.enrollmentScope.programIds,
+      });
+    }
+
+    if (current.oldSlotId === input.newSlotId) return;
+
+    const [nextSlot] = await tx
+      .select({
+        id: conferenceSlots.id,
+        seriesId: conferenceSlots.conferenceSeriesId,
+        startsAt: conferenceSlots.startsAt,
+        endsAt: conferenceSlots.endsAt,
+      })
+      .from(conferenceSlots)
+      .where(eq(conferenceSlots.id, input.newSlotId))
+      .limit(1);
+
+    if (
+      !nextSlot ||
+      nextSlot.seriesId !== current.seriesId ||
+      nextSlot.startsAt <= new Date()
+    ) {
+      throw new Error("Replacement slot is no longer available");
+    }
+
+    const [existingEvent] = await tx
+      .select({ id: calendarEvents.id })
+      .from(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.sourceType, "conference_booking"),
+          eq(calendarEvents.sourceId, current.bookingId),
+        ),
+      )
+      .limit(1);
+
+    let calendarEventId: string;
+    if (existingEvent) {
+      calendarEventId = existingEvent.id;
+      await tx
+        .update(calendarEvents)
+        .set({
+          startsAt: nextSlot.startsAt,
+          endsAt: nextSlot.endsAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(calendarEvents.id, existingEvent.id));
+    } else {
+      const [site] = await tx
+        .select({ timezone: sites.timezone })
+        .from(sites)
+        .where(eq(sites.id, current.siteId))
+        .limit(1);
+
+      if (!site) throw new Error("Site not found");
+
+      calendarEventId = await createConferenceCalendarEvent(tx, {
+        bookingId: current.bookingId,
+        title: current.seriesTitle,
+        startsAt: nextSlot.startsAt,
+        endsAt: nextSlot.endsAt,
+        timezone: site.timezone,
+        siteId: current.siteId,
+        teacherPersonId: current.teacherPersonId,
+        guardianPersonId: actorPersonId,
+        studentPersonId: student.personId,
+      });
+    }
+
+    await claimAvailableSlot(tx, input.newSlotId, { calendarEventId });
+
+    await tx
+      .update(conferenceBookings)
+      .set({ conferenceSlotId: nextSlot.id, updatedAt: new Date() })
+      .where(
+        and(
+          eq(conferenceBookings.id, current.bookingId),
+          eq(conferenceBookings.conferenceSlotId, current.oldSlotId),
+        ),
+      );
+
+    await releaseClaimedSlot(tx, current.oldSlotId);
+
+    await emitEvent(tx, {
+      eventType: EventTypes.ConferenceRescheduled,
+      aggregateType: "conference_booking",
+      aggregateId: current.bookingId,
+      actorPersonId,
+      siteId: current.siteId,
+      payload: {
+        studentProfileId: current.studentProfileId,
+        previousSlotId: current.oldSlotId,
+        slotId: nextSlot.id,
+        calendarEventId,
+      },
+    });
+
+    await writeAudit(tx, context, {
+      action: "conference.reschedule",
+      entityType: "conference_booking",
+      entityId: current.bookingId,
+      scope: { siteId: current.siteId },
+      before: { slotId: current.oldSlotId },
+      after: { slotId: nextSlot.id },
+    });
   });
 }
 

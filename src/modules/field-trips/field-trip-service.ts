@@ -1,8 +1,9 @@
-import { and, eq, gt, isNull, lt } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   calendarEvents,
   consentRecords,
+  enrollments,
   fieldTripAttendance,
   fieldTripChaperones,
   fieldTripIncidents,
@@ -13,89 +14,202 @@ import {
   healthProfiles,
   householdMemberships,
   people,
+  programs,
   sensitiveAccessGrants,
   sites,
   studentProfiles,
 } from "@/db/schema";
 import {
   assertCapability,
+  assertOrganizationScope,
   assertProgramScope,
   assertSiteScope,
+  AuthorizationError,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
+import {
+  publishedTripPermission,
+  tripScheduleIsCurrent,
+  tripScheduleIsProposable,
+} from "./permission-policy";
+
+/**
+ * CommandContext plus optional session attribution. Authenticated server
+ * adapters (requireActor) pass accountId/sessionId/role through so audit rows
+ * keep the same attribution recordAudit produced before the paths converged.
+ */
+export type FieldTripCommandContext = CommandContext & {
+  auditAttribution?: Record<string, unknown>;
+};
 
 export async function proposeFieldTrip(
-  context: CommandContext,
+  context: FieldTripCommandContext,
   input: {
     siteId: string;
-    programId?: string;
+    programId?: string | null;
     title: string;
     destination: string;
     departsAt: Date;
     returnsAt: Date;
-    permissionDueAt?: Date;
+    permissionDueAt?: Date | null;
     feeAmountCents?: number;
+    permissionVersion: string;
+    permissionText: string;
   },
 ): Promise<string> {
   assertCapability(context, "field_trip.propose");
-  assertSiteScope(context, input.siteId);
-  assertProgramScope(context, input.programId);
   if (!context.actorPersonId) throw new Error("Trip proposer is required");
-  if (input.returnsAt <= input.departsAt) {
-    throw new Error("Trip return must be after departure");
+  const actorPersonId = context.actorPersonId;
+
+  const metadata = {
+    permissionVersion: input.permissionVersion,
+    permissionText: input.permissionText,
+  };
+  if (!publishedTripPermission(metadata)) {
+    throw new Error("Provide a valid, versioned school permission statement.");
+  }
+  if (!tripScheduleIsProposable({
+    departsAt: input.departsAt,
+    returnsAt: input.returnsAt,
+    permissionDueAt: input.permissionDueAt ?? null,
+  })) {
+    throw new Error(
+      "Trip dates and permission deadline must be in the future and correctly ordered.",
+    );
   }
 
-  const [trip] = await db
-    .insert(fieldTrips)
-    .values({
-      siteId: input.siteId,
-      programId: input.programId,
-      title: input.title,
-      destination: input.destination,
-      status: "proposed",
-      proposedByPersonId: context.actorPersonId,
-      departsAt: input.departsAt,
-      returnsAt: input.returnsAt,
-      permissionDueAt: input.permissionDueAt,
-      feeAmountCents: input.feeAmountCents,
-    })
-    .returning({ id: fieldTrips.id });
+  return db.transaction(async (tx) => {
+    const [site] = await tx
+      .select({ id: sites.id, organizationId: sites.organizationId })
+      .from(sites)
+      .where(eq(sites.id, input.siteId))
+      .limit(1);
 
-  if (!trip) throw new Error("Failed to propose Field Trip");
-  return trip.id;
+    if (!site) throw new Error("Site not found");
+    assertSiteScope(context, site.id);
+    assertOrganizationScope(context, site.organizationId);
+    assertProgramScope(context, input.programId);
+
+    if (input.programId) {
+      const [program] = await tx
+        .select({ id: programs.id })
+        .from(programs)
+        .where(
+          and(
+            eq(programs.id, input.programId),
+            eq(programs.siteId, site.id),
+            eq(programs.organizationId, site.organizationId),
+          ),
+        )
+        .limit(1);
+      if (!program) {
+        throw new AuthorizationError("trip program belongs to chosen school");
+      }
+    }
+
+    const [trip] = await tx
+      .insert(fieldTrips)
+      .values({
+        siteId: site.id,
+        programId: input.programId ?? null,
+        title: input.title,
+        destination: input.destination,
+        status: "proposed",
+        proposedByPersonId: actorPersonId,
+        departsAt: input.departsAt,
+        returnsAt: input.returnsAt,
+        permissionDueAt: input.permissionDueAt ?? null,
+        feeAmountCents: input.feeAmountCents,
+        metadata,
+      })
+      .returning({ id: fieldTrips.id });
+
+    if (!trip) throw new Error("Failed to propose Field Trip");
+
+    await writeAudit(tx, context, {
+      action: "field_trip.propose",
+      entityType: "field_trip",
+      entityId: trip.id,
+      scope: {
+        siteId: site.id,
+        programId: input.programId ?? null,
+      },
+      after: { status: "proposed", permissionVersion: input.permissionVersion },
+      contextExtras: context.auditAttribution,
+    });
+
+    await emitEvent(tx, {
+      eventType: EventTypes.FieldTripProposed,
+      aggregateType: "field_trip",
+      aggregateId: trip.id,
+      actorPersonId,
+      payload: {
+        siteId: site.id,
+        programId: input.programId ?? null,
+      },
+    });
+
+    return trip.id;
+  });
 }
 
 export async function approveFieldTrip(
-  context: CommandContext,
+  context: FieldTripCommandContext,
   fieldTripId: string,
 ): Promise<string> {
   assertCapability(context, "field_trip.approve");
   if (!context.actorPersonId) throw new Error("Approver identity is required");
+  const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
     const [trip] = await tx
-      .select()
+      .select({
+        id: fieldTrips.id,
+        status: fieldTrips.status,
+        title: fieldTrips.title,
+        destination: fieldTrips.destination,
+        departsAt: fieldTrips.departsAt,
+        returnsAt: fieldTrips.returnsAt,
+        permissionDueAt: fieldTrips.permissionDueAt,
+        metadata: fieldTrips.metadata,
+        siteId: fieldTrips.siteId,
+        programId: fieldTrips.programId,
+        calendarEventId: fieldTrips.calendarEventId,
+        organizationId: sites.organizationId,
+        timezone: sites.timezone,
+      })
       .from(fieldTrips)
+      .innerJoin(sites, eq(sites.id, fieldTrips.siteId))
       .where(eq(fieldTrips.id, fieldTripId))
+      .for("update")
       .limit(1);
 
     if (!trip) throw new Error("Field Trip not found");
     assertSiteScope(context, trip.siteId);
+    assertOrganizationScope(context, trip.organizationId);
     assertProgramScope(context, trip.programId);
 
-    if (trip.status === "approved" && trip.calendarEventId) {
+    if (trip.status === "approved") {
+      if (!trip.calendarEventId) {
+        throw new Error("Approved trip is missing its canonical calendar event.");
+      }
       return trip.calendarEventId;
     }
 
-    const [site] = await tx
-      .select({ timezone: sites.timezone })
-      .from(sites)
-      .where(eq(sites.id, trip.siteId))
-      .limit(1);
-
-    if (!site) throw new Error("Site not found");
+    if (trip.status !== "proposed" || trip.calendarEventId) {
+      throw new Error("Trip is not eligible for approval.");
+    }
+    if (!publishedTripPermission(trip.metadata)) {
+      throw new Error("The trip needs a versioned guardian permission statement.");
+    }
+    if (!tripScheduleIsCurrent({
+      departsAt: trip.departsAt,
+      permissionDueAt: trip.permissionDueAt,
+    })) {
+      throw new Error("This trip's dates or permission deadline have passed.");
+    }
 
     const [event] = await tx
       .insert(calendarEvents)
@@ -105,12 +219,13 @@ export async function approveFieldTrip(
         description: trip.destination,
         startsAt: trip.departsAt,
         endsAt: trip.returnsAt,
-        timezone: site.timezone,
+        timezone: trip.timezone,
+        organizationId: trip.organizationId,
         siteId: trip.siteId,
         programId: trip.programId,
         sourceType: "field_trip",
         sourceId: trip.id,
-        createdByPersonId: context.actorPersonId,
+        createdByPersonId: actorPersonId,
       })
       .returning({ id: calendarEvents.id });
 
@@ -121,7 +236,7 @@ export async function approveFieldTrip(
       .update(fieldTrips)
       .set({
         status: "approved",
-        approvedByPersonId: context.actorPersonId,
+        approvedByPersonId: actorPersonId,
         approvedAt,
         calendarEventId: event.id,
         updatedAt: approvedAt,
@@ -132,7 +247,7 @@ export async function approveFieldTrip(
       eventType: EventTypes.FieldTripApproved,
       aggregateType: "field_trip",
       aggregateId: fieldTripId,
-      actorPersonId: context.actorPersonId,
+      actorPersonId,
       payload: {
         siteId: trip.siteId,
         calendarEventId: event.id,
@@ -149,6 +264,7 @@ export async function approveFieldTrip(
       },
       before: { status: trip.status },
       after: { status: "approved", calendarEventId: event.id },
+      contextExtras: context.auditAttribution,
     });
 
     return event.id;
@@ -156,32 +272,170 @@ export async function approveFieldTrip(
 }
 
 export async function addFieldTripParticipant(
-  context: CommandContext,
+  context: FieldTripCommandContext,
   input: {
     fieldTripId: string;
     studentProfileId: string;
-    householdId: string;
+    householdId?: string;
   },
-): Promise<string> {
+): Promise<{ participantId: string; alreadyInvited: boolean }> {
   assertCapability(context, "field_trip.roster.manage");
 
   return db.transaction(async (tx) => {
     const [trip] = await tx
-      .select()
+      .select({
+        id: fieldTrips.id,
+        status: fieldTrips.status,
+        title: fieldTrips.title,
+        siteId: fieldTrips.siteId,
+        programId: fieldTrips.programId,
+        organizationId: sites.organizationId,
+        permissionDueAt: fieldTrips.permissionDueAt,
+        departsAt: fieldTrips.departsAt,
+        metadata: fieldTrips.metadata,
+        calendarEventId: fieldTrips.calendarEventId,
+        feeAmountCents: fieldTrips.feeAmountCents,
+      })
       .from(fieldTrips)
+      .innerJoin(sites, eq(sites.id, fieldTrips.siteId))
       .where(eq(fieldTrips.id, input.fieldTripId))
+      .for("update")
       .limit(1);
 
     if (!trip) throw new Error("Field Trip not found");
     assertSiteScope(context, trip.siteId);
+    assertOrganizationScope(context, trip.organizationId);
     assertProgramScope(context, trip.programId);
+
+    if (
+      trip.status !== "approved" ||
+      !trip.calendarEventId ||
+      !publishedTripPermission(trip.metadata) ||
+      !tripScheduleIsCurrent({
+        departsAt: trip.departsAt,
+        permissionDueAt: trip.permissionDueAt,
+      })
+    ) {
+      throw new Error("Trip is not open to invitations.");
+    }
+
+    const [student] = await tx
+      .select({ personId: studentProfiles.personId })
+      .from(studentProfiles)
+      .where(eq(studentProfiles.id, input.studentProfileId))
+      .limit(1);
+
+    if (!student) throw new AuthorizationError("student profile");
+
+    const [enrolled] = await tx
+      .select({ id: enrollments.id })
+      .from(enrollments)
+      .innerJoin(programs, eq(programs.id, enrollments.programId))
+      .where(
+        and(
+          eq(enrollments.studentProfileId, input.studentProfileId),
+          eq(enrollments.kind, "program"),
+          eq(enrollments.status, "active"),
+          eq(programs.siteId, trip.siteId),
+          context.scope.programIds
+            ? inArray(programs.id, context.scope.programIds)
+            : undefined,
+          trip.programId
+            ? eq(enrollments.programId, trip.programId)
+            : undefined,
+        ),
+      )
+      .limit(1);
+
+    if (!enrolled) throw new AuthorizationError("active student enrollment");
+
+    const guardians = await tx
+      .select({ personId: guardianRelationships.guardianPersonId })
+      .from(guardianRelationships)
+      .where(
+        and(
+          eq(guardianRelationships.studentPersonId, student.personId),
+          eq(guardianRelationships.canManageEnrollment, true),
+        ),
+      );
+
+    if (!guardians.length) {
+      throw new Error("Student needs an enrollment-authorized guardian.");
+    }
+
+    const [existing] = await tx
+      .select({ id: fieldTripParticipants.id })
+      .from(fieldTripParticipants)
+      .where(
+        and(
+          eq(fieldTripParticipants.fieldTripId, trip.id),
+          eq(fieldTripParticipants.studentProfileId, input.studentProfileId),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      return { participantId: existing.id, alreadyInvited: true };
+    }
 
     let obligationId: string | undefined;
     if (trip.feeAmountCents && trip.feeAmountCents > 0) {
+      const guardianIds = guardians.map((guardian) => guardian.personId);
+      let householdId: string | undefined = input.householdId;
+      if (householdId) {
+        // A caller-supplied household must be verifiably shared by the
+        // student and an enrollment-authorized guardian.
+        const [studentMember] = await tx
+          .select({ id: householdMemberships.id })
+          .from(householdMemberships)
+          .where(
+            and(
+              eq(householdMemberships.householdId, householdId),
+              eq(householdMemberships.personId, student.personId),
+            ),
+          )
+          .limit(1);
+        const [guardianMember] = await tx
+          .select({ id: householdMemberships.id })
+          .from(householdMemberships)
+          .where(
+            and(
+              eq(householdMemberships.householdId, householdId),
+              inArray(householdMemberships.personId, guardianIds),
+            ),
+          )
+          .limit(1);
+        if (!studentMember || !guardianMember) {
+          throw new Error(
+            "Trip fee household must be shared by the student and an authorized guardian.",
+          );
+        }
+      } else {
+        const studentHouseholds = await tx
+          .select({ householdId: householdMemberships.householdId })
+          .from(householdMemberships)
+          .where(eq(householdMemberships.personId, student.personId));
+        const guardianHouseholds = await tx
+          .select({ householdId: householdMemberships.householdId })
+          .from(householdMemberships)
+          .where(inArray(householdMemberships.personId, guardianIds));
+        const eligible = [
+          ...new Set(studentHouseholds.map((row) => row.householdId)),
+        ].filter((id) =>
+          guardianHouseholds.some((row) => row.householdId === id),
+        );
+        householdId = eligible.length === 1 ? eligible[0] : undefined;
+        if (!householdId) {
+          throw new Error(
+            "Trip fee requires exactly one verified shared student/guardian household for billing.",
+          );
+        }
+      }
+
       const [obligation] = await tx
         .insert(financialObligations)
         .values({
-          householdId: input.householdId,
+          householdId,
           subjectType: "field_trip",
           subjectId: trip.id,
           type: "field_trip_fee",
@@ -207,7 +461,49 @@ export async function addFieldTripParticipant(
       .returning({ id: fieldTripParticipants.id });
 
     if (!participant) throw new Error("Failed to add Field Trip participant");
-    return participant.id;
+
+    await notifyMany(
+      tx,
+      [...new Set(guardians.map((guardian) => guardian.personId))].map(
+        (recipientPersonId) => ({
+          recipientPersonId,
+          type: "field_trip_permission_requested",
+          title: "Field trip permission needed",
+          body: "Review permission for " + trip.title + ".",
+          resourceType: "field_trip",
+          resourceId: trip.id,
+        }),
+      ),
+    );
+
+    await writeAudit(tx, context, {
+      action: "field_trip.student.invite",
+      entityType: "field_trip_participant",
+      entityId: participant.id,
+      scope: {
+        siteId: trip.siteId,
+        programId: trip.programId,
+      },
+      after: {
+        status: "invited",
+        studentProfileId: input.studentProfileId,
+        financialObligationId: obligationId ?? null,
+      },
+      contextExtras: context.auditAttribution,
+    });
+
+    await emitEvent(tx, {
+      eventType: EventTypes.FieldTripStudentInvited,
+      aggregateType: "field_trip_participant",
+      aggregateId: participant.id,
+      actorPersonId: context.actorPersonId,
+      payload: {
+        fieldTripId: trip.id,
+        studentProfileId: input.studentProfileId,
+      },
+    });
+
+    return { participantId: participant.id, alreadyInvited: false };
   });
 }
 

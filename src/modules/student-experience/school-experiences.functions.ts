@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, asc, inArray, isNull, ne, notExists, gte, or } from "drizzle-orm";
 import { z } from "zod";
-import { actorSiteIds, assertSiteGranted, recordAudit, requireActor } from "@/modules/identity/actors.server";
+import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
 
 
@@ -39,31 +39,15 @@ export const bookOfficeHour=createServerFn({method:"POST"})
   .validator((value:unknown)=>z.object({slotId:z.string().uuid(),studentPersonId:z.string().uuid()}).parse(value))
   .handler(async({data})=>{
     const actor=await requireActor(["guardian"]);
-   const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-    return db.transaction(async tx=>{
-      const [slotSite]=await tx.select({siteId:schema.conferenceSeries.siteId,seriesStatus:schema.conferenceSeries.status,sectionId:schema.conferenceSeries.sectionId,startsAt:schema.conferenceSlots.startsAt}).from(schema.conferenceSlots)
-        .innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
-        .where(eq(schema.conferenceSlots.id,data.slotId)).limit(1);
-      if(!slotSite||slotSite.seriesStatus!=="published"||slotSite.startsAt<=new Date()) throw new Error("Office-hour slot not available");
-      assertSiteGranted(actor,slotSite.siteId);
-      const [child]=await tx.select({studentProfileId:schema.studentProfiles.id}).from(schema.guardianRelationships)
-        .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.personId,schema.guardianRelationships.studentPersonId))
-        .where(and(eq(schema.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(schema.guardianRelationships.canViewAcademics,true),eq(schema.guardianRelationships.studentPersonId,data.studentPersonId))).limit(1);
-      if(!child) throw new AuthorizationError("guardian relationship");
-      const [siteEnrollment]=await tx.select({id:schema.enrollments.id}).from(schema.enrollments)
-        .innerJoin(schema.programs,eq(schema.programs.id,schema.enrollments.programId))
-        .where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.status,"active"),eq(schema.programs.siteId,slotSite.siteId),inArray(schema.programs.id,actor.scope.programIds??[]))).limit(1);
-      if(!siteEnrollment)throw new AuthorizationError("child enrollment at selected school");
-      if(slotSite.sectionId){
-        const [sectionEnrollment]=await tx.select({id:schema.enrollments.id}).from(schema.enrollments).where(and(eq(schema.enrollments.studentProfileId,child.studentProfileId),eq(schema.enrollments.sectionId,slotSite.sectionId),eq(schema.enrollments.status,"active"),eq(schema.enrollments.kind,"section"),inArray(schema.enrollments.programId,actor.scope.programIds??[]))).limit(1);
-        if(!sectionEnrollment)throw new AuthorizationError("child is not enrolled in the appointment section");
-      }
-      const [slot]=await tx.update(schema.conferenceSlots).set({status:"booked",updatedAt:new Date()}).where(and(eq(schema.conferenceSlots.id,data.slotId),eq(schema.conferenceSlots.status,"available"))).returning({id:schema.conferenceSlots.id});
-      if(!slot) throw new Error("Office-hour slot already taken");
-      const [booking]=await tx.insert(schema.conferenceBookings).values({conferenceSlotId:slot.id,studentProfileId:child.studentProfileId,guardianPersonId:actor.actorPersonId,status:"booked"}).returning({id:schema.conferenceBookings.id});
-      await recordAudit(tx,actor,{action:"conference.book",resourceType:"conference_booking",resourceId:booking!.id,after:{slotId:slot.id,studentProfileId:child.studentProfileId},scope:{siteId:slotSite.siteId}});
-      return {bookingId:booking!.id};
-    });
+    const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+    // Pure read: translate the selected student person into the guardian-linked profile.
+    const [child]=await db.select({studentProfileId:schema.studentProfiles.id}).from(schema.guardianRelationships)
+      .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.personId,schema.guardianRelationships.studentPersonId))
+      .where(and(eq(schema.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(schema.guardianRelationships.canViewAcademics,true),eq(schema.guardianRelationships.studentPersonId,data.studentPersonId))).limit(1);
+    if(!child) throw new AuthorizationError("guardian relationship");
+    const {bookConference}=await import("@/modules/conferences/conference-service");
+    const bookingId=await bookConference(actor,{conferenceSlotId:data.slotId,studentProfileId:child.studentProfileId},{enrollmentScope:{programIds:actor.scope.programIds??[]}});
+    return {bookingId};
   });
 
 
@@ -72,60 +56,7 @@ export const rescheduleOfficeHour=createServerFn({method:"POST"})
  .validator((value:unknown)=>z.object({bookingId:z.string().uuid(),newSlotId:z.string().uuid()}).parse(value))
  .handler(async({data})=>{
   const actor=await requireActor(["guardian"]);
-  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
-  return db.transaction(async tx=>{
-   const [current]=await tx.select({
-    id:s.conferenceBookings.id,oldSlotId:s.conferenceSlots.id,
-    seriesId:s.conferenceSlots.conferenceSeriesId,startsAt:s.conferenceSlots.startsAt,
-    siteId:s.conferenceSeries.siteId,sectionId:s.conferenceSeries.sectionId,
-    seriesStatus:s.conferenceSeries.status,studentProfileId:s.conferenceBookings.studentProfileId,
-   }).from(s.conferenceBookings)
-    .innerJoin(s.conferenceSlots,eq(s.conferenceSlots.id,s.conferenceBookings.conferenceSlotId))
-    .innerJoin(s.conferenceSeries,eq(s.conferenceSeries.id,s.conferenceSlots.conferenceSeriesId))
-    .where(and(eq(s.conferenceBookings.id,data.bookingId),
-      eq(s.conferenceBookings.guardianPersonId,actor.actorPersonId),
-      eq(s.conferenceBookings.status,"booked"))).for("update").limit(1);
-   if(!current||current.startsAt<=new Date()||current.seriesStatus!=="published")
-    throw new AuthorizationError("future published guardian booking");
-   assertSiteGranted(actor,current.siteId);
-   const [linkedChild]=await tx.select({id:s.studentProfiles.id})
-    .from(s.studentProfiles)
-    .innerJoin(s.guardianRelationships,eq(s.guardianRelationships.studentPersonId,s.studentProfiles.personId))
-    .where(and(eq(s.studentProfiles.id,current.studentProfileId),
-     eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),
-     eq(s.guardianRelationships.canViewAcademics,true))).limit(1);
-   if(!linkedChild)throw new AuthorizationError("current guardian relationship");
-   const [activeProgram]=await tx.select({id:s.enrollments.id})
-    .from(s.enrollments).innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
-    .where(and(eq(s.enrollments.studentProfileId,current.studentProfileId),
-      eq(s.enrollments.status,"active"),eq(s.programs.siteId,current.siteId),
-      inArray(s.programs.id,actor.scope.programIds??[]))).limit(1);
-   if(!activeProgram)throw new AuthorizationError("current school enrollment");
-   if(current.sectionId){
-    const [section]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
-     .where(and(eq(s.enrollments.studentProfileId,current.studentProfileId),
-      eq(s.enrollments.sectionId,current.sectionId),eq(s.enrollments.kind,"section"),
-      eq(s.enrollments.status,"active"),
-      inArray(s.enrollments.programId,actor.scope.programIds??[]))).limit(1);
-    if(!section)throw new AuthorizationError("current class enrollment");
-   }
-   if(current.oldSlotId===data.newSlotId)return {saved:true};
-   const [next]=await tx.update(s.conferenceSlots)
-    .set({status:"booked",updatedAt:new Date()})
-    .where(and(eq(s.conferenceSlots.id,data.newSlotId),
-      eq(s.conferenceSlots.conferenceSeriesId,current.seriesId),
-      eq(s.conferenceSlots.status,"available"),gte(s.conferenceSlots.startsAt,new Date())))
-    .returning({id:s.conferenceSlots.id});
-   if(!next)throw new Error("Replacement slot is no longer available");
-   await tx.update(s.conferenceBookings)
-    .set({conferenceSlotId:next.id,updatedAt:new Date()})
-    .where(and(eq(s.conferenceBookings.id,current.id),
-      eq(s.conferenceBookings.conferenceSlotId,current.oldSlotId)));
-   await tx.update(s.conferenceSlots).set({status:"available",updatedAt:new Date()})
-    .where(eq(s.conferenceSlots.id,current.oldSlotId));
-   await recordAudit(tx,actor,{action:"conference.reschedule",
-    resourceType:"conference_booking",resourceId:current.id,
-    before:{slotId:current.oldSlotId},after:{slotId:next.id},scope:{siteId:current.siteId}});
-   return {saved:true};
-  });
+  const {rescheduleConferenceBooking}=await import("@/modules/conferences/conference-service");
+  await rescheduleConferenceBooking(actor,{bookingId:data.bookingId,newSlotId:data.newSlotId},{enrollmentScope:{programIds:actor.scope.programIds??[]}});
+  return {saved:true};
  });

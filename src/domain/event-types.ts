@@ -38,12 +38,20 @@ export const EventTypes = {
   MedicationAdministered: "MedicationAdministered",
   StudentSentHomeIll: "StudentSentHomeIll",
   ReturnToSchoolCleared: "ReturnToSchoolCleared",
+  FieldTripProposed: "FieldTripProposed",
   FieldTripApproved: "FieldTripApproved",
+  FieldTripStudentInvited: "FieldTripStudentInvited",
   FieldTripPermissionSigned: "FieldTripPermissionSigned",
   FieldTripAttendanceRecorded: "FieldTripAttendanceRecorded",
   ActivityEligibilityChecked: "ActivityEligibilityChecked",
   ConferenceBooked: "ConferenceBooked",
+  ConferenceRescheduled: "ConferenceRescheduled",
   ConferenceHeld: "ConferenceHeld",
+  InstructionalCapacityReserved: "InstructionalCapacityReserved",
+  InstructionalCapacityReleased: "InstructionalCapacityReleased",
+  InstructorCapacityReplaced: "InstructorCapacityReplaced",
+  DeliveryArrangementCreated: "DeliveryArrangementCreated",
+  DeliveryArrangementActivated: "DeliveryArrangementActivated",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

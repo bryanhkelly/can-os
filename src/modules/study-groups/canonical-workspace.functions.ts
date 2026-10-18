@@ -235,13 +235,20 @@ export const listCanonicalGuardianGroupConsents = createServerFn({ method: "GET"
   }).from(s.studyGroupMemberships).where(and(
     inArray(s.studyGroupMemberships.groupId, filtered.map(r => r.groupId)),
     inArray(s.studyGroupMemberships.personId, [...studentIds])));
-  return filtered.filter(row => memberships.some(m =>
-    m.groupId === row.groupId && m.personId === row.metadata.studentPersonId &&
-    m.status === "pending" && (!row.metadata.membershipId || row.metadata.membershipId === m.id)))
-    .map(row => ({
+  return filtered.flatMap(row => {
+    const pending = memberships.some(m =>
+      m.groupId === row.groupId && m.personId === row.metadata.studentPersonId &&
+      m.status === "pending" && (!row.metadata.membershipId || row.metadata.membershipId === m.id));
+    // Legacy actions carry no membershipId: surface them as obsolete when the
+    // student's pending membership no longer exists instead of hiding them.
+    const obsolete = !pending && !row.metadata.membershipId && row.status === "open";
+    if (!pending && !obsolete) return [];
+    return [{
       id: row.id, status: row.status, groupTitle: row.groupTitle,
       studentPersonId: String(row.metadata.studentPersonId),
       decision: row.metadata.decision === "approve" ? "approve" :
         row.metadata.decision === "decline" ? "decline" : null,
-    }));
+      obsolete,
+    }];
+  });
 });

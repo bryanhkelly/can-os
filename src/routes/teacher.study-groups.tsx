@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
-import {getStudyGroupAvailability,listFacilitatorGroupScopes,createStudyGroup,listStudyGroupReviewQueue,listStudyGroupReports,decideStudyGroupMembership,resolveStudyGroupReport,scheduleStudyGroupSession,reviseStudyGroupSession,listStudyGroupAttendance,recordStudyGroupAttendance} from "@/modules/study-groups/study-groups.functions";
+import {getStudyGroupAvailability,listFacilitatorGroupScopes,createStudyGroup,listStudyGroupReviewQueue,listStudyGroupReports,resolveStudyGroupReport,scheduleStudyGroupSession,reviseStudyGroupSession,listStudyGroupAttendance,recordStudyGroupAttendance} from "@/modules/study-groups/study-groups.functions";
+import {decideCanonicalGroupMembership} from "@/modules/study-groups/canonical-membership.functions";
 
 import {getFacilitatorStudyGroups} from "@/modules/study-groups/facilitator-query.functions";
 import {safeLoader} from "@/lib/safe-loader";
@@ -42,8 +43,8 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
   {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}
   <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Membership requests</h2>
    {queue.map(m=><div className="flex items-center justify-between gap-3 border-b py-3" key={m.groupId+m.personId}><span>{m.personName} · {m.groupTitle}</span><div className="flex gap-2">
-    <button disabled={busy||!membershipEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>decideStudyGroupMembership({data:{groupId:m.groupId,personId:m.personId,approve:true}}))}>Approve</button>
-    <button disabled={busy||!membershipEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>decideStudyGroupMembership({data:{groupId:m.groupId,personId:m.personId,approve:false}}))}>Decline</button>
+    <button disabled={busy||!membershipEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>decideCanonicalGroupMembership({data:{groupId:m.groupId,studentPersonId:m.personId,approve:true}}))}>Approve</button>
+    <button disabled={busy||!membershipEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>decideCanonicalGroupMembership({data:{groupId:m.groupId,studentPersonId:m.personId,approve:false}}))}>Decline</button>
    </div></div>)}{queue.length===0&&<p>No pending membership requests.</p>}
   </section>
   <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Content moderation</h2>

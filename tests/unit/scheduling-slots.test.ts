@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { conferenceSlots } from "@/db/schema";
 import {
   claimAvailableSlot,
+  releaseClaimedSlot,
   type BookingTx,
   type UpdateChain,
 } from "@/platform/scheduling/booking";
@@ -113,5 +114,19 @@ describe("claimAvailableSlot", () => {
     await expect(
       claimAvailableSlot(tx, "slot-1", { calendarEventId: "event-1" }),
     ).rejects.toThrow("not available");
+  });
+});
+
+describe("releaseClaimedSlot", () => {
+  it("returns the slot to available and detaches the calendar event", async () => {
+    const { tx, calls } = makeFakeUpdateTx([]);
+    await releaseClaimedSlot(tx, "slot-1");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.table).toBe(conferenceSlots);
+    expect(calls[0]!.set).toMatchObject({
+      status: "available",
+      calendarEventId: null,
+    });
+    expect((calls[0]!.set as { updatedAt: unknown }).updatedAt).toBeInstanceOf(Date);
   });
 });

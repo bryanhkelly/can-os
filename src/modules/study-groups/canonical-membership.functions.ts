@@ -166,6 +166,23 @@ export const decideCanonicalGroupConsent = createServerFn({ method: "POST" })
         .where(and(eq(s.studyGroupMemberships.groupId, group.id),
           eq(s.studyGroupMemberships.personId, studentPersonId),
           eq(s.studyGroupMemberships.status, "pending"))).limit(1);
+      // Legacy consent actions carry no membershipId: they cover the student's
+      // current pending membership for the group, and become obsolete once the
+      // student withdrew or the membership was otherwise decided.
+      if (!member && !membershipId) {
+        await tx.update(s.actions).set({
+          status: "cancelled", resolvedAt: new Date(),
+          resolutionNote: "Membership request is no longer pending",
+          metadata: { ...action.metadata, decision: "obsolete" }, updatedAt: new Date(),
+        }).where(eq(s.actions.id, action.id));
+        await recordAudit(tx, actor, {
+          action: "study_group.guardian.consent_obsolete", resourceType: "action",
+          resourceId: action.id,
+          scope: { siteId: group.siteId, programId: group.programId },
+          before: { status: action.status }, after: { status: "cancelled", reason: "obsolete" },
+        });
+        return { saved: true, obsolete: true };
+      }
       if (!member || (membershipId && membershipId !== member.id))
         throw new AuthorizationError("pending student membership");
       await eligibleStudent(tx, studentPersonId, group, actor.scope.programIds ?? []);

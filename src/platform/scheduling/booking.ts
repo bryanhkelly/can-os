@@ -58,3 +58,23 @@ export async function claimAvailableSlot(
   }
   return id;
 }
+
+/**
+ * Release a previously claimed conference slot (booked -> available) and
+ * detach its calendar event link. The caller must hold the booking row lock
+ * (or otherwise own the claim) so the release commits atomically with the
+ * booking mutation that frees it.
+ */
+export async function releaseClaimedSlot(
+  tx: BookingTx,
+  slotId: string,
+): Promise<void> {
+  await tx
+    .update(conferenceSlots)
+    .set({
+      status: "available",
+      calendarEventId: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(conferenceSlots.id, slotId));
+}

@@ -209,11 +209,11 @@ export const gradeSubmission = createServerFn({ method: "POST" })
   }
   if (finalScore === undefined) throw new Error("Enter a numeric score.");
   if (finalScore < 0 || finalScore > points) throw new Error(`Score must be from 0 to ${points}`);
-  const gf1 = await import("./missing-work-service");
+  const missingWork = await import("./missing-work-service");
   // Teacher-of-section relationship and site scope are verified above; grant the
   // domain capability so the shared grading path runs its transaction with the
   // immutable audit event and GradePosted domain event.
-  await gf1.gradeSubmission(
+  await missingWork.gradeSubmission(
    { ...context, capabilities: new Set([...context.capabilities, "submission.grade"]) },
    data.submissionId,
    { score: String(finalScore), feedback },

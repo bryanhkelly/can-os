@@ -35,3 +35,31 @@ export function permissionCanBeSigned(input: {
     input.departsAt.getTime() > now.getTime() &&
     (!input.permissionDueAt || input.permissionDueAt.getTime() >= now.getTime());
 }
+
+/** A proposal must describe a future, correctly ordered trip and deadline. */
+export function tripScheduleIsProposable(input: {
+  departsAt: Date;
+  returnsAt: Date;
+  permissionDueAt?: Date | null;
+}, now = new Date()): boolean {
+  if (input.returnsAt.getTime() <= input.departsAt.getTime()) return false;
+  if (input.departsAt.getTime() <= now.getTime()) return false;
+  if (input.permissionDueAt &&
+    (input.permissionDueAt.getTime() > input.departsAt.getTime() ||
+      input.permissionDueAt.getTime() <= now.getTime())) {
+    return false;
+  }
+  return true;
+}
+
+/** Approval and invitations close once the trip or its deadline has passed. */
+export function tripScheduleIsCurrent(input: {
+  departsAt: Date;
+  permissionDueAt?: Date | null;
+}, now = new Date()): boolean {
+  if (input.departsAt.getTime() <= now.getTime()) return false;
+  if (input.permissionDueAt && input.permissionDueAt.getTime() <= now.getTime()) {
+    return false;
+  }
+  return true;
+}

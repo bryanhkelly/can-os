@@ -15,10 +15,10 @@ import {
   sectionTeachers,
   scheduleTemplatePeriods,
   roleAssignments,
-  auditEvents,
-  domainEvents,
   notifications,
 } from "@/db/schema";
+import { EventTypes } from "@/domain/event-types";
+import { emitEvent, writeAudit } from "@/platform/mutation";
 import {
   assertCapability,
   assertProgramScope,
@@ -482,6 +482,12 @@ export async function reserveInstructionalCapacity(
       await lockSectionStaffingSite(tx, context, demand.sectionId);
     if (demand.demandStatus !== "open") throw new Error("Section capacity demand is not open");
 
+    // Lock order: advisory capacity-demand → advisory capacity → row locks.
+    // The demand lock serializes allocations across offerings; the offering
+    // lock serializes seat claims so two schools cannot both claim the last seats.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`capacity-demand:${demand.demandId}`}))`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`capacity:${input.offeringId}`}))`);
+
     const [offering] = await tx
       .select({
         id: instructionalCapacityOfferings.id,
@@ -530,12 +536,6 @@ export async function reserveInstructionalCapacity(
       throw new Error("Reserved seats must be a positive integer no greater than section demand");
     }
 
-    // Serialize reservations for one offering so two schools cannot both claim
-    // the same last seats.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`capacity:${offering.id}`}))`);
-
-    // The demand row is the serialization point for allocations from different offerings.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`capacity-demand:${demand.demandId}`}))`);
     const existingRows = await tx
       .select({
         id: instructionalCapacityReservations.id,
@@ -600,6 +600,19 @@ export async function reserveInstructionalCapacity(
     if (!reservation) throw new Error("Unable to reserve instructional capacity");
 
     if ((input.status ?? "held") === "committed") {
+      const [role] = await tx
+        .select({ id: roleAssignments.id })
+        .from(roleAssignments)
+        .where(and(
+          eq(roleAssignments.personId, offering.personId),
+          eq(roleAssignments.roleKey, "teacher"),
+          inArray(roleAssignments.organizationId, [
+            demand.organizationId,
+            ...(offering.organizationId ? [offering.organizationId] : []),
+          ]),
+        ))
+        .limit(1);
+      if (!role) throw new Error("Instructor has no active teaching authorization");
       await tx
         .insert(sectionTeachers)
         .values({
@@ -612,6 +625,42 @@ export async function reserveInstructionalCapacity(
           target: [sectionTeachers.sectionId, sectionTeachers.personId],
         });
     }
+
+    await emitEvent(tx, {
+      eventType: EventTypes.InstructionalCapacityReserved,
+      aggregateType: "capacity_reservation",
+      aggregateId: reservation.id,
+      actorPersonId: context.actorPersonId,
+      organizationId: demand.organizationId,
+      siteId: demand.siteId,
+      programId: demand.programId,
+      sectionId: demand.sectionId,
+      payload: {
+        offeringId: offering.id,
+        demandId: demand.demandId,
+        seats,
+        status: input.status ?? "held",
+        instructorPersonId: offering.personId,
+      },
+    });
+    await writeAudit(tx, context, {
+      action: "capacity.reservation.created",
+      entityType: "capacity_reservation",
+      entityId: reservation.id,
+      scope: {
+        programId: demand.programId,
+        siteId: demand.siteId,
+        organizationId: demand.organizationId,
+      },
+      after: {
+        offeringId: offering.id,
+        demandId: demand.demandId,
+        sectionId: demand.sectionId,
+        seats,
+        status: input.status ?? "held",
+        instructorPersonId: offering.personId,
+      },
+    });
 
     return {
       reservationId: reservation.id,
@@ -660,6 +709,33 @@ export async function releaseInstructionalCapacity(
           eq(sectionTeachers.assignmentSource,"capacity")));
       }
     }
+    await emitEvent(tx, {
+      eventType: EventTypes.InstructionalCapacityReleased,
+      aggregateType: "capacity_reservation",
+      aggregateId: reservation.id,
+      actorPersonId: context.actorPersonId,
+      organizationId: demand.organizationId,
+      siteId: demand.siteId,
+      programId: demand.programId,
+      sectionId: reservation.sectionId,
+      payload: {
+        offeringId: reservation.offeringId,
+        demandId: reservation.demandId,
+        instructorPersonId: reservation.personId,
+      },
+    });
+    await writeAudit(tx, context, {
+      action: "capacity.reservation.released",
+      entityType: "capacity_reservation",
+      entityId: reservation.id,
+      scope: {
+        programId: demand.programId,
+        siteId: demand.siteId,
+        organizationId: demand.organizationId,
+      },
+      before: { status: reservation.status },
+      after: { status: "released" },
+    });
   });
 }
 
@@ -746,10 +822,14 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
   return db.transaction(async tx=>{
     const [lookup] = await tx.select({
       sectionId: instructionalCapacityReservations.sectionId,
+      demandId: instructionalCapacityReservations.demandId,
     }).from(instructionalCapacityReservations)
       .where(eq(instructionalCapacityReservations.id, input.reservationId)).limit(1);
     if (!lookup) throw new Error("Capacity reservation not found");
     await lockSectionStaffingSite(tx, context, lookup.sectionId);
+    // Lock order: advisory capacity-demand → advisory capacity → row locks.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`capacity-demand:${lookup.demandId}`}))`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`capacity:${input.replacementOfferingId}`}))`);
     const [old]=await tx.select({
       id:instructionalCapacityReservations.id,demandId:instructionalCapacityReservations.demandId,
       sectionId:instructionalCapacityReservations.sectionId,seats:instructionalCapacityReservations.seats,
@@ -763,7 +843,6 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
     const demand=await loadDemandContext(tx,old.demandId);
     if(!demand)throw new Error("Section demand not found");
     assertDemandScope(context,demand);
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`capacity-demand:${demand.demandId}`}))`);
     const [replacement]=await tx.select({
       id:instructionalCapacityOfferings.id,personId:instructionalCapacityOfferings.personId,
       maxSeats:instructionalCapacityOfferings.maxSeats,status:instructionalCapacityOfferings.status,
@@ -828,16 +907,18 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
       recipientPersonId:replacement.personId,type:"teaching_assignment",title:"Teaching assignment changed",
       body:"You are now assigned to a section.",resourceType:"section",resourceId:demand.sectionId,
     });
-    await tx.insert(auditEvents).values({
-      actorPersonId:context.actorPersonId,action:"capacity.instructor.replaced",
-      resourceType:"section",resourceId:demand.sectionId,
+    await writeAudit(tx,context,{
+      action:"capacity.instructor.replaced",
+      entityType:"section",entityId:demand.sectionId,
       scope:{programId:demand.programId,siteId:demand.siteId,organizationId:demand.organizationId},
       before:{offeringId:old.oldOfferingId,personId:old.oldPersonId},
       after:{offeringId:replacement.id,personId:replacement.personId,reason:input.reason.trim()},
     });
-    await tx.insert(domainEvents).values({
-      eventType:"InstructorCapacityReplaced",aggregateType:"section",aggregateId:demand.sectionId,
-      actorPersonId:context.actorPersonId,payload:{programId:demand.programId,oldPersonId:old.oldPersonId,newPersonId:replacement.personId},
+    await emitEvent(tx,{
+      eventType:EventTypes.InstructorCapacityReplaced,aggregateType:"section",aggregateId:demand.sectionId,
+      actorPersonId:context.actorPersonId,
+      organizationId:demand.organizationId,siteId:demand.siteId,programId:demand.programId,sectionId:demand.sectionId,
+      payload:{oldPersonId:old.oldPersonId,newPersonId:replacement.personId},
     });
     return {sectionId:demand.sectionId,replacementPersonId:replacement.personId};
   });

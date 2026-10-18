@@ -1,11 +1,16 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions, auditEvents, domainEvents } from "@/db/schema";
+import { actions } from "@/db/schema";
 import {
   assertCapability,
+  assertOrganizationScope,
+  assertProgramScope,
+  assertSectionScope,
+  assertSiteScope,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { emitEvent, writeAudit } from "@/platform/mutation";
 
 export async function resolveAction(
   context: CommandContext,
@@ -26,6 +31,15 @@ export async function resolveAction(
     if (!current) throw new Error("Action not found");
     if (current.status === "resolved") return;
 
+    // Capability alone is not authority: the Action's recorded scope must
+    // intersect the actor's verified scope. Null scope fields on the Action
+    // impose no constraint (platform-wide work); an actor with an empty
+    // scope list fails closed.
+    assertOrganizationScope(context, current.organizationId);
+    assertSiteScope(context, current.siteId);
+    assertProgramScope(context, current.programId);
+    assertSectionScope(context, current.sectionId);
+
     const resolvedAt = new Date();
 
     await tx
@@ -38,7 +52,7 @@ export async function resolveAction(
       })
       .where(eq(actions.id, input.actionId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.ActionResolved,
       aggregateType: "action",
       aggregateId: input.actionId,
@@ -49,11 +63,10 @@ export async function resolveAction(
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "action.resolve",
-      resourceType: "action",
-      resourceId: input.actionId,
+      entityType: "action",
+      entityId: input.actionId,
       scope: {
         organizationId: current.organizationId,
         siteId: current.siteId,
@@ -65,7 +78,6 @@ export async function resolveAction(
         status: "resolved",
         resolutionNote: input.resolutionNote,
       },
-      context: { requestId: context.requestId ?? null },
     });
   });
 }

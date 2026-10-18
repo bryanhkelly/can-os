@@ -161,6 +161,14 @@ integration("educational capacity", () => {
     const afterHold = await capacity.getInstructorCapacity(context, teacher.id);
     expect(afterHold[0]?.remainingSeats).toBe(13);
 
+    // Committed reservations assign the instructor to the section, which
+    // requires an active teaching authorization in the organization.
+    await db.insert(s.roleAssignments).values({
+      personId: teacher.id,
+      organizationId: org.id,
+      roleKey: "teacher",
+    });
+
     await capacity.reserveInstructionalCapacity(context, {
       demandId,
       offeringId,

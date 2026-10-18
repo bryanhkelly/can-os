@@ -89,6 +89,14 @@ integration("GF33 field trip end-to-end", () => {
       relationshipLabel: "parent",
     });
 
+    await db.insert(schema.enrollments).values({
+      studentProfileId: student.id,
+      kind: "program",
+      status: "active",
+      organizationId: org.id,
+      programId: program.id,
+    });
+
     await db.insert(schema.healthProfiles).values({
       studentProfileId: student.id,
       emergencySummary: "Carries rescue medication.",
@@ -124,6 +132,9 @@ integration("GF33 field trip end-to-end", () => {
       returnsAt: new Date("2027-10-15T23:00:00.000Z"),
       permissionDueAt: new Date("2027-10-01T23:59:00.000Z"),
       feeAmountCents: 2500,
+      permissionVersion: "2027.1",
+      permissionText:
+        "I authorize my student to attend this trip and accept the school terms.",
     });
 
     const calendarEventId = await trips.approveFieldTrip(staffContext, tripId);
@@ -134,7 +145,7 @@ integration("GF33 field trip end-to-end", () => {
     expect(calendarEvent.siteId).toBe(site.id);
     expect(calendarEvent.timezone).toBe(site.timezone);
 
-    const participantId = await trips.addFieldTripParticipant(staffContext, {
+    const { participantId } = await trips.addFieldTripParticipant(staffContext, {
       fieldTripId: tripId,
       studentProfileId: student.id,
       householdId: household.id,

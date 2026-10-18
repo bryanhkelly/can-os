@@ -26,7 +26,7 @@ export type AccessContext = CommandContext & {
 export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Object.freeze({
  student: ["student:read","assignments:submit","study-groups:participate","notifications:manage","communication.send","calendar.event.create"],
  teacher: ["teacher:read","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate","communication.send","attendance.write","attendance.excuse.review","action.create","action.resolve","program.read","calendar.event.create","insights:read","capacity.read"],
- guardian: ["guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read","communication.send","attendance.excuse.submit","calendar.event.create"],
+ guardian: ["guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read","communication.send","attendance.excuse.submit","calendar.event.create","conference.book"],
  registrar: ["admissions:read","notifications:manage","admissions:decide","enrollment.decide","enrollment.activate","enrollment:manage","registrations:approve","attendance.write","attendance.excuse.review","communication.send","program.read","program.launch.start","program.activate","calendar.event.create","academic_year.manage","academic_year.activate","action.resolve","journey.requirement.complete","admin.manage","insights:read","insights:manage","capacity.read","capacity.manage","capacity.demand.manage","capacity.reserve"],
  specialist: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage","communication.send","action.resolve","action.create","calendar.event.create","insights:read"],
 });

@@ -31,7 +31,7 @@ function endpoint(value) {
 
 const testEndpoint = endpoint(testUrl);
 const mode = process.argv[2];
-if ((mode === "admissions-offers" || mode === "gf1") && !process.env.CAN_APPLICATION_DB_HOST && !process.env.DATABASE_URL) {
+if ((mode === "admissions-offers" || mode === "academic-intervention") && !process.env.CAN_APPLICATION_DB_HOST && !process.env.DATABASE_URL) {
   fail("acceptance testing requires CAN_APPLICATION_DB_HOST or DATABASE_URL for a production endpoint comparison.");
 }
 if (process.env.DATABASE_URL && testEndpoint === endpoint(process.env.DATABASE_URL)) {
@@ -49,15 +49,15 @@ if (process.env.CAN_APPLICATION_DB_HOST) {
 }
 
 if (process.argv.includes("--preflight")) {
-  if (mode !== "admissions-offers" && mode !== "gf1") {
+  if (mode !== "admissions-offers" && mode !== "academic-intervention") {
     fail("preflight is only supported for acceptance-test modes.");
   }
   console.log(`Disposable ${mode} database endpoint check passed.`);
   process.exit(0);
 }
 
-const targeted = mode === "study-groups" || mode === "study-group-lifecycle" || mode === "admissions-offers" || mode === "gf1";
-const suite = mode === "study-groups" ? ["tests/integration/study-group-fixture-integrity.test.ts"] : mode === "study-group-lifecycle" ? ["tests/integration/study-group-session-lifecycle.test.ts"] : mode === "admissions-offers" ? ["tests/integration/admissions-offers.integration.test.ts"] : mode === "gf1" ? ["tests/integration/academic-intervention.integration.test.ts"] : ["tests/integration"];
+const targeted = mode === "study-groups" || mode === "study-group-lifecycle" || mode === "admissions-offers" || mode === "academic-intervention";
+const suite = mode === "study-groups" ? ["tests/integration/study-group-fixture-integrity.test.ts"] : mode === "study-group-lifecycle" ? ["tests/integration/study-group-session-lifecycle.test.ts"] : mode === "admissions-offers" ? ["tests/integration/admissions-offers.integration.test.ts"] : mode === "academic-intervention" ? ["tests/integration/academic-intervention.integration.test.ts"] : ["tests/integration"];
 const args = targeted ? process.argv.slice(3) : process.argv.slice(2);
 // Integration files share one disposable database; running them in parallel
 // lets one file's outbox worker claim another file's fixtures mid-assertion.

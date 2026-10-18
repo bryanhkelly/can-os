@@ -18,6 +18,8 @@ import {
   assertSiteScope,
   type CommandContext,
 } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { emitEvent, writeAudit } from "@/platform/mutation";
 
 export async function createDeliveryArrangement(
   context: CommandContext,
@@ -83,6 +85,7 @@ export async function createDeliveryArrangement(
       throw new Error("Instructor is required for synchronous delivery");
     }
 
+    const status = input.status ?? (input.capacityReservationId ? "reserved" : "proposed");
     const [arrangement] = await tx
       .insert(deliveryArrangements)
       .values({
@@ -92,7 +95,7 @@ export async function createDeliveryArrangement(
         facilitatorPersonId: input.facilitatorPersonId ?? null,
         modality: input.modality,
         capacityReservationId: input.capacityReservationId ?? null,
-        status: input.status ?? (input.capacityReservationId ? "reserved" : "proposed"),
+        status,
         effectiveFrom: input.effectiveFrom ?? null,
         effectiveThrough: input.effectiveThrough ?? null,
       })
@@ -100,7 +103,7 @@ export async function createDeliveryArrangement(
 
     if (!arrangement) throw new Error("Unable to create delivery arrangement");
 
-    if (instructorPersonId && ["ready", "active"].includes(input.status ?? "")) {
+    if (instructorPersonId && ["ready", "active"].includes(status)) {
       await tx.insert(sectionTeachers).values({
         sectionId: input.sectionId,
         personId: instructorPersonId,
@@ -109,6 +112,38 @@ export async function createDeliveryArrangement(
         target: [sectionTeachers.sectionId, sectionTeachers.personId],
       });
     }
+
+    await emitEvent(tx, {
+      eventType: EventTypes.DeliveryArrangementCreated,
+      aggregateType: "delivery_arrangement",
+      aggregateId: arrangement.id,
+      actorPersonId: context.actorPersonId,
+      siteId: section.siteId,
+      programId: section.programId,
+      sectionId: section.id,
+      payload: {
+        academicProviderOrganizationId: input.academicProviderOrganizationId,
+        instructorPersonId,
+        facilitatorPersonId: input.facilitatorPersonId ?? null,
+        modality: input.modality,
+        status,
+        capacityReservationId: input.capacityReservationId ?? null,
+      },
+    });
+    await writeAudit(tx, context, {
+      action: "delivery.arrangement.created",
+      entityType: "delivery_arrangement",
+      entityId: arrangement.id,
+      scope: { programId: section.programId, siteId: section.siteId },
+      after: {
+        sectionId: input.sectionId,
+        academicProviderOrganizationId: input.academicProviderOrganizationId,
+        instructorPersonId,
+        modality: input.modality,
+        status,
+        capacityReservationId: input.capacityReservationId ?? null,
+      },
+    });
 
     return arrangement.id;
   });
@@ -127,6 +162,7 @@ export async function activateDeliveryArrangement(
         sectionId: deliveryArrangements.sectionId,
         instructorPersonId: deliveryArrangements.instructorPersonId,
         capacityReservationId: deliveryArrangements.capacityReservationId,
+        status: deliveryArrangements.status,
       })
       .from(deliveryArrangements)
       .where(eq(deliveryArrangements.id, arrangementId))
@@ -173,6 +209,28 @@ export async function activateDeliveryArrangement(
     await tx.update(deliveryArrangements)
       .set({ status: "active", updatedAt: new Date() })
       .where(eq(deliveryArrangements.id, arrangement.id));
+
+    await emitEvent(tx, {
+      eventType: EventTypes.DeliveryArrangementActivated,
+      aggregateType: "delivery_arrangement",
+      aggregateId: arrangement.id,
+      actorPersonId: context.actorPersonId,
+      siteId: section.siteId,
+      programId: section.programId,
+      sectionId: arrangement.sectionId,
+      payload: {
+        instructorPersonId: arrangement.instructorPersonId,
+        capacityReservationId: arrangement.capacityReservationId,
+      },
+    });
+    await writeAudit(tx, context, {
+      action: "delivery.arrangement.activated",
+      entityType: "delivery_arrangement",
+      entityId: arrangement.id,
+      scope: { programId: section.programId, siteId: section.siteId },
+      before: { status: arrangement.status },
+      after: { status: "active" },
+    });
   });
 }
 
