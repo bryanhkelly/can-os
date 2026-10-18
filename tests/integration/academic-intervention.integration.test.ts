@@ -1,8 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { CommandContext } from "@/domain/command-context";
+import { resolveAccessContext } from "@/domain/access-context";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { updateOperationsAction, assignOperationsAction } from "@/modules/operations/action-workspace.functions";
+import { acceptInsight } from "@/modules/operations/insights.functions";
+
+vi.mock("@tanstack/react-start", () => ({
+  createServerFn: () => ({ validator() { return this; }, handler(callback: unknown) { return callback; } }),
+}));
+vi.mock("@tanstack/react-start/server", () => ({ getRequest: () => new Request("http://localhost") }));
+vi.mock("@/modules/identity/command-context.server", () => ({ getCommandContext: vi.fn() }));
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
-integration("GF1 academic intervention", () => {
+integration("academic intervention", () => {
   it("preserves lifecycle and timeliness while propagating missing work into an Insight and Action", async () => {
     const [
       { db },
@@ -194,7 +205,7 @@ integration("GF1 academic intervention", () => {
       })
       .returning();
 
-    const teacherContext = {
+    const teacherContext: CommandContext = {
       actorPersonId: teacher.id,
       capabilities: new Set([
         "assessment.publish",
@@ -203,7 +214,7 @@ integration("GF1 academic intervention", () => {
         "action.resolve",
         "communication.send",
       ]),
-      scope: { sectionIds: [section.id] },
+      scope: { organizationIds: [hostOrg.id], siteIds: [site.id], programIds: [program.id], sectionIds: [section.id] },
       requestId: `gf1-teacher-${suffix}`,
     };
 
@@ -296,6 +307,35 @@ integration("GF1 academic intervention", () => {
       expect(row.resourceType).toBe("submission");
       expect(row.resourceId).toBe(submission.id);
     }
+
+    const deniedContexts: CommandContext[] = [
+      { ...teacherContext, actorPersonId: null },
+      { ...teacherContext, capabilities: new Set() },
+      { ...teacherContext, actorPersonId: guardian.id },
+      ...[
+        {},
+        { ...teacherContext.scope, organizationIds: [] },
+        { ...teacherContext.scope, organizationIds: [canOrg.id] },
+        { ...teacherContext.scope, programIds: undefined },
+        { ...teacherContext.scope, programIds: [] },
+        { ...teacherContext.scope, programIds: [crypto.randomUUID()] },
+        { ...teacherContext.scope, siteIds: undefined },
+        { ...teacherContext.scope, siteIds: [] },
+        { ...teacherContext.scope, siteIds: [crypto.randomUUID()] },
+        { ...teacherContext.scope, sectionIds: [] },
+        { ...teacherContext.scope, sectionIds: [crypto.randomUUID()] },
+      ].map(scope => ({ ...teacherContext, scope })),
+    ];
+    for (const context of deniedContexts) {
+      await expect(actionModule.createActionFromInsight(context, {
+        insightId: insight.id, title: "Unauthorized intervention",
+      })).rejects.toThrow();
+    }
+    await expect(actionModule.createActionFromInsight(teacherContext, {
+      insightId: insight.id, title: "Invalid owner", ownerPersonId: guardian.id,
+    })).rejects.toThrow("staff relationship");
+    expect((await db.select().from(schema.insights).where(eq(schema.insights.id, insight.id)))[0].status).toBe("open");
+    expect(await db.select().from(schema.actions).where(eq(schema.actions.subjectId, student.id))).toHaveLength(0);
 
     const actionId = await actionModule.createActionFromInsight(
       teacherContext,
@@ -429,11 +469,59 @@ integration("GF1 academic intervention", () => {
       );
     expect(lateSubmissionNotices.some((row) => row.recipientPersonId === teacher.id)).toBe(true);
 
-    await actionResolution.resolveAction(teacherContext, {
-      actionId,
-      resolutionNote:
-        "Student submitted the missing work, teacher graded it, and follow-up is complete.",
-    });
+    const resolution = {
+      actionId, resolutionNote: "  Student submitted the missing work, teacher graded it, and follow-up is complete.  ",
+    };
+    for (const context of deniedContexts) {
+      await expect(actionResolution.resolveAction(context, resolution)).rejects.toThrow();
+    }
+    await expect(actionResolution.resolveAction(teacherContext, {
+      actionId, resolutionNote: " \n ",
+    })).rejects.toThrow("Resolution note required");
+
+    await db.delete(schema.sectionTeachers).where(and(
+      eq(schema.sectionTeachers.sectionId, section.id), eq(schema.sectionTeachers.personId, teacher.id),
+    ));
+    await expect(actionResolution.resolveAction(teacherContext, resolution)).rejects.toThrow("staff relationship");
+    await db.insert(schema.sectionTeachers).values({ sectionId: section.id, personId: teacher.id });
+
+    await db.update(schema.enrollments).set({ status: "withdrawn" }).where(eq(schema.enrollments.sectionId, section.id));
+    await expect(actionResolution.resolveAction(teacherContext, resolution)).rejects.toThrow("student/section relationship");
+    await db.update(schema.enrollments).set({ status: "active" }).where(eq(schema.enrollments.sectionId, section.id));
+    await db.update(schema.sections).set({ active: false }).where(eq(schema.sections.id, section.id));
+    await expect(actionResolution.resolveAction(teacherContext, resolution)).rejects.toThrow("student/section relationship");
+    await db.update(schema.sections).set({ active: true }).where(eq(schema.sections.id, section.id));
+
+    const [wrongSite] = await db.insert(schema.sites).values({
+      organizationId: hostOrg.id, name: "Other Campus", slug: `other-${suffix}`,
+    }).returning();
+    await db.update(schema.actions).set({ siteId: wrongSite.id }).where(eq(schema.actions.id, actionId));
+    await expect(actionResolution.resolveAction({
+      ...teacherContext, scope: { ...teacherContext.scope, siteIds: [site.id, wrongSite.id] },
+    }, resolution)).rejects.toThrow("student/section relationship");
+    await db.update(schema.actions).set({ siteId: site.id }).where(eq(schema.actions.id, actionId));
+
+    for (const type of ["support_referral", "guardian_consent", "group_moderation"]) {
+      await db.update(schema.actions).set({ type }).where(eq(schema.actions.id, actionId));
+      await expect(actionResolution.resolveAction(teacherContext, resolution)).rejects.toThrow("owning domain lifecycle");
+    }
+    await db.update(schema.actions).set({ type: "academic_intervention", status: "cancelled" }).where(eq(schema.actions.id, actionId));
+    await expect(actionResolution.resolveAction(teacherContext, resolution)).rejects.toThrow("Cancelled Action");
+    await db.update(schema.actions).set({ status: "open" }).where(eq(schema.actions.id, actionId));
+    expect(await db.select().from(schema.domainEvents).where(and(
+      eq(schema.domainEvents.aggregateId, actionId), eq(schema.domainEvents.eventType, "ActionResolved"),
+    ))).toHaveLength(0);
+
+    await Promise.all([
+      actionResolution.resolveAction(teacherContext, resolution),
+      actionResolution.resolveAction(teacherContext, resolution),
+    ]);
+    await actionResolution.resolveAction(teacherContext, resolution);
+    await db.delete(schema.sectionTeachers).where(and(
+      eq(schema.sectionTeachers.sectionId, section.id), eq(schema.sectionTeachers.personId, teacher.id),
+    ));
+    await expect(actionResolution.resolveAction(teacherContext, resolution)).rejects.toThrow("staff relationship");
+    await db.insert(schema.sectionTeachers).values({ sectionId: section.id, personId: teacher.id });
 
     const [resolvedAction] = await db
       .select()
@@ -442,6 +530,77 @@ integration("GF1 academic intervention", () => {
 
     expect(resolvedAction.status).toBe("resolved");
     expect(resolvedAction.resolutionNote).toContain("follow-up is complete");
+    expect(resolvedAction.resolutionNote).toBe(resolution.resolutionNote.trim());
+    expect(await db.select().from(schema.auditEvents).where(and(
+      eq(schema.auditEvents.resourceId, actionId), eq(schema.auditEvents.action, "action.resolve"),
+    ))).toHaveLength(1);
+
+    const [operator] = await db.insert(schema.people).values({
+      legalFirstName: "Academic", legalLastName: `Registrar-${suffix}`,
+    }).returning();
+    const [account] = await db.insert(schema.accessAccounts).values({
+      emailNormalized: `academic-operator-${suffix}@example.com`,
+    }).returning();
+    const [grant] = await db.insert(schema.accountPersonGrants).values({
+      accountId: account.id, personId: operator.id, role: "registrar",
+      organizationId: hostOrg.id, siteId: site.id,
+    }).returning();
+    const operatorContext = resolveAccessContext({
+      accountId: account.id, sessionId: crypto.randomUUID(), activeGrantId: grant.id,
+    }, [grant]);
+    operatorContext.scope.programIds = [program.id];
+    vi.mocked(getCommandContext).mockResolvedValue(operatorContext);
+
+    const [operationalAction] = await db.insert(schema.actions).values({
+      type: "academic_intervention", title: "Scoped operational follow-up",
+      subjectType: "student_profile", subjectId: student.id,
+      organizationId: hostOrg.id, siteId: site.id, programId: program.id, sectionId: section.id,
+    }).returning();
+    const operationalResolution = { actionId: operationalAction.id, resolutionNote: "Registrar follow-up complete" };
+    const operation = { id: operationalAction.id, status: "resolved" as const, resolutionNote: operationalResolution.resolutionNote };
+    await db.update(schema.accountPersonGrants).set({ active: false }).where(eq(schema.accountPersonGrants.id, grant.id));
+    await expect(actionResolution.resolveAction(operatorContext, operationalResolution)).rejects.toThrow("staff relationship");
+    await expect(updateOperationsAction({ data: operation })).rejects.toThrow("staff relationship");
+    await db.update(schema.accountPersonGrants).set({ active: true, siteId: wrongSite.id }).where(eq(schema.accountPersonGrants.id, grant.id));
+    await expect(actionResolution.resolveAction(operatorContext, operationalResolution)).rejects.toThrow("staff relationship");
+    await db.update(schema.accountPersonGrants).set({ siteId: site.id }).where(eq(schema.accountPersonGrants.id, grant.id));
+    await db.insert(schema.accountPersonGrants).values({
+      accountId: account.id, personId: guardian.id, role: "teacher",
+      organizationId: hostOrg.id, siteId: site.id,
+    });
+    await expect(assignOperationsAction({ data: {
+      id: operationalAction.id, ownerPersonId: guardian.id, priority: "normal",
+    } })).rejects.toThrow("staff relationship");
+    await assignOperationsAction({ data: {
+      id: operationalAction.id, ownerPersonId: operator.id, priority: "high",
+    } });
+    await updateOperationsAction({ data: operation });
+    await updateOperationsAction({ data: operation });
+    expect(await db.select().from(schema.domainEvents).where(and(
+      eq(schema.domainEvents.aggregateId, operationalAction.id), eq(schema.domainEvents.eventType, "ActionResolved"),
+    ))).toHaveLength(1);
+
+    const [operationalInsight] = await db.insert(schema.insights).values({
+      type: "missing_assignment", title: "Operator intervention", summary: "Missing work",
+      subjectType: "student_profile", subjectId: student.id,
+      organizationId: hostOrg.id, siteId: site.id, programId: program.id, sectionId: section.id,
+    }).returning();
+    operatorContext.scope.programIds = [];
+    await expect(acceptInsight({ data: { insightId: operationalInsight.id } })).rejects.toThrow("academic Action scope");
+    operatorContext.scope.programIds = [program.id];
+    await expect(acceptInsight({ data: {
+      insightId: operationalInsight.id, actionOwnerPersonId: guardian.id,
+    } })).rejects.toThrow("staff relationship");
+    await acceptInsight({ data: { insightId: operationalInsight.id, actionOwnerPersonId: operator.id } });
+
+    const [siteWideAction] = await db.insert(schema.actions).values({
+      type: "academic_intervention", title: "Site-wide follow-up",
+      subjectType: "site", subjectId: site.id, organizationId: hostOrg.id, siteId: site.id,
+    }).returning();
+    await updateOperationsAction({ data: {
+      id: siteWideAction.id, status: "resolved", resolutionNote: "Operational follow-up complete",
+    } });
+    expect((await db.select().from(schema.actions).where(eq(schema.actions.id, siteWideAction.id)))[0].status).toBe("resolved");
 
     const resolvedEvents = await db
       .select()

@@ -9,6 +9,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,isNotNull,isNull,or } from "drizzle-orm";
 import { operationsSelectionSchema,resolveOperationsSelection } from "./operations-scope.server";
+import { resolveActionInTransaction } from "@/modules/actions/resolve-action";
+import { assertAcademicActionAuthority,assertAcademicActionStaff } from "@/modules/actions/academic-action-policy.server";
 
 async function operator() {
  const actor=await getCommandContext(getRequest());
@@ -58,6 +60,12 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    if(!record)throw new AuthorizationError("action scope");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
+   const academic=record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId!==null;
+   if(academic&&data.status==="resolved"){
+    await resolveActionInTransaction(tx,actor,{actionId:record.id,resolutionNote:data.resolutionNote??""});
+    return {saved:true};
+   }
+   if(academic)await assertAcademicActionAuthority(tx,actor,record);
    if(record.status==="cancelled"||record.status==="resolved")throw new Error("Action is closed");
    if(record.status===data.status)return {saved:true};
    const now=new Date();
@@ -78,10 +86,13 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    if(!record||["resolved","cancelled"].includes(record.status))throw new AuthorizationError("active action scope");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
+   const academic=record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId!==null;
+   if(academic)await assertAcademicActionAuthority(tx,actor,record);
    if(data.ownerPersonId){
     if(!record.siteId)throw new AuthorizationError("site-scoped action required for assignment");
     const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist"]))).limit(1);
     if(!grant)throw new AuthorizationError("assignee must have active site membership");
+    if(academic)await assertAcademicActionStaff(tx,data.ownerPersonId,record);
    }
    if(record.ownerPersonId===data.ownerPersonId&&record.priority===data.priority)return {saved:true};
    await tx.update(actions).set({ownerPersonId:data.ownerPersonId,priority:data.priority,updatedAt:new Date()}).where(eq(actions.id,record.id));

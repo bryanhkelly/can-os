@@ -8,6 +8,7 @@ import { readScope } from "@/platform/scope";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { assertAcademicActionAuthority,assertAcademicActionStaff } from "@/modules/actions/academic-action-policy.server";
 
 /**
  * Insight read scoping is registered in ./insights.scope; teachers see insights for
@@ -124,6 +125,8 @@ export const acceptInsight = createServerFn({ method: "POST" })
    if (!insight) throw new Error("Insight not found");
    if (insight.status !== "open") throw new Error("Insight has already been handled");
    await assertInsightManageScope(server, tx, context, insight);
+   const academic=insight.subjectType==="student_profile"&&insight.sectionId!==null;
+   if(academic)await assertAcademicActionAuthority(tx,context,insight);
    if(data.actionOwnerPersonId){
     if(!insight.siteId||!insight.organizationId)
      throw new AuthorizationError("site-specific insight required for assignment");
@@ -139,6 +142,7 @@ export const acceptInsight = createServerFn({ method: "POST" })
       ops.inArray(s.accountPersonGrants.role,["registrar","teacher","specialist"])
      )).limit(1);
     if(!assignee)throw new AuthorizationError("active school staff assignee");
+    if(academic)await assertAcademicActionStaff(tx,data.actionOwnerPersonId,insight);
    }
    const [action] = await tx.insert(s.actions).values({
     type: "academic_intervention",

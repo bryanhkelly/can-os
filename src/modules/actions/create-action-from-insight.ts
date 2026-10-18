@@ -7,6 +7,7 @@ type CommandContext,
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { eq } from "drizzle-orm";
+import { assertAcademicActionAuthority, assertAcademicActionStaff } from "./academic-action-policy.server";
 
 export async function createActionFromInsight(
   context: CommandContext,
@@ -28,6 +29,8 @@ export async function createActionFromInsight(
       .limit(1);
 
     if (!insight) throw new Error("Insight not found");
+    await assertAcademicActionAuthority(tx, context, insight);
+    if (input.ownerPersonId) await assertAcademicActionStaff(tx, input.ownerPersonId, insight);
 
     const [action] = await tx
       .insert(actions)

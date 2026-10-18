@@ -1,6 +1,6 @@
 # CAN OS — current implementation snapshot
 
-**Baseline reviewed:** `main` at `e23cac7` (2026-10-18), plus the academic/conference authorization follow-up included with this snapshot. Consolidation commit `8bdce69` was merged with the documentation baseline and pushed in `e23cac7`. Local automated results are recorded below; they are **not** a verified deployment, production acceptance, security audit, or assertion that remote CI has passed.
+**Baseline reviewed:** the academic Action follow-up on `main` at `5620ef4` (2026-10-18), plus the changes included with this snapshot. The prior academic/conference authorization follow-up was pushed in `75a83be`. Local automated results are recorded below; they are **not** a verified deployment, production acceptance, security audit, or assertion that remote CI has passed.
 
 ## Integrated source baseline
 
@@ -14,6 +14,7 @@
 - Grade finalization/correction and placement prerequisites use versioned grade-scale policy, including custom passing labels and bounded extra-credit handling. Staffing statuses have a pending enum migration; its DDL was verified in a rolled-back isolated test transaction, not applied to production.
 - Approved agent writes use the approval transaction. The Academic Domain API now shares a program-and-relationship predicate across student discovery and summary sections: missing/empty program grants deny visibility, supplied site/section lists restrict it, and teachers only see their assigned sections. Tests cover revoked relationships/assignments and approval-time loss of access.
 - Conference booking/rescheduling no longer accept an optional enrollment-check switch. Both commands require explicit site/program grants, current guardian relationship, school enrollment and active section enrollment where applicable; direct-service regression tests cover denials and transactional rescheduling.
+- Student-section academic Action creation, operational acceptance/assignment/status changes and direct resolution now share resource/relationship policy. Ownership alone does not grant access. Resolution locks the Action, rechecks access on retries, requires a nonblank note and rejects cancelled work; concurrent completion writes one audit and one outbox event. Site-wide operational follow-ups retain their existing path, while the direct resolver rejects other domain types.
 
 ## Architecture versus known code gaps
 
@@ -25,8 +26,8 @@
 
 ## Verification and release status
 
-- Local verification on 2026-10-18: `npm test` passed **71 files / 350 tests**; `npm run test:integration` passed **27 files / 41 tests** using the protected isolated Neon runner. The latter includes negative academic-scope/relationship and conference-enrollment cases; it is not exhaustive authorization certification.
-- `npm run typecheck`, `npm run build`, mutation hygiene, route fixture coverage and `node scripts/check-platform-route-contracts.mjs --check` passed locally after the merge and follow-up changes.
+- Local verification on 2026-10-18: `npm test` passed **71 files / 350 tests**; `npm run test:integration` passed **29 files / 43 tests** using the protected isolated Neon runner. These are working-tree results, including concurrent calendar/transcript work, not a claim that every change belongs to this follow-up. Academic Action regression includes missing/wrong scopes, revoked staff/enrollment relationships, invalid owners, owning-domain rejection, cancelled work, concurrent resolution and operations-adapter parity.
+- `npm run typecheck`, `npm run build`, mutation hygiene, route fixture coverage and `node scripts/check-platform-route-contracts.mjs --check` passed locally with this follow-up.
 - Browser/Playwright cross-persona journeys, remote CI, live R2 configuration and production migration/deployment remain **unverified** in this continuation. No production migration or data modification was performed.
 - All 65 route acceptance entries remain **pending**. The basic source-drift checker is separate from the stricter `--acceptance` gate.
 - Sensitive student, medical, safety, payment and legal data require independent privacy/security review and operational acceptance. Do not infer readiness from documentation or a passing compile.
@@ -34,7 +35,7 @@
 
 ## Remaining follow-up
 
-- Generic Action resolution still needs complete domain/resource/relationship policy, not only capability and scope helpers.
+- Nonacademic and section-less operational Actions still need a complete owning-domain policy review; the academic policy is deliberately not a universal Action abstraction. Historical academic follow-up after withdrawal/inactivation needs an explicit policy before broadening current fail-closed behavior.
 - Remaining school-year/program-launch commands need evidence-parity review.
 - Full authenticated route/deep-link and role-switch browser acceptance is pending.
 - Production staffing migration requires existing-value preflight and controlled rollout. R2 malware/quarantine, retention and live bucket/CORS acceptance remain release gates.

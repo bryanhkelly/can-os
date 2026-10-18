@@ -193,3 +193,20 @@ Conference booking and rescheduling enforce current guardian relationship,
 explicit site/program scope, school enrollment and (for section-scoped series)
 active section enrollment inside their canonical commands. UI callers cannot
 disable these invariants with an optional command parameter.
+
+Student-section academic Actions share one resource policy across direct
+Insight acceptance, operational acceptance, assignment, status changes and
+resolution. Authority requires explicit organization/program scope, explicit
+site scope for site-backed sections, an active section enrollment matching the
+recorded delivery scope, and a current teacher assignment or active
+registrar/specialist grant. Assigning an owner does not confer authority.
+Supplied section scopes further restrict access, including empty lists.
+
+The direct Action resolver is bounded to these academic interventions, not a
+universal override for consent, referrals or moderation. Operational site-wide
+follow-ups retain their existing scoped operations path; referrals retain
+their owning lifecycle. Academic resolution locks the Action, checks authority
+even on retries, rejects cancelled work and blank notes, and writes its audit
+and outbox event once. Withdrawn enrollment or an inactive section currently
+denies academic mutation; historical follow-up requires a separately defined
+policy rather than falling back to generic mutation.
