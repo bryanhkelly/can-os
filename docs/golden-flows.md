@@ -196,6 +196,8 @@ Prove that finalized academic results become family-facing report cards and dura
 11. A correction preserves the prior finalized grade and issuance history rather than silently rewriting it.
 12. Audit trail reconstructs grade finalization, report publication, credit posting, and transcript issuance.
 
+The registrar issues artifacts from the scoped **Admissions → Official transcripts** workspace. A transcript cannot combine records from different credit-issuing organizations without a transfer-credit agreement.
+
 ### Proves
 grade-posting states, grading-period close, report cards, credits, academic record, issuing authority, transcript generation, correction history, counselor/registrar workflow.
 
