@@ -1,16 +1,28 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { AccessContext } from "@/domain/access-context";
+
+const launchState = vi.hoisted(() => ({ context: null as unknown }));
+vi.mock("@tanstack/react-start", () => ({
+  createServerFn: () => ({ validator() { return this; }, handler(callback: unknown) { return callback; } }),
+}));
+vi.mock("@tanstack/react-start/server", () => ({ getRequest: () => new Request("http://localhost") }));
+vi.mock("@/modules/identity/command-context.server", () => ({
+  getCommandContext: async () => launchState.context as AccessContext,
+}));
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
 integration("GF3 host / program launch", () => {
   it("launches a church-hosted academy and K-8 high-school extension through the same path", async () => {
-    const [{ db }, schema, { eq }, programsModule, journeyModule] =
+    const [{ db }, schema, { eq, and }, programsModule, journeyModule, launchAcademics, launchFunctions] =
       await Promise.all([
         import("@/db/client"),
         import("@/db/schema"),
         import("drizzle-orm"),
         import("@/modules/programs/program-launch-service"),
         import("@/modules/journeys/complete-requirement"),
+        import("@/modules/programs/launch-academics.functions"),
+        import("@/modules/programs/launch.functions"),
       ]);
     const { createAcademicTimeFixture } = await import("./helpers/academic-time");
 
@@ -119,6 +131,12 @@ integration("GF3 host / program launch", () => {
         .returning();
 
       const context = contextFor(host.id, site.id);
+      const launchContext = {
+        ...context,
+        role: "registrar" as const,
+        scope: { ...context.scope, programIds: [] as string[] },
+      };
+      launchState.context = launchContext;
 
       const launch = await programsModule.startProgramLaunch(context, {
         hostOrganizationId: host.id,
@@ -138,6 +156,7 @@ integration("GF3 host / program launch", () => {
         academicProviderOrganizationId: canOrg.id,
         creditIssuingOrganizationId: canOrg.id,
       });
+      launchContext.scope.programIds = [launch.programId];
 
       const [launchingProgram] = await db
         .select()
@@ -202,6 +221,13 @@ integration("GF3 host / program launch", () => {
           termId: academicTime.term.id,
         })
         .returning();
+      const [launchTeacher] = await db.insert(schema.people).values({
+        legalFirstName: "Launch", legalLastName: `Teacher-${suffix}-${index}`,
+      }).returning();
+      await db.insert(schema.roleAssignments).values({
+        personId: launchTeacher.id, organizationId: host.id, siteId: site.id,
+        programId: launch.programId, roleKey: "teacher",
+      });
       await db.insert(schema.sectionRegistrationPolicies).values({
         sectionId: section!.id,
         enrollmentCapacity: 24,
@@ -215,6 +241,31 @@ integration("GF3 host / program launch", () => {
         modality: "onsite",
         status: "active",
       });
+      const assigned = await launchAcademics.assignLaunchTeacher({ data: {
+        programId: launch.programId, sectionId: section!.id, teacherPersonId: launchTeacher.id,
+      } });
+      expect(assigned.created).toBe(true);
+      expect(await launchAcademics.assignLaunchTeacher({ data: {
+        programId: launch.programId, sectionId: section!.id, teacherPersonId: launchTeacher.id,
+      } })).toMatchObject({ created: false });
+      const [teacherArrangement] = await db.select().from(schema.deliveryArrangements)
+        .where(and(eq(schema.deliveryArrangements.sectionId, section!.id),
+          eq(schema.deliveryArrangements.instructorPersonId, launchTeacher.id),
+          eq(schema.deliveryArrangements.status, "active")));
+      const teacherAssignmentEvents = await db.select().from(schema.domainEvents).where(and(
+        eq(schema.domainEvents.aggregateId, teacherArrangement.id),
+        eq(schema.domainEvents.eventType, "DeliveryArrangementActivated"),
+      ));
+      expect(teacherAssignmentEvents).toHaveLength(1);
+      expect(await db.select().from(schema.auditEvents).where(and(
+        eq(schema.auditEvents.resourceId, teacherArrangement.id),
+        eq(schema.auditEvents.action, "launch.teacher.assign"),
+      ))).toHaveLength(1);
+      const [teacherAudit] = await db.select().from(schema.auditEvents).where(and(
+        eq(schema.auditEvents.resourceId, teacherArrangement.id),
+        eq(schema.auditEvents.action, "launch.teacher.assign"),
+      ));
+      expect(teacherAudit.context.requestId).toBe(context.requestId);
 
       const orientationId = await programsModule.createProgramOrientation(
         context,
@@ -236,6 +287,38 @@ integration("GF3 host / program launch", () => {
         });
 
       expect(orientationRetryId).toBe(orientationId);
+      expect(await db.select().from(schema.domainEvents).where(and(
+        eq(schema.domainEvents.aggregateId, orientationId),
+        eq(schema.domainEvents.eventType, "CalendarEventCreated"),
+      ))).toHaveLength(1);
+      expect(await db.select().from(schema.auditEvents).where(and(
+        eq(schema.auditEvents.resourceId, orientationId),
+        eq(schema.auditEvents.action, "program.orientation.schedule"),
+      ))).toHaveLength(1);
+
+      launchContext.scope.siteIds = [];
+      const extraSite = await launchFunctions.createLaunchSite({ data: {
+        organizationId: host.id,
+        name: "Additional Campus",
+        slug: `additional-${suffix}-${index}`,
+        timezone: "America/Los_Angeles",
+      } });
+      launchContext.scope.siteIds = [site.id];
+      expect(await db.select().from(schema.domainEvents).where(and(
+        eq(schema.domainEvents.aggregateId, extraSite.siteId),
+        eq(schema.domainEvents.eventType, "SiteCreated"),
+      ))).toHaveLength(1);
+      const [siteAudit] = await db.select().from(schema.auditEvents).where(and(
+        eq(schema.auditEvents.resourceId, extraSite.siteId),
+        eq(schema.auditEvents.action, "site.create"),
+      ));
+      expect(siteAudit.context.requestId).toBe(context.requestId);
+      await (await import("@/workers/domain-event-worker")).processPendingDomainEvents();
+      const [siteEvent] = await db.select().from(schema.domainEvents).where(and(
+        eq(schema.domainEvents.aggregateId, extraSite.siteId),
+        eq(schema.domainEvents.eventType, "SiteCreated"),
+      ));
+      expect(siteEvent.status).toBe("processed");
 
       await programsModule.activateProgram(context, launch.programId);
 

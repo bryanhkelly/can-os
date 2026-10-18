@@ -210,10 +210,30 @@ export async function createProgramOrientation(
       aggregateType: "calendar_event",
       aggregateId: event.id,
       actorPersonId: context.actorPersonId,
+      organizationId: program.organizationId,
+      siteId: program.siteId,
+      programId: program.id,
       payload: {
         programId: program.id,
         type: "orientation",
       },
+    });
+    await writeAudit(tx, context, {
+      action: "program.orientation.schedule",
+      entityType: "calendar_event",
+      entityId: event.id,
+      scope: {
+        organizationId: program.organizationId,
+        siteId: program.siteId,
+        programId: program.id,
+      },
+      after: {
+        title: input.title ?? "CAN Program Orientation",
+        startsAt: input.startsAt.toISOString(),
+        endsAt: input.endsAt?.toISOString() ?? null,
+        timezone: input.timezone,
+      },
+      contextExtras: { sourceType: "program_orientation" },
     });
 
     return event.id;

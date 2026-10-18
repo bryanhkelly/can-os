@@ -149,8 +149,8 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
      aggregateType:"section",aggregateId:existing.id,actorPersonId:actor.actorPersonId,
      payload:{organizationId:program.organizationId,siteId:program.siteId,
       programId:program.id,termId:data.termId}});
-    await writeAudit(tx, {actorPersonId:actor.actorPersonId,
-     action:"launch.section.provision",resourceType:"section",resourceId:existing.id,
+    await writeAudit(tx,actor,{
+     action:"launch.section.provision",entityType:"section",entityId:existing.id,
      scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
      after:{code:data.code,title:data.title,termId:data.termId,
       teacherPersonId:data.teacherPersonId??null}});
@@ -172,12 +172,20 @@ export const assignLaunchTeacher=createServerFn({method:"POST"})
   if(!program.siteId)throw new Error("Teaching assignment requires an onsite school site");
   return db.transaction(async tx=>{
    await lockAttendanceConfigurationAtSite(tx,program.siteId!);
+   const [activeArrangement]=await tx.select({id:deliveryArrangements.id})
+    .from(deliveryArrangements).where(and(
+     eq(deliveryArrangements.sectionId,section.id),
+     eq(deliveryArrangements.instructorPersonId,data.teacherPersonId),
+     eq(deliveryArrangements.status,"active"),
+    )).for("update").limit(1);
+   if(activeArrangement)return {created:false};
    await tx.update(deliveryArrangements).set({status:"completed",updatedAt:new Date()})
     .where(and(eq(deliveryArrangements.sectionId,section.id),eq(deliveryArrangements.status,"active")));
-   await tx.insert(deliveryArrangements).values({
+   const [arrangement]=await tx.insert(deliveryArrangements).values({
     sectionId:section.id,academicProviderOrganizationId:program.academicProviderOrganizationId,
     instructorPersonId:data.teacherPersonId,modality:launchModality(program.deliveryModel),status:"active",
-   });
+   }).returning({id:deliveryArrangements.id});
+   if(!arrangement)throw new Error("Failed to create delivery arrangement");
    const [created]=await tx.insert(sectionTeachers).values({
     sectionId:section.id,personId:data.teacherPersonId,role:"teacher",
    }).onConflictDoNothing().returning({id:sectionTeachers.id});
@@ -186,10 +194,17 @@ export const assignLaunchTeacher=createServerFn({method:"POST"})
      type:"teaching_assignment",status:"unread",title:"New teaching assignment",
      body:"You have been assigned to a course at "+program.name,
      resourceType:"section",resourceId:section.id});
-    await writeAudit(tx, {actorPersonId:actor.actorPersonId,
-     action:"launch.teacher.assign",resourceType:"section",resourceId:section.id,
-     scope:{programId:program.id,siteId:program.siteId},after:{personId:data.teacherPersonId}});
    }
+   await emitEvent(tx,{
+    eventType:"DeliveryArrangementActivated",aggregateType:"delivery_arrangement",
+    aggregateId:arrangement.id,actorPersonId:actor.actorPersonId,
+    organizationId:program.organizationId,siteId:program.siteId,programId:program.id,
+    sectionId:section.id,payload:{instructorPersonId:data.teacherPersonId},
+   });
+   await writeAudit(tx,actor,{
+    action:"launch.teacher.assign",entityType:"delivery_arrangement",entityId:arrangement.id,
+    scope:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,sectionId:section.id},
+    after:{sectionId:section.id,personId:data.teacherPersonId,modality:launchModality(program.deliveryModel)}});
    return {created:Boolean(created)};
   });
  });

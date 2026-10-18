@@ -354,6 +354,7 @@ export async function setAcademicCalendarDay(
         organizationId: schoolYears.organizationId,
         programId: schoolYears.programId,
         siteId: schoolYears.siteId,
+        schoolYearId: schoolYears.id,
       })
       .from(academicCalendars)
       .innerJoin(
@@ -377,7 +378,13 @@ export async function setAcademicCalendarDay(
     await lockAttendanceConfigurationAtSite(tx, record.siteId);
 
     const [existing] = await tx
-      .select({ id: academicCalendarDays.id })
+      .select({
+        id: academicCalendarDays.id,
+        type: academicCalendarDays.type,
+        title: academicCalendarDays.title,
+        instructionalMinutes: academicCalendarDays.instructionalMinutes,
+        notes: academicCalendarDays.notes,
+      })
       .from(academicCalendarDays)
       .where(
         and(
@@ -426,9 +433,37 @@ export async function setAcademicCalendarDay(
       aggregateType: "academic_calendar",
       aggregateId: input.academicCalendarId,
       actorPersonId: context.actorPersonId,
+      organizationId: record.organizationId,
+      siteId: record.siteId,
+      programId: record.programId,
       payload: {
+        operation: existing ? "update_day" : "create_day",
+        schoolYearId: record.schoolYearId,
         calendarDate: input.calendarDate,
         type: input.type,
+      },
+    });
+    await writeAudit(tx, context, {
+      action: "academic_calendar.day.set",
+      entityType: "academic_calendar_day",
+      entityId: dayId,
+      scope: {
+        organizationId: record.organizationId,
+        siteId: record.siteId,
+        programId: record.programId,
+      },
+      before: existing ? {
+        type: existing.type,
+        title: existing.title,
+        instructionalMinutes: existing.instructionalMinutes,
+        notes: existing.notes,
+      } : null,
+      after: {
+        calendarDate: input.calendarDate,
+        type: input.type,
+        title: input.title ?? null,
+        instructionalMinutes: input.instructionalMinutes ?? null,
+        notes: input.notes ?? null,
       },
     });
 

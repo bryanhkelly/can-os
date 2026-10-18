@@ -1,7 +1,8 @@
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { completeJourneyRequirement } from "@/modules/journeys/complete-requirement";
-import { writeAudit } from "@/platform/mutation";
+import { EventTypes } from "@/domain/event-types";
+import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -227,11 +228,17 @@ export const createLaunchSite = createServerFn({method:"POST"})
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
    const [site]=await tx.insert(s.sites).values({...data}).returning({id:s.sites.id});
-   await writeAudit(tx, {actorPersonId:actor.actorPersonId,
-    action:"site.create",resourceType:"site",resourceId:site!.id,
-    scope:{organizationId:data.organizationId,siteId:site!.id},
+   if(!site)throw new Error("Failed to create Site");
+   await emitEvent(tx,{
+    eventType:EventTypes.SiteCreated,aggregateType:"site",aggregateId:site.id,
+    actorPersonId:actor.actorPersonId,organizationId:data.organizationId,
+    siteId:site.id,payload:{name:data.name,timezone:data.timezone},
+   });
+   await writeAudit(tx,actor,{
+    action:"site.create",entityType:"site",entityId:site.id,
+    scope:{organizationId:data.organizationId,siteId:site.id},
     after:{name:data.name,timezone:data.timezone}});
-   return {siteId:site!.id};
+   return {siteId:site.id};
   });
  });
 /** Create a unique orientation event and expose it to site/program calendars. */

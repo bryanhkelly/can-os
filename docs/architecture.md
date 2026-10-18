@@ -210,3 +210,11 @@ even on retries, rejects cancelled work and blank notes, and writes its audit
 and outbox event once. Withdrawn enrollment or an inactive section currently
 denies academic mutation; historical follow-up requires a separately defined
 policy rather than falling back to generic mutation.
+
+School-Year Studio calendar-day create/update, Program Launch orientation and
+site creation, and launch teacher assignment write their audit evidence in the
+same transaction as the mutation. Calendar/launch changes that feed downstream
+projections also emit scoped domain events. Repeating an already-active launch
+teacher assignment is a no-op and does not create another arrangement or
+duplicate evidence. Audit writers receive the verified command context so
+request IDs are retained.

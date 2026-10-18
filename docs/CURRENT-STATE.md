@@ -1,6 +1,6 @@
 # CAN OS — current implementation snapshot
 
-**Baseline reviewed:** the academic Action follow-up on `main` at `5620ef4` (2026-10-18), plus the changes included with this snapshot. The prior academic/conference authorization follow-up was pushed in `75a83be`. Local automated results are recorded below; they are **not** a verified deployment, production acceptance, security audit, or assertion that remote CI has passed.
+**Baseline reviewed:** `main` at `80f6c66` (2026-10-18), plus the academic Action and mutation-evidence follow-ups included with this snapshot. The prior academic/conference authorization follow-up was pushed in `75a83be`. Local automated results are recorded below; they are **not** a verified deployment, production acceptance, security audit, or assertion that remote CI has passed.
 
 ## Integrated source baseline
 
@@ -15,6 +15,7 @@
 - Approved agent writes use the approval transaction. The Academic Domain API now shares a program-and-relationship predicate across student discovery and summary sections: missing/empty program grants deny visibility, supplied site/section lists restrict it, and teachers only see their assigned sections. Tests cover revoked relationships/assignments and approval-time loss of access.
 - Conference booking/rescheduling no longer accept an optional enrollment-check switch. Both commands require explicit site/program grants, current guardian relationship, school enrollment and active section enrollment where applicable; direct-service regression tests cover denials and transactional rescheduling.
 - Student-section academic Action creation, operational acceptance/assignment/status changes and direct resolution now share resource/relationship policy. Ownership alone does not grant access. Resolution locks the Action, rechecks access on retries, requires a nonblank note and rejects cancelled work; concurrent completion writes one audit and one outbox event. Site-wide operational follow-ups retain their existing path, while the direct resolver rejects other domain types.
+- School-Year Studio calendar-day create/update records before/after audit evidence and scoped calendar events. Program orientation, launch site creation and teacher assignment now have transactional audit/domain-event evidence; repeated active teacher assignment is a no-op.
 
 ## Architecture versus known code gaps
 
@@ -26,8 +27,8 @@
 
 ## Verification and release status
 
-- Local verification on 2026-10-18: `npm test` passed **71 files / 350 tests**; `npm run test:integration` passed **29 files / 43 tests** using the protected isolated Neon runner. These are working-tree results, including concurrent calendar/transcript work, not a claim that every change belongs to this follow-up. Academic Action regression includes missing/wrong scopes, revoked staff/enrollment relationships, invalid owners, owning-domain rejection, cancelled work, concurrent resolution and operations-adapter parity.
-- `npm run typecheck`, `npm run build`, mutation hygiene, route fixture coverage and `node scripts/check-platform-route-contracts.mjs --check` passed locally with this follow-up.
+- Local verification on 2026-10-18: `npm test` passed **71 files / 350 tests**; `npm run test:integration` passed **29 files / 43 tests** using the protected isolated Neon runner. These are working-tree results, including concurrent calendar/transcript work, not a claim that every change belongs to this follow-up. Coverage includes academic Action denial/concurrency, school-year calendar-day audit history, program orientation audit, launch site/teacher evidence and duplicate assignment idempotency.
+- `npm run typecheck`, `npm run build`, mutation hygiene, route fixture coverage and `node scripts/check-platform-route-contracts.mjs --check` passed locally after the current evidence changes.
 - Browser/Playwright cross-persona journeys, remote CI, live R2 configuration and production migration/deployment remain **unverified** in this continuation. No production migration or data modification was performed.
 - All 65 route acceptance entries remain **pending**. The basic source-drift checker is separate from the stricter `--acceptance` gate.
 - Sensitive student, medical, safety, payment and legal data require independent privacy/security review and operational acceptance. Do not infer readiness from documentation or a passing compile.

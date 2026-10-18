@@ -178,12 +178,20 @@ integration("GF23 school-year setup", () => {
       name: "Primary Academic Calendar",
     });
 
-    await academicTime.setAcademicCalendarDay(context, {
+    const calendarDayId = await academicTime.setAcademicCalendarDay(context, {
       academicCalendarId: calendarId,
       calendarDate: "2027-09-14",
       type: "instructional",
       instructionalMinutes: 360,
     });
+    expect(await academicTime.setAcademicCalendarDay(context, {
+      academicCalendarId: calendarId,
+      calendarDate: "2027-09-14",
+      type: "special",
+      title: "Adjusted schedule",
+      instructionalMinutes: 300,
+      notes: "Testing calendar revision",
+    })).toBe(calendarDayId);
 
     await expect(
       academicTime.activateSchoolYear(context, schoolYearId),
@@ -225,6 +233,27 @@ integration("GF23 school-year setup", () => {
     expect(activeYear.status).toBe("active");
 
     const { and, eq } = await import("drizzle-orm");
+    const calendarDayAudits = await db.select().from(schema.auditEvents).where(and(
+      eq(schema.auditEvents.resourceId, calendarDayId),
+      eq(schema.auditEvents.action, "academic_calendar.day.set"),
+    ));
+    expect(calendarDayAudits).toHaveLength(2);
+    expect(calendarDayAudits[0]!.before).toBeNull();
+    expect(calendarDayAudits[1]!.before).toMatchObject({
+      type: "instructional", instructionalMinutes: 360,
+    });
+    expect(calendarDayAudits[1]!.after).toMatchObject({
+      type: "special", title: "Adjusted schedule", instructionalMinutes: 300,
+    });
+    expect(calendarDayAudits.every(row => row.context.requestId === context.requestId)).toBe(true);
+
+    const calendarDayEvents = await db.select().from(schema.domainEvents).where(and(
+      eq(schema.domainEvents.aggregateId, calendarId),
+      eq(schema.domainEvents.eventType, "AcademicCalendarChanged"),
+    ));
+    expect(calendarDayEvents.some(event => event.payload.operation === "create_day")).toBe(true);
+    expect(calendarDayEvents.some(event => event.payload.operation === "update_day")).toBe(true);
+
     for (const entry of [
       { id: fallTermId, type: "term", action: "term.create", event: "TermCreated" },
       { id: gradingPeriodId, type: "grading_period", action: "grading_period.create", event: "GradingPeriodCreated" },

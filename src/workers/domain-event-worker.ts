@@ -51,6 +51,7 @@ for (const eventType of [
   EventTypes.EnrollmentActivated,
   EventTypes.ProgramLaunchStarted,
   EventTypes.ProgramActivated,
+  EventTypes.SiteCreated,
   EventTypes.SchoolYearCreated,
   EventTypes.SchoolYearActivated,
   EventTypes.AcademicCalendarChanged,
