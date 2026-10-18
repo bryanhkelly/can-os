@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "description": "Route ownership and acceptance tracking. All 'pending' fields are unverified until source and role journey review; this inventory is not proof of safety.",
-  "generatedFromBranch": "phase1/platform-convergence-foundation",
+  "generatedFromBranch": "main",
   "routes": [
     {
       "file": "src/routes/__root.tsx",
@@ -157,6 +157,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/groups.tsx",
+      "route": "/groups",
+      "owner": "study-groups",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/guardian.academics.tsx",
       "route": "/guardian/academics",
       "owner": "family",
@@ -178,6 +187,33 @@
       "file": "src/routes/guardian.attendance.tsx",
       "route": "/guardian/attendance",
       "owner": "family",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.course-approvals.tsx",
+      "route": "/guardian/course-approvals",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.field-trips.tsx",
+      "route": "/guardian/field-trips",
+      "owner": "field-trips",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.group-permissions.tsx",
+      "route": "/guardian/group-permissions",
+      "owner": "study-groups",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -256,6 +292,24 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.course-requests.tsx",
+      "route": "/operations/course-requests",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.field-trips.tsx",
+      "route": "/operations/field-trips",
+      "owner": "field-trips",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/operations.insights.tsx",
       "route": "/operations/insights",
       "owner": "operations",
@@ -294,6 +348,15 @@
     {
       "file": "src/routes/operations.tsx",
       "route": "/operations",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.workflows.tsx",
+      "route": "/operations/workflows",
       "owner": "operations",
       "verification": "pending",
       "roleJourney": "pending",
@@ -525,5 +588,6 @@
       "writeBoundary": "pending",
       "readBoundary": "pending"
     }
-  ]
+  ],
+  "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
 }

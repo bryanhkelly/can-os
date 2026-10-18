@@ -6,7 +6,7 @@ Scope: Additive specification. No implementation or completed workflow is implie
 A church, independent school, or local operator can create, configure, open, operate, improve, and expand a school of 1–1,000 students using one canonical operating foundation. Launch Studio and School/Site Workspace are two states of the same Organization → Site → Program lifecycle, NOT separate record stores or products.
 
 ## Existing foundations and source references
-- Production: `src/routes/operations.launch.tsx`, `src/modules/programs/launch.functions.ts`, `src/modules/programs/gf3-service.ts`, `src/routes/operations.tsx`; see `docs/domain-model.md`, `docs/golden-flows.md`, `docs/functional-completeness-audit.md`. GF3 is foundation-only as of October 16.
+- Production: `src/routes/operations.launch.tsx`, `src/modules/programs/launch.functions.ts`, `src/modules/programs/gf3-service.ts`, `src/routes/operations.tsx`; see `docs/domain-model.md`, `docs/golden-flows.md`, and `docs/CURRENT-STATE.md`. The October 16 GF3 completeness assessment is historical; confirm current code and acceptance evidence before claiming completion.
 - UX references, not production code: `academy-union-core/src/routes/_shell/launch-center.tsx` and `academy-union-core/src/routes/_shell/church-sites.$siteId.tsx`. Prototype site tabs: overview, local-director operations, partner operations, capacity, revenue, health, compliance, facilities, lab days, attendance, incidents, students, staff, priorities.
 - Follow `docs/prototype-migration.md`: no localStorage workflow state, scripted AI evidence, fake audit history, church-only model, or persona-based production authorization.
 

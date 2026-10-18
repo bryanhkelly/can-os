@@ -1,5 +1,7 @@
 # CAN OS Production Architecture
 
+For current implementation and verification status, see [CURRENT-STATE.md](./CURRENT-STATE.md). This document defines architecture, not a claim that each capability is deployed or accepted.
+
 ## Purpose
 
 CAN OS is a production operating system for distributed Christian education. The prototype in `bryanhkelly/academy-union-core` is a UX and workflow reference only.
@@ -123,7 +125,7 @@ The platform is three modules inside the monolith: **Conversation** (durable thr
 
 Full design: [ask-can-agent-platform.md](./ask-can-agent-platform.md).
 
-## Production build order
+## Capability dependency sequence (architectural roadmap, not current work queue)
 
 1. Domain model + Neon migrations
 2. Identity and authorization
