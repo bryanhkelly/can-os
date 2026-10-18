@@ -26,7 +26,10 @@ function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
  }
  return <WorkspaceShell eyebrow="CAN OS · Academic operations" title="Course registration policies"
   subtitle="Set enrollment limits, academic prerequisites, credit rules and registration deadlines. Schedule conflicts use the section’s canonical timetable."
-  actions={<Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>}>
+  actions={<div className="flex flex-wrap gap-2">
+   <Link to="/operations/course-requests" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Registration requests</Link>
+   <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
+  </div>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <div className="mt-8 space-y-4">
@@ -67,6 +70,12 @@ function CoursePolicyCard({row,save,disabled}:{
      className="mt-1 block w-full rounded border bg-background p-2"/>
    </label>
   </div>
+  <label className="mt-4 flex items-start gap-3 rounded-lg border p-3 text-sm">
+    <input type="checkbox" checked={value.guardianApprovalRequired}
+      onChange={e=>update("guardianApprovalRequired",e.target.checked)} className="mt-1"/>
+    <span>Require verified guardian approval before a registrar may approve this class addition.
+      Student requests remain pending until an authorized guardian records their decision.</span>
+  </label>
   <button type="button" disabled={disabled}
    onClick={()=>save({...value,prerequisites:prerequisites.split(",").map(s=>s.trim()).filter(Boolean)})}
    className="mt-4 rounded bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">

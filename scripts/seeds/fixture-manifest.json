@@ -859,6 +859,119 @@
         "triage notification to its resource"
       ],
       "downstreamRecords": []
+    },
+    "/groups": {
+      "persona": "student",
+      "seeds": [
+        "gf26-study-groups.sql"
+      ],
+      "recordCounts": {
+        "study_groups": 1,
+        "study_group_memberships": 1
+      },
+      "interactions": [
+        "request study group membership",
+        "post to an approved group discussion",
+        "report a group post"
+      ],
+      "downstreamRecords": [
+        "study_group_memberships",
+        "study_group_posts",
+        "audit_events"
+      ]
+    },
+    "/guardian/group-permissions": {
+      "persona": "guardian",
+      "seeds": [
+        "gf26-study-groups.sql"
+      ],
+      "recordCounts": {
+        "study_groups": 1,
+        "actions": 1
+      },
+      "interactions": [
+        "approve or decline a study group participation request"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "study_group_memberships",
+        "audit_events"
+      ]
+    },
+    "/guardian/course-approvals": {
+      "persona": "guardian",
+      "seeds": [
+        "gf40-course-registration.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "sections": 1
+      },
+      "interactions": [
+        "approve or decline a course registration request"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "enrollments",
+        "audit_events"
+      ]
+    },
+    "/operations/course-requests": {
+      "persona": "registrar",
+      "seeds": [
+        "gf40-course-registration.sql",
+        "gf40-rules-assignments.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "sections": 2
+      },
+      "interactions": [
+        "approve or decline a pending course change request"
+      ],
+      "downstreamRecords": [
+        "enrollments",
+        "audit_events",
+        "domainEvents:CourseRegistrationRequested"
+      ]
+    },
+    "/operations/field-trips": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "field_trips": 1,
+        "field_trip_participants": 1
+      },
+      "interactions": [
+        "create a field trip",
+        "invite an enrolled student",
+        "record departure and return checkpoints"
+      ],
+      "downstreamRecords": [
+        "field_trip_participants",
+        "field_trip_attendance",
+        "audit_events"
+      ]
+    },
+    "/guardian/field-trips": {
+      "persona": "guardian",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "field_trips": 1,
+        "field_trip_participants": 1
+      },
+      "interactions": [
+        "grant or decline field trip permission for a child"
+      ],
+      "downstreamRecords": [
+        "field_trip_participants",
+        "audit_events"
+      ]
     }
   }
 }
