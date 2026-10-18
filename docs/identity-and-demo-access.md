@@ -28,7 +28,7 @@ CAN OS is a real multi-user application with a shared Neon-backed synthetic demo
 - Authenticate each request from session, not from query string, localStorage, or client-submitted actorId.
 - Where anonymous shared demo access is allowed, give it an explicit limited demo principal and never pretend that principal represents an authenticated student or staff member.
 
-## Implementation order
+## Original implementation sequence (historical, not a live task list)
 
 1. Add auth/session/one-time-challenge schema, scoped grants and idempotent synthetic fixtures.
 2. Implement identity adapter + Resend magic code workflow with rate limits, challenge expiry, single use and cookie sessions.
@@ -38,6 +38,6 @@ CAN OS is a real multi-user application with a shared Neon-backed synthetic demo
 6. Implement clearly labeled facilitator-controlled demo impersonation and deterministic synthetic reset.
 7. Cover unauthorized reads/writes, role switches, multiple actors, guardian relationships, session replay, cross-user leakage and audit attribution with unit/integration/e2e tests.
 
-## Known interim state
+## Current implementation boundary
 
-The role-specific navigation introduced in this branch is a usability affordance only. It is **not** a security boundary. Do not enable real data until the server work above is complete.
+The application now derives workspace selection from server-issued session grants rather than trusting a browser-selected persona. See `src/modules/identity/command-context.server.ts` and `src/components/shell/WorkspaceNavigation.tsx`. Resource-level authorization, retention, safety, and deployment readiness still require explicit review and tests. Some legacy workflows still contain synthetic-write gates; do not generalize these into product architecture. Nothing in this document certifies the application for real student, medical, or legal data.

@@ -1,5 +1,7 @@
 # CAN OS Golden Flows
 
+This is the canonical catalog of **specified** golden and experience flows, not proof of execution or production readiness. Historical development labels `GF40`, `GF41`, and `GF41B` appear in archived feature notes but are **not currently defined as Golden Flows in this catalog**. See [feature tracks](./FEATURE-TRACKS.md); do not renumber tests or APIs silently.
+
 Golden Flows are the unit of production delivery. A feature is not considered complete merely because its page exists.
 
 ## GF1 — Academic Intervention
