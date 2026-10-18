@@ -139,7 +139,12 @@ async function markFailed(eventId: string, error: unknown): Promise<void> {
       .from(domainEvents)
       .where(eq(domainEvents.id, eventId))
       .limit(1);
-    if (!event) return;
+    // Only failures while the event is leased to this worker may reset it.
+    // If the handler already committed the event as processed and a later
+    // step (subscription fan-out) threw, requeueing would re-run the handler
+    // and duplicate its side effects (insights, notifications, emails).
+    // Subscription-level recovery is owned by recoverSubscriptionEventMatches.
+    if (!event || event.status !== "processing") return;
 
     const attempts = event.attempts + 1;
 
