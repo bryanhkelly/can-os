@@ -96,6 +96,8 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
       actor,
       sites,
       sectionIds,
+      rangeStart,
+      rangeEnd,
     );
 
     const participantEventIds = db

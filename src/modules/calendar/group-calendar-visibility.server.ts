@@ -1,4 +1,4 @@
-import { and, eq, exists, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, exists, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import * as schema from "@/db/schema";
 import type { Actor } from "@/modules/identity/actors.server";
@@ -7,6 +7,8 @@ export async function visibleStudyGroupCalendarEventIds(
   actor: Actor,
   siteIds: readonly string[],
   sectionIds: readonly string[],
+  rangeStart: Date,
+  rangeEnd: Date,
 ): Promise<string[]> {
   if (!siteIds.length) return [];
 
@@ -109,6 +111,8 @@ export async function visibleStudyGroupCalendarEventIds(
     .where(and(
       eq(schema.calendarEvents.type, "study_group"),
       eq(schema.calendarEvents.sourceType, "study_group_session"),
+      gte(schema.calendarEvents.startsAt, rangeStart),
+      lt(schema.calendarEvents.startsAt, rangeEnd),
       eq(schema.studyGroups.status, "active"),
       inArray(schema.studyGroups.siteId, [...siteIds]),
       visibility,

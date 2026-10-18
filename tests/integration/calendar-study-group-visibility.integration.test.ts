@@ -165,12 +165,21 @@ integration("study-group calendar visibility", () => {
     const siteIds = [site!.id];
     const sectionIds: string[] = [];
     const teacherSectionIds = [section!.id];
+    const rangeStart = new Date(Date.now());
+    const rangeEnd = new Date(Date.now() + 3 * 86400000);
 
     const memberActor = actor(member!.id, "student");
-    await expect(visibleStudyGroupCalendarEventIds(memberActor, siteIds, sectionIds))
+    await expect(visibleStudyGroupCalendarEventIds(memberActor, siteIds, sectionIds, rangeStart, rangeEnd))
       .resolves.toContain(event!.id);
-    await expect(visibleStudyGroupCalendarEventIds(memberActor, siteIds, sectionIds))
+    await expect(visibleStudyGroupCalendarEventIds(memberActor, siteIds, sectionIds, rangeStart, rangeEnd))
       .resolves.not.toContain(courseEvent!.id);
+    await expect(visibleStudyGroupCalendarEventIds(
+      memberActor,
+      siteIds,
+      sectionIds,
+      new Date(rangeStart.getTime() - 4 * 86400000),
+      rangeStart,
+    )).resolves.not.toContain(event!.id);
     await db.insert(schema.enrollments).values({
       studentProfileId: profiles[0]!.id,
       kind: "section",
@@ -180,23 +189,23 @@ integration("study-group calendar visibility", () => {
       sectionId: section!.id,
       schoolYearId: academicTime.schoolYear.id,
     });
-    await expect(visibleStudyGroupCalendarEventIds(memberActor, siteIds, sectionIds))
+    await expect(visibleStudyGroupCalendarEventIds(memberActor, siteIds, sectionIds, rangeStart, rangeEnd))
       .resolves.not.toContain(courseEvent!.id);
     await db.update(schema.enrollments).set({ status: "active" }).where(and(
       eq(schema.enrollments.studentProfileId, profiles[0]!.id),
       eq(schema.enrollments.sectionId, section!.id),
     ));
-    await expect(visibleStudyGroupCalendarEventIds(memberActor, siteIds, sectionIds))
+    await expect(visibleStudyGroupCalendarEventIds(memberActor, siteIds, sectionIds, rangeStart, rangeEnd))
       .resolves.toContain(courseEvent!.id);
-    await expect(visibleStudyGroupCalendarEventIds(actor(pendingMember!.id, "student"), siteIds, sectionIds))
+    await expect(visibleStudyGroupCalendarEventIds(actor(pendingMember!.id, "student"), siteIds, sectionIds, rangeStart, rangeEnd))
       .resolves.not.toContain(event!.id);
-    await expect(visibleStudyGroupCalendarEventIds(actor(withdrawnMember!.id, "student"), siteIds, sectionIds))
+    await expect(visibleStudyGroupCalendarEventIds(actor(withdrawnMember!.id, "student"), siteIds, sectionIds, rangeStart, rangeEnd))
       .resolves.not.toContain(event!.id);
-    await expect(visibleStudyGroupCalendarEventIds(actor(facilitator!.id, "teacher"), siteIds, teacherSectionIds))
+    await expect(visibleStudyGroupCalendarEventIds(actor(facilitator!.id, "teacher"), siteIds, teacherSectionIds, rangeStart, rangeEnd))
       .resolves.toContain(event!.id);
-    await expect(visibleStudyGroupCalendarEventIds(actor(facilitator!.id, "teacher"), siteIds, teacherSectionIds))
+    await expect(visibleStudyGroupCalendarEventIds(actor(facilitator!.id, "teacher"), siteIds, teacherSectionIds, rangeStart, rangeEnd))
       .resolves.toContain(courseEvent!.id);
-    await expect(visibleStudyGroupCalendarEventIds(actor(otherTeacher!.id, "teacher"), siteIds, []))
+    await expect(visibleStudyGroupCalendarEventIds(actor(otherTeacher!.id, "teacher"), siteIds, [], rangeStart, rangeEnd))
       .resolves.not.toContain(event!.id);
   });
 });
