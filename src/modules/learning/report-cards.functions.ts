@@ -736,6 +736,112 @@ export const getStudentTranscript = createServerFn({ method: "GET" })
     };
   });
 
+/** Scoped student search for registrars issuing official transcript artifacts. */
+export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" })
+  .validator((value: unknown) => z.object({
+    query: z.string().trim().max(100).default(""),
+  }).parse(value ?? {}))
+  .handler(async ({ data }) => {
+    const context = await getCommandContext(getRequest());
+    assertCapability(context, "enrollment:manage");
+    if (context.role !== "registrar" || !context.actorPersonId) {
+      throw new AuthorizationError("registrar transcript issuance");
+    }
+    if (!context.scope.siteIds?.length || !context.scope.programIds?.length) {
+      throw new AuthorizationError("registrar transcript scope");
+    }
+    const query = data.query.trim();
+    if (query.length < 2) return { candidates: [] };
+
+    const { db, s } = await stores();
+    const namePattern = `%${query.replace(/[!%_]/g, "!$&")}%`;
+    const [grades, withdrawals] = await Promise.all([
+      db.select({
+        studentProfileId: s.studentProfiles.id,
+        studentPersonId: s.studentProfiles.personId,
+        firstName: s.people.legalFirstName,
+        lastName: s.people.legalLastName,
+        issuerId: s.programs.creditIssuingOrganizationId,
+        issuerName: s.organizations.name,
+      }).from(s.sectionGrades)
+        .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.sectionGrades.studentProfileId))
+        .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
+        .innerJoin(s.sections, eq(s.sections.id, s.sectionGrades.sectionId))
+        .innerJoin(s.programs, eq(s.programs.id, s.sections.programId))
+        .innerJoin(s.organizations, eq(s.organizations.id, s.programs.creditIssuingOrganizationId))
+        .where(and(
+          eq(s.sectionGrades.status, "finalized"),
+          inArray(s.sections.siteId, context.scope.siteIds),
+          inArray(s.sections.programId, context.scope.programIds),
+          sql`concat_ws(' ', ${s.people.legalFirstName}, ${s.people.legalLastName}) ilike ${namePattern} escape '!'`,
+        ))
+        .orderBy(s.people.legalLastName, s.people.legalFirstName)
+        .limit(500),
+      db.select({
+        studentProfileId: s.studentProfiles.id,
+        studentPersonId: s.studentProfiles.personId,
+        firstName: s.people.legalFirstName,
+        lastName: s.people.legalLastName,
+        issuerId: s.programs.creditIssuingOrganizationId,
+        issuerName: s.organizations.name,
+      }).from(s.enrollments)
+        .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
+        .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
+        .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+        .innerJoin(s.programs, eq(s.programs.id, s.sections.programId))
+        .innerJoin(s.organizations, eq(s.organizations.id, s.programs.creditIssuingOrganizationId))
+        .where(and(
+          eq(s.enrollments.kind, "section"),
+          eq(s.enrollments.status, "withdrawn"),
+          sql`${s.enrollments.metadata}->>'withdrawalNotation' = 'W'`,
+          inArray(s.sections.siteId, context.scope.siteIds),
+          inArray(s.sections.programId, context.scope.programIds),
+          sql`concat_ws(' ', ${s.people.legalFirstName}, ${s.people.legalLastName}) ilike ${namePattern} escape '!'`,
+        ))
+        .orderBy(s.people.legalLastName, s.people.legalFirstName)
+        .limit(500),
+    ]);
+    if (grades.length === 500 || withdrawals.length === 500) {
+      return { candidates: [], truncated: true };
+    }
+
+    const byStudent = new Map<string, {
+      studentProfileId: string;
+      studentPersonId: string;
+      studentName: string;
+      issuers: Map<string, { id: string; name: string }>;
+      recordCount: number;
+    }>();
+    for (const row of [...grades, ...withdrawals]) {
+      const candidate = byStudent.get(row.studentProfileId) ?? {
+        studentProfileId: row.studentProfileId,
+        studentPersonId: row.studentPersonId,
+        studentName: `${row.firstName} ${row.lastName}`,
+        issuers: new Map<string, { id: string; name: string }>(),
+        recordCount: 0,
+      };
+      candidate.issuers.set(row.issuerId, { id: row.issuerId, name: row.issuerName });
+      candidate.recordCount += 1;
+      byStudent.set(row.studentProfileId, candidate);
+    }
+
+    return {
+      candidates: [...byStudent.values()]
+        .sort((a, b) => a.studentName.localeCompare(b.studentName))
+        .slice(0, 50)
+        .map(candidate => {
+          const issuers = [...candidate.issuers.values()];
+          return {
+            studentPersonId: candidate.studentPersonId,
+            studentName: candidate.studentName,
+            issuer: issuers.length === 1 ? issuers[0] : null,
+            multipleIssuers: issuers.length > 1,
+            recordCount: candidate.recordCount,
+          };
+        }),
+    };
+  });
+
 async function listIssuances(db: DbClient, s: Schema, studentProfileId: string, authorizedIssuers:string[]) {
   if(!authorizedIssuers.length)return [];
   const rows = await db

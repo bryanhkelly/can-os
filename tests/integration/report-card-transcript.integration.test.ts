@@ -8,6 +8,7 @@ import {
   getStudentReportCard,
   getStudentTranscript,
   issueTranscript,
+  listTranscriptIssuanceCandidates,
 } from "@/modules/learning/report-cards.functions";
 import { createAcademicTimeFixture } from "./helpers/academic-time";
 
@@ -175,10 +176,32 @@ integration("GF25 report card and transcript", () => {
       scope,
       requestId: `gf25-${suffix}`,
     };
+    state.context = {
+      ...state.context,
+      actorPersonId: registrar!.id,
+      role: "registrar",
+      capabilities: new Set(["enrollment:manage"]),
+    };
+    await expect(listTranscriptIssuanceCandidates({ data: { query: "St" } }))
+      .resolves.toMatchObject({
+        candidates: [expect.objectContaining({
+          studentPersonId: student!.id,
+          issuer: { id: issuer!.id, name: issuer!.name },
+          multipleIssuers: false,
+        })],
+      });
+    await expect(listTranscriptIssuanceCandidates({ data: { query: "S" } }))
+      .resolves.toEqual({ candidates: [] });
     const gradeCorrection = {
       sectionGradeId: grade!.id,
       percentage: 84,
       reason: "Verified scoring error",
+    };
+    state.context = {
+      ...state.context,
+      actorPersonId: teacher!.id,
+      role: "teacher",
+      capabilities: new Set(["assignments:grade"]),
     };
     await expect(finalizeSectionGrades({ data: {
       sectionId: section!.id,

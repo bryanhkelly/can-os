@@ -84,6 +84,24 @@
         "notifications:admission_offer_issued"
       ]
     },
+    "/admissions/transcripts": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_grades": 1
+      },
+      "interactions": [
+        "search authorized students with finalized academic records",
+        "issue an official transcript from the configured credit issuer"
+      ],
+      "downstreamRecords": [
+        "transcript_issuances",
+        "audit_events",
+        "domainEvents:TranscriptIssued"
+      ]
+    },
     "/admissions/capacity": {
       "persona": "registrar",
       "seeds": [

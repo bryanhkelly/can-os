@@ -66,6 +66,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       eyebrow="CAN OS · Admissions"
       title="Admissions command center"
       subtitle="Registrar workspace: issue offers and activate accepted enrollments. Guardians respond from their own authenticated offer inbox."
+      actions={<a href="/admissions/transcripts" className="rounded-lg border px-3 py-2 text-sm">Official transcripts</a>}
     >
       {error && <p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
       {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
