@@ -46,7 +46,7 @@ export const bookOfficeHour=createServerFn({method:"POST"})
       .where(and(eq(schema.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(schema.guardianRelationships.canViewAcademics,true),eq(schema.guardianRelationships.studentPersonId,data.studentPersonId))).limit(1);
     if(!child) throw new AuthorizationError("guardian relationship");
     const {bookConference}=await import("@/modules/conferences/conference-service");
-    const bookingId=await bookConference(actor,{conferenceSlotId:data.slotId,studentProfileId:child.studentProfileId},{enrollmentScope:{programIds:actor.scope.programIds??[]}});
+    const bookingId=await bookConference(actor,{conferenceSlotId:data.slotId,studentProfileId:child.studentProfileId});
     return {bookingId};
   });
 
@@ -57,6 +57,6 @@ export const rescheduleOfficeHour=createServerFn({method:"POST"})
  .handler(async({data})=>{
   const actor=await requireActor(["guardian"]);
   const {rescheduleConferenceBooking}=await import("@/modules/conferences/conference-service");
-  await rescheduleConferenceBooking(actor,{bookingId:data.bookingId,newSlotId:data.newSlotId},{enrollmentScope:{programIds:actor.scope.programIds??[]}});
+  await rescheduleConferenceBooking(actor,{bookingId:data.bookingId,newSlotId:data.newSlotId});
   return {saved:true};
  });

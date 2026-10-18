@@ -8,6 +8,7 @@ conferenceSlots,
 enrollments,
 guardianRelationships,
 programs,
+sections,
 sites,
 studentProfiles,
 } from "@/db/schema";
@@ -90,15 +91,6 @@ export async function createConferenceSeries(
   });
 }
 
-/**
- * Guardian-portal preconditions that guard the write: an active enrollment at
- * the slot's site (and in the series section, when section-scoped) whose
- * program is within the actor's authorized program ids.
- */
-export type ConferenceEnrollmentScope = {
-  enrollmentScope?: { programIds: string[] };
-};
-
 async function assertEnrollmentEligibility(
   tx: ConferenceTx,
   input: {
@@ -130,13 +122,17 @@ async function assertEnrollmentEligibility(
     const [sectionEnrollment] = await tx
       .select({ id: enrollments.id })
       .from(enrollments)
+      .innerJoin(sections, eq(sections.id, enrollments.sectionId))
       .where(
         and(
           eq(enrollments.studentProfileId, input.studentProfileId),
           eq(enrollments.sectionId, input.sectionId),
           eq(enrollments.status, "active"),
           eq(enrollments.kind, "section"),
+          eq(sections.active, true),
+          eq(sections.siteId, input.siteId),
           inArray(enrollments.programId, input.programIds),
+          inArray(sections.programId, input.programIds),
         ),
       )
       .limit(1);
@@ -188,7 +184,6 @@ export async function bookConference(
     conferenceSlotId: string;
     studentProfileId: string;
   },
-  options?: ConferenceEnrollmentScope,
 ): Promise<string> {
   assertCapability(context, "conference.book");
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
@@ -221,7 +216,9 @@ export async function bookConference(
     if (conferenceWindowProblem(slot)) {
       throw new Error("Office-hour slot not available");
     }
-    assertSiteScope(context, slot.siteId);
+    if (!context.scope.siteIds?.includes(slot.siteId)) {
+      throw new AuthorizationError("conference site scope");
+    }
 
     const [student] = await tx
       .select({ personId: studentProfiles.personId })
@@ -245,14 +242,12 @@ export async function bookConference(
 
     if (!guardian) throw new Error("Actor is not an authorized guardian");
 
-    if (options?.enrollmentScope) {
-      await assertEnrollmentEligibility(tx, {
-        studentProfileId: input.studentProfileId,
-        siteId: slot.siteId,
-        sectionId: slot.sectionId,
-        programIds: options.enrollmentScope.programIds,
-      });
-    }
+    await assertEnrollmentEligibility(tx, {
+      studentProfileId: input.studentProfileId,
+      siteId: slot.siteId,
+      sectionId: slot.sectionId,
+      programIds: context.scope.programIds ?? [],
+    });
 
     const [site] = await tx
       .select({ timezone: sites.timezone })
@@ -331,7 +326,6 @@ export async function rescheduleConferenceBooking(
     bookingId: string;
     newSlotId: string;
   },
-  options?: ConferenceEnrollmentScope,
 ): Promise<void> {
   assertCapability(context, "conference.book");
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
@@ -379,7 +373,9 @@ export async function rescheduleConferenceBooking(
     ) {
       throw new AuthorizationError("future published guardian booking");
     }
-    assertSiteScope(context, current.siteId);
+    if (!context.scope.siteIds?.includes(current.siteId)) {
+      throw new AuthorizationError("conference site scope");
+    }
 
     const [student] = await tx
       .select({ personId: studentProfiles.personId })
@@ -405,14 +401,12 @@ export async function rescheduleConferenceBooking(
       throw new AuthorizationError("current guardian relationship");
     }
 
-    if (options?.enrollmentScope) {
-      await assertEnrollmentEligibility(tx, {
-        studentProfileId: current.studentProfileId,
-        siteId: current.siteId,
-        sectionId: current.sectionId,
-        programIds: options.enrollmentScope.programIds,
-      });
-    }
+    await assertEnrollmentEligibility(tx, {
+      studentProfileId: current.studentProfileId,
+      siteId: current.siteId,
+      sectionId: current.sectionId,
+      programIds: context.scope.programIds ?? [],
+    });
 
     if (current.oldSlotId === input.newSlotId) return;
 

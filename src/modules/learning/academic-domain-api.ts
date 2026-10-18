@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, exists, inArray, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { assessments, enrollments, guardianRelationships, people, sections, sectionTeachers, studentProfiles, submissions, type EvidenceRef } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
@@ -21,6 +21,39 @@ export type VisibleStudent = {
   displayName: string;
 };
 
+/** Discovery and evidence queries share the same grant and per-section relationship policy. */
+function academicSectionAccess(context: AcademicReadContext) {
+  assertAnyCapability(context, READ_CAPABILITIES);
+  const relationships = [];
+  if (context.capabilities.has("student:related-read")) {
+    relationships.push(exists(db.select({ id: guardianRelationships.id })
+      .from(guardianRelationships).where(and(
+        eq(guardianRelationships.guardianPersonId, context.actorPersonId),
+        eq(guardianRelationships.studentPersonId, studentProfiles.personId),
+        eq(guardianRelationships.canViewAcademics, true),
+      ))));
+  }
+  if (context.capabilities.has("student:read")) {
+    relationships.push(eq(studentProfiles.personId, context.actorPersonId));
+  }
+  if (context.capabilities.has("teacher:read")) {
+    relationships.push(exists(db.select({ id: sectionTeachers.id })
+      .from(sectionTeachers).where(and(
+        eq(sectionTeachers.personId, context.actorPersonId),
+        eq(sectionTeachers.sectionId, sections.id),
+      ))));
+  }
+  return and(
+    eq(enrollments.kind, "section"),
+    eq(enrollments.status, "active"),
+    eq(sections.active, true),
+    inArray(sections.programId, context.scope.programIds ?? []),
+    context.scope.siteIds !== undefined ? inArray(sections.siteId, context.scope.siteIds) : undefined,
+    context.scope.sectionIds !== undefined ? inArray(sections.id, context.scope.sectionIds) : undefined,
+    or(...relationships),
+  );
+}
+
 /**
  * Students the actor may see: themselves, children with academic visibility,
  * or students in sections they teach. Name matching is applied after the
@@ -30,33 +63,7 @@ export async function resolveVisibleStudents(
   context: AcademicReadContext,
   nameQuery?: string,
 ): Promise<VisibleStudent[]> {
-  assertAnyCapability(context, READ_CAPABILITIES);
-  const actorId = context.actorPersonId;
-
-  const asGuardian = await db
-    .select({
-      studentProfileId: studentProfiles.id,
-      personId: people.id,
-      preferredName: people.preferredName,
-      legalFirstName: people.legalFirstName,
-      legalLastName: people.legalLastName,
-    })
-    .from(guardianRelationships)
-    .innerJoin(people, eq(people.id, guardianRelationships.studentPersonId))
-    .innerJoin(studentProfiles, eq(studentProfiles.personId, people.id))
-    .innerJoin(enrollments, eq(enrollments.studentProfileId, studentProfiles.id))
-    .innerJoin(sections, eq(sections.id, enrollments.sectionId))
-    .where(
-      and(
-        eq(guardianRelationships.guardianPersonId, actorId),
-        eq(guardianRelationships.canViewAcademics, true),
-        eq(enrollments.status, "active"),
-        ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
-        ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
-      ),
-    );
-
-  const asSelf = await db
+  const rows = await db
     .select({
       studentProfileId: studentProfiles.id,
       personId: people.id,
@@ -68,38 +75,10 @@ export async function resolveVisibleStudents(
     .innerJoin(people, eq(people.id, studentProfiles.personId))
     .innerJoin(enrollments, eq(enrollments.studentProfileId, studentProfiles.id))
     .innerJoin(sections, eq(sections.id, enrollments.sectionId))
-    .where(and(eq(studentProfiles.personId, actorId), eq(enrollments.status, "active"),
-      ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
-      ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : [])));
-
-  const asTeacher = await db
-    .select({
-      studentProfileId: studentProfiles.id,
-      personId: people.id,
-      preferredName: people.preferredName,
-      legalFirstName: people.legalFirstName,
-      legalLastName: people.legalLastName,
-    })
-    .from(sectionTeachers)
-    .innerJoin(enrollments, eq(enrollments.sectionId, sectionTeachers.sectionId))
-    .innerJoin(studentProfiles, eq(studentProfiles.id, enrollments.studentProfileId))
-    .innerJoin(people, eq(people.id, studentProfiles.personId))
-    .innerJoin(sections, eq(sections.id, enrollments.sectionId))
-    .where(
-      and(
-        eq(sectionTeachers.personId, actorId),
-        eq(enrollments.status, "active"),
-        ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
-        ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
-      ),
-    );
+    .where(academicSectionAccess(context));
 
   const byProfile = new Map<string, VisibleStudent>();
-  for (const row of [
-    ...(context.capabilities.has("student:related-read") ? asGuardian : []),
-    ...(context.capabilities.has("student:read") ? asSelf : []),
-    ...(context.capabilities.has("teacher:read") ? asTeacher : []),
-  ]) {
+  for (const row of rows) {
     byProfile.set(row.studentProfileId, {
       studentProfileId: row.studentProfileId,
       personId: row.personId,
@@ -134,12 +113,10 @@ export async function getStudentAcademicSummary(context: AcademicReadContext, st
     const allowedSections = await db.select({ id: sections.id })
       .from(enrollments)
       .innerJoin(sections, eq(sections.id, enrollments.sectionId))
+      .innerJoin(studentProfiles, eq(studentProfiles.id, enrollments.studentProfileId))
       .where(and(
         eq(enrollments.studentProfileId, studentProfileId),
-        eq(enrollments.status, "active"),
-        eq(enrollments.kind, "section"),
-        ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
-        ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
+        academicSectionAccess(context),
       ));
     const allowedSectionIds = allowedSections.map(row => row.id);
     if (!allowedSectionIds.length) {
@@ -161,8 +138,6 @@ export async function getStudentAcademicSummary(context: AcademicReadContext, st
           eq(submissions.studentProfileId, studentProfileId),
           eq(submissions.timeliness, "missing"),
           inArray(sections.id, allowedSectionIds),
-          ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
-          ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
         ),
       )
       .orderBy(desc(assessments.dueAt))
@@ -184,8 +159,6 @@ export async function getStudentAcademicSummary(context: AcademicReadContext, st
           eq(submissions.studentProfileId, studentProfileId),
           eq(submissions.status, "graded"),
           inArray(sections.id, allowedSectionIds),
-          ...(context.scope.siteIds ? [inArray(sections.siteId, context.scope.siteIds)] : []),
-          ...(context.scope.sectionIds ? [inArray(sections.id, context.scope.sectionIds)] : []),
         ),
       )
       .orderBy(desc(submissions.gradedAt))

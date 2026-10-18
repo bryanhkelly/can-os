@@ -4,7 +4,7 @@ const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
 integration("GF39 parent-teacher conferences", () => {
   it("creates slots, authorizes guardian booking, fuses calendar participants, reminds, and records follow-up", async () => {
-    const [{ db }, schema, { eq }, conferences] = await Promise.all([
+    const [{ db }, schema, { and, eq }, conferences] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
@@ -47,6 +47,30 @@ integration("GF39 parent-teacher conferences", () => {
       relationshipLabel: "parent",
     });
 
+    const [jurisdiction] = await db.insert(schema.jurisdictions).values({
+      code: `conferences-${suffix}`, name: "Conference Test",
+    }).returning();
+    const [program] = await db.insert(schema.programs).values({
+      organizationId: org.id, siteId: site.id, jurisdictionId: jurisdiction!.id,
+      type: "full_school", name: "Conference Program", slug: suffix, gradeRange: { min: "6", max: "12" },
+      academicProviderOrganizationId: org.id, creditIssuingOrganizationId: org.id,
+    }).returning();
+    const { createAcademicTimeFixture } = await import("./helpers/academic-time");
+    const academicTime = await createAcademicTimeFixture({
+      organizationId: org.id, programId: program!.id, siteId: site.id, suffix,
+    });
+    const [course] = await db.insert(schema.courseTemplates).values({
+      owningOrganizationId: org.id, code: suffix, title: "Conference Course", subject: "Science",
+    }).returning();
+    const [version] = await db.insert(schema.courseTemplateVersions).values({
+      courseTemplateId: course!.id, version: 1,
+    }).returning();
+    const [section] = await db.insert(schema.sections).values({
+      programId: program!.id, siteId: site.id, courseTemplateVersionId: version!.id,
+      code: suffix, title: "Conference Section", termId: academicTime.term.id,
+    }).returning();
+    await db.insert(schema.sectionTeachers).values({ sectionId: section!.id, personId: teacher.id });
+
     const teacherContext = {
       actorPersonId: teacher.id,
       capabilities: new Set([
@@ -61,6 +85,7 @@ integration("GF39 parent-teacher conferences", () => {
     const seriesId = await conferences.createConferenceSeries(teacherContext, {
       siteId: site.id,
       teacherPersonId: teacher.id,
+      sectionId: section!.id,
       title: "Fall Parent-Teacher Conferences",
       startsAt: new Date("2027-11-10T22:00:00.000Z"),
       endsAt: new Date("2027-11-10T23:00:00.000Z"),
@@ -76,14 +101,39 @@ integration("GF39 parent-teacher conferences", () => {
     const guardianContext = {
       actorPersonId: guardian.id,
       capabilities: new Set(["conference.book"]),
-      scope: {},
+      scope: { siteIds: [site.id], programIds: [program!.id] },
       requestId: `gf39-guardian-${suffix}`,
     };
 
-    const bookingId = await conferences.bookConference(guardianContext, {
+    const bookingInput = {
       conferenceSlotId: slots[0]!.id,
       studentProfileId: student.id,
+    };
+    for (const scope of [{}, { siteIds: [] }, { siteIds: [crypto.randomUUID()] }]) {
+      await expect(conferences.bookConference({ ...guardianContext, scope }, bookingInput))
+        .rejects.toThrow("conference site scope");
+    }
+    await expect(conferences.bookConference(guardianContext, bookingInput))
+      .rejects.toThrow("child enrollment at selected school");
+    await db.insert(schema.enrollments).values({
+      studentProfileId: student.id, organizationId: org.id, programId: program!.id,
+      kind: "program", status: "active", schoolYearId: academicTime.schoolYear.id,
     });
+    for (const programIds of [[], [crypto.randomUUID()]]) {
+      await expect(conferences.bookConference({
+        ...guardianContext, scope: { siteIds: [site.id], programIds },
+      }, bookingInput)).rejects.toThrow("child enrollment at selected school");
+    }
+    await expect(conferences.bookConference(guardianContext, bookingInput))
+      .rejects.toThrow("appointment section");
+    const [enrollment] = await db.insert(schema.enrollments).values({
+      studentProfileId: student.id, organizationId: org.id, programId: program!.id,
+      sectionId: section!.id, kind: "section", status: "active", schoolYearId: academicTime.schoolYear.id,
+    }).returning();
+    await db.update(schema.sections).set({ active: false }).where(eq(schema.sections.id, section!.id));
+    await expect(conferences.bookConference(guardianContext, bookingInput)).rejects.toThrow("appointment section");
+    await db.update(schema.sections).set({ active: true }).where(eq(schema.sections.id, section!.id));
+    const bookingId = await conferences.bookConference(guardianContext, bookingInput);
 
     const [booking] = await db.select().from(schema.conferenceBookings)
       .where(eq(schema.conferenceBookings.id, bookingId));
@@ -106,6 +156,36 @@ integration("GF39 parent-teacher conferences", () => {
         studentProfileId: student.id,
       }),
     ).rejects.toThrow("not available");
+
+    const move = { bookingId, newSlotId: slots[1]!.id };
+    for (const scope of [
+      {}, { siteIds: [] }, { siteIds: [site.id], programIds: [] },
+      { siteIds: [site.id], programIds: [crypto.randomUUID()] },
+    ]) {
+      await expect(conferences.rescheduleConferenceBooking({ ...guardianContext, scope }, move))
+        .rejects.toThrow();
+    }
+    await db.update(schema.enrollments).set({ status: "withdrawn" })
+      .where(eq(schema.enrollments.id, enrollment!.id));
+    await expect(conferences.rescheduleConferenceBooking(guardianContext, move))
+      .rejects.toThrow("appointment section");
+    const [unmoved] = await db.select().from(schema.conferenceBookings)
+      .where(eq(schema.conferenceBookings.id, bookingId));
+    expect(unmoved?.conferenceSlotId).toBe(slots[0]!.id);
+    await db.update(schema.enrollments).set({ status: "active" }).where(eq(schema.enrollments.id, enrollment!.id));
+    await conferences.rescheduleConferenceBooking(guardianContext, move);
+    const [moved] = await db.select().from(schema.conferenceBookings)
+      .where(eq(schema.conferenceBookings.id, bookingId));
+    expect(moved?.conferenceSlotId).toBe(slots[1]!.id);
+    const [released] = await db.select().from(schema.conferenceSlots)
+      .where(eq(schema.conferenceSlots.id, slots[0]!.id));
+    expect(released?.status).toBe("available");
+    const calendar = await db.select().from(schema.calendarEvents).where(and(
+      eq(schema.calendarEvents.sourceType, "conference_booking"),
+      eq(schema.calendarEvents.sourceId, bookingId),
+    ));
+    expect(calendar).toHaveLength(1);
+    expect(calendar[0]!.startsAt.toISOString()).toBe(slots[1]!.startsAt.toISOString());
 
     await conferences.queueConferenceReminder(teacherContext, bookingId);
 

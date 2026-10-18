@@ -180,3 +180,16 @@ A future external academic service can replace the implementation behind this
 contract without changing Ask CAN's planner, approval logic, tool registry, or
 chat UI. New academic capabilities should be introduced as module contracts
 rather than direct cross-module SQL.
+
+Academic student discovery and summary section selection use one shared
+relationship-and-scope predicate. An explicit nonempty program grant is required;
+supplied site/section scopes further restrict it, including empty lists. Only
+active section enrollments in active sections qualify. Guardian academic
+visibility, student self-access, and the teacher's assignment are checked at
+each section, so teaching one class does not expose that student's other classes.
+Approval-time academic access is rechecked before a watch is created.
+
+Conference booking and rescheduling enforce current guardian relationship,
+explicit site/program scope, school enrollment and (for section-scoped series)
+active section enrollment inside their canonical commands. UI callers cannot
+disable these invariants with an optional command parameter.

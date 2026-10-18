@@ -179,20 +179,19 @@ integration("GF-A1 Ask CAN conversation", () => {
       student: student!,
       section: section!,
       site: site!,
-    };
-  }
-
-  function contextFor(personId: string, capabilities: string[]) {
-    return {
-      actorPersonId: personId,
-      capabilities: new Set(capabilities),
-      scope: {},
-      requestId: `gfa1-${crypto.randomUUID().slice(0, 8)}`,
+      contextFor(personId: string, capabilities: string[]) {
+        return {
+          actorPersonId: personId,
+          capabilities: new Set(capabilities),
+          scope: { programIds: [program.id], siteIds: [site.id] },
+          requestId: `agent-conversation-${crypto.randomUUID()}`,
+        };
+      },
     };
   }
 
   it("answers a progress question with evidence from canonical records", async () => {
-    const { db, schema, teacher, student, guardian, outsider, section } = await seedFamily();
+    const { db, schema, teacher, student, guardian, outsider, section, contextFor } = await seedFamily();
     const agent = await import("@/platform/agent");
     const learning = await import("@/modules/learning/missing-work-service");
     const { eq } = await import("drizzle-orm");
@@ -286,7 +285,7 @@ integration("GF-A1 Ask CAN conversation", () => {
   });
 
   it("turns a watch request into a confirmed subscription that then delivers (A1 -> A2)", async () => {
-    const { db, schema, teacher, guardian, student, section } = await seedFamily();
+    const { db, schema, teacher, guardian, student, section, contextFor } = await seedFamily();
     const agent = await import("@/platform/agent");
     const learning = await import("@/modules/learning/missing-work-service");
     const worker = await import("@/workers/domain-event-worker");
@@ -366,8 +365,104 @@ integration("GF-A1 Ask CAN conversation", () => {
     expect(actions).toContain("agent.run.approve");
   });
 
+  it("intersects student relationships with program grants and each teacher's assigned sections", async () => {
+    const { db, schema, teacher, guardian, studentPerson, student, section, site, contextFor } = await seedFamily();
+    const { and, eq } = await import("drizzle-orm");
+    const academic = await import("@/modules/learning/academic-domain-api");
+    const agent = await import("@/platform/agent");
+    const [originalProgram] = await db.select().from(schema.programs)
+      .where(eq(schema.programs.id, section.programId));
+    const [otherProgram] = await db.insert(schema.programs).values({
+      organizationId: originalProgram!.organizationId, siteId: site.id,
+      jurisdictionId: originalProgram!.jurisdictionId, type: originalProgram!.type,
+      name: "Other Program", slug: crypto.randomUUID(), gradeRange: { min: "9", max: "12" },
+      academicProviderOrganizationId: originalProgram!.academicProviderOrganizationId,
+      creditIssuingOrganizationId: originalProgram!.creditIssuingOrganizationId,
+    }).returning();
+    const extraSections = await db.insert(schema.sections).values([
+      { programId: section.programId, title: "Untaught same-program class" },
+      { programId: otherProgram!.id, title: "Other-program class" },
+    ].map(input => ({
+      ...input, siteId: site.id, courseTemplateVersionId: section.courseTemplateVersionId,
+      termId: section.termId, code: crypto.randomUUID(),
+    }))).returning();
+    await db.insert(schema.enrollments).values(extraSections.map(extra => ({
+      studentProfileId: student.id, organizationId: originalProgram!.organizationId,
+      programId: extra.programId, sectionId: extra.id, kind: "section" as const, status: "active" as const,
+    })));
+    const classes = [section, ...extraSections];
+    const assignments = await db.insert(schema.assessments).values(classes.map((entry, index) => ({
+      sectionId: entry.id, title: `Scoped missing work ${index}`, status: "published" as const,
+      pointsPossible: "100", dueAt: new Date("2026-10-01T00:00:00Z"), createdByPersonId: teacher.id,
+    }))).returning();
+    const work = await db.insert(schema.submissions).values(assignments.map((assessment, index) => ({
+      assessmentId: assessment.id, studentProfileId: student.id,
+      status: index === 0 ? "assigned" as const : "graded" as const,
+      timeliness: index === 0 ? "missing" as const : "on_time" as const,
+      score: index === 0 ? null : "95",
+    }))).returning();
+    const guardianContext = contextFor(guardian.id, ["student:related-read"]);
+    const teacherContext = contextFor(teacher.id, ["teacher:read"]);
+    const selfContext = contextFor(studentPerson.id, ["student:read"]);
+    const evidenceIds = async (context: typeof guardianContext) =>
+      (await academic.getStudentAcademicSummary(context, student.id)).evidence.map(ref => ref.id).sort();
+    const inProgramWork = work.slice(0, 2).map(row => row.id).sort();
+    expect(await evidenceIds(guardianContext)).toEqual(inProgramWork);
+    expect(await evidenceIds(selfContext)).toEqual(inProgramWork);
+    expect(await evidenceIds(teacherContext)).toEqual([work[0]!.id]);
+    expect(await academic.resolveVisibleStudents(guardianContext, "Bobby")).toHaveLength(1);
+    for (const scope of [
+      {}, { programIds: [] }, { programIds: [crypto.randomUUID()] },
+      { programIds: [section.programId], siteIds: [] },
+      { programIds: [section.programId], sectionIds: [] },
+      { programIds: [section.programId], siteIds: [crypto.randomUUID()] },
+    ]) {
+      const denied = { ...guardianContext, scope };
+      expect(await academic.resolveVisibleStudents(denied)).toEqual([]);
+      await expect(academic.getStudentAcademicSummary(denied, student.id)).rejects.toThrow("student access");
+    }
+    await expect(academic.resolveVisibleStudents(contextFor(guardian.id, [])))
+      .rejects.toThrow("student:related-read");
+
+    const broadTeacher = { ...teacherContext, scope: {
+      siteIds: [site.id], programIds: [section.programId, otherProgram!.id],
+    } };
+    expect(await evidenceIds(broadTeacher)).toEqual([work[0]!.id]);
+    const restricted = { ...guardianContext, scope: {
+      ...guardianContext.scope, sectionIds: [extraSections[0]!.id],
+    } };
+    expect(await evidenceIds(restricted)).toEqual([work[1]!.id]);
+    await db.update(schema.sections).set({ active: false }).where(eq(schema.sections.id, extraSections[0]!.id));
+    expect(await evidenceIds(guardianContext)).toEqual([work[0]!.id]);
+    await db.update(schema.sections).set({ active: true }).where(eq(schema.sections.id, extraSections[0]!.id));
+    await db.update(schema.enrollments).set({ status: "withdrawn" }).where(and(
+      eq(schema.enrollments.sectionId, extraSections[0]!.id),
+      eq(schema.enrollments.studentProfileId, student.id),
+    ));
+    expect(await evidenceIds(guardianContext)).toEqual([work[0]!.id]);
+
+    const pending = await agent.sendMessage(guardianContext, { body: "Tell me when Bobby misses an assignment." });
+    expect(pending.runStatus).toBe("awaiting_approval");
+    await expect(agent.confirmRun({ ...guardianContext, scope: { programIds: [] } }, {
+      runId: pending.runId, approve: true,
+    })).rejects.toThrow("student access");
+    expect(await db.select().from(schema.subscriptions).where(
+      eq(schema.subscriptions.subscriberPersonId, guardian.id),
+    )).toHaveLength(0);
+    await db.update(schema.guardianRelationships).set({ canViewAcademics: false }).where(and(
+      eq(schema.guardianRelationships.guardianPersonId, guardian.id),
+      eq(schema.guardianRelationships.studentPersonId, studentPerson.id),
+    ));
+    expect(await academic.resolveVisibleStudents(guardianContext)).toEqual([]);
+    await expect(academic.assertGuardianAcademicAccess(guardianContext, student.id)).rejects.toThrow("student access");
+    await db.delete(schema.sectionTeachers).where(and(
+      eq(schema.sectionTeachers.personId, teacher.id), eq(schema.sectionTeachers.sectionId, section.id),
+    ));
+    expect(await academic.resolveVisibleStudents(broadTeacher)).toEqual([]);
+  });
+
   it("never executes without approval and never leaks across permissions", async () => {
-    const { db, schema, guardian, outsider, student } = await seedFamily();
+    const { db, schema, guardian, outsider, student, contextFor } = await seedFamily();
     const agent = await import("@/platform/agent");
     const { eq } = await import("drizzle-orm");
 
