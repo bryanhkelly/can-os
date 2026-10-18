@@ -1,14 +1,15 @@
-import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
-import {normalizeAccessEmail} from "@/domain/access-tokens";
-import {createServerFn} from "@tanstack/react-start";
-import {getRequest} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray,isNull,or} from "drizzle-orm";
-import {z} from "zod";
-import {db} from "@/db/client";
-import {accessAccounts,accountPersonGrants,applications,auditEvents,domainEvents,guardianRelationships,householdMemberships,households,journeys,journeyRequirements,people,programs,studentProfiles} from "@/db/schema";
-import {getCommandContext} from "@/modules/identity/command-context.server";
-import {assertCapability,AuthorizationError} from "@/domain/command-context";
-import {instantiateJourneyFromDefinition} from "@/modules/journeys/instantiate";
+import { db } from "@/db/client";
+import { accessAccounts,accountPersonGrants,applications,guardianRelationships,householdMemberships,households,journeyRequirements,journeys,people,programs,studentProfiles } from "@/db/schema";
+import { normalizeAccessEmail } from "@/domain/access-tokens";
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { and,desc,eq,inArray,isNull,or } from "drizzle-orm";
+import { z } from "zod";
 const uuid=z.string().uuid();
 const applicant=z.object({
  requestId:uuid,programId:uuid,existingApplicationId:uuid.optional(), studentFirstName:z.string().trim().min(1).max(100),
@@ -144,11 +145,11 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     idempotencyKey,
     metadata:{synthetic:false,source:data.source,notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardianPersonId},
    }).returning({id:applications.id});
-   await tx.insert(domainEvents).values({eventType:"AdmissionsInquiryCreated",aggregateType:"application",
+   await emitEvent(tx,{eventType:"AdmissionsInquiryCreated",aggregateType:"application",
     aggregateId:application!.id,actorPersonId:actor.actorPersonId,
     payload:{programId:data.programId,studentProfileId:student!.id}});
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
-    action:"admissions.inquiry.create",resourceType:"application",resourceId:application!.id,
+   await writeAudit(tx,actor,{
+    action:"admissions.inquiry.create",entityType:"application",entityId:application!.id,
     scope:{organizationId:program.organizationId,programId:data.programId},
     after:{stage:"inquiry",source:data.source}});
    return {applicationId:application!.id};
@@ -203,13 +204,13 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
    await tx.update(applications).set({stage:next,metadata:nextMetadata,
     decidedAt:["decline","withdraw"].includes(data.decision)?new Date():app.decidedAt,
     decisionNote:data.note||app.decisionNote,updatedAt:new Date()}).where(eq(applications.id,app.id));
-   await tx.insert(domainEvents).values({eventType:"AdmissionsStageChanged",aggregateType:"application",
+   await emitEvent(tx,{eventType:"AdmissionsStageChanged",aggregateType:"application",
     aggregateId:app.id,actorPersonId:actor.actorPersonId,
     payload:{programId:app.programId,from:app.stage,to:next,decision:data.decision}});
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
-    action:"admissions.stage."+data.decision,resourceType:"application",resourceId:app.id,
+   await writeAudit(tx,actor,{
+    action:"admissions.stage."+data.decision,entityType:"application",entityId:app.id,
     scope:{programId:app.programId},before:{stage:app.stage,disposition:app.metadata.admissionsDisposition??null},
-    after:{stage:next,disposition:nextMetadata.admissionsDisposition??null},context:{note:data.note??null}});
+    after:{stage:next,disposition:nextMetadata.admissionsDisposition??null},contextExtras:{note:data.note??null}});
    return {stage:next};
   });
  });
@@ -281,9 +282,9 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
     organizationId:program.organizationId,siteId:program.siteId,
     isSynthetic:app.metadata.synthetic===true,
    }).returning({id:accountPersonGrants.id});
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
-    action:"admissions.guardian_access.provision",resourceType:"account_person_grant",
-    resourceId:newGrant!.id,scope:{organizationId:program.organizationId,
+   await writeAudit(tx,actor,{
+    action:"admissions.guardian_access.provision",entityType:"account_person_grant",
+    entityId:newGrant!.id,scope:{organizationId:program.organizationId,
      programId:app.programId,siteId:program.siteId},
     after:{personId:contact.id,role:"guardian",applicationId:app.id}});
    return {created:true,email,accountId:account!.id};
@@ -331,9 +332,9 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
   if(!grant)throw new Error("Provision the guardian's identity-bound access first");
   const {requestOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
   await requestOneTimeAccess(contact.email);
-  await db.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
-   action:"admissions.guardian.invite",resourceType:"application",
-   resourceId:data.applicationId,scope:{programId:application.programId},
+  await writeAudit(db,actor,{
+   action:"admissions.guardian.invite",entityType:"application",
+   entityId:data.applicationId,scope:{programId:application.programId},
    after:{invitationRequested:true}});
   return {sent:true};
  });
@@ -373,15 +374,14 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
      verifiedBy:actor.actorPersonId,verifiedAt:verifiedAt.toISOString()},
     updatedAt:verifiedAt,
    }).where(eq(guardianRelationships.id,relationship.id));
-   await tx.insert(auditEvents).values({
-    actorPersonId:actor.actorPersonId,
+   await writeAudit(tx,actor,{
     action:"admissions.guardian_relationship.verify",
-    resourceType:"guardian_relationship",resourceId:relationship.id,
+    entityType:"guardian_relationship",entityId:relationship.id,
     scope:{programId:app.programId},
     before:{verification:relationship.metadata.verification??"unverified"},
     after:{verification:"verified",method:data.method,
      studentProfileId:app.studentProfileId},
-    context:{evidenceNote:data.evidenceNote},
+    contextExtras:{evidenceNote:data.evidenceNote},
    });
    return {verified:true};
   });

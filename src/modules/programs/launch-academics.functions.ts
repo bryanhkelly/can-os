@@ -1,14 +1,22 @@
-import {createServerFn} from "@tanstack/react-start";
-import {getRequest} from "@tanstack/react-start/server";
-import {and,asc,eq,inArray,isNull,or} from "drizzle-orm";
-import {z} from "zod";
-import {db} from "@/db/client";
-import {auditEvents,courseTemplates,courseTemplateVersions,domainEvents,notifications,
- programs,roleAssignments,schoolYears,sectionTeachers,sections,terms,people,deliveryArrangements} from "@/db/schema";
-import {getCommandContext} from "@/modules/identity/command-context.server";
-import {assertCapability,AuthorizationError} from "@/domain/command-context";
-import {evaluateSectionReadiness} from "./section-readiness-service";
-import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
+import { db } from "@/db/client";
+import {
+courseTemplates,courseTemplateVersions,
+deliveryArrangements,
+people,
+programs,roleAssignments,schoolYears,
+sections,
+sectionTeachers,
+terms
+} from "@/db/schema";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { emitEvent,notify,writeAudit } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { and,asc,eq,inArray,isNull,or } from "drizzle-orm";
+import { z } from "zod";
+import { evaluateSectionReadiness } from "./section-readiness-service";
 const uuid=z.string().uuid();
 function launchModality(delivery:{onsite?:boolean;asynchronous?:boolean;liveOnline?:boolean}){
  if(delivery.liveOnline&&delivery.onsite)return "hybrid";
@@ -132,16 +140,16 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
     });
     await tx.insert(sectionTeachers).values({sectionId:existing.id,
      personId:data.teacherPersonId,role:"teacher"}).onConflictDoNothing();
-    await tx.insert(notifications).values({recipientPersonId:data.teacherPersonId,
+    await notify(tx, {recipientPersonId:data.teacherPersonId,
      type:"teaching_assignment",status:"unread",title:"Teaching assignment",
      body:"You have been assigned to "+data.title,resourceType:"section",resourceId:existing.id});
    }
    if(created){
-    await tx.insert(domainEvents).values({eventType:"SectionProvisioned",
+    await emitEvent(tx, {eventType:"SectionProvisioned",
      aggregateType:"section",aggregateId:existing.id,actorPersonId:actor.actorPersonId,
      payload:{organizationId:program.organizationId,siteId:program.siteId,
       programId:program.id,termId:data.termId}});
-    await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+    await writeAudit(tx, {actorPersonId:actor.actorPersonId,
      action:"launch.section.provision",resourceType:"section",resourceId:existing.id,
      scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
      after:{code:data.code,title:data.title,termId:data.termId,
@@ -174,11 +182,11 @@ export const assignLaunchTeacher=createServerFn({method:"POST"})
     sectionId:section.id,personId:data.teacherPersonId,role:"teacher",
    }).onConflictDoNothing().returning({id:sectionTeachers.id});
    if(created){
-    await tx.insert(notifications).values({recipientPersonId:data.teacherPersonId,
+    await notify(tx, {recipientPersonId:data.teacherPersonId,
      type:"teaching_assignment",status:"unread",title:"New teaching assignment",
      body:"You have been assigned to a course at "+program.name,
      resourceType:"section",resourceId:section.id});
-    await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+    await writeAudit(tx, {actorPersonId:actor.actorPersonId,
      action:"launch.teacher.assign",resourceType:"section",resourceId:section.id,
      scope:{programId:program.id,siteId:program.siteId},after:{personId:data.teacherPersonId}});
    }

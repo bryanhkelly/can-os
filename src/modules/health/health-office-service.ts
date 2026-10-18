@@ -1,25 +1,22 @@
-import { and, eq, lte, or, isNull, gte } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  auditEvents,
-  domainEvents,
-  guardianRelationships,
-  healthComplianceItems,
-  healthOfficeVisits,
-  healthProfiles,
-  medicationAdministrations,
-  medicationAuthorizations,
-  notifications,
-  people,
-  returnToSchoolClearances,
-  studentProfiles,
+guardianRelationships,
+healthComplianceItems,
+healthOfficeVisits,
+healthProfiles,
+medicationAdministrations,
+medicationAuthorizations,
+returnToSchoolClearances,
+studentProfiles
 } from "@/db/schema";
 import {
-  assertCapability,
-  assertSiteScope,
-  type CommandContext,
+assertCapability,
+assertSiteScope,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
+import { and,eq } from "drizzle-orm";
 
 export async function ensureHealthProfile(
   context: CommandContext,
@@ -117,7 +114,7 @@ export async function setHealthCompliance(
       id = created.id;
     }
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.HealthComplianceUpdated,
       aggregateType: "health_compliance_item",
       aggregateId: id,
@@ -129,18 +126,13 @@ export async function setHealthCompliance(
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "health.compliance.update",
-      resourceType: "health_compliance_item",
-      resourceId: id,
-      scope: {},
+      entityType: "health_compliance_item",
+      entityId: id,
       before: existing ? { status: existing.status } : null,
       after: { status: input.status, type: input.type },
-      context: {
-        requestId: context.requestId ?? null,
-        classification: "medical",
-      },
+      contextExtras: { classification: "medical" },
     });
 
     return id;
@@ -184,22 +176,17 @@ export async function createMedicationAuthorization(
     throw new Error("Failed to create medication authorization");
   }
 
-  await db.insert(auditEvents).values({
-    actorPersonId: context.actorPersonId,
+  await writeAudit(db, context, {
     action: "medication.authorization.create",
-    resourceType: "medication_authorization",
-    resourceId: authorization.id,
-    scope: {},
+    entityType: "medication_authorization",
+    entityId: authorization.id,
     after: {
       studentProfileId: input.studentProfileId,
       medicationName: input.medicationName,
       startsOn: input.startsOn,
       expiresOn: input.expiresOn ?? null,
     },
-    context: {
-      requestId: context.requestId ?? null,
-      classification: "medical",
-    },
+    contextExtras: { classification: "medical" },
   });
 
   return authorization.id;
@@ -261,11 +248,11 @@ export async function administerMedication(
 
     if (!record) throw new Error("Failed to record medication administration");
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.MedicationAdministered,
       aggregateType: "medication_administration",
       aggregateId: record.id,
-      actorPersonId: actorPersonId,
+      actorPersonId,
       payload: {
         authorizationId: input.authorizationId,
         studentProfileId: authorization.studentProfileId,
@@ -274,20 +261,16 @@ export async function administerMedication(
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: actorPersonId,
+    await writeAudit(tx, context, {
       action: "medication.administer",
-      resourceType: "medication_administration",
-      resourceId: record.id,
+      entityType: "medication_administration",
+      entityId: record.id,
       scope: { siteId: input.siteId },
       after: {
         authorizationId: input.authorizationId,
         result: input.result ?? "administered",
       },
-      context: {
-        requestId: context.requestId ?? null,
-        classification: "medical",
-      },
+      contextExtras: { classification: "medical" },
     });
 
     return record.id;
@@ -348,7 +331,8 @@ export async function recordHealthOfficeVisit(
         .where(eq(guardianRelationships.studentPersonId, student.personId));
 
       if (guardians.length > 0) {
-        await tx.insert(notifications).values(
+        await notifyMany(
+          tx,
           guardians.map(({ personId }) => ({
             recipientPersonId: personId,
             type: "student_sent_home_ill",
@@ -362,11 +346,11 @@ export async function recordHealthOfficeVisit(
         );
       }
 
-      await tx.insert(domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.StudentSentHomeIll,
         aggregateType: "health_office_visit",
         aggregateId: visit.id,
-        actorPersonId: actorPersonId,
+        actorPersonId,
         payload: {
           studentProfileId: input.studentProfileId,
           siteId: input.siteId,
@@ -389,20 +373,16 @@ export async function recordHealthOfficeVisit(
       }
     }
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: actorPersonId,
+    await writeAudit(tx, context, {
       action: "health.visit.record",
-      resourceType: "health_office_visit",
-      resourceId: visit.id,
+      entityType: "health_office_visit",
+      entityId: visit.id,
       scope: { siteId: input.siteId },
       after: {
         reason: input.reason,
         sentHome: input.sentHome ?? false,
       },
-      context: {
-        requestId: context.requestId ?? null,
-        classification: "medical",
-      },
+      contextExtras: { classification: "medical" },
     });
 
     return returnClearanceId
@@ -446,7 +426,7 @@ export async function clearReturnToSchool(
       })
       .where(eq(returnToSchoolClearances.id, input.clearanceId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.ReturnToSchoolCleared,
       aggregateType: "return_to_school_clearance",
       aggregateId: input.clearanceId,
@@ -456,18 +436,13 @@ export async function clearReturnToSchool(
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "health.return_clearance",
-      resourceType: "return_to_school_clearance",
-      resourceId: input.clearanceId,
-      scope: {},
+      entityType: "return_to_school_clearance",
+      entityId: input.clearanceId,
       before: { status: current.status },
       after: { status: "cleared" },
-      context: {
-        requestId: context.requestId ?? null,
-        classification: "medical",
-      },
+      contextExtras: { classification: "medical" },
     });
   });
 }
@@ -504,16 +479,11 @@ export async function getHealthCase(
         .where(eq(returnToSchoolClearances.studentProfileId, studentProfileId)),
     ]);
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "health.read",
-      resourceType: "student_profile",
-      resourceId: studentProfileId,
-      scope: {},
-      context: {
-        requestId: context.requestId ?? null,
-        classification: "medical",
-      },
+      entityType: "student_profile",
+      entityId: studentProfileId,
+      contextExtras: { classification: "medical" },
     });
 
     return {

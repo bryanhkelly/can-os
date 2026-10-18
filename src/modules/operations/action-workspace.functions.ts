@@ -1,13 +1,14 @@
-import {createServerFn} from "@tanstack/react-start";
-import {getRequest} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray,isNull,or,isNotNull} from "drizzle-orm";
-import {db} from "@/db/client";
-import {actions,auditEvents,domainEvents,notifications,accountPersonGrants,people,sites,programs} from "@/db/schema";
-import {getCommandContext} from "@/modules/identity/command-context.server";
-import {AuthorizationError} from "@/domain/command-context";
-import {notificationSummary,dedupeQueue} from "@/domain/notification-triage";
-import {EventTypes} from "@/domain/event-types";
-import {operationsSelectionSchema,resolveOperationsSelection} from "./operations-scope.server";
+import { db } from "@/db/client";
+import { accountPersonGrants,actions,people,programs,sites } from "@/db/schema";
+import { AuthorizationError } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { dedupeQueue,notificationSummary } from "@/domain/notification-triage";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { emitEvent,notify,writeAudit } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { and,desc,eq,inArray,isNotNull,isNull,or } from "drizzle-orm";
+import { operationsSelectionSchema,resolveOperationsSelection } from "./operations-scope.server";
 
 async function operator() {
  const actor=await getCommandContext(getRequest());
@@ -61,8 +62,8 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    if(record.status===data.status)return {saved:true};
    const now=new Date();
    await tx.update(actions).set({status:data.status,resolvedAt:data.status==="resolved"?now:null,resolutionNote:data.status==="resolved"?data.resolutionNote?.trim():record.resolutionNote,updatedAt:now}).where(eq(actions.id,record.id));
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,action:"action.status.change",resourceType:"action",resourceId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{status:record.status},after:{status:data.status},context:{requestId:actor.requestId??null}});
-   if(data.status==="resolved")await tx.insert(domainEvents).values({eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,payload:{subjectType:record.subjectType,subjectId:record.subjectId}});
+   await writeAudit(tx,actor,{action:"action.status.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{status:record.status},after:{status:data.status}});
+   if(data.status==="resolved")await emitEvent(tx,{eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,payload:{subjectType:record.subjectType,subjectId:record.subjectId}});
    return {saved:true};
   });
  });
@@ -84,8 +85,8 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    }
    if(record.ownerPersonId===data.ownerPersonId&&record.priority===data.priority)return {saved:true};
    await tx.update(actions).set({ownerPersonId:data.ownerPersonId,priority:data.priority,updatedAt:new Date()}).where(eq(actions.id,record.id));
-   if(data.ownerPersonId&&data.ownerPersonId!==record.ownerPersonId)await tx.insert(notifications).values({recipientPersonId:data.ownerPersonId,type:"operations_action_assigned",title:"Assigned action: "+record.title,body:"An action requires your attention.",resourceType:"action",resourceId:record.id});
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,action:"action.assignment.change",resourceType:"action",resourceId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{ownerPersonId:record.ownerPersonId,priority:record.priority},after:{ownerPersonId:data.ownerPersonId,priority:data.priority},context:{requestId:actor.requestId??null}});
+   if(data.ownerPersonId&&data.ownerPersonId!==record.ownerPersonId)await notify(tx,{recipientPersonId:data.ownerPersonId,type:"operations_action_assigned",title:"Assigned action: "+record.title,body:"An action requires your attention.",resourceType:"action",resourceId:record.id});
+   await writeAudit(tx,actor,{action:"action.assignment.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{ownerPersonId:record.ownerPersonId,priority:record.priority},after:{ownerPersonId:data.ownerPersonId,priority:data.priority}});
    return {saved:true};
   });
  });

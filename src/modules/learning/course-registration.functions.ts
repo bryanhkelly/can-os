@@ -1,13 +1,14 @@
-import {activateSectionEnrollment} from "@/modules/enrollment/section-allocation.service";
-import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
+import { AuthorizationError } from "@/domain/command-context";
+import { activateSectionEnrollment } from "@/modules/enrollment/section-allocation.service";
+import { actorSiteIds,assertProgramGranted,recordAudit,requireActor,type Actor } from "@/modules/identity/actors.server";
+import { emitEvent,notify,notifyMany,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and,desc,eq,inArray,isNull,sql } from "drizzle-orm";
 import { z } from "zod";
-import { actorSiteIds, assertProgramGranted, recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
-import { AuthorizationError } from "@/domain/command-context";
-import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
 import { resolveCourseGuardianConsent } from "./course-guardian-consent";
+import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
 
 async function studentProfileFor(actor: Actor) {
  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
@@ -115,7 +116,7 @@ export const requestCourseChange = createServerFn({ method:"POST" })
       if(!request)throw new Error("Unable to create course request");
       if(guardianDecisionRequired){
         const recipients=[...new Set(guardians.map(g=>g.personId))];
-        await tx.insert(s.notifications).values(recipients.map(recipientPersonId=>({
+        await notifyMany(tx, recipients.map(recipientPersonId=>({
           recipientPersonId,status:"unread" as const,type:"course_registration_guardian_review",
           title:"Course addition needs your approval",
           body:"Your student requested a class that requires guardian permission.",
@@ -123,7 +124,7 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         })));
       }
       await recordAudit(tx,actor,{action:"course_registration.request",resourceType:"action",resourceId:request.id,after:{operation:data.operation,sectionId:section.id},scope:{programId:section.programId,siteId:section.siteId}});
-      await tx.insert(s.domainEvents).values({eventType:"CourseRegistrationRequested",aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId:studentId,sectionId:section.id,programId:section.programId,operation:data.operation}});
+      await emitEvent(tx, {eventType:"CourseRegistrationRequested",aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId:studentId,sectionId:section.id,programId:section.programId,operation:data.operation}});
       return {requestId:request.id};
     });
   });
@@ -212,10 +213,10 @@ export const decideCourseChange = createServerFn({method:"POST"})
           await tx.update(s.enrollments).set({status:operation==="drop"?"cancelled":"withdrawn",endedAt:new Date(),updatedAt:new Date(),
             metadata:{...membership.metadata,withdrawalNotation:operation==="withdraw"?"W":null,changeRequestId:request.id}
           }).where(eq(s.enrollments.id,membership.id));
-          await tx.insert(s.domainEvents).values({eventType:operation==="drop"?"SectionEnrollmentDropped":"SectionEnrollmentWithdrawn",
+          await emitEvent(tx, {eventType:operation==="drop"?"SectionEnrollmentDropped":"SectionEnrollmentWithdrawn",
             aggregateType:"enrollment",aggregateId:membership.id,actorPersonId:actor.actorPersonId,
             payload:{studentProfileId,sectionId,programId,schoolYearId,transcriptNotation:operation==="withdraw"?"W":null}});
-          await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,
+          await writeAudit(tx, {actorPersonId:actor.actorPersonId,
             action:"course_registration.section."+operation,resourceType:"enrollment",
             resourceId:membership.id,scope:{siteId,programId},
             before:{status:membership.status},after:{status:operation==="drop"?"cancelled":"withdrawn"}});
@@ -223,7 +224,7 @@ export const decideCourseChange = createServerFn({method:"POST"})
       }
       await tx.update(s.actions).set({status:data.approve?"resolved":"cancelled",resolvedAt:new Date(),
         resolutionNote:data.approve?"Approved enrollment change":"Declined enrollment change",updatedAt:new Date()}).where(eq(s.actions.id,request.id));
-      if(request.ownerPersonId)await tx.insert(s.notifications).values({recipientPersonId:request.ownerPersonId,type:"course_registration_decision",status:"unread",
+      if(request.ownerPersonId)await notify(tx, {recipientPersonId:request.ownerPersonId,type:"course_registration_decision",status:"unread",
         title:data.approve?"Your class change was approved":"Your class change was declined",body:request.title,resourceType:"action",resourceId:request.id});
       if(data.approve){
        const [student]=await tx.select({personId:s.studentProfiles.personId})
@@ -233,8 +234,7 @@ export const decideCourseChange = createServerFn({method:"POST"})
          .from(s.guardianRelationships).where(and(
           eq(s.guardianRelationships.studentPersonId,student.personId),
           eq(s.guardianRelationships.canViewAcademics,true)));
-        if(guardians.length)await tx.insert(s.notifications).values(
-         guardians.map(g=>({recipientPersonId:g.personId,
+        if(guardians.length)await notifyMany(tx, guardians.map(g=>({recipientPersonId:g.personId,
           type:"course_registration_decision",status:"unread" as const,
           title:"Course schedule updated",
           body:request.title+" was approved by the school.",
@@ -242,7 +242,7 @@ export const decideCourseChange = createServerFn({method:"POST"})
        }
       }
       await recordAudit(tx,actor,{action:data.approve?"course_registration.approve":"course_registration.decline",resourceType:"action",resourceId:request.id,before:{status:"open"},after:{status:data.approve?"resolved":"cancelled",operation:String(operation)},scope:{programId,siteId}});
-      await tx.insert(s.domainEvents).values({eventType:"CourseRegistrationDecided",aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId,sectionId,programId,operation,approved:data.approve}});
+      await emitEvent(tx, {eventType:"CourseRegistrationDecided",aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId,sectionId,programId,operation,approved:data.approve}});
       return {approved:data.approve};
     });
   });

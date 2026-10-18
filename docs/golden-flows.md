@@ -434,10 +434,10 @@ Conversation durability, Agent Runtime tool calling, identical authorization for
 
 ### Running the GF-A1 test
 
-`tests/integration/gf-a1-conversation.integration.test.ts` covers the flow against a disposable Neon database: evidence-grounded answers, the watch-confirmation flow producing a durable subscription that then delivers (the A1 → A2 loop), approval-gate enforcement (including cross-person approval attempts), and safe refusals that leak nothing.
+`tests/integration/agent-conversation.integration.test.ts` covers the flow against a disposable Neon database: evidence-grounded answers, the watch-confirmation flow producing a durable subscription that then delivers (the A1 → A2 loop), approval-gate enforcement (including cross-person approval attempts), and safe refusals that leak nothing.
 
 ```sh
-node scripts/run-integration-tests.mjs gf-a1-conversation
+node scripts/run-integration-tests.mjs agent-conversation
 ```
 
 The runtime lives in `src/platform/agent/` (planner, tools, runtime); the session-authenticated boundary is `src/modules/conversation/ask-can.functions.ts`; the UI is `src/routes/ask.tsx` with watch management at `src/routes/guardian.watching.tsx`. The planner is deterministic by design for v1 — an LLM planner can replace it behind the same `planTurn` contract without touching execution, authorization, or audit.
@@ -467,10 +467,10 @@ Subscription lifecycle, event-driven delivery over the outbox, delivery-time aut
 
 ### Running the GF-A2 test
 
-`tests/integration/gf-a2-subscriptions.integration.test.ts` covers the flow end to end against a disposable Neon database: delivery to authorized subscribers, suppression of unauthorized ones, idempotent reprocessing, reminder gating on current canonical state, revocation-safe delivery, outbox backoff/escalation, and lease reclaim.
+`tests/integration/subscription-delivery.integration.test.ts` covers the flow end to end against a disposable Neon database: delivery to authorized subscribers, suppression of unauthorized ones, idempotent reprocessing, reminder gating on current canonical state, revocation-safe delivery, outbox backoff/escalation, and lease reclaim.
 
 ```sh
-node scripts/run-integration-tests.mjs gf-a2-subscriptions
+node scripts/run-integration-tests.mjs subscription-delivery
 ```
 
 Requires `TEST_DATABASE_URL` and `CAN_TEST_DB_WRITES_ENABLED=true` in `.env.local` (see scripts/run-integration-tests.mjs safeguards). The subscriptions schema lives in `src/db/schema/subscriptions.ts` (migration `drizzle/0011_charming_logan.sql`); the matcher, reminder processor, and per-event-type policies live in `src/platform/subscriptions/`.

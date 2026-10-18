@@ -1,16 +1,18 @@
-import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { z } from "zod";
-import { getCommandContext } from "@/modules/identity/command-context.server";
 import {
-  assertCapability,
-  assertSiteScope,
-  assertProgramScope,
-  AuthorizationError,
-  type CommandContext,
+assertCapability,
+assertProgramScope,
+assertSiteScope,
+AuthorizationError,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { gradeLabelForPercentage,isPassingGrade } from "@/domain/grade-scale-policy";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { and,asc,desc,eq,inArray,isNotNull,sql } from "drizzle-orm";
+import { z } from "zod";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -23,15 +25,6 @@ async function stores() {
     import("@/db/schema"),
   ]);
   return { db, s };
-}
-
-/** Resolve the published, school-specific GradeScale rather than fixed A–F bands. */
-function letterFor(percentage:number,entries:Array<{
- label:string;minPercent?:number;maxPercent?:number
-}>):string{
- const matched=entries.find(e=>percentage>=(e.minPercent??0)&&percentage<=(e.maxPercent??100));
- if(!matched)throw new Error("Percentage does not fit the school grading scale");
- return matched.label;
 }
 
 type Viewer = { context: CommandContext; studentProfileId: string; siteIds: string[]; programIds: string[] };
@@ -154,22 +147,18 @@ async function finalizedGradeRows(
   const scaleIds=[...new Set(rows.map(row=>row.gradeScaleId).filter((id):id is string=>Boolean(id)))];
   const scaleRows=scaleIds.length?await db.select({id:s.gradeScales.id,configuration:s.gradeScales.configuration})
     .from(s.gradeScales).where(inArray(s.gradeScales.id,scaleIds)):[];
-  const passingByScaleId=new Map(scaleRows.map(scale=>{
-    const entries=scale.configuration.entries;
-    const flagged=entries.some(entry=>typeof entry.passing==="boolean");
-    return [scale.id,new Set(flagged?entries.filter(entry=>entry.passing===true).map(entry=>entry.label):entries.map(entry=>entry.label))] as const;
-  }));
+  const scalesById=new Map(scaleRows.map(scale=>[scale.id,scale.configuration] as const));
   return rows.map((row) => {
     const { sectionMetadata, gradeScaleId, ...rest } = row;
-    const passingLetters=passingByScaleId.get(gradeScaleId??"");
-    const isPassing=passingLetters?passingLetters.has(row.letterGrade??""):
-      ["A","B","C","D","P","Pass"].includes(row.letterGrade??"");
+    const configuration=gradeScaleId?scalesById.get(gradeScaleId):null;
+    if(gradeScaleId&&!configuration)throw new Error("Finalized grade scale is unavailable");
+    const passes=isPassingGrade(row.letterGrade,configuration);
     return {
       ...rest,
       finalizedAt: row.finalizedAt?.toISOString() ?? null,
       creditsAttempted:row.gradingPeriodSequence===lastPeriod.get(row.termId)?
         (typeof sectionMetadata.credits==="number"?sectionMetadata.credits:1):0,
-      creditsEarned:row.gradingPeriodSequence===lastPeriod.get(row.termId)&&isPassing?
+      creditsEarned:row.gradingPeriodSequence===lastPeriod.get(row.termId)&&passes?
         (typeof sectionMetadata.credits==="number"?sectionMetadata.credits:1):0,
     };
   });
@@ -353,7 +342,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           continue;
         }
         const percentage = Math.round((total.earned / total.possible) * 10000) / 100;
-        const letterGrade = letterFor(percentage,gradeScale.configuration.entries);
+        const letterGrade = gradeLabelForPercentage(percentage,gradeScale.configuration.entries);
         const values = {
           status: "finalized" as const,
           score: String(Math.round(total.earned * 100) / 100),
@@ -389,7 +378,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         }
         finalized += 1;
 
-        await tx.insert(s.domainEvents).values({
+        await emitEvent(tx, {
           eventType: EventTypes.GradePosted,
           aggregateType: "section_grade",
           aggregateId: gradeId,
@@ -403,7 +392,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
             percentage,
           },
         });
-        await tx.insert(s.auditEvents).values({
+        await writeAudit(tx, {
           actorPersonId,
           action: "report_card.section_grade.finalize",
           resourceType: "section_grade",
@@ -481,7 +470,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           ];
         });
         if (rows.length) {
-          await tx.insert(s.notifications).values(rows);
+          await notifyMany(tx, rows);
         }
       }
       return { finalized, skipped };
@@ -584,7 +573,7 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
       const newLetterGrade =
         data.letterGrade ??
         (data.percentage !== undefined && scaleEntries.length
-          ? letterFor(data.percentage, scaleEntries)
+          ? gradeLabelForPercentage(data.percentage, scaleEntries)
           : grade.letterGrade);
 
       const priorCorrections = Array.isArray(grade.metadata?.corrections)
@@ -613,7 +602,7 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
         })
         .where(eq(s.sectionGrades.id, grade.id));
 
-      await tx.insert(s.auditEvents).values({
+      await writeAudit(tx, {
         actorPersonId,
         action: "grade.correction",
         resourceType: "section_grade",
@@ -636,9 +625,7 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
         context: { requestId: context.requestId ?? null, reason: data.reason },
       });
 
-      const [gradeEvent] = await tx
-        .insert(s.domainEvents)
-        .values({
+      const gradeEventId = await emitEvent(tx, {
           eventType: EventTypes.GradePosted,
           aggregateType: "section_grade",
           aggregateId: grade.id,
@@ -653,9 +640,7 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
             letterGrade: newLetterGrade,
             percentage: newPercentage,
           },
-        })
-        .returning({ id: s.domainEvents.id });
-      if (!gradeEvent) throw new Error("Failed to record grade correction event");
+        });
 
       const [student] = await tx
         .select({ personId: s.studentProfiles.personId })
@@ -675,17 +660,15 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
         );
 
       const recipients = [student.personId, ...guardians.map((row) => row.personId)];
-      await tx.insert(s.notifications).values(
-        recipients.map((personId) => ({
+      await notifyMany(tx, recipients.map((personId) => ({
           recipientPersonId: personId,
           type: "grade_corrected",
           title: `Updated grade: ${section.title}`,
           body: `A finalized grade was corrected. Reason: ${data.reason}`,
           resourceType: "section_grade",
           resourceId: grade.id,
-          eventId: gradeEvent.id,
-        })),
-      );
+          eventId: gradeEventId,
+        })));
 
       return { corrected: true };
     });
@@ -836,7 +819,7 @@ export const issueTranscript = createServerFn({ method: "POST" })
         .returning({ id: s.transcriptIssuances.id });
       if (!issuance) throw new Error("Failed to issue transcript");
 
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.TranscriptIssued,
         aggregateType: "transcript_issuance",
         aggregateId: issuance.id,
@@ -847,7 +830,7 @@ export const issueTranscript = createServerFn({ method: "POST" })
           gradeCount: rows.length,
         },
       });
-      await tx.insert(s.auditEvents).values({
+      await writeAudit(tx, {
         actorPersonId,
         action: "transcript.issue",
         resourceType: "transcript_issuance",

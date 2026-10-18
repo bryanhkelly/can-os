@@ -73,3 +73,15 @@ describe("deterministic agent planner: intent regression", () => {
     expect(extractStudentQuery("Notify me if Jean-Luc Picard misses homework")).toBe("Jean-Luc Picard");
   });
 });
+
+describe("operations overview intent", () => {
+  it("routes operational vocabulary to the command-center overview", () => {
+    expect(planTurn("Give me the operations overview")).toEqual({ intent: "ask", kind: "operations_overview" });
+    expect(planTurn("Staffing summary for the school please")).toEqual({ intent: "ask", kind: "operations_overview" });
+  });
+
+  it("does not hijack student progress questions", () => {
+    const plan = planTurn("How is Bobby doing?");
+    expect(plan).toEqual({ intent: "ask", kind: "student_summary", studentQuery: "Bobby" });
+  });
+});

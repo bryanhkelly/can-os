@@ -13,6 +13,9 @@ export type AgentPlan =
 const missing = /\b(miss(?:ed|es|ing)?|late|overdue|past[ -]due|unsubmitted|not turned in|not handed in|assignment(?:s)?|homework|coursework|schoolwork)\b/i;
 const watchVerb = /\b(?:tell me|let me know|notify me|alert me|watch|monitor|keep an eye|give me (?:a |an )?(?:heads[ -]up|alert)|send me (?:a |an )?(?:notification|alert)|ping me)\b/i;
 const summaryVerb = /\b(?:how(?:'s| is| are)|how (?:has|did)|give me (?:an? )?(?:update|summary|overview)|(?:show|check|review|summarize|tell me about) (?:the )?(?:[\p{L}][\p{L}'’.-]*['’]s )?(?:progress|grades|performance|status|schoolwork|academic)|(?:what|where) (?:are|is) .*?(?:grades|progress)|is .*?doing\b.*\b(?:in|at) school)\b/iu;
+// Operations overview requires explicit operational vocabulary so a parent
+// asking "how is the school doing?" for their child is not swept into it.
+const operationsOverview = /\b(?:(?:operations?|staffing|capacity|enrollment|command center)\s+(?:overview|summary|status|report|health)|(?:school|site|program)\s+(?:operations|staffing|capacity)\b|how(?:'s| is) (?:the )?(?:school|site|program)\s+(?:doing|running)\s+(?:operationally|on staffing|on capacity))\b/i;
 const token = String.raw`[\p{L}][\p{L}'’.-]*`;
 const fullName = String.raw`${token}(?:\s+${token}){0,2}`;
 const nonNames = new Set(["my","our","the","a","an","me","any","all","their","his","her","child","kid","student","son","daughter","children","kids","students","assignment","assignments","homework","work","grades","grade","progress","school","class","classes","biology","math","english","science","history","teacher","when","if","you","can","please","someone","anyone","every","weekly","daily","summarize","summarise","digest","update","updates","remind","reminder","monday","tuesday","wednesday","thursday","friday","saturday","sunday","about","for","on","watch","monitor","regarding","how","has","is","are","doing","well","tell","notify","alert","ping","know","let","keep","eye"]);
@@ -86,6 +89,9 @@ export function planTurn(message: string): AgentPlan {
     const remind = reminderHours(text);
     return { intent: "watch", studentQuery: extractStudentQuery(text),
       eventTypes: ["AssignmentBecameMissing"], ...(remind === undefined ? {} : { remindAfterHours: remind }) };
+  }
+  if (operationsOverview.test(text) && !extractStudentQuery(text)) {
+    return { intent: "ask", kind: "operations_overview" };
   }
   if (summaryVerb.test(text)) {
     return { intent: "ask", kind: "student_summary", studentQuery: extractStudentQuery(text) };

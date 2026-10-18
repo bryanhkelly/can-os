@@ -1,19 +1,18 @@
-import { and, eq, lt } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  assessments,
-  auditEvents,
-  domainEvents,
-  enrollments,
-  submissions,
-  studentProfiles,
+assessments,
+enrollments,
+studentProfiles,
+submissions
 } from "@/db/schema";
 import {
-  assertCapability,
-  assertSectionScope,
-  type CommandContext,
+assertCapability,
+assertSectionScope,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { and,eq,lt } from "drizzle-orm";
 
 export async function publishAssessment(
   context: CommandContext,
@@ -69,7 +68,7 @@ export async function publishAssessment(
         .onConflictDoNothing();
     }
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.AssessmentPublished,
       aggregateType: "assessment",
       aggregateId: assessmentId,
@@ -81,7 +80,7 @@ export async function publishAssessment(
       },
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "assessment.publish",
       resourceType: "assessment",
@@ -134,7 +133,7 @@ export async function markOverdueSubmissionsMissing(
       if (!updated) continue;
       changed += 1;
 
-      await tx.insert(domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.AssignmentBecameMissing,
         aggregateType: "submission",
         aggregateId: row.submissionId,
@@ -146,7 +145,7 @@ export async function markOverdueSubmissionsMissing(
         },
       });
 
-      await tx.insert(auditEvents).values({
+      await writeAudit(tx, {
         actorPersonId: null,
         action: "submission.mark_missing",
         resourceType: "submission",
@@ -216,7 +215,7 @@ export async function submitAssessment(
 
     if (!submitted.length) throw new Error("Submission was already processed");
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.SubmissionReceived,
       aggregateType: "submission",
       aggregateId: submissionId,
@@ -229,7 +228,7 @@ export async function submitAssessment(
       },
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "submission.submit",
       resourceType: "submission",
@@ -293,7 +292,7 @@ export async function gradeSubmission(
 
     if (!graded.length) throw new Error("Submission grading was already processed");
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.GradePosted,
       aggregateType: "submission",
       aggregateId: submissionId,
@@ -307,7 +306,7 @@ export async function gradeSubmission(
       },
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "submission.grade",
       resourceType: "submission",

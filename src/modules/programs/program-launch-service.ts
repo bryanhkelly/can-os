@@ -1,28 +1,26 @@
-import { and, eq, isNull, or, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  auditEvents,
-  calendarEvents,
-  domainEvents,
-  journeys,
-  organizations,
-  programs,
-  sites,
-  schoolYears,
-  sections,
-  terms,
+calendarEvents,
+journeys,
+organizations,
+programs,
+schoolYears,
+sections,
+sites,
+terms
 } from "@/db/schema";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {
-  assertCapability,
-  assertOrganizationScope,
-  assertProgramScope,
-  assertSiteScope,
-  type CommandContext,
+assertCapability,
+assertOrganizationScope,
+assertProgramScope,
+assertSiteScope,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { and,eq,inArray,isNull,or } from "drizzle-orm";
 import { evaluateSectionReadiness } from "./section-readiness-service";
 
 export async function startProgramLaunch(
@@ -207,7 +205,7 @@ export async function createProgramOrientation(
 
     if (!event) throw new Error("Failed to create orientation event");
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.CalendarEventCreated,
       aggregateType: "calendar_event",
       aggregateId: event.id,
@@ -304,7 +302,7 @@ export async function activateProgram(
       })
       .where(eq(journeys.id, journey.id));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.ProgramActivated,
       aggregateType: "program",
       aggregateId: programId,
@@ -316,7 +314,7 @@ export async function activateProgram(
       },
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "program.activate",
       resourceType: "program",

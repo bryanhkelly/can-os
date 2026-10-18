@@ -14,7 +14,7 @@ function makeFakeTx(returnedId = "11111111-1111-1111-1111-111111111111") {
           calls.push({ table, values });
           const chain: InsertChain = {
             returning() {
-              return Promise.resolve([{ id: returnedId }]);
+              return Promise.resolve((Array.isArray(values) ? values : [values]).map(() => ({ id: returnedId })));
             },
             then(onfulfilled, onrejected) {
               return Promise.resolve(undefined).then(onfulfilled, onrejected);
@@ -75,6 +75,16 @@ describe("emitEvent", () => {
 });
 
 describe("writeAudit", () => {
+  it("preserves exact verified identity attribution without inventing request context", async () => {
+    const { tx, calls } = makeFakeTx();
+    const entry = {
+      actorPersonId: "person-1", action: "identity.session.started",
+      resourceType: "account", resourceId: "account-1",
+      context: { accountId: "account-1", sessionId: "session-1", role: "teacher" },
+    };
+    await writeAudit(tx, entry);
+    expect(calls[0]?.values).toEqual(entry);
+  });
   it("inserts an audit_events row carrying actor, scope and request context", async () => {
     const { tx, calls } = makeFakeTx();
     await writeAudit(tx, context, {
@@ -165,13 +175,25 @@ describe("notify", () => {
 });
 
 describe("notifyMany", () => {
+  it("fails explicitly instead of dropping missing notification IDs", async () => {
+    const { tx } = makeFakeTx();
+    tx.insert = () => ({ values: () => ({
+      returning: () => Promise.resolve([{}]),
+      then: Promise.resolve(undefined).then.bind(Promise.resolve(undefined)),
+    }) });
+    await expect(notifyMany(tx, [{ recipientPersonId: "p-1", type: "t", title: "One" }]))
+      .rejects.toThrow("did not return an id");
+  });
   it("inserts one row per recipient in a single call and returns ids", async () => {
     const { tx, calls } = makeFakeTx();
     const ids = await notifyMany(tx, [
       { recipientPersonId: "p-1", type: "t", title: "One" },
       { recipientPersonId: "p-2", type: "t", title: "Two", eventId: "evt-1" },
     ]);
-    expect(ids).toEqual(["11111111-1111-1111-1111-111111111111"]);
+    expect(ids).toEqual([
+      "11111111-1111-1111-1111-111111111111",
+      "11111111-1111-1111-1111-111111111111",
+    ]);
     expect(calls).toHaveLength(1);
     expect(calls[0].values).toHaveLength(2);
   });

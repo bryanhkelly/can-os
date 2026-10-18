@@ -1,10 +1,11 @@
+import { AuthorizationError } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { actorSiteIds,recordAudit,requireActor } from "@/modules/identity/actors.server";
+import { emitEvent } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, desc, inArray } from "drizzle-orm";
+import { and,desc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
-import { actorSiteIds, recordAudit, requireActor } from "@/modules/identity/actors.server";
-import { AuthorizationError } from "@/domain/command-context";
-import {EventTypes} from "@/domain/event-types";
 
 const studentActor = () => requireActor(["student"]);
 
@@ -34,7 +35,7 @@ export const finishQuickWinAction = createServerFn({ method: "POST" })
     const actor = await studentActor();
     const sites = actorSiteIds(actor);
     if (!process.env.DATABASE_URL) throw new Error("Neon is not configured");
-    const [{ db }, { actions, domainEvents }] = await Promise.all([
+    const [{ db }, { actions }] = await Promise.all([
       import("@/db/client"), import("@/db/schema"),
     ]);
     return db.transaction(async tx => {
@@ -51,7 +52,7 @@ export const finishQuickWinAction = createServerFn({ method: "POST" })
         eq(actions.status, "open"),
       )).returning({ id: actions.id });
       if (!result) throw new Error("Action not found or already completed");
-      await tx.insert(domainEvents).values({eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:result.id,actorPersonId:actor.actorPersonId,payload:{subjectType:current.subjectType,subjectId:current.subjectId}});
+      await emitEvent(tx,{eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:result.id,actorPersonId:actor.actorPersonId,payload:{subjectType:current.subjectType,subjectId:current.subjectId}});
       await recordAudit(tx, actor, { action: "action.complete", resourceType: "action", resourceId: result.id, before: { status: "open" }, after: { status: "resolved" } });
       return { id: result.id };
     });
@@ -82,7 +83,7 @@ export const requestQuickWinHelp = createServerFn({ method: "POST" })
         metadata: { kind: "message", source: "Student support" },
       }).returning({ id: s.actions.id });
       if (!result) throw new Error("Help request could not be saved");
-      await tx.insert(s.domainEvents).values({eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:result.id,actorPersonId:actor.actorPersonId,payload:{subjectType:"student_profile",subjectId:profile.id,source:"student_support_request"}});
+      await emitEvent(tx,{eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:result.id,actorPersonId:actor.actorPersonId,payload:{subjectType:"student_profile",subjectId:profile.id,source:"student_support_request"}});
       await recordAudit(tx, actor, { action: "support_request.create", resourceType: "action", resourceId: result.id, after: { kind: "message" } });
       return { id: result.id };
     });

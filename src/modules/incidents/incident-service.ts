@@ -1,21 +1,20 @@
-import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  auditEvents,
-  domainEvents,
-  incidentAmendments,
-  incidentNotifications,
-  incidentPeople,
-  incidentReviews,
-  incidents,
+incidentAmendments,
+incidentNotifications,
+incidentPeople,
+incidentReviews,
+incidents
 } from "@/db/schema";
 import {
-  assertCapability,
-  assertProgramScope,
-  assertSiteScope,
-  type CommandContext,
+assertCapability,
+assertProgramScope,
+assertSiteScope,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { and,eq } from "drizzle-orm";
 
 const amendableFields = new Set([
   "severity",
@@ -82,7 +81,7 @@ export async function fileIncident(
       );
     }
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.IncidentFiled,
       aggregateType: "incident",
       aggregateId: incident.id,
@@ -96,7 +95,7 @@ export async function fileIncident(
       },
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: actorPersonId,
       action: "incident.file",
       resourceType: "incident",
@@ -165,7 +164,7 @@ export async function amendIncident(
       .set(patch)
       .where(eq(incidents.id, input.incidentId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.IncidentAmended,
       aggregateType: "incident",
       aggregateId: input.incidentId,
@@ -176,7 +175,7 @@ export async function amendIncident(
       },
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "incident.amend",
       resourceType: "incident",
@@ -277,7 +276,7 @@ export async function completeIncidentReview(
       })
       .where(eq(incidentReviews.id, input.reviewId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.IncidentReviewCompleted,
       aggregateType: "incident_review",
       aggregateId: input.reviewId,
@@ -288,7 +287,7 @@ export async function completeIncidentReview(
       },
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "incident.review.complete",
       resourceType: "incident_review",
@@ -343,7 +342,7 @@ export async function queueIncidentNotification(
 
     if (!notification) throw new Error("Failed to queue Incident notification");
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.IncidentNotificationQueued,
       aggregateType: "incident_notification",
       aggregateId: notification.id,
@@ -410,7 +409,7 @@ export async function closeIncident(
       })
       .where(eq(incidents.id, input.incidentId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.IncidentClosed,
       aggregateType: "incident",
       aggregateId: input.incidentId,
@@ -418,7 +417,7 @@ export async function closeIncident(
       payload: {},
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "incident.close",
       resourceType: "incident",
@@ -467,7 +466,7 @@ export async function getIncidentCase(
         .where(eq(incidentAmendments.incidentId, incidentId)),
     ]);
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "incident.read",
       resourceType: "incident",

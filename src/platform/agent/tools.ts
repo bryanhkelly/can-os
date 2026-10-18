@@ -22,13 +22,16 @@ export type ToolResult = {
   data?: Record<string, unknown>;
 };
 
-export type AgentTool = {
+export type AgentToolTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+type ToolDescription = {
   readonly name: string;
   readonly description: string;
-  /** Read-only tools execute immediately; others require human approval. */
-  readonly readOnly: boolean;
-  execute(context: AgentContext, args: Record<string, unknown>): Promise<ToolResult>;
 };
+export type AgentTool = ToolDescription & (
+  | { readonly readOnly: true; execute(context: AgentContext, args: Record<string, unknown>): Promise<ToolResult> }
+  | { readonly readOnly: false; execute(context: AgentContext, args: Record<string, unknown>, tx: AgentToolTransaction): Promise<ToolResult> }
+);
 
 /** Agent runtime consumes academic module capabilities; academic SQL stays in learning. */
 export { resolveVisibleStudents, assertStudentAccess } from "@/modules/learning/academic-domain-api";
@@ -37,7 +40,7 @@ import { getStudentAcademicSummary as academicSummary } from "@/modules/learning
 import { assertStudentAccess, assertGuardianAcademicAccess } from "@/modules/learning/academic-domain-api";
 export type { VisibleStudent } from "@/modules/learning/academic-domain-api";
 
-export const getStudentAcademicSummary: AgentTool = {
+export const getStudentAcademicSummary: Extract<AgentTool, { readOnly: true }> = {
   name: "get_student_academic_summary",
   description: "Retrieve the authorized student academic summary from the Academic Domain API.",
   readOnly: true,
@@ -46,13 +49,13 @@ export const getStudentAcademicSummary: AgentTool = {
   },
 };
 
-export const createWatch: AgentTool = {
+export const createWatch: Extract<AgentTool, { readOnly: false }> = {
   name: "create_watch",
   description:
     "Create a durable subscription that notifies the subscriber when watched events occur for a student (e.g. AssignmentBecameMissing).",
   readOnly: false,
 
-  async execute(context, args) {
+  async execute(context, args, tx) {
     const studentProfileId = String(args.studentProfileId ?? "");
     const student = await assertStudentAccess(context, studentProfileId);
 
@@ -68,7 +71,7 @@ export const createWatch: AgentTool = {
         ? args.sourceConversationId
         : null;
 
-    const [subscription] = await db
+    const [subscription] = await tx
       .insert(subscriptions)
       .values({
         subscriberPersonId: context.actorPersonId,
@@ -81,20 +84,21 @@ export const createWatch: AgentTool = {
         sourceConversationId,
       })
       .returning({ id: subscriptions.id });
+    if (!subscription) throw new Error("Unable to create watch");
 
     return {
       summary: `I'll watch ${student.displayName} for missing assignments${
         reminderHours ? ` and remind you after ${reminderHours} hours if one stays missing` : ""
       }. You can manage this anytime under Things CAN Is Watching.`,
       evidence: [
-        { type: "subscription", id: subscription!.id, label: "Assignment monitoring" },
+        { type: "subscription", id: subscription.id, label: "Assignment monitoring" },
       ],
-      data: { subscriptionId: subscription!.id },
+      data: { subscriptionId: subscription.id },
     };
   },
 };
 
-export const listWatches: AgentTool = {
+export const listWatches: Extract<AgentTool, { readOnly: true }> = {
   name: "list_watches",
   description: "List the subscriber's active standing instructions.",
   readOnly: true,
@@ -138,21 +142,21 @@ export const listWatches: AgentTool = {
   },
 };
 
-export const setWatchStatus: AgentTool = {
+export const setWatchStatus: Extract<AgentTool, { readOnly: false }> = {
   name: "set_watch_status",
   description: "Pause, resume, or revoke one of the subscriber's watches.",
   readOnly: false,
 
-  async execute(context, args) {
+  async execute(context, args, tx) {
     const subscriptionId = String(args.subscriptionId ?? "");
     const status = String(args.status ?? "");
-    if (!["active", "paused", "revoked"].includes(status)) {
+    if (status !== "active" && status !== "paused" && status !== "revoked") {
       throw new Error(`Invalid watch status: ${status}`);
     }
 
-    const rows = await db
+    const rows = await tx
       .update(subscriptions)
-      .set({ status: status as "active" | "paused" | "revoked", updatedAt: new Date() })
+      .set({ status, updatedAt: new Date() })
       .where(
         and(
           eq(subscriptions.id, subscriptionId),
@@ -176,11 +180,11 @@ export const setWatchStatus: AgentTool = {
 };
 
 /** A durable weekly family digest runs independently from the chat session. */
-export const createWeeklyDigest: AgentTool = {
+export const createWeeklyDigest: Extract<AgentTool, { readOnly: false }> = {
   name: "create_weekly_digest",
   description: "Create a weekly academic summary schedule for an authorized guardian.",
   readOnly: false,
-  async execute(context, args) {
+  async execute(context, args, tx) {
     const studentProfileId = String(args.studentProfileId ?? "");
     const student = await assertStudentAccess(context, studentProfileId);
     await assertGuardianAcademicAccess(context, studentProfileId);
@@ -189,7 +193,7 @@ export const createWeeklyDigest: AgentTool = {
     if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6 ||
         !Number.isInteger(hour) || hour < 0 || hour > 23) throw new Error("Invalid schedule");
     const prefs = await getNotificationPreferences(context.actorPersonId);
-    const [subscription] = await db.insert(subscriptions).values({
+    const [subscription] = await tx.insert(subscriptions).values({
       subscriberPersonId: context.actorPersonId,
       eventTypes: ["WeeklyStudentDigest"],
       subjectType: "student_profile",
@@ -199,10 +203,11 @@ export const createWeeklyDigest: AgentTool = {
       createdVia: "conversation",
       sourceConversationId: typeof args.sourceConversationId === "string" ? args.sourceConversationId : null,
     }).returning({ id: subscriptions.id });
+    if (!subscription) throw new Error("Unable to create weekly digest");
     return {
       summary: `I'll send a weekly academic digest for ${student.displayName}. You can pause or revoke it in Things CAN Is Watching.`,
-      evidence: [{ type: "subscription", id: subscription!.id, label: "Weekly academic digest" }],
-      data: { subscriptionId: subscription!.id },
+      evidence: [{ type: "subscription", id: subscription.id, label: "Weekly academic digest" }],
+      data: { subscriptionId: subscription.id },
     };
   },
 };

@@ -1,9 +1,10 @@
-import {createServerFn} from "@tanstack/react-start";
-import {eq,inArray,and} from "drizzle-orm";
-import {z} from "zod";
-import {assertProgramGranted,recordAudit,requireActor} from "@/modules/identity/actors.server";
-import {enrollmentReadiness} from "@/domain/enrollment-readiness";
-import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
+import { enrollmentReadiness } from "@/domain/enrollment-readiness";
+import { assertProgramGranted,recordAudit,requireActor } from "@/modules/identity/actors.server";
+import { operationsSelectionSchema,resolveOperationsSelection } from "@/modules/operations/operations-scope.server";
+import { notifyMany } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { and,eq,inArray } from "drizzle-orm";
+import { z } from "zod";
 const registrar=()=>requireActor(["registrar"],"enrollment.decide");
 const requirementInput=z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid()});
 export const getFamilyReadiness=createServerFn({method:"GET"})
@@ -125,7 +126,7 @@ export const reviewRequirementDocument=createServerFn({method:"POST"})
      .from(s.guardianRelationships).innerJoin(s.people,eq(s.people.id,s.guardianRelationships.guardianPersonId))
      .where(and(eq(s.guardianRelationships.studentPersonId,profile.personId),eq(s.guardianRelationships.canManageEnrollment,true)));
     const notifiedGuardians=[...new Set(guardians.map(g=>g.personId))];
-    if(notifiedGuardians.length)await tx.insert(s.notifications).values(notifiedGuardians.map(recipientPersonId=>({
+    if(notifiedGuardians.length)await notifyMany(tx, notifiedGuardians.map(recipientPersonId=>({
       recipientPersonId,type:"enrollment_document_"+data.status,status:"unread" as const,
       title:data.status==="rejected"?"Enrollment document needs correction":"Enrollment document requested",
       body:data.status==="rejected"?"Please review the enrollment checklist and resubmit the requested information. "+reason:"Please review the outstanding requirement in the enrollment checklist.",

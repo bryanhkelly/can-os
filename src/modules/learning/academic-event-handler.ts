@@ -1,16 +1,16 @@
-import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  assessments,
-  domainEvents,
-  guardianRelationships,
-  notifications,
-  people,
-  sectionTeachers,
-  studentProfiles,
-  submissions,
+assessments,
+domainEvents,
+guardianRelationships,
+people,
+sectionTeachers,
+studentProfiles,
+submissions
 } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
+import { notifyMany } from "@/platform/mutation";
+import { and,eq } from "drizzle-orm";
 
 /**
  * GF1 event handlers for academic events that have user-visible consequences.
@@ -86,8 +86,7 @@ export async function handleSubmissionReceivedEvent(eventId: string): Promise<vo
     // need a new notification because they already appear in the normal grading queue.
     if (timeliness === "late" && context.teacherPersonIds.length) {
       const recipients: string[] = [...new Set<string>(context.teacherPersonIds as string[])];
-      await tx.insert(notifications).values(
-        recipients.map((recipientPersonId: string) => ({
+      await notifyMany(tx, recipients.map((recipientPersonId: string) => ({
           recipientPersonId,
           type: "late_submission_received",
           title: `${context.studentName} submitted ${context.assessmentTitle}`,
@@ -95,8 +94,7 @@ export async function handleSubmissionReceivedEvent(eventId: string): Promise<vo
           resourceType: "submission",
           resourceId: context.submissionId,
           eventId: event.id,
-        })),
-      );
+        })));
     }
   });
 }
@@ -128,8 +126,7 @@ export async function handleGradePostedEvent(eventId: string): Promise<void> {
     const scoreText = context.score === null ? "" : ` Score: ${context.score}.`;
 
     if (recipients.size) {
-      await tx.insert(notifications).values(
-        [...recipients].map((recipientPersonId) => ({
+      await notifyMany(tx, [...recipients].map((recipientPersonId) => ({
           recipientPersonId,
           type: "grade_posted",
           title: `${context.assessmentTitle} has been graded`,
@@ -140,8 +137,7 @@ export async function handleGradePostedEvent(eventId: string): Promise<void> {
           resourceType: "submission",
           resourceId: context.submissionId,
           eventId: event.id,
-        })),
-      );
+        })));
     }
   });
 }

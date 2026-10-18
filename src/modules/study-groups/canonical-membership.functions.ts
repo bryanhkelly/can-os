@@ -1,49 +1,67 @@
-import { createServerFn } from "@tanstack/react-start";
-import { and, eq, inArray, isNull, sql, desc } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { recordAudit, requireActor } from "@/modules/identity/actors.server";
 import { validateGroupInput } from "@/domain/study-groups";
-import { assertGroupScope, eligibleStudent } from "./canonical-membership.server";
+import { recordAudit,requireActor } from "@/modules/identity/actors.server";
+import { emitEvent,notify,notifyMany } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { and,desc,eq,inArray,isNull,sql } from "drizzle-orm";
+import { z } from "zod";
+import { assertGroupScope,eligibleStudent } from "./canonical-membership.server";
 
 const uuid = z.string().uuid();
 
 export const createFacilitatedGroup = createServerFn({ method: "POST" })
-  .validator((value: unknown) => z.object({
+  .validator((value: unknown) => z.union([z.object({
     sectionId: uuid,
     title: z.string().min(3).max(100),
     description: z.string().min(10).max(2000),
     maxMembers: z.number().int().min(2).max(50),
-  }).parse(value))
+  }), z.object({
+    siteId: uuid, programId: uuid.nullish(), kind: z.enum(["course", "interest"]),
+    title: z.string().min(3).max(100),
+    description: z.string().min(10).max(2000),
+    maxMembers: z.number().int().min(2).max(50),
+  }).refine(input => input.kind !== "course" || Boolean(input.programId), {
+    message: "Course study groups require a program",
+  })]).parse(value))
   .handler(async ({ data }) => {
     const actor = await requireActor(["teacher"]);
-    const valid = validateGroupInput({ ...data, kind: "course" });
+    const valid = validateGroupInput({ ...data, kind: "kind" in data ? data.kind : "course" });
     return db.transaction(async tx => {
       const [section] = await tx.select({
         id: s.sections.id, siteId: s.sections.siteId, programId: s.sections.programId,
       }).from(s.sections)
         .innerJoin(s.sectionTeachers, eq(s.sectionTeachers.sectionId, s.sections.id))
-        .where(and(eq(s.sections.id, data.sectionId),
+        .where(and(
+          "sectionId" in data ? eq(s.sections.id, data.sectionId) : and(
+            eq(s.sections.siteId, data.siteId),
+            data.programId ? eq(s.sections.programId, data.programId) : undefined),
           eq(s.sectionTeachers.personId, actor.actorPersonId),
-          eq(s.sections.active, true))).limit(1);
+          eq(s.sections.active, true),
+          inArray(s.sections.siteId, actor.scope.siteIds ?? []),
+          inArray(s.sections.programId, actor.scope.programIds ?? []))).limit(1);
       if (!section || !section.siteId) throw new AuthorizationError("active teaching assignment");
-      assertGroupScope(actor, { ...section, sectionId: section.id });
+      const scope = {
+        id: section.id, siteId: section.siteId,
+        programId: "sectionId" in data ? section.programId : data.programId ?? null,
+        sectionId: "sectionId" in data ? section.id : null,
+      };
+      assertGroupScope(actor, scope);
       const [group] = await tx.insert(s.studyGroups).values({
-        ...valid, sectionId: section.id, siteId: section.siteId, programId: section.programId,
+        ...valid, sectionId: scope.sectionId, siteId: scope.siteId, programId: scope.programId,
         facilitatorPersonId: actor.actorPersonId, visibility: "site", requiresApproval: true,
       }).returning({ id: s.studyGroups.id });
       if (!group) throw new Error("Unable to create study group");
       await recordAudit(tx, actor, {
         action: "study_group.create", resourceType: "study_group", resourceId: group.id,
-        scope: { siteId: section.siteId, programId: section.programId, sectionId: section.id },
-        after: { title: valid.title, maxMembers: valid.maxMembers },
+        scope,
+        after: { title: valid.title, kind: valid.kind, maxMembers: valid.maxMembers },
       });
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: "StudyGroupCreated", aggregateType: "study_group",
         aggregateId: group.id, actorPersonId: actor.actorPersonId,
-        payload: { sectionId: section.id, siteId: section.siteId },
+        payload: { sectionId: scope.sectionId, siteId: scope.siteId, programId: scope.programId },
       });
       return { groupId: group.id };
     });
@@ -110,7 +128,7 @@ export const requestCanonicalGroupMembership = createServerFn({ method: "POST" }
           });
         }
       }
-      await tx.insert(s.notifications).values([
+      await notifyMany(tx, [
         ...[...new Set(guardians.map(g => g.guardianPersonId))].map(recipientPersonId => ({
           recipientPersonId, type: "study_group_consent_requested", status: "unread" as const,
           title: "Study group permission requested", body: "Review a student's group request.",
@@ -126,7 +144,7 @@ export const requestCanonicalGroupMembership = createServerFn({ method: "POST" }
         resourceId: membershipId, scope: { siteId: group.siteId, programId: group.programId },
         after: { status: "pending", studentPersonId: actor.actorPersonId },
       });
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: "StudyGroupMembershipRequested", aggregateType: "study_group_membership",
         aggregateId: membershipId, actorPersonId: actor.actorPersonId, payload: { groupId: group.id },
       });
@@ -203,7 +221,7 @@ export const decideCanonicalGroupConsent = createServerFn({ method: "POST" })
           decision: data.approve ? "approve" : "decline", consentRecordId: consent.id },
         updatedAt: new Date(),
       }).where(eq(s.actions.id, action.id));
-      await tx.insert(s.notifications).values({
+      await notify(tx, {
         recipientPersonId: group.facilitatorPersonId,
         type: "study_group_guardian_consent", status: "unread",
         title: data.approve ? "Guardian approved group participation" : "Guardian declined group participation",
@@ -216,7 +234,7 @@ export const decideCanonicalGroupConsent = createServerFn({ method: "POST" })
         scope: { siteId: group.siteId, programId: group.programId },
         after: { consentRecordId: consent.id, approved: data.approve },
       });
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: "StudyGroupGuardianConsentDecided", aggregateType: "study_group_membership",
         aggregateId: member.id, actorPersonId: actor.actorPersonId,
         payload: { groupId: group.id, approved: data.approve, consentRecordId: consent.id },
@@ -298,7 +316,7 @@ export const decideCanonicalGroupMembership = createServerFn({ method: "POST" })
         reviewedByPersonId: actor.actorPersonId,
         joinedAt: data.approve ? new Date() : null, updatedAt: new Date(),
       }).where(eq(s.studyGroupMemberships.id, member.id));
-      await tx.insert(s.notifications).values({
+      await notify(tx, {
         recipientPersonId: data.studentPersonId, status: "unread",
         type: "study_group_membership_decision",
         title: data.approve ? "Study group membership approved" : "Study group membership declined",
@@ -311,7 +329,7 @@ export const decideCanonicalGroupMembership = createServerFn({ method: "POST" })
         scope: { siteId: group.siteId, programId: group.programId },
         before: { status: "pending" }, after: { status: data.approve ? "approved" : "declined" },
       });
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: "StudyGroupMembershipDecided", aggregateType: "study_group_membership",
         aggregateId: member.id, actorPersonId: actor.actorPersonId,
         payload: { groupId: group.id, approved: data.approve },

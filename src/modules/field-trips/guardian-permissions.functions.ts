@@ -1,12 +1,13 @@
-import { createServerFn } from "@tanstack/react-start";
-import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { actorSiteIds, recordAudit, requireActor } from "@/modules/identity/actors.server";
-import { permissionCanBeSigned, publishedTripPermission } from "./permission-policy";
+import { actorSiteIds,recordAudit,requireActor } from "@/modules/identity/actors.server";
+import { emitEvent,notify } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
+import { and,asc,eq,inArray } from "drizzle-orm";
+import { z } from "zod";
+import { permissionCanBeSigned,publishedTripPermission } from "./permission-policy";
 
 const uuid = z.string().uuid();
 
@@ -148,13 +149,13 @@ export const signGuardianFieldTripPermission = createServerFn({ method: "POST" }
         after: { status: "permission_complete", consentRecordId: consent.id,
           permissionVersion: policy.version },
       });
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: "FieldTripPermissionSigned", aggregateType: "field_trip_participant",
         aggregateId: participant.id, actorPersonId: actor.actorPersonId,
         payload: { fieldTripId: trip.id, studentProfileId: participant.studentProfileId,
           consentRecordId: consent.id },
       });
-      await tx.insert(s.notifications).values({
+      await notify(tx, {
         recipientPersonId: trip.proposedByPersonId, status: "unread",
         type: "field_trip_permission_signed", title: "Trip permission received",
         body: "A guardian signed permission for " + trip.title + ".",

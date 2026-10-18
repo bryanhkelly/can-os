@@ -1,13 +1,14 @@
-import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
-import {and,eq,inArray} from "drizzle-orm";
-import {db} from "@/db/client";
-import {admissionOffers,admissionSeatPools,applications,auditEvents,domainEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles,notifications} from "@/db/schema";
-import {assertCapability,assertProgramScope,AuthorizationError,type CommandContext} from "@/domain/command-context";
-import type {AccessContext} from "@/domain/access-context";
-import {EventTypes} from "@/domain/event-types";
-import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
-import {transitionAdmissionsOffer,type OfferStatus} from "@/domain/admissions-offer-lifecycle";
-import {calculateSeatOccupancy} from "@/domain/admissions-seat-occupancy";
+import { db } from "@/db/client";
+import { admissionOffers,admissionSeatPools,applications,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles } from "@/db/schema";
+import type { AccessContext } from "@/domain/access-context";
+import { transitionAdmissionsOffer,type OfferStatus } from "@/domain/admissions-offer-lifecycle";
+import { calculateSeatOccupancy } from "@/domain/admissions-seat-occupancy";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
+import { assertCapability,assertProgramScope,AuthorizationError,type CommandContext } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
+import { emitEvent,notify,notifyMany,writeAudit } from "@/platform/mutation";
+import { and,eq,inArray } from "drizzle-orm";
 
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
 const guarded=(context:AccessContext,role:"registrar"|"guardian")=>{
@@ -58,8 +59,8 @@ async function expireElapsedOffers(tx:Transaction,context:CommandContext,program
  for(const offer of pending){
   if(!offer.expiresAt||offer.expiresAt.getTime()>now.getTime())continue;
   await tx.update(admissionOffers).set({status:"expired",updatedAt:now}).where(and(eq(admissionOffers.id,offer.id),eq(admissionOffers.status,"issued")));
-  await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"admissions.offer.expire",resourceType:"admission_offer",resourceId:offer.id,scope:{programId},before:{status:"issued"},after:{status:"expired"},context:{requestId:context.requestId??null}});
-  await tx.insert(domainEvents).values({eventType:EventTypes.AdmissionOfferExpired,aggregateType:"admission_offer",aggregateId:offer.id,actorPersonId:context.actorPersonId,payload:{programId,schoolYearId}});
+  await writeAudit(tx,context,{action:"admissions.offer.expire",entityType:"admission_offer",entityId:offer.id,scope:{programId},before:{status:"issued"},after:{status:"expired"}});
+  await emitEvent(tx,{eventType:EventTypes.AdmissionOfferExpired,aggregateType:"admission_offer",aggregateId:offer.id,actorPersonId:context.actorPersonId,payload:{programId,schoolYearId}});
   count++;
  }
  return count;
@@ -102,12 +103,13 @@ export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{
   if(!profile)throw new Error("Student profile missing");
   const guardians=await tx.select({personId:guardianRelationships.guardianPersonId}).from(guardianRelationships)
    .where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.canManageEnrollment,true)));
-  if(guardians.length)await tx.insert(notifications).values([...new Set(guardians.map(g=>g.personId))].map(recipientPersonId=>({
-   recipientPersonId,type:"admission_offer_issued",status:"unread" as const,title:"New enrollment offer",
+  // status relies on the column default ("unread"), matching the prior inline insert.
+  if(guardians.length)await notifyMany(tx,[...new Set(guardians.map(g=>g.personId))].map(recipientPersonId=>({
+   recipientPersonId,type:"admission_offer_issued",title:"New enrollment offer",
    body:"An enrollment offer is ready for your review.",resourceType:"admission_offer",resourceId:offer.id
   })));
-  await tx.insert(domainEvents).values({eventType:EventTypes.AdmissionOfferIssued,aggregateType:"admission_offer",aggregateId:offer.id,actorPersonId:context.actorPersonId,payload:{applicationId:app.id,programId:app.programId,schoolYearId:input.schoolYearId,expiresAt:input.expiresAt.toISOString()}});
-  await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"admissions.offer.issue",resourceType:"admission_offer",resourceId:offer.id,scope:{programId:app.programId},after:{status:"issued",schoolYearId:input.schoolYearId},context:{requestId:context.requestId??null}});
+  await emitEvent(tx,{eventType:EventTypes.AdmissionOfferIssued,aggregateType:"admission_offer",aggregateId:offer.id,actorPersonId:context.actorPersonId,payload:{applicationId:app.id,programId:app.programId,schoolYearId:input.schoolYearId,expiresAt:input.expiresAt.toISOString()}});
+  await writeAudit(tx,context,{action:"admissions.offer.issue",entityType:"admission_offer",entityId:offer.id,scope:{programId:app.programId},after:{status:"issued",schoolYearId:input.schoolYearId}});
   return offer.id;
  });
 }
@@ -130,15 +132,16 @@ export async function respondToSyntheticAdmissionOffer(context:AccessContext,off
   const now=new Date();
   await tx.update(admissionOffers).set({status:changed.status,respondedAt:now,respondedByPersonId:context.actorPersonId,updatedAt:now}).where(eq(admissionOffers.id,offerId));
   if(action==="accept")await tx.update(applications).set({stage:"accepted",decidedAt:now,updatedAt:now}).where(eq(applications.id,app.id));
-  if(offer!.issuedByPersonId)await tx.insert(notifications).values({
-   recipientPersonId:offer!.issuedByPersonId,type:action==="accept"?"admission_offer_accepted":"admission_offer_declined",status:"unread",
+  // status relies on the column default ("unread"), matching the prior inline insert.
+  if(offer!.issuedByPersonId)await notify(tx,{
+   recipientPersonId:offer!.issuedByPersonId,type:action==="accept"?"admission_offer_accepted":"admission_offer_declined",
    title:action==="accept"?"Enrollment offer accepted":"Enrollment offer declined",
    body:action==="accept"?"A guardian accepted an enrollment offer. Activation may proceed.":"A guardian declined an enrollment offer.",
    resourceType:"admission_offer",resourceId:offerId
   });
-  await tx.insert(domainEvents).values({eventType:action==="accept"?EventTypes.AdmissionOfferAccepted:EventTypes.AdmissionOfferDeclined,aggregateType:"admission_offer",aggregateId:offerId,actorPersonId:context.actorPersonId,payload:{applicationId:app.id,programId:app.programId,schoolYearId:offer!.schoolYearId}});
-  if(action==="accept"&&app.stage!=="accepted")await tx.insert(domainEvents).values({eventType:EventTypes.ApplicationAccepted,aggregateType:"application",aggregateId:app.id,actorPersonId:context.actorPersonId,payload:{studentProfileId:app.studentProfileId,programId:app.programId}});
-  await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"admissions.offer."+action,resourceType:"admission_offer",resourceId:offerId,scope:{programId:app.programId},before:{status:offer!.status},after:{status:changed.status},context:{requestId:context.requestId??null}});
+  await emitEvent(tx,{eventType:action==="accept"?EventTypes.AdmissionOfferAccepted:EventTypes.AdmissionOfferDeclined,aggregateType:"admission_offer",aggregateId:offerId,actorPersonId:context.actorPersonId,payload:{applicationId:app.id,programId:app.programId,schoolYearId:offer!.schoolYearId}});
+  if(action==="accept"&&app.stage!=="accepted")await emitEvent(tx,{eventType:EventTypes.ApplicationAccepted,aggregateType:"application",aggregateId:app.id,actorPersonId:context.actorPersonId,payload:{studentProfileId:app.studentProfileId,programId:app.programId}});
+  await writeAudit(tx,context,{action:"admissions.offer."+action,entityType:"admission_offer",entityId:offerId,scope:{programId:app.programId},before:{status:offer!.status},after:{status:changed.status}});
   return offerId;
  });
 }
@@ -171,15 +174,16 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   const [student]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
   if(!student)throw new Error("Student profile missing during activation");
   const recipients=[...new Set([student.personId,offer!.respondedByPersonId].filter((id):id is string=>Boolean(id)))];
-  await tx.insert(notifications).values(recipients.map(recipientPersonId=>({
-   recipientPersonId,type:"enrollment_activated",status:"unread" as const,
+  // status relies on the column default ("unread"), matching the prior inline insert.
+  await notifyMany(tx,recipients.map(recipientPersonId=>({
+   recipientPersonId,type:"enrollment_activated",
    title:"Enrollment confirmed",body:"Your accepted admission offer has been activated for the school year.",
    resourceType:"enrollment",resourceId:enrollment.id
   })));
 
-  await tx.insert(domainEvents).values({eventType:EventTypes.EnrollmentActivated,aggregateType:"enrollment",aggregateId:enrollment.id,actorPersonId:context.actorPersonId,payload:{applicationId:app.id,studentProfileId:app.studentProfileId,programId:offer!.programId,schoolYearId:offer!.schoolYearId,offerId}});
-  await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"journey.activate",resourceType:"journey",resourceId:journey.id,scope:{programId:offer!.programId},before:{status:journey.status},after:{status:"active"},context:{requestId:context.requestId??null,offerId,enrollmentId:enrollment.id}});
-  await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,action:"admissions.offer.activate",resourceType:"enrollment",resourceId:enrollment.id,scope:{programId:offer!.programId},after:{offerId,schoolYearId:offer!.schoolYearId,status:"active"},context:{requestId:context.requestId??null}});
+  await emitEvent(tx,{eventType:EventTypes.EnrollmentActivated,aggregateType:"enrollment",aggregateId:enrollment.id,actorPersonId:context.actorPersonId,payload:{applicationId:app.id,studentProfileId:app.studentProfileId,programId:offer!.programId,schoolYearId:offer!.schoolYearId,offerId}});
+  await writeAudit(tx,context,{action:"journey.activate",entityType:"journey",entityId:journey.id,scope:{programId:offer!.programId},before:{status:journey.status},after:{status:"active"},contextExtras:{offerId,enrollmentId:enrollment.id}});
+  await writeAudit(tx,context,{action:"admissions.offer.activate",entityType:"enrollment",entityId:enrollment.id,scope:{programId:offer!.programId},after:{offerId,schoolYearId:offer!.schoolYearId,status:"active"}});
   return enrollment.id;
  });
 }

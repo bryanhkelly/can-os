@@ -1,11 +1,12 @@
-import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions, auditEvents, domainEvents, insights } from "@/db/schema";
+import { actions,insights } from "@/db/schema";
 import {
-  assertCapability,
-  type CommandContext,
+assertCapability,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { eq } from "drizzle-orm";
 
 export async function createActionFromInsight(
   context: CommandContext,
@@ -59,7 +60,7 @@ export async function createActionFromInsight(
       })
       .where(eq(insights.id, insight.id));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.ActionCreated,
       aggregateType: "action",
       aggregateId: action.id,
@@ -67,11 +68,10 @@ export async function createActionFromInsight(
       payload: { insightId: insight.id },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "action.create_from_insight",
-      resourceType: "action",
-      resourceId: action.id,
+      entityType: "action",
+      entityId: action.id,
       scope: {
         organizationId: insight.organizationId,
         siteId: insight.siteId,
@@ -83,10 +83,7 @@ export async function createActionFromInsight(
         subjectType: insight.subjectType,
         subjectId: insight.subjectId,
       },
-      context: {
-        requestId: context.requestId ?? null,
-        insightId: insight.id,
-      },
+      contextExtras: { insightId: insight.id },
     });
 
     return action.id;

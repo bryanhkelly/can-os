@@ -158,7 +158,7 @@ integration("GF23 school-year setup", () => {
       }),
     ).rejects.toThrow("must fit within Term");
 
-    await academicTime.createGradingPeriod(context, {
+    const gradingPeriodId = await academicTime.createGradingPeriod(context, {
       termId: fallTermId,
       key: `q1-${suffix}`,
       name: "Quarter 1",
@@ -223,6 +223,23 @@ integration("GF23 school-year setup", () => {
       .where((await import("drizzle-orm")).eq(schema.schoolYears.id, schoolYearId));
 
     expect(activeYear.status).toBe("active");
+
+    const { and, eq } = await import("drizzle-orm");
+    for (const entry of [
+      { id: fallTermId, type: "term", action: "term.create", event: "TermCreated" },
+      { id: gradingPeriodId, type: "grading_period", action: "grading_period.create", event: "GradingPeriodCreated" },
+    ]) {
+      const audits = await db.select().from(schema.auditEvents).where(and(
+        eq(schema.auditEvents.resourceId, entry.id),
+        eq(schema.auditEvents.action, entry.action),
+      ));
+      expect(audits).toHaveLength(1);
+      expect(audits[0].context.requestId).toBe(context.requestId);
+      expect(await db.select().from(schema.domainEvents).where(and(
+        eq(schema.domainEvents.aggregateId, entry.id),
+        eq(schema.domainEvents.eventType, entry.event),
+      ))).toHaveLength(1);
+    }
 
     const activationEvents = await db
       .select()

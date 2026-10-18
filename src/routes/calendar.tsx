@@ -4,19 +4,16 @@ import {
   createPersonalEvent,
   getCalendarMonth,
   moveAssessmentDueDate,
+  reviseCalendarEvent,
   type CalendarFeedItem,
 } from "@/modules/calendar/calendar.functions";
+import { dateKeyInTimezone, dateTimeInputInTimezone, dateTimeInputValue } from "@/modules/calendar/timezone";
 
 export const Route = createFileRoute("/calendar")({ component: CalendarPage });
 
 type MonthData = Awaited<ReturnType<typeof getCalendarMonth>>;
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-function dayKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function formatTime(iso: string, timezone: string): string {
   try {
@@ -25,6 +22,11 @@ function formatTime(iso: string, timezone: string): string {
     return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(iso));
   }
 }
+
+type RevisionInput =
+  | { action: "edit"; eventId: string; title: string; description?: string | null }
+  | { action: "reschedule"; eventId: string; startsAt: string; endsAt?: string | null }
+  | { action: "cancel"; eventId: string };
 
 function typeLabel(item: CalendarFeedItem): string {
   if (item.source === "assessment") return "Due";
@@ -55,6 +57,13 @@ function CalendarPage() {
   const [formStart, setFormStart] = useState("09:00");
   const [formEnd, setFormEnd] = useState("");
   const [saving, setSaving] = useState(false);
+  const [manageMode, setManageMode] = useState<{ id: string; mode: "edit" | "reschedule" } | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [moveDate, setMoveDate] = useState("");
+  const [moveStart, setMoveStart] = useState("09:00");
+  const [moveEnd, setMoveEnd] = useState("");
 
   const load = useCallback((y: number, m: number) => {
     setLoading(true);
@@ -78,7 +87,7 @@ function CalendarPage() {
   const byDay = useMemo(() => {
     const map = new Map<string, CalendarFeedItem[]>();
     for (const item of items) {
-      const key = dayKey(item.startsAt);
+      const key = dateKeyInTimezone(item.startsAt, item.timezone);
       const list = map.get(key) ?? [];
       list.push(item);
       map.set(key, list);
@@ -112,17 +121,85 @@ function CalendarPage() {
     setSelectedDay(key);
     setFormDate(key);
     setNotice("");
+    setManageMode(null);
+    setConfirmCancelId(null);
+  };
+
+  const startManage = (item: CalendarFeedItem, mode: "edit" | "reschedule") => {
+    setConfirmCancelId(null);
+    setError("");
+    setNotice("");
+    if (mode === "edit") {
+      setEditTitle(item.title);
+      setEditDescription(item.description ?? "");
+    } else {
+      const startsAt = dateTimeInputValue(item.startsAt, item.timezone);
+      setMoveDate(startsAt.slice(0, 10));
+      setMoveStart(startsAt.slice(11));
+      setMoveEnd(item.endsAt ? dateTimeInputValue(item.endsAt, item.timezone).slice(11) : "");
+    }
+    setManageMode({ id: item.id, mode });
+  };
+
+  const runRevision = (data: RevisionInput, done: string) => {
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    reviseCalendarEvent({ data })
+      .then(() => {
+        setNotice(done);
+        setManageMode(null);
+        setConfirmCancelId(null);
+        load(year, month);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to update event"))
+      .finally(() => setSaving(false));
+  };
+
+  const submitManage = (item: CalendarFeedItem) => {
+    if (!manageMode || manageMode.id !== item.id) return;
+    if (manageMode.mode === "edit") {
+      runRevision(
+        { action: "edit", eventId: item.id, title: editTitle.trim(), description: editDescription.trim() || null },
+        `Updated "${item.title}".`,
+      );
+      return;
+    }
+    if (!moveDate || !moveStart) return;
+    try {
+      const startsAt = dateTimeInputInTimezone(`${moveDate}T${moveStart}`, item.timezone);
+      const endsAt = moveEnd ? dateTimeInputInTimezone(`${moveDate}T${moveEnd}`, item.timezone) : null;
+      runRevision(
+        { action: "reschedule", eventId: item.id, startsAt, endsAt },
+        `Moved "${item.title}" to ${moveDate} (${item.timezone}).`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enter a valid date and time");
+    }
+  };
+
+  const submitCancel = (item: CalendarFeedItem) => {
+    runRevision({ action: "cancel", eventId: item.id }, `Cancelled "${item.title}".`);
   };
 
   const submitEvent = () => {
     const title = formTitle.trim();
     if (!title || !formDate || !formStart || saving) return;
-    setSaving(true);
     setError("");
     setNotice("");
-    const startsAt = new Date(`${formDate}T${formStart}`).toISOString();
-    const endsAt = formEnd ? new Date(`${formDate}T${formEnd}`).toISOString() : undefined;
-    createPersonalEvent({ data: { title, startsAt, endsAt } })
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let startsAt: string;
+    let endsAt: string | undefined;
+    try {
+      startsAt = dateTimeInputInTimezone(`${formDate}T${formStart}`, timezone);
+      endsAt = formEnd ? dateTimeInputInTimezone(`${formDate}T${formEnd}`, timezone) : undefined;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enter a valid date and time");
+      return;
+    }
+    setSaving(true);
+    createPersonalEvent({ data: { title, startsAt, endsAt, timezone } })
       .then(() => {
         setFormTitle("");
         setNotice("Personal event saved.");
@@ -144,12 +221,17 @@ function CalendarPage() {
     if (!id.startsWith("assessment:")) return;
     event.preventDefault();
     const item = items.find((entry) => entry.id === id);
-    if (!item || dayKey(item.startsAt) === targetKey) return;
+    if (!item || dateKeyInTimezone(item.startsAt, item.timezone) === targetKey) return;
     const previous = items;
     const original = new Date(item.startsAt);
-    const target = new Date(`${targetKey}T00:00:00`);
-    target.setHours(original.getHours(), original.getMinutes(), original.getSeconds());
-    const newDueAt = target.toISOString();
+    const originalTime = dateTimeInputValue(item.startsAt, item.timezone).slice(11);
+    let newDueAt: string;
+    try {
+      newDueAt = dateTimeInputInTimezone(`${targetKey}T${originalTime}`, item.timezone);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enter a valid date and time");
+      return;
+    }
     setItems(items.map((entry) => (entry.id === id ? { ...entry, startsAt: newDueAt } : entry)));
     setError("");
     setNotice("");
@@ -231,13 +313,74 @@ function CalendarPage() {
             {selectedDay && (
               <ul className="mt-3 space-y-2">
                 {selectedItems.map((item) => (
-                  <li key={item.id} className="rounded-lg border border-border p-3 text-sm">
-                    <p className="font-semibold">{item.title}</p>
+                  <li key={item.id} className={`rounded-lg border p-3 text-sm ${item.cancelled ? "border-red-200 bg-red-50/40" : "border-border"}`}>
+                    <p className="font-semibold">
+                      {item.title}
+                      {item.cancelled && <span className="ml-2 rounded border border-red-300 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">Cancelled</span>}
+                    </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {typeLabel(item)} · {formatTime(item.startsAt, item.timezone)}
                       {item.endsAt ? ` – ${formatTime(item.endsAt, item.timezone)}` : ""}
                     </p>
                     {item.description && <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>}
+
+                    {item.manageable && !manageMode && confirmCancelId !== item.id && (
+                      <div className="mt-2 flex gap-2">
+                        <button type="button" onClick={() => startManage(item, "edit")} className="rounded border border-border px-2 py-1 text-xs font-semibold">Edit</button>
+                        <button type="button" onClick={() => startManage(item, "reschedule")} className="rounded border border-border px-2 py-1 text-xs font-semibold">Move</button>
+                        <button type="button" onClick={() => setConfirmCancelId(item.id)} className="rounded border border-red-300 px-2 py-1 text-xs font-semibold text-red-700">Cancel event</button>
+                      </div>
+                    )}
+
+                    {confirmCancelId === item.id && (
+                      <div className="mt-2 rounded-lg border border-red-300 p-2">
+                        <p className="text-xs">Cancel "{item.title}"? Participants are notified and the change is audited.</p>
+                        <div className="mt-2 flex gap-2">
+                          <button type="button" disabled={saving} onClick={() => submitCancel(item)} className="rounded bg-red-700 px-2 py-1 text-xs font-semibold text-white disabled:opacity-50">Confirm cancellation</button>
+                          <button type="button" onClick={() => setConfirmCancelId(null)} className="rounded border border-border px-2 py-1 text-xs font-semibold">Keep event</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {manageMode?.id === item.id && manageMode.mode === "edit" && (
+                      <div className="mt-2 space-y-2 border-t border-border pt-2">
+                        <label className="block text-xs">
+                          Title
+                          <input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required minLength={3} maxLength={200} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" />
+                        </label>
+                        <label className="block text-xs">
+                          Description
+                          <textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={2000} rows={2} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" />
+                        </label>
+                      </div>
+                    )}
+
+                    {manageMode?.id === item.id && manageMode.mode === "reschedule" && (
+                      <div className="mt-2 space-y-2 border-t border-border pt-2">
+                        <label className="block text-xs">
+                          Date
+                          <input type="date" value={moveDate} onChange={(event) => setMoveDate(event.target.value)} required className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" />
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="block text-xs">
+                            Start
+                            <input type="time" value={moveStart} onChange={(event) => setMoveStart(event.target.value)} required className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" />
+                          </label>
+                          <label className="block text-xs">
+                            End (optional)
+                            <input type="time" value={moveEnd} onChange={(event) => setMoveEnd(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" />
+                          </label>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Times use {item.timezone}.</p>
+                      </div>
+                    )}
+
+                    {manageMode?.id === item.id && (
+                      <div className="mt-2 flex gap-2">
+                        <button type="button" disabled={saving} onClick={() => submitManage(item)} className="rounded bg-foreground px-2 py-1 text-xs font-semibold text-background disabled:opacity-50">{saving ? "Saving…" : "Save"}</button>
+                        <button type="button" onClick={() => setManageMode(null)} className="rounded border border-border px-2 py-1 text-xs font-semibold">Back</button>
+                      </div>
+                    )}
                   </li>
                 ))}
                 {selectedItems.length === 0 && <li className="text-xs text-muted-foreground">Nothing scheduled.</li>}

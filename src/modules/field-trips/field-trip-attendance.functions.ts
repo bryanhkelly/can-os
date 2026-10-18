@@ -1,10 +1,11 @@
-import { createServerFn } from "@tanstack/react-start";
-import { and, eq, isNull, inArray } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { actorSiteIds, recordAudit, requireActor } from "@/modules/identity/actors.server";
+import { actorSiteIds,recordAudit,requireActor } from "@/modules/identity/actors.server";
+import { emitEvent } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { and,eq,inArray,isNull } from "drizzle-orm";
+import { z } from "zod";
 
 const uuid = z.string().uuid();
 const checkpointStatus = z.discriminatedUnion("checkpoint", [
@@ -117,7 +118,7 @@ export const recordCanonicalFieldTripCheckpoint = createServerFn({ method: "POST
         after: { tripId: trip.id, studentProfileId: participant.studentProfileId,
           status: data.status, checkpoint: data.checkpoint },
       });
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: "FieldTripAttendanceRecorded", aggregateType: "field_trip_attendance",
         aggregateId: record.id, actorPersonId: actor.actorPersonId,
         payload: { fieldTripId: trip.id, studentProfileId: participant.studentProfileId,

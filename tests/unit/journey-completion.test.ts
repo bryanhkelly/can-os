@@ -45,7 +45,10 @@ beforeEach(() => {
   vi.resetAllMocks();
   transaction.mockImplementation(async (callback) => callback({ select, insert, update }));
   insert.mockReturnValue({ values });
-  values.mockResolvedValue(undefined);
+  values.mockImplementation(() => ({
+    returning: vi.fn().mockResolvedValue([{ id: "event" }]),
+    then: Promise.resolve(undefined).then.bind(Promise.resolve(undefined)),
+  }));
   update.mockReturnValue({ set });
   set.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
 });

@@ -1,10 +1,11 @@
-import { createServerFn } from "@tanstack/react-start";
-import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
-import { z } from "zod";
-import { actorSiteIds, recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { actorSiteIds,recordAudit,requireActor,type Actor } from "@/modules/identity/actors.server";
+import { emitEvent } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
+import { and,desc,eq,inArray,ne } from "drizzle-orm";
+import { z } from "zod";
 
 const outreachOutcomes = ["contacted", "meeting_scheduled", "escalated", "no_response"] as const;
 const OPEN_ACTION_STATUSES = ["open", "in_progress", "waiting"] as const;
@@ -235,14 +236,14 @@ export const logCoachOutreach = createServerFn({ method: "POST" })
         after: { outcome: data.outcome, subjectId: data.studentProfileId },
         scope: { siteId: placement.siteId,programId:placement.programId },
       });
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.ActionCreated,
         aggregateType: "action",
         aggregateId: action.id,
         actorPersonId: actor.actorPersonId,
         payload: { type: "coach_outreach", subjectId: data.studentProfileId, outcome: data.outcome },
       });
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.ActionResolved,
         aggregateType: "action",
         aggregateId: action.id,

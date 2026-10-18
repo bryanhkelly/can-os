@@ -1,11 +1,12 @@
-import { readRubric, scoreRubric } from "./rubric";
-import {gradeSubmission,returnSubmissionForRevision,createAssessment,manageAssessment} from "@/modules/learning/gradebook.functions";
+import { assertCapability,assertProgramScope,assertSiteScope,AuthorizationError } from "@/domain/command-context";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { createAssessment,gradeSubmission,manageAssessment,returnSubmissionForRevision } from "@/modules/learning/gradebook.functions";
+import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
+import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { z } from "zod";
-import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertCapability, assertSiteScope, assertProgramScope, AuthorizationError } from "@/domain/command-context";
-import { and, eq, inArray, desc, sql } from "drizzle-orm";
+import { readRubric,scoreRubric } from "./rubric";
 
 
 /** Never accept a browser-selected actor or role for assignment authorization. */
@@ -106,7 +107,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
    const emitSubmission=async(submissionId:string)=>{
-    await tx.insert(s.domainEvents).values({eventType:"SubmissionReceived",aggregateType:"submission",
+    await emitEvent(tx, {eventType:"SubmissionReceived",aggregateType:"submission",
      aggregateId:submissionId,actorPersonId:studentPersonId,payload:{
       assessmentId:assessment.id,studentProfileId:studentId,sectionId:assessment.sectionId,timeliness}});
    };
@@ -116,16 +117,16 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
     for(const action of rows){
      if(action.metadata.assessmentId!==assessment.id||action.status==="resolved"||action.status==="cancelled")continue;
      await tx.update(s.actions).set({status:"resolved",resolvedAt:now,resolutionNote:"Student submitted overdue assignment.",updatedAt:now}).where(eq(s.actions.id,action.id));
-     await tx.insert(s.domainEvents).values({eventType:"ActionResolved",aggregateType:"action",
+     await emitEvent(tx, {eventType:"ActionResolved",aggregateType:"action",
       aggregateId:action.id,actorPersonId:studentPersonId,payload:{submissionId,assessmentId:assessment.id}});
-     await tx.insert(s.auditEvents).values({actorPersonId:studentPersonId,action:"missing_work.resolved_by_submission",resourceType:"action",resourceId:action.id,before:{status:action.status},after:{status:"resolved",submissionId},context:{accountId:context.accountId,sessionId:context.sessionId,assessmentId:assessment.id}});
+     await writeAudit(tx, {actorPersonId:studentPersonId,action:"missing_work.resolved_by_submission",resourceType:"action",resourceId:action.id,before:{status:action.status},after:{status:"resolved",submissionId},context:{accountId:context.accountId,sessionId:context.sessionId,assessmentId:assessment.id}});
     }
    };
 
    if(prior?.status==="returned"){
     const [revision]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,attemptNumber:prior.attemptNumber+1,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
     if(!revision)throw new Error("Unable to save revision");
-    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.submit_revision",resourceType:"submission",resourceId:revision.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId}});
+    await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.submit_revision",resourceType:"submission",resourceId:revision.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId}});
     await emitSubmission(revision.id);
     await resolveFollowUps(revision.id);
     return {submissionId:revision.id};
@@ -133,14 +134,14 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    if(prior){
     const [submitted]=await tx.update(s.submissions).set({status:"submitted",response:{text},timeliness,submittedAt:now,updatedAt:now}).where(and(eq(s.submissions.id,prior.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!submitted)throw new Error("Assignment was submitted or changed in another tab");
-    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.submit",resourceType:"submission",resourceId:submitted.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId}});
+    await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.submit",resourceType:"submission",resourceId:submitted.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId}});
     await emitSubmission(submitted.id);
     await resolveFollowUps(submitted.id);
     return {submissionId:submitted.id};
    }
    const [created]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,status:"submitted",timeliness,response:{text},submittedAt:now}).returning({id:s.submissions.id});
    if(!created)throw new Error("Unable to submit");
-    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.submit",resourceType:"submission",resourceId:created.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId}});
+    await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.submit",resourceType:"submission",resourceId:created.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId}});
     await emitSubmission(created.id);
     await resolveFollowUps(created.id);
    return {submissionId:created.id};
@@ -233,22 +234,22 @@ export const saveAssignmentDraft=createServerFn({method:"POST"})
    if(latest && !["assigned","returned"].includes(latest.status))throw new Error("Submitted work cannot be overwritten");
    if(latest?.status==="returned"){
     const [draft]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,attemptNumber:latest.attemptNumber+1,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing().returning({id:s.submissions.id});
-    if(draft){await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.draft_revision",resourceType:"submission",resourceId:draft.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});return {saved:true};}
+    if(draft){await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.draft_revision",resourceType:"submission",resourceId:draft.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});return {saved:true};}
     const [existing]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId),eq(s.submissions.attemptNumber,latest.attemptNumber+1))).limit(1);
     if(!existing||existing.status!=="assigned")throw new Error("Revision already submitted");
     const [saved]=await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,existing.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!saved)throw new Error("Draft already submitted");
-    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:saved.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});
+    await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:saved.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});
     return {saved:true};
    }
    if(latest){
     const [saved]=await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,latest.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!saved)throw new Error("Draft already submitted");
-    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:saved.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});
+    await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:saved.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});
    }else{
     const [created]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing().returning({id:s.submissions.id});
     if(!created)throw new Error("Assignment draft changed in another tab; refresh before saving");
-    await tx.insert(s.auditEvents).values({actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:created.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});
+    await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:created.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});
    }
    return {saved:true};
   });

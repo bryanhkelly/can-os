@@ -1,0 +1,152 @@
+import { describe, expect, it, vi } from "vitest";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db/client";
+import * as s from "@/db/schema";
+import type { Actor, ActorRole } from "@/modules/identity/actors.server";
+import {
+  createFacilitatedGroup, requestCanonicalGroupMembership,
+  decideCanonicalGroupConsent, decideCanonicalGroupMembership,
+} from "@/modules/study-groups/canonical-membership.functions";
+import {
+  createCanonicalGroupSession, rsvpCanonicalGroupSession,
+  listCanonicalGroupAttendance, recordCanonicalGroupAttendance,
+} from "@/modules/study-groups/canonical-sessions.functions";
+import {
+  createCanonicalGroupPost, reportCanonicalGroupPost, resolveCanonicalGroupReport,
+} from "@/modules/study-groups/canonical-moderation.functions";
+import { createAcademicTimeFixture } from "./helpers/academic-time";
+
+const state = vi.hoisted(() => ({ actor: null as Actor | null }));
+vi.mock("@tanstack/react-start", () => ({
+  createServerFn: () => ({ validator() { return this; }, handler(callback: unknown) { return callback; } }),
+}));
+vi.mock("@/modules/identity/actors.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/modules/identity/actors.server")>(),
+  requireActor: async (roles: readonly ActorRole[]) => {
+    if (!state.actor || !roles.includes(state.actor.role as ActorRole)) throw new Error("Test actor role denied");
+    return state.actor;
+  },
+}));
+
+describe("canonical study group commands", () => {
+  it("preserves interest groups, guardian consent, RSVP-independent attendance and moderation", async () => {
+    const suffix = crypto.randomUUID();
+    const [org] = await db.insert(s.organizations).values({
+      type: "christian_school", name: "Group School", slug: `groups-${suffix}`,
+    }).returning();
+    const [jurisdiction] = await db.insert(s.jurisdictions).values({ code: suffix, name: "Groups" }).returning();
+    const [site] = await db.insert(s.sites).values({
+      organizationId: org!.id, name: "Group Site", slug: suffix,
+    }).returning();
+    const [program] = await db.insert(s.programs).values({
+      organizationId: org!.id, siteId: site!.id, jurisdictionId: jurisdiction!.id,
+      type: "full_school", status: "active", name: "Group Program", slug: suffix,
+      gradeRange: { min: "9", max: "12" },
+      academicProviderOrganizationId: org!.id, creditIssuingOrganizationId: org!.id,
+    }).returning();
+    const time = await createAcademicTimeFixture({
+      organizationId: org!.id, siteId: site!.id, programId: program!.id, suffix,
+    });
+    const [teacher, student, guardian, otherStudent, outsider] = await db.insert(s.people).values(
+      ["Teacher", "Student", "Guardian", "OtherStudent", "Outsider"].map(legalFirstName => ({
+        legalFirstName, legalLastName: suffix,
+      })),
+    ).returning();
+    const profiles = await db.insert(s.studentProfiles).values(
+      [student!, otherStudent!].map(person => ({ personId: person.id, gradeLevel: "9" })),
+    ).returning();
+    await db.insert(s.enrollments).values(profiles.map(profile => ({
+      studentProfileId: profile.id, kind: "program" as const, status: "active" as const,
+      organizationId: org!.id, programId: program!.id, schoolYearId: time.schoolYear.id,
+    })));
+    const [course] = await db.insert(s.courseTemplates).values({
+      owningOrganizationId: org!.id, code: suffix, title: "Group Course", subject: "Science",
+    }).returning();
+    const [version] = await db.insert(s.courseTemplateVersions).values({
+      courseTemplateId: course!.id, version: 1,
+    }).returning();
+    const [section] = await db.insert(s.sections).values({
+      programId: program!.id, siteId: site!.id, termId: time.term.id,
+      courseTemplateVersionId: version!.id, code: suffix, title: "Group Section",
+    }).returning();
+    await db.insert(s.sectionTeachers).values({ sectionId: section!.id, personId: teacher!.id });
+    await db.insert(s.guardianRelationships).values({
+      guardianPersonId: guardian!.id, studentPersonId: student!.id, relationshipLabel: "parent",
+    });
+    const actor = (role: ActorRole, personId: string): Actor => ({
+      accountId: suffix, sessionId: suffix, grantId: suffix, role, actorPersonId: personId,
+      capabilities: new Set(), requestId: suffix,
+      scope: { organizationIds: [org!.id], siteIds: [site!.id], programIds: [program!.id] },
+    });
+    state.actor = actor("teacher", teacher!.id);
+    const { groupId } = await createFacilitatedGroup({ data: {
+      siteId: site!.id, kind: "interest", title: "Science Club",
+      description: "Students exploring science together.", maxMembers: 10,
+    } });
+    const [group] = await db.select().from(s.studyGroups).where(eq(s.studyGroups.id, groupId));
+    expect(group).toMatchObject({ kind: "interest", programId: null, sectionId: null });
+
+    state.actor = actor("student", student!.id);
+    await requestCanonicalGroupMembership({ data: { groupId } });
+    state.actor = actor("teacher", teacher!.id);
+    await expect(decideCanonicalGroupMembership({ data: {
+      groupId, studentPersonId: student!.id, approve: true,
+    } })).rejects.toThrow("Every current enrollment guardian must approve");
+    const [consent] = await db.select().from(s.actions).where(and(
+      eq(s.actions.subjectId, groupId), eq(s.actions.ownerPersonId, guardian!.id),
+    ));
+    state.actor = actor("guardian", guardian!.id);
+    await decideCanonicalGroupConsent({ data: { actionId: consent!.id, approve: true, acknowledged: true } });
+    state.actor = actor("teacher", teacher!.id);
+    await decideCanonicalGroupMembership({ data: { groupId, studentPersonId: student!.id, approve: true } });
+    await db.insert(s.studyGroupMemberships).values({
+      groupId, personId: otherStudent!.id, role: "student", status: "approved",
+    });
+
+    const startsAt = new Date(Date.now() + 86400000).toISOString();
+    const endsAt = new Date(Date.now() + 90000000).toISOString();
+    const { sessionId } = await createCanonicalGroupSession({ data: {
+      groupId, title: "Science session", agenda: "", location: "", startsAt, endsAt,
+    } });
+    state.actor = actor("student", student!.id);
+    await rsvpCanonicalGroupSession({ data: { sessionId, rsvp: "going" } });
+    state.actor = actor("teacher", teacher!.id);
+    expect(await listCanonicalGroupAttendance({ data: { sessionId } })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ personId: student!.id, rsvp: "going" }),
+        expect.objectContaining({ personId: otherStudent!.id, rsvp: null }),
+      ]),
+    );
+    await expect(recordCanonicalGroupAttendance({ data: {
+      sessionId, studentPersonId: otherStudent!.id, attended: true,
+    } })).rejects.toThrow("after a session starts");
+    await db.update(s.studyGroupSessions).set({ startsAt: new Date(Date.now() - 3600000) })
+      .where(eq(s.studyGroupSessions.id, sessionId));
+    await recordCanonicalGroupAttendance({ data: {
+      sessionId, studentPersonId: otherStudent!.id, attended: true,
+    } });
+
+    const { postId } = await createCanonicalGroupPost({ data: { groupId, body: "Please review this post." } });
+    state.actor = actor("student", student!.id);
+    const reports = await Promise.all([1, 2].map(() => reportCanonicalGroupPost({ data: {
+      groupId, postId, reason: "Needs facilitator review.",
+    } })));
+    expect(new Set(reports.map(report => report.reportId)).size).toBe(1);
+    expect(reports.filter(report => report.created)).toHaveLength(1);
+    state.actor = actor("teacher", outsider!.id);
+    await expect(resolveCanonicalGroupReport({ data: {
+      reportId: reports[0]!.reportId, hidePost: true,
+    } })).rejects.toThrow("active facilitated group");
+    state.actor = actor("teacher", teacher!.id);
+    await resolveCanonicalGroupReport({ data: { reportId: reports[0]!.reportId, hidePost: true } });
+    const [post] = await db.select().from(s.studyGroupPosts).where(eq(s.studyGroupPosts.id, postId));
+    expect(post?.hidden).toBe(true);
+    const [action] = await db.select().from(s.actions).where(eq(s.actions.subjectId, reports[0]!.reportId));
+    expect(action?.status).toBe("resolved");
+    expect(await db.select().from(s.domainEvents).where(and(
+      eq(s.domainEvents.aggregateId, action!.id), eq(s.domainEvents.eventType, "ActionResolved"),
+    ))).toHaveLength(1);
+    const audits = await db.select().from(s.auditEvents).where(eq(s.auditEvents.resourceId, groupId));
+    expect(audits.some(audit => audit.context.requestId === suffix)).toBe(true);
+  });
+});

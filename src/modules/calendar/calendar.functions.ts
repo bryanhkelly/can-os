@@ -1,10 +1,13 @@
+import { AuthorizationError } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { actorSiteIds,recordAudit,requireActor,type ActorRole } from "@/modules/identity/actors.server";
+import { emitEvent } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq, gte, inArray, lt, or, isNull, ne, notExists } from "drizzle-orm";
+import { and,asc,eq,gte,inArray,isNull,lt,ne,notExists,or } from "drizzle-orm";
 import { z } from "zod";
-import { actorSiteIds, recordAudit, requireActor, type ActorRole } from "@/modules/identity/actors.server";
-import { EventTypes } from "@/domain/event-types";
-import { AuthorizationError } from "@/domain/command-context";
+import { reviseCalendarEventForActor } from "./calendar-events.server";
+import { isValidTimeZone } from "./timezone";
 
 const allRoles: readonly ActorRole[] = ["student", "teacher", "guardian", "registrar", "specialist"];
 
@@ -17,6 +20,8 @@ export type CalendarFeedItem = {
   endsAt: string | null;
   timezone: string;
   description: string | null;
+  cancelled: boolean;
+  manageable: boolean;
 };
 
 type Schema = typeof import("@/db/schema");
@@ -121,16 +126,51 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
       .orderBy(asc(schema.calendarEvents.startsAt))
       .limit(200);
 
-    const items: CalendarFeedItem[] = events.map((event) => ({
-      id: event.id,
-      title: event.title,
-      type: event.type,
-      source: event.type === "personal" ? "personal" : event.sectionId ? "section" : "site",
-      startsAt: event.startsAt.toISOString(),
-      endsAt: event.endsAt ? event.endsAt.toISOString() : null,
-      timezone: event.timezone,
-      description: event.description,
-    }));
+    const eventIds = events.map((event) => event.id);
+    const ownedEventIds = new Set(
+      eventIds.length
+        ? (
+            await db
+              .select({ calendarEventId: schema.calendarEventParticipants.calendarEventId })
+              .from(schema.calendarEventParticipants)
+              .where(and(
+                inArray(schema.calendarEventParticipants.calendarEventId, eventIds),
+                eq(schema.calendarEventParticipants.participantType, "person"),
+                eq(schema.calendarEventParticipants.participantId, actor.actorPersonId),
+                eq(schema.calendarEventParticipants.role, "owner"),
+              ))
+          ).map((row) => row.calendarEventId)
+        : [],
+    );
+    const canManageStaff = actor.capabilities.has("calendar.event.manage");
+
+    const items: CalendarFeedItem[] = events.map((event) => {
+      const cancelled = event.metadata.cancelled === true;
+      const manageable = !cancelled && !event.sourceType && (
+        event.type === "personal"
+          ? ownedEventIds.has(event.id)
+          : canManageStaff && (
+              actor.role === "registrar"
+                ? Boolean(event.siteId) && sites.includes(event.siteId!) &&
+                  (!event.programId || (actor.scope.programIds ?? []).includes(event.programId))
+                : actor.role === "teacher"
+                  ? Boolean(event.sectionId) && sectionIds.includes(event.sectionId!)
+                  : false
+            )
+      );
+      return {
+        id: event.id,
+        title: event.title,
+        type: event.type,
+        source: event.type === "personal" ? "personal" : event.sectionId ? "section" : "site",
+        startsAt: event.startsAt.toISOString(),
+        endsAt: event.endsAt ? event.endsAt.toISOString() : null,
+        timezone: event.timezone,
+        description: event.description,
+        cancelled,
+        manageable,
+      };
+    });
 
     if (sectionIds.length) {
       const dueRows = await db
@@ -161,6 +201,8 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
           endsAt: null,
           timezone: "America/Los_Angeles",
           description: row.sectionTitle,
+          cancelled: false,
+          manageable: false,
         });
       }
     }
@@ -176,7 +218,7 @@ export const createPersonalEvent = createServerFn({ method: "POST" })
       description: z.string().max(2000).optional(),
       startsAt: z.string().datetime({ offset: true }),
       endsAt: z.string().datetime({ offset: true }).optional(),
-      timezone: z.string().min(1).max(100).default("America/Los_Angeles"),
+      timezone: z.string().min(1).max(100).refine(isValidTimeZone, "timezone must be a valid IANA timezone").default("America/Los_Angeles"),
     }).refine((input) => !input.endsAt || new Date(input.endsAt) > new Date(input.startsAt), {
       message: "endsAt must be after startsAt",
       path: ["endsAt"],
@@ -213,8 +255,26 @@ export const createPersonalEvent = createServerFn({ method: "POST" })
         action: "calendar.personal_event.create",
         resourceType: "calendar_event",
         resourceId: event.id,
-        after: { title: data.title, startsAt: data.startsAt, endsAt: data.endsAt ?? null },
+        after: {
+          title: data.title,
+          startsAt: data.startsAt,
+          endsAt: data.endsAt ?? null,
+          timezone: data.timezone,
+        },
         scope: { siteId },
+      });
+      await emitEvent(tx, {
+        eventType: EventTypes.CalendarEventCreated,
+        aggregateType: "calendar_event",
+        aggregateId: event.id,
+        actorPersonId: actor.actorPersonId,
+        payload: {
+          type: "personal",
+          title: data.title,
+          startsAt: data.startsAt,
+          endsAt: data.endsAt ?? null,
+          timezone: data.timezone,
+        },
       });
       return { eventId: event.id };
     });
@@ -266,13 +326,36 @@ export const moveAssessmentDueDate = createServerFn({ method: "POST" })
         after: { dueAt: newDueAt.toISOString() },
         scope: { siteId: assessment.siteId, programId:assessment.programId, sectionId: assessment.sectionId },
       });
-      await tx.insert(schema.domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.AcademicCalendarChanged,
         aggregateType: "assessment",
         aggregateId: assessment.id,
         actorPersonId: actor.actorPersonId,
+        siteId: assessment.siteId,
+        programId: assessment.programId,
+        sectionId: assessment.sectionId,
         payload: { previousDueAt, newDueAt: newDueAt.toISOString() },
       });
       return { saved: true };
     });
   });
+
+export const reviseCalendarEvent = createServerFn({ method: "POST" })
+  .validator((value: unknown) =>
+    z.discriminatedUnion("action", [
+      z.object({
+        action: z.literal("edit"),
+        eventId: z.string().uuid(),
+        title: z.string().min(3).max(200),
+        description: z.string().max(2000).nullish(),
+      }),
+      z.object({
+        action: z.literal("reschedule"),
+        eventId: z.string().uuid(),
+        startsAt: z.string().datetime({ offset: true }),
+        endsAt: z.string().datetime({ offset: true }).nullish(),
+      }),
+      z.object({ action: z.literal("cancel"), eventId: z.string().uuid() }),
+    ]).parse(value))
+  .handler(async ({ data }) =>
+    reviseCalendarEventForActor(await requireActor(allRoles), data));

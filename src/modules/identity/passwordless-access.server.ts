@@ -1,9 +1,10 @@
-import {and,eq,gt,isNull,lt,sql} from "drizzle-orm";
-import {db} from "@/db/client";
-import {accessAccounts,accessChallenges,accessSessions,accountPersonGrants,auditEvents} from "@/db/schema";
-import {issueOpaqueSecret,hashAccessSecret,normalizeAccessEmail,sessionCookieHeader,clearSessionCookieHeader} from "@/domain/access-tokens";
-import {sendAccessLinkViaResend,type AccessEmailSender} from "./resend-access-mail.server";
-import {roleCapabilities} from "@/domain/access-context";
+import { db } from "@/db/client";
+import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants } from "@/db/schema";
+import { roleCapabilities } from "@/domain/access-context";
+import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader } from "@/domain/access-tokens";
+import { writeAudit } from "@/platform/mutation";
+import { and,eq,gt,isNull,lt,sql } from "drizzle-orm";
+import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
 
 const CHALLENGE_LIFETIME_MS=10*60*1000;
 const REQUEST_COOLDOWN_MS=60*1000;
@@ -83,7 +84,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
   if(!member)throw new Error("Membership unavailable");
-  await tx.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.session.started",resourceType:"account",resourceId:account.id,context:{method:"email_link",sessionId:session.id,grantId:activeGrant.id}});
+  await writeAudit(tx, {actorPersonId:member.personId,action:"identity.session.started",resourceType:"account",resourceId:account.id,context:{method:"email_link",sessionId:session.id,grantId:activeGrant.id}});
   return {accountId:account.id,role:activeGrant.role,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
@@ -93,7 +94,7 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),isNull(accessSessions.revokedAt))).returning({activeGrantId:accessSessions.activeGrantId});
   if(row?.activeGrantId){
    const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,row.activeGrantId)).limit(1);
-   if(member)await tx.insert(auditEvents).values({actorPersonId:member.personId,action:"identity.session.revoked",resourceType:"account",resourceId:accountId,context:{sessionId}});
+   if(member)await writeAudit(tx, {actorPersonId:member.personId,action:"identity.session.revoked",resourceType:"account",resourceId:accountId,context:{sessionId}});
   }
  });
  return clearSessionCookieHeader();
@@ -110,7 +111,7 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
     isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date())))
    .returning({id:accessSessions.id});
   if(!changed)throw new Error("Session expired");
-  await tx.insert(auditEvents).values({actorPersonId:grant.personId,action:"identity.membership.selected",
+  await writeAudit(tx, {actorPersonId:grant.personId,action:"identity.membership.selected",
    resourceType:"account",resourceId:accountId,context:{sessionId,grantId}});
  });
 }

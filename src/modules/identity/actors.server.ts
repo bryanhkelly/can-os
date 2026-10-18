@@ -1,7 +1,8 @@
-import { getRequest } from "@tanstack/react-start/server";
-import { getCommandContext } from "@/modules/identity/command-context.server";
 import type { AccessContext } from "@/domain/access-context";
-import { AuthorizationError, assertCapability } from "@/domain/command-context";
+import { AuthorizationError,assertCapability } from "@/domain/command-context";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { writeAudit,type MutationTx } from "@/platform/mutation";
+import { getRequest } from "@tanstack/react-start/server";
 
 export type ActorRole = "student" | "teacher" | "guardian" | "registrar" | "specialist";
 
@@ -43,16 +44,12 @@ export function assertSiteGranted(actor: Actor, siteId: string | null | undefine
   }
 }
 
-type AuditWriter = {
-  insert: (table: never) => { values: (value: never) => PromiseLike<unknown> };
-};
-
 /**
  * Append an audit row attributing the mutation to the verified account, session and role.
  * Pass the active transaction so the audit row commits with the mutation.
  */
 export async function recordAudit(
-  tx: unknown,
+  tx: MutationTx,
   actor: Actor,
   entry: {
     action: string;
@@ -63,8 +60,7 @@ export async function recordAudit(
     scope?: Record<string, unknown>;
   },
 ): Promise<void> {
-  const { auditEvents } = await import("@/db/schema");
-  await (tx as AuditWriter).insert(auditEvents as never).values({
+  await writeAudit(tx, {
     actorPersonId: actor.actorPersonId,
     action: entry.action,
     resourceType: entry.resourceType,
@@ -76,6 +72,7 @@ export async function recordAudit(
       accountId: actor.accountId,
       sessionId: actor.sessionId,
       role: actor.role,
+      ...(actor.requestId ? { requestId: actor.requestId } : {}),
     },
-  } as never);
+  });
 }

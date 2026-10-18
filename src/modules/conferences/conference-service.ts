@@ -1,33 +1,35 @@
-import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  actions,
-  calendarEventParticipants,
-  calendarEvents,
-  conferenceBookings,
-  conferenceNotes,
-  conferenceSeries,
-  conferenceSlots,
-  enrollments,
-  guardianRelationships,
-  programs,
-  sites,
-  studentProfiles,
+actions,
+conferenceBookings,
+conferenceNotes,
+conferenceSeries,
+conferenceSlots,
+enrollments,
+guardianRelationships,
+programs,
+sites,
+studentProfiles,
 } from "@/db/schema";
 import {
-  assertCapability,
-  assertSiteScope,
-  AuthorizationError,
-  type CommandContext,
+assertCapability,
+assertSiteScope,
+AuthorizationError,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import { emitEvent, writeAudit } from "@/platform/mutation";
 import {
-  claimAvailableSlot,
-  releaseClaimedSlot,
+publishProjection,
+rescheduleProjection,
+} from "@/platform/calendar/projection";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import {
+claimAvailableSlot,
+releaseClaimedSlot,
 } from "@/platform/scheduling/booking";
 import { scheduleReminder } from "@/platform/scheduling/reminders";
 import { materializeSlots } from "@/platform/scheduling/slots";
+import { and,eq,inArray } from "drizzle-orm";
 import { conferenceWindowProblem } from "./eligibility";
 
 type ConferenceTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -162,45 +164,22 @@ async function createConferenceCalendarEvent(
     studentPersonId: string;
   },
 ): Promise<string> {
-  const [event] = await tx
-    .insert(calendarEvents)
-    .values({
-      type: "parent_teacher_conference",
-      title: input.title,
-      startsAt: input.startsAt,
-      endsAt: input.endsAt,
-      timezone: input.timezone,
-      siteId: input.siteId,
-      sourceType: "conference_booking",
-      sourceId: input.bookingId,
-      createdByPersonId: input.guardianPersonId,
-    })
-    .returning({ id: calendarEvents.id });
-
-  if (!event) throw new Error("Failed to create Conference calendar event");
-
-  await tx.insert(calendarEventParticipants).values([
-    {
-      calendarEventId: event.id,
-      participantType: "person",
-      participantId: input.teacherPersonId,
-      role: "teacher",
-    },
-    {
-      calendarEventId: event.id,
-      participantType: "person",
-      participantId: input.guardianPersonId,
-      role: "guardian",
-    },
-    {
-      calendarEventId: event.id,
-      participantType: "person",
-      participantId: input.studentPersonId,
-      role: "student",
-    },
-  ]);
-
-  return event.id;
+  return publishProjection(tx, {
+    sourceType: "conference_booking",
+    sourceId: input.bookingId,
+    type: "parent_teacher_conference",
+    title: input.title,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    timezone: input.timezone,
+    scope: { siteId: input.siteId },
+    createdByPersonId: input.guardianPersonId,
+    participants: [
+      { personId: input.teacherPersonId, role: "teacher" },
+      { personId: input.guardianPersonId, role: "guardian" },
+      { personId: input.studentPersonId, role: "student" },
+    ],
+  });
 }
 
 export async function bookConference(
@@ -456,28 +435,16 @@ export async function rescheduleConferenceBooking(
       throw new Error("Replacement slot is no longer available");
     }
 
-    const [existingEvent] = await tx
-      .select({ id: calendarEvents.id })
-      .from(calendarEvents)
-      .where(
-        and(
-          eq(calendarEvents.sourceType, "conference_booking"),
-          eq(calendarEvents.sourceId, current.bookingId),
-        ),
-      )
-      .limit(1);
+    const rescheduledEventId = await rescheduleProjection(tx, {
+      sourceType: "conference_booking",
+      sourceId: current.bookingId,
+      startsAt: nextSlot.startsAt,
+      endsAt: nextSlot.endsAt,
+    });
 
     let calendarEventId: string;
-    if (existingEvent) {
-      calendarEventId = existingEvent.id;
-      await tx
-        .update(calendarEvents)
-        .set({
-          startsAt: nextSlot.startsAt,
-          endsAt: nextSlot.endsAt,
-          updatedAt: new Date(),
-        })
-        .where(eq(calendarEvents.id, existingEvent.id));
+    if (rescheduledEventId) {
+      calendarEventId = rescheduledEventId;
     } else {
       const [site] = await tx
         .select({ timezone: sites.timezone })

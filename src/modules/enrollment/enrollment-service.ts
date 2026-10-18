@@ -1,31 +1,29 @@
-import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  applications,
-  admissionSeatPools,
-  auditEvents,
-  domainEvents,
-  enrollments,
-  guardianRelationships,
-  householdMemberships,
-  households,
-  journeys,
-  people,
-  programs,
-  schoolYears,
-  studentProfiles,
+admissionSeatPools,
+applications,
+enrollments,
+guardianRelationships,
+householdMemberships,
+households,
+journeys,
+people,
+programs,
+schoolYears,
+studentProfiles
 } from "@/db/schema";
+import { assertApplicationAcceptance,assertApplicationRetryOwnership } from "@/domain/admissions-transitions";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {
-  assertCapability,
-  assertProgramScope,
-  AuthorizationError,
-  type CommandContext,
+assertCapability,
+assertProgramScope,
+AuthorizationError,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
-import {assertApplicationAcceptance,assertApplicationRetryOwnership} from "@/domain/admissions-transitions";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { and,eq } from "drizzle-orm";
 
 /** Enrollment commands must never interpret an absent program grant as global access. */
 function requireEnrollmentProgramScope(context:CommandContext,programId:string):void {
@@ -284,7 +282,7 @@ export async function acceptApplication(
       })
       .where(eq(applications.id, applicationId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.ApplicationAccepted,
       aggregateType: "application",
       aggregateId: applicationId,
@@ -295,7 +293,7 @@ export async function acceptApplication(
       },
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "application.accept",
       resourceType: "application",
@@ -439,7 +437,7 @@ export async function activateEnrollmentFromApplication(
       })
       .where(eq(journeys.id, journey.id));
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "journey.activate",
       resourceType: "journey",
@@ -454,7 +452,7 @@ export async function activateEnrollmentFromApplication(
       },
     });
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.EnrollmentActivated,
       aggregateType: "enrollment",
       aggregateId: enrollment.id,
@@ -467,7 +465,7 @@ export async function activateEnrollmentFromApplication(
       },
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "enrollment.activate",
       resourceType: "enrollment",

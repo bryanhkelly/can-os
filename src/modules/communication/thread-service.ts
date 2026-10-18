@@ -1,24 +1,23 @@
-import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  assessments,
-  auditEvents,
-  communicationMessages,
-  communicationParticipants,
-  communicationThreads,
-  domainEvents,
-  guardianRelationships,
-  people,
-  sectionTeachers,
-  studentProfiles,
-  submissions,
+assessments,
+communicationMessages,
+communicationParticipants,
+communicationThreads,
+guardianRelationships,
+people,
+sectionTeachers,
+studentProfiles,
+submissions,
 } from "@/db/schema";
 import {
-  assertCapability,
-  assertSectionScope,
-  type CommandContext,
+assertCapability,
+assertSectionScope,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { and,eq } from "drizzle-orm";
 
 export async function sendAcademicInterventionMessage(
   context: CommandContext,
@@ -144,28 +143,24 @@ export async function sendAcademicInterventionMessage(
       .set({ lastMessageAt: sentAt, updatedAt: sentAt })
       .where(eq(communicationThreads.id, threadId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.CommunicationMessageSent,
       aggregateType: "communication_thread",
       aggregateId: threadId,
-      actorPersonId: actorPersonId,
+      actorPersonId,
       payload: {
         submissionId: record.submissionId,
         sectionId: record.sectionId,
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: actorPersonId,
+    await writeAudit(tx, context, {
       action: "communication.message_send",
-      resourceType: "communication_thread",
-      resourceId: threadId,
+      entityType: "communication_thread",
+      entityId: threadId,
       scope: { sectionId: record.sectionId },
       after: { sent: true },
-      context: {
-        requestId: context.requestId ?? null,
-        submissionId: record.submissionId,
-      },
+      contextExtras: { submissionId: record.submissionId },
     });
 
     return threadId;

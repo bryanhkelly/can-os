@@ -10,6 +10,11 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import {
+  capacityDemandStatus,
+  capacityOfferingStatus,
+  capacityReservationStatus,
+} from "./enums";
 import { people } from "./identity";
 import { courseTemplates, sections } from "./academics";
 import { jurisdictions, organizations, programs, sites } from "./organizations";
@@ -81,7 +86,7 @@ export const instructionalCapacityOfferings = pgTable(
     jurisdictionId: uuid("jurisdiction_id").references(() => jurisdictions.id, { onDelete: "restrict" }),
     modality: text("modality").notNull(),
     maxSeats: integer("max_seats").notNull(),
-    status: text("status").default("open").notNull(),
+    status: capacityOfferingStatus("status").default("open").notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -103,7 +108,7 @@ export const sectionCapacityDemands = pgTable(
     modality: text("modality").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
-    status: text("status").default("open").notNull(),
+    status: capacityDemandStatus("status").default("open").notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -123,7 +128,7 @@ export const instructionalCapacityReservations = pgTable(
     demandId: uuid("demand_id").notNull().references(() => sectionCapacityDemands.id, { onDelete: "cascade" }),
     sectionId: uuid("section_id").notNull().references(() => sections.id, { onDelete: "cascade" }),
     seats: integer("seats").notNull(),
-    status: text("status").default("held").notNull(),
+    status: capacityReservationStatus("status").default("held").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdByPersonId: uuid("created_by_person_id").references(() => people.id, { onDelete: "restrict" }),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),

@@ -1,31 +1,30 @@
-import { and, eq, inArray, lte, gte, or, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
 import {
-  courseTemplateVersions,
-  courseTemplates,
-  instructorAvailabilityWindows,
-  instructorCapabilities,
-  instructionalCapacityOfferings,
-  instructionalCapacityReservations,
-  people,
-  programs,
-  sectionCapacityDemands,
-  sections,
-  sectionTeachers,
-  scheduleTemplatePeriods,
-  roleAssignments,
-  notifications,
+courseTemplates,
+courseTemplateVersions,
+instructionalCapacityOfferings,
+instructionalCapacityReservations,
+instructorAvailabilityWindows,
+instructorCapabilities,
+people,
+programs,
+roleAssignments,
+scheduleTemplatePeriods,
+sectionCapacityDemands,
+sections,
+sectionTeachers
 } from "@/db/schema";
-import { EventTypes } from "@/domain/event-types";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {
-  assertCapability,
-  assertProgramScope,
-  assertSectionScope,
-  assertSiteScope,
-  type CommandContext,
+assertCapability,
+assertProgramScope,
+assertSectionScope,
+assertSiteScope,
+type CommandContext,
 } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { emitEvent,notify,writeAudit } from "@/platform/mutation";
+import { and,eq,gte,inArray,isNull,lte,or,sql } from "drizzle-orm";
 
 /** Acquired before capacity reservation locks when teacher assignments may change. */
 async function lockSectionStaffingSite(
@@ -903,7 +902,7 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
         eq(instructionalCapacityReservations.status,"committed"))).limit(1);
     if(!remaining.length)await tx.delete(sectionTeachers).where(and(eq(sectionTeachers.sectionId,demand.sectionId),
       eq(sectionTeachers.personId,old.oldPersonId),eq(sectionTeachers.assignmentSource,"capacity")));
-    await tx.insert(notifications).values({
+    await notify(tx, {
       recipientPersonId:replacement.personId,type:"teaching_assignment",title:"Teaching assignment changed",
       body:"You are now assigned to a section.",resourceType:"section",resourceId:demand.sectionId,
     });

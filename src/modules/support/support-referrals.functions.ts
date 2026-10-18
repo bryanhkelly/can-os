@@ -1,10 +1,11 @@
+import { AuthorizationError } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { actorSiteIds,recordAudit,requireActor,type Actor } from "@/modules/identity/actors.server";
+import { emitEvent,notify } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and,desc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
-import { actorSiteIds, recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
-import { AuthorizationError } from "@/domain/command-context";
-import {EventTypes} from "@/domain/event-types";
 
 const stages = ["submitted","accepted","plan_created","in_service","review","closed"] as const;
 type Stage = typeof stages[number];
@@ -171,7 +172,7 @@ export const createSupportReferral = createServerFn({ method: "POST" })
         includeEvidence: data.includeEvidence, notes: observations, reporterPersonId: actor.actorPersonId,
       }).returning({ id: s.supportReferrals.id });
       await tx.insert(s.supportReferralStageEvents).values({ referralId: referral!.id, stage: "submitted", actorPersonId: actor.actorPersonId });
-      await tx.insert(s.domainEvents).values({eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,actorPersonId:actor.actorPersonId,payload:{subjectType:"student_profile",subjectId,referralId:referral!.id}});
+      await emitEvent(tx, {eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,actorPersonId:actor.actorPersonId,payload:{subjectType:"student_profile",subjectId,referralId:referral!.id}});
       await recordAudit(tx, actor, { action: "support_referral.create", resourceType: "action", resourceId: action.id, after: { category: data.category, subjectId, stage: "submitted" }, scope: { siteId: placement.siteId,programId:placement.programId } });
       return action;
     });
@@ -216,7 +217,7 @@ export const advanceSupportReferral = createServerFn({ method: "POST" })
       }).where(eq(s.supportReferrals.id, referral.id));
       await tx.insert(s.supportReferralStageEvents).values({ referralId: referral.id, stage: data.nextStage, note, actorPersonId: actor.actorPersonId });
       if ((data.nextStage === "accepted" || data.nextStage === "review") && referral.reporterPersonId) {
-        await tx.insert(s.notifications).values({
+        await notify(tx, {
           recipientPersonId: referral.reporterPersonId,
           type: data.nextStage === "accepted" ? "support_referral_accepted" : "support_referral_update",
           title: data.nextStage === "accepted" ? "Student support referral accepted" : "Academic support update",
@@ -224,7 +225,7 @@ export const advanceSupportReferral = createServerFn({ method: "POST" })
           resourceType: "action", resourceId: record.id,
         });
       }
-      if(data.nextStage==="closed")await tx.insert(s.domainEvents).values({eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,payload:{subjectType:record.subjectType,subjectId:record.subjectId,referralId:referral.id}});
+      if(data.nextStage==="closed")await emitEvent(tx, {eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,payload:{subjectType:record.subjectType,subjectId:record.subjectId,referralId:referral.id}});
       await recordAudit(tx, actor, { action: "support_referral.advance", resourceType: "action", resourceId: record.id, before: { stage: previous }, after: { stage: data.nextStage, ownerPersonId: owner }, scope: { siteId: record.siteId,programId:record.programId } });
       return { stage: data.nextStage };
     });

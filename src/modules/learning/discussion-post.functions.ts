@@ -1,9 +1,10 @@
-import {createServerFn} from "@tanstack/react-start";
-import {getRequest} from "@tanstack/react-start/server";
-import {getCommandContext} from "@/modules/identity/command-context.server";
-import {assertCapability,AuthorizationError} from "@/domain/command-context";
-import {and,eq} from "drizzle-orm";
-import {isValidDiscussionPost} from "@/domain/course-discussions";
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { isValidDiscussionPost } from "@/domain/course-discussions";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { writeAudit } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { and,eq } from "drizzle-orm";
 import { z } from "zod";
 /** Authorized enrolled student posting into a section discussion. */
 export const postDiscussionMessage=createServerFn({method:"POST"})
@@ -35,7 +36,7 @@ export const postDiscussionMessage=createServerFn({method:"POST"})
   const [created]=await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:actorPersonId,body:data.body.trim(),metadata:{...(data.parentMessageId?{parentMessageId:data.parentMessageId}:{})}}).returning({id:s.communicationMessages.id});
   if(!created)throw new Error("Unable to create discussion response");
   await tx.update(s.communicationThreads).set({lastMessageAt:new Date(),updatedAt:new Date()}).where(eq(s.communicationThreads.id,thread.id));
-  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,action:"discussion.post",resourceType:"communication_message",resourceId:created.id,after:{threadId:thread.id,parentMessageId:data.parentMessageId??null},context:{sessionId:actor.sessionId}});
+  await writeAudit(tx, {actorPersonId:actor.actorPersonId,action:"discussion.post",resourceType:"communication_message",resourceId:created.id,after:{threadId:thread.id,parentMessageId:data.parentMessageId??null},context:{sessionId:actor.sessionId}});
   return {id:created.id};
  });
 });

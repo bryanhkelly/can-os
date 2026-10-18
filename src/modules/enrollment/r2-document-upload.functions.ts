@@ -1,14 +1,14 @@
-import {createServerFn} from "@tanstack/react-start";
-import {z} from "zod";
-import {matchesEnrollmentDocumentSignature} from "@/domain/enrollment-document-signature";
-import {assertR2DemoEnabled,assertR2DocumentGrant} from "@/domain/r2-document-access";
-import {getRequest} from "@tanstack/react-start/server";
-import {getCommandContext} from "@/modules/identity/command-context.server";
-import {and,eq,desc,sql} from "drizzle-orm";
-import {db} from "@/db/client";
-import {applications,journeys,journeyRequirements,documents,auditEvents,programs,guardianRelationships,studentProfiles} from "@/db/schema";
-import {assertSyntheticMutation} from "@/modules/_demo/demo-write-gate";
-import {newDocumentKey,signR2Object,validateDocumentUpload,r2Config} from "./r2-documents.server";
+import { db } from "@/db/client";
+import { applications,documents,guardianRelationships,journeyRequirements,journeys,programs,studentProfiles } from "@/db/schema";
+import { assertR2DemoEnabled,assertR2DocumentGrant } from "@/domain/r2-document-access";
+import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { writeAudit } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { and,desc,eq,sql } from "drizzle-orm";
+import { z } from "zod";
+import { newDocumentKey,r2Config,signR2Object,validateDocumentUpload,verifyDocumentObject } from "./r2-documents.server";
 async function uploadsEnabled(applicationId:string,mode:"upload"|"download"="upload"){
 
  const context=await getCommandContext(getRequest());
@@ -58,34 +58,7 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
   const actorId=await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
   if(!data.key.startsWith("enrollment/"+data.applicationId+"/"+data.requirementId+"/"))throw new Error("Document belongs to another application");
   await requirementScope(data.applicationId,data.requirementId);
-  r2Config();
-  const response=await fetch(signR2Object("HEAD",data.key,undefined,30),{method:"HEAD"});
-  if(!response.ok)throw new Error("Uploaded R2 object could not be verified");
-  const contentLength=Number(response.headers.get("content-length"));
-  if(contentLength!==data.size)throw new Error("Uploaded document size does not match");
-  const returnedType=response.headers.get("content-type");
-  if(returnedType&&returnedType!==data.mimeType)throw new Error("Uploaded document type does not match");
-  const sample=await fetch(signR2Object("GET",data.key,undefined,30),{headers:{Range:"bytes=0-15"}});
-  if(sample.status!==206)throw new Error("R2 did not honor the bounded file-signature request");
-  const returnedRange=sample.headers.get("content-range");
-  if(returnedRange!==`bytes 0-15/${data.size}`)throw new Error("Unexpected R2 signature response");
-  const contentLengthHeader=sample.headers.get("content-length");
-  if(contentLengthHeader!==null&&Number(contentLengthHeader)!==16)throw new Error("Unexpected R2 signature response size");
-  // Never consume a response body of unknown size: an intermediary may ignore Range.
-  const reader=sample.body?.getReader();
-  if(!reader)throw new Error("R2 signature response has no body");
-  const headerBytes=new Uint8Array(16);
-  let offset=0;
-  try{
-   while(true){
-    const {done,value}=await reader.read();
-    if(done)break;
-    if(offset+value.length>16)throw new Error("R2 signature response exceeded 16 bytes");
-    headerBytes.set(value,offset);offset+=value.length;
-   }
-  }finally{await reader.cancel().catch(()=>{});}
-  if(offset!==16||!matchesEnrollmentDocumentSignature(data.mimeType,headerBytes))
-   throw new Error("Uploaded document content does not match its declared type");
+  await verifyDocumentObject(data.key,data.mimeType,data.size);
   return db.transaction(async tx=>{
    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.requirementId}))`);
    const [existing]=await tx.select({id:documents.id}).from(documents).where(and(eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageKey,data.key))).limit(1);
@@ -112,10 +85,10 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
     evidence:[...requirement.evidence,{kind:"document_review",status:"received",documentId:document.id,
      text:"New file uploaded; review required.",reviewedAt:now.toISOString()}]}).where(eq(journeyRequirements.id,requirement.id));
    await tx.update(journeys).set({status:"in_progress",completedAt:null,updatedAt:now}).where(eq(journeys.id,journey.id));
-   await tx.insert(auditEvents).values({actorPersonId:actorId,action:"enrollment.document.resubmitted",resourceType:"journey_requirement",resourceId:requirement.id,
+   await writeAudit(tx, {actorPersonId:actorId,action:"enrollment.document.resubmitted",resourceType:"journey_requirement",resourceId:requirement.id,
     before:{status:requirement.status},after:{status:"needs_you",documentId:document.id,version},context:{applicationId:data.applicationId}});
    const [appRecord]=await tx.select({metadata:applications.metadata}).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
-   await tx.insert(auditEvents).values({actorPersonId:actorId,action:"enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{applicationId:data.applicationId,synthetic:appRecord?.metadata.synthetic===true}});
+   await writeAudit(tx, {actorPersonId:actorId,action:"enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{applicationId:data.applicationId,synthetic:appRecord?.metadata.synthetic===true}});
    return {documentId:document.id,created:true};
   });
  });

@@ -1,27 +1,26 @@
-import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  academicCalendarDays,
-  academicCalendars,
-  auditEvents,
-  domainEvents,
-  gradeScales,
-  gradingPeriods,
-  programs,
-  scheduleTemplatePeriods,
-  scheduleTemplates,
-  schoolYears,
-  terms,
+academicCalendarDays,
+academicCalendars,
+gradeScales,
+gradingPeriods,
+programs,
+scheduleTemplatePeriods,
+scheduleTemplates,
+schoolYears,
+terms,
 } from "@/db/schema";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {
-  assertCapability,
-  assertOrganizationScope,
-  assertProgramScope,
-  assertSiteScope,
-  type CommandContext,
+assertCapability,
+assertOrganizationScope,
+assertProgramScope,
+assertSiteScope,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { and,eq } from "drizzle-orm";
 
 function assertDateRange(startsOn: string, endsOn: string, label: string) {
   if (startsOn > endsOn) {
@@ -101,7 +100,7 @@ export async function createSchoolYear(
 
     if (!year) throw new Error("Failed to create SchoolYear");
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.SchoolYearCreated,
       aggregateType: "school_year",
       aggregateId: year.id,
@@ -113,11 +112,10 @@ export async function createSchoolYear(
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "school_year.create",
-      resourceType: "school_year",
-      resourceId: year.id,
+      entityType: "school_year",
+      entityId: year.id,
       scope: {
         organizationId: input.organizationId,
         programId: input.programId ?? null,
@@ -129,7 +127,6 @@ export async function createSchoolYear(
         endsOn: input.endsOn,
         status: "draft",
       },
-      context: { requestId: context.requestId ?? null },
     });
 
     return year.id;
@@ -195,6 +192,14 @@ export async function createTerm(
       .returning({ id: terms.id });
 
     if (!term) throw new Error("Failed to create Term");
+    const scope = { organizationId: year.organizationId, siteId: year.siteId, programId: year.programId };
+    await writeAudit(tx, context, {
+      action: "term.create", entityType: "term", entityId: term.id, scope, after: { ...input },
+    });
+    await emitEvent(tx, {
+      eventType: "TermCreated", aggregateType: "term", aggregateId: term.id,
+      actorPersonId: context.actorPersonId, ...scope, payload: { schoolYearId: year.id },
+    });
     return term.id;
   });
 }
@@ -257,6 +262,20 @@ export async function createGradingPeriod(
       .returning({ id: gradingPeriods.id });
 
     if (!period) throw new Error("Failed to create GradingPeriod");
+    const scope = { organizationId: record.organizationId, siteId: record.siteId, programId: record.programId };
+    await writeAudit(tx, context, {
+      action: "grading_period.create", entityType: "grading_period", entityId: period.id, scope,
+      after: {
+        termId: input.termId, key: input.key, name: input.name, sequence: input.sequence,
+        startsOn: input.startsOn, endsOn: input.endsOn,
+        gradePostingOpensAt: input.gradePostingOpensAt?.toISOString() ?? null,
+        gradePostingClosesAt: input.gradePostingClosesAt?.toISOString() ?? null,
+      },
+    });
+    await emitEvent(tx, {
+      eventType: "GradingPeriodCreated", aggregateType: "grading_period", aggregateId: period.id,
+      actorPersonId: context.actorPersonId, ...scope, payload: { termId: input.termId },
+    });
     return period.id;
   });
 }
@@ -295,7 +314,7 @@ export async function createAcademicCalendar(
       .returning({ id: academicCalendars.id });
 
     if (!calendar) throw new Error("Failed to create AcademicCalendar");
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.AcademicCalendarChanged,
       aggregateType: "academic_calendar",
       aggregateId: calendar.id,
@@ -303,13 +322,11 @@ export async function createAcademicCalendar(
       payload: { operation: "create", siteId: year.siteId,
         programId: year.programId ?? null, schoolYearId: year.id },
     });
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "academic_calendar.create",
-      resourceType: "academic_calendar", resourceId: calendar.id,
+      entityType: "academic_calendar", entityId: calendar.id,
       scope: { organizationId: year.organizationId, programId: year.programId ?? null,
         siteId: year.siteId }, after: { version: 1, active: true },
-      context: { requestId: context.requestId ?? null },
     });
     return calendar.id;
   });
@@ -404,7 +421,7 @@ export async function setAcademicCalendarDay(
       dayId = day.id;
     }
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.AcademicCalendarChanged,
       aggregateType: "academic_calendar",
       aggregateId: input.academicCalendarId,
@@ -487,7 +504,7 @@ export async function createScheduleTemplate(
         })),
       );
     }
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.ScheduleTemplateChanged,
       aggregateType: "schedule_template", aggregateId: template.id,
       actorPersonId: context.actorPersonId,
@@ -495,15 +512,14 @@ export async function createScheduleTemplate(
         programId: input.programId ?? year.programId ?? null,
         schoolYearId: year.id, periodCount: input.periods.length },
     });
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId, action: "schedule_template.create",
-      resourceType: "schedule_template", resourceId: template.id,
+    await writeAudit(tx, context, {
+      action: "schedule_template.create",
+      entityType: "schedule_template", entityId: template.id,
       scope: { organizationId: year.organizationId, siteId: year.siteId,
         programId: input.programId ?? year.programId ?? null },
       after: { effectiveFrom: input.effectiveFrom,
         effectiveThrough: input.effectiveThrough ?? null,
         periodCount: input.periods.length },
-      context: { requestId: context.requestId ?? null },
     });
 
     return template.id;
@@ -613,7 +629,7 @@ export async function activateSchoolYear(
       .set({ status: "active", updatedAt: activatedAt })
       .where(eq(schoolYears.id, schoolYearId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.SchoolYearActivated,
       aggregateType: "school_year",
       aggregateId: schoolYearId,
@@ -625,11 +641,10 @@ export async function activateSchoolYear(
       },
     });
 
-    await tx.insert(auditEvents).values({
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "school_year.activate",
-      resourceType: "school_year",
-      resourceId: schoolYearId,
+      entityType: "school_year",
+      entityId: schoolYearId,
       scope: {
         organizationId: year.organizationId,
         programId: year.programId ?? null,
@@ -637,7 +652,6 @@ export async function activateSchoolYear(
       },
       before: { status: year.status },
       after: { status: "active" },
-      context: { requestId: context.requestId ?? null },
     });
   });
 }

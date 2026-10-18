@@ -33,7 +33,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Remove simulated calendar-status metadata command from school-experience service.
 - [x] Move authorized personal-event creation and teaching-scoped assessment due-date changes off synthetic-only write gates.
 - [x] Prevent site/section calendar memberships from revealing personal or explicitly participant-restricted events; bound guardian sections to authorized programs/sites.
-- [ ] Build canonical school calendar edit/reschedule/cancel commands with downstream propagation in Phase 2.
+- [x] Build canonical school calendar edit/reschedule/cancel commands with scoped authorization, participant notices, complete audit/domain-event before/after state, and timezone-correct calendar controls; source-owned events continue through their owning workflows.
 - [x] Restrict non-registrar school-experience calendar queries to site-level events, leaving section events to authorized student/teacher read models.
 - [x] Require explicit guardian child selection for office-hour booking; check guardian relationship and active enrollment at the appointment's site.
 - [x] Repair guardian conference slot series identifiers needed by the reschedule picker; check published series, guardian-child relationship and active class/program enrollment again on reschedule.
@@ -54,7 +54,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Converge enrolled-student discussion posting and teacher discussion creation, locking and moderation on records independent of fixture markers; maintain verified section membership and relationship guards.
 - [ ] Run deferred integration and authorization testing for discussion lifecycle before production release.
 - [x] Replace local-only StudentExperience with canonical read-only student work/schedule/action projection and real workflow deep links.
-- [ ] Verify typecheck, build, unit tests and role-switch browser journeys before closing Phase 1 (user deferred, so Phase 1 cannot be marked verified).
+- [ ] Complete role-switch browser journeys before closing Phase 1. CLI typecheck, build and automated regression suites now pass; browser acceptance remains unverified.
 - [x] Align fixture manifest after removing `/demo-health` (previously blocked CI at route fixture coverage).
 - [x] Capture 58 source route owners and pending read/write/role acceptance fields in docs/platform-route-contracts.json with a source-drift and acceptance checker.
 - [ ] Run the route-contract checker and resolve all pending acceptance fields when verification is authorized.
@@ -66,7 +66,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Constrain site-bound registrar administration to its original grant site rather than expanded organization read scopes: account/people listings, staff invitations and grant toggles; allow only staff roles in the staff invite command and require a school where the active grant is site-bound.
 - [x] Replace student assignment role-preview and teacher controls with a student-only coursework, autosave, submission and feedback experience; teacher authoring/grading remains in /teacher/gradebook.
 - [x] Accept authentic student assignment written submissions and drafts using verified active enrollment, school/program checks and audited state transitions; resolve missing-work Actions independently of fixture markers.
-- [x] Restrict 13 study-group site queries and mutations to the member’s permitted program or site-wide groups; retain demo write gates for unfinished posting, reporting, moderation and session workflows.
+- [x] Restrict study-group queries and mutations to the member's permitted program or site-wide groups; canonical commands now own posting, reporting, moderation and session workflows.
 - [x] Make teacher group creation select a verified site/program and require an active teaching assignment there; display only scopes projected from actual assigned sections.
 - [x] Unblock authenticated student/facilitator study-group READS independently of demo write availability; label gated writes as unavailable rather than failing after click.
 - [x] Validate student active enrollment on membership requests, group details, posts, facilitator approvals and session RSVPs; enforce current scope on leaving and linked-child guardian consent.
@@ -75,12 +75,12 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Reset stale guardian approvals on a new membership request after leaving; require affirmative current consent from every linked enrollment guardian before facilitating approval.
 - [x] Permit verified guardian consent decisions only on pending memberships with current child enrollment; cancel outstanding consent actions when students leave and emit ActionCreated/ActionResolved for the consent lifecycle.
 - [x] Link authorized guardian consent notifications to the actual consent screen, including the selected child’s name.
-- [x] Keep the four unreleased group-session mutations (scheduling, RSVP, attendance recording, revision) behind the demo flag **and** a synthetic-group record guard; authentic groups cannot enter those paths even if demo writes are on.
+- [x] Replace the four legacy group-session writers (scheduling, RSVP, attendance recording, revision) with canonical commands enforcing facilitator assignment, group scope, enrollment and approved membership as applicable.
 - [x] Add pending-request withdrawal to the student UI, so students can withdraw and re-request with fresh guardian consent after a decline.
 - [x] Enable authentic student group discussion posts (approved membership, current enrollment, plain-text validation, short post cooldown, audit records).
 - [x] Enable authenticated content reporting and facilitator moderation, including post-context review, transactional ActionCreated/ActionResolved, owner notification, hidden-post state and student notification.
-- [x] Distinguish real group content/moderation controls from still-restricted legacy session scheduling, RSVP and attendance UI, even in demo-enabled deployments.
-- [ ] Converge group session scheduling, RSVP, attendance recording, reschedule/cancellation with correct real-data calendar and notification lifecycle (Phase 2 dependency).
+- [x] Wire both existing group-page entry points to canonical commands; preserve their URLs and remove obsolete legacy-session restriction copy.
+- [x] Converge group session scheduling, RSVP, attendance recording, reschedule/cancellation with real-data calendar and notification lifecycle. Integration tests cover consent, interest creation, duplicate reporting, moderation, RSVP-independent attendance, and reschedule/cancellation.
 - [x] Restrict authenticated student and guardian learning-document uploads and downloads to current school/program and related submission/attendance records; accept only verifiable PDF/JPEG/PNG media.
 - [x] Require verified private R2 object existence, exact content length/MIME and bounded PDF/image signatures before linking an upload. Expire pending attachment metadata and provide 60-second scope-checked private downloads.
 - [x] Implement authentic enrollment R2 upload, versioning, document review, guardian notifications and archived authorized downloads behind `CAN_R2_LIVE_UPLOADS_ENABLED`; keep demo uploads behind their existing separate flag. Only show upload controls when R2 is configured and the respective mode is enabled.
@@ -92,7 +92,7 @@ Phase 0 release stabilization and Phase 4 release hardening are intentionally sc
 - [x] Replace five legacy teacher assignment mutation implementations with compatibility adapters into canonical gradebook grading, rubric grading, creation, deadline/status changes and return-for-revision commands. They now share the same permission, audit and domain-event path.
 - [ ] Remove deprecated compatibility export names after confirming no external integrations or tests depend on them.
 - [x] Validate insight-created Action owners against an active staff grant at the specific insight school/organization, and notify an assigned owner inside the creation transaction.
-- [x] Source-scan the 54 `*.functions.ts` module files for legacy demo write gates: outside explicit synthetic R2 access, remaining study-group *session* mutations stay deliberately flagged and isolated from authentic groups. The public fixture-preview read remains fixture-only by design.
+- [x] Remove remaining legacy study-group session writers and their demo-only mutation gates. Explicit synthetic R2 access and public fixture-preview reads remain separate by design.
 - [x] Remove demo-write gates from real grade finalization, append-audited grade corrections and transcript issuance, enforce program grants for finalized grades/withdrawals and scope transcript issuance history to authorized credit issuers.
 - [ ] Complete per-record security review beyond fixture gates, including verified negative-access cases for school/role changes and lifecycle transitions.
 
@@ -125,4 +125,41 @@ Return to Phase 0 CI/migrations/release baseline and Phase 4 security/performanc
 
 ## Phase 1 completion gate
 
-Development implementation is substantially converged; Phase 2 owns the connected live group-session and calendar mutation lifecycle. Do not mark Phase 1 complete or merge its draft branch merely because feature commits exist. In addition to the unchecked items above, validate the route inventory, remaining synthetic-only write boundaries, school/program/child access for every affected server operation, Action lifecycle parity, and notification target permissions. Typecheck, build, multi-role integration and browser acceptance are currently deferred by the user, not waived; completion and production release must not be claimed until that validation is performed.
+Development implementation is substantially converged. Do not mark Phase 1 complete merely because feature commits or passing CLI checks exist. In addition to the unchecked items above, validate remaining synthetic-only write boundaries, school/program/child access for every affected server operation, Action lifecycle parity, and notification target permissions. Current CLI and integration results are recorded below; full cross-role browser acceptance and production rollout remain outstanding.
+
+## Architectural consolidation continuation
+
+Implemented and regression-checked in the current working tree:
+
+- Domain modules now write ordinary audit events, domain events and inbox notifications through `platform/mutation`. The CI mutation-hygiene checker prevents new inline evidence inserts; governed incident-delivery records remain domain-owned.
+- Audit adapters preserve verified account/session/role context and include a request ID when supplied. Notification batches fail explicitly on incomplete insert results.
+- Enrollment and learning attachments share private R2 signing and bounded object verification. Domain key scopes, authorization, allowed formats, feature flags and size policies remain specialized.
+- Conferences, field trips and activity events share source-aware calendar projection infrastructure. Advisory locks serialize projection publication; participant response state and cancellation metadata survive republishing. Activity seasons retain multiple independently identified events; no blanket source uniqueness constraint is introduced.
+- Legacy study-group pages are adapters to canonical mutation commands. Read projections remain separate where required by existing page shapes. Reporting and resolution use a consistent group-before-post lock order.
+- Grade finalization, corrections, report cards, transcripts and placement prerequisites share versioned grade-scale policy. Configured failing labels are not treated as passing; custom passing labels are supported; extra credit above 100 uses a covering top band without silently clamping other gaps.
+- Approved agent writes use the approval transaction. Operations-overview intent is reachable, and student search no longer requires synthetic markers; student searches require explicit school/program scope and the applicable relationship.
+- Term and grading-period creation now record transactional audit and domain evidence.
+- Remaining `gf-*` integration test assets use domain names: `agent-conversation.integration.test.ts` and `subscription-delivery.integration.test.ts`. Golden Flow IDs remain documentation traceability labels.
+
+### Verification
+
+- Unit suite: **71 files / 350 tests passed**.
+- Isolated Neon integration suite: **27 files / 40 tests passed**.
+- Typecheck and production build: passed.
+- Mutation-hygiene checker: passed.
+- Route fixture coverage: **58 routes declared, no unseeded routes**. This is static inventory verification, not browser or authenticated deep-link acceptance.
+- Staffing schema generation: no drift. Migration `0021_staffing_status_enums.sql` was executed and checked inside a rolled-back transaction against the isolated test database; it has **not** been applied to production.
+
+### Controlled migration rollout
+
+Before applying the staffing enum migration, preflight existing values in all four tables. Offerings and demands currently permit `open`; reservations permit `held`, `committed`, `released`; delivery arrangements permit `proposed`, `reserved`, `ready`, `active`, `completed`. Investigate any other existing values before deployment rather than coercing or dropping records. Apply through the normal reviewed migration workflow with an appropriate lock/maintenance window.
+
+### Still outstanding
+
+- Full resource/domain/relationship policy for generic Action resolution, beyond its present capability and scope checks.
+- Consistent required program constraints across the Academic Domain API used by Ask CAN.
+- Conference command/UI enrollment-invariant parity and remaining school-year/program-launch evidence gaps.
+- Complete authenticated route/deep-link and cross-persona browser acceptance; no claim that every route is live-tested.
+- R2 bucket/CORS, malware/quarantine and retention acceptance, and controlled production migration/deployment.
+
+These are follow-up and release gates, not completed by shared-helper adoption or the passing suites above. This continuation does not certify the entire platform as production-ready.

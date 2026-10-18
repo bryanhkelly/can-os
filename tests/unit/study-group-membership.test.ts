@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { listStudyGroups } from "@/modules/study-groups/study-groups.functions";
+import { listStudyGroups } from "@/modules/study-groups/study-group-queries.functions";
 import {
   decideCanonicalGroupConsent,
   decideCanonicalGroupMembership,
@@ -66,7 +66,9 @@ beforeEach(() => {
   recordAudit.mockResolvedValue(undefined);
   transaction.mockImplementation(async (callback) => callback({ select, insert, update }));
   insert.mockReturnValue({ values });
-  values.mockReturnValue({ returning: vi.fn().mockResolvedValue([{ id: "created" }]) });
+  values.mockImplementation(input => ({
+    returning: vi.fn().mockResolvedValue((Array.isArray(input) ? input : [input]).map(() => ({ id: "created" }))),
+  }));
   update.mockReturnValue({ set });
   set.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
 });

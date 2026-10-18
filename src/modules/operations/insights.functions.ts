@@ -1,12 +1,13 @@
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { assertInsightManageScope } from "@/modules/operations/insights.scope";
+import { operationsSelectionSchema,resolveOperationsSelection } from "@/modules/operations/operations-scope.server";
+import { emitEvent,notify,writeAudit } from "@/platform/mutation";
+import { readScope } from "@/platform/scope";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { EventTypes } from "@/domain/event-types";
-import { readScope } from "@/platform/scope";
-import { assertInsightManageScope } from "@/modules/operations/insights.scope";
-import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
 
 /**
  * Insight read scoping is registered in ./insights.scope; teachers see insights for
@@ -155,7 +156,7 @@ export const acceptInsight = createServerFn({ method: "POST" })
    }).returning({ id: s.actions.id });
    if (!action) throw new Error("Failed to create Action");
    if(data.actionOwnerPersonId){
-    await tx.insert(s.notifications).values({
+    await notify(tx, {
      recipientPersonId:data.actionOwnerPersonId,
      type:"operations_action_assigned",
      title:"Action assigned from school insight",
@@ -169,14 +170,14 @@ export const acceptInsight = createServerFn({ method: "POST" })
     acknowledgedAt: new Date(),
     updatedAt: new Date(),
    }).where(ops.eq(s.insights.id, insight.id));
-   await tx.insert(s.domainEvents).values({
+   await emitEvent(tx, {
     eventType: EventTypes.ActionCreated,
     aggregateType: "action",
     aggregateId: action.id,
     actorPersonId: context.actorPersonId,
     payload: { insightId: insight.id },
    });
-   await tx.insert(s.auditEvents).values({
+   await writeAudit(tx, {
     actorPersonId: context.actorPersonId,
     action: "action.create_from_insight",
     resourceType: "action",
@@ -225,7 +226,7 @@ export const dismissInsight = createServerFn({ method: "POST" })
     resolvedAt: now,
     updatedAt: now,
    }).where(ops.eq(s.insights.id, insight.id));
-   await tx.insert(s.auditEvents).values({
+   await writeAudit(tx, {
     actorPersonId: context.actorPersonId,
     action: "insight.dismiss",
     resourceType: "insight",

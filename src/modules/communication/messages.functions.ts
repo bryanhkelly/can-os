@@ -1,11 +1,12 @@
-import { createServerFn } from "@tanstack/react-start";
-import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { z } from "zod";
-import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { roleCapabilities } from "@/domain/access-context";
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import {roleCapabilities} from "@/domain/access-context";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
+import { and,asc,desc,eq,inArray } from "drizzle-orm";
+import { z } from "zod";
 
 /**
  * Contextual messaging surface (GF1 step 12, Experience Flow N1).
@@ -300,7 +301,7 @@ export const startThread = createServerFn({ method: "POST" })
         .returning({ id: s.communicationMessages.id });
       if (!message) throw new Error("Failed to send message");
 
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.CommunicationMessageSent,
         aggregateType: "communication_thread",
         aggregateId: thread.id,
@@ -308,7 +309,7 @@ export const startThread = createServerFn({ method: "POST" })
         payload: { threadId: thread.id, messageId: message.id },
       });
 
-      await tx.insert(s.auditEvents).values({
+      await writeAudit(tx, {
         actorPersonId,
         action: "communication.message_send",
         resourceType: "communication_thread",
@@ -533,7 +534,7 @@ export const replyToThread = createServerFn({ method: "POST" })
         .set({ lastMessageAt: sentAt, updatedAt: sentAt })
         .where(eq(s.communicationThreads.id, thread.id));
 
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.CommunicationMessageSent,
         aggregateType: "communication_thread",
         aggregateId: thread.id,
@@ -541,7 +542,7 @@ export const replyToThread = createServerFn({ method: "POST" })
         payload: { threadId: thread.id, messageId: message.id },
       });
 
-      await tx.insert(s.auditEvents).values({
+      await writeAudit(tx, {
         actorPersonId,
         action: "communication.message_send",
         resourceType: "communication_thread",

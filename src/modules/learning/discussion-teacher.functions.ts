@@ -1,8 +1,9 @@
-import {createServerFn} from "@tanstack/react-start";
-import {getRequest} from "@tanstack/react-start/server";
-import {getCommandContext} from "@/modules/identity/command-context.server";
-import {assertCapability, AuthorizationError} from "@/domain/command-context";
-import {and,eq} from "drizzle-orm";
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { writeAudit } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { and,eq } from "drizzle-orm";
 import { z } from "zod";
 async function authorizedTeacher(){
  const actor=await getCommandContext(getRequest());
@@ -27,7 +28,7 @@ export const createCourseDiscussion=createServerFn({method:"POST"})
   const [thread]=await tx.insert(s.communicationThreads).values({subject,contextType:"section",contextId:data.sectionId,createdByPersonId:actor.actorPersonId!,metadata:{kind:"course_discussion",locked:false,graded:false}}).returning({id:s.communicationThreads.id});
   if(!thread)throw new Error("Unable to create discussion");
   await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:actor.actorPersonId!,body:prompt,metadata:{kind:"prompt"}});
-  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"discussion.create",resourceType:"communication_thread",resourceId:thread.id,after:{sectionId:data.sectionId,subject},context:{sessionId:actor.sessionId}});
+  await writeAudit(tx, {actorPersonId:actor.actorPersonId!,action:"discussion.create",resourceType:"communication_thread",resourceId:thread.id,after:{sectionId:data.sectionId,subject},context:{sessionId:actor.sessionId}});
   return {id:thread.id};
  });
 });
@@ -44,7 +45,7 @@ export const setCourseDiscussionLock=createServerFn({method:"POST"})
   const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId)||!actor.scope.programIds?.includes(site.programId))throw new AuthorizationError("discussion section scope");
   await tx.update(s.communicationThreads).set({metadata:{...thread.metadata,locked:data.locked},updatedAt:new Date()}).where(eq(s.communicationThreads.id,thread.id));
-  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"discussion.lock",resourceType:"communication_thread",resourceId:thread.id,before:{locked:thread.metadata.locked===true},after:{locked:data.locked},context:{sessionId:actor.sessionId}});
+  await writeAudit(tx, {actorPersonId:actor.actorPersonId!,action:"discussion.lock",resourceType:"communication_thread",resourceId:thread.id,before:{locked:thread.metadata.locked===true},after:{locked:data.locked},context:{sessionId:actor.sessionId}});
   return {saved:true};
  });
 });
@@ -64,7 +65,7 @@ export const moderateDiscussionMessage=createServerFn({method:"POST"})
   const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId)||!actor.scope.programIds?.includes(site.programId))throw new AuthorizationError("discussion section scope");
   await tx.update(s.communicationMessages).set({metadata:{...message.metadata,hidden:data.hidden,moderatedBy:actor.actorPersonId!}}).where(eq(s.communicationMessages.id,message.id));
-  await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId!,action:"discussion.moderate",resourceType:"communication_message",resourceId:message.id,before:{hidden:message.metadata.hidden===true},after:{hidden:data.hidden},context:{sessionId:actor.sessionId,threadId:message.threadId}});
+  await writeAudit(tx, {actorPersonId:actor.actorPersonId!,action:"discussion.moderate",resourceType:"communication_message",resourceId:message.id,before:{hidden:message.metadata.hidden===true},after:{hidden:data.hidden},context:{sessionId:actor.sessionId,threadId:message.threadId}});
   return {saved:true};
  });
 });

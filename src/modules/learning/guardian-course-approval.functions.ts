@@ -1,14 +1,16 @@
-import { createServerFn } from "@tanstack/react-start";
-import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  actions, consentRecords, domainEvents, enrollments, guardianRelationships,
-  notifications, people, programs, sections, studentProfiles, terms,
+actions,consentRecords,
+enrollments,guardianRelationships,
+people,programs,sections,studentProfiles,terms
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { actorSiteIds, recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
+import { actorSiteIds,recordAudit,requireActor,type Actor } from "@/modules/identity/actors.server";
+import { emitEvent,notify } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
+import { and,desc,eq,inArray,isNull } from "drizzle-orm";
+import { z } from "zod";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
 
 const CONSENT_TYPE = "course_registration_add_decision";
@@ -203,12 +205,12 @@ export const decideGuardianCourseApproval = createServerFn({ method: "POST" })
         scope: { siteId: request.siteId, programId: request.programId },
         after: { decision: data.approve ? "approve" : "decline", consentRecordId: decision.id },
       });
-      await tx.insert(domainEvents).values({
+      await emitEvent(tx, {
         eventType: "CourseRegistrationGuardianDecision", aggregateType: "action",
         aggregateId: request.id, actorPersonId: actor.actorPersonId,
         payload: { sectionId: section.id, studentProfileId: student.id, approved: data.approve },
       });
-      await tx.insert(notifications).values({
+      await notify(tx, {
         recipientPersonId: request.ownerPersonId, status: "unread",
         type: "course_registration_guardian_decision",
         title: data.approve ? "Your guardian approved your course request" : "Your guardian declined your course request",

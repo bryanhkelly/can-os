@@ -1,19 +1,18 @@
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { writeAudit } from "@/platform/mutation";
+import { signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { createHmac, createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and,desc,eq,inArray,sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
-import { r2Config } from "@/modules/enrollment/r2-documents.server";
 
 /**
  * Assignment-submission and attendance-excuse attachments on the existing R2 +
- * documents infrastructure. The enrollment signer in r2-documents.server.ts only
- * signs `enrollment/...` keys, so the presign below follows its SigV4 pattern with
- * a `learning/...` key scope. Follow-up: extract a shared scope-parameterized
- * signer so enrollment and learning stop duplicating the algorithm.
+ * documents infrastructure. Domain authorization and key policy stay here;
+ * signing and bounded object verification are shared storage infrastructure.
  */
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -49,37 +48,8 @@ function newAttachmentKey(kind: "assignment" | "excuse", scopeId: string): strin
   return `learning/${kind}/${scopeId}/${randomUUID()}`;
 }
 
-/** Short-lived one-object SigV4 URL for learning keys; mirrors the enrollment signer. */
 function signLearningObject(method: "PUT" | "HEAD" | "GET", key: string, contentType?: string, expires = 180): string {
-  if (expires < 1 || expires > 900 || !learningKeyPattern.test(key)) throw new Error("Invalid R2 signing request");
-  const sha = (value: string) => createHash("sha256").update(value).digest("hex");
-  const hmac = (secret: Buffer | string, value: string) => createHmac("sha256", secret).update(value).digest();
-  const cfg = r2Config();
-  const now = new Date();
-  const stamp = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
-  const day = stamp.slice(0, 8);
-  const host = cfg.account + ".r2.cloudflarestorage.com";
-  const scope = day + "/auto/s3/aws4_request";
-  const path = "/" + cfg.bucket + "/" + key.split("/").map(encodeURIComponent).join("/");
-  const signedHeaders = contentType ? "content-type;host" : "host";
-  const headers = contentType ? "content-type:" + contentType + "\nhost:" + host + "\n" : "host:" + host + "\n";
-  const params = new URLSearchParams({
-    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
-    "X-Amz-Credential": cfg.accessKey + "/" + scope,
-    "X-Amz-Date": stamp,
-    "X-Amz-Expires": String(expires),
-    "X-Amz-SignedHeaders": signedHeaders,
-  });
-  params.sort();
-  const query = params.toString().replace(/\+/g, "%20").replace(/%7E/gi, "~");
-  const canonical = [method, path, query, headers, signedHeaders, "UNSIGNED-PAYLOAD"].join("\n");
-  const stringToSign = ["AWS4-HMAC-SHA256", stamp, scope, sha(canonical)].join("\n");
-  const kDate = hmac("AWS4" + cfg.secret, day);
-  const kRegion = hmac(kDate, "auto");
-  const kService = hmac(kRegion, "s3");
-  const kSign = hmac(kService, "aws4_request");
-  const signature = createHmac("sha256", kSign).update(stringToSign).digest("hex");
-  return "https://" + host + path + "?" + query + "&X-Amz-Signature=" + signature;
+  return signPrivateObjectUrl({ method, key, keyPattern: learningKeyPattern, contentType, expiresSeconds: expires });
 }
 
 /** Confirm that the private object was actually uploaded before linking it to a student record. */
@@ -90,38 +60,12 @@ async function assertUploadedLearningObject(
   !Number.isSafeInteger(expectedSize)||Number(expectedSize)<1||
   Number(expectedSize)>MAX_ATTACHMENT_BYTES)
   throw new Error("Invalid attachment storage record");
- const head=await fetch(signLearningObject("HEAD",key,undefined,30),{method:"HEAD"});
- if(!head.ok)throw new Error("Attachment upload could not be verified");
- if(Number(head.headers.get("content-length"))!==expectedSize)
-  throw new Error("Uploaded attachment size does not match the expected size");
- const actualType=head.headers.get("content-type");
- if(actualType?.split(";")[0]?.toLowerCase()!==contentType.toLowerCase())
-  throw new Error("Uploaded attachment type does not match the expected format");
- // The supported image/PDF formats have recognizable magic bytes. Request
- // exactly 16 bytes and reject any storage server that ignores the Range.
- if(["application/pdf","image/jpeg","image/png"].includes(contentType)){
-  if(Number(expectedSize)<16)throw new Error("Uploaded file is too small");
-  const sample=await fetch(signLearningObject("GET",key,undefined,30),{
-   headers:{Range:"bytes=0-15"}
-  });
-  if(sample.status!==206||
-   sample.headers.get("content-range")!==`bytes 0-15/${expectedSize}`)
-   throw new Error("Storage did not honor the bounded signature request");
-  const reader=sample.body?.getReader();
-  if(!reader)throw new Error("Attachment signature response missing");
-  const bytes=new Uint8Array(16);
-  let offset=0;
-  try{
-   while(true){
-    const {done,value}=await reader.read();
-    if(done)break;
-    if(offset+value.length>16)throw new Error("Signature response exceeded 16 bytes");
-    bytes.set(value,offset);offset+=value.length;
-   }
-  }finally{await reader.cancel().catch(()=>{});}
-  if(offset!==16||!matchesEnrollmentDocumentSignature(contentType,bytes))
-   throw new Error("File signature does not match the declared format");
- }
+ await verifyPrivateObject({
+  key,keyPattern:learningKeyPattern,expectedSize:Number(expectedSize),
+  expectedContentType:contentType,
+  verifySignature:["application/pdf","image/jpeg","image/png"].includes(contentType)
+   ? matchesEnrollmentDocumentSignature:undefined,
+ });
 }
 
 /** Verified student actor; identity always comes from the server session. */
@@ -210,7 +154,7 @@ export const createSubmissionAttachmentUpload = createServerFn({ method: "POST" 
         expiresAt: new Date(Date.now()+24*60*60*1000),
       }).returning({ id: s.documents.id });
       if (!document) throw new Error("Could not record attachment");
-      await tx.insert(s.auditEvents).values({
+      await writeAudit(tx, {
         actorPersonId: studentPersonId,
         action: "assignment.attachment.upload",
         resourceType: "document",
@@ -275,7 +219,7 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
           .where(and(eq(s.submissions.id, latest.id), inArray(s.submissions.status, ["assigned", "submitted"])))
           .returning({ id: s.submissions.id });
         if (!updated) throw new Error("Assignment changed in another tab; refresh before attaching");
-        await tx.insert(s.auditEvents).values({
+        await writeAudit(tx, {
           actorPersonId: studentPersonId,
           action: "assignment.attachment.attach",
           resourceType: "submission",
@@ -292,7 +236,7 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
         response: { attachments: [document.id] },
       }).returning({ id: s.submissions.id });
       if (!created) throw new Error("Unable to attach document");
-      await tx.insert(s.auditEvents).values({
+      await writeAudit(tx, {
         actorPersonId: studentPersonId,
         action: "assignment.attachment.attach",
         resourceType: "submission",
@@ -361,7 +305,7 @@ export const createExcuseAttachmentUpload = createServerFn({ method: "POST" })
         expiresAt: new Date(Date.now()+24*60*60*1000),
       }).returning({ id: s.documents.id });
       if (!document) throw new Error("Could not record attachment");
-      await tx.insert(s.auditEvents).values({
+      await writeAudit(tx, {
         actorPersonId: context.actorPersonId,
         action: "attendance.excuse.document.upload",
         resourceType: "document",
@@ -415,7 +359,7 @@ export const attachDocumentToExcuse = createServerFn({ method: "POST" })
         .where(and(eq(s.attendanceExcuses.id, excuse.id), eq(s.attendanceExcuses.status, "submitted")))
         .returning({ id: s.attendanceExcuses.id });
       if (!updated) throw new Error("Excuse changed in another tab; refresh before attaching");
-      await tx.insert(s.auditEvents).values({
+      await writeAudit(tx, {
         actorPersonId: context.actorPersonId,
         action: "attendance.excuse.document.attach",
         resourceType: "attendance_excuse",

@@ -1,17 +1,16 @@
-import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  auditEvents,
-  domainEvents,
-  journeyRequirements,
-  journeys,
+journeyRequirements,
+journeys,
 } from "@/db/schema";
 import {
-  assertCapability,
-  assertProgramScope,
-  type CommandContext,
+assertCapability,
+assertProgramScope,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { and,eq,ne } from "drizzle-orm";
 
 export async function completeJourneyRequirement(
   context: CommandContext,
@@ -65,7 +64,7 @@ export async function completeJourneyRequirement(
         })
         .where(eq(journeyRequirements.id, requirementId));
 
-      await tx.insert(domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.JourneyRequirementCompleted,
         aggregateType: "journey_requirement",
         aggregateId: requirementId,
@@ -73,11 +72,10 @@ export async function completeJourneyRequirement(
         payload: { journeyId: current.journeyId },
       });
 
-      await tx.insert(auditEvents).values({
-        actorPersonId: context.actorPersonId,
+      await writeAudit(tx, context, {
         action: "journey.requirement.complete",
-        resourceType: "journey_requirement",
-        resourceId: requirementId,
+        entityType: "journey_requirement",
+        entityId: requirementId,
         scope: {
           organizationId: current.organizationId,
           siteId: current.siteId,
@@ -85,7 +83,6 @@ export async function completeJourneyRequirement(
         },
         before: { status: current.requirementStatus },
         after: { status: "complete" },
-        context: { requestId: context.requestId ?? null },
       });
     }
 
@@ -110,7 +107,7 @@ export async function completeJourneyRequirement(
         .set({ status: "ready", updatedAt: completedAt })
         .where(eq(journeys.id, current.journeyId));
 
-      await tx.insert(domainEvents).values({
+      await emitEvent(tx, {
         eventType: EventTypes.JourneyReady,
         aggregateType: "journey",
         aggregateId: current.journeyId,
@@ -118,11 +115,10 @@ export async function completeJourneyRequirement(
         payload: {},
       });
 
-      await tx.insert(auditEvents).values({
-        actorPersonId: context.actorPersonId,
+      await writeAudit(tx, context, {
         action: "journey.ready",
-        resourceType: "journey",
-        resourceId: current.journeyId,
+        entityType: "journey",
+        entityId: current.journeyId,
         scope: {
           organizationId: current.organizationId,
           siteId: current.siteId,
@@ -130,7 +126,6 @@ export async function completeJourneyRequirement(
         },
         before: { status: current.journeyStatus },
         after: { status: "ready" },
-        context: { requestId: context.requestId ?? null },
       });
     }
 

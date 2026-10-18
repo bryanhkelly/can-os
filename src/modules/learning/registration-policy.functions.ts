@@ -1,12 +1,13 @@
-import {createServerFn} from "@tanstack/react-start";
-import {getRequest} from "@tanstack/react-start/server";
-import {and,asc,eq,inArray,sql} from "drizzle-orm";
-import {z} from "zod";
-import {db} from "@/db/client";
-import {sections,terms,programs,enrollments,auditEvents,domainEvents} from "@/db/schema";
-import {getSectionRegistrationPolicy,replaceSectionRegistrationPolicy} from "./section-registration-policy-service";
-import {getCommandContext} from "@/modules/identity/command-context.server";
-import {assertCapability,AuthorizationError} from "@/domain/command-context";
+import { db } from "@/db/client";
+import { enrollments,programs,sections,terms } from "@/db/schema";
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { and,asc,eq,inArray,sql } from "drizzle-orm";
+import { z } from "zod";
+import { getSectionRegistrationPolicy,replaceSectionRegistrationPolicy } from "./section-registration-policy-service";
 const uuid=z.string().uuid(),date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 async function registrar(){
  const actor=await getCommandContext(getRequest());
@@ -89,11 +90,11 @@ export const updateCoursePolicy=createServerFn({method:"POST"})
     guardianApprovalRequired:data.policy.guardianApprovalRequired,
    });
    const after=await getSectionRegistrationPolicy(section.id,tx);
-   await tx.insert(domainEvents).values({eventType:"CourseRegistrationPolicyChanged",
+   await emitEvent(tx,{eventType:"CourseRegistrationPolicyChanged",
     aggregateType:"section",aggregateId:section.id,actorPersonId:actor.actorPersonId,
     payload:{programId:section.programId,siteId:section.siteId}});
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
-    action:"course_registration.policy.update",resourceType:"section",resourceId:section.id,
+   await writeAudit(tx,actor,{
+    action:"course_registration.policy.update",entityType:"section",entityId:section.id,
     scope:{organizationId:section.organizationId,siteId:section.siteId,programId:section.programId},
     before,after});
    return {saved:true};

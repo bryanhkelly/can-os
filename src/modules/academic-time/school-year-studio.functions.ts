@@ -1,14 +1,15 @@
+import { db } from "@/db/client";
+import { academicCalendarDays,academicCalendars,gradeScales,gradingPeriods,organizations,programs,scheduleTemplatePeriods,scheduleTemplates,schoolYears,sites,terms } from "@/db/schema";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and,asc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "@/db/client";
-import { academicCalendars, academicCalendarDays, scheduleTemplatePeriods, domainEvents, auditEvents, gradeScales, gradingPeriods, organizations, programs, scheduleTemplates, schoolYears, sites, terms } from "@/db/schema";
-import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
-import { EventTypes } from "@/domain/event-types";
-import { activateSchoolYear, createAcademicCalendar, createGradingPeriod, createScheduleTemplate, createSchoolYear, createTerm, setAcademicCalendarDay } from "./school-year-service";
+import { activateSchoolYear,createAcademicCalendar,createGradingPeriod,createScheduleTemplate,createSchoolYear,createTerm,setAcademicCalendarDay } from "./school-year-service";
 
 const uuid = z.string().uuid();
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -89,8 +90,8 @@ export const createStudioGradeScale=createServerFn({method:"POST"})
      {label:"F",minPercent:0,maxPercent:59.99,gpaPoints:0,passing:false},
     ]},
    }).returning({id:gradeScales.id});
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
-    action:"grade_scale.create",resourceType:"grade_scale",resourceId:scale!.id,
+   await writeAudit(tx,actor,{
+    action:"grade_scale.create",entityType:"grade_scale",entityId:scale!.id,
     scope:{organizationId:data.organizationId},after:{name:data.name,version:1}});
    return {gradeScaleId:scale!.id};
   });
@@ -147,14 +148,14 @@ export const removeStudioCalendarDay=createServerFn({method:"POST"})
     throw new AuthorizationError("calendar day access");
    await lockAttendanceConfigurationAtSite(tx,record.siteId);
    await tx.delete(academicCalendarDays).where(eq(academicCalendarDays.id,record.id));
-   await tx.insert(domainEvents).values({
+   await emitEvent(tx,{
     eventType:"AcademicCalendarChanged",aggregateType:"academic_calendar",
     aggregateId:record.calendarId,actorPersonId:actor.actorPersonId,
     payload:{calendarDate:record.date,operation:"delete",siteId:record.siteId},
    });
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
-    action:"academic_calendar.day.remove",resourceType:"academic_calendar_day",
-    resourceId:record.id,scope:{organizationId:record.organizationId,siteId:record.siteId},
+   await writeAudit(tx,actor,{
+    action:"academic_calendar.day.remove",entityType:"academic_calendar_day",
+    entityId:record.id,scope:{organizationId:record.organizationId,siteId:record.siteId},
     before:{calendarDate:record.date}});
    return {removed:true};
   });
@@ -200,11 +201,11 @@ export const replaceStudioSchedulePeriods=createServerFn({method:"POST"})
    await tx.insert(scheduleTemplatePeriods).values(data.periods.map(p=>({
     ...p,scheduleTemplateId:record.id,
    })));
-   await tx.insert(domainEvents).values({eventType:EventTypes.ScheduleTemplateChanged,
+   await emitEvent(tx,{eventType:EventTypes.ScheduleTemplateChanged,
     aggregateType:"schedule_template",aggregateId:record.id,actorPersonId:actor.actorPersonId,
     payload:{siteId:record.siteId,programId:record.programId,periodCount:data.periods.length}});
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
-    action:"schedule.periods.replace",resourceType:"schedule_template",resourceId:record.id,
+   await writeAudit(tx,actor,{
+    action:"schedule.periods.replace",entityType:"schedule_template",entityId:record.id,
     scope:{organizationId:record.organizationId,siteId:record.siteId,programId:record.programId},
     after:{periods:data.periods}});
    return {updated:true};
@@ -249,15 +250,15 @@ export const populateStudioInstructionalDays=createServerFn({method:"POST"})
     // Existing holiday and closure rows always win.
     await tx.insert(academicCalendarDays).values(rows).onConflictDoNothing();
    }
-   await tx.insert(domainEvents).values({
+   await emitEvent(tx,{
     eventType:"AcademicCalendarChanged",aggregateType:"academic_calendar",
     aggregateId:calendar.id,actorPersonId:actor.actorPersonId,
     payload:{operation:"populate",weekdays:data.weekdays,scheduledDays:rows.length,
      siteId:calendar.siteId},
    });
-   await tx.insert(auditEvents).values({
-    actorPersonId:actor.actorPersonId,action:"academic_calendar.populate",
-    resourceType:"academic_calendar",resourceId:calendar.id,
+   await writeAudit(tx,actor,{
+    action:"academic_calendar.populate",
+    entityType:"academic_calendar",entityId:calendar.id,
     scope:{organizationId:calendar.organizationId,siteId:calendar.siteId,
      programId:calendar.programId},
     after:{weekdays:data.weekdays,instructionalMinutes:data.instructionalMinutes,

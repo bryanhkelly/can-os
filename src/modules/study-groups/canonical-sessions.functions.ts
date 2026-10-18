@@ -1,16 +1,42 @@
-import { createServerFn } from "@tanstack/react-start";
-import { and, eq } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { recordAudit, requireActor } from "@/modules/identity/actors.server";
 import { validateSession } from "@/domain/study-groups";
-import { assertGroupScope, eligibleStudent, facilitatedGroup } from "./canonical-membership.server";
-import { notifyMembers, reviseGroupSessionForActor } from "./canonical-sessions.server";
+import { recordAudit,requireActor } from "@/modules/identity/actors.server";
+import { emitEvent } from "@/platform/mutation";
+import { createServerFn } from "@tanstack/react-start";
+import { and,eq } from "drizzle-orm";
+import { z } from "zod";
+import { assertGroupScope,eligibleStudent,facilitatedGroup } from "./canonical-membership.server";
+import { notifyMembers,reviseGroupSessionForActor } from "./canonical-sessions.server";
 
 const uuid = z.string().uuid();
 const time = z.string().datetime({ offset: true });
+
+/** Facilitator-facing roster for one session: every approved member, with any RSVP/attendance row. */
+export const listCanonicalGroupAttendance = createServerFn({ method: "GET" })
+  .validator((value: unknown) => z.object({ sessionId: uuid }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(["teacher"]);
+    return db.transaction(async tx => {
+      const [owner] = await tx.select({ groupId: s.studyGroupSessions.groupId })
+        .from(s.studyGroupSessions).where(eq(s.studyGroupSessions.id, data.sessionId)).limit(1);
+      if (!owner) throw new Error("Session not found");
+      const group = await facilitatedGroup(tx, actor, owner.groupId);
+      // The roster includes every approved member, even when they never RSVP'd.
+      // Attendance recording must not depend on having an existing RSVP row.
+      return tx.select({
+        personId: s.studyGroupMemberships.personId,
+        rsvp: s.studyGroupSessionAttendance.rsvp,
+        attended: s.studyGroupSessionAttendance.attended,
+      }).from(s.studyGroupMemberships)
+        .leftJoin(s.studyGroupSessionAttendance, and(
+          eq(s.studyGroupSessionAttendance.personId, s.studyGroupMemberships.personId),
+          eq(s.studyGroupSessionAttendance.sessionId, data.sessionId)))
+        .where(and(eq(s.studyGroupMemberships.groupId, group.id),
+          eq(s.studyGroupMemberships.status, "approved")));
+    });
+  });
 
 export const createCanonicalGroupSession = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
@@ -49,7 +75,7 @@ export const createCanonicalGroupSession = createServerFn({ method: "POST" })
         resourceId: session.id, scope: { siteId: group.siteId, programId: group.programId },
         after: { startsAt: times.start.toISOString(), endsAt: times.end.toISOString(), calendarEventId: event.id },
       });
-      await tx.insert(s.domainEvents).values({
+      await emitEvent(tx, {
         eventType: "StudyGroupSessionCreated", aggregateType: "study_group_session",
         aggregateId: session.id, actorPersonId: actor.actorPersonId,
         payload: { groupId: group.id, calendarEventId: event.id },

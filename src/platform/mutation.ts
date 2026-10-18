@@ -69,19 +69,30 @@ export async function emitEvent(
  * request. Same shape as `recordAudit` in modules/identity/actors.server.ts:
  * actor in the column, request/session detail in the `context` jsonb.
  */
+type AuditRow = Omit<typeof auditEvents.$inferInsert, "id" | "occurredAt">;
+type AuditChange = {
+  action: string;
+  entityType: string;
+  entityId: string;
+  scope?: Record<string, unknown>;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  contextExtras?: Record<string, unknown>;
+};
+
+export function writeAudit(tx: MutationTx, entry: AuditRow): Promise<void>;
+export function writeAudit(tx: MutationTx, context: CommandContext, entry: AuditChange): Promise<void>;
 export async function writeAudit(
   tx: MutationTx,
-  context: CommandContext,
-  entry: {
-    action: string;
-    entityType: string;
-    entityId: string;
-    scope?: Record<string, unknown>;
-    before?: Record<string, unknown> | null;
-    after?: Record<string, unknown> | null;
-    contextExtras?: Record<string, unknown>;
-  },
+  contextOrEntry: CommandContext | AuditRow,
+  entry?: AuditChange,
 ): Promise<void> {
+  if ("action" in contextOrEntry) {
+    await tx.insert(auditEvents).values(contextOrEntry);
+    return;
+  }
+  if (!entry) throw new Error("Audit change is required");
+  const context = contextOrEntry;
   await tx.insert(auditEvents).values({
     actorPersonId: context.actorPersonId,
     action: entry.action,
@@ -105,6 +116,8 @@ export type NotificationInput = {
   resourceType?: string | null;
   resourceId?: string | null;
   eventId?: string | null;
+  status?: "unread" | "read" | "dismissed";
+  readAt?: Date | null;
 };
 
 /** Queue an in-app notification for a single recipient. */
@@ -135,10 +148,14 @@ export async function notifyMany(
         resourceType: notification.resourceType ?? null,
         resourceId: notification.resourceId ?? null,
         eventId: notification.eventId ?? null,
+        ...(notification.status !== undefined ? { status: notification.status } : {}),
+        ...(notification.readAt !== undefined ? { readAt: notification.readAt } : {}),
       })),
     )
     .returning({ id: notifications.id });
-  return rows
-    .map((row) => row.id)
-    .filter((value): value is string => typeof value === "string");
+  if (rows.length !== items.length) throw new Error("Notification insert returned an incomplete batch");
+  return rows.map(row => {
+    if (typeof row.id !== "string") throw new Error("Notification insert did not return an id");
+    return row.id;
+  });
 }

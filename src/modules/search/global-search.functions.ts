@@ -49,6 +49,8 @@ async function searchCourses(actor: Actor, like: string): Promise<SearchHit[]> {
   if (actor.role !== "student" && actor.role !== "teacher") return [];
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const siteIds = actor.scope.siteIds ?? [];
+  const programIds = actor.scope.programIds ?? [];
+  if (!siteIds.length || !programIds.length) return [];
 
   if (actor.role === "student") {
     const rows = await db
@@ -72,7 +74,9 @@ async function searchCourses(actor: Actor, like: string): Promise<SearchHit[]> {
       .where(
         and(
           ilike(s.sections.title, like),
-          siteIds.length ? inArray(s.sections.siteId, siteIds) : undefined,
+          inArray(s.sections.siteId, siteIds),
+          inArray(s.sections.programId, programIds),
+          eq(s.sections.active, true),
         ),
       )
       .limit(5);
@@ -97,7 +101,9 @@ async function searchCourses(actor: Actor, like: string): Promise<SearchHit[]> {
     .where(
       and(
         ilike(s.sections.title, like),
-        siteIds.length ? inArray(s.sections.siteId, siteIds) : undefined,
+        inArray(s.sections.siteId, siteIds),
+        inArray(s.sections.programId, programIds),
+        eq(s.sections.active, true),
       ),
     )
     .limit(5);
@@ -113,6 +119,8 @@ async function searchAssignments(actor: Actor, like: string): Promise<SearchHit[
   if (actor.role !== "student" && actor.role !== "teacher") return [];
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const siteIds = actor.scope.siteIds ?? [];
+  const programIds = actor.scope.programIds ?? [];
+  if (!siteIds.length || !programIds.length) return [];
 
   const scopeJoin =
     actor.role === "student"
@@ -161,7 +169,9 @@ async function searchAssignments(actor: Actor, like: string): Promise<SearchHit[
       and(
         ilike(s.assessments.title, like),
         inArray(s.assessments.status, ["published", "closed"]),
-        siteIds.length ? inArray(s.sections.siteId, siteIds) : undefined,
+        inArray(s.sections.siteId, siteIds),
+        inArray(s.sections.programId, programIds),
+        eq(s.sections.active, true),
       ),
     )
     .orderBy(desc(s.assessments.dueAt))
@@ -177,6 +187,9 @@ async function searchAssignments(actor: Actor, like: string): Promise<SearchHit[
 
 async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> {
   if (actor.role === "student") return [];
+  const siteIds = actor.scope.siteIds ?? [];
+  const programIds = actor.scope.programIds ?? [];
+  if (!siteIds.length || !programIds.length) return [];
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
 
   const nameMatch = or(
@@ -191,7 +204,6 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
     legalFirstName: string;
     legalLastName: string;
     gradeLevel: string | null;
-    synthetic: unknown;
   }> = [];
 
   if (actor.role === "guardian") {
@@ -202,15 +214,20 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
         legalFirstName: s.people.legalFirstName,
         legalLastName: s.people.legalLastName,
         gradeLevel: s.studentProfiles.gradeLevel,
-        synthetic: s.people.metadata,
       })
       .from(s.guardianRelationships)
       .innerJoin(s.people, eq(s.people.id, s.guardianRelationships.studentPersonId))
       .innerJoin(s.studentProfiles, eq(s.studentProfiles.personId, s.people.id))
+      .innerJoin(s.enrollments, eq(s.enrollments.studentProfileId, s.studentProfiles.id))
+      .innerJoin(s.programs, eq(s.programs.id, s.enrollments.programId))
       .where(
         and(
           eq(s.guardianRelationships.guardianPersonId, actor.actorPersonId),
           eq(s.guardianRelationships.canViewAcademics, true),
+          eq(s.enrollments.kind, "program"),
+          eq(s.enrollments.status, "active"),
+          inArray(s.programs.siteId, siteIds),
+          inArray(s.programs.id, programIds),
           nameMatch,
         ),
       )
@@ -223,7 +240,6 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
         legalFirstName: s.people.legalFirstName,
         legalLastName: s.people.legalLastName,
         gradeLevel: s.studentProfiles.gradeLevel,
-        synthetic: s.people.metadata,
       })
       .from(s.sectionTeachers)
       .innerJoin(
@@ -236,10 +252,12 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
       )
       .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
       .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
-      .where(and(eq(s.sectionTeachers.personId, actor.actorPersonId), nameMatch))
+      .innerJoin(s.sections, eq(s.sections.id, s.sectionTeachers.sectionId))
+      .where(and(eq(s.sectionTeachers.personId, actor.actorPersonId),
+        eq(s.sections.active, true), inArray(s.sections.siteId, siteIds),
+        inArray(s.sections.programId, programIds), nameMatch))
       .limit(8);
   } else {
-    const siteIds = actorSiteIds(actor);
     rows = await db
       .select({
         personId: s.people.id,
@@ -247,7 +265,6 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
         legalFirstName: s.people.legalFirstName,
         legalLastName: s.people.legalLastName,
         gradeLevel: s.studentProfiles.gradeLevel,
-        synthetic: s.people.metadata,
       })
       .from(s.enrollments)
       .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
@@ -256,7 +273,10 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
       .where(
         and(
           eq(s.enrollments.status, "active"),
+          eq(s.enrollments.kind, "section"),
+          eq(s.sections.active, true),
           inArray(s.sections.siteId, siteIds),
+          inArray(s.sections.programId, programIds),
           nameMatch,
         ),
       )
@@ -268,7 +288,6 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
   for (const row of rows) {
     if (seen.has(row.personId)) continue;
     seen.add(row.personId);
-    if ((row.synthetic as Record<string, unknown>)?.synthetic !== true) continue;
     hits.push({
       id: `student-${row.personId}`,
       label: displayName(row),
@@ -311,7 +330,7 @@ async function searchMessages(actor: Actor, like: string): Promise<SearchHit[]> 
 }
 
 /**
- * Prototype-grade global search over canonical data. Every group is derived
+ * Workspace search over canonical data. Every group is derived
  * from the verified session's role and scope — the palette is a view over
  * authorized state, never a separate access path.
  */

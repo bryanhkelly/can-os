@@ -5,6 +5,12 @@ import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
 
+/** Deployment feature flags for the study-group pages. */
+export const getStudyGroupAvailability = createServerFn({ method: "GET" }).handler(async () => ({
+  enabled: true, writesEnabled: true, membershipEnabled: true,
+  creationEnabled: true, contentEnabled: true, moderationEnabled: true,
+}));
+
 /** Canonical read projection for the temporary Phase 3 /groups entry point. */
 export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await requireActor(["student", "teacher"]);
@@ -16,6 +22,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
     id: s.studyGroups.id, siteId: s.studyGroups.siteId, programId: s.studyGroups.programId,
     sectionId: s.studyGroups.sectionId, facilitatorPersonId: s.studyGroups.facilitatorPersonId,
     title: s.studyGroups.title, description: s.studyGroups.description,
+    kind: s.studyGroups.kind,
     maxMembers: s.studyGroups.maxMembers,
   }).from(s.studyGroups).where(and(
     eq(s.studyGroups.status, "active"), inArray(s.studyGroups.siteId, sites),
@@ -97,7 +104,10 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
     actor.role === "teacher" ? db.select({
       id: s.studyGroupReports.id, groupId: s.studyGroupReports.groupId,
       postId: s.studyGroupReports.postId, reason: s.studyGroupReports.reason,
-    }).from(s.studyGroupReports).where(and(
+      postBody: s.studyGroupPosts.body, postHidden: s.studyGroupPosts.hidden,
+    }).from(s.studyGroupReports)
+      .leftJoin(s.studyGroupPosts, eq(s.studyGroupPosts.id, s.studyGroupReports.postId))
+      .where(and(
       inArray(s.studyGroupReports.groupId, ids),
       eq(s.studyGroupReports.status, "open"))).limit(200) : Promise.resolve([]),
     actor.role === "teacher" ? db.select({
@@ -176,6 +186,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
         })) : [];
       return {
         id: g.id, title: g.title, description: g.description,
+        kind: g.kind,
         maxMembers: g.maxMembers,
         membershipStatus: own?.status ?? null,
         approvedCount: actor.role === "teacher"

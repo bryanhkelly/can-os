@@ -32,7 +32,7 @@ npm run typecheck
 npm test
 npm run build
 npm run db:generate
-node scripts/run-integration-tests.mjs gf-a2-subscriptions
+node scripts/run-integration-tests.mjs subscription-delivery
 ```
 For database tests use `TEST_DATABASE_URL` pointing to a disposable Neon branch and `CAN_TEST_DB_WRITES_ENABLED=true`. Review the existing integration script's safety gates before running.
 

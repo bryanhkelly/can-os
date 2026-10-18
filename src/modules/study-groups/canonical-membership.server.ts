@@ -16,7 +16,7 @@ export function assertGroupScope(actor: Actor, group: GroupScope) {
 }
 
 /** Active enrollment in the group's school/program and, for course groups, section. */
-export async function eligibleStudent(tx: Tx, studentPersonId: string, group: GroupScope, grantedPrograms: string[]) {
+export async function eligibleStudent(tx: Pick<Tx, "select">, studentPersonId: string, group: GroupScope, grantedPrograms: string[]) {
   if (!group.siteId) throw new AuthorizationError("group site");
   const [membership] = await tx.select({ studentProfileId: s.studentProfiles.id })
     .from(s.studentProfiles)
@@ -68,10 +68,11 @@ export async function facilitatedGroup(tx: Tx, actor: Actor, groupId: string) {
 }
 
 /** Scope-verified group with this student's approved membership. */
-export async function participatingStudent(tx: Tx, actor: Actor, groupId: string) {
-  const [group] = await tx.select().from(s.studyGroups)
+export async function participatingStudent(tx: Tx, actor: Actor, groupId: string, lock = false) {
+  const query = tx.select().from(s.studyGroups)
     .where(and(eq(s.studyGroups.id, groupId), eq(s.studyGroups.status, "active")))
     .limit(1);
+  const [group] = await (lock ? query.for("update") : query);
   if (!group) throw new Error("Group not found");
   assertGroupScope(actor, group);
   await eligibleStudent(tx, actor.actorPersonId, group, actor.scope.programIds ?? []);

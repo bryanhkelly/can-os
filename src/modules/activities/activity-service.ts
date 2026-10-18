@@ -1,27 +1,26 @@
-import { and, count, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  activities,
-  activityEligibilityChecks,
-  activityRegistrations,
-  activitySeasons,
-  auditEvents,
-  calendarEvents,
-  consentRecords,
-  domainEvents,
-  financialObligations,
-  guardianRelationships,
-  householdMemberships,
-  sites,
-  studentProfiles,
+activities,
+activityEligibilityChecks,
+activityRegistrations,
+activitySeasons,
+consentRecords,
+financialObligations,
+guardianRelationships,
+householdMemberships,
+sites,
+studentProfiles
 } from "@/db/schema";
 import {
-  assertCapability,
-  assertProgramScope,
-  assertSiteScope,
-  type CommandContext,
+assertCapability,
+assertProgramScope,
+assertSiteScope,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { publishProjection } from "@/platform/calendar/projection";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { and,count,eq,inArray } from "drizzle-orm";
 import { assertSeasonRegistrationOpen } from "./registration-policy";
 
 export async function createActivity(
@@ -281,7 +280,7 @@ export async function withdrawActivityRegistration(
     }).where(eq(activityRegistrations.id, input.registrationId));
 
     // Do not silently refund or void payments; financial review is required.
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "activity.registration.withdraw",
       resourceType: "activity_registration",
@@ -351,7 +350,7 @@ export async function evaluateActivityEligibility(
       })
       .where(eq(activityRegistrations.id, input.registrationId));
 
-    await tx.insert(domainEvents).values({
+    await emitEvent(tx, {
       eventType: EventTypes.ActivityEligibilityChecked,
       aggregateType: "activity_eligibility_check",
       aggregateId: check.id,
@@ -364,7 +363,7 @@ export async function evaluateActivityEligibility(
       },
     });
 
-    await tx.insert(auditEvents).values({
+    await writeAudit(tx, {
       actorPersonId: context.actorPersonId,
       action: "activity.eligibility.evaluate",
       resourceType: "activity_registration",
@@ -421,24 +420,21 @@ export async function addActivityCalendarEvent(
 
     if (!site) throw new Error("Site not found");
 
-    const [event] = await tx
-      .insert(calendarEvents)
-      .values({
-        type: input.type,
-        title: input.title,
-        startsAt: input.startsAt,
-        endsAt: input.endsAt,
-        timezone: site.timezone,
-        siteId: record.siteId,
-        programId: record.programId,
-        sourceType: "activity_season",
-        sourceId: input.activitySeasonId,
-        createdByPersonId: context.actorPersonId,
-      })
-      .returning({ id: calendarEvents.id });
+    const eventId = await publishProjection(tx, {
+      sourceType: "activity_season",
+      sourceId: input.activitySeasonId,
+      // Creating a season occurrence must not overwrite another meeting,
+      // even when its title and start time happen to match.
+      instanceKey: crypto.randomUUID(),
+      type: input.type,
+      title: input.title,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      timezone: site.timezone,
+      scope: { siteId: record.siteId, programId: record.programId },
+      createdByPersonId: context.actorPersonId,
+    });
 
-    if (!event) throw new Error("Failed to create activity CalendarEvent");
-
-    return event.id;
+    return eventId;
   });
 }

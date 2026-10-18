@@ -244,7 +244,7 @@ describe("transactional admissions events", () => {
         eventType: "ApplicationAccepted", aggregateId: "application",
       }));
     }
-    expect(values).toHaveBeenCalledWith(expect.objectContaining({recipientPersonId:"registrar-person",type:action==="accept"?"admission_offer_accepted":"admission_offer_declined",resourceId:"offer"}));
+    expect(values).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({recipientPersonId:"registrar-person",type:action==="accept"?"admission_offer_accepted":"admission_offer_declined",resourceId:"offer"})]));
   });
 
   it("does not activate an accepted offer missing a guardian response timestamp", async () => {

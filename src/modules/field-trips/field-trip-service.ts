@@ -1,38 +1,38 @@
-import { and, eq, gt, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  calendarEvents,
-  consentRecords,
-  enrollments,
-  fieldTripAttendance,
-  fieldTripChaperones,
-  fieldTripIncidents,
-  fieldTripParticipants,
-  fieldTrips,
-  financialObligations,
-  guardianRelationships,
-  healthProfiles,
-  householdMemberships,
-  people,
-  programs,
-  sensitiveAccessGrants,
-  sites,
-  studentProfiles,
+consentRecords,
+enrollments,
+fieldTripAttendance,
+fieldTripChaperones,
+fieldTripIncidents,
+fieldTripParticipants,
+fieldTrips,
+financialObligations,
+guardianRelationships,
+healthProfiles,
+householdMemberships,
+people,
+programs,
+sensitiveAccessGrants,
+sites,
+studentProfiles,
 } from "@/db/schema";
 import {
-  assertCapability,
-  assertOrganizationScope,
-  assertProgramScope,
-  assertSiteScope,
-  AuthorizationError,
-  type CommandContext,
+assertCapability,
+assertOrganizationScope,
+assertProgramScope,
+assertSiteScope,
+AuthorizationError,
+type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
+import { publishProjection } from "@/platform/calendar/projection";
+import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
+import { and,eq,gt,inArray,isNull,lt } from "drizzle-orm";
 import {
-  publishedTripPermission,
-  tripScheduleIsCurrent,
-  tripScheduleIsProposable,
+publishedTripPermission,
+tripScheduleIsCurrent,
+tripScheduleIsProposable,
 } from "./permission-policy";
 
 /**
@@ -211,25 +211,22 @@ export async function approveFieldTrip(
       throw new Error("This trip's dates or permission deadline have passed.");
     }
 
-    const [event] = await tx
-      .insert(calendarEvents)
-      .values({
-        type: "field_trip",
-        title: trip.title,
-        description: trip.destination,
-        startsAt: trip.departsAt,
-        endsAt: trip.returnsAt,
-        timezone: trip.timezone,
+    const eventId = await publishProjection(tx, {
+      sourceType: "field_trip",
+      sourceId: trip.id,
+      type: "field_trip",
+      title: trip.title,
+      description: trip.destination,
+      startsAt: trip.departsAt,
+      endsAt: trip.returnsAt,
+      timezone: trip.timezone,
+      scope: {
         organizationId: trip.organizationId,
         siteId: trip.siteId,
         programId: trip.programId,
-        sourceType: "field_trip",
-        sourceId: trip.id,
-        createdByPersonId: actorPersonId,
-      })
-      .returning({ id: calendarEvents.id });
-
-    if (!event) throw new Error("Failed to create Field Trip calendar event");
+      },
+      createdByPersonId: actorPersonId,
+    });
 
     const approvedAt = new Date();
     await tx
@@ -238,7 +235,7 @@ export async function approveFieldTrip(
         status: "approved",
         approvedByPersonId: actorPersonId,
         approvedAt,
-        calendarEventId: event.id,
+        calendarEventId: eventId,
         updatedAt: approvedAt,
       })
       .where(eq(fieldTrips.id, fieldTripId));
@@ -250,7 +247,7 @@ export async function approveFieldTrip(
       actorPersonId,
       payload: {
         siteId: trip.siteId,
-        calendarEventId: event.id,
+        calendarEventId: eventId,
       },
     });
 
@@ -263,11 +260,11 @@ export async function approveFieldTrip(
         programId: trip.programId,
       },
       before: { status: trip.status },
-      after: { status: "approved", calendarEventId: event.id },
+      after: { status: "approved", calendarEventId: eventId },
       contextExtras: context.auditAttribution,
     });
 
-    return event.id;
+    return eventId;
   });
 }
 

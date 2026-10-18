@@ -359,3 +359,21 @@ export const supportServiceStatus = pgEnum("support_service_status", [
   "scheduled",
   "completed",
 ]);
+
+export const capacityOfferingStatus = pgEnum("capacity_offering_status", ["open"]);
+
+export const capacityDemandStatus = pgEnum("capacity_demand_status", ["open"]);
+
+export const capacityReservationStatus = pgEnum("capacity_reservation_status", [
+  "held",
+  "committed",
+  "released",
+]);
+
+export const deliveryArrangementStatus = pgEnum("delivery_arrangement_status", [
+  "proposed",
+  "reserved",
+  "ready",
+  "active",
+  "completed",
+]);

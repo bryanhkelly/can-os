@@ -1,10 +1,12 @@
-import {and,eq,inArray,sql} from "drizzle-orm";
-import {db} from "@/db/client";
+import { db } from "@/db/client";
 import * as s from "@/db/schema";
-import type {CommandContext} from "@/domain/command-context";
-import {getSectionRegistrationPolicy} from "@/modules/learning/section-registration-policy-service";
-import {findSectionScheduleConflicts} from "@/modules/academic-time/section-schedule-service";
-import {lockAttendanceConfigurationAtSite} from "@/domain/attendance-configuration-lock";
+import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
+import type { CommandContext } from "@/domain/command-context";
+import { isPassingGrade } from "@/domain/grade-scale-policy";
+import { findSectionScheduleConflicts } from "@/modules/academic-time/section-schedule-service";
+import { getSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
+import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
+import { and,eq,inArray,sql } from "drizzle-orm";
 
 export type EnrollmentTransaction=Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type SectionPlacementInput={
@@ -76,13 +78,22 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  const prereqs=policy.prerequisites;
  if(prereqs.length){
   const grades=await tx.select({sectionCode:s.sections.code,courseCode:s.courseTemplates.code,
-   grade:s.sectionGrades.letterGrade})
+   grade:s.sectionGrades.letterGrade,gradeScaleId:s.sectionGrades.gradeScaleId})
    .from(s.sectionGrades).innerJoin(s.sections,eq(s.sections.id,s.sectionGrades.sectionId))
    .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
    .innerJoin(s.courseTemplates,eq(s.courseTemplates.id,s.courseTemplateVersions.courseTemplateId))
    .where(and(eq(s.sectionGrades.studentProfileId,studentProfileId),
     eq(s.sectionGrades.status,"finalized")));
-  const completed=new Set(grades.filter(g=>["A","B","C","D","P","Pass"].includes(g.grade??""))
+  // Passing is defined by each grade's versioned scale, not a hard-coded list.
+  const scaleIds=[...new Set(grades.map(g=>g.gradeScaleId).filter((id):id is string=>Boolean(id)))];
+  const scaleRows=scaleIds.length?await tx.select({id:s.gradeScales.id,configuration:s.gradeScales.configuration})
+   .from(s.gradeScales).where(inArray(s.gradeScales.id,scaleIds)):[];
+  const scaleConfigById=new Map(scaleRows.map(row=>[row.id,row.configuration] as const));
+  const completed=new Set(grades.filter(g=>{
+   const configuration=g.gradeScaleId?scaleConfigById.get(g.gradeScaleId):null;
+   if(g.gradeScaleId&&!configuration)throw new Error("Finalized grade scale is unavailable");
+   return isPassingGrade(g.grade,configuration);
+  })
    .flatMap(g=>[g.sectionCode,g.courseCode]));
   const unmet=prereqs.filter(prereq=>!completed.has(prereq));
   if(unmet.length)throw new Error("Unmet prerequisites: "+unmet.join(", "));
@@ -107,17 +118,17 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
     eq(s.guardianRelationships.studentPersonId,student.personId),
     eq(s.guardianRelationships.canViewAcademics,true)));
   const recipients=[...new Set([student.personId,...guardian.map(g=>g.personId)])];
-  if(recipients.length)await tx.insert(s.notifications).values(recipients.map(recipientPersonId=>({
+  if(recipients.length)await notifyMany(tx, recipients.map(recipientPersonId=>({
    recipientPersonId,type:"course_placement",status:"unread" as const,
    title:"New class available",body:"A new class has been added to your schedule.",
    resourceType:"section",resourceId:sectionId,
   })));
  }
- await tx.insert(s.domainEvents).values({eventType:"SectionEnrollmentActivated",
+ await emitEvent(tx, {eventType:"SectionEnrollmentActivated",
   aggregateType:"enrollment",aggregateId:enrolled.id,actorPersonId:actor.actorPersonId,
   payload:{studentProfileId,sectionId,programId:section.programId,
    applicationId:input.applicationId??null,requestId:input.requestId??null}});
- await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,
+ await writeAudit(tx, {actorPersonId:actor.actorPersonId,
   action:"enrollment.section.activate",resourceType:"enrollment",resourceId:enrolled.id,
   scope:{organizationId:section.organizationId,siteId:section.siteId,programId:section.programId},
   after:{studentProfileId,sectionId,source:input.source}});

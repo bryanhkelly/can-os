@@ -1,10 +1,11 @@
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { completeJourneyRequirement } from "@/modules/journeys/complete-requirement";
+import { writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { startProgramLaunch, activateProgram, createProgramOrientation } from "./program-launch-service";
-import { completeJourneyRequirement } from "@/modules/journeys/complete-requirement";
+import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
 
 const programTypes = [
   "church_hosted_academy",
@@ -226,7 +227,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
    const [site]=await tx.insert(s.sites).values({...data}).returning({id:s.sites.id});
-   await tx.insert(s.auditEvents).values({actorPersonId:actor.actorPersonId,
+   await writeAudit(tx, {actorPersonId:actor.actorPersonId,
     action:"site.create",resourceType:"site",resourceId:site!.id,
     scope:{organizationId:data.organizationId,siteId:site!.id},
     after:{name:data.name,timezone:data.timezone}});

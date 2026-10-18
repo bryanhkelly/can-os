@@ -1,8 +1,9 @@
-import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
-import { recordAudit, type Actor } from "@/modules/identity/actors.server";
 import { validateSession } from "@/domain/study-groups";
+import { recordAudit,type Actor } from "@/modules/identity/actors.server";
+import { emitEvent,notifyMany } from "@/platform/mutation";
+import { and,eq } from "drizzle-orm";
 import { facilitatedGroup } from "./canonical-membership.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -13,7 +14,7 @@ export async function notifyMembers(tx: Tx, groupId: string, title: string, body
       eq(s.studyGroupMemberships.groupId, groupId),
       eq(s.studyGroupMemberships.status, "approved")));
   if (!members.length) return;
-  await tx.insert(s.notifications).values(members.map(member => ({
+  await notifyMany(tx, members.map(member => ({
     recipientPersonId: member.personId, status: "unread" as const,
     type: "study_group_session_update", title, body,
     resourceType: "study_group_session", resourceId: sessionId,
@@ -72,7 +73,7 @@ export async function reviseGroupSessionForActor(actor: Actor, data: ReviseGroup
         startsAt: times!.start.toISOString(), endsAt: times!.end.toISOString(),
       },
     });
-    await tx.insert(s.domainEvents).values({
+    await emitEvent(tx, {
       eventType: data.action === "cancel" ? "StudyGroupSessionCancelled" : "StudyGroupSessionRescheduled",
       aggregateType: "study_group_session", aggregateId: session.id,
       actorPersonId: actor.actorPersonId, payload: { groupId: group.id, calendarEventId: event.id },

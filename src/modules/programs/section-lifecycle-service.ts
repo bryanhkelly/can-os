@@ -1,12 +1,20 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  actions, auditEvents, domainEvents, enrollments, instructionalCapacityReservations,
-  instructionalCapacityOfferings, notifications, programs, roleAssignments,
-  sectionCapacityDemands, sectionTeachers, sections, terms, scheduleTemplates,
+actions,
+enrollments,
+instructionalCapacityOfferings,
+instructionalCapacityReservations,
+programs,roleAssignments,
+scheduleTemplates,
+sectionCapacityDemands,
+sections,
+sectionTeachers,
+terms
 } from "@/db/schema";
-import { assertCapability, assertProgramScope, assertSectionScope, assertSiteScope, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
+import { assertCapability,assertProgramScope,assertSectionScope,assertSiteScope,AuthorizationError,type CommandContext } from "@/domain/command-context";
+import { emitEvent,notify,writeAudit } from "@/platform/mutation";
+import { and,eq,inArray,sql } from "drizzle-orm";
 
 type LifecycleContext = CommandContext & { actorPersonId: string };
 async function authorizedSection(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], context: LifecycleContext, sectionId: string) {
@@ -33,12 +41,12 @@ async function authorizedSection(tx: Parameters<Parameters<typeof db.transaction
   return row;
 }
 async function journal(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], context: LifecycleContext, section: Awaited<ReturnType<typeof authorizedSection>>, action: string, before: Record<string,unknown>, after: Record<string,unknown>) {
-  await tx.insert(auditEvents).values({
+  await writeAudit(tx, {
     actorPersonId: context.actorPersonId, action, resourceType:"section", resourceId: section.id,
     scope:{organizationId:section.organizationId,siteId:section.siteId,programId:section.programId},
     before,after,
   });
-  await tx.insert(domainEvents).values({
+  await emitEvent(tx, {
     eventType: action, aggregateType:"section", aggregateId:section.id,
     actorPersonId:context.actorPersonId, payload:{programId:section.programId, siteId:section.siteId, ...after},
   });
@@ -155,7 +163,7 @@ export async function replaceSectionTeacher(context: LifecycleContext, input:{se
     await tx.insert(sectionTeachers).values({sectionId:section.id,personId:input.newPersonId,role:old.role,assignmentSource:"manual"})
       .onConflictDoNothing();
     await tx.delete(sectionTeachers).where(eq(sectionTeachers.id,old.id));
-    await tx.insert(notifications).values({
+    await notify(tx, {
       recipientPersonId:input.newPersonId,type:"teaching_assignment",title:"New teaching assignment",
       body:"You have been assigned to "+section.title,resourceType:"section",resourceId:section.id,
     });
@@ -389,7 +397,7 @@ export async function expireOutstandingSectionOffers(limit=100):Promise<number>{
    if(!item||item.status!=="in_progress"||!item.dueAt||item.dueAt>new Date())return;
    await tx.update(actions).set({status:"waiting",dueAt:null,updatedAt:new Date(),
     metadata:{...item.metadata,offerExpiredAt:new Date().toISOString()}}).where(eq(actions.id,item.id));
-   await tx.insert(auditEvents).values({action:"SectionWaitlistOfferExpired",resourceType:"action",
+   await writeAudit(tx, {action:"SectionWaitlistOfferExpired",resourceType:"action",
     resourceId:item.id,scope:{organizationId:item.organizationId,programId:item.programId,siteId:item.siteId},
     before:{status:"in_progress"},after:{status:"waiting"}});
    expired++;

@@ -1,11 +1,12 @@
+import { assertCapability,assertProgramScope,assertSiteScope,AuthorizationError } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { readRubric,scoreRubric } from "@/modules/student-experience/rubric";
+import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
+import { and,asc,desc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { getCommandContext } from "@/modules/identity/command-context.server";
-import { assertCapability, assertSiteScope, assertProgramScope, AuthorizationError } from "@/domain/command-context";
-import { EventTypes } from "@/domain/event-types";
-import { readRubric, scoreRubric } from "@/modules/student-experience/rubric";
 
 /** Read a stored criterion-level breakdown from submission feedback. */
 function readRubricScores(value: unknown): Array<{ id: string; points: number }> {
@@ -278,7 +279,7 @@ export const createAssessment = createServerFn({ method: "POST" })
       timeliness: "on_time" as const,
      }))).onConflictDoNothing();
     }
-    await tx.insert(s.domainEvents).values({
+    await emitEvent(tx, {
      eventType: EventTypes.AssessmentPublished,
      aggregateType: "assessment",
      aggregateId: assessment.id,
@@ -286,7 +287,7 @@ export const createAssessment = createServerFn({ method: "POST" })
      payload: { sectionId: data.sectionId, dueAt: dueAt.toISOString(), assignedCount },
     });
    }
-   await tx.insert(s.auditEvents).values({
+   await writeAudit(tx, {
     actorPersonId: context.actorPersonId,
     action: "assessment.create",
     resourceType: "assessment",
@@ -360,7 +361,7 @@ export const manageAssessment = createServerFn({method:"POST"})
      .values(enrolled.map(row=>({assessmentId:assessment.id,studentProfileId:row.studentProfileId,
       status:"assigned" as const,timeliness:"on_time" as const})))
      .onConflictDoNothing();
-    await tx.insert(s.domainEvents).values({
+    await emitEvent(tx, {
      eventType:EventTypes.AssessmentPublished,aggregateType:"assessment",
      aggregateId:assessment.id,actorPersonId:context.actorPersonId,
      payload:{sectionId:assessment.sectionId,assignedCount,dueAt:dueAt!.toISOString()}
@@ -368,14 +369,14 @@ export const manageAssessment = createServerFn({method:"POST"})
    }
    if((data.action==="reschedule"||(data.action==="reopen"&&data.dueAt))&&
      dueAt?.getTime()!==assessment.dueAt?.getTime()){
-    await tx.insert(s.domainEvents).values({
+    await emitEvent(tx, {
      eventType:EventTypes.AcademicCalendarChanged,aggregateType:"assessment",
      aggregateId:assessment.id,actorPersonId:context.actorPersonId,
      payload:{previousDueAt:assessment.dueAt?.toISOString()??null,
       newDueAt:dueAt?.toISOString()??null,action:data.action}
     });
    }
-   await tx.insert(s.auditEvents).values({
+   await writeAudit(tx, {
     actorPersonId:context.actorPersonId,
     action:"assessment."+data.action,resourceType:"assessment",resourceId:assessment.id,
     scope:{siteId:assessment.siteId,programId:assessment.programId,sectionId:assessment.sectionId},
@@ -423,14 +424,14 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
     .where(and(eq(s.submissions.id,record.id),eq(s.submissions.status,"graded")))
     .returning({id:s.submissions.id});
    if(!updated)throw new Error("Submission status changed before return");
-   await tx.insert(s.auditEvents).values({
+   await writeAudit(tx, {
     actorPersonId:context.actorPersonId,action:"assignment.return",
     resourceType:"submission",resourceId:updated.id,
     scope:{siteId:record.siteId,programId:record.programId,sectionId:record.sectionId},
     before:{status:"graded"},after:{status:"returned"},
     context:{accountId:context.accountId,sessionId:context.sessionId}
    });
-   await tx.insert(s.notifications).values({
+   await notify(tx, {
     recipientPersonId:record.studentPersonId,type:"assignment_feedback",
     status:"unread",title:"Assignment returned for revision",
     body:"Your teacher returned your work. Review feedback and submit a revision.",

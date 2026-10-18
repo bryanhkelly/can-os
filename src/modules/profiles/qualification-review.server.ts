@@ -1,9 +1,10 @@
-import { eq, desc, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { auditEvents, domainEvents, memberships, qualificationClaims, qualificationVerificationEvents, roleAssignments, documents } from "@/db/schema";
-import { AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { documents,memberships,qualificationClaims,qualificationVerificationEvents,roleAssignments } from "@/db/schema";
+import { AuthorizationError,type CommandContext } from "@/domain/command-context";
+import { decideCredentialReview,type VerificationDecision,type VerificationStatus } from "@/domain/credential-workflow";
 import { reviewerCanVerify } from "@/domain/reviewer-authorization";
-import { decideCredentialReview, type VerificationDecision, type VerificationStatus } from "@/domain/credential-workflow";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { desc,eq,sql } from "drizzle-orm";
 
 /** Database-backed authorization: caller scope alone is never sufficient. */
 export async function assertScopedQualificationReviewer(context: CommandContext, subjectPersonId: string) {
@@ -47,8 +48,8 @@ export async function reviewQualification(
      evidenceDocumentId:evidenceId,reason:input.reason??null,
    }).returning({id:qualificationVerificationEvents.id});
    if(!event) throw new Error("Verification event insertion failed");
-   await tx.insert(domainEvents).values({eventType:"QualificationVerificationDecided",aggregateType:"QualificationClaim",aggregateId:claim.id,actorPersonId:context.actorPersonId!,payload:{verificationEventId:event.id,decision:input.decision}});
-   await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId!,action:"qualification.verification.decided",resourceType:"QualificationClaim",resourceId:claim.id,before:{status:current},after:{status:decision.status,verificationEventId:event.id},context:{requestId:context.requestId??null}});
+   await emitEvent(tx,{eventType:"QualificationVerificationDecided",aggregateType:"QualificationClaim",aggregateId:claim.id,actorPersonId:context.actorPersonId!,payload:{verificationEventId:event.id,decision:input.decision}});
+   await writeAudit(tx,context,{action:"qualification.verification.decided",entityType:"QualificationClaim",entityId:claim.id,before:{status:current},after:{status:decision.status,verificationEventId:event.id}});
    return {claimId:claim.id,verificationEventId:event.id,status:decision.status};
  });
 }

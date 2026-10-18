@@ -18,5 +18,5 @@ export const getFacilitatorStudyGroups=createServerFn({method:"GET"}).handler(as
  const sessions=await db.select({id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId,title:s.studyGroupSessions.title,startsAt:s.studyGroupSessions.startsAt,endsAt:s.studyGroupSessions.endsAt,metadata:s.calendarEvents.metadata})
   .from(s.studyGroupSessions).leftJoin(s.calendarEvents,and(eq(s.calendarEvents.sourceType,"study_group_session"),eq(s.calendarEvents.sourceId,s.studyGroupSessions.id)))
   .where(and(inArray(s.studyGroupSessions.groupId,permitted.map(g=>g.id)))).limit(100);
- return permitted.map(group=>({id:group.id,title:group.title,legacySessionWrites:group.metadata.synthetic===true,sessions:sessions.filter(session=>session.groupId===group.id).map(session=>({id:session.id,title:session.title,startsAt:session.startsAt.toISOString(),endsAt:session.endsAt.toISOString(),cancelled:session.metadata?.cancelled===true}))}));
+ return permitted.map(group=>({id:group.id,title:group.title,sessions:sessions.filter(session=>session.groupId===group.id).map(session=>({id:session.id,title:session.title,startsAt:session.startsAt.toISOString(),endsAt:session.endsAt.toISOString(),cancelled:!session.metadata||session.metadata.cancelled===true}))}));
 });

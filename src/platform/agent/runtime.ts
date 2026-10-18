@@ -424,8 +424,9 @@ export async function confirmRun(
     const args = (run.result.args ?? {}) as Record<string, unknown>;
     const tool = getAgentTool(toolName);
     if (!tool) throw new Error(`Unknown tool in approved run: ${toolName}`);
+    if (tool.readOnly) throw new Error("Approved runs must contain a consequential tool");
 
-    const result = await tool.execute(context, args);
+    const result = await tool.execute(context, args, tx);
 
     await tx
       .update(agentRuns)

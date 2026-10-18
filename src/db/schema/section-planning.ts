@@ -11,6 +11,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
+import { deliveryArrangementStatus } from "./enums";
 import { sections } from "./academics";
 import { organizations } from "./organizations";
 import { people } from "./identity";
@@ -69,7 +70,7 @@ export const deliveryArrangements = pgTable(
     modality: text("modality").notNull(),
     capacityReservationId: uuid("capacity_reservation_id")
       .references(() => instructionalCapacityReservations.id, { onDelete: "restrict" }),
-    status: text("status").default("proposed").notNull(),
+    status: deliveryArrangementStatus("status").default("proposed").notNull(),
     effectiveFrom: timestamp("effective_from", { withTimezone: true }),
     effectiveThrough: timestamp("effective_through", { withTimezone: true }),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
