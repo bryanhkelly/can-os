@@ -31,6 +31,7 @@ type RevisionInput =
 function typeLabel(item: CalendarFeedItem): string {
   if (item.source === "assessment") return "Due";
   if (item.source === "personal") return "Personal";
+  if (item.source === "study_group") return "Study group";
   if (item.source === "section") return "Section";
   return "Site";
 }
@@ -38,6 +39,7 @@ function typeLabel(item: CalendarFeedItem): string {
 function chipClass(item: CalendarFeedItem): string {
   if (item.source === "assessment") return "border-amber-300 bg-amber-50 text-amber-900";
   if (item.source === "personal") return "border-emerald-300 bg-emerald-50 text-emerald-900";
+  if (item.source === "study_group") return "border-violet-300 bg-violet-50 text-violet-900";
   if (item.source === "section") return "border-sky-300 bg-sky-50 text-sky-900";
   return "border-border bg-background";
 }

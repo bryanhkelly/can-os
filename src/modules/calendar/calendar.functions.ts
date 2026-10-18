@@ -7,6 +7,7 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,eq,gte,inArray,isNull,lt,ne,notExists,or } from "drizzle-orm";
 import { z } from "zod";
 import { reviseCalendarEventForActor } from "./calendar-events.server";
+import { visibleStudyGroupCalendarEventIds } from "./group-calendar-visibility.server";
 import { isValidTimeZone } from "./timezone";
 
 const allRoles: readonly ActorRole[] = ["student", "teacher", "guardian", "registrar", "specialist"];
@@ -15,7 +16,7 @@ export type CalendarFeedItem = {
   id: string;
   title: string;
   type: string;
-  source: "site" | "section" | "personal" | "assessment";
+  source: "site" | "section" | "personal" | "assessment" | "study_group";
   startsAt: string;
   endsAt: string | null;
   timezone: string;
@@ -91,6 +92,11 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
     const rangeEnd = new Date(Date.UTC(data.year, data.month, 1));
 
     const sectionIds = await visibleSectionIds(db, schema, actor, sites);
+    const visibleStudyGroupEventIds = await visibleStudyGroupCalendarEventIds(
+      actor,
+      sites,
+      sectionIds,
+    );
 
     const participantEventIds = db
       .select({ id: schema.calendarEventParticipants.calendarEventId })
@@ -111,16 +117,23 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
       .where(and(
         gte(schema.calendarEvents.startsAt, rangeStart),
         lt(schema.calendarEvents.startsAt, rangeEnd),
-        ne(schema.calendarEvents.type, "study_group"),
         or(
           and(inArray(schema.calendarEvents.siteId, sites),
             isNull(schema.calendarEvents.sectionId),
             or(isNull(schema.calendarEvents.programId),inArray(schema.calendarEvents.programId,actor.scope.programIds??[])),
             ne(schema.calendarEvents.type, "personal"),
+            ne(schema.calendarEvents.type, "study_group"),
             notExists(hasExplicitParticipants)),
           sectionIds.length ? and(inArray(schema.calendarEvents.sectionId, sectionIds),
+            ne(schema.calendarEvents.type, "study_group"),
             notExists(hasExplicitParticipants)) : undefined,
-          inArray(schema.calendarEvents.id, participantEventIds),
+          and(
+            ne(schema.calendarEvents.type, "study_group"),
+            inArray(schema.calendarEvents.id, participantEventIds),
+          ),
+          visibleStudyGroupEventIds.length
+            ? inArray(schema.calendarEvents.id, visibleStudyGroupEventIds)
+            : undefined,
         ),
       ))
       .orderBy(asc(schema.calendarEvents.startsAt))
@@ -162,7 +175,9 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
         id: event.id,
         title: event.title,
         type: event.type,
-        source: event.type === "personal" ? "personal" : event.sectionId ? "section" : "site",
+        source: event.type === "personal" ? "personal"
+          : event.type === "study_group" ? "study_group"
+          : event.sectionId ? "section" : "site",
         startsAt: event.startsAt.toISOString(),
         endsAt: event.endsAt ? event.endsAt.toISOString() : null,
         timezone: event.timezone,

@@ -281,6 +281,11 @@ Prove that distributed CAN students can form durable, safe academic peer connect
 8. Student can leave/report/escalate safely.
 9. Group health/participation can inform retention/support Insights without exposing private peer content broadly.
 
+### Calendar visibility invariants
+- A Study Group session is visible only while its Group is active and the viewer has current access: an approved member with active Program enrollment, or the scoped facilitator.
+- Course-linked Groups additionally require active enrollment in the Group's active Section.
+- Site, Section, and participant calendar visibility must not bypass these Group membership and scope checks.
+
 ### Proves
 peer-group domain model, membership, moderation/safety, calendar integration, academic context, distributed-network community.
 
