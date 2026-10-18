@@ -13,7 +13,7 @@ import {
   studyGroupMemberships,
   studyGroupSessions,
 } from "@/db/schema";
-import { reviseGroupSessionForActor } from "@/modules/study-groups/canonical-sessions.functions";
+import { reviseGroupSessionForActor } from "@/modules/study-groups/canonical-sessions.server";
 import type { Actor } from "@/modules/identity/actors.server";
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
