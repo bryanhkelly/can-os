@@ -120,7 +120,7 @@ Processing reuses the existing transactional outbox and domain-event worker:
 2. Outbox worker claims the event (existing; see hardening notes below).
 3. Subscription matcher finds active subscriptions for the event type and subject scope.
 4. **Authorization is re-evaluated at delivery time** — a subscription never acts as a cached permission. If the GuardianRelationship was revoked, delivery is suppressed and the subscription flagged.
-5. Delivery routes to the channel. In-app uses the existing Notification policy layer; email/SMS/agent_webhook go through a delivery worker with retry, dedup, quiet hours, and consent enforcement (per notification-architecture.md).
+5. Delivery routes to the channel. In-app uses the existing Notification policy layer; email/SMS/agent_webhook go through a delivery worker with retry, dedup, quiet hours, and consent enforcement (under the canonical architecture and domain notification contracts; see [architecture.md](./architecture.md) and [domain-model.md](./domain-model.md)).
 6. Reminder policies ("remind me next day if still missing") are scheduled follow-up checks against *current* canonical state — the reminder fires only if the condition still holds.
 
 Delivery invariants:

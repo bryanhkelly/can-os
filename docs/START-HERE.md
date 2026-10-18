@@ -1,0 +1,21 @@
+# CAN OS documentation — start here
+
+This directory separates **current specifications** from **historical implementation reports**. Read [AGENTS.md](../AGENTS.md) before development work and check the current repository head against [CURRENT-STATE.md](./CURRENT-STATE.md).
+
+## Authority
+
+- **Development instructions:** `../AGENTS.md` and `../.github/copilot-instructions.md`.
+- **Design invariants:** [architecture](./architecture.md), [domain model](./domain-model.md), [golden flows](./golden-flows.md), and [prototype migration](./prototype-migration.md).
+- **Current implementation snapshot:** [CURRENT-STATE.md](./CURRENT-STATE.md). Refresh its commit and evidence whenever relying on it for a decision.
+- **Canonical ownership maps:** [capability matrix](./platform-capability-matrix.md), [integration map](./platform-integration-map.md), and machine-readable [route contracts](./platform-route-contracts.json).
+- **Specialist design and operations:** [Ask CAN](./ask-can-agent-platform.md), [identity and access](./identity-and-demo-access.md), [Neon development](./neon-development.md), [field/medical/safety gates](./school-operations-security-gates.md), [R2 documents](./cloudflare-r2-enrollment.md), [school launch](./school-launch-studio-site-workspace.md), [school lifecycle](./school-operations-lifecycle.md), [qualification ADR](./adr-profile-compliance-scale.md), and [capacity model](./educational-capacity-model.md).
+- **Focused current implementation note:** [admissions offers](./admissions-offers.md). Historic labels: [feature tracks](./FEATURE-TRACKS.md).
+- **Release evidence:** [synthetic pilot gate](./synthetic-pilot-release-gate.md). A `HOLD` snapshot is not production authorization and requires up-to-date verification.
+
+## Historical records
+
+Documents under [archive/2026-10](./archive/2026-10/) preserve early demo designs, phase handoffs, and development checklists. They may mention branches, flags, routes, identities or unimplemented capabilities that are now obsolete. **Do not implement from archived instructions.** Source code is the evidence for the current implementation; run tests and security review for acceptance.
+
+## Documentation hygiene
+
+Update this index when document authority changes. Move obsolete release notes to the archive rather than silently rewriting history. Preserve links or revise active references whenever moving a document. Treat generated inventories as code contracts and check them in CI.

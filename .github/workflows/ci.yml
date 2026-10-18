@@ -37,6 +37,9 @@ jobs:
       - name: Enforce shared mutation evidence writers
         run: node scripts/check-mutation-hygiene.mjs
 
+      - name: Check canonical route ownership contracts
+        run: node scripts/check-platform-route-contracts.mjs --check
+
       - name: Admissions and authorization regressions
         run: npx vitest run tests/unit/admissions-session-roles.test.ts tests/unit/admissions-offer-events.test.ts tests/unit/admissions-seat-occupancy.test.ts
 
