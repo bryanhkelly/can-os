@@ -99,6 +99,22 @@ Initial event architecture should use the transactional outbox pattern:
 
 Do not introduce Kafka or a distributed event platform for v1.
 
+Activity, conference, and field-trip commands use the existing `writeAudit` and
+`emitEvent` helpers inside the same database transaction as their business
+writes. This includes activity/season creation, registration and withdrawal,
+calendar publication, conference-series creation and reminder queuing, both
+conference outcomes and follow-up Actions, trip consent, chaperone safety grants,
+attendance and incident linkage. Existing no-op retries do not append duplicate
+evidence. Reminder requests remain explicit sends, not deduplicated retries.
+Reminder queuing checks the booking's site scope. Incident linkage checks both
+resources' scopes and requires the same site and, for program-specific trips,
+the same program before writing the association or evidence.
+Audit/event payloads carry resource references, scope and decision metadata,
+not private conference notes, consent signatures or medical evidence.
+Integration regressions inject audit and event failures and verify business
+writes and mutation evidence roll back together; no separate mutation framework
+or schema migration is needed.
+
 ### Scheduled activities and calendar projections
 
 `ScheduledOccurrence` is the shared record for the time and delivery scope of

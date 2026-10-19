@@ -11,6 +11,7 @@ financialObligations,
 guardianRelationships,
 healthProfiles,
 householdMemberships,
+incidents,
 people,
 programs,
 sensitiveAccessGrants,
@@ -526,6 +527,8 @@ export async function signFieldTripPermission(
         fieldTripId: fieldTrips.id,
         siteId: fieldTrips.siteId,
         programId: fieldTrips.programId,
+        participantStatus: fieldTripParticipants.status,
+        consentRecordId: fieldTripParticipants.consentRecordId,
       })
       .from(fieldTripParticipants)
       .innerJoin(fieldTrips, eq(fieldTrips.id, fieldTripParticipants.fieldTripId))
@@ -605,6 +608,14 @@ export async function signFieldTripPermission(
       },
     });
 
+    await writeAudit(tx, context, {
+      action: "field_trip.permission.sign",
+      entityType: "field_trip_participant",
+      entityId: input.participantId,
+      scope: { siteId: record.siteId, programId: record.programId },
+      before: { status: record.participantStatus, consentRecordId: record.consentRecordId },
+      after: { status: "permission_complete", consentRecordId: consent.id, permissionVersion: input.version },
+    });
     return consent.id;
   });
 }
@@ -672,6 +683,32 @@ export async function assignFieldTripChaperone(
       .returning({ id: fieldTripChaperones.id });
 
     if (!chaperone) throw new Error("Failed to assign chaperone");
+    await writeAudit(tx, context, {
+      action: "field_trip.chaperone.assign",
+      entityType: "field_trip_chaperone",
+      entityId: chaperone.id,
+      scope: { siteId: trip.siteId, programId: trip.programId },
+      after: {
+        fieldTripId: trip.id, personId: input.personId, role: input.role ?? "chaperone",
+        accessGrantId: grant.id, validFrom: accessStarts.toISOString(), validThrough: accessEnds.toISOString(),
+      },
+    });
+    await writeAudit(tx, context, {
+      action: "field_trip.safety_access.grant",
+      entityType: "sensitive_access_grant",
+      entityId: grant.id,
+      scope: { siteId: trip.siteId, programId: trip.programId },
+      after: { fieldTripId: trip.id, granteePersonId: input.personId, classification: "medical" },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.FieldTripChaperoneAssigned,
+      aggregateType: "field_trip_chaperone",
+      aggregateId: chaperone.id,
+      actorPersonId: context.actorPersonId,
+      siteId: trip.siteId,
+      programId: trip.programId,
+      payload: { fieldTripId: trip.id, personId: input.personId, accessGrantId: grant.id },
+    });
     return chaperone.id;
   });
 }
@@ -885,6 +922,16 @@ export async function recordFieldTripAttendance(
       },
     });
 
+    await writeAudit(tx, context, {
+      action: "field_trip.attendance.record",
+      entityType: "field_trip_attendance",
+      entityId: record.id,
+      scope: { siteId: trip.siteId, programId: trip.programId },
+      after: {
+        fieldTripId: input.fieldTripId, studentProfileId: input.studentProfileId,
+        status: input.status, checkpoint: input.checkpoint,
+      },
+    });
     return record.id;
   });
 }
@@ -898,11 +945,39 @@ export async function linkFieldTripIncident(
 ): Promise<void> {
   assertCapability(context, "field_trip.incident.link");
 
-  await db
-    .insert(fieldTripIncidents)
-    .values({
-      fieldTripId: input.fieldTripId,
-      incidentId: input.incidentId,
-    })
-    .onConflictDoNothing();
+  await db.transaction(async (tx) => {
+    const [trip] = await tx.select({ siteId: fieldTrips.siteId, programId: fieldTrips.programId })
+      .from(fieldTrips).where(eq(fieldTrips.id, input.fieldTripId)).limit(1);
+    if (!trip) throw new Error("Field Trip not found");
+    assertSiteScope(context, trip.siteId);
+    assertProgramScope(context, trip.programId);
+    const [incident] = await tx.select({ siteId: incidents.siteId, programId: incidents.programId })
+      .from(incidents).where(eq(incidents.id, input.incidentId)).limit(1);
+    if (!incident) throw new Error("Incident not found");
+    assertSiteScope(context, incident.siteId);
+    assertProgramScope(context, incident.programId);
+    if (incident.siteId !== trip.siteId || (trip.programId && incident.programId !== trip.programId)) {
+      throw new AuthorizationError("incident belongs to trip scope");
+    }
+    const [link] = await tx.insert(fieldTripIncidents).values({
+      fieldTripId: input.fieldTripId, incidentId: input.incidentId,
+    }).onConflictDoNothing().returning({ id: fieldTripIncidents.id });
+    if (!link) return;
+    await writeAudit(tx, context, {
+      action: "field_trip.incident.link",
+      entityType: "field_trip_incident",
+      entityId: link.id,
+      scope: { siteId: trip.siteId, programId: trip.programId },
+      after: { fieldTripId: input.fieldTripId, incidentId: input.incidentId },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.FieldTripIncidentLinked,
+      aggregateType: "field_trip_incident",
+      aggregateId: link.id,
+      actorPersonId: context.actorPersonId,
+      siteId: trip.siteId,
+      programId: trip.programId,
+      payload: { fieldTripId: input.fieldTripId, incidentId: input.incidentId },
+    });
+  });
 }

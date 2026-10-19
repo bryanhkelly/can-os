@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { expectEvidenceFailure, expectMutationEvidence } from "./helpers/mutation-evidence";
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
 integration("GF36 co-curriculars and athletics", () => {
   it("tracks consent, physical expiry, fees, versioned eligibility, and canonical calendar events", async () => {
-    const [{ db }, schema, { eq }, activities] = await Promise.all([
+    const [{ db }, schema, { count, eq }, activities] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
@@ -113,6 +114,13 @@ integration("GF36 co-curriculars and athletics", () => {
       requestId: `gf36-staff-${suffix}`,
     };
 
+    for (const writer of ["writeAudit", "emitEvent"] as const) {
+      const name = `Rollback activity ${writer}-${suffix}`;
+      await expectEvidenceFailure(db, writer, () => activities.createActivity(staffContext, {
+        siteId: site.id, programId: program.id, type: "club", name,
+      }));
+      expect(await db.select().from(schema.activities).where(eq(schema.activities.name, name))).toEqual([]);
+    }
     const activityId = await activities.createActivity(staffContext, {
       siteId: site.id,
       programId: program.id,
@@ -121,14 +129,20 @@ integration("GF36 co-curriculars and athletics", () => {
       advisorPersonId: coach.id,
     });
 
-    const seasonId = await activities.createActivitySeason(staffContext, {
+    const seasonInput = {
       activityId,
       name: "Spring 2028",
       startsOn: "2028-01-15",
       endsOn: "2028-05-20",
       feeAmountCents: 15000,
       capacity: 1,
-    });
+    };
+    for (const writer of ["writeAudit", "emitEvent"] as const) {
+      await expectEvidenceFailure(db, writer, () => activities.createActivitySeason(staffContext, seasonInput));
+      expect(await db.select().from(schema.activitySeasons)
+        .where(eq(schema.activitySeasons.activityId, activityId))).toEqual([]);
+    }
+    const seasonId = await activities.createActivitySeason(staffContext, seasonInput);
 
     const guardianContext = {
       actorPersonId: guardian.id,
@@ -137,6 +151,18 @@ integration("GF36 co-curriculars and athletics", () => {
       requestId: `gf36-guardian-${suffix}`,
     };
 
+    for (const writer of ["writeAudit", "emitEvent"] as const) {
+      await expectEvidenceFailure(db, writer, () => activities.registerForActivity(guardianContext, {
+        activitySeasonId: seasonId, studentProfileId: student.id,
+        householdId: household.id, consentVersion: "rollback",
+      }));
+      expect(await db.select().from(schema.activityRegistrations)
+        .where(eq(schema.activityRegistrations.activitySeasonId, seasonId))).toEqual([]);
+      expect(await db.select().from(schema.consentRecords)
+        .where(eq(schema.consentRecords.subjectId, seasonId))).toEqual([]);
+      expect(await db.select().from(schema.financialObligations)
+        .where(eq(schema.financialObligations.subjectId, seasonId))).toEqual([]);
+    }
     const registrationId = await activities.registerForActivity(guardianContext, {
       activitySeasonId: seasonId,
       studentProfileId: student.id,
@@ -199,13 +225,21 @@ integration("GF36 co-curriculars and athletics", () => {
       .where(eq(schema.activityEligibilityChecks.activityRegistrationId, registrationId));
     expect(checks).toHaveLength(2);
 
-    const eventId = await activities.addActivityCalendarEvent(staffContext, {
+    const calendarInput = {
       activitySeasonId: seasonId,
       title: "Track Practice",
-      type: "practice",
+      type: "practice" as const,
       startsAt: new Date("2028-02-01T20:00:00.000Z"),
       endsAt: new Date("2028-02-01T22:00:00.000Z"),
-    });
+    };
+    for (const writer of ["writeAudit", "emitEvent"] as const) {
+      const beforeOccurrences = await db.select({ total: count() }).from(schema.scheduledOccurrences);
+      await expectEvidenceFailure(db, writer, () => activities.addActivityCalendarEvent(staffContext, calendarInput));
+      expect(await db.select().from(schema.calendarEvents)
+        .where(eq(schema.calendarEvents.sourceId, seasonId))).toEqual([]);
+      expect(await db.select({ total: count() }).from(schema.scheduledOccurrences)).toEqual(beforeOccurrences);
+    }
+    const eventId = await activities.addActivityCalendarEvent(staffContext, calendarInput);
 
     const [event] = await db.select().from(schema.calendarEvents)
       .where(eq(schema.calendarEvents.id, eventId));
@@ -216,11 +250,34 @@ integration("GF36 co-curriculars and athletics", () => {
 
     await expect(activities.withdrawActivityRegistration({ ...guardianContext, actorPersonId: coach.id }, { registrationId }))
       .rejects.toThrow(/authorized guardian/);
+    for (const writer of ["writeAudit", "emitEvent"] as const) {
+      await expectEvidenceFailure(db, writer, () => activities.withdrawActivityRegistration(guardianContext, { registrationId }));
+      const [unchanged] = await db.select().from(schema.activityRegistrations)
+        .where(eq(schema.activityRegistrations.id, registrationId));
+      expect(unchanged?.status).toBe("conditional");
+    }
     await activities.withdrawActivityRegistration(guardianContext, { registrationId });
     await activities.withdrawActivityRegistration(guardianContext, { registrationId }); // idempotent
     const [withdrawn] = await db.select().from(schema.activityRegistrations)
       .where(eq(schema.activityRegistrations.id, registrationId));
     expect(withdrawn.status).toBe("withdrawn");
     expect(withdrawn.rosterStatus).toBe("not_rostered");
+    const scope = { siteId: site.id, programId: program.id };
+    for (const [resourceType, resourceId, action, eventType, context] of [
+      ["activity", activityId, "activity.create", "ActivityCreated", staffContext],
+      ["activity_season", seasonId, "activity.season.create", "ActivitySeasonCreated", staffContext],
+      ["activity_registration", registrationId, "activity.registration.create", "ActivityRegistrationCreated", guardianContext],
+      ["activity_registration", siblingRegistrationId, "activity.registration.create", "ActivityRegistrationCreated", guardianContext],
+      ["activity_registration", registrationId, "activity.registration.withdraw", "ActivityRegistrationWithdrawn", guardianContext],
+      ["calendar_event", eventId, "activity.calendar.create", "CalendarEventCreated", staffContext],
+    ] as const) {
+      await expectMutationEvidence(db, {
+        resourceType, resourceId, action, eventType, scope,
+        actorPersonId: context.actorPersonId, requestId: context.requestId,
+      });
+    }
+    const registrationAudit = await db.select().from(schema.auditEvents)
+      .where(eq(schema.auditEvents.resourceId, registrationId));
+    expect(JSON.stringify(registrationAudit)).not.toContain(physical.id);
   });
 });

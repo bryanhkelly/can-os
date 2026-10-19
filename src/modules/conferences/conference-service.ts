@@ -88,6 +88,26 @@ export async function createConferenceSeries(
     if (slots.length === 0) throw new Error("Conference series has no valid slots");
     await tx.insert(conferenceSlots).values(slots);
 
+    await writeAudit(tx, context, {
+      action: "conference.series.create",
+      entityType: "conference_series",
+      entityId: series.id,
+      scope: { siteId: input.siteId, sectionId: input.sectionId },
+      after: {
+        status: "published", teacherPersonId: input.teacherPersonId,
+        startsAt: input.startsAt.toISOString(), endsAt: input.endsAt.toISOString(),
+        slotMinutes, slotCount: slots.length,
+      },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.ConferenceSeriesCreated,
+      aggregateType: "conference_series",
+      aggregateId: series.id,
+      actorPersonId: context.actorPersonId,
+      siteId: input.siteId,
+      sectionId: input.sectionId,
+      payload: { teacherPersonId: input.teacherPersonId, slotCount: slots.length },
+    });
     return series.id;
   });
 }
@@ -510,24 +530,45 @@ export async function queueConferenceReminder(
       .select({
         guardianPersonId: conferenceBookings.guardianPersonId,
         startsAt: conferenceSlots.startsAt,
+        siteId: conferenceSeries.siteId,
       })
       .from(conferenceBookings)
       .innerJoin(
         conferenceSlots,
         eq(conferenceSlots.id, conferenceBookings.conferenceSlotId),
       )
+      .innerJoin(
+        conferenceSeries,
+        eq(conferenceSeries.id, conferenceSlots.conferenceSeriesId),
+      )
       .where(eq(conferenceBookings.id, bookingId))
       .limit(1);
 
     if (!booking) throw new Error("Conference booking not found");
+    assertSiteScope(context, booking.siteId);
 
-    await scheduleReminder(tx, {
+    const notificationId = await scheduleReminder(tx, {
       recipientPersonId: booking.guardianPersonId,
       type: "conference_reminder",
       title: "Parent-teacher conference reminder",
       body: `Your conference is scheduled for ${booking.startsAt.toISOString()}.`,
       resourceType: "conference_booking",
       resourceId: bookingId,
+    });
+    await writeAudit(tx, context, {
+      action: "conference.reminder.queue",
+      entityType: "conference_booking",
+      entityId: bookingId,
+      scope: { siteId: booking.siteId },
+      after: { notificationId },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.ConferenceReminderQueued,
+      aggregateType: "conference_booking",
+      aggregateId: bookingId,
+      actorPersonId: context.actorPersonId,
+      siteId: booking.siteId,
+      payload: { notificationId },
     });
   });
 }
@@ -617,20 +658,33 @@ export async function completeConference(
 
       if (!action) throw new Error("Failed to create Conference follow-up Action");
       actionId = action.id;
-    }
-
-    if (input.outcome === "held") {
+      await writeAudit(tx, context, {
+        action: "action.create",
+        entityType: "action",
+        entityId: action.id,
+        scope: { siteId: record.siteId },
+        after: { type: "conference_follow_up", conferenceBookingId: input.bookingId },
+      });
       await emitEvent(tx, {
-        eventType: EventTypes.ConferenceHeld,
-        aggregateType: "conference_booking",
-        aggregateId: input.bookingId,
+        eventType: EventTypes.ActionCreated,
+        aggregateType: "action",
+        aggregateId: action.id,
         actorPersonId: context.actorPersonId,
-        payload: {
-          studentProfileId: record.studentProfileId,
-          actionId: actionId ?? null,
-        },
+        siteId: record.siteId,
+        payload: { type: "conference_follow_up", conferenceBookingId: input.bookingId },
       });
     }
+
+    await emitEvent(tx, {
+      eventType: input.outcome === "held" ? EventTypes.ConferenceHeld : EventTypes.ConferenceNoShowRecorded,
+      aggregateType: "conference_booking",
+      aggregateId: input.bookingId,
+      actorPersonId: context.actorPersonId,
+      payload: {
+        studentProfileId: record.studentProfileId,
+        actionId: actionId ?? null,
+      },
+    });
 
     await writeAudit(tx, context, {
       action: "conference.complete",

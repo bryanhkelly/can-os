@@ -38,20 +38,38 @@ export async function createActivity(
   assertSiteScope(context, input.siteId);
   assertProgramScope(context, input.programId);
 
-  const [activity] = await db
-    .insert(activities)
-    .values({
+  return db.transaction(async (tx) => {
+    const [activity] = await tx
+      .insert(activities)
+      .values({
+        siteId: input.siteId,
+        programId: input.programId,
+        type: input.type,
+        name: input.name,
+        advisorPersonId: input.advisorPersonId,
+        status: "active",
+      })
+      .returning({ id: activities.id });
+
+    if (!activity) throw new Error("Failed to create Activity");
+    await writeAudit(tx, context, {
+      action: "activity.create",
+      entityType: "activity",
+      entityId: activity.id,
+      scope: { siteId: input.siteId, programId: input.programId },
+      after: { status: "active", type: input.type, advisorPersonId: input.advisorPersonId ?? null },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.ActivityCreated,
+      aggregateType: "activity",
+      aggregateId: activity.id,
+      actorPersonId: context.actorPersonId,
       siteId: input.siteId,
       programId: input.programId,
-      type: input.type,
-      name: input.name,
-      advisorPersonId: input.advisorPersonId,
-      status: "active",
-    })
-    .returning({ id: activities.id });
-
-  if (!activity) throw new Error("Failed to create Activity");
-  return activity.id;
+      payload: { type: input.type },
+    });
+    return activity.id;
+  });
 }
 
 export async function createActivitySeason(
@@ -102,6 +120,22 @@ export async function createActivitySeason(
       .returning({ id: activitySeasons.id });
 
     if (!season) throw new Error("Failed to create Activity season");
+    await writeAudit(tx, context, {
+      action: "activity.season.create",
+      entityType: "activity_season",
+      entityId: season.id,
+      scope: { siteId: activity.siteId, programId: activity.programId },
+      after: { activityId: activity.id, status: "registration", startsOn: input.startsOn, endsOn: input.endsOn },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.ActivitySeasonCreated,
+      aggregateType: "activity_season",
+      aggregateId: season.id,
+      actorPersonId: context.actorPersonId,
+      siteId: activity.siteId,
+      programId: activity.programId,
+      payload: { activityId: activity.id },
+    });
     return season.id;
   });
 }
@@ -234,6 +268,26 @@ export async function registerForActivity(
       .returning({ id: activityRegistrations.id });
 
     if (!registration) throw new Error("Failed to create Activity registration");
+    const status = waitlisted ? "waitlisted" : "pending";
+    await writeAudit(tx, context, {
+      action: "activity.registration.create",
+      entityType: "activity_registration",
+      entityId: registration.id,
+      scope: { siteId: record.siteId, programId: record.programId },
+      after: {
+        activitySeasonId: record.seasonId, studentProfileId: input.studentProfileId,
+        status, consentRecordId: consent.id, financialObligationId: obligationId ?? null,
+      },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.ActivityRegistrationCreated,
+      aggregateType: "activity_registration",
+      aggregateId: registration.id,
+      actorPersonId,
+      siteId: record.siteId,
+      programId: record.programId,
+      payload: { activitySeasonId: record.seasonId, studentProfileId: input.studentProfileId, status },
+    });
     return registration.id;
   });
 }
@@ -257,8 +311,12 @@ export async function withdrawActivityRegistration(
     if (!target) throw new Error("Activity registration not found");
 
     // Same lock used by concurrent registration; re-read after taking the lock.
-    await tx.select({ id: activitySeasons.id }).from(activitySeasons)
-      .where(eq(activitySeasons.id, target.seasonId)).for("update");
+    const [season] = await tx.select({
+      id: activitySeasons.id, siteId: activities.siteId, programId: activities.programId,
+    }).from(activitySeasons)
+      .innerJoin(activities, eq(activities.id, activitySeasons.activityId))
+      .where(eq(activitySeasons.id, target.seasonId)).for("update", { of: activitySeasons });
+    if (!season) throw new Error("Activity season not found");
     const [registration] = await tx.select().from(activityRegistrations)
       .where(eq(activityRegistrations.id, input.registrationId)).limit(1);
     if (!registration) throw new Error("Activity registration not found");
@@ -280,15 +338,23 @@ export async function withdrawActivityRegistration(
     }).where(eq(activityRegistrations.id, input.registrationId));
 
     // Do not silently refund or void payments; financial review is required.
-    await writeAudit(tx, {
-      actorPersonId,
+    await writeAudit(tx, context, {
       action: "activity.registration.withdraw",
-      resourceType: "activity_registration",
-      resourceId: input.registrationId,
-      scope: {},
+      entityType: "activity_registration",
+      entityId: input.registrationId,
+      scope: { siteId: season.siteId, programId: season.programId },
       before: { status: registration.status },
       after: { status: "withdrawn" },
-      context: { requestId: context.requestId ?? null, financialReviewRequired: !!registration.financialObligationId },
+      contextExtras: { financialReviewRequired: !!registration.financialObligationId },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.ActivityRegistrationWithdrawn,
+      aggregateType: "activity_registration",
+      aggregateId: registration.id,
+      actorPersonId,
+      siteId: season.siteId,
+      programId: season.programId,
+      payload: { activitySeasonId: target.seasonId, studentProfileId: registration.studentProfileId },
     });
   });
 }
@@ -363,11 +429,10 @@ export async function evaluateActivityEligibility(
       },
     });
 
-    await writeAudit(tx, {
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "activity.eligibility.evaluate",
-      resourceType: "activity_registration",
-      resourceId: input.registrationId,
+      entityType: "activity_registration",
+      entityId: input.registrationId,
       scope: {
         siteId: record.siteId,
         programId: record.programId,
@@ -376,7 +441,6 @@ export async function evaluateActivityEligibility(
         eligibilityStatus: input.status,
         ruleVersion: input.ruleVersion,
       },
-      context: { requestId: context.requestId ?? null },
     });
 
     return check.id;
@@ -435,6 +499,25 @@ export async function addActivityCalendarEvent(
       createdByPersonId: context.actorPersonId,
     });
 
+    await writeAudit(tx, context, {
+      action: "activity.calendar.create",
+      entityType: "calendar_event",
+      entityId: eventId,
+      scope: { siteId: record.siteId, programId: record.programId },
+      after: {
+        activitySeasonId: record.seasonId, type: input.type,
+        startsAt: input.startsAt.toISOString(), endsAt: input.endsAt?.toISOString() ?? null,
+      },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.CalendarEventCreated,
+      aggregateType: "calendar_event",
+      aggregateId: eventId,
+      actorPersonId: context.actorPersonId,
+      siteId: record.siteId,
+      programId: record.programId,
+      payload: { sourceType: "activity_season", sourceId: record.seasonId },
+    });
     return eventId;
   });
 }
