@@ -73,8 +73,20 @@ caused by CRLF versus LF; compare the committed file representation before
 concluding that an applied migration was changed. Do not rewrite migration
 history, stamp missing ledger entries or use `db:push` as a shortcut.
 
-The dated, locally configured database audit is recorded in
-[CURRENT-STATE.md](./CURRENT-STATE.md); it does not certify other Neon branches.
+The historical drift audit and subsequent approved production reconciliation
+are recorded in [CURRENT-STATE.md](./CURRENT-STATE.md). That rollout used a fresh
+production copy, a clean replay of committed migrations as the reference,
+catalog equivalence and existing-record preservation checks, isolated integration
+tests, and an independent pre-change recovery branch. Missing ledger entries
+were appended only after the reconciled schema passed those checks in the same
+transaction; existing ledger entries were not rewritten. This is not permission
+to stamp unverified histories on other branches.
+
+Confirm the Neon project, branch and endpoint with management metadata before
+any rollout. The reconciled target is branch `production` at endpoint
+`ep-autumn-glade-ar9r1t5q`; endpoint `ep-noisy-bird-arruu0it` belongs to `test01`.
+Neither connection variable names nor a passing `db:generate` establish target
+identity or migration status.
 
 ## Connection handling
 

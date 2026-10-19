@@ -10,7 +10,7 @@ export default defineConfig({
     tsconfigPaths(),
     tailwindcss(),
     tanstackStart(),
-    netlify(),
+    netlify({ dev: { edgeFunctions: { enabled: false } } }),
     react(),
   ],
 });
