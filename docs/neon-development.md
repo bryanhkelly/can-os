@@ -137,8 +137,31 @@ test branch, not production. Recovery branch
 `calendar-pre-rollout-2026-10-19T18-20-23-197Z`
 (`br-shiny-tooth-ar9dc51o`) was created before any production mutation.
 The project branch quota blocked creation of the fresh rehearsal branch.
-The owner declined branch deletion and changed the request to commit only;
-production remains unchanged and production-copy validation is still required.
+The owner initially declined branch deletion and changed the request to commit
+only; no production mutation occurred at that stage.
+
+The owner subsequently approved production migration with an explicit
+alternative validation plan: rehearse transactionally on the existing recovery
+copy and roll back, rather than delete another branch to run a separate full
+integration suite. That rehearsal passed on 2026-10-19 at 19:09 UTC. It exercised
+the exact committed `0023`-`0025` SQL, data preservation, legacy-shaped inserts,
+schedule/timezone/scope updates, explicit occurrence links and idempotent bridge
+installation. The schema and ledger changes were rolled back and verified
+absent on the recovery branch. This was not a full integration-suite run on a
+fresh branch; the committed release had separately passed 484 unit tests and
+nine focused integration tests on the existing isolated test database.
+
+At 19:09 UTC, the same committed SQL was applied transactionally to confirmed
+production endpoint `ep-autumn-glade-ar9r1t5q`. The migration transaction used
+bounded lock/statement timeouts, checked existing ledger hashes, and validated
+data preservation before committing. Production is now at `0025`; a separate
+connection verified the ledger hashes, both enabled bridge triggers, validated
+foreign keys, required occurrence links, indexes and the `published` enum value.
+All six existing calendar events retained their original values and participant
+records, with zero missing occurrences or schedule/scope mismatches. No fixture
+records were inserted into production. The recovery branch remains at its
+pre-migration state. This records database migration, not application deployment
+or browser acceptance; no Git push or application rollout was performed.
 
 A later **contract** change is a separate approved release. It may remove the
 compatibility columns only after deployment records show no old application
