@@ -16,8 +16,8 @@ const EMPTY_TODAY = {
  connected: false,
  teacher: { firstName: "" },
  sections: [] as { id: string; title: string; studentCount: number }[],
- ungraded: [] as { assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; submittedAt: string | null }[],
- missingWork: [] as { assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; dueAt: string }[],
+ ungraded: [] as { sectionId: string; assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; submittedAt: string | null }[],
+ missingWork: [] as { sectionId: string; assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; dueAt: string }[],
  notices: [] as { id: string; title: string; body: string | null; status: string; createdAt: string }[],
 };
 
@@ -66,6 +66,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
  // submission_status has no "late" value; late work arrives as status "submitted"
  // with timeliness "late", so the queue keys on ungraded submitted attempts.
  const ungradedRows = await db.select({
+  sectionId: s.sections.id,
   assessmentId: s.submissions.assessmentId,
   studentProfileId: s.submissions.studentProfileId,
   firstName: s.people.legalFirstName,
@@ -87,6 +88,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   .orderBy(asc(s.submissions.submittedAt))
   .limit(20);
  const ungraded = ungradedRows.map(row => ({
+  sectionId: row.sectionId,
   assessmentId: row.assessmentId,
   studentProfileId: row.studentProfileId,
   studentName: `${row.firstName} ${row.lastName}`,
@@ -145,6 +147,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
    const attempt = latest.get(`${assessment.id}:${student.studentProfileId}`);
    if (attempt && attempt.status !== "assigned") return [];
    return [{
+    sectionId: assessment.sectionId,
     assessmentId: assessment.id,
     studentProfileId: student.studentProfileId,
     studentName: `${student.firstName} ${student.lastName}`,

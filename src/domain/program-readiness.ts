@@ -9,6 +9,6 @@ export function programReadiness(items:ReadinessItem[]){
 }
 export function readinessFromSnapshot(snapshot:Partial<Record<ReadinessDimension,"ready"|"needs_review"|"missing">>):ReadinessItem[]{
  const labels:Record<ReadinessDimension,string>={academics:"Course offering",staffing:"Staff qualifications",safeguarding:"Safety and supervision",calendar:"Academic calendar",enrollment:"Enrollment capacity",records:"School records"};
- const links:Record<ReadinessDimension,string>={academics:"/student/courses",staffing:"/profiles",safeguarding:"/profiles",calendar:"/student/experiences",enrollment:"/student/courses",records:"/operations"};
+ const links:Record<ReadinessDimension,string>={academics:"/operations/launch",staffing:"/staff/teachers",safeguarding:"/profiles",calendar:"/operations/school-years",enrollment:"/admissions/capacity",records:"/operations"};
  return readinessDimensions.map(key=>({key,label:labels[key],state:snapshot[key]??"missing",detail:snapshot[key]==="ready"?"Illustrative readiness marker":"Requires review before launch",href:links[key]}));
 }

@@ -1,24 +1,21 @@
 import {createFileRoute,Link} from "@tanstack/react-router";
-import {getSyntheticPrograms} from "@/modules/operations/program-preview.functions";
-import {programIndicators} from "@/domain/program-indicators";
-import {schoolTemplates} from "@/domain/school-template";
-import {programReadiness,readinessFromSnapshot} from "@/domain/program-readiness";
+import {getScopedPrograms} from "@/modules/operations/program-preview.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-export const Route=createFileRoute("/readiness")({loader:safeLoader(()=>getSyntheticPrograms(),{authMessage:"Sign in with an authorized staff account to view program launch readiness."}),component:ReadinessPage});
+import {WorkspaceShell,WorkspacePanel} from "@/components/workspace";
+export const Route=createFileRoute("/readiness")({
+  loader:safeLoader(()=>getScopedPrograms(),{authMessage:"Sign in with authorized program access."}),component:ReadinessPage,
+});
 function ReadinessPage(){
- const outcome=Route.useLoaderData();
- if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Synthetic planning example" title="Program launch readiness" outcome={outcome}/>;
- const programs:Awaited<ReturnType<typeof getSyntheticPrograms>>=outcome.data;
- const items=readinessFromSnapshot({academics:"ready",staffing:"needs_review",safeguarding:"missing",calendar:"ready",enrollment:"needs_review",records:"missing"});
- const summary=programReadiness(items);
- return <main className="mx-auto max-w-5xl px-5 py-10">
- <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Synthetic planning example</p>
- <h1 className="mt-2 font-serif text-5xl">Program launch readiness</h1>
- <p className="mt-4 text-sm text-muted-foreground">Illustrative K–8 high-school extension. Statuses are sample values, not accreditation or verified compliance findings.</p>
- <section className="mt-5 rounded-xl border bg-card p-5"><h2 className="font-semibold">Synthetic programs in the database</h2>{programs.length?programs.map(p=><p key={p.id} className="mt-2 text-sm">{p.name} · {p.organizationName} · {p.status} · grades {p.gradeRange.min}–{p.gradeRange.max} · {p.counts.sections} sections · {p.counts.teachers} teaching assignments · {p.counts.enrollments} enrollments<span className="mt-2 flex flex-wrap gap-2">{programIndicators(p.counts).map(i=><span key={i.key} className="rounded border px-2 py-1 text-xs">{i.label}: {i.state.replace("_"," ")}</span>)}</span></p>):<p className="mt-2 text-sm text-muted-foreground">No explicitly marked synthetic programs found. Planning example below is illustrative.</p>}</section>
- <div className="mt-6 rounded-xl border bg-card p-5"><p className="font-serif text-3xl">{summary.ready} of {summary.total} dimensions ready</p><p className="mt-2 text-sm text-muted-foreground">{summary.blockers} open planning dimensions</p></div>
- <section className="mt-7 grid gap-3 sm:grid-cols-2">{items.map(x=><article key={x.key} className="rounded-xl border bg-card p-5"><div className="flex items-start justify-between gap-4"><h2 className="font-semibold">{x.label}</h2><span className="text-xs text-muted-foreground">{x.state.replace("_"," ")}</span></div><p className="mt-2 text-sm text-muted-foreground">{x.detail}</p><Link to={x.href} className="mt-3 inline-block text-xs font-bold underline">Explore workflow →</Link></article>)}</section>
- <section className="mt-10"><h2 className="font-serif text-3xl">Reusable program starting points</h2><p className="mt-2 text-sm text-muted-foreground">Configuration presets only; jurisdictional requirements and responsible organizations must be assigned before approval.</p><div className="mt-4 grid gap-3 sm:grid-cols-2">{schoolTemplates.map(t=><article key={t.key} className="rounded-xl border bg-card p-5"><h3 className="font-semibold">{t.title}</h3><p className="mt-2 text-sm text-muted-foreground">{t.description}</p><p className="mt-2 text-xs text-muted-foreground">Suggested onsite days: {t.delivery.onsiteDaysPerWeek}/week</p></article>)}</div></section>
- </main>;
+  const outcome=Route.useLoaderData();
+  if(!outcome.ok)return <LoaderFailure title="Program overview" outcome={outcome}/>;
+  return <WorkspaceShell title="Program overview" eyebrow="CAN OS · Programs"
+    subtitle="Recorded program status and operational counts. Counts are not readiness or activation approval.">
+    <div className="mt-6 grid gap-4">{outcome.data.map(program=><WorkspacePanel key={program.id} title={program.name}
+      description={`${program.organizationName} · ${program.status}`}>
+      <p className="text-sm">{program.counts.sections} sections · {program.counts.teachers} teaching assignments · {program.counts.enrollments} enrollment records</p>
+    </WorkspacePanel>)}</div>
+    {!outcome.data.length&&<p role="status" className="mt-6 text-sm">No programs are available in this membership.</p>}
+    <p className="mt-6 text-sm">Authorized program operators can review blocking requirements in <Link to="/operations/launch" className="underline">Program launches</Link>.</p>
+  </WorkspaceShell>;
 }

@@ -171,7 +171,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
 
  const students = await guardianStudents(s, actor, siteIds);
  const excuseWindow = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
- const excuseItems: { id: string; title: string; childName: string; expectedAt: string }[] = [];
+ const excuseItems: { id: string; title: string; childName: string; studentPersonId: string; expectedAt: string }[] = [];
  for (const student of students) {
   const rows = await db.select({
    eventId: s.attendanceEvents.id,
@@ -192,6 +192,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
      id: row.eventId,
      title: "Absence needs an excuse",
      childName: student.firstName ?? student.legalFirstName,
+     studentPersonId: student.studentPersonId,
      expectedAt: row.expectedAt.toISOString(),
     });
    }
@@ -204,7 +205,7 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   type: row.type,
   title: row.title,
   detail: row.body ?? "",
-  href: notificationHref(row.type, row.resourceType),
+  href: `/notifications?notification=${encodeURIComponent(row.id)}`,
   createdAt: row.createdAt.toISOString(),
  }));
  const actionItems = openActions.map(row => ({
@@ -213,7 +214,9 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   type: row.type,
   title: row.title,
   detail: row.description ?? "",
-  href: "/guardian",
+  href: `/guardian?action=${encodeURIComponent(row.id)}`,
+  priority:row.priority,
+  dueAt:row.dueAt?.toISOString()??null,
   createdAt: row.dueAt?.toISOString() ?? "",
  }));
  const absenceItems = excuseItems.map(row => ({
@@ -222,17 +225,9 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   type: "attendance_excuse",
   title: `${row.childName}: ${row.title}`,
   detail: `Absence on ${new Date(row.expectedAt).toLocaleDateString()} has no excuse yet.`,
-  href: "/guardian/attendance",
+  href: `/guardian/attendance?student=${encodeURIComponent(row.studentPersonId)}&attendance=${encodeURIComponent(row.id)}`,
   createdAt: row.expectedAt,
  }));
 
  return { items: [...actionItems, ...absenceItems, ...notificationItems] };
 });
-
-function notificationHref(type: string, resourceType: string | null): string {
- if (type.includes("admission") || type.includes("offer")) return "/guardian/admission-offers";
- if (type.includes("attendance") || type.includes("absence") || type.includes("excuse")) return "/guardian/attendance";
- if (type.includes("message") || resourceType === "communication_thread") return "/messages";
- if (type.includes("grade") || type.includes("report")) return "/guardian/report-cards";
- return "/guardian/academics";
-}

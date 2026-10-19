@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { WorkspaceShell } from "@/components/workspace";
+import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
 import {
   activateLaunch,
   completeLaunchRequirement,
@@ -56,6 +58,7 @@ export const Route = createFileRoute("/operations/launch")({
 });
 
 function LaunchWizardPage() {
+  const selection=Route.useSearch();
   const { options, launches, authError }: {
     options: Awaited<ReturnType<typeof listLaunchOptions>> | null;
     launches: Awaited<ReturnType<typeof listLaunches>> | null;
@@ -79,7 +82,7 @@ function LaunchWizardPage() {
   const [jurisdictionId, setJurisdictionId] = useState("");
   const [academicProviderOrganizationId, setAcademicProviderOrganizationId] = useState("");
   const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState("");
-  const [siteId, setSiteId] = useState("");
+  const [siteId, setSiteId] = useState(selection.siteId??"");
   const [newSiteName,setNewSiteName]=useState("");
   const [newSiteSlug,setNewSiteSlug]=useState("");
   const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
@@ -193,26 +196,18 @@ function LaunchWizardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-      <div className="mx-auto max-w-5xl">
-        <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Operations</Link>
-        <Link to="/operations/workflows" search={{siteId:undefined,programId:undefined}} className="ml-4 text-xs underline">Connected workflows →</Link>
-        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-          CAN OS · Program launch
-        </p>
-        <h1 className="mt-2 font-serif text-4xl">Host / program launch</h1>
-        <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          Launch a new program on an Organization → Site → Program foundation. A Launch Journey is
-          instantiated from configuration; the program can activate only when every blocking
-          requirement is complete and the journey is ready.
-        </p>
+    <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Host / program launch"
+      subtitle="Launch programs on an Organization → Site → Program foundation, with recorded readiness and explicit blocking requirements."
+      breadcrumbs={<><Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
+      actions={<Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Connected workflows</Link>}>
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>
         )}
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          <section className="rounded-xl border bg-card p-5">
-            <h2 className="font-serif text-2xl">Start a launch</h2>
+        <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
+        <div className="mt-8 grid gap-6">
+          <details className="rounded-xl border bg-card p-5">
+            <summary className="cursor-pointer text-lg font-semibold">Start a new program launch</summary>
             {created && (
               <p role="status" className="mt-4 rounded-lg border p-3 text-sm">
                 Launch started. Program <code>{created.programId}</code> with Launch Journey{" "}
@@ -376,12 +371,12 @@ function LaunchWizardPage() {
                 </p>
               )}
             </form>
-          </section>
+          </details>
 
           <section>
             <h2 className="font-serif text-2xl">Launches in progress</h2>
             <div className="mt-4 space-y-3">
-              {launches.launches.map((launch) => {
+              {launches.launches.filter(launch=>(!selection.siteId||launch.siteId===selection.siteId)&&(!selection.programId||launch.id===selection.programId)).map((launch) => {
                 const blockingIncomplete = launch.requirements.filter(
                   (requirement) => requirement.blocking && requirement.status !== "complete",
                 );
@@ -393,7 +388,7 @@ function LaunchWizardPage() {
                       <span className="text-xs uppercase text-muted-foreground">{launch.status}</span>
                     </div>
                     <Link to="/operations/launch/$programId" params={{programId:launch.id}}
-                      search={{siteId:undefined,programId:undefined}}
+                      search={{siteId:launch.siteId??undefined,programId:undefined}}
                       className="mt-2 inline-block text-xs font-semibold underline">Configure classes and instructors →</Link>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {typeLabels[launch.type] ?? launch.type}
@@ -468,7 +463,6 @@ function LaunchWizardPage() {
             </div>
           </section>
         </div>
-      </div>
-    </main>
+    </WorkspaceShell>
   );
 }

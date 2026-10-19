@@ -223,6 +223,18 @@ A notification about "Avery's English dropped 8 points" must land on **Avery + E
 ### Proves
 deep links, multi-child family state, Action aggregation, contextual notifications, fast completion loops, confirmation semantics.
 
+### Implemented class participation slice
+
+Parents can enter `/classes`, choose a child/class, read published lessons and
+syllabus, inspect that child's durable student-reported completion, open the
+exact class assignment, read released text annotations, and start/reply to the
+shared student/family/teaching-team assessment conversation. Every contextual
+link retains the selected child and class. Removing academic guardian access or
+active enrollment blocks subsequent academic-thread reads/replies despite old
+participant rows. The isolated `class-participation` integration suite proves
+these command/read-model boundaries; it does not certify live notification
+delivery or authenticated browser acceptance.
+
 ---
 
 ## Experience Flow S1 — Student: "What do I have to do today?"
@@ -240,6 +252,31 @@ deep links, multi-child family state, Action aggregation, contextual notificatio
 7. Missing work is presented as a recovery path, not a shame state: what is missing, what can still be submitted, who can help, and the fastest route back on track.
 8. Formation obligations such as chapel, service hours, and mentor meetings are first-class Today items.
 9. Calendar/schedule/due-date changes propagate immediately so Today remains trustworthy.
+
+Published class lessons, syllabus, resources and announcements are available
+at `/classes?section=<sectionId>`. Lesson completion is durable per student,
+section and immutable curriculum release, not a grade or attendance claim.
+Students can discuss work with their teaching team, see released response-text
+annotations, and open a shared assignment conversation with their authorized
+family and teachers. The same completion record is read by the parent class
+view and assigned-teacher roster. Authoring, live sessions and replay are not
+part of this participation slice.
+
+Student Today summary cards link to enrolled My classes (Classes), assignments
+(Upcoming assignments), and `/student/assignments?filter=missing` (Missing work).
+Assignment filters are URL-backed so reloads and browser back/forward retain
+the selected view; `assessment` deep links continue to open individual work.
+Assessment-backed actions open their specific assignment, including returned
+work for revision. Other Review action links use
+`/student/experiences?action=<actionId>` to show the selected authorized action,
+not the general experiences list. Unavailable targets show an explicit message
+rather than silently opening unrelated work. Assignment selection is URL-backed.
+
+My classes uses `/student/courses` with actively enrolled sections only.
+`section` selects the class and `tab=overview|classwork|grades` selects its
+detail panel. Catalog and schedule-change requests remain separate at
+`/student/courses?view=catalog`. Assignment scores and revision feedback are
+not presented as finalized course grades; official results remain in report cards.
 
 ### Trust invariant
 If the canonical calendar says a live session is cancelled or an assignment due date moved, Student Today must reflect it from the same source of truth. No shadow calendar.
@@ -264,6 +301,34 @@ This is a shared cross-persona flow and should be treated as a platform primitiv
 9. Notification/Action state updates everywhere.
 
 No notification should exist without a meaningful landing context.
+
+### Navigation contracts
+
+- Record-title links and their adjacent Open/Review controls resolve to the same
+  canonical workspace and preserve the selected record, child, section, site or
+  program. Page headings and informational labels need not be links.
+- Search results retain context: courses use `section`, assignments use
+  `assessment` (plus `section` for teacher gradebooks), student results use the
+  authorized child's `student` parameter or staff profile route, and messages
+  use `thread`.
+- Teacher Today grading links open the gradebook, not the missing-work queue.
+  A student-assessment link opens the corresponding grading/review panel.
+- Family needs link to the selected action, notification or attendance case,
+  rather than looping to an unselected family home.
+- Admissions and family readiness links preserve `application` and delivery
+  scope. Site and program shortcuts preserve their school/program context.
+- Calendar titles retain the canonical event and its date in the event's time
+  zone. Permission, offer and operations notifications retain their resource ID.
+- Unavailable deep-link targets show explicit context errors, never a different
+  child's records or an unrelated assignment. URL parameters select views only;
+  server authorization and domain-owned mutation boundaries remain authoritative.
+- Disabled coming-soon controls stay explicitly disabled. Non-actionable
+  gradebook statuses are text, not inert buttons. Registrar referral summaries
+  do not link into teacher/specialist-only support workflows.
+
+Route integrity tests inspect static/templated targets and native button
+handlers across application source. Contextual navigation tests cover selection
+and URL preservation; they do not certify authenticated browser journeys.
 
 ---
 

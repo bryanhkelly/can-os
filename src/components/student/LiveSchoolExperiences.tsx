@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {getGuardianStudents} from "@/modules/family/guardian-assignments.functions";
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { bookOfficeHour, rescheduleOfficeHour } from "@/modules/student-experience/school-experiences.functions";
 import { readNotification } from "@/modules/communication/notification-center.functions";
 
@@ -41,7 +42,7 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
      <h3 className="font-semibold">Site calendar exceptions</h3>
      <p className="text-xs text-muted-foreground">Schedule changes are managed in the school calendar.</p>
      {data.events.map(event=><div key={event.id} className="rounded-xl border border-border p-4">
-      <p className="text-sm font-semibold">{event.title}</p>
+      <p className="text-sm font-semibold"><Link to="/calendar" search={{date:dateKeyInTimezone(event.startsAt,event.timezone),event:event.id}} className="hover:underline">{event.title}</Link></p>
       <p className="mt-1 text-xs text-muted-foreground">{format(event.startsAt,event.timezone)}</p>
       <p className="mt-1 text-xs font-semibold">{event.status==="cancelled"?"Cancelled":"Scheduled"}</p>
       <p className="mt-2 text-xs text-muted-foreground">For changes, contact your school office.</p>
@@ -52,7 +53,7 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
      <h3 className="font-semibold">Announcements</h3>
      <p className="text-xs text-muted-foreground">Acknowledge Site and network communications.</p>
      {data.notices.map(notice=><div key={notice.id} className="rounded-xl border border-border p-4">
-      <p className="text-sm font-semibold">{notice.title}</p>
+      <p className="text-sm font-semibold"><Link to="/notifications" search={{notification:notice.id}} className="hover:underline">{notice.title}</Link></p>
       <p className="mt-2 text-xs leading-5 text-muted-foreground">{notice.body}</p>
       <button disabled={busy||notice.acknowledged} onClick={()=>perform(()=>readNotification({data:{id:notice.id}}),"Acknowledgement saved.")} className="mt-3 rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">{notice.acknowledged?"Acknowledged ✓":"Acknowledge"}</button>
      </div>)}

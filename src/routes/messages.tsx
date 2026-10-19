@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   getThread,
   listMyThreads,
@@ -8,7 +8,12 @@ import {
   startThread,
 } from "@/modules/communication/messages.functions";
 
-export const Route = createFileRoute("/messages")({ component: MessagesPage });
+export const Route = createFileRoute("/messages")({
+  validateSearch: (search: Record<string, unknown>): { thread?: string } => ({
+    thread: typeof search.thread === "string" ? search.thread : undefined,
+  }),
+  component: MessagesPage,
+});
 
 type ThreadSummary = Awaited<ReturnType<typeof listMyThreads>>["threads"][number];
 type ThreadDetail = Awaited<ReturnType<typeof getThread>>;
@@ -27,8 +32,10 @@ function relativeTime(iso: string): string {
 }
 
 function MessagesPage() {
+  const { thread } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const selectedId = thread ?? threads[0]?.id ?? "";
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
   const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(true);
@@ -50,7 +57,6 @@ function MessagesPage() {
       .then((result) => {
         if (!active) return;
         setThreads(result.threads);
-        setSelectedId(result.threads[0]?.id ?? "");
         setLoading(false);
       })
       .catch(() => {
@@ -69,21 +75,24 @@ function MessagesPage() {
     };
   }, []);
 
-  const openThread = useCallback((threadId: string) => {
-    setSelectedId(threadId);
+  const openThread = (threadId: string) => {
+    void navigate({ search: { thread: threadId } });
+  };
+
+  useEffect(() => {
     setDetail(null);
     setReply("");
     setSentNotice(false);
+    if (!selectedId) return;
+    let active = true;
+    setError("");
     setLoadingThread(true);
-    getThread({ data: { threadId } })
-      .then((result) => setDetail(result))
-      .catch(() => setError("Unable to open this conversation."))
-      .finally(() => setLoadingThread(false));
-  }, []);
-
-  useEffect(() => {
-    if (selectedId) openThread(selectedId);
-  }, [selectedId, openThread]);
+    getThread({ data: { threadId: selectedId } })
+      .then((result) => { if (active) setDetail(result); })
+      .catch(() => { if (active) setError("Unable to open this conversation."); })
+      .finally(() => { if (active) setLoadingThread(false); });
+    return () => { active = false; };
+  }, [selectedId]);
 
   const sendReply = () => {
     const body = reply.trim();
@@ -250,11 +259,11 @@ function MessagesPage() {
           <div className="mt-8 grid gap-4 md:grid-cols-[300px_1fr]">
             <nav aria-label="Conversations" className="grid content-start gap-2">
               {threads.map((thread) => (
-                <button
+                <Link
                   key={thread.id}
-                  type="button"
-                  onClick={() => openThread(thread.id)}
-                  aria-current={thread.id === selectedId}
+                  to="/messages"
+                  search={{thread:thread.id}}
+                  aria-current={thread.id === selectedId?"page":undefined}
                   className={`rounded-xl border bg-card p-4 text-left ${
                     thread.id === selectedId ? "ring-2 ring-primary" : ""
                   }`}
@@ -268,7 +277,7 @@ function MessagesPage() {
                   <p className="mt-1 truncate text-xs text-muted-foreground">
                     {thread.snippet || "No messages yet"}
                   </p>
-                </button>
+                </Link>
               ))}
             </nav>
             <section className="rounded-xl border bg-card p-5" aria-label="Conversation">
@@ -276,6 +285,7 @@ function MessagesPage() {
               {!loadingThread && detail && (
                 <>
                   <h2 className="text-lg font-semibold">{detail.thread.subject}</h2>
+                  {detail.thread.contextHref&&<a href={detail.thread.contextHref} className="mt-2 inline-block text-sm underline">Open related assignment</a>}
                   <div className="mt-4 grid max-h-[28rem] content-start gap-3 overflow-y-auto pr-1">
                     {detail.messages.map((message) => (
                       <div

@@ -4,9 +4,10 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readRubric,scoreRubric } from "@/modules/student-experience/rubric";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,desc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
+import { signPrivateObjectUrl } from "@/platform/storage/r2";
 
 /** Read a stored criterion-level breakdown from submission feedback. */
 function readRubricScores(value: unknown): Array<{ id: string; points: number }> {
@@ -47,9 +48,66 @@ async function teacherForSubmission(submissionId: string) {
   .innerJoin(schema.assessments, eq(schema.assessments.id, schema.submissions.assessmentId))
   .where(eq(schema.submissions.id, submissionId))
   .limit(1);
- if (!row) throw new AuthorizationError("submission section");
+ if (!row?.sectionId) throw new AuthorizationError("submission section");
  return teacherActor(row.sectionId);
 }
+
+async function submissionForReview(submissionId:string){
+ const context=await teacherForSubmission(submissionId);
+ assertCapability(context,"assignments:grade");
+ const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+ const [submission]=await db.select({
+  id:s.submissions.id,assessmentId:s.submissions.assessmentId,studentProfileId:s.submissions.studentProfileId,
+  studentPersonId:s.studentProfiles.personId,response:s.submissions.response,attemptNumber:s.submissions.attemptNumber,
+  submittedAt:s.submissions.submittedAt,status:s.submissions.status,
+ }).from(s.submissions).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.submissions.studentProfileId))
+  .where(eq(s.submissions.id,submissionId)).limit(1);
+ if(!submission||!["submitted","graded","returned"].includes(submission.status))
+  throw new AuthorizationError("submitted work for review");
+ return {db,s,submission};
+}
+
+async function reviewAttachments(submissionId:string){
+ const {db,s,submission}=await submissionForReview(submissionId);
+ const ids=Array.isArray(submission.response.attachments)
+  ?submission.response.attachments.filter((id):id is string=>typeof id==="string"&&z.string().uuid().safeParse(id).success):[];
+ const documents=ids.length?await db.select({
+  id:s.documents.id,fileName:s.documents.fileName,storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt,
+ }).from(s.documents).where(and(inArray(s.documents.id,ids),
+  eq(s.documents.subjectType,"assessment"),eq(s.documents.subjectId,submission.assessmentId),
+  eq(s.documents.category,"assignment_submission"),eq(s.documents.uploadedByPersonId,submission.studentPersonId),
+  eq(s.documents.storageProvider,"cloudflare_r2"))):[];
+ return {db,s,submission,documents:documents.filter(document=>document.verifiedAt&&
+  document.storageKey.startsWith(`learning/assignment/${submission.assessmentId}/`))};
+}
+
+export const getSubmissionReview=createServerFn({method:"GET"})
+ .validator((value:unknown)=>z.object({submissionId:z.string().uuid()}).parse(value))
+ .handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const {db,s,submission,documents}=await reviewAttachments(data.submissionId);
+  const attempts=await db.select({id:s.submissions.id,attemptNumber:s.submissions.attemptNumber,
+   status:s.submissions.status,submittedAt:s.submissions.submittedAt,score:s.submissions.score})
+   .from(s.submissions).where(and(eq(s.submissions.assessmentId,submission.assessmentId),
+    eq(s.submissions.studentProfileId,submission.studentProfileId))).orderBy(desc(s.submissions.attemptNumber));
+  return {
+   responseText:typeof submission.response.text==="string"?submission.response.text:"",
+   attemptNumber:submission.attemptNumber,submittedAt:submission.submittedAt?.toISOString()??null,
+   attachments:documents.map(document=>({id:document.id,fileName:document.fileName})),
+   attempts:attempts.map(attempt=>({...attempt,submittedAt:attempt.submittedAt?.toISOString()??null})),
+  };
+ });
+
+export const getTeacherSubmissionAttachment=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({submissionId:z.string().uuid(),documentId:z.string().uuid()}).parse(value))
+ .handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const {documents}=await reviewAttachments(data.submissionId);
+  const document=documents.find(item=>item.id===data.documentId);
+  if(!document)throw new AuthorizationError("verified attachment on authorized submission");
+  return {downloadUrl:signPrivateObjectUrl({method:"GET",key:document.storageKey,
+   keyPattern:/^learning\/assignment\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i,expiresSeconds:60})};
+ });
 
 /** Sections the authenticated teacher teaches, for the gradebook section picker. */
 export const getGradebookSections = createServerFn({ method: "GET" }).handler(async () => {
@@ -84,6 +142,7 @@ export const getGradebook = createServerFn({ method: "GET" })
 
   const studentRows = await db.select({
    studentProfileId: s.enrollments.studentProfileId,
+   personId: s.people.id,
    firstName: s.people.legalFirstName,
    lastName: s.people.legalLastName,
    preferredName: s.people.preferredName,
@@ -141,6 +200,7 @@ export const getGradebook = createServerFn({ method: "GET" })
    section,
    students: studentRows.map(row => ({
     studentProfileId: row.studentProfileId,
+    personId: row.personId,
     displayName: `${row.preferredName ?? row.firstName} ${row.lastName}`,
    })),
    assessments: assessmentRows.map(row => ({

@@ -1,6 +1,7 @@
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { writeAudit } from "@/platform/mutation";
+import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,eq } from "drizzle-orm";
@@ -8,13 +9,13 @@ import { z } from "zod";
 async function authorizedTeacher(){
  const actor=await getCommandContext(getRequest());
  if(actor.role!=="teacher"||!actor.actorPersonId)throw new AuthorizationError("teacher identity");
- assertCapability(actor,"assignments:grade");
+ assertCapability(actor,"discussions:moderate");
  if(!actor.scope.siteIds?.length)throw new AuthorizationError("teacher site membership");
  return actor;
 }
 /** Teacher-created section discussions using actual school records. */
 export const createCourseDiscussion=createServerFn({method:"POST"})
-.validator((input:unknown)=>z.object({sectionId:z.string().min(1),subject:z.string(),prompt:z.string()}).parse(input))
+.validator((input:unknown)=>z.object({sectionId:z.string().uuid(),subject:z.string(),prompt:z.string()}).parse(input))
 .handler(async({data})=>{
  const actor=await authorizedTeacher();
  const subject=data.subject.trim(),prompt=data.prompt.trim();
@@ -23,17 +24,18 @@ export const createCourseDiscussion=createServerFn({method:"POST"})
  return db.transaction(async tx=>{
   const [assigned]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,data.sectionId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assigned)throw new Error("Teacher is not assigned to this section");
-  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(eq(s.sections.id,data.sectionId)).limit(1);
+  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(and(eq(s.sections.id,data.sectionId),eq(s.sections.active,true))).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId)||!actor.scope.programIds?.includes(site.programId))throw new AuthorizationError("discussion section site");
   const [thread]=await tx.insert(s.communicationThreads).values({subject,contextType:"section",contextId:data.sectionId,createdByPersonId:actor.actorPersonId!,metadata:{kind:"course_discussion",locked:false,graded:false}}).returning({id:s.communicationThreads.id});
   if(!thread)throw new Error("Unable to create discussion");
   await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:actor.actorPersonId!,body:prompt,metadata:{kind:"prompt"}});
   await writeAudit(tx, {actorPersonId:actor.actorPersonId!,action:"discussion.create",resourceType:"communication_thread",resourceId:thread.id,after:{sectionId:data.sectionId,subject},context:{sessionId:actor.sessionId}});
+  await emitEvent(tx,{eventType:EventTypes.CourseDiscussionCreated,aggregateType:"communication_thread",aggregateId:thread.id,actorPersonId:actor.actorPersonId,payload:{sectionId:data.sectionId}});
   return {id:thread.id};
  });
 });
 export const setCourseDiscussionLock=createServerFn({method:"POST"})
-.validator((input:unknown)=>z.object({threadId:z.string().min(1),locked:z.boolean()}).parse(input))
+.validator((input:unknown)=>z.object({threadId:z.string().uuid(),locked:z.boolean()}).parse(input))
 .handler(async({data})=>{
  const actor=await authorizedTeacher();
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -42,16 +44,17 @@ export const setCourseDiscussionLock=createServerFn({method:"POST"})
   if(!thread||thread.contextType!=="section"||!thread.contextId||thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
   const [assigned]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assigned)throw new Error("Teacher is not assigned to this section");
-  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
+  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(and(eq(s.sections.id,thread.contextId),eq(s.sections.active,true))).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId)||!actor.scope.programIds?.includes(site.programId))throw new AuthorizationError("discussion section scope");
   await tx.update(s.communicationThreads).set({metadata:{...thread.metadata,locked:data.locked},updatedAt:new Date()}).where(eq(s.communicationThreads.id,thread.id));
   await writeAudit(tx, {actorPersonId:actor.actorPersonId!,action:"discussion.lock",resourceType:"communication_thread",resourceId:thread.id,before:{locked:thread.metadata.locked===true},after:{locked:data.locked},context:{sessionId:actor.sessionId}});
+  await emitEvent(tx,{eventType:EventTypes.CourseDiscussionLockChanged,aggregateType:"communication_thread",aggregateId:thread.id,actorPersonId:actor.actorPersonId,payload:{sectionId:thread.contextId,locked:data.locked}});
   return {saved:true};
  });
 });
 
 export const moderateDiscussionMessage=createServerFn({method:"POST"})
-.validator((input:unknown)=>z.object({messageId:z.string().min(1),hidden:z.boolean()}).parse(input))
+.validator((input:unknown)=>z.object({messageId:z.string().uuid(),hidden:z.boolean()}).parse(input))
 .handler(async({data})=>{
  const actor=await authorizedTeacher();
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
@@ -62,10 +65,11 @@ export const moderateDiscussionMessage=createServerFn({method:"POST"})
   if(!thread||thread.contextType!=="section"||!thread.contextId||thread.metadata.kind!=="course_discussion")throw new Error("Discussion unavailable");
   const [assignment]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,thread.contextId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assignment)throw new Error("Teacher is not assigned to this section");
-  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(eq(s.sections.id,thread.contextId)).limit(1);
+  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(and(eq(s.sections.id,thread.contextId),eq(s.sections.active,true))).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId)||!actor.scope.programIds?.includes(site.programId))throw new AuthorizationError("discussion section scope");
   await tx.update(s.communicationMessages).set({metadata:{...message.metadata,hidden:data.hidden,moderatedBy:actor.actorPersonId!}}).where(eq(s.communicationMessages.id,message.id));
   await writeAudit(tx, {actorPersonId:actor.actorPersonId!,action:"discussion.moderate",resourceType:"communication_message",resourceId:message.id,before:{hidden:message.metadata.hidden===true},after:{hidden:data.hidden},context:{sessionId:actor.sessionId,threadId:message.threadId}});
+  await emitEvent(tx,{eventType:EventTypes.CourseDiscussionMessageModerated,aggregateType:"communication_thread",aggregateId:message.threadId,actorPersonId:actor.actorPersonId,payload:{messageId:message.id,hidden:data.hidden}});
   return {saved:true};
  });
 });

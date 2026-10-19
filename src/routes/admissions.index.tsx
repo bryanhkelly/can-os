@@ -1,13 +1,13 @@
 import { listEnrollmentPlacements, placeEnrolledStudent } from "@/modules/enrollment/course-placement.functions";
 import { useState } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
 import { listMySites } from "@/modules/operations/site-directory.functions";
 import { listAdmissionsPrograms } from "@/modules/enrollment/admissions-program-directory.functions";
 import { getAdmissionOfferOptions, issueAdmissionOffer, activateOfferedEnrollment } from "@/modules/enrollment/admissions-offer.functions";
-import { admissionsPipelineSummary } from "@/domain/admissions-pipeline";
+import { admissionsPipelineSummary, pipelineStages, type AdmissionsStage } from "@/domain/admissions-pipeline";
 import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions-offer-selection";
-import { WorkspaceShell, StatCard, EmptyState } from "@/components/workspace";
+import { WorkspaceShell, StatCard, EmptyState, DetailNavigation, StatusBadge } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
@@ -19,9 +19,11 @@ const loadAdmissions = async (selection:{siteId?:string;programId?:string}={}) =
 });
 
 export const Route = createFileRoute("/admissions/")({
-  validateSearch:(search:Record<string,unknown>)=>({
+  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string;stage?:AdmissionsStage}=>({
     siteId:typeof search.siteId==="string"?search.siteId:undefined,
     programId:typeof search.programId==="string"?search.programId:undefined,
+    application:typeof search.application==="string"?search.application:undefined,
+    stage:pipelineStages.find(stage=>stage===search.stage),
   }),
   loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
   loader:({deps})=>safeLoader(()=>loadAdmissions(deps),{
@@ -40,9 +42,6 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
   const { rows, options, sites, programs } = data;
   const selected=Route.useSearch();
   const programChoices=programs.filter(program=>!selected.siteId||program.siteId===selected.siteId);
-  const familyScope=new URLSearchParams();
-  if(selected.siteId)familyScope.set("siteId",selected.siteId);
-  if(selected.programId)familyScope.set("programId",selected.programId);
   const openScope=(siteId?:string,programId?:string)=>{
     const query=new URLSearchParams();
     if(siteId)query.set("siteId",siteId);
@@ -62,11 +61,11 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
 
   return (
     <WorkspaceShell
-      className="[&>div]:max-w-6xl"
+      width="wide"
       eyebrow="CAN OS · Admissions"
       title="Admissions command center"
       subtitle="Registrar workspace: issue offers and activate accepted enrollments. Guardians respond from their own authenticated offer inbox."
-      actions={<a href="/admissions/transcripts" className="rounded-lg border px-3 py-2 text-sm">Official transcripts</a>}
+      actions={<div className="flex flex-wrap gap-2"><Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg bg-foreground px-3 py-2 text-sm text-background">New inquiry</Link><a href="/admissions/transcripts" className="rounded-lg border px-3 py-2 text-sm">Official transcripts</a></div>}
     >
       {error && <p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
       {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
@@ -93,14 +92,41 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       </div>
       <div className="mt-3 rounded-xl border p-4"><p className="text-sm">Active program enrollments across applications: <strong>{rows.reduce((n, x) => n + x.enrollments.length, 0)}</strong></p></div>
       <h2 className="mt-9 font-serif text-2xl">Pipeline</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-4">{summary.byStage.map(x => <div className="rounded-xl border p-4" key={x.stage}><p className="text-sm capitalize">{x.stage}</p><p className="font-serif text-2xl">{x.count}</p></div>)}</div>
+      <DetailNavigation label="Admissions stages">
+       <Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId}} aria-current={!selected.stage?"page":undefined}>All ({summary.total})</Link>
+       {summary.byStage.map(item=><Link key={item.stage} to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:item.stage}}
+        aria-current={selected.stage===item.stage?"page":undefined} className="capitalize">{item.stage} ({item.count})</Link>)}
+      </DetailNavigation>
+      {!selected.application&&<div className="overflow-x-auto rounded-xl border bg-card">
+       <table className="w-full text-left text-sm">
+        <caption className="sr-only">Authorized admissions pipeline and next steps</caption>
+        <thead className="border-b bg-muted/50"><tr><th scope="col" className="p-4">Applicant</th><th scope="col" className="p-4">Program</th><th scope="col" className="p-4">Stage</th><th scope="col" className="p-4">Next step</th></tr></thead>
+        <tbody className="divide-y">{rows.filter(row=>!selected.stage||row.stage===selected.stage).map(row=>{
+         const offer=selectActionableOffer(row.offers);
+         const next=row.outstandingRequirements>0?`Review ${row.outstandingRequirements} blocking requirement(s)`:
+          row.stage==="declined"||row.stage==="withdrawn"?"Review closed application":
+          offer?.status==="issued"?"Awaiting family response":
+          offer?.status==="accepted"&&!row.enrollments.some(enrollment=>enrollment.schoolYearId===offer.schoolYearId)?"Activate accepted enrollment":
+          row.enrollments.length?"Review class placement":row.stage==="accepted"?"Review offer eligibility":"Review application evidence";
+         return <tr key={row.id} className="align-top hover:bg-muted/40">
+          <th scope="row" className="p-4 font-semibold"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:row.id}} className="underline">{row.studentName??row.id}</Link><span className="mt-1 block text-xs font-normal text-muted-foreground">{row.submittedAt?`Submitted ${new Date(row.submittedAt).toLocaleDateString()}`:"Not submitted"}</span></th>
+          <td className="p-4">{row.program}</td><td className="p-4"><StatusBadge tone={row.outstandingRequirements>0?"attention":"neutral"}>{row.stage}</StatusBadge></td>
+          <td className="p-4"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:row.id}} className="underline">{next}</Link></td>
+         </tr>;
+        })}</tbody>
+       </table>
+       {!rows.some(row=>!selected.stage||row.stage===selected.stage)&&<p className="p-5 text-sm text-muted-foreground">No applications in this stage and scope.</p>}
+      </div>}
       <h2 className="mt-9 font-serif text-2xl">Applications</h2>
-      <div className="mt-4 space-y-3">{rows.map(x => {
+      {selected.application&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId}} className="mt-3 inline-block text-sm underline">View all applications</Link>}
+      {selected.application&&!rows.some(row=>row.id===selected.application)&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current admissions view.</p>}
+      <div className="mt-4 space-y-3">{rows.filter(row=>row.id===selected.application).map(x => {
         const years = options.find(o => o.applicationId === x.id)?.years ?? [];
         const latest = selectActionableOffer(x.offers);
         const activated = latest ? x.enrollments.some(e => e.schoolYearId === latest.schoolYearId) : false;
         return <article key={x.id} className="rounded-xl border p-4">
-          <p className="font-semibold">{x.program}</p>
+          <h3 className="mb-2 font-serif text-2xl">{x.studentName??x.id}</h3>
+          <p className="font-semibold"><Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="hover:underline">{x.program}</Link></p>
           <p className="mt-1 text-sm capitalize text-muted-foreground">{x.stage} · {x.outstandingRequirements} outstanding blocking requirements</p>
           <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o => <span key={o.id} className="rounded-lg border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt ? ` · Expires ${new Date(o.expiresAt).toLocaleDateString()}` : ""}</span>)}{!latest && <span className="text-xs text-muted-foreground">No currently actionable offer</span>}</div>
           {activated && <p className="mt-3 text-sm font-semibold">Enrollment active · Student is enrolled in this school year</p>}
@@ -110,7 +136,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
             {latest?.status === "accepted" && !activated && <button disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => activateOfferedEnrollment({ data: { offerId: latest.id } }))}>Registrar: Activate enrollment</button>}
           </div>
           {x.enrollments.length > 0 && <CoursePlacement applicationId={x.id} />}
-          <a href={"/admissions/families"+(selected.siteId||selected.programId?"?"+familyScope.toString():"")} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</a>
+          <Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
         </article>;
       })}
         {!rows.length && <EmptyState title="No applications are available in your authorized programs." />}</div>

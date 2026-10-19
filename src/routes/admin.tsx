@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 export const Route = createFileRoute("/admin")({ component: AdminConsolePage });
 
-const roles = ["teacher", "registrar", "specialist"] as const;
+const roles = ["teacher", "registrar", "specialist", "counselor"] as const;
 
 const inviteSchema = z.object({
   email: z.string().trim().email(),

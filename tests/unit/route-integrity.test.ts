@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import ts from "typescript";
 import {
   workspaceLinks,
   workspaceHome,
@@ -36,7 +37,31 @@ const routePaths = new Set(
 );
 
 function linkPath(target: string): string {
-  return target.split("?")[0].replace(/\/$/, "") || "/";
+  return target.split(/[?#]/)[0].replace(/\/$/, "") || "/";
+}
+
+function matchesRoute(target: string): boolean {
+  return [...routePaths].some(route =>
+    new RegExp("^"+route.replace(/\$[^/]+/g,"[^/]+")+"/?$").test(linkPath(target)),
+  );
+}
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{
+    const full=join(dir,entry.name);
+    return entry.isDirectory()?sourceFiles(full):/\.(tsx|ts)$/.test(entry.name)?[full]:[];
+  });
+}
+
+function literalTargets(node: ts.Node): string[] {
+  if(ts.isStringLiteralLike(node))return [node.text];
+  if(ts.isTemplateExpression(node))return [
+    node.head.text+node.templateSpans.map(span=>"record"+span.literal.text).join(""),
+  ];
+  if(ts.isConditionalExpression(node))return [...literalTargets(node.whenTrue),...literalTargets(node.whenFalse)];
+  if(ts.isBinaryExpression(node)&&node.operatorToken.kind===ts.SyntaxKind.PlusToken)return literalTargets(node.left);
+  if(ts.isParenthesizedExpression(node)||ts.isAsExpression(node))return literalTargets(node.expression);
+  return [];
 }
 
 describe("route tree freshness", () => {
@@ -53,6 +78,59 @@ describe("route tree freshness", () => {
 });
 
 describe("navigation link targets", () => {
+  it("resolves literal and templated links, redirects, and generated navigation URLs across the application",()=>{
+    const broken:string[]=[];
+    for(const file of sourceFiles(join(repoRoot,"src"))){
+      if(file.endsWith("routeTree.gen.ts"))continue;
+      const source=ts.createSourceFile(file,readFileSync(file,"utf8"),ts.ScriptTarget.Latest,true,
+        file.endsWith(".tsx")?ts.ScriptKind.TSX:ts.ScriptKind.TS);
+      const visit=(node:ts.Node):void=>{
+        let values:string[]=[];
+        if(ts.isJsxAttribute(node)&&["to","href"].includes(node.name.getText(source))&&node.initializer){
+          const value=ts.isJsxExpression(node.initializer)?node.initializer.expression:node.initializer;
+          if(value)values=literalTargets(value);
+        }else if(ts.isPropertyAssignment(node)&&["to","href","path"].includes(node.name.getText(source))){
+          values=literalTargets(node.initializer);
+        }else if(ts.isCallExpression(node)&&node.expression.getText(source)==="window.location.assign"&&node.arguments[0]){
+          values=literalTargets(node.arguments[0]);
+        }
+        for(const value of values){
+          if(value.startsWith("/")&&!value.startsWith("//")&&!matchesRoute(value)){
+            broken.push(`${file.slice(repoRoot.length+1)}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line+1} -> ${value}`);
+          }
+        }
+        ts.forEachChild(node,visit);
+      };
+      visit(source);
+    }
+    expect(broken).toEqual([]);
+  });
+
+  it("has no enabled native buttons without an action or a submitting form",()=>{
+    const inert:string[]=[];
+    for(const root of [routesDir,join(repoRoot,"src","components")]){
+      for(const file of sourceFiles(root)){
+        const source=ts.createSourceFile(file,readFileSync(file,"utf8"),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+        const visit=(node:ts.Node):void=>{
+          if((ts.isJsxOpeningElement(node)||ts.isJsxSelfClosingElement(node))&&node.tagName.getText(source)==="button"){
+            const attributes=node.attributes.properties;
+            const hasAction=attributes.some(attr=>ts.isJsxSpreadAttribute(attr)||
+              ts.isJsxAttribute(attr)&&["onClick","onClickCapture","disabled"].includes(attr.name.getText(source)));
+            let inForm=false;
+            for(let parent:ts.Node|undefined=node.parent;parent;parent=parent.parent){
+              if(ts.isJsxElement(parent)&&parent.openingElement.tagName.getText(source)==="form"){
+                inForm=true;break;
+              }
+            }
+            if(!hasAction&&!inForm)inert.push(`${file.slice(repoRoot.length+1)}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line+1}`);
+          }
+          ts.forEachChild(node,visit);
+        };
+        visit(source);
+      }
+    }
+    expect(inert).toEqual([]);
+  });
   it("every primary navigation link resolves to a route", () => {
     const broken = Object.values(workspaceLinks).flat()
       .map((link) => link.path)

@@ -87,15 +87,98 @@
 - The temporary rehearsal branch and its reference database were removed after verification. The independent pre-change recovery branch is retained.
 - This establishes migration/schema equivalence and isolated integration evidence, not browser acceptance, remote CI status, application deployment health or a complete database security/permissions audit.
 
+## Class participation build and approved schema rollout (2026-10-19)
+
+- Added student/parent/teacher class participation: published lesson reading,
+  syllabus/resources, durable student-reported progress, teacher roster,
+  class announcements, production discussions, parent assignment detail,
+  released response-text annotations and contextual family/teacher messages.
+  The inventory and exclusions are in [prototype migration](./prototype-migration.md).
+- Working-tree verification: **84 files / 469 tests**, TypeScript, production
+  build, **67 source routes / 67 contracts / 0 issues**, fixture coverage and
+  mutation hygiene passed. The isolated `class-participation` integration flow
+  passed against real Neon transactions, including resource authorization,
+  retries, cross-role progress/feedback and access revocation. Schema DDL and
+  fixtures rolled back, with cleanup verified independently in the test.
+- After explicit operator approval, management metadata reconfirmed project
+  `sweet-hall-62441909`, branch `production` (`br-restless-sea-ar9ooo55`), endpoint
+  `ep-autumn-glade-ar9r1t5q`. All 22 prior migrations matched local SQL hashes
+  (normalizing Windows line endings where needed) and journal timestamps.
+- The official Drizzle migrator applied only `0022_stale_sphinx`, with bounded
+  lock/statement timeouts. Verified `lesson_progress`, `submission_annotations`,
+  five foreign keys, the annotation offset check, five indexes and the exact
+  new ledger hash/timestamp. A separate connection confirmed persistence.
+  No migration history was rewritten and no production fixtures/content seeded.
+- At 390px, the signed-out class route shows the authorized-account prompt,
+  no private controls and no horizontal overflow. Genuine authenticated browser
+  journeys and actual private R2 downloads remain unverified. No application
+  deployment, commit or remote CI result is implied by this schema rollout.
+
+## Expanded workspace follow-up
+
+- Added the desktop sidebar/mobile modal navigation and retained authenticated
+  top-bar utilities. Study-group discovery/detail now share enrollment policy.
+- Added distinct counselor membership and caseload, shared specialist/counselor
+  referral/plan/service workflows and canonical outreach. Clinical/private
+  counseling notes are excluded pending policy.
+- Replaced the synthetic profile explorer with real relationship-authorized
+  profiles, private verified photo Documents and self-only JPEG/PNG upload.
+  Student class pages now display the assigned teachers as profile links.
+- Removed synthetic-only program and calendar-export reads without weakening
+  authentication, scoped access, demo isolation or private-file verification.
+- Verification: **84 nonintegration files / 470 tests** passed. TypeScript,
+  production build, **69 route sources / 69 contracts / zero issues**, fixture
+  coverage and mutation hygiene passed. The expanded isolated Neon rollback
+  flow passed with group eligibility, counselor routing/lifecycle/outreach,
+  profile relationships, failed-upload verification and photo idempotency.
+  Storage calls are mocked; no live R2 delivery is certified.
+- Genuine student-session browser checks confirmed sidebar navigation, a
+  keyboard-dismissable mobile menu, no horizontal overflow at 390px, and the
+  enrolled-class teacher link opening the correct authorized profile.
+  Specialist-session checks opened the populated caseload and exact referral,
+  retained `/support` as the return route, and confirmed blank plan fields with
+  saving disabled until required inputs are supplied. Counselor browser
+  acceptance remains blocked on an actual counselor grant.
+- Application data remains a blocker for the sample study groups: four active
+  section enrollments and two memberships exist, but no active program
+  enrollment or accepted application. There is no counselor grant and there
+  are no profile-photo Documents. The operator approved repairs only through
+  supported audited operations; repairs stopped because enrollment activation
+  has no accepted application and staff provisioning needs an authenticated
+  registrar. No application content/grants/enrollments were changed. Updated
+  disposable fixtures were not run against the application database.
+
 ## Remaining follow-up
 
 - CI now runs for pull requests, pushes to `main`, and manual dispatch; obsolete phase/feature push triggers were removed. Start short-lived development branches from current `main` and submit focused pull requests. Branch protection and required-check enforcement are GitHub settings and remain unverified by this cleanup.
 - Admissions CI requires the `integration-test` environment secret `CAN_ADMISSIONS_TEST_DATABASE_URL` and variable `CAN_APPLICATION_DB_HOST`; their remote configuration remains unverified. Keep the isolated-database preflight mandatory before migration or test writes.
-- Production is reconciled through `0021`; other Neon branches are not certified by this rollout. The historical `0019`/`0020` timestamp inversion remains unchanged; `0020` is comment-only and all entries precede the verified `0021` high-water mark. Keep future journal timestamps increasing.
+- Production is current through `0022`; other Neon branches are not certified by these rollouts. The historical `0019`/`0020` timestamp inversion remains unchanged; `0020` is comment-only and all entries precede the verified `0021` high-water mark. Keep future journal timestamps increasing.
 - Nonacademic and section-less operational Actions still need a complete owning-domain policy review; the academic policy is deliberately not a universal Action abstraction. Historical academic follow-up after withdrawal/inactivation needs an explicit policy before broadening current fail-closed behavior.
 - Remaining school-year/program-launch commands need evidence-parity review.
 - Full authenticated route/deep-link and role-switch browser acceptance is pending.
 - Retire the pre-change recovery branch only after post-deployment acceptance and recovery retention are reviewed. R2 malware/quarantine, retention and live bucket/CORS acceptance remain release gates.
+
+## Production migration re-verification before main publication
+
+On 2026-10-19, Neon management metadata independently reconfirmed the configured
+endpoint as production (`ep-autumn-glade-ar9r1t5q`, branch
+`br-restless-sea-ar9ooo55`). All **23 migration ledger entries**, through
+`0022_stale_sphinx`, matched local SQL hashes and journal timestamps, allowing
+Windows line-ending normalization. There were **zero pending migrations**.
+`drizzle-kit generate` confirmed that the current schema exports introduce no
+unrepresented schema changes.
+
+Read-only catalog verification checked **120 tables, 1,235 columns, 238 declared
+indexes, 288 foreign keys and 62 enum value sets**, plus declared check/unique/
+composite-key constraints, with no missing required objects or incompatible
+column types/nullability. The two historical foreign-key names on
+`subscription_event_receipts` and `notification_preferences` differ from
+generated names but have matching columns, targets, actions and validation.
+`subscription_delivery_status` contains the expected values in a historical
+order with `processing` appended; this was preserved, not rebuilt or restamped.
+No new DDL, sample seeds, enrollment repairs or counselor grants were executed
+as part of this re-verification. Schema currency is not a claim of application
+deployment or live storage acceptance.
 
 ## Updating this snapshot
 

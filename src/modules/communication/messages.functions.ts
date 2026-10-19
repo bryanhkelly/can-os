@@ -210,8 +210,21 @@ async function listAllowedThreadContacts(
       .from(s.guardianRelationships)
       .where(eq(s.guardianRelationships.studentPersonId, actorPersonId));
     for (const row of guardianRows) add(row.guardianPersonId, "guardian");
+  } else if (role === "specialist" || role === "counselor") {
+    const students = await db.selectDistinct({ personId: s.studentProfiles.personId, profileId: s.studentProfiles.id })
+      .from(s.actions).innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.actions.subjectId))
+      .where(and(eq(s.actions.subjectType, "student_profile"),
+        inArray(s.actions.type, ["support_referral", "coach_outreach", "academic_follow_up"]),
+        inArray(s.actions.siteId, siteIds), inArray(s.actions.programId, programIds)));
+    const studentIds = students.map(student => student.personId);
+    for (const student of students) add(student.personId, "school support student");
+    if (studentIds.length) {
+      const guardians = await db.select({ personId: s.guardianRelationships.guardianPersonId })
+        .from(s.guardianRelationships).where(and(inArray(s.guardianRelationships.studentPersonId, studentIds),
+          eq(s.guardianRelationships.canViewAcademics, true)));
+      for (const guardian of guardians) add(guardian.personId, "guardian of support student");
+    }
   }
-  // registrar/specialist: no relationship-derived contacts yet
 
   if (!relationships.size) return [];
   const names = await fetchDisplayNames(db, s, [...relationships.keys()]);
@@ -360,11 +373,13 @@ export const listMyThreads = createServerFn({ method: "GET" }).handler(async () 
   const actorPersonId = requireActorPerson(context.actorPersonId);
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
 
-  const threads = await db
+  const candidates = await db
     .select({
       id: s.communicationThreads.id,
       subject: s.communicationThreads.subject,
       contextType: s.communicationThreads.contextType,
+      contextId: s.communicationThreads.contextId,
+      metadata: s.communicationThreads.metadata,
       lastMessageAt: s.communicationThreads.lastMessageAt,
       createdAt: s.communicationThreads.createdAt,
     })
@@ -380,6 +395,19 @@ export const listMyThreads = createServerFn({ method: "GET" }).handler(async () 
       ),
     );
 
+  const threads = [];
+  for (const thread of candidates) {
+    if (thread.metadata?.kind === "academic_conversation") {
+      const { academicConversationHref } = await import("@/modules/learning/academic-conversation-access.server");
+      try { await academicConversationHref(thread); }
+      catch (cause) {
+        // Historical participant rows do not retain access after a relationship or grant is revoked.
+        if (cause instanceof AuthorizationError) continue;
+        throw cause;
+      }
+    }
+    threads.push(thread);
+  }
   if (!threads.length) return { threads: [] };
 
   const latest = await db
@@ -433,12 +461,18 @@ export const getThread = createServerFn({ method: "GET" })
         subject: s.communicationThreads.subject,
         contextType: s.communicationThreads.contextType,
         contextId: s.communicationThreads.contextId,
+        metadata: s.communicationThreads.metadata,
         lastMessageAt: s.communicationThreads.lastMessageAt,
       })
       .from(s.communicationThreads)
       .where(eq(s.communicationThreads.id, data.threadId))
       .limit(1);
     if (!thread) throw new Error("Thread not found");
+    let contextHref: string | null = null;
+    if (thread.metadata?.kind === "academic_conversation") {
+      const { academicConversationHref } = await import("@/modules/learning/academic-conversation-access.server");
+      contextHref = await academicConversationHref(thread);
+    }
 
     const rows = await db
       .select({
@@ -460,6 +494,7 @@ export const getThread = createServerFn({ method: "GET" })
         subject: thread.subject,
         contextType: thread.contextType,
         contextId: thread.contextId,
+        contextHref,
       },
       messages: rows.map((row) => ({
         id: row.id,
@@ -496,7 +531,8 @@ export const replyToThread = createServerFn({ method: "POST" })
 
     return db.transaction(async (tx) => {
       const [thread] = await tx
-        .select({ id: s.communicationThreads.id })
+        .select({ id: s.communicationThreads.id, contextType: s.communicationThreads.contextType,
+          contextId: s.communicationThreads.contextId, metadata: s.communicationThreads.metadata })
         .from(s.communicationThreads)
         .where(eq(s.communicationThreads.id, data.threadId))
         .for("update")
@@ -516,6 +552,10 @@ export const replyToThread = createServerFn({ method: "POST" })
         .limit(1);
       if (!participant) {
         throw new AuthorizationError("communication thread participation");
+      }
+      if (thread.metadata?.kind === "academic_conversation") {
+        const { academicConversationHref } = await import("@/modules/learning/academic-conversation-access.server");
+        await academicConversationHref(thread, tx);
       }
 
       const [message] = await tx

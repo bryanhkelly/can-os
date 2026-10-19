@@ -5,6 +5,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianFeedbackReleased, latestGuardianAttempts } from "@/domain/guardian-academics";
 import { z } from "zod";
+import { readRubric } from "@/modules/student-experience/rubric";
 
 /**
  * Guardian academic visibility is derived from a verified session AND an active
@@ -52,9 +53,13 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
    sectionId: s.assessments.sectionId,
    course: s.sections.title,
    title: s.assessments.title,
+   instructions: s.assessments.instructions,
+   metadata: s.assessments.metadata,
    dueAt: s.assessments.dueAt,
    pointsPossible: s.assessments.pointsPossible,
    submissionStatus: s.submissions.status,
+   submissionId: s.submissions.id,
+   timeliness: s.submissions.timeliness,
    attemptNumber: s.submissions.attemptNumber,
    submittedAt: s.submissions.submittedAt,
    gradedAt: s.submissions.gradedAt,
@@ -77,6 +82,10 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
     sectionId: row.sectionId,
     course: row.course,
     title: row.title,
+    instructions: row.instructions,
+    rubric: readRubric(row.metadata?.rubricCriteria),
+    submissionId: row.submissionId,
+    timeliness: row.timeliness,
     dueAt: row.dueAt?.toISOString() ?? null,
     status: row.submissionStatus ?? "assigned",
     submittedAt: row.submittedAt?.toISOString() ?? null,

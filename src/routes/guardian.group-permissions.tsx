@@ -6,6 +6,9 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 export const Route=createFileRoute("/guardian/group-permissions")({
+ validateSearch:(search:Record<string,unknown>):{action?:string}=>({
+  action:typeof search.action==="string"?search.action:undefined,
+ }),
  loader:safeLoader(()=>listCanonicalGuardianGroupConsents(),{
   authMessage:"Sign in as the student's authorized guardian to review group participation."}),
  component:GuardianConsents
@@ -17,6 +20,7 @@ function GuardianConsents(){
 }
 function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuardianGroupConsents>>}){
  const router=useRouter();
+ const {action}=Route.useSearch();
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [acknowledged,setAcknowledged]=useState<Record<string,boolean>>({});
  async function decide(actionId:string,approve:boolean){
@@ -36,7 +40,9 @@ function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuard
   </div>}>
   {notice&&<p className="mt-5 rounded-lg border p-3 text-sm" role="status">{notice}</p>}
   {error&&<p className="mt-5 rounded-lg border border-red-500 p-3 text-sm" role="alert">{error}</p>}
-  <div className="mt-7 space-y-3">{items.map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
+  {action&&<Link to="/guardian/group-permissions" className="mt-4 inline-block text-sm underline">View all group permissions</Link>}
+  {action&&!items.some(item=>item.id===action)&&<p role="alert" className="mt-4 rounded-xl border p-4">This permission request is unavailable in your current family workspace.</p>}
+  <div className="mt-7 space-y-3">{items.filter(item=>!action||item.id===action).map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
    <h2 className="font-semibold">{item.groupTitle}</h2>
    <p className="mt-2 text-sm text-muted-foreground">{item.obsolete?"This request is no longer active — the student's membership request was withdrawn or already decided.":item.status==="open"?"Your decision is needed":item.decision==="approve"?"Permission approved":"Permission declined"}</p>
    {item.obsolete&&<div className="mt-4 flex gap-2">

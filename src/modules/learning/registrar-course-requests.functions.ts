@@ -102,6 +102,7 @@ export const listRegistrarCourseRequests = createServerFn({ method: "GET" }).han
       id: row.id, operation, title: row.title,
       studentName: row.studentName + " " + row.studentLastName,
       sectionTitle: row.sectionTitle, sectionCode: row.sectionCode,
+      siteId: row.sectionSiteId, programId: row.sectionProgramId,
       programActive, deadline, deadlinePassed: today > deadline,
       guardianState: approvalState,
       canApprove: programActive && today <= deadline &&

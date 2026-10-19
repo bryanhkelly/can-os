@@ -62,9 +62,8 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <WorkspaceNavigation />
+      <WorkspaceNavigation><Outlet /></WorkspaceNavigation>
       <CommandPalette />
-      <Outlet />
     </QueryClientProvider>
   );
 }

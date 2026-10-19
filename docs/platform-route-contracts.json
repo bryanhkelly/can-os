@@ -4,6 +4,33 @@
   "generatedFromBranch": "main",
   "routes": [
     {
+      "file": "src/routes/counselor.tsx",
+      "route": "/counselor",
+      "owner": "support",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/support.tsx",
+      "route": "/support",
+      "owner": "support",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/classes.tsx",
+      "route": "/classes",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/__root.tsx",
       "route": "<root>",
       "owner": "shell",

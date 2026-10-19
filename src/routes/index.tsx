@@ -9,6 +9,7 @@ const workspaceHome: Record<string, string> = {
   guardian: "/guardian",
   registrar: "/operations",
   specialist: "/coach",
+  counselor: "/counselor",
 };
 
 /** Authenticated application entry, never a synthetic-feature showcase. */

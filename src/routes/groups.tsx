@@ -17,6 +17,9 @@ import {
 } from "@/modules/study-groups/canonical-sessions.functions";
 
 export const Route = createFileRoute("/groups")({
+  validateSearch:(search:Record<string,unknown>):{group?:string}=>({
+    group:typeof search.group==="string"?search.group:undefined,
+  }),
   loader: safeLoader(() => getCanonicalGroupWorkspace(), {
     authMessage: "Sign in as a student or teacher to access your study groups.",
   }),
@@ -43,6 +46,7 @@ function localTime(iso: string) {
 
 function GroupsView({ data }: { data: Workspace }) {
   const router = useRouter();
+  const {group:requestedGroup}=Route.useSearch();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -84,6 +88,8 @@ function GroupsView({ data }: { data: Workspace }) {
     >
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
       {error && <p role="alert" className="mt-4 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+      {requestedGroup&&<Link to="/groups" className="mt-4 inline-block text-sm underline">View all study groups</Link>}
+      {requestedGroup&&!data.groups.some(group=>group.id===requestedGroup)&&<p role="alert" className="mt-4 rounded-lg border p-4 text-sm">This group is unavailable in your current workspace.</p>}
       {data.role === "teacher" && <section className="mt-8 rounded-xl border bg-card p-5">
         <h2 className="text-lg font-semibold">Create a course group</h2>
         <p className="mt-1 text-sm text-muted-foreground">Only sections you actively teach can host a group.</p>
@@ -127,10 +133,10 @@ function GroupsView({ data }: { data: Workspace }) {
         </p>}
       </section>}
       <section className="mt-8 space-y-5" aria-label="Available study groups">
-        {data.groups.map(group => <article key={group.id} className="rounded-xl border bg-card p-5">
+        {data.groups.filter(group=>!requestedGroup||group.id===requestedGroup).map(group => <article key={group.id} className="rounded-xl border bg-card p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">{group.title}</h2>
+              <h2 className="text-lg font-semibold"><Link to="/groups" search={{group:group.id}} className="hover:underline">{group.title}</Link></h2>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{group.description}</p>
               <p className="mt-2 text-xs text-muted-foreground">
                 Capacity: {group.maxMembers}

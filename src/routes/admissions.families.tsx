@@ -6,9 +6,10 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 const loadFamilyReadiness=(selection:{siteId?:string;programId?:string}={})=>getFamilyReadiness({data:selection});
 export const Route=createFileRoute("/admissions/families")({
- validateSearch:(search:Record<string,unknown>)=>({
+ validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string}=>({
   siteId:typeof search.siteId==="string"?search.siteId:undefined,
   programId:typeof search.programId==="string"?search.programId:undefined,
+  application:typeof search.application==="string"?search.application:undefined,
  }),
  loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
  loader:({deps})=>safeLoader(()=>loadFamilyReadiness(deps),{
@@ -23,8 +24,10 @@ function Families(){
 }
 function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness>>}){
  const router=useRouter();
+ const selection=Route.useSearch();
+ const visibleApps=apps.filter(app=>!selection.application||app.id===selection.application);
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notes,setNotes]=useState<Record<string,string>>({});
- const families=[...new Set(apps.map(a=>a.householdId))];
+ const families=[...new Set(visibleApps.map(a=>a.householdId))];
  const [files,setFiles]=useState<Record<string,File|null>>({});
  const [uploadModes,setUploadModes]=useState({live:false,demo:false});
  useEffect(()=>{void getEnrollmentDocumentUploadAvailability().then(setUploadModes).catch(()=>{});},[]);
@@ -72,18 +75,20 @@ function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Enrollment</p>
   <h1 className="mt-2 font-serif text-4xl">Family enrollment readiness</h1>
   <p className="mt-3 text-sm text-muted-foreground">Review each household journey and its supporting private documents. Uploads are available only where the deployment has enabled the relevant R2 workflow.</p>
+  {selection.application&&<Link to="/admissions/families" search={{siteId:selection.siteId,programId:selection.programId}} className="mt-4 inline-block text-sm underline">View all household readiness</Link>}
+  {selection.application&&!visibleApps.length&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current family readiness view.</p>}
   {error&&<p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
   <div className="mt-6 rounded-xl border p-5"><p className="text-sm">Households represented</p><p className="font-serif text-3xl">{families.length}</p></div>
   <div className="mt-6 space-y-4">{families.map((id,i)=><section key={id} className="rounded-xl border p-5">
    <h2 className="font-serif text-xl">Household {i+1}</h2>
-   <div className="mt-3 space-y-3">{apps.filter(a=>a.householdId===id).map(a=><article key={a.id} className="rounded-lg border p-3">
+   <div className="mt-3 space-y-3">{visibleApps.filter(a=>a.householdId===id).map(a=><article key={a.id} className="rounded-lg border p-3">
     <p className="font-semibold">{a.program} · {a.stage}</p>
     <p className="mt-2 text-sm">Next step: <strong>{a.activeSchoolYears.length?"Enrollment active — prepare for school":a.offers.some(o=>o.status==="accepted")?"Registrar activation pending":a.offers.some(o=>o.status==="issued")?"Guardian response pending":a.readiness.blockers?"Complete blocking requirements":"Ready for an admissions offer"}</strong></p>
     <div className="mt-3 flex flex-wrap gap-2">{a.offers.map(o=><span key={o.schoolYearId+":"+o.status} className="rounded-md border px-2 py-1 text-xs">Offer: {o.status}{o.respondedAt?" · Responded "+new Date(o.respondedAt).toLocaleDateString():""}</span>)}</div>
     <p className="mt-2 text-sm">Journey: <strong>{a.journeyStatus?.replaceAll("_"," ")??"Not started"}</strong> · Program enrollment: <strong>{a.activeSchoolYears.length?"Active":"Not active"}</strong></p>
     {a.activeSchoolYears.length>0&&<p className="mt-1 text-xs text-muted-foreground">Active school-year records: {a.activeSchoolYears.length}</p>}
     <p className="mt-1 text-sm text-muted-foreground">{a.readiness.completed} of {a.readiness.total} requirements complete · {a.readiness.blockers} blocking</p>
-    <Link to="/admissions" search={{siteId:undefined,programId:undefined}} className="mt-2 inline-block text-xs font-semibold underline">Review offers and enrollment →</Link>
+    <Link to="/admissions" search={{siteId:selection.siteId,programId:selection.programId,application:a.id}} className="mt-2 inline-block text-xs font-semibold underline">Review offers and enrollment →</Link>
     {a.activeSchoolYears.length>0&&<p className="mt-2 text-xs text-muted-foreground">The admissions checklist is now a historical record. Active enrollment requirements are managed separately.</p>}
     {!((a.isFixture?uploadModes.demo:uploadModes.live))&&<p className="mt-3 text-xs text-muted-foreground">Document uploads are not enabled for this application. Existing verified documents may still be reviewed.</p>}
     <div className="mt-3 space-y-3">{a.requirements.map(r=><div key={r.id} className="rounded-lg border p-3"><label className="flex items-center gap-3 text-sm">

@@ -51,6 +51,7 @@ async function resolveStudentScope(db:any,s:any,actor:Actor,studentProfileId:str
 
 type CaseloadEntry = {
   studentProfileId: string;
+  personId: string;
   name: string;
   gradeLevel: string | null;
   openReferrals: number;
@@ -63,7 +64,7 @@ type CaseloadEntry = {
 };
 
 export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async () => {
-  const actor = await requireActor(["specialist"], "referrals:read");
+  const actor = await requireActor(["specialist", "counselor"], "referrals:read");
   setResponseHeader("Cache-Control", "no-store");
   const sites = actorSiteIds(actor);
   const { db, s } = await context();
@@ -127,7 +128,7 @@ export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async 
     let entry = byStudent.get(studentProfileId);
     if (!entry) {
       entry = {
-        studentProfileId, name: "", gradeLevel: null,
+        studentProfileId, personId: "", name: "", gradeLevel: null,
         openReferrals: 0, latestReferralStage: null,
         openInsights: 0, latestInsightTitle: null,
         openActions: 0, hasOpenPlan: false,
@@ -172,6 +173,7 @@ export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async 
   if (!studentIds.length) return { students: [] as CaseloadEntry[] };
   const profiles = await db.select({
     id: s.studentProfiles.id,
+    personId: s.studentProfiles.personId,
     gradeLevel: s.studentProfiles.gradeLevel,
     firstName: s.people.legalFirstName,
     lastName: s.people.legalLastName,
@@ -184,6 +186,7 @@ export const getCoachCaseload = createServerFn({ method: "GET" }).handler(async 
     const entry = byStudent.get(profile.id);
     if (entry) {
       entry.name = `${profile.preferredName ?? profile.firstName} ${profile.lastName}`;
+      entry.personId = profile.personId;
       entry.gradeLevel = profile.gradeLevel;
     }
   }
@@ -206,7 +209,7 @@ export const logCoachOutreach = createServerFn({ method: "POST" })
     outcome: z.enum(outreachOutcomes),
   }).parse)
   .handler(async ({ data }) => {
-    const actor = await requireActor(["specialist"], "referrals:manage");
+    const actor = await requireActor(["specialist", "counselor"], "referrals:manage");
     const sites = actorSiteIds(actor);
     const { db, s } = await context();
     const placement=await resolveStudentScope(db,s,actor,data.studentProfileId);
@@ -257,7 +260,7 @@ export const logCoachOutreach = createServerFn({ method: "POST" })
 export const getCoachStudentHistory = createServerFn({ method: "GET" })
   .validator(z.object({ studentProfileId: z.string().uuid() }).parse)
   .handler(async ({ data }) => {
-    const actor = await requireActor(["specialist"], "referrals:read");
+    const actor = await requireActor(["specialist", "counselor"], "referrals:read");
     setResponseHeader("Cache-Control", "no-store");
     const sites = actorSiteIds(actor);
     const { db, s } = await context();

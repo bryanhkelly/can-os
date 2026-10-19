@@ -42,11 +42,18 @@ export const getCourseRegistration = createServerFn({ method: "GET" }).handler(a
         viewerRole === "student" ? eq(s.actions.ownerPersonId,actor.actorPersonId) : inArray(s.actions.siteId,sites))),
   ]);
   const latest = new Map<string,(typeof memberships)[number]>();
+  const teachers=catalog.length?await db.select({sectionId:s.sectionTeachers.sectionId,personId:s.people.id,
+    firstName:s.people.legalFirstName,lastName:s.people.legalLastName,preferredName:s.people.preferredName})
+    .from(s.sectionTeachers).innerJoin(s.people,eq(s.people.id,s.sectionTeachers.personId))
+    .where(inArray(s.sectionTeachers.sectionId,catalog.map(course=>course.id))):[];
   for (const membership of memberships) if (membership.sectionId && !latest.has(membership.sectionId)) latest.set(membership.sectionId,membership);
   const sectionsWithPolicy=await Promise.all(catalog.map(async course=>{
     const policy=await getSectionRegistrationPolicy(course.id);
     return {
       id:course.id,title:course.title,code:course.code,subject:course.subject,description:course.description,
+      teachers:teachers.filter(teacher=>teacher.sectionId===course.id).map(teacher=>({
+        personId:teacher.personId,name:`${teacher.preferredName??teacher.firstName} ${teacher.lastName}`,
+      })),
       credits:policy.credits,
       mode:typeof course.metadata.deliveryMode==="string"?course.metadata.deliveryMode:"hybrid",
       policy:{capacity:policy.enrollmentCapacity,prerequisites:policy.prerequisites,

@@ -1,5 +1,5 @@
 export type DiscussionMessage={id:string;authorLabel:string;body:string;createdAt:string;parentMessageId:string|null};
-export function discussionTree(messages:DiscussionMessage[]){
+export function discussionTree<T extends DiscussionMessage>(messages:T[]){
  const ids=new Set(messages.map(m=>m.id));
  const ordered=[...messages].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
  return ordered.map(m=>({...m,parentMessageId:m.parentMessageId&&ids.has(m.parentMessageId)&&m.parentMessageId!==m.id?m.parentMessageId:null}));

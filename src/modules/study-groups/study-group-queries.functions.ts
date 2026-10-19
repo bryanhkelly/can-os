@@ -41,6 +41,7 @@ export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
  .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
  .where(and(eq(s.studentProfiles.personId,actor.actorPersonId!),
   eq(s.enrollments.status,"active"),
+  eq(s.enrollments.kind,"program"),
   inArray(s.programs.siteId,actor.sites),
   inArray(s.programs.id,actor.scope.programIds??[])));
  if(!enrolled.length)return [];
@@ -50,14 +51,21 @@ export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
   capacity:s.studyGroups.maxMembers,requiresApproval:s.studyGroups.requiresApproval,
   facilitator:s.studyGroups.facilitatorPersonId,status:s.studyGroups.status,
   siteId:s.studyGroups.siteId,programId:s.studyGroups.programId,
+  sectionId:s.studyGroups.sectionId,
   membership:s.studyGroupMemberships.status
  }).from(s.studyGroups)
  .leftJoin(s.studyGroupMemberships,and(eq(s.studyGroupMemberships.groupId,s.studyGroups.id),eq(s.studyGroupMemberships.personId,actor.actorPersonId!)))
  .where(and(eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),
   or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
  .orderBy(desc(s.studyGroups.createdAt)).limit(100);
+ const sections=await db.select({id:s.sections.id}).from(s.enrollments)
+  .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .where(and(eq(s.studentProfiles.personId,actor.actorPersonId!),eq(s.enrollments.kind,"section"),
+   eq(s.enrollments.status,"active"),eq(s.sections.active,true),inArray(s.sections.siteId,actor.sites),
+   inArray(s.sections.programId,actor.scope.programIds??[])));
  return rows.filter(group=>enrolled.some(row=>row.siteId===group.siteId&&
-  (!group.programId||row.programId===group.programId)));
+  (!group.programId||row.programId===group.programId))&&(!group.sectionId||sections.some(section=>section.id===group.sectionId)));
 });
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
  const actor=await groupActor("student");

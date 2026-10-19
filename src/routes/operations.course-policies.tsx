@@ -16,6 +16,8 @@ function CoursePoliciesPage(){
 type CoursePolicyRow=Awaited<ReturnType<typeof listCoursePolicies>>[number];
 function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
  const router=useRouter();
+ const selection=Route.useSearch();
+ const visibleRows=rows.filter(row=>(!selection.siteId||row.siteId===selection.siteId)&&(!selection.programId||row.programId===selection.programId));
  const [error,setError]=useState(""),[notice,setNotice]=useState(""),[saving,setSaving]=useState("");
  async function save(sectionId:string,policy:(typeof rows)[number]["policy"]){
   setError("");setNotice("");setSaving(sectionId);
@@ -27,15 +29,15 @@ function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
  return <WorkspaceShell eyebrow="CAN OS · Academic operations" title="Course registration policies"
   subtitle="Set enrollment limits, academic prerequisites, credit rules and registration deadlines. Schedule conflicts use the section’s canonical timetable."
   actions={<div className="flex flex-wrap gap-2">
-   <Link to="/operations/course-requests" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Registration requests</Link>
-   <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
+   <Link to="/operations/course-requests" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Registration requests</Link>
+   <Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
   </div>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <div className="mt-8 space-y-4">
-   {rows.map(r=><CoursePolicyCard key={r.id} row={r}
+   {visibleRows.map(r=><CoursePolicyCard key={r.id} row={r}
      disabled={Boolean(saving)} save={policy=>save(r.id,policy)}/>)}
-   {!rows.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">
+   {!visibleRows.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">
     No sections are available. Provision courses in the School Launch workspace first.
    </p>}
   </div>

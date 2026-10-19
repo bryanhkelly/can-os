@@ -38,9 +38,8 @@ registerDomainEventHandler(EventTypes.CommunicationMessageSent, handleAcademicPa
 registerDomainEventHandler(EventTypes.ActionCreated, handleAcademicPassThroughEvent);
 registerDomainEventHandler(EventTypes.ActionResolved, handleAcademicPassThroughEvent);
 
-// Phase 2 lifecycle facts already have their own transactional audit and
-// recipient notifications. Pass through to shared subscriptions and complete
-// the outbox instead of leaving these canonical events indefinitely pending.
+// Lifecycle facts already have transactional evidence. Pass through to shared
+// subscriptions and complete the outbox; delivery depends on registered consumers.
 for (const eventType of [
   EventTypes.ApplicationStarted,
   EventTypes.ApplicationAccepted,
@@ -61,6 +60,18 @@ for (const eventType of [
   EventTypes.AttendanceExcuseSubmitted,
   EventTypes.AttendanceExcuseApproved,
   EventTypes.AttendanceExcuseRejected,
+  EventTypes.LessonCompletionChanged,
+  EventTypes.ClassAnnouncementPublished,
+  EventTypes.SubmissionAnnotated,
+  EventTypes.ProfilePhotoChanged,
+  EventTypes.SupportReferralAdvanced,
+  EventTypes.SupportPlanSaved,
+  EventTypes.SupportServiceScheduled,
+  EventTypes.SupportServiceCompleted,
+  EventTypes.CourseDiscussionCreated,
+  EventTypes.CourseDiscussionMessagePosted,
+  EventTypes.CourseDiscussionLockChanged,
+  EventTypes.CourseDiscussionMessageModerated,
 ] as const) {
   registerDomainEventHandler(eventType, handleAcademicPassThroughEvent);
 }

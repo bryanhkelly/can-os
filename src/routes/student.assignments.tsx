@@ -1,12 +1,20 @@
 import {useEffect,useRef,useState} from "react";
+import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
+import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getAssignments,saveAssignmentResponse,saveAssignmentDraft} from "@/modules/student-experience/assignments.functions";
 import {createSubmissionAttachmentUpload,attachDocumentToSubmission,listSubmissionAttachments,getSubmissionAttachmentDownload} from "@/modules/learning/submission-attachments.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
+import {WorkspaceShell,StatusBadge} from "@/components/workspace";
 
 const loadAssignments=()=>getAssignments();
 export const Route=createFileRoute("/student/assignments")({
+ validateSearch:(search:Record<string,unknown>):{filter?:"all"|"todo"|"missing"|"submitted"|"feedback";assessment?:string;section?:string}=>({
+  filter:search.filter==="all"||search.filter==="todo"||search.filter==="missing"||search.filter==="submitted"||search.filter==="feedback"?search.filter:undefined,
+  assessment:typeof search.assessment==="string"?search.assessment:undefined,
+  section:typeof search.section==="string"?search.section:undefined,
+ }),
  loader:safeLoader(loadAssignments,{authMessage:"Sign in with an authorized student account to view your assignments."}),
  component:StudentAssignments
 });
@@ -25,44 +33,41 @@ function formatDate(value:string|null){
 type AssignmentData=Awaited<ReturnType<typeof loadAssignments>>;
 function StudentAssignments(){
  const result=Route.useLoaderData();
+ const {filter="all",assessment,section}=Route.useSearch();
  if(!result.ok)return <LoaderFailure eyebrow="CAN OS · Student" title="Your assignments" outcome={result}/>;
- return <StudentAssignmentsView data={result.data}/>;
+ return <StudentAssignmentsView key={JSON.stringify([filter,assessment,section])} data={result.data}/>;
 }
 function StudentAssignmentsView({data}:{data:AssignmentData}){
  const {connected,assignments}=data;
  const router=useRouter();
- const [selected,setSelected]=useState<string|null>(null);
- const [draft,setDraft]=useState("");
+ const {filter="all",assessment,section}=Route.useSearch();
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState("");
  const [error,setError]=useState("");
  const [draftStatus,setDraftStatus]=useState<"idle"|"saving"|"saved"|"error">("idle");
- const [filter,setFilter]=useState<"all"|"todo"|"submitted"|"feedback">("all");
  const [pendingFiles,setPendingFiles]=useState<File[]>([]);
  const [attachments,setAttachments]=useState<{documentId:string;fileName:string}[]>([]);
  const saveGeneration=useRef(0);
- const chosen=assignments.find(item=>item.assessmentId===selected);
+ const items=assignments.filter(item=>(!section||item.sectionId===section)&&(
+  filter==="all"||
+  (filter==="todo"&&(!item.status||item.status==="assigned"||item.status==="returned"))||
+  (filter==="missing"&&item.timeliness==="missing")||
+  (filter==="submitted"&&item.status==="submitted")||
+  (filter==="feedback"&&["graded","returned"].includes(item.status??""))));
+ const [selection]=useState(()=>assessment??items[0]?.assessmentId);
+ const chosen=items.find(item=>item.assessmentId===selection);
+ const selected=chosen?.assessmentId??null;
+ const selectedIndex=items.findIndex(item=>item.assessmentId===selected);
+ const previousAssignment=items[selectedIndex-1],nextAssignment=items[selectedIndex+1];
+ const [draft,setDraft]=useState(()=>chosen?.responseText??"");
  const editable=Boolean(chosen&&chosen.assessmentStatus==="published"&&
   (!chosen.status||chosen.status==="assigned"||chosen.status==="returned"));
- function openAssignment(id:string,text:string){
-  saveGeneration.current++;
-  setSelected(id);setDraft(text);setDraftStatus("idle");setPendingFiles([]);
-  setError("");setNotice("");
- }
- useEffect(()=>{
-  const requested=new URLSearchParams(window.location.search).get("assessment");
-  const target=assignments.find(item=>item.assessmentId===requested)??assignments[0];
-  if(!selected&&target){
-   setSelected(target.assessmentId);
-   setDraft(target.responseText??"");
-  }
- },[assignments,selected]);
  useEffect(()=>{
   if(!selected){setAttachments([]);return;}
   let active=true;
   listSubmissionAttachments({data:{assessmentId:selected}})
    .then(result=>{if(active)setAttachments(result.attachments)})
-   .catch(()=>{if(active)setAttachments([])});
+   .catch(()=>{if(active){setAttachments([]);setError("Unable to load this assignment's attachments.");}});
   return()=>{active=false};
  },[selected]);
  useEffect(()=>{
@@ -109,50 +114,61 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
    setError(cause instanceof Error?cause.message:"Unable to submit assignment");
   }finally{setBusy(false);}
  }
- const items=assignments.filter(item=>
-  filter==="all"||
-  (filter==="todo"&&(!item.status||item.status==="assigned"||item.status==="returned"))||
-  (filter==="submitted"&&item.status==="submitted")||
-  (filter==="feedback"&&["graded","returned"].includes(item.status??"")));
- return <main className="mx-auto max-w-6xl px-5 py-10 pb-24">
-  <Link to="/student" className="text-xs font-semibold underline">← Student Today</Link>
-  <p className="mt-8 text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Student learning</p>
-  <h1 className="mt-2 font-serif text-4xl">Your assignments</h1>
-  <p className="mt-3 max-w-2xl text-sm text-muted-foreground">View coursework in your enrolled classes, save a draft, submit responses, and review feedback. Teachers manage assessments and grades in their separate authorized gradebook.</p>
+ return <WorkspaceShell width="wide" eyebrow="CAN OS · Student learning" title="Your assignments"
+  subtitle="Read instructions, save your response, submit work and follow through on feedback."
+  breadcrumbs={<><Link to="/student" className="underline">Student Today</Link><span>/</span><Link to="/student/courses" search={{section}} className="underline">{section?"Class":"My classes"}</Link><span>/</span><span>Assignments</span></>}>
   {!connected&&<p role="status" className="mt-5 rounded-xl border p-4 text-sm">School records are currently unavailable.</p>}
   {error&&<p role="alert" className="mt-5 rounded-xl border p-4 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-xl border p-4 text-sm">{notice}</p>}
+  {assessment&&!chosen&&<p role="alert" className="mt-5 rounded-xl border p-4 text-sm">This assignment is unavailable in the current view. Choose another assignment or select All.</p>}
   <div className="mt-6 grid gap-3 sm:grid-cols-3">
    <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Assignments</p><p className="mt-1 text-3xl font-semibold">{assignments.length}</p></div>
    <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Awaiting feedback</p><p className="mt-1 text-3xl font-semibold">{assignments.filter(item=>item.status==="submitted").length}</p></div>
    <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Graded</p><p className="mt-1 text-3xl font-semibold">{assignments.filter(item=>item.status==="graded").length}</p></div>
   </div>
   <nav aria-label="Assignment filters" className="mt-7 flex flex-wrap gap-2">
-   {([["all","All"],["todo","To do / revise"],["submitted","Submitted"],["feedback","Feedback"]] as const)
-    .map(([key,label])=><button key={key} type="button" onClick={()=>setFilter(key)}
-     className={"rounded-full border px-4 py-2 text-xs font-semibold "+(filter===key?"bg-foreground text-background":"bg-card")}>{label}</button>)}
+   {([["all","All"],["todo","To do / revise"],["missing","Missing work"],["submitted","Submitted"],["feedback","Feedback"]] as const)
+    .map(([key,label])=><Link key={key} to="/student/assignments" search={{filter:key,section}} aria-current={filter===key?"page":undefined}
+     className={"rounded-full border px-4 py-2 text-xs font-semibold "+(filter===key?"bg-foreground text-background":"bg-card")}>{label}</Link>)}
   </nav>
-  <div className="mt-5 grid gap-6 lg:grid-cols-2">
+  <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,2fr)]">
    <section aria-label="Assignments" className="space-y-3">
     {!items.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No assignments in this view.</p>}
-    {items.map(item=><button key={item.assessmentId} type="button"
-     onClick={()=>openAssignment(item.assessmentId,item.responseText??"")}
-     className={"w-full rounded-xl border bg-card p-5 text-left "+(selected===item.assessmentId?"border-foreground":"")}>
+    {items.map(item=><Link key={item.assessmentId} to="/student/assignments"
+     search={{filter,section,assessment:item.assessmentId}} aria-current={selected===item.assessmentId?"page":undefined}
+     className={"block w-full rounded-xl border bg-card p-5 text-left "+(selected===item.assessmentId?"border-foreground":"")}>
      <p className="text-xs text-muted-foreground">{item.course} · {item.status??"not started"}</p>
      <h2 className="mt-2 font-semibold">{item.title}</h2>
      <p className="mt-2 text-xs text-muted-foreground">Due {formatDate(item.dueAt)}</p>
      {item.score!==null&&item.score!==undefined&&<p className="mt-2 text-sm">Score: {item.score} / {item.pointsPossible??100}</p>}
-    </button>)}
+    </Link>)}
    </section>
    <section aria-label="Assignment details">
     {!chosen?<div className="rounded-xl border p-6"><h2 className="font-serif text-xl">Select an assignment</h2></div>:
     <article className="rounded-xl border bg-card p-6">
+     <nav aria-label="Assignment navigation" className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b pb-4 text-sm">
+      <span>{selectedIndex+1} of {items.length}</span>
+      <div className="flex gap-4">
+       {previousAssignment&&<Link to="/student/assignments" search={{filter,section,assessment:previousAssignment.assessmentId}} className="underline">Previous</Link>}
+       {nextAssignment&&selectedIndex>=0&&<Link to="/student/assignments" search={{filter,section,assessment:nextAssignment.assessmentId}} className="underline">Next</Link>}
+      </div>
+     </nav>
      <p className="text-xs text-muted-foreground">{chosen.course}</p>
      <h2 className="mt-2 font-serif text-2xl">{chosen.title}</h2>
      <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{chosen.instructions??"Follow your teacher's instructions."}</p>
      <p className="mt-3 text-xs text-muted-foreground">Due {formatDate(chosen.dueAt)} · {chosen.assessmentStatus}</p>
+     <div className="mt-3"><StatusBadge tone={chosen.timeliness==="missing"?"attention":chosen.status==="graded"?"success":"neutral"}>{chosen.status??"Assigned"}{chosen.timeliness==="missing"?" · Missing":chosen.timeliness==="late"?" · Late":""}</StatusBadge></div>
      {chosen.metadata.rubric&&<p className="mt-4 rounded-lg bg-muted p-3 text-sm">Rubric: {chosen.metadata.rubric}</p>}
+     {(chosen.metadata.criteria??[]).length>0&&<details className="mt-4 rounded-lg border p-4" open>
+      <summary className="cursor-pointer text-sm font-semibold">How this work is assessed</summary>
+      <ul className="mt-3 divide-y">{chosen.metadata.criteria.map(criterion=><li key={criterion.id} className="py-3 text-sm">
+       <p className="font-semibold">{criterion.label} · {criterion.maxPoints} points</p>
+       {criterion.description&&<p className="mt-1 text-muted-foreground">{criterion.description}</p>}
+      </li>)}</ul>
+     </details>}
      {chosen.feedbackText&&<div className="mt-4 rounded-lg bg-muted p-4"><p className="font-semibold text-sm">Teacher feedback</p><p className="mt-2 text-sm">{chosen.feedbackText}</p></div>}
+     {chosen.submissionId&&["graded","returned"].includes(chosen.status??"")&&<SubmissionAnnotations key={chosen.submissionId} submissionId={chosen.submissionId}/>}
+     <AssignmentConversation key={`conversation-${chosen.assessmentId}`} assessmentId={chosen.assessmentId}/>
      {chosen.attempts.length>1&&<div className="mt-4 rounded-lg border p-3"><h3 className="font-semibold text-sm">Submission history</h3>{chosen.attempts.map(attempt=><p key={attempt.attempt} className="mt-1 text-xs">Attempt {attempt.attempt} · {attempt.status}{attempt.score!==null?" · "+attempt.score+" points":""}</p>)}</div>}
      {attachments.length>0&&<div className="mt-4 rounded-lg border p-3"><p className="font-semibold text-sm">Attached files</p>{attachments.map(file=><button type="button" key={file.documentId}
       className="mt-1 block text-xs underline" onClick={async()=>{
@@ -182,5 +198,5 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
     </article>}
    </section>
   </div>
- </main>;
+ </WorkspaceShell>;
 }

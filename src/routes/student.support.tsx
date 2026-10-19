@@ -11,9 +11,13 @@ const loadSupportReferrals=async()=>{
   const data=await getQuickWinActions();
   return {viewerRole:"student" as const,actions:data.actions};
  }
- return {viewerRole:"staff" as const,referrals:await getSupportReferrals()};
+ return {viewerRole:viewer.role,referrals:await getSupportReferrals()};
 };
 export const Route=createFileRoute("/student/support")({
+ validateSearch:(search:Record<string,unknown>):{referral?:string;assessment?:string}=>({
+  referral:typeof search.referral==="string"?search.referral:undefined,
+  assessment:typeof search.assessment==="string"?search.assessment:undefined,
+ }),
  loader:safeLoader(loadSupportReferrals,{authMessage:"Sign in with an authorized student, teacher, or specialist account to view support."}),
  component:SupportPage,
 });
@@ -73,47 +77,37 @@ const destinations=[
 const stages=["submitted","accepted","plan_created","in_service","review","closed"] as const;
 function SupportPage(){
  const outcome=Route.useLoaderData();
+ const search=Route.useSearch();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Student support" title="Student support that follows through." outcome={outcome}/>;
  if(outcome.data.viewerRole==="student")return <StudentSupportView actions={outcome.data.actions}/>;
- return <SupportView referrals={outcome.data.referrals}/>;
+ return <SupportView key={JSON.stringify(search)} referrals={outcome.data.referrals} role={outcome.data.viewerRole} search={search}/>;
 }
-function SupportView({referrals}:{referrals:Awaited<ReturnType<typeof getSupportReferrals>>}){
+export function SupportView({referrals,role,search,route="/student/support"}:{referrals:Awaited<ReturnType<typeof getSupportReferrals>>;role:"teacher"|"specialist"|"counselor";search:{referral?:string;assessment?:string};route?:"/student/support"|"/support"}){
  const router=useRouter();
- const [role,setRole]=useState<"teacher"|"specialist"|null>(null);
  const [students,setStudents]=useState<{id:string;name:string;sectionTitle:string}[]>([]);
  const [studentProfileId,setStudentProfileId]=useState("");
  const [category,setCategory]=useState<typeof destinations[number]["value"]>("academic");
  const [priority,setPriority]=useState<"normal"|"high">("normal");
  const [observations,setObservations]=useState("");
  const [includeEvidence,setIncludeEvidence]=useState(true);
- const [selected,setSelected]=useState<string|null>(null);
+ const selected=search.referral??null;
  const [note,setNote]=useState("");
- const [goal,setGoal]=useState("Improve writing confidence and thesis development");
- const [intervention,setIntervention]=useState("Three academic coaching sessions with a targeted writing exercise");
- const [reviewDate,setReviewDate]=useState("2026-11-15");
- const [serviceDate,setServiceDate]=useState("2026-10-26T14:00");
+ const [goal,setGoal]=useState("");
+ const [intervention,setIntervention]=useState("");
+ const [reviewDate,setReviewDate]=useState("");
+ const [serviceDate,setServiceDate]=useState("");
  const [serviceKind,setServiceKind]=useState<"tutoring"|"coaching"|"planning"|"learning_support">("coaching");
- const [area,setArea]=useState<"academic"|"learning"|"counselor"|"planning">("academic");
+ const [area,setArea]=useState<"academic"|"learning"|"counselor"|"planning">(()=>referrals.find(item=>item.id===search.referral)?.requestedArea??(role==="counselor"?"counselor":"academic"));
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");
  const chosen=referrals.find(r=>r.id===selected);
  useEffect(()=>{
+  if(role!=="teacher")return;
   let active=true;
-  fetch("/access/session",{credentials:"same-origin",cache:"no-store"})
-   .then(async response=>{
-    if(!response.ok)throw new Error("Session required");
-    return response.json() as Promise<{role:string}>;
-   }).then(async session=>{
-    if(session.role!=="teacher"&&session.role!=="specialist")throw new Error("Authorized staff role required");
-    if(!active)return;
-    setRole(session.role);
-    if(session.role==="teacher"){
-     const rows=await listTeacherReferralStudents();
-     if(active)setStudents(rows);
-    }
-   }).catch(()=>{if(active)setError("Open this workspace with an authorized teacher or specialist membership.");});
+  listTeacherReferralStudents().then(rows=>{if(active)setStudents(rows);})
+   .catch(()=>{if(active)setError("Unable to load students for referral.");});
   return()=>{active=false;};
- },[]);
- useEffect(()=>{const params=new URLSearchParams(window.location.search);const referral=params.get("referral");const assessment=params.get("assessment");if(referral&&referrals.some(r=>r.id===referral))setSelected(referral);if(assessment){setCategory("academic");setObservations("Academic support requested after review of assignment "+assessment+". Please review the assessment evidence and plan targeted assistance.");setIncludeEvidence(true);}},[referrals]);
+ },[role]);
+ useEffect(()=>{if(search.assessment){setCategory("academic");setObservations("Academic support requested after review of assignment "+search.assessment+". Please review the assessment evidence and plan targeted assistance.");setIncludeEvidence(true);}},[search.assessment]);
  async function execute(work:()=>Promise<unknown>,success:string) {
   setBusy(true);setError("");setMessage("");
   try{await work();await router.invalidate();setMessage(success);setNote("");}
@@ -121,29 +115,31 @@ function SupportView({referrals}:{referrals:Awaited<ReturnType<typeof getSupport
   finally{setBusy(false);}
  }
  const next=chosen?stages[stages.indexOf(chosen.stage as typeof stages[number])+1]:undefined;
- if(!role)return <main className="mx-auto max-w-6xl px-5 py-10" role={error?"alert":"status"}>{error||"Loading authorized support workspace…"}</main>;
  return <main className="mx-auto max-w-6xl px-5 pb-24 pt-9">
-  <Link to={role==="teacher"?"/teacher":"/coach"} className="text-xs font-semibold text-muted-foreground hover:underline">← Workspace home</Link>
-  <p className="mt-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · GF41 · SYNTHETIC DEVELOPMENT WORKSPACE</p>
+  <Link to={role==="teacher"?"/teacher":role==="counselor"?"/counselor":"/coach"} className="text-xs font-semibold text-muted-foreground hover:underline">← Workspace home</Link>
+  <p className="mt-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Student support</p>
   <h1 className="mt-2 font-serif text-5xl">Student support that follows through.</h1>
   <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">A teacher raises a concern, a support professional accepts responsibility, and everyone can see the appropriate status and next step.</p>
+  <p className="mt-2 text-xs text-muted-foreground">School-support records are shared with authorized staff. Do not enter clinical or private counseling notes here.</p>
   <div className="mt-7 flex flex-wrap items-center gap-4">
    <span className="text-sm">Verified staff role: <strong>{role??"Unavailable"}</strong></span>
    <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">{referrals.length} referral(s)</span>
   </div>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-300 p-3 text-sm">{error}</p>}
   {message&&<p role="status" className="mt-5 rounded-lg border border-emerald-300 p-3 text-sm">{message}</p>}
+  {selected&&<Link to={route} search={{}} className="mt-4 inline-block text-sm underline">View all referrals</Link>}
+  {selected&&!chosen&&<p role="alert" className="mt-4 rounded-xl border p-4 text-sm">This referral is unavailable in your current support workspace.</p>}
   <div className="mt-8 grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
    <section>
     <h2 className="font-serif text-3xl">{role==="teacher"?"My referrals":"Support caseload"}</h2>
     <div className="mt-4 space-y-3">
-     {referrals.map(item=><button key={item.id} onClick={()=>{setSelected(item.id);setNote("");}} className={`w-full rounded-xl border bg-card p-5 text-left hover:border-foreground/40 ${selected===item.id?"border-foreground":"border-border"}`}>
+     {referrals.filter(item=>!selected||item.id===selected).map(item=><Link key={item.id} to={route} search={{referral:item.id}} className={`block w-full rounded-xl border bg-card p-5 text-left hover:border-foreground/40 ${selected===item.id?"border-foreground":"border-border"}`}>
       <div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.category} · {item.priority}</p><span className="rounded-full bg-stone-warm px-2 py-1 text-xs">{item.stage.replaceAll("_"," ")}</span></div>
       <h3 className="mt-2 text-base font-semibold">{item.title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{item.description}</p>
       <p className="mt-3 text-xs text-muted-foreground">Assigned: {item.assignedTo}</p>
       {role==="teacher"&&item.academicRecommendation&&<p className="mt-2 rounded-lg bg-stone-warm p-3 text-xs">Academic update: {item.academicRecommendation}</p>}
-     </button>)}
+     </Link>)}
     </div>
    </section>
    {role==="teacher"?<section className="h-fit rounded-2xl border border-border bg-card p-6">
@@ -187,14 +183,14 @@ function SupportView({referrals}:{referrals:Awaited<ReturnType<typeof getSupport
       <label className="mt-3 block text-xs">Student goal<input value={goal} onChange={e=>setGoal(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
       <label className="mt-3 block text-xs">Intervention<textarea value={intervention} onChange={e=>setIntervention(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
       <label className="mt-3 block text-xs">Review target<input type="date" value={reviewDate} onChange={e=>setReviewDate(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
-      <button disabled={busy} onClick={()=>execute(()=>saveSupportPlan({data:{referralId:chosen.id,goal,intervention,targetDate:reviewDate}}),"Support plan saved.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">Save support plan</button>
+      <button disabled={busy||goal.trim().length<3||intervention.trim().length<3||!reviewDate} onClick={()=>execute(()=>saveSupportPlan({data:{referralId:chosen.id,goal,intervention,targetDate:reviewDate}}),"Support plan saved.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-40">Save support plan</button>
      </div>}
      {chosen.plan&&<div className="mt-5 rounded-xl bg-stone-warm p-4 text-sm"><p className="font-semibold">Support plan</p><p className="mt-2">Goal: {chosen.plan.goal}</p><p className="mt-2">Intervention: {chosen.plan.intervention}</p><p className="mt-2 text-xs">Review: {chosen.plan.targetDate.slice(0,10)}</p></div>}
      {["plan_created","in_service"].includes(chosen.stage)&&<div className="mt-5 rounded-xl border border-border p-4">
        <h3 className="font-semibold">Schedule student support</h3>
        <label className="mt-3 block text-xs">Service type<select value={serviceKind} onChange={e=>setServiceKind(e.target.value as typeof serviceKind)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"><option value="coaching">Academic coaching</option><option value="tutoring">Tutoring</option><option value="learning_support">Learning support</option><option value="planning">College/career planning</option></select></label>
        <label className="mt-3 block text-xs">Meeting time<input type="datetime-local" value={serviceDate} onChange={e=>setServiceDate(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
-       <button disabled={busy} onClick={()=>execute(()=>scheduleSupportService({data:{referralId:chosen.id,kind:serviceKind,scheduledAt:new Date(serviceDate).toISOString()}}),"Support service scheduled.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">Schedule service</button>
+       <button disabled={busy||!serviceDate} onClick={()=>execute(()=>scheduleSupportService({data:{referralId:chosen.id,kind:serviceKind,scheduledAt:new Date(serviceDate).toISOString()}}),"Support service scheduled.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-40">Schedule service</button>
      </div>}
      {chosen.services.map(service=><div key={service.id} className="mt-3 rounded-xl border border-border p-4">
        <p className="text-sm font-semibold">{service.kind.replaceAll("_"," ")} · {service.status}</p>
@@ -202,7 +198,7 @@ function SupportView({referrals}:{referrals:Awaited<ReturnType<typeof getSupport
        {service.outcome&&<p className="mt-2 text-xs">Outcome: {service.outcome}</p>}
        {service.status==="scheduled"&&<button disabled={busy||note.trim().length<3} onClick={()=>execute(()=>completeSupportService({data:{referralId:chosen.id,serviceId:service.id,outcome:note}}),"Service completion documented.")} className="mt-3 rounded-lg border border-border px-3 py-2 text-xs">Record completed service using note</button>}
      </div>)}
-     {next&&next!=="plan_created"&&next!=="in_service"?<button disabled={busy||note.trim().length<3} onClick={()=>execute(()=>advanceSupportReferral({data:{referralId:chosen.id,nextStage:next,note,area}}),`Referral advanced to ${next.replaceAll("_"," ")}.`)} className="mt-4 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40">Move to {next.replaceAll("_"," ")}</button>:<p className="mt-4 text-sm font-semibold">Referral closed</p>}
+     {next&&next!=="plan_created"&&next!=="in_service"?<button disabled={busy||note.trim().length<3} onClick={()=>execute(()=>advanceSupportReferral({data:{referralId:chosen.id,nextStage:next,note,area}}),`Referral advanced to ${next.replaceAll("_"," ")}.`)} className="mt-4 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40">Move to {next.replaceAll("_"," ")}</button>:<p className="mt-4 text-sm font-semibold">{chosen.stage==="closed"?"Referral closed":chosen.stage==="accepted"?"Create the support plan to continue.":"Schedule and complete services before review."}</p>}
     </>:<p className="mt-4 text-sm text-muted-foreground">Select a referral from your caseload to accept, plan, monitor or close it.</p>}
    </section>}
   </div>

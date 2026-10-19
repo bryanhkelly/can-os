@@ -1,0 +1,249 @@
+import type { ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Route as Courses } from "@/routes/student.courses";
+import { Route as Notifications } from "@/routes/notifications";
+import { Route as Operations } from "@/routes/operations";
+import { Route as Site } from "@/routes/sites.$siteId";
+import { Route as Admissions } from "@/routes/admissions.index";
+import { Route as Families } from "@/routes/admissions.families";
+import { Route as Support } from "@/routes/student.support";
+import { Route as CourseRequests } from "@/routes/operations.course-requests";
+import { Route as Offers } from "@/routes/guardian.admission-offers";
+import { Route as Permissions } from "@/routes/guardian.group-permissions";
+import { Route as StudentGroups } from "@/routes/student.study-groups";
+import { readinessFromSnapshot } from "@/domain/program-readiness";
+
+const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,data:null as unknown}));
+vi.mock("@tanstack/react-router",()=>({
+  createFileRoute:()=> (options:object)=>({
+    options,useSearch:()=>state.search,useLoaderData:()=>state.data,
+  }),
+  Link:({to,search,params,children,...props}:{
+    to:string;search?:Record<string,string|undefined>;params?:Record<string,string>;children:ReactNode;
+  })=>{
+    const path=to.replace(/\$([^/]+)/g,(_,key:string)=>params?.[key]??key);
+    const query=new URLSearchParams(Object.entries(search??{}).filter((entry):entry is [string,string]=>entry[1]!==undefined)).toString();
+    return <a href={path+(query?"?"+query:"")} {...props}>{children}</a>;
+  },
+  useRouter:()=>({invalidate:vi.fn()}),
+}));
+vi.mock("@/modules/learning/course-registration.functions",()=>({
+  getCourseRegistration:vi.fn(),requestCourseChange:vi.fn(),decideCourseChange:vi.fn(),
+}));
+vi.mock("@/modules/student-experience/assignments.functions",()=>({getAssignments:vi.fn()}));
+vi.mock("@/modules/communication/notification-center.functions",()=>({
+  getNotifications:vi.fn(),readNotification:vi.fn(),readAllNotifications:vi.fn(),setNotificationStatus:vi.fn(),
+}));
+vi.mock("@/modules/operations/command-center.functions",()=>({getLiveOperationsCommandCenter:vi.fn()}));
+vi.mock("@/modules/operations/release-health.functions",()=>({getReleaseHealth:vi.fn()}));
+vi.mock("@/modules/operations/action-workspace.functions",()=>({
+  getOperationsActions:vi.fn(),updateOperationsAction:vi.fn(),assignOperationsAction:vi.fn(),
+}));
+vi.mock("@/modules/operations/site-today.functions",()=>({getSiteToday:vi.fn()}));
+vi.mock("@/modules/enrollment/course-placement.functions",()=>({listEnrollmentPlacements:vi.fn(),placeEnrolledStudent:vi.fn()}));
+vi.mock("@/modules/enrollment/admissions-dashboard.functions",()=>({getAdmissionsDashboard:vi.fn()}));
+vi.mock("@/modules/operations/site-directory.functions",()=>({listMySites:vi.fn()}));
+vi.mock("@/modules/enrollment/admissions-program-directory.functions",()=>({listAdmissionsPrograms:vi.fn()}));
+vi.mock("@/modules/enrollment/admissions-offer.functions",()=>({
+  getAdmissionOfferOptions:vi.fn(),issueAdmissionOffer:vi.fn(),activateOfferedEnrollment:vi.fn(),
+}));
+vi.mock("@/modules/enrollment/r2-document-upload.functions",()=>({
+  beginEnrollmentDocumentUpload:vi.fn(),finishEnrollmentDocumentUpload:vi.fn(),
+  getEnrollmentDocumentDownload:vi.fn(),getEnrollmentDocumentUploadAvailability:vi.fn(),
+}));
+vi.mock("@/modules/enrollment/family-readiness.functions",()=>({
+  getFamilyReadiness:vi.fn(),setFamilyRequirement:vi.fn(),addRequirementReviewNote:vi.fn(),reviewRequirementDocument:vi.fn(),
+}));
+vi.mock("@/modules/support/support-referrals.functions",()=>({
+  advanceSupportReferral:vi.fn(),createSupportReferral:vi.fn(),getSupportReferrals:vi.fn(),
+  getSupportViewerRole:vi.fn(),listTeacherReferralStudents:vi.fn(),saveSupportPlan:vi.fn(),
+  scheduleSupportService:vi.fn(),completeSupportService:vi.fn(),
+}));
+vi.mock("@/modules/actions/student-actions.functions",()=>({getQuickWinActions:vi.fn(),requestQuickWinHelp:vi.fn()}));
+vi.mock("@/modules/learning/registrar-course-requests.functions",()=>({listRegistrarCourseRequests:vi.fn()}));
+vi.mock("@/modules/enrollment/guardian-admission-offers.functions",()=>({getGuardianAdmissionOffers:vi.fn()}));
+vi.mock("@/modules/study-groups/canonical-workspace.functions",()=>({
+  listCanonicalGuardianGroupConsents:vi.fn(),getStudyGroupAvailability:vi.fn(),
+}));
+vi.mock("@/modules/study-groups/canonical-membership.functions",()=>({
+  decideCanonicalGroupConsent:vi.fn(),requestCanonicalGroupMembership:vi.fn(),leaveCanonicalGroup:vi.fn(),
+}));
+vi.mock("@/modules/study-groups/study-group-queries.functions",()=>({listStudyGroups:vi.fn(),getStudyGroupDetail:vi.fn()}));
+vi.mock("@/modules/study-groups/canonical-moderation.functions",()=>({createCanonicalGroupPost:vi.fn(),reportCanonicalGroupPost:vi.fn()}));
+vi.mock("@/modules/study-groups/canonical-sessions.functions",()=>({rsvpCanonicalGroupSession:vi.fn()}));
+
+function render(route:{options:{component?:unknown}}){
+  const Page=route.options.component;
+  if(typeof Page!=="function")throw new Error("Missing page component");
+  return renderToStaticMarkup(<Page/>);
+}
+function successful(data:unknown){state.data={ok:true,data};}
+
+describe("application contextual navigation",()=>{
+  beforeEach(()=>{state.search={};state.data=null;});
+
+  it("opens the requested course and links to only that class's assignments",()=>{
+    state.search={section:"english"};
+    const policy={addDropEndsOn:"2030-01-01",withdrawalEndsOn:"2030-02-01",prerequisites:[],guardianApprovalRequired:false};
+    successful({connected:true,viewerRole:"student",requests:[],sections:[
+      {id:"math",title:"Mathematics",credits:1,enrollmentStatus:"active",policy},
+      {id:"english",title:"English Literature",credits:1,enrollmentStatus:"active",policy},
+    ]});
+    const html=render(Courses);
+    expect(html).toContain("English Literature");
+    expect(html).not.toContain("Mathematics");
+    expect(html).toContain('href="/student/assignments?section=english"');
+    expect(html).toContain('href="/student/study-groups"');
+  });
+
+  it("reports an unavailable course without opening another course",()=>{
+    state.search={section:"unavailable"};
+    successful({connected:true,viewerRole:"student",requests:[],sections:[]});
+    expect(render(Courses)).toContain("This course is unavailable in your current workspace.");
+  });
+
+  it("opens the selected notification and preserves its full related-record URL",()=>{
+    state.search={notification:"selected"};
+    successful([
+      {id:"selected",title:"English feedback",status:"unread",date:"2030-01-01",body:"Read your feedback",href:"/student/assignments?assessment=essay"},
+      {id:"other",title:"Unrelated update",status:"read",date:"2030-01-01",body:"Other",href:null},
+    ]);
+    const html=render(Notifications);
+    expect(html).toContain('href="/student/assignments?assessment=essay"');
+    expect(html).not.toContain("Unrelated update");
+    expect(html).toContain("View all notifications");
+  });
+
+  it("opens only the selected operations action without exposing a forbidden referral workflow",()=>{
+    state.search={action:"referral",siteId:"school",programId:"program"};
+    state.data={
+      operations:{items:[
+        {id:"referral",kind:"action",title:"Academic referral",detail:"Support team follow-up",priority:"normal",managedBySupport:true,href:"/operations"},
+        {id:"other",kind:"action",title:"Unrelated action",detail:"Other",priority:"normal",managedBySupport:false,href:"/operations"},
+      ],sites:[],programs:[],assignees:[],summary:{total:2,urgent:0,needsResponse:2}},
+      health:{buildId:"test",schemaStatus:"compatible",details:"Ready"},commandCenter:null,authError:"",
+    };
+    const html=render(Operations);
+    expect(html).toContain("Academic referral");
+    expect(html).not.toContain("Unrelated action");
+    expect(html).toContain("Managed by the support team");
+    expect(html).not.toContain('href="/student/support');
+    expect(html).not.toContain(">Resolve</button>");
+    expect(html).toContain('href="/operations?siteId=school&amp;programId=program&amp;action=referral"');
+  });
+
+  it("preserves the site, program, action and event in Site Today links",()=>{
+    successful({
+      site:{id:"school",name:"Test school",organizationName:"Test organization",timezone:"America/Los_Angeles"},
+      localDate:"2030-01-01",asOf:"2030-01-01T12:00:00Z",
+      enrollment:{count:1,note:"Active"},attendance:{count:1,present:1,absent:0,tardy:0,note:"Recorded"},
+      actions:[{id:"task",title:"Review staffing",status:"open",priority:"normal",description:null,dueAt:null}],
+      events:[{id:"event",title:"Evening assembly",startsAt:"2030-01-02T01:00:00Z",type:"assembly"}],
+      programs:[{id:"program",name:"Test program",status:"active",type:"full_school",gradeRange:{min:"9",max:"12"}}],
+    });
+    const html=render(Site);
+    expect(html).toContain('href="/operations?siteId=school&amp;action=task"');
+    expect(html).toContain('href="/operations/launch?siteId=school"');
+    expect(html).toContain('href="/admissions?siteId=school"');
+    expect(html).toContain('href="/operations/launch/program?siteId=school"');
+    expect(html).toContain('href="/calendar?date=2030-01-01&amp;event=event"');
+  });
+
+  it("keeps the selected application when opening household readiness",()=>{
+    state.search={siteId:"school",application:"application"};
+    successful({
+      sites:[],programs:[],options:[],
+      rows:[{id:"application",programId:"program",program:"Test program",stage:"inquiry",submittedAt:null,outstandingRequirements:0,offers:[],enrollments:[]},
+        {id:"other",programId:"other-program",program:"Unrelated application",stage:"inquiry",submittedAt:null,outstandingRequirements:0,offers:[],enrollments:[]}],
+    });
+    const html=render(Admissions);
+    expect(html).toContain('href="/admissions/families?siteId=school&amp;programId=program&amp;application=application"');
+    expect(html).not.toContain("Unrelated application");
+  });
+
+  it("returns from household readiness to the same admissions application",()=>{
+    state.search={siteId:"school",programId:"program",application:"application"};
+    successful([{id:"application",householdId:"household",program:"Test program",stage:"inquiry",isFixture:false,
+      offers:[],activeSchoolYears:[],requirements:[],readiness:{completed:0,total:0,blockers:0},journeyStatus:null}]);
+    expect(render(Families)).toContain('href="/admissions?siteId=school&amp;programId=program&amp;application=application"');
+  });
+
+  it("filters the admissions pipeline by stage without dropping scope from applicant links",()=>{
+    state.search={siteId:"school",programId:"program",stage:"inquiry"};
+    successful({
+      sites:[],programs:[],options:[],
+      rows:[
+        {id:"jordan",studentName:"Jordan Sample",programId:"program",program:"Academy",stage:"inquiry",submittedAt:null,outstandingRequirements:2,offers:[],enrollments:[]},
+        {id:"casey",studentName:"Casey Sample",programId:"program",program:"Academy",stage:"accepted",submittedAt:null,outstandingRequirements:0,offers:[],enrollments:[]},
+      ],
+    });
+    const html=render(Admissions);
+    expect(html).toContain("Jordan Sample");
+    expect(html).not.toContain("Casey Sample");
+    expect(html).toContain("Review 2 blocking requirement(s)");
+    expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;application=jordan"');
+    expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=inquiry" aria-current="page"');
+  });
+
+  it("opens a staff referral without relying on a second client-side role lookup",()=>{
+    state.search={referral:"referral"};
+    successful({viewerRole:"specialist",referrals:[
+      {id:"referral",title:"Academic coaching",category:"academic",stage:"submitted",priority:"normal",description:"Read evidence",assignedTo:"Coach",plan:null,services:[]},
+      {id:"other",title:"Unrelated referral",category:"academic",stage:"submitted",priority:"normal",description:"Other",assignedTo:"Coach",plan:null,services:[]},
+    ]});
+    const html=render(Support);
+    expect(html).toContain("Academic coaching");
+    expect(html).toContain("Read evidence");
+    expect(html).not.toContain("Unrelated referral");
+    expect(html).not.toContain("Loading authorized support workspace");
+  });
+
+  it("sends readiness shortcuts to operational owners, not student pages",()=>{
+    const links=Object.fromEntries(readinessFromSnapshot({}).map(item=>[item.key,item.href]));
+    expect(links).toMatchObject({
+      academics:"/operations/launch",staffing:"/staff/teachers",
+      calendar:"/operations/school-years",enrollment:"/admissions/capacity",
+    });
+    expect(Object.values(links).some(href=>href.startsWith("/student"))).toBe(false);
+  });
+
+  it("retains delivery scope in course request queues and return links",()=>{
+    state.search={siteId:"school",programId:"program"};
+    successful([
+      {id:"request",siteId:"school",programId:"program",studentName:"Jordan",sectionTitle:"English Literature",operation:"add",createdAt:"2030-01-01",deadline:"2030-02-01",programActive:true,canApprove:true},
+      {id:"other",siteId:"other-school",programId:"other-program",sectionTitle:"Unrelated course"},
+    ]);
+    const html=render(CourseRequests);
+    expect(html).toContain("English Literature");
+    expect(html).not.toContain("Unrelated course");
+    expect(html).toContain('href="/operations/course-policies?siteId=school&amp;programId=program"');
+    expect(html).toContain('href="/operations?siteId=school&amp;programId=program"');
+  });
+
+  it("opens only the requested offer for the selected child",()=>{
+    state.search={student:"child",offer:"selected"};
+    successful([{applicationId:"application",studentName:"Jordan",program:"English program",offers:[
+      {id:"selected",status:"accepted"},{id:"other",status:"declined"},
+    ]}]);
+    const html=render(Offers);
+    expect(html).toContain("Offer status: accepted");
+    expect(html).not.toContain("Offer status: declined");
+    expect(html).toContain('href="/guardian/admission-offers?student=child"');
+  });
+
+  it("does not replace an unavailable group permission request with another",()=>{
+    state.search={action:"unavailable"};
+    successful([{id:"other",groupTitle:"Unrelated group",status:"open"}]);
+    const html=render(Permissions);
+    expect(html).toContain("This permission request is unavailable");
+    expect(html).not.toContain("Unrelated group");
+  });
+
+  it("uses the same URL for student group titles and Open controls",()=>{
+    successful({enabled:true,writesEnabled:false,membershipEnabled:false,contentEnabled:false,
+      groups:[{id:"group",title:"English study group",kind:"course",capacity:20,membership:null}]});
+    const html=render(StudentGroups);
+    expect(html.match(/href="\/student\/study-groups\?group=group"/g)).toHaveLength(2);
+  });
+});

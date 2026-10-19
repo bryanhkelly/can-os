@@ -42,7 +42,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
         {items.map(x => (
           <article key={x.assessmentId + ":" + x.studentProfileId} className="rounded-xl border bg-card p-5">
             <p className="text-xs text-muted-foreground">{x.course} · due {new Date(x.dueAt).toLocaleDateString()}</p>
-            <h2 className="mt-2 font-semibold">{x.title}</h2>
+            <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:x.sectionId,assessment:x.assessmentId,student:x.studentProfileId}} className="hover:underline">{x.title}</Link></h2>
             <p className="mt-1 text-sm">{x.studentName} · {x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
             <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
             <button

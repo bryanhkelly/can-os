@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { listGuardianEffectiveAbsences, submitEffectiveAttendanceExcuse } from "@/modules/attendance/onsite-attendance-workflow.functions";
 import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachmentCounts } from "@/modules/learning/submission-attachments.functions";
@@ -8,14 +8,17 @@ const excuseMimes: Record<string, string> = { pdf: "application/pdf", docx: "app
 const excuseAttachmentMime = (name: string) => excuseMimes[name.split(".").pop()?.toLowerCase() ?? ""] ?? null;
 
 export const Route = createFileRoute("/guardian/attendance")({
- validateSearch:(search:Record<string,unknown>)=>({student:typeof search.student==="string"?search.student:undefined}),
+ validateSearch:(search:Record<string,unknown>):{student?:string;attendance?:string}=>({
+  student:typeof search.student==="string"?search.student:undefined,
+  attendance:typeof search.attendance==="string"?search.attendance:undefined,
+ }),
  component: GuardianAttendancePage,
 });
 
 type Absence = Awaited<ReturnType<typeof listGuardianEffectiveAbsences>>["absences"][number];
 
 function GuardianAttendancePage() {
-  const {student}=Route.useSearch();
+  const {student,attendance}=Route.useSearch();
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -105,6 +108,8 @@ function GuardianAttendancePage() {
       {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
       {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance…</p>}
       {!loading && !error && <>
+        {attendance&&<Link to="/guardian/attendance" search={{student}} className="mt-4 inline-block text-sm underline">View all attendance for this child</Link>}
+        {attendance&&!absences.some(item=>item.attendanceEventId===attendance)&&<p role="alert" className="mt-4 rounded-xl border p-4">This attendance record is unavailable in the current view.</p>}
         <div className="mt-6 grid grid-cols-3 gap-3" aria-label="Attendance summary">
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Recent attendance cases</p><p className="mt-1 text-2xl font-semibold">{absences.length}</p></div>
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Needs an excuse</p><p className="mt-1 text-2xl font-semibold">{needsExcuse.length}</p></div>
@@ -112,7 +117,7 @@ function GuardianAttendancePage() {
         </div>
         {absences.length === 0 && <p className="mt-8 text-sm">No recent absence or tardy cases were found for your students.</p>}
         {absences.length > 0 && <div className="mt-8 grid gap-4">
-          {absences.map(absence => <section key={absence.attendanceEventId} className="rounded-xl border bg-card p-5">
+          {absences.filter(item=>!attendance||item.attendanceEventId===attendance).map(absence => <section key={absence.attendanceEventId} className="rounded-xl border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">{absence.studentName}</h2>

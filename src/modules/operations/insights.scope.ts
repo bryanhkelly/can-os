@@ -36,7 +36,7 @@ async function insightReadScope({ db, s, ops }: ReadScopeHelpers, context: Scope
     if (!sectionIds.length) return ops.sql`false`;
     return ops.inArray(s.insights.sectionId, sectionIds);
   }
-  if (context.role === "specialist") {
+  if (context.role === "specialist" || context.role === "counselor") {
     if (!siteIds.length) return ops.sql`false`;
     return ops.and(ops.isNotNull(s.insights.sectionId), ops.inArray(s.sections.siteId, siteIds));
   }

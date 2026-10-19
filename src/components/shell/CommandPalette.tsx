@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { searchWorkspace, type SearchHit } from "@/modules/search/global-search.functions";
 import { workspaceLinks } from "@/components/shell/WorkspaceNavigation";
@@ -25,7 +24,6 @@ const GROUP_ORDER: Array<{ key: "courses" | "assignments" | "students" | "messag
  * authorized server search over courses, assignments, students, and messages.
  */
 export function CommandPalette() {
-  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [activeRole, setActiveRole] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -145,7 +143,7 @@ export function CommandPalette() {
     const entry = flat[index];
     if (!entry) return;
     setOpen(false);
-    void navigate({ to: entry.item.to });
+    window.location.assign(entry.item.to);
   };
 
   const onInputKeyDown = (event: React.KeyboardEvent) => {

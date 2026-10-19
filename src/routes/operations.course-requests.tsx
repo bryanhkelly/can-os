@@ -24,6 +24,10 @@ function RegistrarCourseRequests() {
 type CourseRequest = Awaited<ReturnType<typeof listRegistrarCourseRequests>>[number];
 function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
   const router = useRouter();
+  const selection=Route.useSearch();
+  const visibleRequests=requests.filter(request=>
+    (!selection.siteId||request.siteId===selection.siteId)&&
+    (!selection.programId||request.programId===selection.programId));
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -49,17 +53,17 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
       title="Course change approvals"
       subtitle="Approve or decline pending student course changes. Enrollment guards and any required guardian permission are verified again when you approve."
       actions={<div className="flex flex-wrap gap-2">
-        <Link to="/operations/course-policies" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">
+        <Link to="/operations/course-policies" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">
           Registration policies
         </Link>
         <Link to="/operations/field-trips" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Field trips</Link>
-        <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
+        <Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
       </div>}
     >
       {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
       {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
       <div className="mt-7 space-y-4">
-        {requests.map(request => (
+        {visibleRequests.map(request => (
           <article key={request.id} className="rounded-xl border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -99,7 +103,7 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
             </div>
           </article>
         ))}
-        {requests.length === 0 &&
+        {visibleRequests.length === 0 &&
           <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
             No pending course change requests in your authorized schools and programs.
           </p>}

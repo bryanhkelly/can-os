@@ -39,9 +39,9 @@ function TeacherTodayPage() {
 
    {ready && <>
     <div className="mt-8 grid grid-cols-3 gap-3" aria-label="Today summary">
-     <StatCard label="Sections" value={data.sections.length} />
-     <StatCard label="Needs grading" value={data.ungraded.length} />
-     <StatCard label="Missing work" value={data.missingWork.length} />
+     <Link to="/classes"><StatCard label="Sections" value={data.sections.length} /></Link>
+     <Link to="/teacher/gradebook"><StatCard label="Needs grading" value={data.ungraded.length} /></Link>
+     <Link to="/teacher/missing-work"><StatCard label="Missing work" value={data.missingWork.length} /></Link>
     </div>
 
     <section className="mt-10">
@@ -49,7 +49,8 @@ function TeacherTodayPage() {
      {data.sections.length === 0 && <EmptyState className="mt-4" title="No sections are assigned to you yet." />}
      <div className="mt-4 grid gap-3 sm:grid-cols-2">
       {data.sections.map(section => <article key={section.id} className="rounded-xl border bg-card p-5">
-       <h2 className="font-semibold">{section.title}</h2>
+       <h2 className="font-semibold"><Link to="/classes" search={{section:section.id}} className="hover:underline">{section.title}</Link></h2>
+       <Link to="/teacher/gradebook" search={{section:section.id}} className="mt-2 inline-block text-sm underline">Class gradebook</Link>
        <p className="mt-1 text-sm text-muted-foreground">{section.studentCount} enrolled {section.studentCount === 1 ? "student" : "students"}</p>
       </article>)}
      </div>
@@ -58,13 +59,13 @@ function TeacherTodayPage() {
     <section className="mt-10">
      <div className="flex flex-wrap items-baseline justify-between gap-3">
       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Needs grading</p>
-      <Link to="/teacher/missing-work" className="text-xs font-semibold underline">Open missing-work queue →</Link>
+      <Link to="/teacher/gradebook" className="text-xs font-semibold underline">Open gradebook →</Link>
      </div>
      {data.ungraded.length === 0 && <EmptyState className="mt-4" title="Nothing waiting for a grade. Nice work." />}
      <div className="mt-4 grid gap-3">
       {data.ungraded.map(item => <article key={`${item.assessmentId}:${item.studentProfileId}`} className="rounded-xl border bg-card p-5">
        <p className="text-xs text-muted-foreground">{item.sectionTitle} · submitted {item.submittedAt ? new Date(item.submittedAt).toLocaleDateString() : "recently"}</p>
-       <h2 className="mt-2 font-semibold">{item.assessmentTitle}</h2>
+       <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:item.sectionId,assessment:item.assessmentId,student:item.studentProfileId}} className="hover:underline">{item.assessmentTitle}</Link></h2>
        <p className="mt-1 text-sm">{item.studentName}</p>
       </article>)}
      </div>
@@ -76,7 +77,7 @@ function TeacherTodayPage() {
      <div className="mt-4 grid gap-3">
       {data.missingWork.map(item => <article key={`${item.assessmentId}:${item.studentProfileId}`} className="rounded-xl border bg-card p-5">
        <p className="text-xs text-muted-foreground">{item.sectionTitle} · due {new Date(item.dueAt).toLocaleDateString()}</p>
-       <h2 className="mt-2 font-semibold">{item.assessmentTitle}</h2>
+       <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:item.sectionId,assessment:item.assessmentId,student:item.studentProfileId}} className="hover:underline">{item.assessmentTitle}</Link></h2>
        <p className="mt-1 text-sm">{item.studentName} · no submission recorded</p>
       </article>)}
      </div>
@@ -88,7 +89,7 @@ function TeacherTodayPage() {
      <div className="mt-4 grid gap-3">
       {data.notices.map(notice => <article key={notice.id} className="rounded-xl border bg-card p-5">
        <p className="text-xs text-muted-foreground">{new Date(notice.createdAt).toLocaleDateString()}{notice.status === "unread" ? " · unread" : ""}</p>
-       <h2 className="mt-2 font-semibold">{notice.title}</h2>
+       <h2 className="mt-2 font-semibold"><Link to="/notifications" search={{notification:notice.id}} className="hover:underline">{notice.title}</Link></h2>
        {notice.body && <p className="mt-1 text-sm text-muted-foreground">{notice.body}</p>}
       </article>)}
      </div>

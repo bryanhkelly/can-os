@@ -13,6 +13,13 @@ VALUES
 ('fb000000-0000-4000-8000-000000000003','fa000000-0000-4000-8000-000000000003','f4100000-0000-4000-8000-000000000003','specialist','f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003',true)
 ON CONFLICT (id) DO NOTHING;
 
+-- Disposable-fixture membership only; provision application roles through Admin.
+INSERT INTO account_person_grants(id,account_id,person_id,role,organization_id,site_id,is_synthetic)
+VALUES ('fb000000-0000-4000-8000-000000000005','fa000000-0000-4000-8000-000000000003',
+ 'f4100000-0000-4000-8000-000000000003','counselor',
+ 'f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003',true)
+ON CONFLICT (id) DO NOTHING;
+
 -- Riley Example is the synthetic instructor for Jordan's four enrolled classes.
 -- This relationship is required by the server-authorized assignment workflow.
 INSERT INTO section_teachers (section_id,person_id,role)

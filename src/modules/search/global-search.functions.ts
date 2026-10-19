@@ -27,7 +27,7 @@ const EMPTY: WorkspaceSearchResults = {
   messages: [],
 };
 
-const ALL_ROLES = ["student", "teacher", "guardian", "registrar", "specialist"] as const;
+const ALL_ROLES = ["student", "teacher", "guardian", "registrar", "specialist", "counselor"] as const;
 
 function escapeLike(term: string): string {
   return term.replace(/[\\%_]/g, "");
@@ -84,7 +84,7 @@ async function searchCourses(actor: Actor, like: string): Promise<SearchHit[]> {
       id: `course-${row.id}`,
       label: row.title,
       sub: row.code,
-      to: "/student/courses",
+      to: `/student/courses?section=${encodeURIComponent(row.id)}`,
     }));
   }
 
@@ -111,7 +111,7 @@ async function searchCourses(actor: Actor, like: string): Promise<SearchHit[]> {
     id: `course-${row.id}`,
     label: row.title,
     sub: row.code,
-    to: "/teacher/gradebook",
+    to: `/teacher/gradebook?section=${encodeURIComponent(row.id)}`,
   }));
 }
 
@@ -148,6 +148,7 @@ async function searchAssignments(actor: Actor, like: string): Promise<SearchHit[
       title: s.assessments.title,
       dueAt: s.assessments.dueAt,
       sectionTitle: s.sections.title,
+      sectionId: s.sections.id,
     })
     .from(s.assessments)
     .innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
@@ -181,7 +182,9 @@ async function searchAssignments(actor: Actor, like: string): Promise<SearchHit[
     id: `assignment-${row.id}`,
     label: row.title,
     sub: row.dueAt ? `${row.sectionTitle} · due ${day(row.dueAt)}` : row.sectionTitle,
-    to: actor.role === "student" ? "/student/assignments" : "/teacher/gradebook",
+    to: actor.role === "student"
+      ? `/student/assignments?assessment=${encodeURIComponent(row.id)}`
+      : `/teacher/gradebook?section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.id)}`,
   }));
 }
 
@@ -294,7 +297,7 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
       sub: row.gradeLevel ? `Grade ${row.gradeLevel}` : "Student",
       to:
         actor.role === "guardian"
-          ? "/guardian/academics"
+          ? `/guardian/academics?student=${encodeURIComponent(row.personId)}`
           : `/staff/students/${row.personId}`,
     });
     if (hits.length >= 5) break;
@@ -325,7 +328,7 @@ async function searchMessages(actor: Actor, like: string): Promise<SearchHit[]> 
     id: `thread-${row.id}`,
     label: row.subject,
     sub: row.lastMessageAt ? `Last message ${day(row.lastMessageAt)}` : "Thread",
-    to: "/messages",
+    to: `/messages?thread=${encodeURIComponent(row.id)}`,
   }));
 }
 

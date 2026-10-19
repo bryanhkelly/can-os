@@ -50,7 +50,7 @@ describe("canonical workspace search", () => {
     };
     const result = await searchWorkspace({ data: { query: suffix } });
     expect(result.students).toEqual([expect.objectContaining({
-      id: `student-${student!.id}`, label: `Alex ${suffix}`, to: "/guardian/academics",
+      id: `student-${student!.id}`, label: `Alex ${suffix}`, to: `/guardian/academics?student=${student!.id}`,
     })]);
     for (const scope of [
       { siteIds: [], programIds: [program!.id] },

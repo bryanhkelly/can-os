@@ -28,6 +28,10 @@ CAN OS is a real multi-user application with a shared Neon-backed synthetic demo
 - Authenticate each request from session, not from query string, localStorage, or client-submitted actorId.
 - Where anonymous shared demo access is allowed, give it an explicit limited demo principal and never pretend that principal represents an authenticated student or staff member.
 
+## Local synthetic demo sign-in
+
+In the existing access form, the four seeded synthetic email addresses reveal a code field and use the fixed code `CANOS-LOCAL-TEST` without email delivery in local development or test runs. Other addresses keep the standard email-link flow. Enable demo-code redemption explicitly with `CAN_DEMO_FIXED_ACCESS_ENABLED=true`; the server also requires `NODE_ENV` to be `development` or `test`. Production environments reject this sign-in path even if the flag is accidentally set. It only accepts the four allowlisted `.invalid` demo emails with an active synthetic grant, creates a regular audited server session, and does not mark the email as verified. Never use this code for real accounts or shared production access.
+
 ## Original implementation sequence (historical, not a live task list)
 
 1. Add auth/session/one-time-challenge schema, scoped grants and idempotent synthetic fixtures.

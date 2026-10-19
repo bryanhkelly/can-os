@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader } from "@/domain/access-tokens";
+import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS } from "@/domain/local-demo-access";
 import { writeAudit } from "@/platform/mutation";
 import { and,eq,gt,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
@@ -86,6 +87,56 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   if(!member)throw new Error("Membership unavailable");
   await writeAudit(tx, {actorPersonId:member.personId,action:"identity.session.started",resourceType:"account",resourceId:account.id,context:{method:"email_link",sessionId:session.id,grantId:activeGrant.id}});
   return {accountId:account.id,role:activeGrant.role,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
+ });
+}
+/** Local/test-only sign-in for the seeded synthetic demo accounts. */
+export async function redeemLocalDemoAccess(
+ rawEmail:string,
+ code:string,
+):Promise<{setCookie:string;accountId:string;role:string}> {
+ if(!isLocalDemoAccessEnabled(process.env) || code!==LOCAL_DEMO_ACCESS_CODE) {
+  throw new Error("Invalid local demo credentials");
+ }
+ const email=normalizeAccessEmail(rawEmail);
+ if(!LOCAL_DEMO_ACCOUNTS.some(account=>account.email===email)) {
+  throw new Error("Invalid local demo credentials");
+ }
+ const now=new Date();
+ return db.transaction(async tx=>{
+  const [account]=await tx.select({id:accessAccounts.id})
+   .from(accessAccounts)
+   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false)))
+   .limit(1);
+  if(!account)throw new Error("Invalid local demo credentials");
+  const grants=await tx.select({
+   id:accountPersonGrants.id,
+   personId:accountPersonGrants.personId,
+   role:accountPersonGrants.role,
+   isSynthetic:accountPersonGrants.isSynthetic,
+  }).from(accountPersonGrants)
+   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)));
+  const grant=grants.find(candidate=>candidate.isSynthetic&&Object.hasOwn(roleCapabilities,candidate.role));
+  if(!grant)throw new Error("Invalid local demo credentials");
+  const secret=issueOpaqueSecret();
+  const [session]=await tx.insert(accessSessions).values({
+   accountId:account.id,
+   secretHash:hashAccessSecret(secret,secretPepper()),
+   activeGrantId:grant.id,
+   expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
+  }).returning({id:accessSessions.id});
+  if(!session)throw new Error("Unable to establish session");
+  await writeAudit(tx,{
+   actorPersonId:grant.personId,
+   action:"identity.session.started",
+   resourceType:"account",
+   resourceId:account.id,
+   context:{method:"local_demo_code",sessionId:session.id,grantId:grant.id},
+  });
+  return {
+   accountId:account.id,
+   role:grant.role,
+   setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000),
+  };
  });
 }
 export async function revokeAccessSession(sessionId:string,accountId:string):Promise<string> {

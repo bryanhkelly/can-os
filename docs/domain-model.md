@@ -9,6 +9,14 @@ One permanent human identity.
 
 A Person may simultaneously be a student, guardian, teacher, volunteer, pastor, board member, coach, alumnus, or staff member.
 
+School profiles use this permanent identity and current scoped teaching,
+enrollment or guardian relationships. They do not expose clinical, contact or
+credential evidence. A profile photo is an existing verified `Document` with
+category `profile_photo`, subject `person`, standard sensitivity and private R2
+storage. Only the person can upload their own bounded JPEG/PNG; related viewers
+are reauthorized before receiving a short-lived download URL. Missing photos
+render initials, not stock images.
+
 ### StudentProfile
 Student-domain data associated with a Person. Never a second identity.
 
@@ -19,6 +27,14 @@ A Student may participate in more than one Household.
 
 ### GuardianRelationship
 Explicit Person-to-Student relationship including legal/visibility rules.
+
+### School-support staff
+`counselor` and `specialist` are distinct verified membership roles sharing the
+school-support workspace. Caseload, referrals, plans, services and outreach use
+existing scoped Actions and support records, with immutable mutation evidence
+and transactional domain events. This shared school-support policy does not
+authorize clinical/private counseling notes; those remain excluded pending
+explicit confidentiality, consent, retention and exceptional-access policy.
 
 ## Organizations and delivery
 
@@ -83,6 +99,14 @@ Canonical reusable course definition.
 ### CourseTemplateVersion
 Immutable/versioned curriculum release used by Sections.
 
+Published class reading content uses the optional `curriculum.learning` contract:
+`version: 1`, `syllabus`, ordered `modules` with stable IDs and ordered `lessons`
+(`id`, `title`, `body`, `resources`), and class-level `resources`. Resource IDs
+are unique throughout the release. Each resource contains exactly one HTTPS
+`url` or private `documentId`. Invalid configured content fails explicitly;
+absent content is an unpublished-content empty state, not synthetic lessons.
+Sections never maintain a second browser-side curriculum store.
+
 ### ModuleTemplate
 Reusable ordered module structure.
 
@@ -127,6 +151,29 @@ Definition of work to be completed/evaluated.
 Student attempt against an Assessment.
 
 Lifecycle and timeliness are separate dimensions.
+
+### LessonProgress
+Student-reported completion of a stable lesson ID, scoped to the StudentProfile,
+Section and CourseTemplateVersion. A version change does not silently carry
+completion onto different content. This is not attendance, a grade or mastery.
+Repeated writes of the same state are idempotent; changes produce an AuditEvent
+and transactional outbox DomainEvent. Parents read only their academically
+authorized child's progress; assigned teachers read current roster progress.
+
+### SubmissionAnnotation
+Append-only teacher feedback on an exact text range of one Submission attempt.
+Browser UTF-16 offsets and the quoted text must match the persisted response.
+Students and academically authorized guardians see annotations only after that
+attempt is graded or returned. A revision creates another attempt and does not
+retarget earlier annotations. This does not provide PDF/image markup.
+
+### Class communications
+Announcements and discussions reuse CommunicationThread/CommunicationMessage
+with Section context; they are not separate communication stores. Assignment
+conversations use Assessment context plus the target StudentProfile and are
+shared with the student, academically authorized guardians and assigned teachers.
+They are not private teacher notes. Reading or replying rechecks current
+enrollment, scope and relationship, even when historical participant rows remain.
 
 ### SectionGrade
 Computed/finalizable academic result for a Student in a Section/GradingPeriod. Finalization is explicit and corrections are append-only/audited.

@@ -139,7 +139,7 @@ export const acceptInsight = createServerFn({ method: "POST" })
       ops.eq(s.accountPersonGrants.organizationId,insight.organizationId),
       ops.eq(s.accountPersonGrants.siteId,insight.siteId),
       ops.eq(s.accountPersonGrants.active,true),
-      ops.inArray(s.accountPersonGrants.role,["registrar","teacher","specialist"])
+      ops.inArray(s.accountPersonGrants.role,["registrar","teacher","specialist","counselor"])
      )).limit(1);
     if(!assignee)throw new AuthorizationError("active school staff assignee");
     if(academic)await assertAcademicActionStaff(tx,data.actionOwnerPersonId,insight);

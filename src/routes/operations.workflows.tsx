@@ -65,7 +65,7 @@ function ConnectedWorkflowsPage() {
         {data.programs.map(program => <article key={program.id} className="rounded-2xl border bg-card p-5 sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="font-serif text-2xl">{program.name}</h2>
+              <h2 className="font-serif text-2xl"><Link to="/operations/launch/$programId" params={{programId:program.id}} search={{siteId:program.siteId??undefined,programId:undefined}} className="hover:underline">{program.name}</Link></h2>
               <p className="mt-1 text-xs capitalize text-muted-foreground">
                 {program.type.replaceAll("_"," ")} · {program.status}
               </p>
@@ -88,7 +88,7 @@ function ConnectedWorkflowsPage() {
             <section className="rounded-xl border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF23 / GF3 · Launch readiness</h3>
-                <Link to="/operations/school-years" search={{siteId:undefined,programId:undefined}} className="text-xs underline">School-year studio</Link>
+                <Link to="/operations/school-years" search={{siteId:program.siteId??undefined,programId:program.id}} className="text-xs underline">School-year studio</Link>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <Metric label="Active year" value={program.launch.hasActiveSchoolYear ? "Yes" : "No"} />
@@ -103,7 +103,7 @@ function ConnectedWorkflowsPage() {
             <section className="rounded-xl border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF22 / GF2 · Admissions to enrollment</h3>
-                <Link to="/admissions/families" search={{siteId:undefined,programId:undefined}} className="text-xs underline">Family readiness</Link>
+                <Link to="/admissions/families" search={{siteId:program.siteId??undefined,programId:program.id}} className="text-xs underline">Family readiness</Link>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <Metric label="Applications" value={program.enrollment.applications} />
@@ -126,7 +126,7 @@ function ConnectedWorkflowsPage() {
             <section className="rounded-xl border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF1 · Learning and intervention</h3>
-                <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="text-xs underline">Actions queue</Link>
+                <Link to="/operations" search={{siteId:program.siteId??undefined,programId:program.id}} className="text-xs underline">Actions queue</Link>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <Metric label="Latest missing attempts" value={program.learning.missingLatestAttempts} />

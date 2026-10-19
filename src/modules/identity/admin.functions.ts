@@ -4,7 +4,7 @@ import { z } from "zod";
 import { recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
 // The staff-invite flow must not grant student or guardian identities.
-const assignableRoles = ["teacher", "registrar", "specialist"] as const;
+const assignableRoles = ["teacher", "registrar", "specialist", "counselor"] as const;
 
 /** Every admin function requires the registrar role, admin.manage, and a non-empty organization scope. */
 async function requireRegistrar(): Promise<Actor & { organizationIds: string[]; grantSiteId: string | null }> {

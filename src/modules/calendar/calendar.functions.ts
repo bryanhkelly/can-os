@@ -10,7 +10,7 @@ import { reviseCalendarEventForActor } from "./calendar-events.server";
 import { visibleStudyGroupCalendarEventIds } from "./group-calendar-visibility.server";
 import { isValidTimeZone } from "./timezone";
 
-const allRoles: readonly ActorRole[] = ["student", "teacher", "guardian", "registrar", "specialist"];
+const allRoles: readonly ActorRole[] = ["student", "teacher", "guardian", "registrar", "specialist", "counselor"];
 
 export type CalendarFeedItem = {
   id: string;
@@ -23,6 +23,7 @@ export type CalendarFeedItem = {
   description: string | null;
   cancelled: boolean;
   manageable: boolean;
+  sectionId?: string | null;
 };
 
 type Schema = typeof import("@/db/schema");
@@ -186,6 +187,7 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
         description: event.description,
         cancelled,
         manageable,
+        sectionId: event.sectionId,
       };
     });
 
@@ -196,6 +198,7 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
           title: schema.assessments.title,
           dueAt: schema.assessments.dueAt,
           sectionTitle: schema.sections.title,
+          sectionId: schema.sections.id,
         })
         .from(schema.assessments)
         .innerJoin(schema.sections, eq(schema.sections.id, schema.assessments.sectionId))
@@ -220,6 +223,7 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
           description: row.sectionTitle,
           cancelled: false,
           manageable: false,
+          sectionId: row.sectionId,
         });
       }
     }

@@ -29,6 +29,7 @@ export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Obj
  guardian: ["guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read","communication.send","attendance.excuse.submit","calendar.event.create","conference.book"],
  registrar: ["admissions:read","notifications:manage","admissions:decide","enrollment.decide","enrollment.activate","enrollment:manage","registrations:approve","attendance.write","attendance.excuse.review","communication.send","program.read","program.launch.start","program.activate","calendar.event.create","calendar.event.manage","academic_year.manage","academic_year.activate","action.resolve","journey.requirement.complete","admin.manage","insights:read","insights:manage","capacity.read","capacity.manage","capacity.demand.manage","capacity.reserve"],
  specialist: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage","communication.send","action.resolve","action.create","calendar.event.create","insights:read"],
+ counselor: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage","communication.send","action.resolve","action.create","calendar.event.create","insights:read"],
 });
 
 /** This may be called only after authenticating a server session and fetching grants from Neon. */

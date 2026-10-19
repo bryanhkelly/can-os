@@ -36,11 +36,14 @@ export const getOperationsActions=createServerFn({method:"GET"})
   detail:record.description??record.type.replaceAll("_"," "),
   priority:record.priority==="urgent"?"critical" as const:record.priority==="high"?"high" as const:"normal" as const,
   createdAt:record.createdAt.toISOString(),
-  href:record.type==="support_referral"?"/student/support?referral="+encodeURIComponent(record.id):"/operations",
+  href:"/operations",
   needsResponse:record.status==="open",
  })));
- const scopedItems=items.map(item=>({...item,siteId:records.find(record=>record.id===item.id)?.siteId??null,ownerPersonId:records.find(record=>record.id===item.id)?.ownerPersonId??null}));
- const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist"])));
+ const scopedItems=items.map(item=>{
+  const record=records.find(record=>record.id===item.id);
+  return {...item,siteId:record?.siteId??null,ownerPersonId:record?.ownerPersonId??null,managedBySupport:record?.type==="support_referral"};
+ });
+ const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor"])));
  const [siteChoices,programChoices]=await Promise.all([
   db.select({id:sites.id,name:sites.name}).from(sites).where(inArray(sites.id,actor.scope.siteIds!)),
   actor.scope.programIds?.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,actor.scope.programIds),isNotNull(programs.siteId),...(data.siteId?[eq(programs.siteId,data.siteId)]:[]))) : Promise.resolve([]),
@@ -90,7 +93,7 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    if(academic)await assertAcademicActionAuthority(tx,actor,record);
    if(data.ownerPersonId){
     if(!record.siteId)throw new AuthorizationError("site-scoped action required for assignment");
-    const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist"]))).limit(1);
+    const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor"]))).limit(1);
     if(!grant)throw new AuthorizationError("assignee must have active site membership");
     if(academic)await assertAcademicActionStaff(tx,data.ownerPersonId,record);
    }

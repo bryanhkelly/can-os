@@ -59,7 +59,7 @@ export async function assertAcademicActionStaff(
       eq(accountPersonGrants.personId, personId),
       eq(accountPersonGrants.active, true),
       eq(accountPersonGrants.organizationId, resource.organizationId),
-      or(eq(accountPersonGrants.role, "registrar"), eq(accountPersonGrants.role, "specialist")),
+      or(eq(accountPersonGrants.role, "registrar"), eq(accountPersonGrants.role, "specialist"), eq(accountPersonGrants.role, "counselor")),
       resource.siteId === null ? isNull(accountPersonGrants.siteId)
         : or(isNull(accountPersonGrants.siteId), eq(accountPersonGrants.siteId, resource.siteId)),
     )).limit(1);

@@ -6,11 +6,15 @@ export const Route=createFileRoute("/access/verify")({
    if(new URL(request.url).origin!==request.headers.get("origin"))return Response.json({error:"Invalid request origin"},{status:403});
    let value:unknown;
    try{value=await request.json();}catch{return Response.json({error:"Invalid request"},{status:400});}
-   const token=value&&typeof value==="object"&&"token" in value?(value as {token:unknown}).token:null;
-   if(typeof token!=="string")return Response.json({error:"Invalid request"},{status:400});
+   const payload=value&&typeof value==="object"?value:null;
    try{
-    const {redeemOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
-    const result=await redeemOneTimeAccess(token);
+    const {redeemLocalDemoAccess,redeemOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
+    const result=payload&&"email" in payload&&typeof payload.email==="string"&&"code" in payload&&typeof payload.code==="string"
+     ?await redeemLocalDemoAccess(payload.email,payload.code)
+     :payload&&"token" in payload&&typeof payload.token==="string"
+      ?await redeemOneTimeAccess(payload.token)
+      :null;
+    if(!result)return Response.json({error:"Invalid request"},{status:400});
     return new Response(JSON.stringify({ok:true,role:result.role}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
    }catch{return Response.json({error:"Invalid or expired access link"},{status:401});}
   },
@@ -31,7 +35,7 @@ function VerifyAccess(){
    if(!res.ok){setStatus("This access link is invalid or expired.");return;}
    setToken(null);
    const body=await res.json() as {role?:string};
-   const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/student/support"};
+   const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/coach",counselor:"/counselor"};
    window.location.replace(home[body.role??""]??"/access");
   }catch{setStatus("Unable to complete sign-in.");}finally{setWorking(false);}
  }

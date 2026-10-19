@@ -13,6 +13,36 @@
     "identity-demo-accounts.sql"
   ],
   "routes": {
+    "/counselor": {
+      "persona": "counselor",
+      "seeds": ["gf41-support-referrals.sql"],
+      "recordCounts": {"actions": 1, "support_referrals": 1},
+      "interactions": ["read scoped support caseload", "open exact student context", "log school-support outreach"],
+      "downstreamRecords": ["actions", "audit_events", "domain_events"]
+    },
+    "/support": {
+      "persona": "specialist, counselor",
+      "seeds": ["gf41-support-referrals.sql"],
+      "recordCounts": {"actions": 1, "support_referrals": 1},
+      "interactions": ["triage referral", "save plan", "schedule and complete service", "review and close referral"],
+      "downstreamRecords": ["support_plans", "support_services", "support_referral_stage_events", "audit_events", "domain_events"]
+    },
+    "/classes": {
+      "persona": "student, guardian, teacher",
+      "seeds": ["class-participation.sql"],
+      "recordCounts": {
+        "sections": 1,
+        "course_template_versions": 1,
+        "enrollments": 1
+      },
+      "interactions": [
+        "read published lessons, syllabus and external resources",
+        "persist lesson completion and view it as the guardian or assigned teacher",
+        "publish and read a class announcement",
+        "open section-scoped classwork and discussions"
+      ],
+      "downstreamRecords": ["lesson_progress", "communication_threads", "communication_messages", "audit_events", "domain_events"]
+    },
     "/": {
       "fixtureRequired": false,
       "persona": "public",
@@ -368,19 +398,17 @@
       ]
     },
     "/profiles": {
-      "persona": "staff",
-      "seeds": [
-        "synthetic-profiles-compliance.sql"
-      ],
+      "persona": "authenticated",
+      "seeds": [],
       "recordCounts": {
-        "qualification_definitions": 1,
-        "qualification_claims": 1,
-        "compliance_frameworks": 1
+        "people": 1
       },
       "interactions": [
-        "review person qualifications and compliance posture"
+        "open own or relationship-authorized school profile",
+        "show initials without a verified photo",
+        "upload own JPEG or PNG through private storage"
       ],
-      "downstreamRecords": []
+      "downstreamRecords": ["documents", "audit_events", "domain_events"]
     },
     "/readiness": {
       "persona": "registrar",

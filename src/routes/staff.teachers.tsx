@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
 import { useEffect, useState } from "react";
 import { listTeachers } from "@/modules/profiles/directory.functions";
 
@@ -73,7 +74,7 @@ function StaffTeachersPage() {
               <tbody>
                 {teachers.map((teacher) => (
                   <tr key={teacher.personId} className="border-b last:border-0 align-top">
-                    <td className="px-5 py-3 font-semibold">{teacher.name}</td>
+                    <td className="px-5 py-3 font-semibold"><ProfilePhoto personId={teacher.personId} name={teacher.name}/><Link to="/profiles" search={{person:teacher.personId}} className="mt-2 inline-block underline">{teacher.name}</Link></td>
                     <td className="px-5 py-3">{teacher.sections.join(", ")}</td>
                     <td className="px-5 py-3">{teacher.studentCount}</td>
                   </tr>

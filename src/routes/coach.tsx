@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { WorkspaceShell } from "@/components/workspace";
 import { useEffect, useState } from "react";
 import {
   getCoachCaseload,
@@ -6,7 +7,12 @@ import {
   logCoachOutreach,
 } from "@/modules/support/coach.functions";
 
-export const Route = createFileRoute("/coach")({ component: CoachPage });
+export const Route = createFileRoute("/coach")({
+  validateSearch: (search: Record<string,unknown>):{student?:string}=>({student:typeof search.student==="string"?search.student:undefined}),
+  component:()=>{const search=Route.useSearch();const navigate=Route.useNavigate();
+    return <CoachPage key={search.student??"all"} studentProfileId={search.student}
+      selectStudent={student=>void navigate({search:{student}})}/>;},
+});
 
 type CaseloadStudent = Awaited<ReturnType<typeof getCoachCaseload>>["students"][number];
 type TimelineEntry = Awaited<ReturnType<typeof getCoachStudentHistory>>["timeline"][number];
@@ -18,11 +24,13 @@ const outcomes = [
   { value: "no_response", label: "No response" },
 ] as const;
 
-function CoachPage() {
+export function CoachPage({studentProfileId,selectStudent,title="Specialist caseload"}:{
+  studentProfileId?:string;selectStudent:(id:string)=>void;title?:string;
+}) {
   const [students, setStudents] = useState<CaseloadStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const selected = studentProfileId ?? null;
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [note, setNote] = useState("");
@@ -30,6 +38,7 @@ function CoachPage() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [message, setMessage] = useState("");
+  const [historyError,setHistoryError]=useState("");
 
   useEffect(() => {
     let active = true;
@@ -53,16 +62,16 @@ function CoachPage() {
     if (!selected) return;
     let active = true;
     setTimelineLoading(true);
-    setTimeline([]);
+    setTimeline([]);setHistoryError("");
     getCoachStudentHistory({ data: { studentProfileId: selected } })
       .then((result) => {
         if (!active) return;
         setTimeline(result.timeline);
         setTimelineLoading(false);
       })
-      .catch(() => {
+      .catch((cause) => {
         if (!active) return;
-        setTimeline([]);
+        setTimeline([]);setHistoryError(cause instanceof Error?cause.message:"Unable to load student history.");
         setTimelineLoading(false);
       });
     return () => {
@@ -95,15 +104,14 @@ function CoachPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-      <div className="mx-auto max-w-6xl">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Coach</p>
-        <h1 className="mt-2 font-serif text-4xl">Caseload</h1>
+    <WorkspaceShell width="wide" eyebrow="CAN OS · Student support" title={title}
+      actions={<Link to="/support" className="rounded-lg border px-4 py-2 text-sm">Referrals, plans & services</Link>}>
         <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
           Students at your sites with open referrals, support plans, insights, or actions — sorted by what needs attention first.
         </p>
         {loading && <p className="mt-8 text-sm" role="status">Loading caseload…</p>}
         {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
+        {!loading&&!error&&selected&&!chosen&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This student is unavailable in your current caseload.</p>}
         {!loading && !error && students.length === 0 && (
           <p className="mt-8 text-sm">No students currently need coach attention at your sites.</p>
         )}
@@ -115,7 +123,7 @@ function CoachPage() {
                   <button
                     key={student.studentProfileId}
                     onClick={() => {
-                      setSelected(student.studentProfileId);
+                      selectStudent(student.studentProfileId);
                       setMessage("");
                       setFormError("");
                     }}
@@ -162,9 +170,12 @@ function CoachPage() {
               {chosen && (
                 <>
                   <h2 className="font-serif text-2xl">{chosen.name}</h2>
+                  <Link to="/staff/students/$personId" params={{personId:chosen.personId}} className="mt-3 inline-block text-sm underline">Open student profile</Link>
+                  <p className="mt-3 text-xs text-muted-foreground">School-support records only. Do not enter clinical or private counseling notes.</p>
                   <h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Timeline</h3>
+                  {historyError&&<p role="alert" className="mt-3 text-sm">{historyError}</p>}
                   {timelineLoading && <p className="mt-3 text-sm" role="status">Loading history…</p>}
-                  {!timelineLoading && timeline.length === 0 && (
+                  {!timelineLoading && !historyError && timeline.length === 0 && (
                     <p className="mt-3 text-sm text-muted-foreground">No recorded history yet.</p>
                   )}
                   <ol className="mt-3 space-y-3">
@@ -172,6 +183,7 @@ function CoachPage() {
                       <li key={`${entry.kind}-${entry.id}`} className="rounded-lg border border-border p-3 text-sm">
                         <div className="flex flex-wrap justify-between gap-2">
                           <p className="font-semibold">{entry.title}</p>
+                          {entry.kind==="referral"&&<Link to="/support" search={{referral:entry.id}} className="text-xs underline">Open referral</Link>}
                           <span className="text-xs text-muted-foreground">
                             {new Date(entry.occurredAt).toLocaleString()}
                           </span>
@@ -232,7 +244,6 @@ function CoachPage() {
             </section>
           </div>
         )}
-      </div>
-    </main>
+    </WorkspaceShell>
   );
 }

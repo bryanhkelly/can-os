@@ -21,6 +21,7 @@ export const getQuickWinActions = createServerFn({ method: "GET" }).handler(asyn
     id: actions.id, title: actions.title, description: actions.description,
     status: actions.status, priority: actions.priority, dueAt: actions.dueAt,
     metadata: actions.metadata, type: actions.type,
+    subjectType: actions.subjectType, subjectId: actions.subjectId,
   }).from(actions).where(and(
     eq(actions.ownerPersonId, actor.actorPersonId),
     inArray(actions.siteId, sites),

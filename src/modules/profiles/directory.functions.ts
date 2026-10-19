@@ -6,13 +6,13 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 
 /**
- * Staff directory authorization: teacher, registrar, and specialist roles only,
+ * Staff directory authorization: teacher, registrar, specialist and counselor,
  * always scoped to their verified siteIds (resolved from DB grants, never caller claims).
  *
  * Visibility model (documented choice):
  * - Registrar: all students with an active section enrollment at scoped sites.
  * - Teacher: students actively enrolled in sections they teach (at scoped sites).
- * - Specialist: students at scoped sites. Specialists are routed site-wide
+ * - Specialist/counselor: students at scoped sites. Support staff are routed site-wide
  *   (see support/support-referrals.functions.ts), so directory scope
  *   matches site scope rather than referral-only scope.
  *
@@ -21,7 +21,7 @@ import { AuthorizationError, type CommandContext } from "@/domain/command-contex
 
 type StaffContext = CommandContext & { role: string };
 
-const staffRoles = ["teacher", "registrar", "specialist"] as const;
+const staffRoles = ["teacher", "registrar", "specialist", "counselor"] as const;
 type StaffRole = (typeof staffRoles)[number];
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

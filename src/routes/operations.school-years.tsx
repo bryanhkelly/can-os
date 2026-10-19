@@ -14,13 +14,15 @@ export const Route=createFileRoute("/operations/school-years")({
 type Snapshot=Awaited<ReturnType<typeof getSchoolYearStudio>>;
 function SchoolYearStudio(){
  const result=Route.useLoaderData();
+ const selection=Route.useSearch();
  if(!result.ok)return <LoaderFailure eyebrow="CAN OS · Academic time" title="School-year setup" outcome={result}/>;
- return <Studio data={result.data}/>;
+ return <Studio key={JSON.stringify(selection)} data={result.data}/>;
 }
 function Studio({data}:{data:Snapshot}){
  const router=useRouter();
- const [siteId,setSiteId]=useState(data.sites[0]?.id??"");
- const [programId,setProgramId]=useState("");
+ const selection=Route.useSearch();
+ const [siteId,setSiteId]=useState(selection.siteId??data.programs.find(p=>p.id===selection.programId)?.siteId??data.sites[0]?.id??"");
+ const [programId,setProgramId]=useState(selection.programId??"");
  const [scaleId,setScaleId]=useState(data.gradeScales[0]?.id??"");
  const [newScaleName,setNewScaleName]=useState("Standard A–F");
  const [name,setName]=useState("2027–2028 School Year");
@@ -63,7 +65,7 @@ function Studio({data}:{data:Snapshot}){
    <button disabled={busy||!siteId||!scaleId} onClick={()=>run(()=>createStudioYear({data:{siteId,...(programId?{programId}:{}),gradeScaleId:scaleId,key,name,startsOn:start,endsOn:end}}))} className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create school year</button>
   </section>
   <h2 className="mt-10 font-serif text-2xl">School years</h2>
-  <div className="mt-4 space-y-4">{data.years.map(y=><YearCard key={y.id} year={y} busy={busy} run={run}/>)}
+  <div className="mt-4 space-y-4">{data.years.filter(y=>!siteId||y.siteId===siteId).map(y=><YearCard key={y.id} year={y} busy={busy} run={run}/>)}
   {!data.years.length&&<p className="rounded-xl border p-5 text-sm">No school years have been configured at your sites.</p>}</div>
  </WorkspaceShell>;
 }
