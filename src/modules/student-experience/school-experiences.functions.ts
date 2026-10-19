@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, asc, inArray, isNull, ne, notExists, gte, or } from "drizzle-orm";
 import { z } from "zod";
@@ -51,7 +52,9 @@ export const bookOfficeHour=createServerFn({method:"POST"})
     // Pure read: translate the selected student person into the guardian-linked profile.
     const [child]=await db.select({studentProfileId:schema.studentProfiles.id}).from(schema.guardianRelationships)
       .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.personId,schema.guardianRelationships.studentPersonId))
-      .where(and(eq(schema.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(schema.guardianRelationships.canViewAcademics,true),eq(schema.guardianRelationships.studentPersonId,data.studentPersonId))).limit(1);
+      .where(guardianRelationshipPredicate({
+        guardianPersonId: actor.actorPersonId, studentPersonId: data.studentPersonId, access: "academic",
+      })).limit(1);
     if(!child) throw new AuthorizationError("guardian relationship");
     const {bookConference}=await import("@/modules/conferences/conference-service");
     const bookingId=await bookConference(actor,{conferenceSlotId:data.slotId,studentProfileId:child.studentProfileId});

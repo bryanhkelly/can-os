@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { validateGroupInput } from "@/domain/study-groups";
 import { recordAudit,requireActor } from "@/modules/identity/actors.server";
 import { emitEvent,notify,notifyMany } from "@/platform/mutation";
@@ -80,10 +81,9 @@ export const requestCanonicalGroupMembership = createServerFn({ method: "POST" }
       assertGroupScope(actor, group);
       await eligibleStudent(tx, actor.actorPersonId, group, actor.scope.programIds ?? []);
       const guardians = await tx.select({ guardianPersonId: s.guardianRelationships.guardianPersonId })
-        .from(s.guardianRelationships).where(and(
-          eq(s.guardianRelationships.studentPersonId, actor.actorPersonId),
-          eq(s.guardianRelationships.canManageEnrollment, true),
-        ));
+        .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+          studentPersonId: actor.actorPersonId, access: "enrollment",
+        }));
       // K-12 school groups fail closed when no authorized enrollment guardian exists.
       if (!guardians.length) throw new Error("A linked guardian is required for study group participation.");
       const [existing] = await tx.select().from(s.studyGroupMemberships)
@@ -169,10 +169,9 @@ export const decideCanonicalGroupConsent = createServerFn({ method: "POST" })
       const membershipId = action.metadata.membershipId;
       if (typeof studentPersonId !== "string") throw new AuthorizationError("consent subject");
       const [relationship] = await tx.select({ id: s.guardianRelationships.id })
-        .from(s.guardianRelationships).where(and(
-          eq(s.guardianRelationships.studentPersonId, studentPersonId),
-          eq(s.guardianRelationships.guardianPersonId, actor.actorPersonId),
-          eq(s.guardianRelationships.canManageEnrollment, true))).limit(1);
+        .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+          studentPersonId, guardianPersonId: actor.actorPersonId, access: "enrollment",
+        })).limit(1);
       if (!relationship) throw new AuthorizationError("guardian permission");
       const [group] = await tx.select().from(s.studyGroups)
         .where(and(eq(s.studyGroups.id, action.subjectId), eq(s.studyGroups.status, "active")))
@@ -272,10 +271,9 @@ export const decideCanonicalGroupMembership = createServerFn({ method: "POST" })
       if (data.approve) {
         await eligibleStudent(tx, data.studentPersonId, group, actor.scope.programIds ?? []);
         const guardians = await tx.select({ personId: s.guardianRelationships.guardianPersonId })
-          .from(s.guardianRelationships).where(and(
-            eq(s.guardianRelationships.studentPersonId, data.studentPersonId),
-            eq(s.guardianRelationships.canManageEnrollment, true),
-          ));
+          .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+            studentPersonId: data.studentPersonId, access: "enrollment",
+          }));
         if (!guardians.length) throw new Error("Guardian consent is required.");
         const guardianActions = await tx.select().from(s.actions)
           .where(and(eq(s.actions.type, "study_group_consent"),

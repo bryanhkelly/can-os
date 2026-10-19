@@ -1,6 +1,7 @@
 import { roleCapabilities } from "@/domain/access-context";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -79,8 +80,7 @@ async function listAllowedThreadContacts(
       .innerJoin(s.enrollments,eq(s.enrollments.studentProfileId,s.studentProfiles.id))
       .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
       .where(and(
-        eq(s.guardianRelationships.guardianPersonId,actorPersonId),
-        eq(s.guardianRelationships.canViewAcademics,true),
+        guardianRelationshipPredicate({ guardianPersonId: actorPersonId, access: "academic" }),
         eq(s.enrollments.status,"active"),
         inArray(s.programs.siteId,siteIds),
         inArray(s.programs.id,programIds),
@@ -118,7 +118,7 @@ async function listAllowedThreadContacts(
           studentPersonId: s.guardianRelationships.studentPersonId,
         })
         .from(s.guardianRelationships)
-        .where(inArray(s.guardianRelationships.studentPersonId, studentIds));
+        .where(guardianRelationshipPredicate({ studentPersonIds: studentIds }));
       const studentNames = await fetchDisplayNames(db, s, studentIds);
       for (const row of coGuardianRows) {
         add(
@@ -167,12 +167,7 @@ async function listAllowedThreadContacts(
             studentPersonId: s.guardianRelationships.studentPersonId,
           })
           .from(s.guardianRelationships)
-          .where(
-            and(
-              inArray(s.guardianRelationships.studentPersonId, studentIds),
-              eq(s.guardianRelationships.canViewAcademics, true),
-            ),
-          );
+          .where(guardianRelationshipPredicate({ studentPersonIds: studentIds, access: "academic" }));
         const studentNames = await fetchDisplayNames(db, s, studentIds);
         for (const row of guardianRows) {
           add(
@@ -208,7 +203,7 @@ async function listAllowedThreadContacts(
     const guardianRows = await db
       .select({ guardianPersonId: s.guardianRelationships.guardianPersonId })
       .from(s.guardianRelationships)
-      .where(eq(s.guardianRelationships.studentPersonId, actorPersonId));
+      .where(guardianRelationshipPredicate({ studentPersonId: actorPersonId }));
     for (const row of guardianRows) add(row.guardianPersonId, "guardian");
   } else if (role === "specialist" || role === "counselor") {
     const students = await db.selectDistinct({ personId: s.studentProfiles.personId, profileId: s.studentProfiles.id })
@@ -220,8 +215,9 @@ async function listAllowedThreadContacts(
     for (const student of students) add(student.personId, "school support student");
     if (studentIds.length) {
       const guardians = await db.select({ personId: s.guardianRelationships.guardianPersonId })
-        .from(s.guardianRelationships).where(and(inArray(s.guardianRelationships.studentPersonId, studentIds),
-          eq(s.guardianRelationships.canViewAcademics, true)));
+        .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+          studentPersonIds: studentIds, access: "academic",
+        }));
       for (const guardian of guardians) add(guardian.personId, "guardian of support student");
     }
   }

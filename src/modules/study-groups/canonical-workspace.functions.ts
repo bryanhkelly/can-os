@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, inArray, or, isNull, desc } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -132,9 +133,9 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
     ? await Promise.all([
       db.select({ studentPersonId: s.guardianRelationships.studentPersonId,
         guardianPersonId: s.guardianRelationships.guardianPersonId })
-        .from(s.guardianRelationships).where(and(
-          inArray(s.guardianRelationships.studentPersonId, pendingStudentIds),
-          eq(s.guardianRelationships.canManageEnrollment, true))),
+        .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+          studentPersonIds: pendingStudentIds, access: "enrollment",
+        })),
       db.select({ groupId: s.actions.subjectId, ownerPersonId: s.actions.ownerPersonId,
         status: s.actions.status, metadata: s.actions.metadata })
         .from(s.actions).where(and(eq(s.actions.type, "study_group_consent"),
@@ -232,8 +233,9 @@ export const listCanonicalGuardianGroupConsents = createServerFn({ method: "GET"
   if (!rows.length) return [];
   const guardians = await db.select({ studentPersonId: s.guardianRelationships.studentPersonId })
     .from(s.guardianRelationships)
-    .where(and(eq(s.guardianRelationships.guardianPersonId, actor.actorPersonId),
-      eq(s.guardianRelationships.canManageEnrollment, true)));
+    .where(guardianRelationshipPredicate({
+      guardianPersonId: actor.actorPersonId, access: "enrollment",
+    }));
   const studentIds = new Set(guardians.map(g => g.studentPersonId));
   const filtered = rows.filter(row => row.groupStatus === "active" &&
     typeof row.metadata.studentPersonId === "string" &&

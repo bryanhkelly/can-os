@@ -154,6 +154,15 @@ site/program scope, current enrollment and document-specific checks remain in
 the owning workflow. The predicate is a shared SQL policy fragment, not a
 replacement authorization service.
 
+Conferences, field trips, study groups, contextual messaging, school profiles,
+workspace search and office-hour booking also reuse this predicate. Conference
+and academic views retain academic permission; trip invitation/consent eligibility
+and study-group consent retain enrollment permission. Trip signature verification,
+emergency-contact lookup and family messaging contacts that historically require
+only the relationship remain relationship-only. Correlated consent-signer joins
+still enforce their document and student checks; no lifecycle or scope checks
+move into the predicate.
+
 ```text
 permission = capability + resource + scope + relationship
 ```

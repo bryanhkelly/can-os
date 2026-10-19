@@ -32,11 +32,11 @@ export const listGuardianFieldTripPermissions = createServerFn({ method: "GET" }
     .innerJoin(s.fieldTrips, eq(s.fieldTrips.id, s.fieldTripParticipants.fieldTripId))
     .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.fieldTripParticipants.studentProfileId))
     .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
-    .innerJoin(s.guardianRelationships, and(
-      eq(s.guardianRelationships.studentPersonId, s.studentProfiles.personId),
-      eq(s.guardianRelationships.guardianPersonId, actor.actorPersonId),
-      eq(s.guardianRelationships.canManageEnrollment, true),
-    ))
+    .innerJoin(s.guardianRelationships, guardianRelationshipPredicate({
+      studentPersonId: s.studentProfiles.personId,
+      guardianPersonId: actor.actorPersonId,
+      access: "enrollment",
+    }))
     .where(and(inArray(s.fieldTrips.siteId, sites),
       inArray(s.fieldTrips.status, ["proposed", "approved"])))
     .orderBy(asc(s.fieldTrips.departsAt)).limit(150);

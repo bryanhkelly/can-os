@@ -15,11 +15,13 @@ import {
   createCanonicalGroupPost, reportCanonicalGroupPost, resolveCanonicalGroupReport,
 } from "@/modules/study-groups/canonical-moderation.functions";
 import { createAcademicTimeFixture } from "./helpers/academic-time";
+import { listCanonicalGuardianGroupConsents } from "@/modules/study-groups/canonical-workspace.functions";
 
 const state = vi.hoisted(() => ({ actor: null as Actor | null }));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({ validator() { return this; }, handler(callback: unknown) { return callback; } }),
 }));
+vi.mock("@tanstack/react-start/server", () => ({ setResponseHeader: vi.fn() }));
 vi.mock("@/modules/identity/actors.server", async importOriginal => ({
   ...await importOriginal<typeof import("@/modules/identity/actors.server")>(),
   requireActor: async (roles: readonly ActorRole[]) => {
@@ -87,6 +89,16 @@ describe("canonical study group commands", () => {
     expect(group).toMatchObject({ kind: "interest", programId: null, sectionId: null });
 
     state.actor = actor("student", student!.id);
+    const relationship = and(eq(s.guardianRelationships.guardianPersonId, guardian!.id),
+      eq(s.guardianRelationships.studentPersonId, student!.id));
+    await db.update(s.guardianRelationships).set({
+      canManageEnrollment: false, canViewAcademics: true, canSubmitAttendanceExcuse: true,
+    }).where(relationship);
+    await expect(requestCanonicalGroupMembership({ data: { groupId } }))
+      .rejects.toThrow("A linked guardian is required");
+    await db.update(s.guardianRelationships).set({
+      canManageEnrollment: true, canViewAcademics: false, canSubmitAttendanceExcuse: false,
+    }).where(relationship);
     await requestCanonicalGroupMembership({ data: { groupId } });
     state.actor = actor("teacher", teacher!.id);
     await expect(decideCanonicalGroupMembership({ data: {
@@ -96,6 +108,15 @@ describe("canonical study group commands", () => {
       eq(s.actions.subjectId, groupId), eq(s.actions.ownerPersonId, guardian!.id),
     ));
     state.actor = actor("guardian", guardian!.id);
+    expect(await listCanonicalGuardianGroupConsents()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: consent!.id })]),
+    );
+    await db.update(s.guardianRelationships).set({ canManageEnrollment: false }).where(relationship);
+    expect(await listCanonicalGuardianGroupConsents()).toEqual([]);
+    await expect(decideCanonicalGroupConsent({ data: {
+      actionId: consent!.id, approve: true, acknowledged: true,
+    } })).rejects.toThrow();
+    await db.update(s.guardianRelationships).set({ canManageEnrollment: true }).where(relationship);
     await decideCanonicalGroupConsent({ data: { actionId: consent!.id, approve: true, acknowledged: true } });
     state.actor = actor("teacher", teacher!.id);
     await decideCanonicalGroupMembership({ data: { groupId, studentPersonId: student!.id, approve: true } });

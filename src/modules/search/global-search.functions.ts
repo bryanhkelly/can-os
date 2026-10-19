@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
@@ -225,8 +226,7 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
       .innerJoin(s.programs, eq(s.programs.id, s.enrollments.programId))
       .where(
         and(
-          eq(s.guardianRelationships.guardianPersonId, actor.actorPersonId),
-          eq(s.guardianRelationships.canViewAcademics, true),
+          guardianRelationshipPredicate({ guardianPersonId: actor.actorPersonId, access: "academic" }),
           eq(s.enrollments.kind, "program"),
           eq(s.enrollments.status, "active"),
           inArray(s.programs.siteId, siteIds),

@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { requireActor, recordAudit, type Actor } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
@@ -44,14 +45,17 @@ async function authorizedProfile(viewer: Actor, personId: string) {
       const visible = viewer.role === "student"
         ? await own.where(and(conditions, eq(s.studentProfiles.personId, viewer.actorPersonId)))
         : await own.innerJoin(s.guardianRelationships, eq(s.guardianRelationships.studentPersonId, s.studentProfiles.personId))
-          .where(and(conditions, eq(s.guardianRelationships.guardianPersonId, viewer.actorPersonId), eq(s.guardianRelationships.canViewAcademics, true)));
+          .where(and(conditions, guardianRelationshipPredicate({
+            guardianPersonId: viewer.actorPersonId, access: "academic",
+          })));
       const ids = new Set(visible.map(row => row.sectionId));
       // Families see their actual teachers, not other students in a shared class.
       sections = teaching.filter(section => ids.has(section.id));
       if (viewer.role === "guardian" && enrolled.length) {
         const [relationship] = await db.select({ id: s.guardianRelationships.id }).from(s.guardianRelationships)
-          .where(and(eq(s.guardianRelationships.guardianPersonId, viewer.actorPersonId),
-            eq(s.guardianRelationships.studentPersonId, personId), eq(s.guardianRelationships.canViewAcademics, true))).limit(1);
+          .where(guardianRelationshipPredicate({
+            guardianPersonId: viewer.actorPersonId, studentPersonId: personId, access: "academic",
+          })).limit(1);
         if (relationship) sections = enrolled;
       }
     } else if (viewer.role === "teacher" && enrolled.length) {

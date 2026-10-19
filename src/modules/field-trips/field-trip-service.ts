@@ -27,6 +27,7 @@ AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { publishProjection } from "@/platform/calendar/projection";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,gt,inArray,isNull,lt } from "drizzle-orm";
@@ -350,12 +351,9 @@ export async function addFieldTripParticipant(
     const guardians = await tx
       .select({ personId: guardianRelationships.guardianPersonId })
       .from(guardianRelationships)
-      .where(
-        and(
-          eq(guardianRelationships.studentPersonId, student.personId),
-          eq(guardianRelationships.canManageEnrollment, true),
-        ),
-      );
+      .where(guardianRelationshipPredicate({
+        studentPersonId: student.personId, access: "enrollment",
+      }));
 
     if (!guardians.length) {
       throw new Error("Student needs an enrollment-authorized guardian.");
@@ -548,12 +546,9 @@ export async function signFieldTripPermission(
     const [guardian] = await tx
       .select({ id: guardianRelationships.id })
       .from(guardianRelationships)
-      .where(
-        and(
-          eq(guardianRelationships.guardianPersonId, actorPersonId),
-          eq(guardianRelationships.studentPersonId, student.personId),
-        ),
-      )
+      .where(guardianRelationshipPredicate({
+        guardianPersonId: actorPersonId, studentPersonId: student.personId,
+      }))
       .limit(1);
 
     if (!guardian) throw new Error("Actor is not an authorized guardian");
@@ -805,7 +800,7 @@ export async function getFieldTripSafetyPacket(
           people,
           eq(people.id, guardianRelationships.guardianPersonId),
         )
-        .where(eq(guardianRelationships.studentPersonId, row.studentPersonId));
+        .where(guardianRelationshipPredicate({ studentPersonId: row.studentPersonId }));
 
       students.push({
         participantId: row.participantId,

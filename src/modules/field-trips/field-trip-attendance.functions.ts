@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { actorSiteIds,recordAudit,requireActor } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -83,10 +84,11 @@ export const recordCanonicalFieldTripCheckpoint = createServerFn({ method: "POST
           throw new Error("Student cannot board without verified guardian permission.");
         const [consent] = await tx.select({ id: s.consentRecords.id })
           .from(s.consentRecords)
-          .innerJoin(s.guardianRelationships, and(
-            eq(s.guardianRelationships.guardianPersonId, s.consentRecords.signerPersonId),
-            eq(s.guardianRelationships.studentPersonId, student.personId),
-            eq(s.guardianRelationships.canManageEnrollment, true)))
+          .innerJoin(s.guardianRelationships, guardianRelationshipPredicate({
+            guardianPersonId: s.consentRecords.signerPersonId,
+            studentPersonId: student.personId,
+            access: "enrollment",
+          }))
           .where(and(eq(s.consentRecords.id, participant.consentRecordId),
             eq(s.consentRecords.subjectType, "field_trip_participant"),
             eq(s.consentRecords.subjectId, participant.id),

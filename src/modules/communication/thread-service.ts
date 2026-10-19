@@ -1,4 +1,5 @@
 import { db } from "@/db/client";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import {
 assessments,
 communicationMessages,
@@ -86,12 +87,9 @@ export async function sendAcademicInterventionMessage(
       const guardians = await tx
         .select({ personId: guardianRelationships.guardianPersonId })
         .from(guardianRelationships)
-        .where(
-          and(
-            eq(guardianRelationships.studentPersonId, record.studentPersonId),
-            eq(guardianRelationships.canViewAcademics, true),
-          ),
-        );
+        .where(guardianRelationshipPredicate({
+          studentPersonId: record.studentPersonId, access: "academic",
+        }));
 
       const teachers = await tx
         .select({ personId: sectionTeachers.personId })
