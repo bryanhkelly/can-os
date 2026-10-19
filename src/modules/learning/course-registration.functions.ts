@@ -1,5 +1,6 @@
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import { AuthorizationError } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { activateSectionEnrollment } from "@/modules/enrollment/section-allocation.service";
 import { actorSiteIds,assertProgramGranted,recordAudit,requireActor,type Actor } from "@/modules/identity/actors.server";
 import { emitEvent,notify,notifyMany,writeAudit } from "@/platform/mutation";
@@ -98,9 +99,9 @@ export const requestCourseChange = createServerFn({ method:"POST" })
       if(data.operation==="add" && today>policy.addDropEndsOn) throw new Error("Registration window has closed.");
       const guardianDecisionRequired=data.operation==="add"&&policy.guardianApprovalRequired;
       const guardians=guardianDecisionRequired?await tx.select({personId:s.guardianRelationships.guardianPersonId})
-        .from(s.guardianRelationships).where(and(
-          eq(s.guardianRelationships.studentPersonId,actor.actorPersonId),
-          eq(s.guardianRelationships.canManageEnrollment,true))) : [];
+        .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+          studentPersonId: actor.actorPersonId, access: "enrollment",
+        })) : [];
       if(guardianDecisionRequired&&!guardians.length)
         throw new Error("This class requires a connected guardian with enrollment approval permission.");
       const [membership]=await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,section.id),eq(s.enrollments.status,"active"))).limit(1);
@@ -187,9 +188,9 @@ export const decideCourseChange = createServerFn({method:"POST"})
         const today=new Date().toISOString().slice(0,10);
         if(operation==="add" && policyAtApproval.guardianApprovalRequired){
           const eligibleGuardians=await tx.select({personId:s.guardianRelationships.guardianPersonId})
-            .from(s.guardianRelationships).where(and(
-              eq(s.guardianRelationships.studentPersonId,request.ownerPersonId),
-              eq(s.guardianRelationships.canManageEnrollment,true)));
+            .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+              studentPersonId: request.ownerPersonId, access: "enrollment",
+            }));
           const consentRows=await tx.select({
             signerPersonId:s.consentRecords.signerPersonId,evidence:s.consentRecords.signatureEvidence,
           }).from(s.consentRecords).where(and(
@@ -238,9 +239,9 @@ export const decideCourseChange = createServerFn({method:"POST"})
         .from(s.studentProfiles).where(eq(s.studentProfiles.id,studentProfileId)).limit(1);
        if(student){
         const guardians=await tx.select({personId:s.guardianRelationships.guardianPersonId})
-         .from(s.guardianRelationships).where(and(
-          eq(s.guardianRelationships.studentPersonId,student.personId),
-          eq(s.guardianRelationships.canViewAcademics,true)));
+         .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+          studentPersonId: student.personId, access: "academic",
+         }));
         if(guardians.length)await notifyMany(tx, guardians.map(g=>({recipientPersonId:g.personId,
           type:"course_registration_decision",status:"unread" as const,
           title:"Course schedule updated",

@@ -1,4 +1,4 @@
-import { and, eq, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, eq, inArray, type SQL, type SQLWrapper } from "drizzle-orm";
 import { guardianRelationships } from "@/db/schema/identity";
 
 export type GuardianRelationshipAccess =
@@ -8,8 +8,9 @@ export type GuardianRelationshipAccess =
   | "attendance-excuse";
 
 type GuardianRelationshipSubjects =
-  | { guardianPersonId: string | SQLWrapper; studentPersonId?: string | SQLWrapper }
-  | { guardianPersonId?: string | SQLWrapper; studentPersonId: string | SQLWrapper };
+  | { guardianPersonId: string | SQLWrapper; studentPersonId?: string | SQLWrapper; studentPersonIds?: never }
+  | { guardianPersonId?: string | SQLWrapper; studentPersonId: string | SQLWrapper; studentPersonIds?: never }
+  | { guardianPersonId?: string | SQLWrapper; studentPersonId?: never; studentPersonIds: string[] };
 
 export type GuardianRelationshipFilter = GuardianRelationshipSubjects & {
   access?: GuardianRelationshipAccess;
@@ -28,6 +29,9 @@ export function guardianRelationshipPredicate(
     conditions.push(
       eq(guardianRelationships.studentPersonId, filter.studentPersonId),
     );
+  }
+  if (filter.studentPersonIds) {
+    conditions.push(inArray(guardianRelationships.studentPersonId, filter.studentPersonIds));
   }
 
   switch (filter.access) {

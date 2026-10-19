@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -55,10 +56,9 @@ export const listRegistrarCourseRequests = createServerFn({ method: "GET" }).han
     db.select({
       studentPersonId: guardianRelationships.studentPersonId,
       guardianPersonId: guardianRelationships.guardianPersonId,
-    }).from(guardianRelationships).where(and(
-      inArray(guardianRelationships.studentPersonId, studentIds),
-      eq(guardianRelationships.canManageEnrollment, true),
-    )),
+    }).from(guardianRelationships).where(guardianRelationshipPredicate({
+      studentPersonIds: studentIds, access: "enrollment",
+    })),
     db.select({
       subjectId: consentRecords.subjectId, signerPersonId: consentRecords.signerPersonId,
       evidence: consentRecords.signatureEvidence,

@@ -1,4 +1,5 @@
 import { db } from "@/db/client";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import {
 assessments,
 domainEvents,
@@ -44,12 +45,9 @@ async function loadSubmissionContext(tx: any, submissionId: string) {
     tx
       .select({ personId: guardianRelationships.guardianPersonId })
       .from(guardianRelationships)
-      .where(
-        and(
-          eq(guardianRelationships.studentPersonId, record.studentPersonId),
-          eq(guardianRelationships.canViewAcademics, true),
-        ),
-      ),
+      .where(guardianRelationshipPredicate({
+        studentPersonId: record.studentPersonId, access: "academic",
+      })),
     tx
       .select({ personId: sectionTeachers.personId })
       .from(sectionTeachers)

@@ -5,6 +5,7 @@ enrollments,guardianRelationships,
 people,programs,sections,studentProfiles,terms
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { actorSiteIds,recordAudit,requireActor,type Actor } from "@/modules/identity/actors.server";
 import { emitEvent,notify } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -41,11 +42,11 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     .innerJoin(terms, eq(terms.id, sections.termId))
     .innerJoin(studentProfiles, eq(studentProfiles.personId, actions.ownerPersonId))
     .innerJoin(people, eq(people.id, actions.ownerPersonId))
-    .innerJoin(guardianRelationships, and(
-      eq(guardianRelationships.studentPersonId, actions.ownerPersonId),
-      eq(guardianRelationships.guardianPersonId, actor.actorPersonId),
-      eq(guardianRelationships.canManageEnrollment, true),
-    ))
+    .innerJoin(guardianRelationships, guardianRelationshipPredicate({
+      studentPersonId: actions.ownerPersonId,
+      guardianPersonId: actor.actorPersonId,
+      access: "enrollment",
+    }))
     .where(and(
       eq(actions.type, "course_registration_request"),
       eq(actions.subjectType, "section"),
@@ -149,11 +150,11 @@ export const decideGuardianCourseApproval = createServerFn({ method: "POST" })
           !actor.scope.programIds?.includes(request.programId))
         throw new AuthorizationError("guardian school and program scope");
       const [relationship] = await tx.select({ id: guardianRelationships.id })
-        .from(guardianRelationships).where(and(
-          eq(guardianRelationships.guardianPersonId, actor.actorPersonId),
-          eq(guardianRelationships.studentPersonId, request.ownerPersonId),
-          eq(guardianRelationships.canManageEnrollment, true),
-        )).limit(1);
+        .from(guardianRelationships).where(guardianRelationshipPredicate({
+          guardianPersonId: actor.actorPersonId,
+          studentPersonId: request.ownerPersonId,
+          access: "enrollment",
+        })).limit(1);
       if (!relationship) throw new AuthorizationError("guardian enrollment authority");
       const [student] = await tx.select({ id: studentProfiles.id })
         .from(studentProfiles).where(eq(studentProfiles.personId, request.ownerPersonId)).limit(1);

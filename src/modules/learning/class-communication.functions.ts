@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { recordAudit } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
 import { authorizeClass, classActor } from "./class-access.server";
@@ -83,7 +84,7 @@ export const startAssignmentConversation = createServerFn({ method: "POST" })
         threadId = thread.id;
       }
       const guardians = await tx.select({ personId: s.guardianRelationships.guardianPersonId }).from(s.guardianRelationships)
-        .where(and(eq(s.guardianRelationships.studentPersonId, targetPersonId), eq(s.guardianRelationships.canViewAcademics, true)));
+        .where(guardianRelationshipPredicate({ studentPersonId: targetPersonId, access: "academic" }));
       const teachers = await tx.select({ personId: s.sectionTeachers.personId }).from(s.sectionTeachers)
         .where(eq(s.sectionTeachers.sectionId, section.id));
       if (!teachers.length) throw new Error("No teaching team is assigned to this class.");

@@ -145,6 +145,15 @@ all remaining readers/writers have been retired.
 
 Authorization is not portal-based RBAC.
 
+Learning uses `guardianRelationshipPredicate` for guardian academic visibility,
+course-enrollment authority, conversation recipients, attachment visibility and
+academic notification recipients, including batch queries. Academic viewing,
+enrollment management and attendance-excuse permissions remain independent;
+an empty student batch matches no relationships. Capability, verified role,
+site/program scope, current enrollment and document-specific checks remain in
+the owning workflow. The predicate is a shared SQL policy fragment, not a
+replacement authorization service.
+
 ```text
 permission = capability + resource + scope + relationship
 ```

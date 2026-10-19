@@ -1,5 +1,6 @@
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
 import { signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
@@ -116,11 +117,11 @@ async function requireGuardianEvent(tx: Tx, s: DbSchema, attendanceEventId: stri
     .where(and(eq(s.attendanceEvents.id, attendanceEventId), inArray(s.attendanceEvents.programId, programIds))).limit(1);
   if (!record) throw new Error("AttendanceEvent not found");
   const [relationship] = await tx.select({ id: s.guardianRelationships.id }).from(s.guardianRelationships)
-    .where(and(
-      eq(s.guardianRelationships.guardianPersonId, guardianPersonId),
-      eq(s.guardianRelationships.studentPersonId, record.studentPersonId),
-      eq(s.guardianRelationships.canViewAcademics, true),
-    )).limit(1);
+    .where(guardianRelationshipPredicate({
+      guardianPersonId,
+      studentPersonId: record.studentPersonId,
+      access: "academic",
+    })).limit(1);
   if (!relationship) throw new AuthorizationError("guardian attendance relationship");
   return record;
 }
@@ -381,11 +382,11 @@ export const listExcuseAttachmentCounts = createServerFn({ method: "GET" })
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const viewable = await db.select({ eventId: s.attendanceEvents.id }).from(s.attendanceEvents)
       .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.attendanceEvents.studentProfileId))
-      .innerJoin(s.guardianRelationships, and(
-        eq(s.guardianRelationships.studentPersonId, s.studentProfiles.personId),
-        eq(s.guardianRelationships.guardianPersonId, context.actorPersonId!),
-        eq(s.guardianRelationships.canViewAcademics, true),
-      ))
+      .innerJoin(s.guardianRelationships, guardianRelationshipPredicate({
+        studentPersonId: s.studentProfiles.personId,
+        guardianPersonId: context.actorPersonId!,
+        access: "academic",
+      }))
       .where(and(inArray(s.attendanceEvents.id, eventIds), inArray(s.attendanceEvents.programId, context.scope.programIds ?? [])));
     if (!viewable.length) return { counts: [] };
     const excuses = await db.select({

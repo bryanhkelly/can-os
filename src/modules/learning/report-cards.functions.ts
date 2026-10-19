@@ -6,6 +6,7 @@ AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { gradeLabelForPercentage,isPassingGrade } from "@/domain/grade-scale-policy";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
@@ -67,13 +68,11 @@ async function resolveStudentViewer(
     const [relationship] = await db
       .select({ id: s.guardianRelationships.id })
       .from(s.guardianRelationships)
-      .where(
-        and(
-          eq(s.guardianRelationships.guardianPersonId, context.actorPersonId),
-          eq(s.guardianRelationships.studentPersonId, studentPersonId),
-          eq(s.guardianRelationships.canViewAcademics, true),
-        ),
-      )
+      .where(guardianRelationshipPredicate({
+        guardianPersonId: context.actorPersonId,
+        studentPersonId,
+        access: "academic",
+      }))
       .limit(1);
     if (!relationship) throw new AuthorizationError("guardian academic relationship");
     const [profile] = await db
@@ -439,12 +438,10 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
             guardianPersonId: s.guardianRelationships.guardianPersonId,
           })
           .from(s.guardianRelationships)
-          .where(
-            and(
-              inArray(s.guardianRelationships.studentPersonId, students.map((row) => row.personId)),
-              eq(s.guardianRelationships.canViewAcademics, true),
-            ),
-          );
+          .where(guardianRelationshipPredicate({
+            studentPersonIds: students.map(row => row.personId),
+            access: "academic",
+          }));
         const guardiansByStudent = new Map<string, string[]>();
         for (const row of guardians) {
           const list = guardiansByStudent.get(row.studentPersonId) ?? [];
@@ -652,12 +649,9 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
       const guardians = await tx
         .select({ personId: s.guardianRelationships.guardianPersonId })
         .from(s.guardianRelationships)
-        .where(
-          and(
-            eq(s.guardianRelationships.studentPersonId, student.personId),
-            eq(s.guardianRelationships.canViewAcademics, true),
-          ),
-        );
+        .where(guardianRelationshipPredicate({
+          studentPersonId: student.personId, access: "academic",
+        }));
 
       const recipients = [student.personId, ...guardians.map((row) => row.personId)];
       await notifyMany(tx, recipients.map((personId) => ({
