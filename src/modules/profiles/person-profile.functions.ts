@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { requireActor, recordAudit, type Actor } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
@@ -88,10 +89,9 @@ export const getProfilePhoto = createServerFn({ method: "GET" })
     await authorizedProfile(viewer, personId);
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const [photo] = await db.select({ key: s.documents.storageKey, mimeType: s.documents.mimeType }).from(s.documents)
-      .where(and(eq(s.documents.subjectType, "person"), eq(s.documents.subjectId, personId),
-        eq(s.documents.category, "profile_photo"), eq(s.documents.storageProvider, "cloudflare_r2"),
-        eq(s.documents.sensitivityTier, "standard"), sql`${s.documents.verifiedAt} is not null`,
-        or(isNull(s.documents.expiresAt), sql`${s.documents.expiresAt} > now()`)))
+      .where(verifiedPrivateDocumentPredicate({
+        subjectType: "person", subjectId: personId, category: "profile_photo", sensitivityTier: "standard",
+      }))
       .orderBy(desc(s.documents.createdAt), desc(s.documents.id)).limit(1);
     if (!photo) return { url: null };
     if (!photo.key.startsWith(`profiles/${personId}/`) || !photoKeyPattern.test(photo.key) ||

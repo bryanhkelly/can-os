@@ -106,6 +106,8 @@ describe("teacher submission review boundary", () => {
     expect(query.params).toEqual([documentId, "assessment", assessmentId, "assignment_submission", "student", "cloudflare_r2"]);
     expect(query.sql).toContain('"documents"."uploaded_by_person_id"');
     expect(query.sql).toContain('"documents"."subject_id"');
+    expect(query.sql).toContain('"documents"."verified_at" is not null');
+    expect(query.sql).toContain('"documents"."expires_at" > now()');
   });
   it.each([
     { ...document, verifiedAt: null },

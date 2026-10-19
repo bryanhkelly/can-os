@@ -150,6 +150,84 @@ integration("class participation cross-workspace flow", () => {
       }
       await expect(classes.getClassResourceDownload({ data: { ...download, resourceId: "library" } })).rejects.toThrow(/configured private/);
       expect(signPrivateObjectUrl).toHaveBeenCalledTimes(1);
+      const attachments = await import("@/modules/learning/submission-attachments.functions");
+      const gradebook = await import("@/modules/learning/gradebook.functions");
+      const attachmentKey = `learning/assignment/${assessment.id}/${crypto.randomUUID()}`;
+      const attachment = first(await tx.insert(s.documents).values({
+        subjectType: "assessment", subjectId: assessment.id, category: "assignment_submission",
+        fileName: "evidence.pdf", storageKey: attachmentKey, storageProvider: "cloudflare_r2",
+        uploadedByPersonId: student.id, verifiedAt: new Date(),
+      }).returning());
+      await tx.update(s.submissions).set({ response: { ...submission.response, attachments: [attachment.id] } })
+        .where(eq(s.submissions.id, submission.id));
+      const studentDownload = { assessmentId: assessment.id, documentId: attachment.id };
+      const teacherDownload = { submissionId: submission.id, documentId: attachment.id };
+      for (const expiresAt of [null, new Date(Date.now() + 86400000)]) {
+        await tx.update(s.documents).set({ expiresAt }).where(eq(s.documents.id, attachment.id));
+        act("student", student.id);
+        expect((await attachments.listSubmissionAttachments({ data: { assessmentId: assessment.id } })).attachments)
+          .toEqual([{ documentId: attachment.id, fileName: "evidence.pdf" }]);
+        expect((await attachments.getSubmissionAttachmentDownload({ data: studentDownload })).expiresInSeconds).toBe(60);
+        act("teacher", teacher.id);
+        expect((await gradebook.getSubmissionReview({ data: { submissionId: submission.id } })).attachments)
+          .toEqual([{ id: attachment.id, fileName: "evidence.pdf" }]);
+        await gradebook.getTeacherSubmissionAttachment({ data: teacherDownload });
+        expect(signPrivateObjectUrl).toHaveBeenLastCalledWith(expect.objectContaining({ key: attachmentKey, expiresSeconds: 60 }));
+      }
+      for (const change of [
+        { subjectType: "person" }, { subjectId: crypto.randomUUID() }, { category: "profile_photo" },
+        { storageProvider: "public" }, { uploadedByPersonId: unrelated.id }, { verifiedAt: null },
+        { expiresAt: new Date("2000-01-01") },
+        { storageKey: `learning/assignment/${crypto.randomUUID()}/${crypto.randomUUID()}` },
+      ]) {
+        await tx.update(s.documents).set(change).where(eq(s.documents.id, attachment.id));
+        const signedCount = vi.mocked(signPrivateObjectUrl).mock.calls.length;
+        act("student", student.id);
+        expect((await attachments.listSubmissionAttachments({ data: { assessmentId: assessment.id } })).attachments).toEqual([]);
+        await expect(attachments.getSubmissionAttachmentDownload({ data: studentDownload })).rejects.toThrow(/verified attachment/);
+        act("teacher", teacher.id);
+        expect((await gradebook.getSubmissionReview({ data: { submissionId: submission.id } })).attachments).toEqual([]);
+        await expect(gradebook.getTeacherSubmissionAttachment({ data: teacherDownload })).rejects.toThrow(/verified attachment/);
+        expect(signPrivateObjectUrl).toHaveBeenCalledTimes(signedCount);
+        await tx.update(s.documents).set({
+          subjectType: "assessment", subjectId: assessment.id, category: "assignment_submission",
+          storageProvider: "cloudflare_r2", uploadedByPersonId: student.id, verifiedAt: new Date(),
+          expiresAt: null, storageKey: attachmentKey,
+        }).where(eq(s.documents.id, attachment.id));
+      }
+      const absence = first(await tx.insert(s.attendanceEvents).values({
+        studentProfileId: profile.id, programId: program.id, siteId: site.id,
+        occurrenceKey: suffix, status: "absent", expectedAt: new Date(), recordedByPersonId: teacher.id,
+      }).returning());
+      const excuseKey = `learning/excuse/${absence.id}/${crypto.randomUUID()}`;
+      const excuseDocument = first(await tx.insert(s.documents).values({
+        subjectType: "attendance_event", subjectId: absence.id, category: "attendance_excuse",
+        fileName: "excuse.pdf", storageKey: excuseKey, storageProvider: "cloudflare_r2",
+        uploadedByPersonId: parent.id, verifiedAt: new Date(),
+      }).returning());
+      await tx.insert(s.attendanceExcuses).values({
+        attendanceEventId: absence.id, submittedByPersonId: parent.id, reason: "Appointment",
+        documentIds: [excuseDocument.id],
+      });
+      act("guardian", parent.id);
+      const excuseDownload = { attendanceEventId: absence.id, documentId: excuseDocument.id };
+      expect((await attachments.getExcuseAttachmentDownload({ data: excuseDownload })).expiresInSeconds).toBe(60);
+      for (const change of [
+        { expiresAt: new Date("2000-01-01") }, { verifiedAt: null }, { uploadedByPersonId: unrelated.id },
+        { subjectId: crypto.randomUUID() }, { subjectType: "assessment" }, { category: "assignment_submission" },
+        { storageProvider: "public" }, { storageKey: attachmentKey },
+      ]) {
+        await tx.update(s.documents).set(change).where(eq(s.documents.id, excuseDocument.id));
+        const signedCount = vi.mocked(signPrivateObjectUrl).mock.calls.length;
+        await expect(attachments.getExcuseAttachmentDownload({ data: excuseDownload })).rejects.toThrow(/verified excuse/);
+        expect(signPrivateObjectUrl).toHaveBeenCalledTimes(signedCount);
+        await tx.update(s.documents).set({
+          expiresAt: null, verifiedAt: new Date(), uploadedByPersonId: parent.id, subjectId: absence.id,
+          subjectType: "attendance_event", category: "attendance_excuse",
+          storageProvider: "cloudflare_r2", storageKey: excuseKey,
+        }).where(eq(s.documents.id, excuseDocument.id));
+      }
+      act("student", student.id);
       const completion = { sectionId: section.id, versionId: version.id, lessonId: "evidence", completed: true };
       await classes.setLessonCompletion({ data: completion });
       await classes.setLessonCompletion({ data: completion });
@@ -309,6 +387,7 @@ integration("class participation cross-workspace flow", () => {
       await tx.update(s.guardianRelationships).set({ canViewAcademics: true }).where(eq(s.guardianRelationships.id, relationship.id));
       act("student", student.id);
       await tx.update(s.enrollments).set({ status: "withdrawn" }).where(eq(s.enrollments.id, enrollment.id));
+      await expect(attachments.getSubmissionAttachmentDownload({ data: studentDownload })).rejects.toThrow(/not enrolled/);
       await expect(classes.getClassWorkspace({ data: { sectionId: section.id } })).rejects.toThrow(/enrollment/);
       await expect(classes.setLessonCompletion({ data: { ...completion, completed: false } })).rejects.toThrow(/enrollment/);
       expect(await tx.select().from(s.auditEvents).where(inArray(s.auditEvents.action, [

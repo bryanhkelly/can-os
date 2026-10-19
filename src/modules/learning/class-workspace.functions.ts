@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { recordAudit } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
 import { signPrivateObjectUrl } from "@/platform/storage/r2";
@@ -119,11 +120,11 @@ export const getClassResourceDownload = createServerFn({ method: "POST" })
     if (!resource?.documentId) throw new AuthorizationError("configured private class resource");
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const [document] = await db.select({ key: s.documents.storageKey }).from(s.documents).where(and(
-      eq(s.documents.id, resource.documentId), eq(s.documents.subjectType, "course_template_version"),
-      eq(s.documents.subjectId, section.versionId), eq(s.documents.category, "class_resource"),
-      eq(s.documents.sensitivityTier, "standard"), eq(s.documents.storageProvider, "cloudflare_r2"),
-      sql`${s.documents.verifiedAt} is not null`,
-      or(isNull(s.documents.expiresAt), sql`${s.documents.expiresAt} > now()`),
+      eq(s.documents.id, resource.documentId),
+      verifiedPrivateDocumentPredicate({
+        subjectType: "course_template_version", subjectId: section.versionId,
+        category: "class_resource", sensitivityTier: "standard",
+      }),
     )).limit(1);
     if (!document || !document.key.startsWith(`learning/resources/${section.versionId}/`)) throw new AuthorizationError("verified class resource");
     return { downloadUrl: signPrivateObjectUrl({ method: "GET", key: document.key,

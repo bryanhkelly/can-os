@@ -3,7 +3,7 @@ import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { searchWorkspace } from "@/modules/search/global-search.functions";
 import { listThreadContacts } from "@/modules/communication/messages.functions";
-import { getPersonProfile } from "@/modules/profiles/person-profile.functions";
+import { getPersonProfile, getProfilePhoto } from "@/modules/profiles/person-profile.functions";
 import type { Actor } from "@/modules/identity/actors.server";
 import { and, eq } from "drizzle-orm";
 import { createAcademicTimeFixture } from "./helpers/academic-time";
@@ -13,6 +13,7 @@ vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({ validator() { return this; }, handler(callback: unknown) { return callback; } }),
 }));
 vi.mock("@tanstack/react-start/server", () => ({ setResponseHeader: vi.fn(), getRequest: vi.fn() }));
+vi.mock("@/platform/storage/r2", () => ({ signPrivateObjectUrl: vi.fn(() => "https://private.example/photo") }));
 vi.mock("@/modules/identity/command-context.server", () => ({ getCommandContext: async () => {
   if (!state.actor) throw new Error("Test actor missing");
   return state.actor;
@@ -84,6 +85,28 @@ describe("canonical workspace search", () => {
     expect(result.students).toEqual([expect.objectContaining({
       id: `student-${student!.id}`, label: `Alex ${suffix}`, to: `/guardian/academics?student=${student!.id}`,
     })]);
+    const photoKey = `profiles/${student!.id}/${crypto.randomUUID()}`;
+    const [photo] = await db.insert(s.documents).values({
+      subjectType: "person", subjectId: student!.id, category: "profile_photo",
+      fileName: "photo.png", storageProvider: "cloudflare_r2", storageKey: photoKey,
+      mimeType: "image/png", uploadedByPersonId: student!.id, verifiedAt: new Date(),
+    }).returning();
+    const { signPrivateObjectUrl } = await import("@/platform/storage/r2");
+    expect(await getProfilePhoto({ data: { personId: student!.id } })).toEqual({ url: "https://private.example/photo" });
+    expect(signPrivateObjectUrl).toHaveBeenLastCalledWith(expect.objectContaining({ key: photoKey, expiresSeconds: 300 }));
+    for (const change of [
+      { subjectId: guardian!.id }, { category: "assignment_submission" }, { storageProvider: "public" },
+      { sensitivityTier: "restricted" }, { verifiedAt: null }, { expiresAt: new Date("2000-01-01") },
+    ]) {
+      await db.update(s.documents).set(change).where(eq(s.documents.id, photo!.id));
+      const signedCount = vi.mocked(signPrivateObjectUrl).mock.calls.length;
+      expect(await getProfilePhoto({ data: { personId: student!.id } })).toEqual({ url: null });
+      expect(signPrivateObjectUrl).toHaveBeenCalledTimes(signedCount);
+      await db.update(s.documents).set({
+        subjectId: student!.id, category: "profile_photo", storageProvider: "cloudflare_r2",
+        sensitivityTier: "standard", verifiedAt: new Date(), expiresAt: null,
+      }).where(eq(s.documents.id, photo!.id));
+    }
     const relationship = and(eq(s.guardianRelationships.guardianPersonId, guardian!.id),
       eq(s.guardianRelationships.studentPersonId, student!.id));
     for (let flags = 0; flags < 8; flags++) {
@@ -99,6 +122,9 @@ describe("canonical workspace search", () => {
         expect(await profileRequest).toMatchObject({ personId: student!.id });
       } else {
         await expect(profileRequest).rejects.toThrow("current profile relationship");
+        const signedCount = vi.mocked(signPrivateObjectUrl).mock.calls.length;
+        await expect(getProfilePhoto({ data: { personId: student!.id } })).rejects.toThrow("current profile relationship");
+        expect(signPrivateObjectUrl).toHaveBeenCalledTimes(signedCount);
       }
       const { contacts } = await listThreadContacts();
       expect(contacts.map(contact => contact.personId).sort()).toEqual(

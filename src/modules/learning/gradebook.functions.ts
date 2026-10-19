@@ -1,5 +1,6 @@
 import { assertCapability,assertProgramScope,assertSiteScope,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
@@ -74,9 +75,10 @@ async function reviewAttachments(submissionId:string){
  const documents=ids.length?await db.select({
   id:s.documents.id,fileName:s.documents.fileName,storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt,
  }).from(s.documents).where(and(inArray(s.documents.id,ids),
-  eq(s.documents.subjectType,"assessment"),eq(s.documents.subjectId,submission.assessmentId),
-  eq(s.documents.category,"assignment_submission"),eq(s.documents.uploadedByPersonId,submission.studentPersonId),
-  eq(s.documents.storageProvider,"cloudflare_r2"))):[];
+  verifiedPrivateDocumentPredicate({
+   subjectType:"assessment",subjectId:submission.assessmentId,
+   category:"assignment_submission",uploadedByPersonId:submission.studentPersonId,
+  }))):[];
  return {db,s,submission,documents:documents.filter(document=>document.verifiedAt&&
   document.storageKey.startsWith(`learning/assignment/${submission.assessmentId}/`))};
 }

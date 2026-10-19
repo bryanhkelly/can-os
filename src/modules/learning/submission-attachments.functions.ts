@@ -1,6 +1,7 @@
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
 import { signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
@@ -269,10 +270,14 @@ export const listSubmissionAttachments = createServerFn({ method: "GET" })
       ? (latest.response.attachments as unknown[]).filter((item): item is string => typeof item === "string" && uuidPattern.test(item))
       : [];
     if (!ids.length) return { attachments: [] };
-    const rows = await db.select({ id: s.documents.id, fileName: s.documents.fileName }).from(s.documents)
-      .where(and(inArray(s.documents.id, ids), eq(s.documents.uploadedByPersonId, studentPersonId)))
+    const rows = await db.select({ id: s.documents.id, fileName: s.documents.fileName, storageKey: s.documents.storageKey }).from(s.documents)
+      .where(and(inArray(s.documents.id, ids), verifiedPrivateDocumentPredicate({
+        subjectType: "assessment", subjectId: assessment.id,
+        category: "assignment_submission", uploadedByPersonId: studentPersonId,
+      })))
       .orderBy(s.documents.createdAt);
-    const byId = new Map(rows.map((row) => [row.id, row.fileName]));
+    const byId = new Map(rows.filter(row => row.storageKey.startsWith(`learning/assignment/${assessment.id}/`))
+      .map((row) => [row.id, row.fileName]));
     return { attachments: ids.filter((id) => byId.has(id)).map((id) => ({ documentId: id, fileName: byId.get(id)! })) };
   });
 
@@ -423,10 +428,10 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
    storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt,
    mimeType:s.documents.mimeType
   }).from(s.documents).where(and(eq(s.documents.id,data.documentId),
-   eq(s.documents.subjectType,"assessment"),eq(s.documents.subjectId,assessment.id),
-   eq(s.documents.category,"assignment_submission"),
-   eq(s.documents.uploadedByPersonId,studentPersonId),
-   eq(s.documents.storageProvider,"cloudflare_r2"))).limit(1);
+   verifiedPrivateDocumentPredicate({
+    subjectType:"assessment",subjectId:assessment.id,category:"assignment_submission",
+    uploadedByPersonId:studentPersonId,
+   }))).limit(1);
   if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/assignment/${assessment.id}/`))
     throw new AuthorizationError("verified attachment scope");
   return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
@@ -453,11 +458,10 @@ export const getExcuseAttachmentDownload=createServerFn({method:"POST"})
   const [document]=await tx.select({
    storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt
   }).from(s.documents).where(and(eq(s.documents.id,data.documentId),
-    eq(s.documents.subjectType,"attendance_event"),
-    eq(s.documents.subjectId,data.attendanceEventId),
-    eq(s.documents.category,"attendance_excuse"),
-    eq(s.documents.uploadedByPersonId,context.actorPersonId!),
-    eq(s.documents.storageProvider,"cloudflare_r2"))).limit(1);
+    verifiedPrivateDocumentPredicate({
+     subjectType:"attendance_event",subjectId:data.attendanceEventId,category:"attendance_excuse",
+     uploadedByPersonId:context.actorPersonId!,
+    }))).limit(1);
   if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/excuse/${data.attendanceEventId}/`))
     throw new AuthorizationError("verified excuse document scope");
   return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};

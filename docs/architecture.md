@@ -177,6 +177,26 @@ Examples:
 
 Object access and field access are separate. Sensitive fields include medical, counseling, discipline, family financials, internal notes, and formation records.
 
+## Private document eligibility
+
+`verifiedPrivateDocumentPredicate` shares the storage-eligibility checks for
+class resources, profile photos, student/teacher submission files and guardian
+excuse downloads: exact subject and category, private R2 provider, recorded
+verification, and no expired authorization. Workflows add uploader or sensitivity
+constraints where required and retain their capability, relationship, enrollment,
+linked-document and object-key scope checks before signing a URL.
+Submission listings use the same eligibility as downloads; expired, pending,
+wrong-subject or wrong-owner files are not presented as downloadable attachments.
+Assignment and excuse downloads now reject expired document records, matching
+the existing class-resource and profile-photo behavior. Upload completion still
+clears the temporary assignment-upload expiry when verification succeeds.
+
+This is a SQL policy fragment, not a generic document workflow or CRUD service.
+Existing storage signing, bounded verification and domain upload lifecycles
+remain in place. Enrollment documents use a separate metadata-based storage
+verification and human-review lifecycle; they are deliberately not treated as
+`verifiedAt` download records by this predicate.
+
 ## Ask CAN agent platform
 
 Ask CAN is the primary interaction surface for CAN OS, not a late-stage feature. Natural-language conversation produces real domain objects — subscriptions, actions, communication threads — under the same authorization context as the UI.
