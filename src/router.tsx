@@ -9,6 +9,9 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    defaultPendingComponent: () => <main role="status" className="p-6" aria-label="Loading page">Loading page...</main>,
+    defaultPendingMs: 150,
+    defaultPendingMinMs: 0,
     defaultPreloadStaleTime: 0,
   });
 };

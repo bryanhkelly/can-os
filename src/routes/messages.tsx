@@ -285,7 +285,7 @@ function MessagesPage() {
               {!loadingThread && detail && (
                 <>
                   <h2 className="text-lg font-semibold">{detail.thread.subject}</h2>
-                  {detail.thread.contextHref&&<a href={detail.thread.contextHref} className="mt-2 inline-block text-sm underline">Open related assignment</a>}
+                  {detail.thread.contextHref&&<Link to={detail.thread.contextHref} href={detail.thread.contextHref} className="mt-2 inline-block text-sm underline">Open related assignment</Link>}
                   <div className="mt-4 grid max-h-[28rem] content-start gap-3 overflow-y-auto pr-1">
                     {detail.messages.map((message) => (
                       <div

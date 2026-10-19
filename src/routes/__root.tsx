@@ -1,5 +1,6 @@
 import { WorkspaceNavigation } from "@/components/shell/WorkspaceNavigation";
 import { CommandPalette } from "@/components/shell/CommandPalette";
+import { WorkspaceSessionProvider, workspaceSessionQueryOptions } from "@/components/shell/WorkspaceSession";
 import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -17,6 +18,9 @@ import {
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  loader: ({ context }) => context.queryClient.fetchQuery(workspaceSessionQueryOptions()),
+  staleTime: Infinity,
+  headers: () => ({ "Cache-Control": "private, no-store" }),
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -59,11 +63,14 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const session = Route.useLoaderData();
 
   return (
     <QueryClientProvider client={queryClient}>
-      <WorkspaceNavigation><Outlet /></WorkspaceNavigation>
-      <CommandPalette />
+      <WorkspaceSessionProvider initial={session}>
+        <WorkspaceNavigation><Outlet /></WorkspaceNavigation>
+        <CommandPalette />
+      </WorkspaceSessionProvider>
     </QueryClientProvider>
   );
 }

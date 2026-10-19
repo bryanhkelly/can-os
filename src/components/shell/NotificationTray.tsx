@@ -33,7 +33,7 @@ export function NotificationTray({ onNavigate }: { onNavigate: () => void }) {
     {loading ? <p role="status" className="mt-5 text-sm">Loading notifications...</p> :
       <ul className="mt-5 space-y-3">{visible.map(notice => <li key={notice.id} className="rounded-xl border bg-card p-4">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="font-semibold">{notice.href ? <a href={notice.href} onClick={onNavigate} className="underline">{notice.title}</a> :
+          <h3 className="font-semibold">{notice.href ? <Link to={notice.href} href={notice.href} onClick={onNavigate} className="underline">{notice.title}</Link> :
             <Link to="/notifications" search={{ notification: notice.id }} onClick={onNavigate} className="underline">{notice.title}</Link>}</h3>
           {notice.status === "unread" && <StatusBadge tone="attention">Unread</StatusBadge>}
         </div>

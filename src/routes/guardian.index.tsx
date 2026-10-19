@@ -62,8 +62,8 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
     {needs.length === 0 && <EmptyState className="mt-4 bg-card" title="You are all caught up. Nothing needs your attention right now." />}
     {needs.length > 0 && <div className="mt-4 grid gap-3">
      {prioritized.filter(item=>!action||item.kind==="action"&&item.id===action).map(item => {
-      const Container=action?"article":"a";
-      return <Container key={`${item.kind}-${item.id}`} href={action?undefined:item.href} className="block rounded-xl border bg-card p-5 transition-colors hover:bg-muted">
+      const Container=action?"article":Link;
+      return <Container key={`${item.kind}-${item.id}`} to={item.href} href={action?undefined:item.href} className="block rounded-xl border bg-card p-5 transition-colors hover:bg-muted">
       <div className="flex flex-wrap items-start justify-between gap-3">
        <div>
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.type.replaceAll("_", " ")}</p>
@@ -105,10 +105,10 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
       </dl>
       <p className="mt-4 text-sm text-muted-foreground">{child.awaitingSections?"Your school is arranging class placement.":child.missingCount>0?`${child.missingCount} assignment(s) need follow-through.`:child.unexcusedAbsences>0?"An absence needs your review.":"No missing work or unexcused absences in this summary."}</p>
       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
-       <a href={"/guardian/academics?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Academics</a>
-       <a href={"/guardian/attendance?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</a>
-       <a href={"/guardian/report-cards?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</a>
-       <a href={"/guardian/admission-offers?student="+encodeURIComponent(child.studentPersonId)} className="rounded-full border px-3 py-1 hover:bg-muted">Offers</a>
+       <Link to="/guardian/academics" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Academics</Link>
+       <Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Attendance</Link>
+       <Link to="/guardian/report-cards" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Report cards</Link>
+       <Link to="/guardian/admission-offers" search={{student:child.studentPersonId}} className="rounded-full border px-3 py-1 hover:bg-muted">Offers</Link>
       </nav>
      </article>)}
     </div>}

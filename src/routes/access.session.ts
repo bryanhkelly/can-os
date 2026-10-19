@@ -1,7 +1,8 @@
 import {createFileRoute} from "@tanstack/react-router";
-import {and,eq,inArray} from "drizzle-orm";
+import {eq} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accountPersonGrants,people,sites,programs} from "@/db/schema";
+import {accountPersonGrants} from "@/db/schema";
+import {readWorkspaceSession} from "@/modules/identity/workspace-session.server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {selectAccessGrant} from "@/modules/identity/passwordless-access.server";
 import {AuthorizationError} from "@/domain/command-context";
@@ -12,23 +13,12 @@ export const Route=createFileRoute("/access/session")({
  server:{handlers:{
   GET:async({request})=>{
    try{
-    const context=await getCommandContext(request);
-    const grants=await db.select({
-     id:accountPersonGrants.id,personId:accountPersonGrants.personId,role:accountPersonGrants.role,
-     firstName:people.legalFirstName,lastName:people.legalLastName,
-     organizationId:accountPersonGrants.organizationId,siteId:accountPersonGrants.siteId,
-    }).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId))
-     .where(and(eq(accountPersonGrants.accountId,context.accountId),eq(accountPersonGrants.active,true)));
-    // Resolve display choices strictly inside the verified active grant scope.
-    const siteIds=context.scope.siteIds??[];
-    const programIds=context.scope.programIds??[];
-    const [siteChoices,programChoices]=await Promise.all([
-     siteIds.length?db.select({id:sites.id,name:sites.name,organizationId:sites.organizationId}).from(sites).where(inArray(sites.id,siteIds)):Promise.resolve([]),
-     programIds.length?db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(inArray(programs.id,programIds)):Promise.resolve([]),
-    ]);
-    return Response.json({authenticated:true,sites:siteChoices,programs:programChoices,activeGrantId:context.grantId,role:context.role,grants,activeContext:{organizationIds:context.scope.organizationIds??[],siteIds:context.scope.siteIds??[],programIds:context.scope.programIds??[]}},
-     {headers:{"Cache-Control":"no-store"}});
-   }catch{return Response.json({authenticated:false},{status:401,headers:{"Cache-Control":"no-store"}});}
+    const session=await readWorkspaceSession(request);
+    return Response.json(session,{status:session.authenticated?200:401,headers:{"Cache-Control":"no-store"}});
+   }catch(error){
+    console.error("Unable to load workspace session",error);
+    return Response.json({error:"Unable to load your workspace session."},{status:500,headers:{"Cache-Control":"no-store"}});
+   }
   },
   POST:async({request})=>{
    if(new URL(request.url).origin!==request.headers.get("origin"))

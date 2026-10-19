@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { acceptInsight, dismissInsight, listInsights,listInsightScopeOptions } from "@/modules/operations/insights.functions";
 
@@ -25,6 +25,7 @@ function evidenceLabel(entry: Record<string, unknown>): string {
 }
 
 function InsightsPage() {
+ const navigate=useNavigate();
  const selection=Route.useSearch();
  const [scopes,setScopes]=useState<Awaited<ReturnType<typeof listInsightScopeOptions>>>([]);
  const sites=[...new Map(scopes.map(s=>[s.siteId,{id:s.siteId,name:s.siteName}])).values()];
@@ -33,7 +34,7 @@ function InsightsPage() {
   const qs=new URLSearchParams();
   if(siteId)qs.set("siteId",siteId);
   if(programId)qs.set("programId",programId);
-  window.location.assign("/operations/insights"+(qs.size?"?"+qs.toString():""));
+  void navigate({href:"/operations/insights"+(qs.size?"?"+qs.toString():"")});
  };
  const [status, setStatus] = useState<StatusFilter>("open");
  const [insights, setInsights] = useState<Insight[]>([]);

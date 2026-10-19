@@ -33,7 +33,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
   finally{setBusy(null);}
  }
  return <main className="mx-auto max-w-4xl space-y-6 px-5 py-10">
-  <header><h1 className="font-serif text-4xl">Enrollment offers</h1><p className="mt-2 text-muted-foreground">Review offers for students whose enrollment you are authorized to manage.</p>{student&&<a href="/guardian/admission-offers" className="mt-2 inline-block text-xs font-semibold underline">View offers for all children →</a>}</header>
+  <header><h1 className="font-serif text-4xl">Enrollment offers</h1><p className="mt-2 text-muted-foreground">Review offers for students whose enrollment you are authorized to manage.</p>{student&&<Link to="/guardian/admission-offers" className="mt-2 inline-block text-xs font-semibold underline">View offers for all children →</Link>}</header>
   {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}
   {offer&&<Link to="/guardian/admission-offers" search={{student}} className="inline-block text-sm underline">View all offers for this child</Link>}
   {offer&&!applications.some(app=>app.offers.some(item=>item.id===offer))&&<p role="alert" className="rounded-lg border p-4">This offer is unavailable in your current family workspace.</p>}

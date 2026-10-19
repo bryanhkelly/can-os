@@ -33,7 +33,7 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
   const query=new URLSearchParams();
   if(siteId)query.set("siteId",siteId);
   if(programId)query.set("programId",programId);
-  window.location.assign("/admissions/capacity"+(query.size?"?"+query:""));
+  void router.navigate({href:"/admissions/capacity"+(query.size?"?"+query:"")});
  }
  const router=useRouter();
  const [edits,setEdits]=useState<Record<string,string>>({});

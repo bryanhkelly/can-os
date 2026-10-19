@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -7,6 +7,7 @@ import {
   workspaceLinks,
   workspaceHome,
 } from "@/components/shell/WorkspaceNavigation";
+vi.mock("@/modules/identity/workspace-session.functions",()=>({getWorkspaceSession:vi.fn()}));
 
 /**
  * Route wiring integrity. Two failure classes this guards against:

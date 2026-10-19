@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { safeLoader } from "@/lib/safe-loader";
 import {
@@ -61,7 +61,7 @@ function TranscriptIssuanceView({
       setError("Enter at least two characters to search for a student.");
       return;
     }
-    window.location.assign(`/admissions/transcripts?query=${encodeURIComponent(normalized)}`);
+    void router.navigate({to:"/admissions/transcripts",search:{query:normalized}});
   }
 
   async function issue(studentPersonId: string, studentName: string) {
@@ -87,7 +87,7 @@ function TranscriptIssuanceView({
       eyebrow="CAN OS · Registrar"
       title="Official transcripts"
       subtitle="Search finalized academic records in your authorized school scope and issue a point-in-time transcript from the credit issuer of record."
-      actions={<a href="/admissions" className="rounded-lg border px-3 py-2 text-sm">Admissions</a>}
+      actions={<Link to="/admissions" className="rounded-lg border px-3 py-2 text-sm">Admissions</Link>}
     >
       {error && <p role="alert" className="mt-4 rounded-lg border border-red-400 p-3 text-sm">{error}</p>}
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}

@@ -1,7 +1,10 @@
-import {describe,expect,it} from "vitest";
+import {describe,expect,it,vi} from "vitest";
 import {createElement} from "react";
 import {renderToStaticMarkup} from "react-dom/server";
 import {SidebarLinks,workspaceHome,workspaceLinks} from "@/components/shell/WorkspaceNavigation";
+import {createMemoryHistory,createRootRoute,createRouter,RouterProvider} from "@tanstack/react-router";
+
+vi.mock("@/modules/identity/workspace-session.functions",()=>({getWorkspaceSession:vi.fn()}));
 
 describe("canonical workspace navigation",()=>{
  it("has a landing page for each recognized member role",()=>{
@@ -25,9 +28,12 @@ describe("canonical workspace navigation",()=>{
   expect(paths("counselor")).not.toContain("/teacher/gradebook");
   expect(paths("student")).toContain("/student/study-groups");
  });
- it("marks only the selected destination and preserves its concrete route",()=>{
-  const markup=renderToStaticMarkup(createElement(SidebarLinks,{links:workspaceLinks.student,activePath:"/student/study-groups"}));
-  expect(markup).toContain('href="/student/study-groups" aria-current="page"');
+ it("marks only the selected destination and preserves its concrete route",async()=>{
+  const root=createRootRoute({component:()=>createElement(SidebarLinks,{links:workspaceLinks.student,activePath:"/student/study-groups"})});
+  const router=createRouter({routeTree:root,history:createMemoryHistory({initialEntries:["/"]})});
+  await router.load();
+  const markup=renderToStaticMarkup(createElement(RouterProvider,{router}));
+  expect(markup).toMatch(/<a[^>]*aria-current="page"[^>]*href="\/student\/study-groups"/);
   expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
   expect(markup).not.toContain('href="/counselor"');
  });

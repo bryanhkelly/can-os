@@ -9,7 +9,13 @@ export default defineConfig({
   plugins: [
     tsconfigPaths(),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart({
+      router: {
+        codeSplittingOptions: {
+          defaultBehavior: [["loader"], ["component"], ["pendingComponent"], ["errorComponent"], ["notFoundComponent"]],
+        },
+      },
+    }),
     netlify({ dev: { edgeFunctions: { enabled: false } } }),
     react(),
   ],

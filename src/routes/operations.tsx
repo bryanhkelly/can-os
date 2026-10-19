@@ -29,7 +29,7 @@ function OperationsPage(){
   const query=new URLSearchParams();
   if(siteId)query.set("siteId",siteId);
   if(programId)query.set("programId",programId);
-  window.location.assign("/operations"+(query.size?"?"+query.toString():""));
+  void router.navigate({href:"/operations"+(query.size?"?"+query.toString():"")});
  };
  const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null);

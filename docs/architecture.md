@@ -159,6 +159,36 @@ The two must share the same primitives:
 - Student Today reads the canonical SchoolYear/Term/Calendar/Schedule/Assessment data.
 - Family Home aggregates each child's canonical status rather than maintaining a separate family dashboard state.
 
+### Workspace shell and navigation lifecycle
+
+The root route resolves minimal workspace display context on the server through
+the Identity module's `readWorkspaceSession` service, also used by
+`GET /access/session`. The initial HTML contains the verified role-aware
+navigation; hydration does not start a second account bootstrap. Responses with
+workspace context are private and must not be cached by a shared CDN.
+
+One React Query session entry feeds the persistent shell, application entry,
+and command palette. It revalidates on window focus and every minute while the
+app is active. A changed verified identity, active grant, or scope discards the
+mounted workspace through a document reload. Login, membership switching and
+logout deliberately retain document navigation to discard previous identity
+state and caches. Session infrastructure failures are reported explicitly, not
+converted into successful signed-out responses.
+
+Ordinary internal links, scope selectors and search destinations use TanStack
+Router navigation. Resource URLs retain their query and fragment. External
+resources and file downloads retain native browser navigation. Root display
+context is not an authorization cache: every protected read and command still
+resolves and enforces its own server access context.
+
+Route loaders and components are code-split separately. The shared pending
+component lives inside the route outlet, leaving the shell available while
+page-specific code and data load during client navigation. Route reference
+metadata remains eager; unrelated page implementations and loader dependencies
+are lazy. Full-document server rendering can still wait on page loaders;
+database read-model latency is a separate optimization from shell hydration.
+
+
 
 ## Agent-to-academic service boundary
 
