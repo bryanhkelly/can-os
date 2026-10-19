@@ -61,6 +61,7 @@ integration("GF26 real Neon session lifecycle", () => {
       startsAt, endsAt, timezone: site!.timezone,
       siteId: site!.id, sourceType: "study_group_session", sourceId: session!.id,
       createdByPersonId: facilitator!.id,
+      metadata: { location: "Study room" },
     }).returning();
     await db.insert(studyGroupMemberships).values({
       groupId: group!.id, personId: member!.id, role: "member", status: "approved",
@@ -82,6 +83,24 @@ integration("GF26 real Neon session lifecycle", () => {
 
     const newStart = new Date(startsAt.getTime() + 7 * 86400000);
     const newEnd = new Date(endsAt.getTime() + 7 * 86400000);
+    const [duplicate] = await db.insert(calendarEvents).values({
+      type: "study_group", title: "Duplicate projection",
+      startsAt, endsAt, timezone: site!.timezone,
+      siteId: site!.id, sourceType: "study_group_session", sourceId: session!.id,
+    }).returning();
+    await expect(reviseGroupSessionForActor(actor, {
+      action: "reschedule", sessionId: session!.id,
+      startsAt: newStart.toISOString(), endsAt: newEnd.toISOString(),
+    })).rejects.toThrow("Calendar projection identity is ambiguous");
+    const [unchanged] = await db.select().from(studyGroupSessions)
+      .where(eq(studyGroupSessions.id, session!.id));
+    expect(unchanged!.startsAt.toISOString()).toBe(startsAt.toISOString());
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.resourceId, session!.id)))
+      .toHaveLength(0);
+    expect(await db.select().from(notifications).where(eq(notifications.resourceId, session!.id)))
+      .toHaveLength(0);
+    await db.delete(calendarEvents).where(eq(calendarEvents.id, duplicate!.id));
+
     await reviseGroupSessionForActor(actor, {
       action: "reschedule", sessionId: session!.id,
       startsAt: newStart.toISOString(), endsAt: newEnd.toISOString(),
@@ -95,6 +114,7 @@ integration("GF26 real Neon session lifecycle", () => {
       .where(eq(calendarEvents.id, event!.id));
     expect(movedEvent!.startsAt.toISOString()).toBe(newStart.toISOString());
     expect(movedEvent!.endsAt?.toISOString()).toBe(newEnd.toISOString());
+    expect(movedEvent!.metadata.location).toBe("Study room");
 
     const memberNotices = () => db.select().from(notifications).where(and(
       eq(notifications.resourceType, "study_group_session"),
@@ -117,6 +137,12 @@ integration("GF26 real Neon session lifecycle", () => {
     const [cancelledEvent] = await db.select().from(calendarEvents)
       .where(eq(calendarEvents.id, event!.id));
     expect(cancelledEvent!.metadata.cancelled).toBe(true);
+    expect(cancelledEvent!.metadata.cancelledAt).toEqual(expect.any(String));
+    expect(cancelledEvent!.metadata.location).toBe("Study room");
+    expect(await db.select().from(calendarEvents).where(and(
+      eq(calendarEvents.sourceType, "study_group_session"),
+      eq(calendarEvents.sourceId, session!.id),
+    ))).toHaveLength(1);
     const afterCancel = await memberNotices();
     expect(afterCancel).toHaveLength(2);
     expect(afterCancel.map((n) => n.title).sort()).toEqual([

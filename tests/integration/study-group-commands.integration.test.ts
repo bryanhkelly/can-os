@@ -108,6 +108,17 @@ describe("canonical study group commands", () => {
     const { sessionId } = await createCanonicalGroupSession({ data: {
       groupId, title: "Science session", agenda: "", location: "", startsAt, endsAt,
     } });
+    const projections = await db.select().from(s.calendarEvents).where(and(
+      eq(s.calendarEvents.sourceType, "study_group_session"),
+      eq(s.calendarEvents.sourceId, sessionId),
+    ));
+    expect(projections).toHaveLength(1);
+    expect(projections[0]).toMatchObject({
+      type: "study_group", title: "Science session", description: "",
+      siteId: site!.id, programId: null, sectionId: null,
+      startsAt: new Date(startsAt), endsAt: new Date(endsAt),
+      timezone: site!.timezone, createdByPersonId: teacher!.id,
+    });
     state.actor = actor("student", student!.id);
     await rsvpCanonicalGroupSession({ data: { sessionId, rsvp: "going" } });
     state.actor = actor("teacher", teacher!.id);

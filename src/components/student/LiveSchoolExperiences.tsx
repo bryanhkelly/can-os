@@ -43,6 +43,7 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
      {data.events.map(event=><div key={event.id} className="rounded-xl border border-border p-4">
       <p className="text-sm font-semibold">{event.title}</p>
       <p className="mt-1 text-xs text-muted-foreground">{format(event.startsAt,event.timezone)}</p>
+      <p className="mt-1 text-xs font-semibold">{event.status==="cancelled"?"Cancelled":"Scheduled"}</p>
       <p className="mt-2 text-xs text-muted-foreground">For changes, contact your school office.</p>
      </div>)}
      {data.events.length===0&&<p className="text-xs text-muted-foreground">No upcoming calendar events.</p>}

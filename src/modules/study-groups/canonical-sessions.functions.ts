@@ -4,6 +4,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { validateSession } from "@/domain/study-groups";
 import { recordAudit,requireActor } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
+import { publishProjection } from "@/platform/calendar/projection";
 import { createServerFn } from "@tanstack/react-start";
 import { and,eq } from "drizzle-orm";
 import { z } from "zod";
@@ -60,25 +61,24 @@ export const createCanonicalGroupSession = createServerFn({ method: "POST" })
         location: data.location, startsAt: times.start, endsAt: times.end,
       }).returning({ id: s.studyGroupSessions.id });
       if (!session) throw new Error("Unable to create study session");
-      const [event] = await tx.insert(s.calendarEvents).values({
+      const calendarEventId = await publishProjection(tx, {
         type: "study_group", title: data.title, description: data.agenda,
         startsAt: times.start, endsAt: times.end, timezone: site.timezone,
-        siteId: group.siteId, programId: group.programId,
-        sectionId: group.sectionId, sourceType: "study_group_session",
+        scope: { siteId: group.siteId, programId: group.programId, sectionId: group.sectionId },
+        sourceType: "study_group_session",
         sourceId: session.id, createdByPersonId: actor.actorPersonId,
-      }).returning({ id: s.calendarEvents.id });
-      if (!event) throw new Error("Unable to create session calendar event");
+      });
       await notifyMembers(tx, group.id, "New study group session",
         "Your facilitator scheduled " + data.title + ".", session.id);
       await recordAudit(tx, actor, {
         action: "study_group.session.create", resourceType: "study_group_session",
         resourceId: session.id, scope: { siteId: group.siteId, programId: group.programId },
-        after: { startsAt: times.start.toISOString(), endsAt: times.end.toISOString(), calendarEventId: event.id },
+        after: { startsAt: times.start.toISOString(), endsAt: times.end.toISOString(), calendarEventId },
       });
       await emitEvent(tx, {
         eventType: "StudyGroupSessionCreated", aggregateType: "study_group_session",
         aggregateId: session.id, actorPersonId: actor.actorPersonId,
-        payload: { groupId: group.id, calendarEventId: event.id },
+        payload: { groupId: group.id, calendarEventId },
       });
       return { sessionId: session.id };
     });

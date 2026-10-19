@@ -3,6 +3,7 @@ import * as s from "@/db/schema";
 import { validateSession } from "@/domain/study-groups";
 import { recordAudit,type Actor } from "@/modules/identity/actors.server";
 import { emitEvent,notifyMany } from "@/platform/mutation";
+import { cancelProjection,rescheduleProjection } from "@/platform/calendar/projection";
 import { and,eq } from "drizzle-orm";
 import { facilitatedGroup } from "./canonical-membership.server";
 
@@ -51,14 +52,16 @@ export async function reviseGroupSessionForActor(actor: Actor, data: ReviseGroup
       await tx.update(s.studyGroupSessions).set({
         startsAt: times.start, endsAt: times.end, updatedAt: new Date(),
       }).where(eq(s.studyGroupSessions.id, session.id));
-      await tx.update(s.calendarEvents).set({
-        startsAt: times.start, endsAt: times.end, updatedAt: new Date(),
-      }).where(eq(s.calendarEvents.id, event.id));
+      const calendarEventId = await rescheduleProjection(tx, {
+        sourceType: "study_group_session", sourceId: session.id,
+        startsAt: times.start, endsAt: times.end,
+      });
+      if (!calendarEventId) throw new Error("Session calendar event missing");
     } else {
-      await tx.update(s.calendarEvents).set({
-        metadata: { ...event.metadata, cancelled: true, cancelledAt: new Date().toISOString() },
-        updatedAt: new Date(),
-      }).where(eq(s.calendarEvents.id, event.id));
+      const cancelled = await cancelProjection(tx, {
+        sourceType: "study_group_session", sourceId: session.id,
+      });
+      if (!cancelled) throw new Error("Session calendar event missing");
     }
     await notifyMembers(tx, group.id,
       data.action === "cancel" ? "Study group session cancelled" : "Study group session rescheduled",
