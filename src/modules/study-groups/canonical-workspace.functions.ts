@@ -11,7 +11,7 @@ export const getStudyGroupAvailability = createServerFn({ method: "GET" }).handl
   creationEnabled: true, contentEnabled: true, moderationEnabled: true,
 }));
 
-/** Canonical read projection for the temporary Phase 3 /groups entry point. */
+/** Canonical read projection for the shared /groups workspace. */
 export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await requireActor(["student", "teacher"]);
   setResponseHeader("Cache-Control", "private, no-store");

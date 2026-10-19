@@ -103,6 +103,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/admissions.transcripts.tsx",
+      "route": "/admissions/transcripts",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/admissions.tsx",
       "route": "/admissions",
       "owner": "enrollment",

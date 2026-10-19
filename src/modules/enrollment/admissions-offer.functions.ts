@@ -18,7 +18,7 @@ async function authorizedActor(role:"registrar"|"guardian",capability:string,pro
  return actor;
 }
 
-export const getSyntheticAdmissionOfferOptions=createServerFn({method:"GET"})
+export const getAdmissionOfferOptions=createServerFn({method:"GET"})
  .validator((value:unknown)=>operationsSelectionSchema.parse(value??{}))
  .handler(async({data})=>{
  const actor=await getCommandContext(getRequest());
@@ -28,27 +28,26 @@ export const getSyntheticAdmissionOfferOptions=createServerFn({method:"GET"})
  const scoped=await resolveOperationsSelection(actor,data);
  if(!process.env.DATABASE_URL)return [];
  const apps=await db.select({id:applications.id,programId:applications.programId,metadata:applications.metadata}).from(applications).where(inArray(applications.programId,scoped.programIds)).limit(150);
- const synthetic=apps;
- if(!synthetic.length)return [];
+ if(!apps.length)return [];
  const pools=await db.select({programId:admissionSeatPools.programId,schoolYearId:admissionSeatPools.schoolYearId,capacity:admissionSeatPools.capacity,name:schoolYears.name}).from(admissionSeatPools).innerJoin(schoolYears,eq(schoolYears.id,admissionSeatPools.schoolYearId)).where(inArray(admissionSeatPools.programId,scoped.programIds));
- return synthetic.map(app=>({applicationId:app.id,years:pools.filter(p=>p.programId===app.programId).map(p=>({id:p.schoolYearId,name:p.name,capacity:p.capacity}))}));
+ return apps.map(app=>({applicationId:app.id,years:pools.filter(p=>p.programId===app.programId).map(p=>({id:p.schoolYearId,name:p.name,capacity:p.capacity}))}));
 });
 
-async function syntheticApplication(id:string){
+async function loadApplication(id:string){
  const [app]=await db.select({id:applications.id,programId:applications.programId,studentProfileId:applications.studentProfileId,metadata:applications.metadata}).from(applications).where(eq(applications.id,id)).limit(1);
  if(!app)throw new Error("Application not found");
  return app;
 }
-async function syntheticOffer(id:string){
+async function loadOffer(id:string){
  const [offer]=await db.select({id:admissionOffers.id,applicationId:admissionOffers.applicationId,programId:admissionOffers.programId}).from(admissionOffers).where(eq(admissionOffers.id,id)).limit(1);
  if(!offer)throw new Error("Offer not found");
- const app=await syntheticApplication(offer.applicationId);
+ const app=await loadApplication(offer.applicationId);
  if(app.programId!==offer.programId)throw new Error("Offer program mismatch");
  return {offer,app};
 }
-export const issueSyntheticOfferFromDemo=createServerFn({method:"POST"})
+export const issueAdmissionOffer=createServerFn({method:"POST"})
 .validator((data:{applicationId:string;schoolYearId:string})=>data).handler(async({data})=>{
- const app=await syntheticApplication(data.applicationId);
+ const app=await loadApplication(data.applicationId);
  const actor=await authorizedActor("registrar","enrollment.decide",app.programId);
  assertRecordWriteAllowed(app.metadata,"registrar");
  // A stable key makes concurrent retries safe; the domain service rejects a second active offer.
@@ -59,21 +58,21 @@ export const issueSyntheticOfferFromDemo=createServerFn({method:"POST"})
  const expiresAt=new Date(Date.now()+14*24*60*60*1000);
  return {offerId:await issueSyntheticAdmissionOffer(actor,{applicationId:app.id,schoolYearId:data.schoolYearId,idempotencyKey:key,expiresAt})};
 });
-export const respondSyntheticOfferFromDemo=createServerFn({method:"POST"})
+export const respondToAdmissionOffer=createServerFn({method:"POST"})
 .validator((data:{offerId:string;decision:"accept"|"decline"})=>data).handler(async({data})=>{
  if(!["accept","decline"].includes(data.decision))throw new Error("Invalid decision");
- const {offer,app}=await syntheticOffer(data.offerId);
+ const {offer,app}=await loadOffer(data.offerId);
  const actor=await authorizedActor("guardian","enrollment.apply",app.programId);
  assertRecordWriteAllowed(app.metadata,"guardian");
  const [profile]=await db.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
  if(!profile)throw new Error("Student profile missing");
  const [guardian]=await db.select({id:guardianRelationships.guardianPersonId}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.canManageEnrollment,true),eq(guardianRelationships.guardianPersonId,actor.actorPersonId!))).limit(1);
- if(!guardian)throw new Error("Synthetic guardian relationship missing");
+ if(!guardian)throw new Error("Guardian relationship missing");
  return {offerId:await respondToSyntheticAdmissionOffer(actor,offer.id,data.decision)};
 });
-export const activateSyntheticOfferFromDemo=createServerFn({method:"POST"})
+export const activateOfferedEnrollment=createServerFn({method:"POST"})
 .validator((data:{offerId:string})=>data).handler(async({data})=>{
- const {offer,app}=await syntheticOffer(data.offerId);
+ const {offer,app}=await loadOffer(data.offerId);
  const actor=await authorizedActor("registrar","enrollment.activate",app.programId);
  assertRecordWriteAllowed(app.metadata,"registrar");
  return {enrollmentId:await activateSyntheticOfferedEnrollment(actor,offer.id)};

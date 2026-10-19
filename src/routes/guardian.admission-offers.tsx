@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {createFileRoute,useRouter,Link} from "@tanstack/react-router";
 import {getGuardianAdmissionOffers} from "@/modules/enrollment/guardian-admission-offers.functions";
-import {respondSyntheticOfferFromDemo} from "@/modules/enrollment/admissions-offer-demo.functions";
+import {respondToAdmissionOffer} from "@/modules/enrollment/admissions-offer.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 
@@ -25,7 +25,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState("");
  async function respond(offerId:string,decision:"accept"|"decline"){
   setBusy(offerId);setError("");
-  try{await respondSyntheticOfferFromDemo({data:{offerId,decision}});await router.invalidate();}
+  try{await respondToAdmissionOffer({data:{offerId,decision}});await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Unable to respond to offer");}
   finally{setBusy(null);}
  }

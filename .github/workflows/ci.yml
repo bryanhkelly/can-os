@@ -9,9 +9,6 @@ on:
   push:
     branches:
       - main
-      - "foundation/**"
-      - "db/**"
-      - "feat/profiles-evidence-school-configuration"
 
 jobs:
   verify:

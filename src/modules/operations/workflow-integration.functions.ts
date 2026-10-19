@@ -13,7 +13,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 
 /**
- * Phase 2 canonical cross-workflow projection. This is deliberately read-only:
+ * Canonical cross-workflow projection. This is deliberately read-only:
  * the existing domain services own state changes and audit/event emission.
  * A fixture and an authentic record with identical domain facts project alike.
  */

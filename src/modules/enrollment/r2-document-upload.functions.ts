@@ -44,7 +44,7 @@ async function requirementScope(applicationId:string,requirementId:string,allowC
  const [requirement]=await db.select({id:journeyRequirements.id}).from(journeyRequirements).where(and(eq(journeyRequirements.id,requirementId),eq(journeyRequirements.journeyId,journey.id))).limit(1);
  if(!requirement)throw new Error("Requirement is outside the application");
 }
-export const beginSyntheticR2DocumentUpload=createServerFn({method:"POST"})
+export const beginEnrollmentDocumentUpload=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),fileName:z.string().min(1).max(150),mimeType:z.enum(["application/pdf","image/jpeg","image/png"]),size:z.number().int().min(16).max(10*1024*1024)}).parse(data))
  .handler(async({data})=>{
   await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
@@ -52,7 +52,7 @@ export const beginSyntheticR2DocumentUpload=createServerFn({method:"POST"})
   const key=newDocumentKey(data.applicationId,data.requirementId);
   return {key,uploadUrl:signR2Object("PUT",key,data.mimeType,180),expiresInSeconds:180};
  });
-export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
+export const finishEnrollmentDocumentUpload=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),key:z.string().regex(/^enrollment\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i),fileName:z.string().min(1).max(150),mimeType:z.enum(["application/pdf","image/jpeg","image/png"]),size:z.number().int().min(16).max(10*1024*1024)}).parse(data))
  .handler(async({data})=>{
   const actorId=await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
@@ -94,7 +94,7 @@ export const finishSyntheticR2DocumentUpload=createServerFn({method:"POST"})
  });
 
 /** Short-lived document retrieval after application and guardian/registrar scope checks. */
-export const getSyntheticR2DocumentDownload=createServerFn({method:"POST"})
+export const getEnrollmentDocumentDownload=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),documentId:z.string().uuid()}).parse(data))
  .handler(async({data})=>{
   await uploadsEnabled(data.applicationId,"download");
@@ -119,8 +119,3 @@ export const getEnrollmentDocumentUploadAvailability=createServerFn({method:"GET
   demo:configured&&process.env.CAN_R2_DEMO_UPLOADS_ENABLED==="true",
  };
 });
-
-/** Canonical aliases; legacy names remain for existing route consumers. */
-export const beginEnrollmentDocumentUpload=beginSyntheticR2DocumentUpload;
-export const finishEnrollmentDocumentUpload=finishSyntheticR2DocumentUpload;
-export const getEnrollmentDocumentDownload=getSyntheticR2DocumentDownload;

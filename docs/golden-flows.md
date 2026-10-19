@@ -323,14 +323,14 @@ A Playwright golden-flow test covers GF1 end to end (assignment becomes missing 
 
 Prerequisites:
 
-- `npm install -D @playwright/test` and `npx playwright install chromium`
-- Add `"test:e2e": "playwright test"` to `package.json` scripts
+- Run `npm ci` for the committed dependencies and `npx playwright install chromium` for the browser.
 - Set `DATABASE_URL` to a **disposable Neon branch** (never production). The test inserts and deletes its own synthetic rows, but it is not isolated against real data.
 
 Run:
 
-```sh
-DATABASE_URL=postgres://... npm run test:e2e
+```powershell
+$env:DATABASE_URL = "<disposable Neon connection>"
+npm run test:e2e
 ```
 
 Playwright starts `npm run dev` itself (reusing an existing server on port 3000) with `CAN_ACCESS_TOKEN_PEPPER`, `CAN_JOB_SECRET`, and `CAN_DEMO_WRITES_ENABLED=true` set to test values; override any of them via the environment. The test signs in by inserting real session rows (secret hashed with the pepper) and injecting the session cookie — there is no app backdoor. Reports land in `playwright-report/` (git-ignored).

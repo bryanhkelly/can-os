@@ -49,7 +49,7 @@ function ConnectedWorkflowsPage() {
   return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
     <div className="mx-auto max-w-6xl">
       <Link to="/operations" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Operations</Link>
-      <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Phase 2</p>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Operations</p>
       <h1 className="mt-2 font-serif text-4xl">Connected school workflows</h1>
       <p className="mt-3 max-w-3xl text-sm text-muted-foreground">
         One authorized view of the host launch, admissions-to-enrollment,

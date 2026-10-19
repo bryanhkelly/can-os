@@ -2,10 +2,12 @@
 
 **Baseline reviewed:** `main` at `80f6c66` (2026-10-18), plus the academic Action and mutation-evidence follow-ups included with this snapshot. The prior academic/conference authorization follow-up was pushed in `75a83be`. Local automated results are recorded below; they are **not** a verified deployment, production acceptance, security audit, or assertion that remote CI has passed.
 
+**Repository cleanup review:** based on `main` at `6be1a57` (2026-10-18), plus the cleanup changes on `chore/repository-stabilization-20261018`. This refresh covers unused-source tracing, the route inventory, local checks and a read-only audit of the locally configured Neon connection, not a full product acceptance review. Earlier integration results remain historical evidence.
+
 ## Integrated source baseline
 
 - The main branch includes the development changes associated with Phases 1, 2 and 3. Phase 1 PR #120 is marked merged by GitHub. The Phase 2 and Phase 3 implementation work was integrated via commits on `main`; PRs #121 and #122 were closed without GitHub reporting them as merged. Do not use those original PR states as instructions for future branching.
-- `src/routes/` contains **65** TypeScript/TSX route source files, matching `docs/platform-route-contracts.json`. **Every route's verification, role journey, read boundary and write boundary remains `pending`.** Recording ownership is not acceptance. The separate fixture-coverage checker reports 58 route declarations; neither inventory is browser acceptance.
+- `src/routes/` contains **66** TypeScript/TSX route source files, matching `docs/platform-route-contracts.json`. The registrar transcript route is owned by Learning, which supplies its canonical read and issuance commands. **Every route's verification, role journey, read boundary and write boundary remains `pending`.** Recording ownership is not acceptance. The separate fixture-coverage checker reports 59 route declarations; neither inventory is browser acceptance.
 - Workspace entry uses server session grants (`src/routes/index.tsx`, `src/components/shell/WorkspaceNavigation.tsx`). Module-level authorization still requires code and negative-access tests.
 - Existing student/teacher group routes now call canonical creation, consent, posting, moderation, session, RSVP and attendance commands. The old combined `study-groups.functions.ts` mutation module was retired; retained read projections in `study-group-queries.functions.ts` preserve existing page shapes. Isolated integration tests cover interest groups, consent, duplicate reports, moderation, RSVP-independent attendance, and session reschedule/cancellation.
 - Admissions offer commands are present under `src/modules/enrollment/admissions-offer-service.ts` and related server functions; some paths still use `assertRecordWriteAllowed` or synthetic-prefixed compatibility names. Do not misreport them as uniformly provenance-neutral or production accepted.
@@ -16,6 +18,13 @@
 - Conference booking/rescheduling no longer accept an optional enrollment-check switch. Both commands require explicit site/program grants, current guardian relationship, school enrollment and active section enrollment where applicable; direct-service regression tests cover denials and transactional rescheduling.
 - Student-section academic Action creation, operational acceptance/assignment/status changes and direct resolution now share resource/relationship policy. Ownership alone does not grant access. Resolution locks the Action, rechecks access on retries, requires a nonblank note and rejects cancelled work; concurrent completion writes one audit and one outbox event. Site-wide operational follow-ups retain their existing path, while the direct resolver rejects other domain types.
 - School-Year Studio calendar-day create/update records before/after audit evidence and scoped calendar events. Program orientation, launch site creation and teacher assignment now have transactional audit/domain-event evidence; repeated active teacher assignment is a no-op.
+
+## Retired repository leftovers
+
+- Removed 25 unused source files after tracing route, test and script imports: the hard-coded student dataset and local-state experience lab; unused UI scaffolding, rubric editor and academic case view; superseded attendance, enrollment, program-launch and Student Today adapters; unused fixture-health and section-planning server functions; and their orphaned query/policy/validation helpers. The active routes keep their canonical implementations.
+- Removed the obsolete lab's four fixture-only tests, not the live student workflow tests. Removed four unused direct Radix dependencies and 29 installed packages with the package manager; the lockfile is updated.
+- Admissions routes now import `admissions-offer.functions.ts` using product-facing names. Existing service commands, synthetic write guards and persisted idempotency-key format are unchanged. Enrollment document functions now expose their canonical names directly rather than retaining unused synthetic-named exports.
+- Historical archives, committed migrations/snapshots, SQL fixtures, compatibility redirects and offline attendance queue compatibility remain intact. Tested domain services are retained even when no current route calls them. The standalone qualification-review service is also retained as an intended domain capability, not represented as a wired or accepted product flow.
 
 ## Architecture versus known code gaps
 
@@ -29,13 +38,31 @@
 
 - Local verification on 2026-10-18: `npm test` passed **71 files / 350 tests**; `npm run test:integration` passed **29 files / 43 tests** using the protected isolated Neon runner. These are working-tree results, including concurrent calendar/transcript work, not a claim that every change belongs to this follow-up. Coverage includes academic Action denial/concurrency, school-year calendar-day audit history, program orientation audit, launch site/teacher evidence and duplicate assignment idempotency.
 - `npm run typecheck`, `npm run build`, mutation hygiene, route fixture coverage and `node scripts/check-platform-route-contracts.mjs --check` passed locally after the current evidence changes.
+- Repository cleanup verification on 2026-10-18: the final full non-database unit run passed **71 files / 355 tests**, including nine new admissions server-function regressions covering registrar role/capability/program denial, synthetic write gating, guardian relationship checks, issuance idempotency and command delegation.
+- Route ownership passed **66/66**, fixture coverage passed **59/59**, mutation hygiene passed, and typecheck and production build passed. `npm run db:generate` left committed migration files unchanged. These checks used the existing local Vite configuration change. Database integration and browser suites were not rerun during cleanup.
 - Browser/Playwright cross-persona journeys, remote CI, live R2 configuration and production migration/deployment remain **unverified** in this continuation. No production migration or data modification was performed.
-- All 65 route acceptance entries remain **pending**. The basic source-drift checker is separate from the stricter `--acceptance` gate.
+- All 66 route acceptance entries remain **pending**. The basic source-drift checker is separate from the stricter `--acceptance` gate.
 - Sensitive student, medical, safety, payment and legal data require independent privacy/security review and operational acceptance. Do not infer readiness from documentation or a passing compile.
 - Refer to [release gate](./synthetic-pilot-release-gate.md) for recorded evidence and its dated limitations, [security gates](./school-operations-security-gates.md), and [Neon test isolation](./neon-development.md).
 
+## Read-only Neon audit (2026-10-18)
+
+**Target:** the database selected by `DATABASE_URL` in local ignored configuration. Its deployment/branch classification was not independently established; these findings must not be generalized to every Neon branch. Queries ran in transactions with `transaction_read_only=on`; no migration, ledger update, fixture write or schema mutation was performed.
+
+- The Drizzle ledger contains **9 rows, corresponding to `0000` through `0008`**. Eight hashes match the local files byte-for-byte; `0006` matches after LF normalization (the Windows checkout is CRLF), not evidence of edited migration history.
+- There are no ledger entries for `0009` through `0021`. Nevertheless, later structures such as subscriptions and conversations already exist. This is **partial schema/ledger drift**, not proof that every unrecorded migration can safely be replayed. Reconcile deployed objects and migration history on an isolated copy before approving database changes.
+- Canonical source defines **118 tables**; this database has **111 public tables**, including three unmodeled legacy tables. Ten canonical tables are missing:
+  `delivery_arrangements`, `instructional_capacity_offerings`, `instructional_capacity_reservations`, `instructor_availability_windows`, `instructor_capabilities`, `notification_preferences`, `section_capacity_demands`, `section_prerequisites`, `section_registration_policies`, and `subscription_event_receipts`.
+- Existing-table column-name checks found three missing columns: `section_teachers.assignment_source`, `subscription_deliveries.next_attempt_at`, and `subscription_deliveries.lease_until`. No extra columns were found on the modeled tables. This is a name-level comparison, not a full type/index/constraint equivalence certificate.
+- The legacy tables `incident_actions`, `activity_calendar_events`, and `conference_actions` each contain **0 rows** and have no inbound foreign keys. Committed migration `0009_retire_dead_join_tables.sql` already targets their removal. They were not dropped; other dependencies and rollout safety still require review.
+- The four staffing status enum types introduced by `0021` are absent. Its target capacity/delivery tables are also absent, so checking those tables' status values is not yet possible.
+- Journal timestamps for `0019` and the comment-only `0020` are reversed. Migration files and journal were preserved unchanged.
+
 ## Remaining follow-up
 
+- CI now runs for pull requests, pushes to `main`, and manual dispatch; obsolete phase/feature push triggers were removed. Start short-lived development branches from current `main` and submit focused pull requests. Branch protection and required-check enforcement are GitHub settings and remain unverified by this cleanup.
+- Admissions CI requires the `integration-test` environment secret `CAN_ADMISSIONS_TEST_DATABASE_URL` and variable `CAN_APPLICATION_DB_HOST`; their remote configuration remains unverified. Keep the isolated-database preflight mandatory before migration or test writes.
+- Reconcile the audited database's partial schema/ledger drift before running `db:migrate`; neither a clean `db:generate` nor the ledger alone proves replay safety. Review the `0019`/`0020` timestamp ordering as part of that process.
 - Nonacademic and section-less operational Actions still need a complete owning-domain policy review; the academic policy is deliberately not a universal Action abstraction. Historical academic follow-up after withdrawal/inactivation needs an explicit policy before broadening current fail-closed behavior.
 - Remaining school-year/program-launch commands need evidence-parity review.
 - Full authenticated route/deep-link and role-switch browser acceptance is pending.

@@ -25,7 +25,8 @@ A CI job should:
 4. run `npm run test:integration`;
 5. delete the temporary Neon branch.
 
-`npm test` skips database integration files when `DATABASE_URL` is absent.
+`npm test` excludes database integration and browser test files; run the explicit
+integration command below for database-backed acceptance.
 When a database is supplied directly, the test setup requires `APP_ENV=test`,
 `CAN_TEST_DB_WRITES_ENABLED=true`, and non-production mode.
 
@@ -48,6 +49,9 @@ npm run db:generate
 
 Review generated SQL before applying it.
 
+`db:generate` compares source schema with committed snapshots; it does not
+inspect Neon or prove that a deployed database is current.
+
 Apply committed migrations with:
 
 ```bash
@@ -60,6 +64,17 @@ If an existing database has tables but no Drizzle migration-history table,
 do not replay the initial migrations against it. Compare the deployed schema
 with committed snapshots and establish a reviewed baseline first. Production
 migrations require explicit approval and successful isolated validation.
+
+If the migration ledger stops before schema objects that already exist,
+treat the database as drifted rather than assuming every unrecorded migration
+is safe to replay. Compare `drizzle.__drizzle_migrations` with committed SQL and
+the deployed catalog on an isolated copy. On Windows, a hash mismatch may be
+caused by CRLF versus LF; compare the committed file representation before
+concluding that an applied migration was changed. Do not rewrite migration
+history, stamp missing ledger entries or use `db:push` as a shortcut.
+
+The dated, locally configured database audit is recorded in
+[CURRENT-STATE.md](./CURRENT-STATE.md); it does not certify other Neon branches.
 
 ## Connection handling
 

@@ -4,7 +4,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
 import { listMySites } from "@/modules/operations/site-directory.functions";
 import { listAdmissionsPrograms } from "@/modules/enrollment/admissions-program-directory.functions";
-import { getSyntheticAdmissionOfferOptions, issueSyntheticOfferFromDemo, activateSyntheticOfferFromDemo } from "@/modules/enrollment/admissions-offer-demo.functions";
+import { getAdmissionOfferOptions, issueAdmissionOffer, activateOfferedEnrollment } from "@/modules/enrollment/admissions-offer.functions";
 import { admissionsPipelineSummary } from "@/domain/admissions-pipeline";
 import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions-offer-selection";
 import { WorkspaceShell, StatCard, EmptyState } from "@/components/workspace";
@@ -13,7 +13,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 
 const loadAdmissions = async (selection:{siteId?:string;programId?:string}={}) => ({
  rows: await getAdmissionsDashboard({data:selection}),
- options: await getSyntheticAdmissionOfferOptions({data:selection}),
+ options: await getAdmissionOfferOptions({data:selection}),
  sites: await listMySites(),
  programs: await listAdmissionsPrograms(),
 });
@@ -105,9 +105,9 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o => <span key={o.id} className="rounded-lg border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt ? ` · Expires ${new Date(o.expiresAt).toLocaleDateString()}` : ""}</span>)}{!latest && <span className="text-xs text-muted-foreground">No currently actionable offer</span>}</div>
           {activated && <p className="mt-3 text-sm font-semibold">Enrollment active · Student is enrolled in this school year</p>}
           <div className="mt-4 flex flex-wrap gap-2">
-            {years.filter(year => canIssueAnotherOffer(x.stage, x.outstandingRequirements, x.offers, year.id)).map(year => <button key={year.id} disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => issueSyntheticOfferFromDemo({ data: { applicationId: x.id, schoolYearId: year.id } }))}>Registrar: Issue offer · {year.name}</button>)}
+            {years.filter(year => canIssueAnotherOffer(x.stage, x.outstandingRequirements, x.offers, year.id)).map(year => <button key={year.id} disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => issueAdmissionOffer({ data: { applicationId: x.id, schoolYearId: year.id } }))}>Registrar: Issue offer · {year.name}</button>)}
             {latest?.status === "issued" && <p className="text-xs text-muted-foreground">Waiting for guardian response in the guardian enrollment-offers workspace.</p>}
-            {latest?.status === "accepted" && !activated && <button disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => activateSyntheticOfferFromDemo({ data: { offerId: latest.id } }))}>Registrar: Activate enrollment</button>}
+            {latest?.status === "accepted" && !activated && <button disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => activateOfferedEnrollment({ data: { offerId: latest.id } }))}>Registrar: Activate enrollment</button>}
           </div>
           {x.enrollments.length > 0 && <CoursePlacement applicationId={x.id} />}
           <a href={"/admissions/families"+(selected.siteId||selected.programId?"?"+familyScope.toString():"")} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</a>
