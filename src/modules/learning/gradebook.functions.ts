@@ -1,7 +1,7 @@
 import { assertCapability,assertProgramScope,assertSiteScope,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { readRubric,scoreRubric } from "@/modules/student-experience/rubric";
+import { readRubric,scoreRubric } from "@/modules/learning/rubric";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";

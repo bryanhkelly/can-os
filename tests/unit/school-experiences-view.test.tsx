@@ -8,7 +8,7 @@ vi.mock("@tanstack/react-router", () => ({
   Link:({to,search,children,...props}:{to:string;search:Record<string,string>;children:ReactNode})=>
     <a href={to+"?"+new URLSearchParams(search)} {...props}>{children}</a>,
 }));
-vi.mock("@/modules/family/guardian-assignments.functions", () => ({ getGuardianStudents: vi.fn() }));
+vi.mock("@/modules/learning/guardian-academic-queries.functions", () => ({ getGuardianStudents: vi.fn() }));
 vi.mock("@/modules/student-experience/school-experiences.functions", () => ({
   bookOfficeHour: vi.fn(), rescheduleOfficeHour: vi.fn(),
 }));

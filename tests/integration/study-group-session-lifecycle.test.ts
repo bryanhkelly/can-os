@@ -8,6 +8,7 @@ import {
   notifications,
   organizations,
   people,
+  scheduledOccurrences,
   sites,
   studyGroups,
   studyGroupMemberships,
@@ -17,6 +18,14 @@ import { reviseGroupSessionForActor } from "@/modules/study-groups/canonical-ses
 import type { Actor } from "@/modules/identity/actors.server";
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
+
+async function createOccurrence(startsAt: Date, endsAt: Date, timezone: string, siteId: string) {
+  const [occurrence] = await db.insert(scheduledOccurrences).values({
+    startsAt, endsAt, timezone, siteId,
+  }).returning({ id: scheduledOccurrences.id });
+  if (!occurrence) throw new Error("Calendar occurrence fixture missing");
+  return occurrence.id;
+}
 
 /**
  * GF26 canonical session lifecycle: reschedule propagates to the canonical
@@ -62,6 +71,7 @@ integration("GF26 real Neon session lifecycle", () => {
       siteId: site!.id, sourceType: "study_group_session", sourceId: session!.id,
       createdByPersonId: facilitator!.id,
       metadata: { location: "Study room" },
+      scheduledOccurrenceId: await createOccurrence(startsAt, endsAt, site!.timezone, site!.id),
     }).returning();
     await db.insert(studyGroupMemberships).values({
       groupId: group!.id, personId: member!.id, role: "member", status: "approved",
@@ -87,6 +97,7 @@ integration("GF26 real Neon session lifecycle", () => {
       type: "study_group", title: "Duplicate projection",
       startsAt, endsAt, timezone: site!.timezone,
       siteId: site!.id, sourceType: "study_group_session", sourceId: session!.id,
+      scheduledOccurrenceId: await createOccurrence(startsAt, endsAt, site!.timezone, site!.id),
     }).returning();
     await expect(reviseGroupSessionForActor(actor, {
       action: "reschedule", sessionId: session!.id,
@@ -115,6 +126,10 @@ integration("GF26 real Neon session lifecycle", () => {
     expect(movedEvent!.startsAt.toISOString()).toBe(newStart.toISOString());
     expect(movedEvent!.endsAt?.toISOString()).toBe(newEnd.toISOString());
     expect(movedEvent!.metadata.location).toBe("Study room");
+    const [movedOccurrence] = await db.select().from(scheduledOccurrences)
+      .where(eq(scheduledOccurrences.id, movedEvent!.scheduledOccurrenceId));
+    expect(movedOccurrence!.startsAt.toISOString()).toBe(newStart.toISOString());
+    expect(movedOccurrence!.endsAt?.toISOString()).toBe(newEnd.toISOString());
 
     const memberNotices = () => db.select().from(notifications).where(and(
       eq(notifications.resourceType, "study_group_session"),

@@ -328,6 +328,7 @@ export const schoolConfigurationStatus = pgEnum("school_configuration_status", [
 
 export const complianceFrameworkVersionStatus = pgEnum("compliance_framework_version_status", [
   "draft",
+  "published",
 ]);
 
 export const sectionGradeStatus = pgEnum("section_grade_status", ["draft", "finalized"]);

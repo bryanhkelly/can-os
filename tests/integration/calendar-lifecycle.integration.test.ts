@@ -13,6 +13,7 @@ import {
   notifications,
   organizations,
   people,
+  scheduledOccurrences,
   programs,
   sections,
   sectionTeachers,
@@ -25,6 +26,22 @@ import { reviseCalendarEventForActor } from "@/modules/calendar/calendar-events.
 import type { Actor } from "@/modules/identity/actors.server";
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
+
+async function createOccurrence(input: {
+  startsAt: Date;
+  endsAt?: Date | null;
+  timezone: string;
+  organizationId?: string | null;
+  siteId?: string | null;
+  programId?: string | null;
+  sectionId?: string | null;
+  createdByPersonId?: string | null;
+}) {
+  const [occurrence] = await db.insert(scheduledOccurrences).values(input)
+    .returning({ id: scheduledOccurrences.id });
+  if (!occurrence) throw new Error("Calendar occurrence fixture missing");
+  return occurrence.id;
+}
 
 /**
  * Canonical calendar event lifecycle: authorized edit/reschedule/cancel with
@@ -122,6 +139,11 @@ integration("calendar event lifecycle", () => {
       startsAt: start, endsAt: end, timezone: "America/Los_Angeles",
       organizationId: hostOrg!.id, siteId: site!.id, programId: program!.id,
       createdByPersonId: registrar!.id,
+      scheduledOccurrenceId: await createOccurrence({
+        startsAt: start, endsAt: end, timezone: "America/Los_Angeles",
+        organizationId: hostOrg!.id, siteId: site!.id, programId: program!.id,
+        createdByPersonId: registrar!.id,
+      }),
     }).returning();
     await db.insert(calendarEventParticipants).values([
       { calendarEventId: siteEvent!.id, participantType: "person", participantId: studentPerson!.id, role: "attendee" },
@@ -137,6 +159,10 @@ integration("calendar event lifecycle", () => {
     const [moved] = await db.select().from(calendarEvents).where(eq(calendarEvents.id, siteEvent!.id));
     expect(moved!.startsAt.toISOString()).toBe(newStart.toISOString());
     expect(moved!.endsAt?.toISOString()).toBe(newEnd.toISOString());
+    const [movedOccurrence] = await db.select().from(scheduledOccurrences)
+      .where(eq(scheduledOccurrences.id, moved!.scheduledOccurrenceId));
+    expect(movedOccurrence!.startsAt.toISOString()).toBe(newStart.toISOString());
+    expect(movedOccurrence!.endsAt?.toISOString()).toBe(newEnd.toISOString());
 
     const participantNotices = await db.select().from(notifications).where(and(
       eq(notifications.resourceType, "calendar_event"),
@@ -199,6 +225,11 @@ integration("calendar event lifecycle", () => {
       startsAt: start, endsAt: end, timezone: "America/Los_Angeles",
       organizationId: hostOrg!.id, siteId: site!.id, programId: program!.id, sectionId: section!.id,
       createdByPersonId: teacher!.id,
+      scheduledOccurrenceId: await createOccurrence({
+        startsAt: start, endsAt: end, timezone: "America/Los_Angeles",
+        organizationId: hostOrg!.id, siteId: site!.id, programId: program!.id,
+        sectionId: section!.id, createdByPersonId: teacher!.id,
+      }),
     }).returning();
 
     await reviseCalendarEventForActor(teacherActor, {
@@ -222,6 +253,10 @@ integration("calendar event lifecycle", () => {
       type: "personal", title: `Dentist ${suffix}`,
       startsAt: start, timezone: "America/Los_Angeles",
       createdByPersonId: guardian!.id,
+      scheduledOccurrenceId: await createOccurrence({
+        startsAt: start, timezone: "America/Los_Angeles",
+        createdByPersonId: guardian!.id,
+      }),
     }).returning();
     await db.insert(calendarEventParticipants).values({
       calendarEventId: personal!.id, participantType: "person",
@@ -246,6 +281,10 @@ integration("calendar event lifecycle", () => {
       startsAt: start, endsAt: end, timezone: "America/Los_Angeles",
       siteId: site!.id, sourceType: "study_group_session", sourceId: crypto.randomUUID(),
       createdByPersonId: teacher!.id,
+      scheduledOccurrenceId: await createOccurrence({
+        startsAt: start, endsAt: end, timezone: "America/Los_Angeles",
+        siteId: site!.id, createdByPersonId: teacher!.id,
+      }),
     }).returning();
     await expect(
       reviseCalendarEventForActor(registrarActor, {

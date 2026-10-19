@@ -1,5 +1,9 @@
 import { and, eq, sql } from "drizzle-orm";
-import { calendarEventParticipants, calendarEvents } from "@/db/schema";
+import {
+  calendarEventParticipants,
+  calendarEvents,
+  scheduledOccurrences,
+} from "@/db/schema";
 
 export type ProjectionTx = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
@@ -41,10 +45,16 @@ export type PublishProjectionInput = ProjectionSource & {
   participants?: ReadonlyArray<ProjectionParticipant>;
 };
 
+export type ProjectionCreation = { id: string; created: boolean };
+
 async function findProjectionEvent(
   tx: ProjectionTx,
   source: ProjectionSource,
-): Promise<{ id: string; metadata: Record<string, unknown> } | undefined> {
+): Promise<{
+  id: string;
+  metadata: Record<string, unknown>;
+  scheduledOccurrenceId: string;
+} | undefined> {
   // The schema permits multiple events per source. Serialize all projection
   // writers for that source without imposing a blanket uniqueness constraint.
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`calendar-projection:${source.sourceType}:${source.sourceId}`}))`);
@@ -58,7 +68,11 @@ async function findProjectionEvent(
     );
   }
   const rows = await tx
-    .select({ id: calendarEvents.id, metadata: calendarEvents.metadata })
+    .select({
+      id: calendarEvents.id,
+      metadata: calendarEvents.metadata,
+      scheduledOccurrenceId: calendarEvents.scheduledOccurrenceId,
+    })
     .from(calendarEvents)
     .where(and(...conditions))
     .limit(2);
@@ -126,6 +140,80 @@ async function syncParticipantsForEvent(
   );
 }
 
+async function insertProjection(
+  tx: ProjectionTx,
+  input: PublishProjectionInput,
+  metadata: Record<string, unknown>,
+): Promise<string> {
+  const [occurrence] = await tx
+    .insert(scheduledOccurrences)
+    .values({
+      startsAt: input.startsAt,
+      endsAt: input.endsAt ?? null,
+      timezone: input.timezone,
+      organizationId: input.scope?.organizationId ?? null,
+      siteId: input.scope?.siteId ?? null,
+      programId: input.scope?.programId ?? null,
+      sectionId: input.scope?.sectionId ?? null,
+      createdByPersonId: input.createdByPersonId ?? null,
+    })
+    .returning({ id: scheduledOccurrences.id });
+  if (!occurrence) throw new Error("Failed to create scheduled occurrence");
+
+  const rows = await tx
+    .insert(calendarEvents)
+    .values({
+      type: input.type,
+      title: input.title,
+      description: input.description ?? null,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt ?? null,
+      timezone: input.timezone,
+      organizationId: input.scope?.organizationId ?? null,
+      siteId: input.scope?.siteId ?? null,
+      programId: input.scope?.programId ?? null,
+      sectionId: input.scope?.sectionId ?? null,
+      sourceType: input.sourceType,
+      sourceId: input.sourceId,
+      scheduledOccurrenceId: occurrence.id,
+      createdByPersonId: input.createdByPersonId ?? null,
+      metadata,
+    })
+    .returning({ id: calendarEvents.id });
+
+  const id = rows[0]?.id;
+  if (typeof id !== "string") {
+    throw new Error("Failed to publish calendar projection");
+  }
+  if (input.participants) {
+    await syncParticipantsForEvent(tx, id, input.participants);
+  }
+  return id;
+}
+
+/**
+ * Create a source projection once, without changing an existing event. Use
+ * this for source-owned events whose first scheduled details are immutable
+ * through the creation command; later edits use the owning lifecycle.
+ */
+export async function createProjectionIfAbsent(
+  tx: ProjectionTx,
+  input: PublishProjectionInput,
+): Promise<ProjectionCreation> {
+  validateTimes(input.startsAt, input.endsAt);
+  const existing = await findProjectionEvent(tx, input);
+  if (existing) return { id: existing.id, created: false };
+
+  const metadata: Record<string, unknown> = { ...(input.metadata ?? {}) };
+  if (input.instanceKey !== undefined) {
+    metadata[PROJECTION_INSTANCE_KEY] = input.instanceKey;
+  }
+  return {
+    id: await insertProjection(tx, input, metadata),
+    created: true,
+  };
+}
+
 /**
  * Publish (or idempotently republish) the calendar projection for a domain
  * source. The first publish inserts the calendar event plus any participant
@@ -146,6 +234,19 @@ export async function publishProjection(
   const existing = await findProjectionEvent(tx, input);
 
   if (existing) {
+    await tx
+      .update(scheduledOccurrences)
+      .set({
+        startsAt: input.startsAt,
+        endsAt: input.endsAt ?? null,
+        timezone: input.timezone,
+        organizationId: input.scope?.organizationId ?? null,
+        siteId: input.scope?.siteId ?? null,
+        programId: input.scope?.programId ?? null,
+        sectionId: input.scope?.sectionId ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(scheduledOccurrences.id, existing.scheduledOccurrenceId));
     await tx
       .update(calendarEvents)
       .set({
@@ -171,34 +272,7 @@ export async function publishProjection(
     return existing.id;
   }
 
-  const rows = await tx
-    .insert(calendarEvents)
-    .values({
-      type: input.type,
-      title: input.title,
-      description: input.description ?? null,
-      startsAt: input.startsAt,
-      endsAt: input.endsAt ?? null,
-      timezone: input.timezone,
-      organizationId: input.scope?.organizationId ?? null,
-      siteId: input.scope?.siteId ?? null,
-      programId: input.scope?.programId ?? null,
-      sectionId: input.scope?.sectionId ?? null,
-      sourceType: input.sourceType,
-      sourceId: input.sourceId,
-      createdByPersonId: input.createdByPersonId ?? null,
-      metadata,
-    })
-    .returning({ id: calendarEvents.id });
-
-  const id = rows[0]?.id;
-  if (typeof id !== "string") {
-    throw new Error("Failed to publish calendar projection");
-  }
-  if (input.participants) {
-    await syncParticipantsForEvent(tx, id, input.participants);
-  }
-  return id;
+  return insertProjection(tx, input, metadata);
 }
 
 /**
@@ -213,6 +287,14 @@ export async function rescheduleProjection(
   validateTimes(input.startsAt, input.endsAt);
   const existing = await findProjectionEvent(tx, input);
   if (!existing) return false;
+  await tx
+    .update(scheduledOccurrences)
+    .set({
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(scheduledOccurrences.id, existing.scheduledOccurrenceId));
   await tx
     .update(calendarEvents)
     .set({

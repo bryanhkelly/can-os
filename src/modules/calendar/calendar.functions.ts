@@ -1,4 +1,5 @@
 import { AuthorizationError } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { EventTypes } from "@/domain/event-types";
 import { actorSiteIds,recordAudit,requireActor,type ActorRole } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
@@ -65,8 +66,10 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
       ))
       .innerJoin(schema.sections, eq(schema.sections.id, schema.enrollments.sectionId))
       .where(and(
-        eq(schema.guardianRelationships.guardianPersonId, actor.actorPersonId),
-        eq(schema.guardianRelationships.canViewAcademics, true),
+        guardianRelationshipPredicate({
+          guardianPersonId: actor.actorPersonId,
+          access: "academic",
+        }),
         inArray(schema.enrollments.programId, actor.scope.programIds ?? []),
         inArray(schema.sections.siteId, sites),
         inArray(schema.sections.programId, actor.scope.programIds ?? []),
@@ -117,17 +120,21 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
     const events = await db
       .select()
       .from(schema.calendarEvents)
+      .innerJoin(
+        schema.scheduledOccurrences,
+        eq(schema.calendarEvents.scheduledOccurrenceId, schema.scheduledOccurrences.id),
+      )
       .where(and(
-        gte(schema.calendarEvents.startsAt, rangeStart),
-        lt(schema.calendarEvents.startsAt, rangeEnd),
+        gte(schema.scheduledOccurrences.startsAt, rangeStart),
+        lt(schema.scheduledOccurrences.startsAt, rangeEnd),
         or(
-          and(inArray(schema.calendarEvents.siteId, sites),
-            isNull(schema.calendarEvents.sectionId),
-            or(isNull(schema.calendarEvents.programId),inArray(schema.calendarEvents.programId,actor.scope.programIds??[])),
+          and(inArray(schema.scheduledOccurrences.siteId, sites),
+            isNull(schema.scheduledOccurrences.sectionId),
+            or(isNull(schema.scheduledOccurrences.programId),inArray(schema.scheduledOccurrences.programId,actor.scope.programIds??[])),
             ne(schema.calendarEvents.type, "personal"),
             ne(schema.calendarEvents.type, "study_group"),
             notExists(hasExplicitParticipants)),
-          sectionIds.length ? and(inArray(schema.calendarEvents.sectionId, sectionIds),
+          sectionIds.length ? and(inArray(schema.scheduledOccurrences.sectionId, sectionIds),
             ne(schema.calendarEvents.type, "study_group"),
             notExists(hasExplicitParticipants)) : undefined,
           and(
@@ -139,10 +146,20 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
             : undefined,
         ),
       ))
-      .orderBy(asc(schema.calendarEvents.startsAt))
+      .orderBy(asc(schema.scheduledOccurrences.startsAt))
       .limit(200);
+    const calendarEvents = events.map(({ calendar_events: event, scheduled_occurrences: occurrence }) => ({
+      ...event,
+      startsAt: occurrence.startsAt,
+      endsAt: occurrence.endsAt,
+      timezone: occurrence.timezone,
+      organizationId: occurrence.organizationId,
+      siteId: occurrence.siteId,
+      programId: occurrence.programId,
+      sectionId: occurrence.sectionId,
+    }));
 
-    const eventIds = events.map((event) => event.id);
+    const eventIds = calendarEvents.map((event) => event.id);
     const ownedEventIds = new Set(
       eventIds.length
         ? (
@@ -160,7 +177,7 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
     );
     const canManageStaff = actor.capabilities.has("calendar.event.manage");
 
-    const items: CalendarFeedItem[] = events.map((event) => {
+    const items: CalendarFeedItem[] = calendarEvents.map((event) => {
       const cancelled = event.metadata.cancelled === true;
       const manageable = !cancelled && !event.sourceType && (
         event.type === "personal"
@@ -251,6 +268,18 @@ export const createPersonalEvent = createServerFn({ method: "POST" })
     // Their owner participant record is the visibility authority.
     const siteId = null;
     return db.transaction(async (tx) => {
+      const [occurrence] = await tx
+        .insert(schema.scheduledOccurrences)
+        .values({
+          startsAt: new Date(data.startsAt),
+          endsAt: data.endsAt ? new Date(data.endsAt) : null,
+          timezone: data.timezone,
+          siteId,
+          createdByPersonId: actor.actorPersonId,
+        })
+        .returning({ id: schema.scheduledOccurrences.id });
+      if (!occurrence) throw new Error("Failed to create scheduled occurrence");
+
       const [event] = await tx
         .insert(schema.calendarEvents)
         .values({
@@ -261,6 +290,7 @@ export const createPersonalEvent = createServerFn({ method: "POST" })
           endsAt: data.endsAt ? new Date(data.endsAt) : null,
           timezone: data.timezone,
           siteId,
+          scheduledOccurrenceId: occurrence.id,
           createdByPersonId: actor.actorPersonId,
         })
         .returning({ id: schema.calendarEvents.id });

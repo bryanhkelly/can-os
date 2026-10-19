@@ -17,6 +17,7 @@ assertProgramScope,
 assertSiteScope,
 type CommandContext,
 } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { EventTypes } from "@/domain/event-types";
 import { publishProjection } from "@/platform/calendar/projection";
 import { emitEvent,writeAudit } from "@/platform/mutation";
@@ -156,12 +157,10 @@ export async function registerForActivity(
     const [guardian] = await tx
       .select({ id: guardianRelationships.id })
       .from(guardianRelationships)
-      .where(
-        and(
-          eq(guardianRelationships.guardianPersonId, actorPersonId),
-          eq(guardianRelationships.studentPersonId, student.personId),
-        ),
-      )
+      .where(guardianRelationshipPredicate({
+        guardianPersonId: actorPersonId,
+        studentPersonId: student.personId,
+      }))
       .limit(1);
 
     if (!guardian) throw new Error("Actor is not an authorized guardian");
@@ -249,6 +248,7 @@ export async function withdrawActivityRegistration(
 ): Promise<void> {
   assertCapability(context, "activity.register");
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  const actorPersonId = context.actorPersonId;
   await db.transaction(async (tx) => {
     const [target] = await tx.select({
       seasonId: activityRegistrations.activitySeasonId,
@@ -266,10 +266,10 @@ export async function withdrawActivityRegistration(
       .from(studentProfiles).where(eq(studentProfiles.id, registration.studentProfileId)).limit(1);
     if (!student) throw new Error("Student not found");
     const [guardian] = await tx.select({ id: guardianRelationships.id })
-      .from(guardianRelationships).where(and(
-        eq(guardianRelationships.guardianPersonId, context.actorPersonId!),
-        eq(guardianRelationships.studentPersonId, student.personId),
-      )).limit(1);
+      .from(guardianRelationships).where(guardianRelationshipPredicate({
+        guardianPersonId: actorPersonId,
+        studentPersonId: student.personId,
+      })).limit(1);
     if (!guardian) throw new Error("Actor is not an authorized guardian");
     if (registration.status === "withdrawn") return;
     if (!["pending", "eligible", "conditional", "waitlisted"].includes(registration.status)) {
@@ -281,7 +281,7 @@ export async function withdrawActivityRegistration(
 
     // Do not silently refund or void payments; financial review is required.
     await writeAudit(tx, {
-      actorPersonId: context.actorPersonId,
+      actorPersonId,
       action: "activity.registration.withdraw",
       resourceType: "activity_registration",
       resourceId: input.registrationId,

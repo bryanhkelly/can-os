@@ -6,7 +6,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { z } from "zod";
-import { readRubric,scoreRubric } from "./rubric";
+import { readRubric,scoreRubric } from "@/modules/learning/rubric";
 
 
 /** Never accept a browser-selected actor or role for assignment authorization. */

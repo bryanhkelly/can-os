@@ -7,7 +7,7 @@ import { and, asc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   actions, assessments, calendarEvents, enrollments, people, sections,
-  studentProfiles, submissions,
+  scheduledOccurrences, studentProfiles, submissions,
 } from "@/db/schema";
 
 export type StudentTodayData = Awaited<ReturnType<typeof getStudentToday>>;
@@ -62,26 +62,30 @@ export async function getStudentToday(studentProfileId: string, at = new Date())
       title: calendarEvents.title,
       description: calendarEvents.description,
       type: calendarEvents.type,
-      startsAt: calendarEvents.startsAt,
-      endsAt: calendarEvents.endsAt,
-      timezone: calendarEvents.timezone,
-      siteId: calendarEvents.siteId,
-      sectionId: calendarEvents.sectionId,
+      startsAt: scheduledOccurrences.startsAt,
+      endsAt: scheduledOccurrences.endsAt,
+      timezone: scheduledOccurrences.timezone,
+      siteId: scheduledOccurrences.siteId,
+      sectionId: scheduledOccurrences.sectionId,
       sourceType: calendarEvents.sourceType,
     })
     .from(calendarEvents)
+    .innerJoin(
+      scheduledOccurrences,
+      eq(calendarEvents.scheduledOccurrenceId, scheduledOccurrences.id),
+    )
     .where(and(
-      inArray(calendarEvents.siteId, siteIds),
-      gte(calendarEvents.startsAt, startOfDay),
-      lt(calendarEvents.startsAt, endOfDay),
+      inArray(scheduledOccurrences.siteId, siteIds),
+      gte(scheduledOccurrences.startsAt, startOfDay),
+      lt(scheduledOccurrences.startsAt, endOfDay),
       or(
         ...[
-          ...sectionIds.map(id => eq(calendarEvents.sectionId, id)),
-          isNull(calendarEvents.sectionId),
+          ...sectionIds.map(id => eq(scheduledOccurrences.sectionId, id)),
+          isNull(scheduledOccurrences.sectionId),
         ],
       ),
     ))
-    .orderBy(asc(calendarEvents.startsAt)) : [];
+    .orderBy(asc(scheduledOccurrences.startsAt)) : [];
 
   const coursework = sectionIds.length ? await db
     .select({

@@ -1,6 +1,5 @@
 import { db } from "@/db/client";
 import {
-calendarEvents,
 journeys,
 organizations,
 programs,
@@ -20,6 +19,7 @@ type CommandContext,
 import { EventTypes } from "@/domain/event-types";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { emitEvent,writeAudit } from "@/platform/mutation";
+import { createProjectionIfAbsent } from "@/platform/calendar/projection";
 import { and,eq,inArray,isNull,or } from "drizzle-orm";
 import { evaluateSectionReadiness } from "./section-readiness-service";
 
@@ -173,42 +173,27 @@ export async function createProgramOrientation(
     if (!program) throw new Error("Program not found");
     assertProgramScope(context, input.programId);
 
-    const [existing] = await tx
-      .select({ id: calendarEvents.id })
-      .from(calendarEvents)
-      .where(
-        and(
-          eq(calendarEvents.sourceType, "program_orientation"),
-          eq(calendarEvents.sourceId, input.programId),
-        ),
-      )
-      .limit(1);
-
-    if (existing) return existing.id;
-
-    const [event] = await tx
-      .insert(calendarEvents)
-      .values({
-        type: "orientation",
-        title: input.title ?? "CAN Program Orientation",
-        startsAt: input.startsAt,
-        endsAt: input.endsAt,
-        timezone: input.timezone,
+    const projection = await createProjectionIfAbsent(tx, {
+      type: "orientation",
+      title: input.title ?? "CAN Program Orientation",
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      timezone: input.timezone,
+      scope: {
         organizationId: program.organizationId,
         siteId: program.siteId,
         programId: program.id,
-        sourceType: "program_orientation",
-        sourceId: program.id,
-        createdByPersonId: context.actorPersonId,
-      })
-      .returning({ id: calendarEvents.id });
-
-    if (!event) throw new Error("Failed to create orientation event");
+      },
+      sourceType: "program_orientation",
+      sourceId: program.id,
+      createdByPersonId: context.actorPersonId,
+    });
+    if (!projection.created) return projection.id;
 
     await emitEvent(tx, {
       eventType: EventTypes.CalendarEventCreated,
       aggregateType: "calendar_event",
-      aggregateId: event.id,
+      aggregateId: projection.id,
       actorPersonId: context.actorPersonId,
       organizationId: program.organizationId,
       siteId: program.siteId,
@@ -221,7 +206,7 @@ export async function createProgramOrientation(
     await writeAudit(tx, context, {
       action: "program.orientation.schedule",
       entityType: "calendar_event",
-      entityId: event.id,
+      entityId: projection.id,
       scope: {
         organizationId: program.organizationId,
         siteId: program.siteId,
@@ -236,7 +221,7 @@ export async function createProgramOrientation(
       contextExtras: { sourceType: "program_orientation" },
     });
 
-    return event.id;
+    return projection.id;
   });
 }
 

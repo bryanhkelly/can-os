@@ -162,6 +162,27 @@
       "when": 1792407519480,
       "tag": "0022_stale_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792412918022,
+      "tag": "0023_panoramic_slapstick",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792428387426,
+      "tag": "0024_quick_scalphunter",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792430673309,
+      "tag": "0025_calendar_occurrence_compatibility",
+      "breakpoints": true
     }
   ]
 }

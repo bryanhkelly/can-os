@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { actorSiteIds,recordAudit,requireActor } from "@/modules/identity/actors.server";
 import { emitEvent,notify } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -100,11 +101,11 @@ export const signGuardianFieldTripPermission = createServerFn({ method: "POST" }
         .from(s.studentProfiles).where(eq(s.studentProfiles.id, participant.studentProfileId)).limit(1);
       if (!student) throw new AuthorizationError("student profile");
       const [relationship] = await tx.select({ id: s.guardianRelationships.id })
-        .from(s.guardianRelationships).where(and(
-          eq(s.guardianRelationships.studentPersonId, student.personId),
-          eq(s.guardianRelationships.guardianPersonId, actor.actorPersonId),
-          eq(s.guardianRelationships.canManageEnrollment, true),
-        )).limit(1);
+        .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+          studentPersonId: student.personId,
+          guardianPersonId: actor.actorPersonId,
+          access: "enrollment",
+        })).limit(1);
       if (!relationship) throw new AuthorizationError("authorized guardian");
       const [enrolled] = await tx.select({ id: s.enrollments.id })
         .from(s.enrollments)

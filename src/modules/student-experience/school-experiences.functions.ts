@@ -17,7 +17,15 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
   if(!process.env.DATABASE_URL) return {connected:false,viewerRole,events:[],notices:[],slots:[],bookings:[]};
   const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   const [events,notices,slots,bookings]=await Promise.all([
-    db.select().from(schema.calendarEvents).where(and(inArray(schema.calendarEvents.siteId,sites),gte(schema.calendarEvents.startsAt,new Date()),isNull(schema.calendarEvents.sectionId),ne(schema.calendarEvents.type,"personal"),ne(schema.calendarEvents.type,"study_group"),or(isNull(schema.calendarEvents.programId),inArray(schema.calendarEvents.programId,actor.scope.programIds??[])),notExists(db.select({id:schema.calendarEventParticipants.id}).from(schema.calendarEventParticipants).where(eq(schema.calendarEventParticipants.calendarEventId,schema.calendarEvents.id))))).orderBy(asc(schema.calendarEvents.startsAt)).limit(50),
+    db.select().from(schema.calendarEvents)
+      .innerJoin(schema.scheduledOccurrences,eq(schema.calendarEvents.scheduledOccurrenceId,schema.scheduledOccurrences.id))
+      .where(and(inArray(schema.scheduledOccurrences.siteId,sites),gte(schema.scheduledOccurrences.startsAt,new Date()),isNull(schema.scheduledOccurrences.sectionId),ne(schema.calendarEvents.type,"personal"),ne(schema.calendarEvents.type,"study_group"),or(isNull(schema.scheduledOccurrences.programId),inArray(schema.scheduledOccurrences.programId,actor.scope.programIds??[])),notExists(db.select({id:schema.calendarEventParticipants.id}).from(schema.calendarEventParticipants).where(eq(schema.calendarEventParticipants.calendarEventId,schema.calendarEvents.id)))))
+      .orderBy(asc(schema.scheduledOccurrences.startsAt)).limit(50)
+      .then(rows=>rows.map(row=>({
+        ...row.calendar_events,
+        startsAt:row.scheduled_occurrences.startsAt,
+        timezone:row.scheduled_occurrences.timezone,
+      }))),
     db.select().from(schema.notifications).where(eq(schema.notifications.recipientPersonId,actor.actorPersonId)),
     viewerRole==="guardian" ? db.select({id:schema.conferenceSlots.id,seriesId:schema.conferenceSlots.conferenceSeriesId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status})
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))

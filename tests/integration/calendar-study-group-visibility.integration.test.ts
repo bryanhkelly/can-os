@@ -106,6 +106,15 @@ integration("study-group calendar visibility", () => {
       startsAt: new Date(Date.now() + 86400000),
       endsAt: new Date(Date.now() + 90000000),
     }).returning();
+    const [occurrence] = await db.insert(schema.scheduledOccurrences).values({
+      startsAt: session!.startsAt,
+      endsAt: session!.endsAt,
+      timezone: "America/Los_Angeles",
+      siteId: site!.id,
+      programId: program!.id,
+      createdByPersonId: facilitator!.id,
+    }).returning();
+    if (!occurrence) throw new Error("Calendar occurrence fixture missing");
     const [event] = await db.insert(schema.calendarEvents).values({
       type: "study_group",
       title: `Science session ${suffix}`,
@@ -116,6 +125,7 @@ integration("study-group calendar visibility", () => {
       programId: program!.id,
       sourceType: "study_group_session",
       sourceId: session!.id,
+      scheduledOccurrenceId: occurrence.id,
       createdByPersonId: facilitator!.id,
     }).returning();
     const [courseGroup] = await db.insert(schema.studyGroups).values({
@@ -139,6 +149,16 @@ integration("study-group calendar visibility", () => {
       startsAt: new Date(Date.now() + 172800000),
       endsAt: new Date(Date.now() + 176400000),
     }).returning();
+    const [courseOccurrence] = await db.insert(schema.scheduledOccurrences).values({
+      startsAt: courseSession!.startsAt,
+      endsAt: courseSession!.endsAt,
+      timezone: "America/Los_Angeles",
+      siteId: site!.id,
+      programId: program!.id,
+      sectionId: section!.id,
+      createdByPersonId: facilitator!.id,
+    }).returning();
+    if (!courseOccurrence) throw new Error("Calendar occurrence fixture missing");
     const [courseEvent] = await db.insert(schema.calendarEvents).values({
       type: "study_group",
       title: `Course session ${suffix}`,
@@ -150,6 +170,7 @@ integration("study-group calendar visibility", () => {
       sectionId: section!.id,
       sourceType: "study_group_session",
       sourceId: courseSession!.id,
+      scheduledOccurrenceId: courseOccurrence.id,
       createdByPersonId: facilitator!.id,
     }).returning();
 

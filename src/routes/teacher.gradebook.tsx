@@ -8,7 +8,7 @@ import {
  getGradebookSections,
  gradeSubmission,
 } from "@/modules/learning/gradebook.functions";
-import { scoreRubric, type CriterionGrade } from "@/modules/student-experience/rubric";
+import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";

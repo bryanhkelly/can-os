@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import {getGuardianStudents} from "@/modules/family/guardian-assignments.functions";
+import {getGuardianStudents} from "@/modules/learning/guardian-academic-queries.functions";
 import { Link, useRouter } from "@tanstack/react-router";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { bookOfficeHour, rescheduleOfficeHour } from "@/modules/student-experience/school-experiences.functions";

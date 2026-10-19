@@ -3,7 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, asc, eq, inArray, gte, lt, ne, isNull, notExists, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions, attendanceEvents, calendarEvents, calendarEventParticipants, enrollments, organizations, programs, sites } from "@/db/schema";
+import { actions, attendanceEvents, calendarEvents, calendarEventParticipants, enrollments, organizations, programs, scheduledOccurrences, sites } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 
@@ -52,9 +52,6 @@ export const getSiteToday = createServerFn({ method: "GET" })
     const hasParticipants = db.select({id:calendarEventParticipants.id})
       .from(calendarEventParticipants)
       .where(eq(calendarEventParticipants.calendarEventId,calendarEvents.id));
-    const allowedProgram = programIds.length
-      ? or(isNull(calendarEvents.programId),inArray(calendarEvents.programId,programIds))
-      : isNull(calendarEvents.programId);
     const [actionRows, eventRows, attendanceRows, enrolledRows] = await Promise.all([
       db.select({
         id: actions.id, title: actions.title, description: actions.description,
@@ -66,13 +63,15 @@ export const getSiteToday = createServerFn({ method: "GET" })
         .orderBy(asc(actions.dueAt)).limit(100),
       db.select({
         id: calendarEvents.id, title: calendarEvents.title, type: calendarEvents.type,
-        startsAt: calendarEvents.startsAt, endsAt: calendarEvents.endsAt,
-        programId: calendarEvents.programId,
+        startsAt: scheduledOccurrences.startsAt, endsAt: scheduledOccurrences.endsAt,
+        programId: scheduledOccurrences.programId,
       }).from(calendarEvents)
-        .where(and(eq(calendarEvents.siteId, site.id), gte(calendarEvents.startsAt, start),
-          lt(calendarEvents.startsAt, end),isNull(calendarEvents.sectionId),
-          ne(calendarEvents.type,"personal"),ne(calendarEvents.type,"study_group"),notExists(hasParticipants),allowedProgram))
-        .orderBy(asc(calendarEvents.startsAt)).limit(200),
+        .innerJoin(scheduledOccurrences, eq(calendarEvents.scheduledOccurrenceId, scheduledOccurrences.id))
+        .where(and(eq(scheduledOccurrences.siteId, site.id), gte(scheduledOccurrences.startsAt, start),
+          lt(scheduledOccurrences.startsAt, end),isNull(scheduledOccurrences.sectionId),
+          ne(calendarEvents.type,"personal"),ne(calendarEvents.type,"study_group"),notExists(hasParticipants),
+          programIds.length ? or(isNull(scheduledOccurrences.programId),inArray(scheduledOccurrences.programId,programIds)) : isNull(scheduledOccurrences.programId)))
+        .orderBy(asc(scheduledOccurrences.startsAt)).limit(200),
       programIds.length ? db.select({
         id: attendanceEvents.id, programId: attendanceEvents.programId,
         studentProfileId: attendanceEvents.studentProfileId, status: attendanceEvents.status,

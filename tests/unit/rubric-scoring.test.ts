@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readRubric, scoreRubric, sampleRubric } from "@/modules/student-experience/rubric";
+import { readRubric, scoreRubric, sampleRubric } from "@/modules/learning/rubric";
 describe("criterion rubric scoring",()=>{
  it("totals correctly with partial credit",()=>expect(scoreRubric(sampleRubric,[
   {id:"thesis",points:24},{id:"evidence",points:32},{id:"clarity",points:27}

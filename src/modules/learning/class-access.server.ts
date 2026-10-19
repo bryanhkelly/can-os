@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { requireActor, assertSiteGranted, assertProgramGranted, type Actor } from "@/modules/identity/actors.server";
 export type ClassTransaction = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
@@ -35,8 +36,11 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
   if (!personId) throw new AuthorizationError("selected child");
   if (actor.role === "guardian") {
     const [related] = await query.select({ id: s.guardianRelationships.id }).from(s.guardianRelationships)
-      .where(and(eq(s.guardianRelationships.guardianPersonId, actor.actorPersonId),
-        eq(s.guardianRelationships.studentPersonId, personId), eq(s.guardianRelationships.canViewAcademics, true))).limit(1);
+      .where(guardianRelationshipPredicate({
+        guardianPersonId: actor.actorPersonId,
+        studentPersonId: personId,
+        access: "academic",
+      })).limit(1);
     if (!related) throw new AuthorizationError("guardian academic relationship");
   }
   const [enrollment] = await query.select({ profileId: s.studentProfiles.id }).from(s.enrollments)
@@ -67,7 +71,10 @@ export async function accessibleClasses(actor: Actor) {
   const rows = actor.role === "guardian"
     ? await query.innerJoin(s.guardianRelationships, and(
       eq(s.guardianRelationships.studentPersonId, s.studentProfiles.personId),
-      eq(s.guardianRelationships.guardianPersonId, actor.actorPersonId), eq(s.guardianRelationships.canViewAcademics, true),
+      guardianRelationshipPredicate({
+        guardianPersonId: actor.actorPersonId,
+        access: "academic",
+      }),
     )).where(scope).orderBy(s.sections.title)
     : await query.where(and(scope, eq(s.studentProfiles.personId, actor.actorPersonId))).orderBy(s.sections.title);
   return [...new Map(rows.map(row => [`${row.id}:${row.studentPersonId}`, {

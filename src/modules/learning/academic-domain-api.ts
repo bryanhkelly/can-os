@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { assessments, enrollments, guardianRelationships, people, sections, sectionTeachers, studentProfiles, submissions, type EvidenceRef } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import type { CommandContext } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 
 /** Academic module's public contract for UI and agent callers. No agent-specific imports. */
 export type AcademicReadContext = CommandContext & { actorPersonId: string };
@@ -27,11 +28,11 @@ function academicSectionAccess(context: AcademicReadContext) {
   const relationships = [];
   if (context.capabilities.has("student:related-read")) {
     relationships.push(exists(db.select({ id: guardianRelationships.id })
-      .from(guardianRelationships).where(and(
-        eq(guardianRelationships.guardianPersonId, context.actorPersonId),
-        eq(guardianRelationships.studentPersonId, studentProfiles.personId),
-        eq(guardianRelationships.canViewAcademics, true),
-      ))));
+      .from(guardianRelationships).where(guardianRelationshipPredicate({
+        guardianPersonId: context.actorPersonId,
+        studentPersonId: studentProfiles.personId,
+        access: "academic",
+      }))));
   }
   if (context.capabilities.has("student:read")) {
     relationships.push(eq(studentProfiles.personId, context.actorPersonId));
@@ -213,11 +214,11 @@ export async function assertGuardianAcademicAccess(context: AcademicReadContext,
   }
   const student = await assertStudentAccess(context, studentProfileId);
   const [relationship] = await db.select({ id: guardianRelationships.id })
-    .from(guardianRelationships).where(and(
-      eq(guardianRelationships.guardianPersonId, context.actorPersonId),
-      eq(guardianRelationships.studentPersonId, student.personId),
-      eq(guardianRelationships.canViewAcademics, true),
-    )).limit(1);
+    .from(guardianRelationships).where(guardianRelationshipPredicate({
+      guardianPersonId: context.actorPersonId,
+      studentPersonId: student.personId,
+      access: "academic",
+    })).limit(1);
   if (!relationship) throw new AuthorizationError("guardian academic relationship");
   return student;
 }

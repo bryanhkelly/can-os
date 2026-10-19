@@ -99,6 +99,32 @@ Initial event architecture should use the transactional outbox pattern:
 
 Do not introduce Kafka or a distributed event platform for v1.
 
+### Scheduled activities and calendar projections
+
+`ScheduledOccurrence` is the shared record for the time and delivery scope of
+one scheduled instance. `CalendarEvent` remains the calendar-facing
+representation, including its title, description, display type, participants,
+and source metadata; its `scheduledOccurrenceId` points to the occurrence.
+CalendarEvent's existing time/scope columns remain as a compatibility copy for
+current readers. Shared writers synchronize them transactionally; migration
+triggers also bridge inserts and schedule/scope updates from older application
+instances during rolling deployment.
+Domain aggregates such as FieldTrip, ConferenceSlot, Activity occurrence, and
+StudyGroupSession continue to own their specialized lifecycle, eligibility,
+attendance, and approval rules.
+
+Writers create or update the occurrence and calendar projection in the same
+transaction through the shared calendar projection API. Domain-owned events
+must still be changed through their owning workflow. This additive boundary
+allows common schedule queries and future calendar capabilities without
+collapsing unrelated business processes into a universal Event entity.
+Calendar month, study-group visibility, Site Today, Student Today, and School
+Experiences reads now take schedule and scope from `ScheduledOccurrence`.
+`CalendarEvent` retains synchronized compatibility columns for older consumers
+and domain-specific workflows. Remove the database bridge and compatibility
+columns only in a later contract migration, after old application instances and
+all remaining readers/writers have been retired.
+
 ## Authorization
 
 Authorization is not portal-based RBAC.
@@ -187,7 +213,6 @@ page-specific code and data load during client navigation. Route reference
 metadata remains eager; unrelated page implementations and loader dependencies
 are lazy. Full-document server rendering can still wait on page loaders;
 database read-model latency is a separate optimization from shell hydration.
-
 
 
 ## Agent-to-academic service boundary

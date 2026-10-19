@@ -125,7 +125,7 @@ integration("class participation cross-workspace flow", () => {
       const teacherDiscussions = await import("@/modules/learning/discussion-teacher-query.functions");
       const studentDiscussions = await import("@/modules/learning/course-discussions.functions");
       const posts = await import("@/modules/learning/discussion-post.functions");
-      const family = await import("@/modules/family/guardian-assignments.functions");
+      const academicQueries = await import("@/modules/learning/guardian-academic-queries.functions");
       const messaging = await import("@/modules/communication/messages.functions");
       act("student", student.id);
       expect((await classes.getClassDirectory()).classes.map(row => row.id)).toEqual([section.id]);
@@ -184,7 +184,7 @@ integration("class participation cross-workspace flow", () => {
       expect((await annotations.getSubmissionAnnotations({ data: { submissionId: submission.id } })).annotations).toEqual([]);
       await tx.update(s.submissions).set({ status: "graded", score: "0", gradedAt: new Date(), feedback: { comment: "Review the evidence." } }).where(eq(s.submissions.id, submission.id));
       expect((await annotations.getSubmissionAnnotations({ data: { submissionId: submission.id } })).annotations[0]?.comment).toBe(annotation.comment);
-      const assignments = await family.getGuardianAssignments({ data: { studentPersonId: student.id } });
+      const assignments = await academicQueries.getGuardianAssignments({ data: { studentPersonId: student.id } });
       expect(assignments.assignments[0]).toMatchObject({ score: "0.00", instructions: "Explain a passage.", feedback: "Review the evidence." });
       const message = { assessmentId: assessment.id, studentPersonId: student.id, messageId: crypto.randomUUID(), body: "How can we help with revision?" };
       const conversation = await communication.startAssignmentConversation({ data: message });

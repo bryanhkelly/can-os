@@ -3,6 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 
 /**
  * Family Home is a read model over canonical domain state.
@@ -31,10 +32,10 @@ async function guardianStudents(s: Schema, guardianPersonId: string, siteIds: st
  }).from(s.guardianRelationships)
   .innerJoin(s.people, eq(s.people.id, s.guardianRelationships.studentPersonId))
   .innerJoin(s.studentProfiles, eq(s.studentProfiles.personId, s.guardianRelationships.studentPersonId))
-  .where(and(
-   eq(s.guardianRelationships.guardianPersonId, guardianPersonId),
-   eq(s.guardianRelationships.canViewAcademics, true),
-  ));
+  .where(guardianRelationshipPredicate({
+   guardianPersonId,
+   access: "academic",
+  }));
  const unique = Array.from(new Map(rows.map(row => [row.studentProfileId, row])).values());
  if (!unique.length) return [];
  const withEnrollment = await db.select({ studentProfileId: s.enrollments.studentProfileId })

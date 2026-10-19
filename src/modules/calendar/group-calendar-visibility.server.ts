@@ -101,6 +101,10 @@ export async function visibleStudyGroupCalendarEventIds(
     .select({ id: schema.calendarEvents.id })
     .from(schema.calendarEvents)
     .innerJoin(
+      schema.scheduledOccurrences,
+      eq(schema.calendarEvents.scheduledOccurrenceId, schema.scheduledOccurrences.id),
+    )
+    .innerJoin(
       schema.studyGroupSessions,
       eq(schema.calendarEvents.sourceId, schema.studyGroupSessions.id),
     )
@@ -111,8 +115,8 @@ export async function visibleStudyGroupCalendarEventIds(
     .where(and(
       eq(schema.calendarEvents.type, "study_group"),
       eq(schema.calendarEvents.sourceType, "study_group_session"),
-      gte(schema.calendarEvents.startsAt, rangeStart),
-      lt(schema.calendarEvents.startsAt, rangeEnd),
+      gte(schema.scheduledOccurrences.startsAt, rangeStart),
+      lt(schema.scheduledOccurrences.startsAt, rangeEnd),
       eq(schema.studyGroups.status, "active"),
       inArray(schema.studyGroups.siteId, [...siteIds]),
       visibility,

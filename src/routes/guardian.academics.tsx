@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {resolveGuardianChild} from "@/domain/guardian-child-context";
 import { useEffect, useState } from "react";
-import { getGuardianAssignments, getGuardianStudents } from "@/modules/family/guardian-assignments.functions";
+import { getGuardianAssignments, getGuardianStudents } from "@/modules/learning/guardian-academic-queries.functions";
 import { guardianAssignmentSummary } from "@/domain/guardian-academics";
 import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";

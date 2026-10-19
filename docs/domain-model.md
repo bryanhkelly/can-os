@@ -72,6 +72,24 @@ Regulatory/geographic context used to select requirements and policy configurati
 
 Do not scatter state-specific `if state === ...` logic through features.
 
+## Scheduled activities
+
+### ScheduledOccurrence
+One scheduled instance with its start/end, timezone, and delivery scope
+(Organization, Site, Program, and optionally Section). `CalendarEvent` is the
+calendar-facing representation linked to this record; it carries presentation
+details and participant rows. During migration, its existing time/scope fields
+are a synchronized compatibility copy. Domain aggregates remain authoritative
+for specialized rules and lifecycle state—for example, trip approval and
+attendance, conference booking, activity eligibility, or study-group
+membership. Create, reschedule, and cancellation commands run through the
+owning domain workflow and write calendar projections transactionally. During
+rolling deployment, database triggers also bridge legacy CalendarEvent inserts
+and schedule/scope updates into the linked occurrence.
+
+This is a shared scheduling primitive, not a universal Event, task, approval,
+or workflow model.
+
 ## Authorization model
 
 ### Membership

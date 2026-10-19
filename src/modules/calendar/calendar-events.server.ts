@@ -1,6 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { calendarEventParticipants, calendarEvents, sectionTeachers, sections } from "@/db/schema";
+import {
+  calendarEventParticipants,
+  calendarEvents,
+  scheduledOccurrences,
+  sectionTeachers,
+  sections,
+} from "@/db/schema";
 import { emitEvent, notifyMany } from "@/platform/mutation";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -145,13 +151,30 @@ export async function reviseCalendarEventForActor(actor: Actor, input: CalendarE
     : null;
 
   return db.transaction(async (tx) => {
-    const [event] = await tx
-      .select()
+    const [rows] = await tx
+      .select({
+        event: calendarEvents,
+        occurrence: scheduledOccurrences,
+      })
       .from(calendarEvents)
+      .innerJoin(
+        scheduledOccurrences,
+        eq(calendarEvents.scheduledOccurrenceId, scheduledOccurrences.id),
+      )
       .where(eq(calendarEvents.id, input.eventId))
       .for("update")
       .limit(1);
-    if (!event) throw new Error("Calendar event not found");
+    if (!rows) throw new Error("Calendar event not found");
+    const event = {
+      ...rows.event,
+      startsAt: rows.occurrence.startsAt,
+      endsAt: rows.occurrence.endsAt,
+      timezone: rows.occurrence.timezone,
+      organizationId: rows.occurrence.organizationId,
+      siteId: rows.occurrence.siteId,
+      programId: rows.occurrence.programId,
+      sectionId: rows.occurrence.sectionId,
+    };
     await authorizeRevision(tx, actor, event);
     assertDirectlyManaged(event);
     if (event.metadata.cancelled === true) throw new Error("Cancelled event cannot be changed");
@@ -168,6 +191,9 @@ export async function reviseCalendarEventForActor(actor: Actor, input: CalendarE
       const sameStart = times.start.getTime() === event.startsAt.getTime();
       const sameEnd = (times.end?.getTime() ?? null) === (event.endsAt?.getTime() ?? null);
       if (sameStart && sameEnd) return { saved: true };
+      await tx.update(scheduledOccurrences)
+        .set({ startsAt: times.start, endsAt: times.end, updatedAt: now })
+        .where(eq(scheduledOccurrences.id, event.scheduledOccurrenceId));
       await tx.update(calendarEvents)
         .set({ startsAt: times.start, endsAt: times.end, updatedAt: now })
         .where(eq(calendarEvents.id, event.id));

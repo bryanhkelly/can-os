@@ -18,6 +18,7 @@ assertSiteScope,
 AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { EventTypes } from "@/domain/event-types";
 import {
 publishProjection,
@@ -231,13 +232,11 @@ export async function bookConference(
     const [guardian] = await tx
       .select({ id: guardianRelationships.id })
       .from(guardianRelationships)
-      .where(
-        and(
-          eq(guardianRelationships.guardianPersonId, actorPersonId),
-          eq(guardianRelationships.studentPersonId, student.personId),
-          eq(guardianRelationships.canViewAcademics, true),
-        ),
-      )
+      .where(guardianRelationshipPredicate({
+        guardianPersonId: actorPersonId,
+        studentPersonId: student.personId,
+        access: "academic",
+      }))
       .limit(1);
 
     if (!guardian) throw new Error("Actor is not an authorized guardian");
