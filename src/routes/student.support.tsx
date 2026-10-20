@@ -4,6 +4,7 @@ import { advanceSupportReferral, createSupportReferral, getSupportReferrals, get
 import { safeLoader } from "@/lib/safe-loader";
 import {getQuickWinActions,requestQuickWinHelp} from "@/modules/actions/student-actions.functions";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { isStudentSupportAction } from "@/modules/actions/student-action-policy";
 
 const loadSupportReferrals=async()=>{
  const viewer=await getSupportViewerRole();
@@ -27,8 +28,7 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState("");
  const [error,setError]=useState("");
- const relevant=actions.filter(action=>
-  ["student_recovery","student_support","student_support_request","conference_follow_up"].includes(action.type));
+ const relevant=actions.filter(action=>isStudentSupportAction(action.type));
  async function askForHelp(){
   setBusy(true);setError("");setNotice("");
   try{
@@ -60,11 +60,16 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
   <section className="mt-7">
    <h2 className="font-serif text-2xl">Your support actions</h2>
    {relevant.length===0&&<p className="mt-3 rounded-xl border p-4 text-sm text-muted-foreground">No support actions recorded yet.</p>}
-   <div className="mt-3 space-y-3">{relevant.map(action=><article key={action.id} className="rounded-xl border bg-card p-4">
-    <p className="font-semibold">{action.title}</p>
+   <div className="mt-3 space-y-3">{relevant.map(action=>{
+    const target=action.subjectType==="assessment"&&action.subjectId
+     ?{to:"/student/assignments" as const,search:{assessment:action.subjectId}}
+     :{to:"/student/experiences" as const,search:{action:action.id}};
+    return <article key={action.id} className="rounded-xl border bg-card p-4">
+    <p className="font-semibold"><Link {...target} className="hover:underline">{action.title}</Link></p>
     <p className="mt-2 text-sm text-muted-foreground">{action.description}</p>
     <p className="mt-2 text-xs capitalize">Status: {action.status.replaceAll("_"," ")}</p>
-   </article>)}</div>
+    <Link {...target} className="mt-3 inline-block text-sm underline">{target.to==="/student/assignments"?"Review assignment":"Review action"} →</Link>
+   </article>;})}</div>
   </section>
  </main>;
 }

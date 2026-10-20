@@ -131,6 +131,7 @@ describe("family and student profiles", () => {
     expect(html).not.toContain("student=child-profile");
   });
   const profile: ComponentProps<typeof Student360View>["profile"] = {
+    viewerRole: "registrar",
     identity: { personId: "student-person", name: "Jordan Sample", gradeLevel: "9" }, guardians: [],
     sections: [{ sectionId: "english", title: "English", teacherNames: ["Avery Sample"] }],
     academics: { openMissingWorkCount: 0, sections: [{ sectionId: "english", title: "English", letterGrade: "F", percentage: "0", finalizedAt: "2030-01-01" }] },
@@ -148,6 +149,23 @@ describe("family and student profiles", () => {
     const html = renderToStaticMarkup(<Student360View profile={profile} tab="relationships"/>);
     expect(html).toContain("No guardians on record.");
     expect(html).not.toContain("Finalized grade:");
+  });
+  it.each(["teacher","specialist","counselor","registrar"] as const)("opens the exact support records available to %s",viewerRole=>{
+    const html=renderToStaticMarkup(<Student360View tab="support" profile={{
+      ...profile,viewerRole,
+      openActions:[
+        {id:"intervention",type:"academic_intervention",title:"Academic follow-up",status:"open",priority:"high",dueAt:null},
+        {id:"referral",type:"support_referral",title:"Learning referral",status:"open",priority:"normal",dueAt:null},
+        {id:"office",type:"office_follow_up",title:"Office follow-up",status:"open",priority:"normal",dueAt:null},
+      ],
+      supportReferrals:[{id:"referral",title:"Learning referral",stage:"submitted",category:"academic",createdAt:"2030-01-01"}],
+      insights:[{id:"signal",title:"Missing work signal",type:"missing_work",createdAt:"2030-01-01"}],
+    }}/>);
+    expect(html).toContain('href="/actions/intervention"');
+    expect(html).toContain('href="/operations/insights?insight=signal"');
+    expect(html.includes('href="/support?referral=referral"')).toBe(viewerRole!=="registrar");
+    expect(html.includes('href="/actions/office"')).toBe(viewerRole==="registrar");
+    expect(html).not.toContain('href="/actions/referral"');
   });
 });
 

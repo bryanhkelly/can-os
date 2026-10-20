@@ -4,6 +4,15 @@
   "generatedFromBranch": "main",
   "routes": [
     {
+      "file": "src/routes/actions.$actionId.tsx",
+      "route": "/actions/$actionId",
+      "owner": "actions",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/counselor.tsx",
       "route": "/counselor",
       "owner": "support",

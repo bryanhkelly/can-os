@@ -13,6 +13,17 @@
     "identity-demo-accounts.sql"
   ],
   "routes": {
+    "/actions/$actionId": {
+      "persona": "registrar, teacher, specialist, counselor",
+      "seeds": ["staff-experiences-v1.sql"],
+      "recordCounts": {"actions": 1, "insights": 1},
+      "interactions": [
+        "registrar opens an existing scoped operational Action by ID",
+        "accept an authorized academic insight and open the created Action",
+        "deny unrelated staff and direct private referral access"
+      ],
+      "downstreamRecords": []
+    },
     "/counselor": {
       "persona": "counselor",
       "seeds": ["gf41-support-referrals.sql"],

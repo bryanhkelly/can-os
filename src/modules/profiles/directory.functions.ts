@@ -407,6 +407,7 @@ export const getStudent360 = createServerFn({ method: "GET" })
     }
 
     return {
+      viewerRole: context.role,
       identity: {
         personId: profile.personId,
         name: displayName(profile.legalFirstName, profile.legalLastName, profile.preferredName),

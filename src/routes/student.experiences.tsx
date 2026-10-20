@@ -8,7 +8,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 
 const loadExperiences = async (action?: string) => {
   const [quickWins,school] = await Promise.all([
-    getQuickWinActions(), action ? Promise.resolve(null) : getSchoolExperiences(),
+    getQuickWinActions({data:{actionId:action}}), action ? Promise.resolve(null) : getSchoolExperiences(),
   ]);
   return {quickWins,school};
 };

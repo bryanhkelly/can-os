@@ -46,7 +46,7 @@ export const listInsightScopeOptions=createServerFn({method:"GET"}).handler(asyn
 });
 
 export const listInsights = createServerFn({ method: "GET" })
- .validator((value: unknown) => operationsSelectionSchema.extend({status:z.enum(insightStatuses).optional()}).parse(value ?? {}))
+ .validator((value: unknown) => operationsSelectionSchema.extend({status:z.enum(insightStatuses).optional(),insightId:z.string().uuid().optional()}).parse(value ?? {}))
  .handler(async ({ data }) => {
   const context = await getCommandContext(getRequest());
   assertCapability(context, "insights:read");
@@ -77,7 +77,7 @@ export const listInsights = createServerFn({ method: "GET" })
    .leftJoin(s.sections, ops.eq(s.sections.id, s.insights.sectionId))
    .leftJoin(s.studentProfiles, ops.eq(s.studentProfiles.id, s.insights.subjectId))
    .leftJoin(s.people, ops.eq(s.people.id, s.studentProfiles.personId))
-   .where(ops.and(scope, data.status ? ops.eq(s.insights.status, data.status) : undefined,
+   .where(ops.and(scope, data.insightId ? ops.eq(s.insights.id,data.insightId) : data.status ? ops.eq(s.insights.status, data.status) : undefined,
     data.siteId||data.programId?ops.inArray(s.insights.siteId,selection.siteIds):undefined,
     data.programId?ops.eq(s.insights.programId,data.programId):undefined))
    .orderBy(ops.desc(s.insights.createdAt))

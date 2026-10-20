@@ -272,6 +272,11 @@ work for revision. Other Review action links use
 not the general experiences list. Unavailable targets show an explicit message
 rather than silently opening unrelated work. Assignment selection is URL-backed.
 
+The student Support page uses the same destinations for support-action titles
+and Review links: assessment-backed actions open the exact assignment, while
+support requests and other follow-ups open their selected saved-action detail.
+These links do not grant access to private staff referral or service records.
+
 My classes uses `/student/courses` with actively enrolled sections only.
 `section` selects the class and `tab=overview|classwork|grades` selects its
 detail panel. Catalog and schedule-change requests remain separate at
@@ -325,6 +330,26 @@ No notification should exist without a meaningful landing context.
 - Disabled coming-soon controls stay explicitly disabled. Non-actionable
   gradebook statuses are text, not inert buttons. Registrar referral summaries
   do not link into teacher/specialist-only support workflows.
+- Saved student-action titles and Review controls use the exact assignment or
+  `/student/experiences?action=<id>`, including non-assessment support requests.
+  Exact Action reads retain owner/site/program authorization and are not limited
+  to the latest 100 directory results. Waiting, in-progress and cancelled work
+  keep their actual status; only resolved work is labeled completed. Student
+  completion controls match the server's existing supported types and open state.
+- Staff Action links use `/actions/<id>` for read-only canonical details.
+  Academic interventions recheck the shared academic Action policy; generic
+  operational Actions remain registrar-only. Referral details stay in
+  `/support?referral=<id>` for teachers, specialists and counselors.
+  Details include a verified-role workspace return link; site-less academic
+  Actions do not link into the site-only Operations queue.
+- Staff profile insights use `/operations/insights?insight=<id>` and select that
+  exact authorized insight regardless of its status. Accepting an insight
+  offers a link to the created Action; unavailable selections never fall back
+  to another record.
+- Teacher study-group request, report, group and session titles preserve
+  `group` and, for sessions, `session` in `/teacher/study-groups`. Group selection
+  filters the facilitator queues and schedule choices; unavailable groups or
+  sessions are explicit. These links do not change facilitator authority.
 
 Route integrity tests inspect static/templated targets and native button
 handlers across application source. Contextual navigation tests cover selection

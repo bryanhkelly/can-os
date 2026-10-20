@@ -3,6 +3,7 @@ import { Link, useRouter } from "@tanstack/react-router";
 import {
   finishQuickWinAction, requestQuickWinHelp,
 } from "@/modules/actions/student-actions.functions";
+import { canCompleteStudentAction } from "@/modules/actions/student-action-policy";
 
 type Action = {
   id: string; title: string; description: string | null;
@@ -17,7 +18,7 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
-  const outstanding = actions.filter(action => action.status === "open");
+  const outstanding = actions.filter(action => ["open", "in_progress", "waiting"].includes(action.status));
   const visible = actionId ? actions.filter(action => action.id === actionId) : actions;
 
   async function finish(actionId: string) {
@@ -50,14 +51,22 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
     {error && <p role="alert" className="mt-4 rounded-lg border border-red-300 px-3 py-2 text-sm">{error}</p>}
     {saved && <p role="status" className="mt-4 rounded-lg border border-emerald-300 px-3 py-2 text-sm">{saved}</p>}
     <div className="mt-5 space-y-3">
-      {visible.map(action => <div key={action.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-background p-4">
-        <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{String(action.metadata.source ?? action.type)} · {action.priority} priority</p><p className="mt-1 text-sm font-semibold">{action.title}</p><p className="mt-1 text-xs text-muted-foreground">{action.description}</p></div>
-        {action.subjectType === "assessment" && action.subjectId &&
-          <Link to="/student/assignments" search={{assessment:action.subjectId}} className="text-xs font-semibold underline">Review assignment</Link>}
-        {action.status === "open" ?
-          <button disabled={busy} onClick={()=>finish(action.id)} className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">Mark complete</button> :
-          <span className="text-xs font-semibold text-emerald-800">Completed ✓</span>}
-      </div>)}
+      {visible.map(action => {
+        const target = action.subjectType === "assessment" && action.subjectId
+          ? { to: "/student/assignments" as const, search: { assessment: action.subjectId } }
+          : { to: "/student/experiences" as const, search: { action: action.id } };
+        return <div key={action.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-background p-4">
+        <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{String(action.metadata.source ?? action.type)} · {action.priority} priority</p><p className="mt-1 text-sm font-semibold"><Link {...target} className="hover:underline">{action.title}</Link></p><p className="mt-1 text-xs text-muted-foreground">{action.description}</p></div>
+        {(target.to === "/student/assignments" || !actionId) &&
+          <Link {...target} className="text-xs font-semibold underline">{target.to === "/student/assignments" ? "Review assignment" : "Review action"}</Link>}
+        <span className={"text-xs font-semibold capitalize"+(action.status==="resolved"?" text-emerald-800":" text-muted-foreground")}>
+          {action.status==="resolved"?"Completed":action.status.replaceAll("_"," ")}
+        </span>
+        {canCompleteStudentAction(action) &&
+          <button disabled={busy||!connected} onClick={()=>finish(action.id)} className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">Mark complete</button>}
+        {action.status==="open"&&!canCompleteStudentAction(action)&&
+          <p className="text-xs text-muted-foreground">Managed in its owning workflow.</p>}
+      </div>;})}
       {actionId && !visible.length ? <p role="alert" className="text-sm text-muted-foreground">This action is unavailable in your current student workspace.</p> :
         !actions.length && <p className="text-sm text-muted-foreground">You have no saved actions.</p>}
     </div>

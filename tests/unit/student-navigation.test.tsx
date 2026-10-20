@@ -5,6 +5,8 @@ import { StudentExperience } from "@/components/student/StudentExperience";
 import { LiveQuickWins } from "@/components/student/LiveQuickWins";
 import { Route } from "@/routes/student.assignments";
 import { Route as ExperiencesRoute } from "@/routes/student.experiences";
+import { getQuickWinActions } from "@/modules/actions/student-actions.functions";
+import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 
 const state = vi.hoisted(() => ({
   search: {} as Record<string, unknown>,
@@ -160,6 +162,12 @@ describe("individual student actions",()=>{
     expect(validate({action:"help"})).toEqual({action:"help"});
     expect(validate({action:42})).toEqual({action:undefined});
   });
+  it("links saved-action titles and review controls to their exact destinations",()=>{
+    const html=renderToStaticMarkup(<LiveQuickWins connected actions={actions}/>);
+    expect(html).toContain('href="/student/assignments?assessment=returned" class="hover:underline">Revise English essay</a>');
+    expect(html).toContain('href="/student/experiences?action=help" class="hover:underline">Check in with mentor</a>');
+    expect(html).toContain('href="/student/experiences?action=help" class="text-xs font-semibold underline">Review action</a>');
+  });
   it("shows only the requested action and links to its assignment",()=>{
     const html=renderToStaticMarkup(<LiveQuickWins connected actions={actions} actionId="revision"/>);
     expect(html).toContain("Revise English essay");
@@ -172,5 +180,48 @@ describe("individual student actions",()=>{
     expect(html).toContain("This action is unavailable in your current student workspace.");
     expect(html).not.toContain("Revise English essay");
     expect(html).not.toContain("Check in with mentor");
+  });
+  it.each(["open","in_progress","waiting","resolved","cancelled"] as const)("keeps %s work in its actual state",status=>{
+    const html=renderToStaticMarkup(<LiveQuickWins connected actions={[{...actions[1]!,status}]}/>);
+    expect(html.includes(">Completed</span>")).toBe(status==="resolved");
+    if(status!=="resolved")expect(html).toContain(`>${status.replaceAll("_"," ")}</span>`);
+    expect(html.includes(">Mark complete</button>")).toBe(status==="open");
+    expect(html).toContain(["open","in_progress","waiting"].includes(status)
+      ?"1 saved action need attention":"0 saved actions need attention");
+  });
+  it.each(["student_recovery","student_support","student_support_request","conference_follow_up"])("retains completion for supported open %s actions",type=>{
+    const html=renderToStaticMarkup(<LiveQuickWins connected actions={[{...actions[1]!,type}]}/>);
+    expect(html).toContain(">Mark complete</button>");
+  });
+  it.each(["academic_intervention","support_referral","field_trip_consent"])("does not offer generic completion for %s",type=>{
+    const html=renderToStaticMarkup(<LiveQuickWins connected actions={[{...actions[1]!,type}]}/>);
+    expect(html).not.toContain(">Mark complete</button>");
+    expect(html).toContain("Managed in its owning workflow.");
+    expect(html).not.toContain(">Completed</span>");
+  });
+  it("disables completion when the database connection is unavailable",()=>{
+    const html=renderToStaticMarkup(<LiveQuickWins connected={false} actions={[actions[1]!]}/>);
+    expect(html).toMatch(/<button disabled=""[^>]*>Mark complete<\/button>/);
+  });
+});
+
+describe("student Action detail loader",()=>{
+  const load=ExperiencesRoute.options.loader as (input:{deps:{action?:string}})=>Promise<{
+    ok:boolean;data?:{quickWins:unknown;school:unknown};
+  }>;
+  beforeEach(()=>vi.clearAllMocks());
+  it("requests the exact Action without loading unrelated school experiences",async()=>{
+    vi.mocked(getQuickWinActions).mockResolvedValue({connected:true,actions:[]});
+    const action="00000000-0000-4000-8000-000000000001";
+    const result=await load({deps:{action}});
+    expect(getQuickWinActions).toHaveBeenCalledWith({data:{actionId:action}});
+    expect(getSchoolExperiences).not.toHaveBeenCalled();
+    expect(result).toEqual({ok:true,data:{quickWins:{connected:true,actions:[]},school:null}});
+  });
+  it("retains the combined directory when there is no selection",async()=>{
+    vi.mocked(getQuickWinActions).mockResolvedValue({connected:true,actions:[]});
+    await load({deps:{}});
+    expect(getQuickWinActions).toHaveBeenCalledWith({data:{actionId:undefined}});
+    expect(getSchoolExperiences).toHaveBeenCalledOnce();
   });
 });

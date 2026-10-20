@@ -6,15 +6,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
+import { isStudentSupportAction } from "./student-action-policy";
 
 const studentActor = () => requireActor(["student"]);
 
-export const getQuickWinActions = createServerFn({ method: "GET" }).handler(async () => {
+export const getQuickWinActions = createServerFn({ method: "GET" })
+ .validator((value: unknown) => z.object({ actionId: z.string().uuid().optional() }).default({}).parse(value))
+ .handler(async ({ data }) => {
   const actor = await studentActor();
   setResponseHeader("Cache-Control", "private, no-store");
   const sites = actorSiteIds(actor);
   if (!process.env.DATABASE_URL) return { connected: false as const, actions: [] };
-  const [{ db }, { actions, domainEvents }] = await Promise.all([
+  const [{ db }, { actions }] = await Promise.all([
     import("@/db/client"), import("@/db/schema"),
   ]);
   const rows = await db.select({
@@ -26,7 +29,8 @@ export const getQuickWinActions = createServerFn({ method: "GET" }).handler(asyn
     eq(actions.ownerPersonId, actor.actorPersonId),
     inArray(actions.siteId, sites),
     inArray(actions.programId, actor.scope.programIds ?? []),
-  )).orderBy(desc(actions.createdAt)).limit(100);
+    data.actionId ? eq(actions.id, data.actionId) : undefined,
+  )).orderBy(desc(actions.createdAt)).limit(data.actionId ? 1 : 100);
   return { connected: true as const, actions: rows.map(row => ({ ...row, metadata: { source: typeof row.metadata.source === "string" ? row.metadata.source : row.type }, dueAt: row.dueAt?.toISOString() ?? null })) };
 });
 
@@ -42,7 +46,7 @@ export const finishQuickWinAction = createServerFn({ method: "POST" })
     return db.transaction(async tx => {
       const [current] = await tx.select({id:actions.id,type:actions.type,subjectType:actions.subjectType,subjectId:actions.subjectId,programId:actions.programId}).from(actions).where(and(eq(actions.id,data.actionId),eq(actions.ownerPersonId,actor.actorPersonId),inArray(actions.siteId,sites),eq(actions.status,"open"))).for("update").limit(1);
       if(!current||!current.programId||!(actor.scope.programIds??[]).includes(current.programId))throw new AuthorizationError("open owned action in authorized program");
-      if(!["student_recovery","student_support","student_support_request","conference_follow_up"].includes(current.type))throw new AuthorizationError("Action requires its owning workflow");
+      if(!isStudentSupportAction(current.type))throw new AuthorizationError("Action requires its owning workflow");
       const [result] = await tx.update(actions).set({
         status: "resolved", resolvedAt: new Date(), resolutionNote: "Completed by owner",
         updatedAt: new Date(),

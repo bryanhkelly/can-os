@@ -40,6 +40,7 @@ function Student360Page({ personId }: { personId: string }) {
 }
 
 export function Student360View({ profile, tab = "overview" }: { profile: Student360; tab?: ProfileTab }) {
+  const canOpenReferrals = ["teacher", "specialist", "counselor"].includes(profile.viewerRole);
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Staff" title={profile.identity.name}
     subtitle={`Grade ${profile.identity.gradeLevel ?? "not recorded"} · ${profile.sections.length} active class(es)`}
     breadcrumbs={<><Link to="/staff/students" className="underline">Students</Link><span>/</span><span>{profile.identity.name}</span></>}
@@ -78,7 +79,13 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
       {(tab === "overview" || tab === "support") && <>
         <WorkspacePanel title="Open actions">
           <ul className="space-y-3">{profile.openActions.map(action => <li key={action.id} className="rounded-lg border p-4">
-            <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{action.title}</h3>
+            <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{action.type==="support_referral"
+              ?canOpenReferrals
+                ?<Link to="/support" search={{referral:action.id}} className="hover:underline">{action.title}</Link>
+                :action.title
+              :profile.viewerRole==="registrar"||action.type==="academic_intervention"
+                ?<Link to="/actions/$actionId" params={{actionId:action.id}} className="hover:underline">{action.title}</Link>
+                :action.title}</h3>
               <StatusBadge tone={action.priority === "high" || action.priority === "urgent" ? "attention" : "neutral"}>{action.status.replaceAll("_", " ")}</StatusBadge></div>
             <p className="mt-2 text-sm text-muted-foreground">{action.type.replaceAll("_", " ")}{action.dueAt ? ` · Due ${new Date(action.dueAt).toLocaleDateString()}` : ""}</p>
           </li>)}</ul>
@@ -86,14 +93,16 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
         </WorkspacePanel>
         <WorkspacePanel title="Support referrals">
           <ul className="space-y-3">{profile.supportReferrals.map(referral => <li key={referral.id} className="rounded-lg border p-4">
-            <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{referral.title}</h3><StatusBadge>{referral.stage.replaceAll("_", " ")}</StatusBadge></div>
+            <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{canOpenReferrals
+              ?<Link to="/support" search={{referral:referral.id}} className="hover:underline">{referral.title}</Link>
+              :referral.title}</h3><StatusBadge>{referral.stage.replaceAll("_", " ")}</StatusBadge></div>
             <p className="mt-2 text-sm text-muted-foreground">{referral.category} · Opened {new Date(referral.createdAt).toLocaleDateString()}</p>
           </li>)}</ul>
           {!profile.supportReferrals.length && <p className="text-sm text-muted-foreground">No open support referrals.</p>}
         </WorkspacePanel>
         <WorkspacePanel title="Recent insights">
           <ul className="space-y-3">{profile.insights.map(insight => <li key={insight.id} className="rounded-lg border p-4">
-            <h3 className="font-semibold">{insight.title}</h3><p className="mt-1 text-sm text-muted-foreground">{insight.type.replaceAll("_", " ")} · {new Date(insight.createdAt).toLocaleDateString()}</p>
+            <h3 className="font-semibold"><Link to="/operations/insights" search={{insight:insight.id}} className="hover:underline">{insight.title}</Link></h3><p className="mt-1 text-sm text-muted-foreground">{insight.type.replaceAll("_", " ")} · {new Date(insight.createdAt).toLocaleDateString()}</p>
           </li>)}</ul>
           {!profile.insights.length && <p className="text-sm text-muted-foreground">No insights recorded for this student.</p>}
         </WorkspacePanel>

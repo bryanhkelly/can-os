@@ -241,7 +241,7 @@ describe("application contextual navigation",()=>{
   });
 
   it("uses the same URL for student group titles and Open controls",()=>{
-    successful({enabled:true,writesEnabled:false,membershipEnabled:false,contentEnabled:false,
+    successful({enabled:true,writesEnabled:false,membershipEnabled:false,contentEnabled:false,creationEnabled:false,sections:[],
       groups:[{id:"group",title:"English study group",kind:"course",capacity:20,membership:null}]});
     const html=render(StudentGroups);
     expect(html.match(/href="\/student\/study-groups\?group=group"/g)).toHaveLength(2);

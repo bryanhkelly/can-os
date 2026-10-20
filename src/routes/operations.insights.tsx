@@ -1,11 +1,12 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { acceptInsight, dismissInsight, listInsights,listInsightScopeOptions } from "@/modules/operations/insights.functions";
 
 export const Route = createFileRoute("/operations/insights")({
- validateSearch:(search:Record<string,unknown>)=>({
+ validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;insight?:string}=>({
   siteId:typeof search.siteId==="string"?search.siteId:undefined,
   programId:typeof search.programId==="string"?search.programId:undefined,
+  insight:typeof search.insight==="string"?search.insight:undefined,
  }),
  component:InsightsPage
 });
@@ -42,12 +43,13 @@ function InsightsPage() {
  const [busy, setBusy] = useState("");
  const [error, setError] = useState("");
  const [notice, setNotice] = useState("");
+ const [createdActionId,setCreatedActionId]=useState("");
 
  const load = useCallback(async (filter: StatusFilter) => {
   setLoading(true);
   setError("");
   try {
-   const result = await listInsights({ data: { status: filter,siteId:selection.siteId,programId:selection.programId } });
+   const result = await listInsights({ data: { status: filter,siteId:selection.siteId,programId:selection.programId,insightId:selection.insight } });
    setInsights(result.insights);
   } catch {
    setInsights([]);
@@ -55,18 +57,21 @@ function InsightsPage() {
   } finally {
    setLoading(false);
   }
- }, [selection.siteId,selection.programId]);
+ }, [selection.siteId,selection.programId,selection.insight]);
 
  useEffect(()=>{let active=true;void listInsightScopeOptions().then(rows=>{if(active)setScopes(rows)}).catch(()=>{});return()=>{active=false};},[]);
  useEffect(() => {
+  setCreatedActionId("");setNotice("");
   void load(status);
  }, [status, load]);
 
  const accept = async (insight: Insight) => {
   setBusy(insight.id);
   setNotice("");
+  setCreatedActionId("");
   try {
-   await acceptInsight({ data: { insightId: insight.id } });
+   const result=await acceptInsight({ data: { insightId: insight.id } });
+   setCreatedActionId(result.actionId);
    setNotice(`Action created from "${insight.title}".`);
    await load(status);
   } catch (cause) {
@@ -81,6 +86,7 @@ function InsightsPage() {
   if (reason === null) return;
   setBusy(insight.id);
   setNotice("");
+  setCreatedActionId("");
   try {
    await dismissInsight({ data: { insightId: insight.id, reason } });
    setNotice(`Dismissed "${insight.title}".`);
@@ -115,10 +121,12 @@ function InsightsPage() {
      </select>
     </label>
    </div>
-   {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+   {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}{createdActionId&&<>
+    {" "}<Link to="/actions/$actionId" params={{actionId:createdActionId}} className="font-semibold underline">Open created Action</Link>
+   </>}</p>}
    {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
    {!error && <>
-    <div className="mt-6 flex gap-2" role="tablist" aria-label="Insight status filter">
+    {selection.insight?<Link to="/operations/insights" search={{siteId:selection.siteId,programId:selection.programId}} className="mt-6 inline-block text-sm underline">All insights</Link>:<div className="mt-6 flex gap-2" role="tablist" aria-label="Insight status filter">
      {tabs.map(tab => <button
       key={tab.id}
       type="button"
@@ -129,14 +137,16 @@ function InsightsPage() {
        ? "rounded-full border bg-foreground px-4 py-1.5 text-xs font-bold text-background"
        : "rounded-full border px-4 py-1.5 text-xs font-bold text-muted-foreground"}
      >{tab.label}</button>)}
-    </div>
+    </div>}
     {loading && <p role="status" className="mt-8 text-sm">Loading insights…</p>}
-    {!loading && insights.length === 0 && <p className="mt-8 rounded-xl border p-5 text-sm">No {tabs.find(tab => tab.id === status)?.label.toLowerCase()} insights in your scope.</p>}
+    {!loading && insights.length === 0 && (selection.insight
+     ?<p role="alert" className="mt-8 rounded-xl border p-5 text-sm">This insight is unavailable in your current workspace.</p>
+     :<p className="mt-8 rounded-xl border p-5 text-sm">No {tabs.find(tab => tab.id === status)?.label.toLowerCase()} insights in your scope.</p>)}
     {!loading && insights.length > 0 && <div className="mt-6 grid gap-4">
      {insights.map(insight => <article key={insight.id} className="rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
        <div>
-        <h2 className="text-lg font-semibold">{insight.title}</h2>
+        <h2 className="text-lg font-semibold"><Link to="/operations/insights" search={{siteId:selection.siteId,programId:selection.programId,insight:insight.id}} className="hover:underline">{insight.title}</Link></h2>
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
          {insight.type.replaceAll("_", " ")} · {insight.subjectName ?? `${insight.subjectType.replaceAll("_", " ")} ${insight.subjectId.slice(0, 8)}`} · {new Date(insight.createdAt).toLocaleDateString()}
         </p>
