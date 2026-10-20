@@ -7,6 +7,7 @@ import {
 } from "@/modules/learning/report-cards.functions";
 import { getGuardianStudents } from "@/modules/learning/guardian-academic-queries.functions";
 import { ReportCardView, TranscriptView } from "@/components/report-card";
+import { EmptyState, QueryState, WorkspaceShell } from "@/components/workspace";
 
 export const Route = createFileRoute("/guardian/report-cards")({
   validateSearch:(search:Record<string,unknown>):{student?:string}=>({
@@ -72,25 +73,23 @@ function GuardianReportCardsPage() {
     return () => { active = false; };
   }, [selected]);
 
-  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Report card</p>
-      <h1 className="mt-2 font-serif text-4xl">Report card</h1>
-      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Finalized grades by grading period, plus the durable transcript record, for students connected to your account.</p>
+  const unavailable = student && !selected && !loadingStudents
+    ? "This student is unavailable in your current family workspace. Choose an authorized student above."
+    : "";
+
+  return <WorkspaceShell eyebrow="CAN OS · Report card" title="Report card"
+    subtitle="Finalized grades by grading period, plus the durable transcript record, for students connected to your account.">
       {students.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
         Student
         <select className="mt-2 w-full rounded-lg border bg-background p-3" value={selected} onChange={event => void navigate({search:{student:event.target.value}})}>
           {students.map(student => <option key={student.studentPersonId} value={student.studentPersonId}>{student.firstName} {student.lastName}</option>)}
         </select>
       </label>}
-      {(loading || loadingStudents) && <p className="mt-8 text-sm" role="status">Loading report card…</p>}
-      {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
-      {student&&!selected&&!loadingStudents&&!error&&<p role="alert" className="mt-8 rounded-lg border p-4 text-sm">This student is unavailable in your current family workspace. Choose an authorized student above.</p>}
-      {!loading && !loadingStudents && !error && students.length === 0 && <p className="mt-8 text-sm">No students with academic-viewing permission were found at your school.</p>}
-      {!loading && !loadingStudents && !error && students.length > 0 && <>
+      <QueryState loading={(loading || loadingStudents) && "Loading report card…"}
+        error={error || unavailable} isEmpty={students.length === 0}
+        empty={<EmptyState className="mt-8" title="No students with academic-viewing permission were found at your school." />}>
         <ReportCardView grades={grades} />
         <TranscriptView rows={transcript.rows} issuances={transcript.issuances} />
-      </>}
-    </div>
-  </main>;
+      </QueryState>
+  </WorkspaceShell>;
 }

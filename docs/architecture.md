@@ -24,6 +24,18 @@ CAN OS begins as a **modular monolith**, not a microservice system.
 
 A workspace is a view over the user's identity, roles, capabilities, scope, and relationships. A workspace is not a separate identity or security boundary.
 
+### Shared workspace presentation
+
+Student/teacher directories and student/guardian report cards compose the existing
+`WorkspaceShell`, `QueryState` and `EmptyState` components instead of duplicating
+page headers and loading/error/empty markup. Query states are mutually exclusive:
+loading precedes error, then a successful empty result, then content. An
+unavailable guardian child shows an alert and never a misleading empty report.
+Authorized students with no finalized grades still see the report and transcript
+empty states. Directory searches retain their debounce and stale-response cleanup;
+a successful retry clears the preceding error. Data loading and authorization
+remain in the existing route/server functions, not a generic form or CRUD engine.
+
 ## Organization model
 
 Do not encode "church" as the root production primitive.

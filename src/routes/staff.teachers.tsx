@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
 import { useEffect, useState } from "react";
 import { listTeachers } from "@/modules/profiles/directory.functions";
+import { EmptyState, QueryState, WorkspaceShell } from "@/components/workspace";
 
 export const Route = createFileRoute("/staff/teachers")({ component: StaffTeachersPage });
 
@@ -21,6 +22,7 @@ function StaffTeachersPage() {
         .then((result) => {
           if (active) {
             setTeachers(result.teachers);
+            setError("");
             setLoading(false);
           }
         })
@@ -39,13 +41,8 @@ function StaffTeachersPage() {
   }, [query]);
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-      <div className="mx-auto max-w-5xl">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Staff</p>
-        <h1 className="mt-2 font-serif text-4xl">Teacher directory</h1>
-        <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          Teachers leading sections at your school sites, with current rosters.
-        </p>
+    <WorkspaceShell eyebrow="CAN OS · Staff" title="Teacher directory"
+      subtitle="Teachers leading sections at your school sites, with current rosters.">
         <label className="mt-8 block max-w-sm text-sm font-semibold">
           Search by name
           <input
@@ -56,12 +53,8 @@ function StaffTeachersPage() {
             placeholder="First or last name"
           />
         </label>
-        {loading && <p className="mt-8 text-sm" role="status">Loading teachers…</p>}
-        {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
-        {!loading && !error && teachers.length === 0 && (
-          <p className="mt-8 text-sm">No teachers matched your search at your school sites.</p>
-        )}
-        {!loading && !error && teachers.length > 0 && (
+        <QueryState loading={loading && "Loading teachers…"} error={error} isEmpty={teachers.length === 0}
+          empty={<EmptyState className="mt-8" title="No teachers matched your search at your school sites." />}>
           <div className="mt-8 overflow-x-auto rounded-xl border bg-card">
             <table className="w-full text-left text-sm">
               <thead>
@@ -82,8 +75,7 @@ function StaffTeachersPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
-    </main>
+        </QueryState>
+    </WorkspaceShell>
   );
 }

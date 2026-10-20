@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { searchStudents } from "@/modules/profiles/directory.functions";
+import { EmptyState, QueryState, WorkspaceShell } from "@/components/workspace";
 
 export const Route = createFileRoute("/staff/students")({ component: StaffStudentsPage });
 
@@ -20,6 +21,7 @@ function StaffStudentsPage() {
         .then((result) => {
           if (active) {
             setStudents(result.students);
+            setError("");
             setLoading(false);
           }
         })
@@ -38,13 +40,8 @@ function StaffStudentsPage() {
   }, [query]);
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-      <div className="mx-auto max-w-5xl">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Staff</p>
-        <h1 className="mt-2 font-serif text-4xl">Student directory</h1>
-        <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          Students at your school sites. Select a student to open their 360 profile.
-        </p>
+    <WorkspaceShell eyebrow="CAN OS · Staff" title="Student directory"
+      subtitle="Students at your school sites. Select a student to open their 360 profile.">
         <label className="mt-8 block max-w-sm text-sm font-semibold">
           Search by name
           <input
@@ -55,12 +52,8 @@ function StaffStudentsPage() {
             placeholder="First or last name"
           />
         </label>
-        {loading && <p className="mt-8 text-sm" role="status">Loading students…</p>}
-        {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
-        {!loading && !error && students.length === 0 && (
-          <p className="mt-8 text-sm">No students matched your search at your school sites.</p>
-        )}
-        {!loading && !error && students.length > 0 && (
+        <QueryState loading={loading && "Loading students…"} error={error} isEmpty={students.length === 0}
+          empty={<EmptyState className="mt-8" title="No students matched your search at your school sites." />}>
           <div className="mt-8 overflow-x-auto rounded-xl border bg-card">
             <table className="w-full text-left text-sm">
               <thead>
@@ -87,8 +80,7 @@ function StaffStudentsPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
-    </main>
+        </QueryState>
+    </WorkspaceShell>
   );
 }
