@@ -6,6 +6,7 @@ import { Route as Notifications } from "@/routes/notifications";
 import { Route as Operations } from "@/routes/operations";
 import { Route as Site } from "@/routes/sites.$siteId";
 import { Route as Admissions } from "@/routes/admissions.index";
+import { Route as Intake } from "@/routes/admissions.intake";
 import { Route as Families } from "@/routes/admissions.families";
 import { Route as Support } from "@/routes/student.support";
 import { Route as CourseRequests } from "@/routes/operations.course-requests";
@@ -35,18 +36,25 @@ vi.mock("@/modules/student-experience/assignments.functions",()=>({getAssignment
 vi.mock("@/modules/communication/notification-center.functions",()=>({
   getNotifications:vi.fn(),readNotification:vi.fn(),readAllNotifications:vi.fn(),setNotificationStatus:vi.fn(),
 }));
+vi.mock("@/modules/communication/delivery-history.functions",()=>({getDeliveryHistory:vi.fn()}));
 vi.mock("@/modules/operations/command-center.functions",()=>({getLiveOperationsCommandCenter:vi.fn()}));
 vi.mock("@/modules/operations/release-health.functions",()=>({getReleaseHealth:vi.fn()}));
 vi.mock("@/modules/operations/action-workspace.functions",()=>({
   getOperationsActions:vi.fn(),updateOperationsAction:vi.fn(),assignOperationsAction:vi.fn(),
 }));
 vi.mock("@/modules/operations/site-today.functions",()=>({getSiteToday:vi.fn()}));
+vi.mock("@/modules/programs/opening-handoff.functions",()=>({acknowledgeLaunchHandoff:vi.fn(),transferLaunchHandoff:vi.fn()}));
 vi.mock("@/modules/enrollment/course-placement.functions",()=>({listEnrollmentPlacements:vi.fn(),placeEnrolledStudent:vi.fn()}));
 vi.mock("@/modules/enrollment/admissions-dashboard.functions",()=>({getAdmissionsDashboard:vi.fn()}));
+vi.mock("@/modules/enrollment/admissions-intake.functions",()=>({
+ listAdmissionsIntake:vi.fn(),listAdmissionsIntakePrograms:vi.fn(),createAdmissionsInquiry:vi.fn(),
+ provisionInquiryGuardianAccount:vi.fn(),sendAdmissionsGuardianInvitation:vi.fn(),
+ verifyAdmissionsGuardianRelationship:vi.fn(),transitionAdmissionsStage:vi.fn(),
+}));
 vi.mock("@/modules/operations/site-directory.functions",()=>({listMySites:vi.fn()}));
 vi.mock("@/modules/enrollment/admissions-program-directory.functions",()=>({listAdmissionsPrograms:vi.fn()}));
 vi.mock("@/modules/enrollment/admissions-offer.functions",()=>({
-  getAdmissionOfferOptions:vi.fn(),issueAdmissionOffer:vi.fn(),activateOfferedEnrollment:vi.fn(),
+  getAdmissionOfferOptions:vi.fn(),issueAdmissionOffer:vi.fn(),activateOfferedEnrollment:vi.fn(),withdrawIssuedAdmissionOffer:vi.fn(),
 }));
 vi.mock("@/modules/enrollment/r2-document-upload.functions",()=>({
   beginEnrollmentDocumentUpload:vi.fn(),finishEnrollmentDocumentUpload:vi.fn(),
@@ -63,6 +71,8 @@ vi.mock("@/modules/support/support-referrals.functions",()=>({
 vi.mock("@/modules/actions/student-actions.functions",()=>({getQuickWinActions:vi.fn(),requestQuickWinHelp:vi.fn()}));
 vi.mock("@/modules/learning/registrar-course-requests.functions",()=>({listRegistrarCourseRequests:vi.fn()}));
 vi.mock("@/modules/enrollment/guardian-admission-offers.functions",()=>({getGuardianAdmissionOffers:vi.fn()}));
+vi.mock("@/modules/enrollment/guardian-enrollment-checklist.functions",()=>({getGuardianEnrollmentChecklist:vi.fn()}));
+vi.mock("@/modules/enrollment/enrollment-form.functions",()=>({submitGuardianEnrollmentForm:vi.fn(),decideEnrollmentForm:vi.fn()}));
 vi.mock("@/modules/study-groups/canonical-workspace.functions",()=>({
   listCanonicalGuardianGroupConsents:vi.fn(),getStudyGroupAvailability:vi.fn(),
 }));
@@ -105,10 +115,10 @@ describe("application contextual navigation",()=>{
 
   it("opens the selected notification and preserves its full related-record URL",()=>{
     state.search={notification:"selected"};
-    successful([
+    successful({notices:[
       {id:"selected",title:"English feedback",status:"unread",date:"2030-01-01",body:"Read your feedback",href:"/student/assignments?assessment=essay"},
       {id:"other",title:"Unrelated update",status:"read",date:"2030-01-01",body:"Other",href:null},
-    ]);
+    ],history:{ok:true,data:{items:[],nextCursor:null}}});
     const html=render(Notifications);
     expect(html).toContain('href="/student/assignments?assessment=essay"');
     expect(html).not.toContain("Unrelated update");
@@ -141,6 +151,7 @@ describe("application contextual navigation",()=>{
       actions:[{id:"task",title:"Review staffing",status:"open",priority:"normal",description:null,dueAt:null}],
       events:[{id:"event",title:"Evening assembly",startsAt:"2030-01-02T01:00:00Z",type:"assembly"}],
       programs:[{id:"program",name:"Test program",status:"active",type:"full_school",gradeRange:{min:"9",max:"12"}}],
+      openingHandoffs:[],
     });
     const html=render(Site);
     expect(html).toContain('href="/operations?siteId=school&amp;action=task"');
@@ -148,6 +159,20 @@ describe("application contextual navigation",()=>{
     expect(html).toContain('href="/admissions?siteId=school"');
     expect(html).toContain('href="/operations/launch/program?siteId=school"');
     expect(html).toContain('href="/calendar?date=2030-01-01&amp;event=event"');
+  });
+
+  it("routes a handoff to its owning workspace without generic resolve or reassignment controls",()=>{
+    state.data={
+      operations:{items:[{id:"handoff",kind:"action",title:"Opening handoff",detail:"Named recipient receipt",
+        priority:"high",openingHandoff:true,siteId:"school",ownerPersonId:"receiver"}],
+        sites:[],programs:[],assignees:[],summary:{total:1,urgent:0,needsResponse:1}},
+      health:{buildId:"test",schemaStatus:"compatible",details:"Ready"},commandCenter:null,authError:"",
+    };
+    const html=render(Operations);
+    expect(html).toContain('href="/sites/school"');
+    expect(html).toContain("Named-recipient acknowledgment");
+    expect(html).not.toContain("Resolve</button>");
+    expect(html).not.toContain("Assign Opening handoff");
   });
 
   it("keeps the selected application when opening household readiness",()=>{
@@ -167,6 +192,34 @@ describe("application contextual navigation",()=>{
     successful([{id:"application",householdId:"household",program:"Test program",stage:"inquiry",isFixture:false,
       offers:[],activeSchoolYears:[],requirements:[],readiness:{completed:0,total:0,blockers:0},journeyStatus:null}]);
     expect(render(Families)).toContain('href="/admissions?siteId=school&amp;programId=program&amp;application=application"');
+  });
+
+  it("shows the Admissions waitlist and does not offer a seat until restored",()=>{
+    state.search={application:"application"};
+    successful({sites:[],programs:[],options:[{applicationId:"application",years:[{id:"year",name:"School year"}]}],
+      rows:[{id:"application",studentName:"Waitlisted Student",programId:"program",program:"Academy",stage:"eligibility",
+        disposition:"waitlisted",outstandingRequirements:0,offers:[],enrollments:[]}]});
+    const html=render(Admissions);
+    expect(html).toContain("restore this application to review");
+    expect(html).not.toContain("Registrar: Issue offer");
+    expect(html).toContain('href="/admissions/intake?programId=program&amp;application=application"');
+    state.search={};
+    expect(render(Admissions)).toContain("Restore waitlisted application to review");
+  });
+
+  it("keeps the selected Admissions intake application when resolving an offer exception",()=>{
+    state.search={application:"application"};
+    successful({programs:[],records:[
+      {id:"application",studentFirst:"Selected",studentLast:"Applicant",programId:"program",siteId:"school",
+        programName:"Academy",stage:"eligibility",disposition:"waitlisted",updatedAt:"2030-01-01"},
+      {id:"other",studentFirst:"Unrelated",studentLast:"Applicant",programId:"program",
+        programName:"Academy",stage:"inquiry",updatedAt:"2030-01-01"},
+    ]});
+    const html=render(Intake);
+    expect(html).toContain("Selected Applicant");
+    expect(html).not.toContain('>Unrelated Applicant</h3>');
+    expect(html).toContain("Restore to review");
+    expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;application=application"');
   });
 
   it("filters the admissions pipeline by stage without dropping scope from applicant links",()=>{
@@ -223,13 +276,90 @@ describe("application contextual navigation",()=>{
 
   it("opens only the requested offer for the selected child",()=>{
     state.search={student:"child",offer:"selected"};
-    successful([{applicationId:"application",studentName:"Jordan",program:"English program",offers:[
-      {id:"selected",status:"accepted"},{id:"other",status:"declined"},
+    successful([{applicationId:"application",studentName:"Jordan",program:"English program",blockers:[],offers:[
+      {id:"selected",status:"accepted",progress:{message:"Admissions must activate enrollment.",canAccept:false}},
+      {id:"other",status:"declined",progress:{message:"Offer declined.",canAccept:false}},
     ]}]);
     const html=render(Offers);
     expect(html).toContain("Offer status: accepted");
     expect(html).not.toContain("Offer status: declined");
     expect(html).toContain('href="/guardian/admission-offers?student=child"');
+  });
+
+  it("shows family-facing readiness blockers without offering premature acceptance",()=>{
+    successful([{applicationId:"application",studentName:"Jordan",program:"Academy",
+      blockers:[{id:"review",title:"Enrollment review",status:"needs_you"}],offers:[
+        {id:"offer",status:"issued",schoolYearName:"2030-2031",expiresAt:null,enrollmentActive:false,
+          progress:{message:"Enrollment requirements need review.",canAccept:false}},
+      ]}]);
+    const html=render(Offers);
+    expect(html).toContain("Enrollment review");
+    expect(html).toContain("needs you");
+    expect(html).toContain("School year: 2030-2031");
+    expect(html).toMatch(/<button disabled=""[^>]*>Accept<\/button>/);
+    expect(html).toMatch(/<button disabled=""[^>]*>Decline<\/button>/);
+  });
+
+  it("opens only the enrollment application linked from a document review notice",()=>{
+    state.search={student:"child",application:"selected"};
+    successful([
+      {applicationId:"selected",studentName:"Jordan",program:"Selected enrollment",blockers:[],offers:[]},
+      {applicationId:"other",studentName:"Casey",program:"Unrelated enrollment",blockers:[],offers:[]},
+    ]);
+    const html=render(Offers);
+    expect(html).toContain("Selected enrollment");
+    expect(html).not.toContain("Unrelated enrollment");
+    expect(html).toContain("Enrollment checklist");
+    expect(html).toContain("Loading enrollment checklist");
+    expect(html).toContain('href="/guardian/admission-offers?student=child"');
+  });
+
+  it("does not let the registrar enrollment checklist bypass pending document review",()=>{
+    successful([{id:"application",householdId:"household",program:"Academy",stage:"application",isFixture:false,
+      offers:[],activeSchoolYears:[],journeyStatus:"in_progress",readiness:{completed:0,total:1,blockers:1},
+      requirements:[{id:"document",title:"Enrollment evidence",status:"needs_you",blocking:true,documents:[],
+        evidence:[{kind:"document_review",status:"received",text:"Awaiting review"}]}]}]);
+    const html=render(Families);
+    expect(html).toMatch(/<input type="checkbox" disabled=""/);
+    expect(html).toContain("the checklist cannot bypass review");
+    expect(html).toContain("Document request and rejection reasons are visible to the family");
+  });
+
+  it("does not open another enrollment application when a checklist link is unavailable",()=>{
+    state.search={application:"missing"};
+    successful([{applicationId:"other",studentName:"Casey",program:"Unrelated enrollment",blockers:[],offers:[]}]);
+    const html=render(Offers);
+    expect(html).toContain("This enrollment application is unavailable");
+    expect(html).not.toContain("Unrelated enrollment");
+  });
+
+  it("links active enrollment with assigned classes to the family workspace",()=>{
+    successful([{applicationId:"application",studentName:"Jordan",program:"Academy",blockers:[],offers:[
+      {id:"offer",status:"accepted",schoolYearName:"2030-2031",enrollmentActive:true,sectionCount:2,
+        progress:{message:"Enrollment is active and classes are assigned.",canAccept:false}},
+    ]}]);
+    const html=render(Offers);
+    expect(html).toContain("2 assigned classes");
+    expect(html).toContain('href="/guardian"');
+    expect(html).not.toContain(">Accept</button>");
+  });
+
+  it("requires reason and confirmation for issued-offer withdrawal, never accepted offers",()=>{
+    state.search={application:"application"};
+    const row={id:"application",programId:"program",program:"Academy",stage:"application",
+      submittedAt:null,outstandingRequirements:0,enrollments:[],
+      offers:[{id:"offer",schoolYearId:"year",status:"issued",expiresAt:null}]};
+    successful({sites:[],programs:[],options:[],rows:[row]});
+    const html=render(Admissions);
+    expect(html).toContain("Reason for withdrawal (internal)");
+    expect(html).toMatch(/<textarea required="" minLength="10" maxLength="2000"/);
+    expect(html).toContain('type="checkbox" required=""');
+    expect(html).toMatch(/<button type="submit" disabled=""[^>]*>Withdraw offer<\/button>/);
+    successful({sites:[],programs:[],options:[],rows:[{...row,stage:"accepted",outstandingRequirements:1,
+      offers:[{...row.offers[0],status:"accepted"}]}]});
+    const accepted=render(Admissions);
+    expect(accepted).not.toContain("Withdraw offer");
+    expect(accepted).toMatch(/<button disabled=""[^>]*>Registrar: Activate enrollment<\/button>/);
   });
 
   it("does not replace an unavailable group permission request with another",()=>{

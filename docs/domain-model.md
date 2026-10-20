@@ -17,6 +17,29 @@ storage. Only the person can upload their own bounded JPEG/PNG; related viewers
 are reauthorized before receiving a short-lived download URL. Missing photos
 render initials, not stock images.
 
+Teacher self-service qualifications are a separate private workspace, not part
+of the public profile DTO. A qualification claim references the shared catalog
+definition and person-owned restricted evidence. Submission and independent
+review append immutable verification decisions; corrections and renewals create
+new claims. Verification, current validity, program-specific eligibility and
+class authorization remain distinct facts. Launch reviewers require an explicit
+institutional verifier grant and relationship even when their session role is
+registrar; a policy-publication permission does not grant evidence-review access.
+
+Qualification definitions belong to a shared catalog, not a program-specific
+credential store. Initial basic definitions may be created by an explicitly
+granted institutional catalog steward. Their unique stable key, classification
+and title are create-only in this workflow; identical retries reuse the entry
+and conflicting definitions are rejected. Adding a catalog entry never changes
+existing claims, verification decisions or published program requirements.
+
+Program teacher-policy revisions create a new immutable requirement set and
+record an audited supersession bound on the preceding version. Future effective
+instants preserve earlier requirements; launch eligibility evaluates every
+version applicable during instruction. Revising requires an explicit scoped
+institutional publisher grant and is restricted to pre-opening programs. It
+does not remove teaching relationships, approve credentials or grant exceptions.
+
 ### StudentProfile
 Student-domain data associated with a Person. Never a second identity.
 
@@ -72,6 +95,34 @@ Regulatory/geographic context used to select requirements and policy configurati
 
 Do not scatter state-specific `if state === ...` logic through features.
 
+### Program opening handoff
+
+New site-based activation requires a deliberately selected existing active
+site registrar/operator. Activation atomically creates a
+`program_opening_handoff` Action owned by that person, an in-app notification,
+and audit/outbox evidence alongside the Program and Journey transition.
+The Action retains the opening instant, launch Journey and section IDs; no
+school records are copied into a new operational store.
+
+Only the selected recipient with a current active site operator grant and
+matching organization/site/program scope may acknowledge receipt, with a
+confirmed note. Receipt resolves that same Action and records immutable
+evidence; it is separate from activation and is not regulatory approval.
+The opening registrar may select themselves when they hold the required site
+operator grant. Generic Action reassignment/status commands cannot bypass this
+domain workflow. Earlier active programs are not backfilled or falsely marked
+acknowledged, and site-less programs retain their existing activation behavior.
+
+A pending handoff may be recovered only when its current recipient is no
+longer eligible. A scoped registrar with an explicit institutional
+`program.opening.handoff.manage` grant selects an eligible replacement, records
+a reason and confirms transfer. The same Action remains open, preserving its
+opening snapshot. An expected revision and request identity guard stale writes
+and identical retries; immutable audit/events preserve previous and replacement
+ownership. The replacement receives an in-app notification and must independently
+acknowledge receipt. Resolved handoffs and still-eligible recipients cannot be
+transferred through this recovery command.
+
 ## Scheduled activities
 
 ### ScheduledOccurrence
@@ -125,6 +176,21 @@ are unique throughout the release. Each resource contains exactly one HTTPS
 absent content is an unpublished-content empty state, not synthetic lessons.
 Sections never maintain a second browser-side curriculum store.
 
+The registrar Curriculum Studio authors the owning organization's courses only
+with an explicit institutional `curriculum.publish` grant, active membership and
+matching organization/site/program scope. A registrar session alone is not
+publisher authority. A course has at most one authoring draft; new drafts may
+clone a published release while retaining stable module/lesson/resource IDs.
+Saves use a canonical content revision to reject stale edits. Publication requires
+a syllabus, modules, lesson reading, confirmation and a reason, and writes
+immutable audit and transactional outbox evidence. Published releases cannot be
+edited. New releases are selectable for new sections only: publishing never
+changes an existing Section's version or carries forward lesson completion.
+Drafts already referenced by a Section require reconciliation before publication.
+This authoring workflow permits HTTPS resource links only; private document
+publication awaits a verified asset workflow. Existing published private
+resources retain their authorized read/download behavior.
+
 ### ModuleTemplate
 Reusable ordered module structure.
 
@@ -155,12 +221,105 @@ Site-scoped canonical instructional calendar including school days, holidays, cl
 ### Section
 A delivered instance for a specific Term, roster, teachers, Program, and schedule context.
 
+The launch academic-readiness projection reports whether the assigned
+instructor has any current verified qualification evidence. Review decisions
+are `submit`, `approve`, `reject` and `revoke`; only the latest sequence per
+claim determines its status. Evidence is current when approved, not
+future-issued and not expired (the expiry instant is exclusive). Unsupported
+persisted decisions fail explicitly rather than becoming an unreviewed claim.
+This advisory indicator is not program/jurisdiction-specific teaching
+eligibility and does not authorize assignments or replace configured policy.
+
 ### Enrollment
 Keep kinds explicit:
 
 - admission/program enrollment
 - school-year enrollment
 - section enrollment
+
+AdmissionOffer acceptance is a guardian decision, not an active Enrollment.
+Activation retains the Application's Household, Person, StudentProfile and
+GuardianRelationship identities. It requires the recorded accepting guardian
+to retain enrollment-management authority, a ready Journey with no outstanding
+blocking requirements, and a configured school-year seat pool. Readiness review
+and activation serialize on the Journey; guardian decisions retain a shared
+relationship lock through the transaction. Checklist changes record before/after
+requirement and Journey status in immutable audit and outbox evidence.
+
+A scoped registrar may withdraw an issued, unaccepted offer with explicit
+confirmation and an internal reason. This releases its seat, preserves the
+Application and offer history, and notifies managing guardians without exposing
+the reason. Identical retries are no-ops; a changed reason is rejected. Accepted
+offers and active enrollments cannot be cancelled through this command.
+
+Waitlist is an Application disposition, not a new Journey or identity. A
+registrar must explicitly restore it to eligibility review before an offer
+can be issued or accepted. Declined/withdrawn Applications cannot be revived
+by a stale offer response or issuance retry. Intake must first reject a
+closing/waitlisting decision while any unexpired issued or accepted offer
+exists, across all school years. The registrar explicitly withdraws each
+unaccepted offer using the existing confirmed, audited command; accepted
+offers and active enrollments cannot be cancelled through intake. Elapsed,
+declined and revoked offers do not prevent closure. Closing clears any
+waitlist/offer-ready disposition; restoring a waitlist preserves the same
+Household, student, Application, Journey and evidence. Closed Applications
+are not reopened by the waitlist-restore command.
+
+Application decisions, offer issuance, guardian response, offer withdrawal
+and both activation paths take the same transaction-scoped application
+advisory lock before taking seat-pool or application row locks. This prevents
+a concurrent intake decision and offer action from both committing conflicting
+states. Pool-wide expiration only takes the pool lock; it never waits for an
+application lock. Registrar and guardian projections expose the same waitlist/
+closed state and actionable next steps; server checks remain authoritative.
+
+Guardian offer progress distinguishes response, readiness review, activation
+and class placement. Only active section enrollments in active Sections count
+as assigned classes. A later accepted offer does not overwrite the historical
+status of withdrawn, declined or expired offers. Family Home and Student Today
+restrict these enrollment/class projections to current relationship and
+site/program grants; accepting an offer alone does not grant class access.
+
+Enrollment evidence remains attached to the application's canonical
+JourneyRequirement, not a separate family checklist engine. Managing guardians
+see requirement status, explicit family-visible document instructions and file
+history, never internal registrar notes or raw storage keys. Replacing a file
+supersedes the preceding Document, invalidates requirement completion and
+returns the Journey to review. Only registrar approval of the current,
+storage-verified file completes a document requirement; the generic checklist
+cannot bypass pending document review. Upload and review mutations append
+audit and transactional outbox evidence, and identical retries do not duplicate
+records or request/rejection notifications. Archived journeys remain readable
+to currently authorized actors but do not accept new uploads.
+
+An enrollment requirement may snapshot a configured `enrollmentForm` from its
+JourneyDefinition. Program metadata `enrollmentJourneyDefinitionKey` chooses
+the approved packet for both family application and registrar intake; absent
+configuration preserves the existing `family-enrollment` default. Named
+packets can encode the school's jurisdiction-specific requirements without
+state-specific code branches. Active definition selection retains the existing
+key/version mechanism; use a new approved key for a new packet release.
+
+One currently authorized managing guardian signs each form. A submission
+retains its exact form/consent, version, answers, signer identity, typed name
+and signing instant. Registrar approval is mandatory and rechecks the signer's
+current enrollment-management relationship. Rejection requires a family-visible
+reason and a fresh corrected signature. Review targets the latest submission;
+old reviews cannot approve newer answers. Signature and review retries preserve
+the original evidence and reject changed input. Audit stores reference/digest
+evidence rather than copying private answers or consent signatures into the
+outbox. Generic checklist completion and document approval cannot waive a
+configured form. Offer readiness and legacy activation verify the signed,
+approved snapshot rather than trusting only its `complete` status.
+
+Packet configuration uses `requirements[].enrollmentForm` with `version`,
+`instructions`, `consent` and up to 30 `fields`. Each field has a unique `key`,
+`label`, `type` (`text` or `yes_no`) and `required` flag. A false yes/no answer
+is a supplied answer, not missing consent; the school statement requires its
+own affirmative signature acknowledgement. Required forms must also set the
+JourneyRequirement's `blocking: true`. Configure only school-approved text in
+reviewed JourneyDefinitions; the application does not invent legal language,
+retrofit historical journeys or apply production packet configuration.
 
 ### Assessment
 Definition of work to be completed/evaluated.
@@ -314,6 +473,23 @@ Expected/present/absent/tardy/excused operational attendance fact.
 
 ### AttendanceExcuse
 Parent/guardian explanation and site review state.
+
+A submitted excuse belongs to the exact AttendanceEvent it explains. If a
+subsequent correction supersedes that event, approval/rejection must not change
+the newer school record. A currently scoped registrar with
+`attendance.excuse.review` can explicitly close the obsolete excuse as
+`withdrawn`, with confirmation, a guardian-visible reason and the expected
+current AttendanceEvent identity. Assigned teachers cannot perform this
+closure. Current or already-approved/rejected excuses cannot be closed this way.
+
+Closure takes the same occurrence advisory lock as marking and excuse review,
+changes only the excuse, and writes immutable audit/outbox evidence plus an
+in-app notification to its submitter. Identical retries reuse the result;
+different retry content or a changed current attendance event is rejected.
+Guardian history distinguishes earlier excuses from the current mark, and
+notification links recheck the guardian relationship and site/program grants.
+Family attendance counts and absence follow-ups use effective correction-chain
+facts, not superseded absent rows.
 
 ### CalendarEvent
 Canonical shared calendar object.

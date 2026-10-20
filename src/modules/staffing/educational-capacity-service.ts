@@ -24,7 +24,8 @@ type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
-import { and,eq,gte,inArray,isNull,lte,or,sql } from "drizzle-orm";
+import { and,eq,gte,inArray,lte,sql } from "drizzle-orm";
+import { currentCapacityReservationFilter, isCurrentCapacityReservation } from "./reservation-policy";
 
 /** Acquired before capacity reservation locks when teacher assignments may change. */
 async function lockSectionStaffingSite(
@@ -39,8 +40,6 @@ async function lockSectionStaffingSite(
     throw new Error("Section capacity is not in the authorized teaching site");
   await lockAttendanceConfigurationAtSite(tx, site.siteId);
 }
-
-const ACTIVE_RESERVATION_STATUSES = ["held", "committed"] as const;
 
 export type CapacityCandidate = {
   offeringId: string;
@@ -415,11 +414,7 @@ export async function findCapacityCandidates(
           instructionalCapacityReservations.offeringId,
           compatible.map((row) => row.offeringId),
         ),
-        inArray(instructionalCapacityReservations.status, [...ACTIVE_RESERVATION_STATUSES]),
-        or(
-          isNull(instructionalCapacityReservations.expiresAt),
-          gte(instructionalCapacityReservations.expiresAt, now),
-        ),
+        currentCapacityReservationFilter(now),
       ),
     );
 
@@ -547,11 +542,13 @@ export async function reserveInstructionalCapacity(
       .where(eq(instructionalCapacityReservations.offeringId, offering.id));
 
     const now = new Date();
+    if (input.expiresAt && (!Number.isFinite(input.expiresAt.getTime()) || input.expiresAt <= now)) {
+      throw new Error("Capacity reservation expiry must be in the future");
+    }
     const usedByOthers = existingRows
       .filter((row) =>
         row.demandId !== input.demandId &&
-        ACTIVE_RESERVATION_STATUSES.includes(row.status as (typeof ACTIVE_RESERVATION_STATUSES)[number]) &&
-        (!row.expiresAt || row.expiresAt >= now),
+        isCurrentCapacityReservation(row, now),
       )
       .reduce((sum, row) => sum + row.seats, 0);
 
@@ -567,8 +564,7 @@ export async function reserveInstructionalCapacity(
     }).from(instructionalCapacityReservations)
       .where(eq(instructionalCapacityReservations.demandId,demand.demandId));
     const usedDemandSeats = demandRows.filter(r=>r.offeringId!==offering.id &&
-      ACTIVE_RESERVATION_STATUSES.includes(r.status as (typeof ACTIVE_RESERVATION_STATUSES)[number]) &&
-      (!r.expiresAt||r.expiresAt>now)).reduce((sum,r)=>sum+r.seats,0);
+      isCurrentCapacityReservation(r, now)).reduce((sum,r)=>sum+r.seats,0);
     if(usedDemandSeats+seats>demand.expectedSeats)
       throw new Error("Reservations exceed the section's instructional demand");
     const [reservation] = await tx
@@ -700,8 +696,7 @@ export async function releaseInstructionalCapacity(
         .where(and(eq(instructionalCapacityReservations.sectionId,reservation.sectionId),
           eq(instructionalCapacityOfferings.personId,reservation.personId),
           eq(instructionalCapacityReservations.status,"committed"),
-          or(isNull(instructionalCapacityReservations.expiresAt),
-            gte(instructionalCapacityReservations.expiresAt,new Date())))).limit(1);
+          currentCapacityReservationFilter(new Date()))).limit(1);
       if(!other.length){
         await tx.delete(sectionTeachers).where(and(eq(sectionTeachers.sectionId,reservation.sectionId),
           eq(sectionTeachers.personId,reservation.personId),
@@ -781,8 +776,7 @@ export async function getInstructorCapacity(
     .where(
       and(
         inArray(instructionalCapacityReservations.offeringId, offerings.map((o) => o.offeringId)),
-        inArray(instructionalCapacityReservations.status, [...ACTIVE_RESERVATION_STATUSES]),
-        or(isNull(instructionalCapacityReservations.expiresAt), gte(instructionalCapacityReservations.expiresAt, now)),
+        currentCapacityReservationFilter(now),
       ),
     );
 
@@ -875,9 +869,9 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
       expiresAt:instructionalCapacityReservations.expiresAt,demandId:instructionalCapacityReservations.demandId})
       .from(instructionalCapacityReservations)
       .where(eq(instructionalCapacityReservations.offeringId,replacement.id));
+    const now = new Date();
     const used=taken.filter(row=>row.demandId!==demand.demandId &&
-      ACTIVE_RESERVATION_STATUSES.includes(row.status as (typeof ACTIVE_RESERVATION_STATUSES)[number]) &&
-      (!row.expiresAt||row.expiresAt>new Date())).reduce((sum,row)=>sum+row.seats,0);
+      isCurrentCapacityReservation(row, now)).reduce((sum,row)=>sum+row.seats,0);
     if(used+old.seats>replacement.maxSeats)throw new Error("Replacement has insufficient seats");
     const [existing]=await tx.select({id:instructionalCapacityReservations.id})
       .from(instructionalCapacityReservations)
@@ -899,7 +893,8 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
       .innerJoin(instructionalCapacityOfferings,eq(instructionalCapacityOfferings.id,instructionalCapacityReservations.offeringId))
       .where(and(eq(instructionalCapacityReservations.sectionId,demand.sectionId),
         eq(instructionalCapacityOfferings.personId,old.oldPersonId),
-        eq(instructionalCapacityReservations.status,"committed"))).limit(1);
+        eq(instructionalCapacityReservations.status,"committed"),
+        currentCapacityReservationFilter(now))).limit(1);
     if(!remaining.length)await tx.delete(sectionTeachers).where(and(eq(sectionTeachers.sectionId,demand.sectionId),
       eq(sectionTeachers.personId,old.oldPersonId),eq(sectionTeachers.assignmentSource,"capacity")));
     await notify(tx, {

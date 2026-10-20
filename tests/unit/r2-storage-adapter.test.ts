@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
-import { signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
+import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
 
 const key = "learning/assignment/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222";
 const keyPattern = /^learning\/assignment\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/;
@@ -37,6 +37,14 @@ function verify() {
 }
 
 describe("shared private object storage", () => {
+  it("binds create-only upload headers into the signature without changing existing clients", () => {
+    const regular = new URL(createPrivateUploadUrl({ key, keyPattern, contentType:"application/pdf" }));
+    const immutable = new URL(createPrivateUploadUrl({ key, keyPattern, contentType:"application/pdf",preventOverwrite:true }));
+    expect(regular.searchParams.get("X-Amz-SignedHeaders")).toBe("content-type;host");
+    expect(immutable.searchParams.get("X-Amz-SignedHeaders")).toBe("content-type;host;if-none-match");
+    expect(immutable.searchParams.get("X-Amz-Signature")).not.toBe(regular.searchParams.get("X-Amz-Signature"));
+    expect(()=>signPrivateObjectUrl({method:"GET",key,keyPattern,preventOverwrite:true})).toThrow("only valid for uploads");
+  });
   it("enforces each domain key scope and integer URL expiry", () => {
     expect(new URL(signPrivateObjectUrl({ method: "GET", key, keyPattern })).pathname).toContain(key);
     for (const expiresSeconds of [0, 901, NaN, Infinity, 1.5]) {

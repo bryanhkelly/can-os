@@ -7,6 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
+import { listOpeningOperators } from "./opening-handoff.server";
 
 const programTypes = [
   "church_hosted_academy",
@@ -147,6 +148,8 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
         and(
           inArray(s.programs.organizationId, organizationIds),
           inArray(s.programs.status, ["draft", "launching", "ready"]),
+          inArray(s.programs.id,context.scope.programIds??[]),
+          ...(context.scope.siteIds?.length?[inArray(s.programs.siteId,context.scope.siteIds)]:[]),
         ),
       )
       .orderBy(asc(s.programs.createdAt));
@@ -180,6 +183,7 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
           createdAt: program.createdAt.toISOString(),
           journey: journey ?? null,
           requirements,
+          openingOperators:await listOpeningOperators(program),
         };
       }),
     );
@@ -207,10 +211,10 @@ export const completeLaunchRequirement = createServerFn({ method: "POST" })
 
 /** Activate a launched program; program-launch-service enforces the Launch Journey ready invariant. */
 export const activateLaunch = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({ programId: uuid }).parse(data))
+  .validator((data: unknown) => z.object({ programId: uuid,recipientPersonId:uuid.optional() }).strict().parse(data))
   .handler(async ({ data }) => {
     const context = await registrarContext("program.activate");
-    await activateProgram(context, data.programId);
+    await activateProgram(context, data.programId,data.recipientPersonId?{recipientPersonId:data.recipientPersonId}:undefined);
     return { programId: data.programId, status: "active" as const };
   });
 

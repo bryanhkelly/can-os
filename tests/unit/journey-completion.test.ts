@@ -39,6 +39,8 @@ const current = {
   organizationId: "organization",
   siteId: "site",
   programId: "program",
+  metadata: {},
+  evidence: [],
 };
 
 beforeEach(() => {
@@ -54,6 +56,11 @@ beforeEach(() => {
 });
 
 describe("Journey completion transactions", () => {
+  it("cannot waive a configured enrollment signature through generic completion", async () => {
+    select.mockReturnValueOnce(query([{ ...current, metadata: { enrollmentForm: {} } }]));
+    await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("registrar review workflow");
+    expect(update).not.toHaveBeenCalled();
+  });
   it("locks the Journey and writes events and audit for both transitions", async () => {
     const locked = query([current]);
     select.mockReturnValueOnce(locked).mockReturnValueOnce(query([]));

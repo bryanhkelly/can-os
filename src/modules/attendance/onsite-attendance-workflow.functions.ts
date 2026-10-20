@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -12,7 +12,7 @@ import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { loadExpectedAttendanceCoverage } from "./expected-attendance-queries";
-import { recordAttendanceRevision, submitAttendanceExcuse, reviewAttendanceExcuse } from "./attendance-service";
+import { closeObsoleteAttendanceExcuse, recordAttendanceRevision, submitAttendanceExcuse, reviewAttendanceExcuse } from "./attendance-service";
 
 const uuid = z.string().uuid();
 const dateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
@@ -22,6 +22,7 @@ const dateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
 const occurrence = (date: string) => date + ":site-day";
 
 async function staff(capability: string) {
+  setResponseHeader("Cache-Control", "private, no-store");
   const actor = await getCommandContext(getRequest());
   assertCapability(actor, capability);
   if (!actor.actorPersonId || !["registrar", "teacher"].includes(actor.role) ||
@@ -31,6 +32,7 @@ async function staff(capability: string) {
   return actor;
 }
 async function guardian() {
+  setResponseHeader("Cache-Control", "private, no-store");
   const actor = await getCommandContext(getRequest());
   assertCapability(actor, "attendance.excuse.submit");
   if (actor.role !== "guardian" || !actor.actorPersonId ||
@@ -326,10 +328,17 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
           const eventId = excuse?.attendanceEventId ?? f.id;
           return {
             attendanceEventId: eventId,
+            relatedAttendanceEventIds: history.map(row => row.id),
             studentPersonId: profileToPerson.get(f.studentProfileId) ?? "",
             studentName: nameByPerson.get(profileToPerson.get(f.studentProfileId) ?? "") ?? "Student",
             expectedAt: f.expectedAt.toISOString(),
             status: f.status, originalStatus: earliest.status,
+            historicalExcuses: excuses.filter(row => history.some(event => event.id === row.attendanceEventId) &&
+              row.id !== excuse?.id).map(row => ({
+                excuseId: row.id, attendanceEventId: row.attendanceEventId, status: row.status,
+                reason: row.reason, reviewNote: row.reviewNote,
+                reviewedAt: row.reviewedAt?.toISOString() ?? null,
+              })),
             excuse: excuse ? {
               excuseId: excuse.id, status: excuse.status, reason: excuse.reason,
               reviewNote: excuse.reviewNote,
@@ -438,13 +447,26 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
       const current = effective.get([r.studentProfileId, r.programId, r.occurrenceKey].join(":"));
       return {
         excuseId: r.excuseId, attendanceEventId: r.attendanceEventId,
+        currentAttendanceEventId: current?.id ?? null,
         studentName: r.preferredName ?? r.legalFirstName + " " + r.legalLastName,
         expectedAt: r.expectedAt.toISOString(), eventStatus: current?.status ?? r.eventStatus,
         reason: r.reason, submittedAt: r.submittedAt.toISOString(),
         canReview: current?.id === r.attendanceEventId &&
           (current?.status === "absent" || current?.status === "tardy"),
+        canClose: actor.role === "registrar" && !!current && current.id !== r.attendanceEventId,
       };
     }) };
+  });
+
+export const closeStaleAttendanceExcuse = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    excuseId: uuid, expectedCurrentEventId: uuid,
+    reason: z.string().trim().min(10).max(2000), confirmed: z.literal(true),
+  }).strict().parse(value))
+  .handler(async ({ data }) => {
+    const actor = await staff("attendance.excuse.review");
+    if (actor.role !== "registrar") throw new AuthorizationError("registrar obsolete excuse closure");
+    return closeObsoleteAttendanceExcuse(actor, data);
   });
 
 export const reviewCurrentAttendanceExcuse = createServerFn({ method: "POST" })

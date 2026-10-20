@@ -3,7 +3,8 @@ import {createServerFn} from "@tanstack/react-start";
 import {and,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {applications,admissionOffers,admissionSeatPools,guardianRelationships,studentProfiles,schoolYears} from "@/db/schema";
-import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment} from "./admissions-offer-service";
+import {issueSyntheticAdmissionOffer,respondToSyntheticAdmissionOffer,activateSyntheticOfferedEnrollment,withdrawAdmissionOffer} from "./admissions-offer-service";
+import {z} from "zod";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
@@ -46,7 +47,7 @@ async function loadOffer(id:string){
  return {offer,app};
 }
 export const issueAdmissionOffer=createServerFn({method:"POST"})
-.validator((data:{applicationId:string;schoolYearId:string})=>data).handler(async({data})=>{
+.validator((data:unknown)=>z.object({applicationId:z.string().uuid(),schoolYearId:z.string().uuid()}).strict().parse(data)).handler(async({data})=>{
  const app=await loadApplication(data.applicationId);
  const actor=await authorizedActor("registrar","enrollment.decide",app.programId);
  assertRecordWriteAllowed(app.metadata,"registrar");
@@ -59,7 +60,7 @@ export const issueAdmissionOffer=createServerFn({method:"POST"})
  return {offerId:await issueSyntheticAdmissionOffer(actor,{applicationId:app.id,schoolYearId:data.schoolYearId,idempotencyKey:key,expiresAt})};
 });
 export const respondToAdmissionOffer=createServerFn({method:"POST"})
-.validator((data:{offerId:string;decision:"accept"|"decline"})=>data).handler(async({data})=>{
+.validator((data:unknown)=>z.object({offerId:z.string().uuid(),decision:z.enum(["accept","decline"])}).strict().parse(data)).handler(async({data})=>{
  if(!["accept","decline"].includes(data.decision))throw new Error("Invalid decision");
  const {offer,app}=await loadOffer(data.offerId);
  const actor=await authorizedActor("guardian","enrollment.apply",app.programId);
@@ -71,9 +72,18 @@ export const respondToAdmissionOffer=createServerFn({method:"POST"})
  return {offerId:await respondToSyntheticAdmissionOffer(actor,offer.id,data.decision)};
 });
 export const activateOfferedEnrollment=createServerFn({method:"POST"})
-.validator((data:{offerId:string})=>data).handler(async({data})=>{
+.validator((data:unknown)=>z.object({offerId:z.string().uuid()}).strict().parse(data)).handler(async({data})=>{
  const {offer,app}=await loadOffer(data.offerId);
  const actor=await authorizedActor("registrar","enrollment.activate",app.programId);
  assertRecordWriteAllowed(app.metadata,"registrar");
  return {enrollmentId:await activateSyntheticOfferedEnrollment(actor,offer.id)};
 });
+
+export const withdrawIssuedAdmissionOffer=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({offerId:z.string().uuid(),
+  reason:z.string().trim().min(10).max(2000),confirmed:z.literal(true)}).strict().parse(value))
+ .handler(async({data})=>{
+  const {app}=await loadOffer(data.offerId);
+  const actor=await authorizedActor("registrar","enrollment.decide",app.programId);
+  return withdrawAdmissionOffer(actor,data);
+ });

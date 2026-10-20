@@ -1,8 +1,13 @@
 import { enrollmentReadiness } from "@/domain/enrollment-readiness";
 import { assertProgramGranted,recordAudit,requireActor } from "@/modules/identity/actors.server";
 import { operationsSelectionSchema,resolveOperationsSelection } from "@/modules/operations/operations-scope.server";
-import { notifyMany } from "@/platform/mutation";
+import { emitEvent,notifyMany } from "@/platform/mutation";
+import { EventTypes } from "@/domain/event-types";
+import { authorizeEnrollmentApplication } from "./enrollment-access.server";
+import { enrollmentFormState } from "@/domain/enrollment-form";
+import { enrollmentFormRevision } from "./enrollment-form.server";
 import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
 const registrar=()=>requireActor(["registrar"],"enrollment.decide");
@@ -11,6 +16,7 @@ export const getFamilyReadiness=createServerFn({method:"GET"})
  .validator((value:unknown)=>operationsSelectionSchema.parse(value??{}))
  .handler(async({data})=>{
  const actor=await registrar();
+ setResponseHeader("Cache-Control","private, no-store");
  const scoped=await resolveOperationsSelection(actor,data);
  if(!scoped.programIds.length)return [];
  if(!process.env.DATABASE_URL)return [];
@@ -21,14 +27,18 @@ export const getFamilyReadiness=createServerFn({method:"GET"})
  const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId,status:s.journeys.status}).from(s.journeys).where(and(eq(s.journeys.participantType,"application"),inArray(s.journeys.participantId,synthetic.map(x=>x.id))));
  const enrollmentRows=await db.select({studentProfileId:s.enrollments.studentProfileId,programId:s.enrollments.programId,schoolYearId:s.enrollments.schoolYearId,status:s.enrollments.status,kind:s.enrollments.kind}).from(s.enrollments).where(inArray(s.enrollments.studentProfileId,[...new Set(synthetic.map(a=>a.studentProfileId))]));
  const offers=await db.select({applicationId:s.admissionOffers.applicationId,status:s.admissionOffers.status,schoolYearId:s.admissionOffers.schoolYearId,respondedAt:s.admissionOffers.respondedAt,expiresAt:s.admissionOffers.expiresAt}).from(s.admissionOffers).where(inArray(s.admissionOffers.applicationId,synthetic.map(x=>x.id)));
- const requirements=journeys.length?await db.select({id:s.journeyRequirements.id,journeyId:s.journeyRequirements.journeyId,title:s.journeyRequirements.title,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking,evidence:s.journeyRequirements.evidence}).from(s.journeyRequirements).where(inArray(s.journeyRequirements.journeyId,journeys.map(x=>x.id))):[];
+ const requirements=journeys.length?await db.select({id:s.journeyRequirements.id,journeyId:s.journeyRequirements.journeyId,title:s.journeyRequirements.title,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking,evidence:s.journeyRequirements.evidence,metadata:s.journeyRequirements.metadata}).from(s.journeyRequirements).where(inArray(s.journeyRequirements.journeyId,journeys.map(x=>x.id))):[];
+ const withForms=requirements.map(requirement=>{
+  const state=enrollmentFormState(requirement.metadata,requirement.evidence);
+  return {...requirement,form:state?{...state,revision:enrollmentFormRevision(state.form)}:null};
+ });
  const requirementIds=requirements.map(r=>r.id);
  const uploadedDocuments=requirementIds.length?await db.select({id:s.documents.id,subjectId:s.documents.subjectId,fileName:s.documents.fileName,createdAt:s.documents.createdAt,metadata:s.documents.metadata})
   .from(s.documents).where(and(eq(s.documents.subjectType,"journey_requirement"),eq(s.documents.storageProvider,"cloudflare_r2"),inArray(s.documents.subjectId,requirementIds))):[];
- return synthetic.map(app=>{const isFixture=app.metadata.synthetic===true;const journeyIds=new Set(journeys.filter(j=>j.participantId===app.id).map(j=>j.id));return {id:app.id,isFixture,householdId:app.householdId,program:app.program,stage:app.stage,journeyStatus:journeys.find(j=>j.participantId===app.id)?.status??null,activeSchoolYears:enrollmentRows.filter(e=>e.studentProfileId===app.studentProfileId&&e.programId===app.programId&&e.kind==="program"&&e.status==="active").map(e=>e.schoolYearId),offers:offers.filter(o=>o.applicationId===app.id).map(o=>({...o,respondedAt:o.respondedAt?.toISOString()??null,expiresAt:o.expiresAt?.toISOString()??null})),requirements:requirements.filter(r=>journeyIds.has(r.journeyId)).map(r=>({...r,documents:uploadedDocuments.filter(d=>d.subjectId===r.id&&d.metadata.applicationId===app.id).map(d=>({id:d.id,fileName:d.fileName,uploadedAt:d.createdAt.toISOString(),reviewStatus:typeof d.metadata.reviewStatus==="string"?d.metadata.reviewStatus:"received",version:typeof d.metadata.version==="number"?d.metadata.version:1,isCurrent:d.metadata.isCurrent!==false})),evidence:r.evidence.filter(e=>(e.kind==="registrar_note"&&typeof e.text==="string")||(e.kind==="document_review"&&typeof e.status==="string")).map(e=>({kind:String(e.kind),text:typeof e.text==="string"?e.text:"",status:typeof e.status==="string"?e.status:"",reviewedAt:typeof e.reviewedAt==="string"?e.reviewedAt:"",documentId:typeof e.documentId==="string"?e.documentId:""}))})),readiness:enrollmentReadiness(requirements.filter(r=>journeyIds.has(r.journeyId)))};});
+ return synthetic.map(app=>{const isFixture=app.metadata.synthetic===true;const journeyIds=new Set(journeys.filter(j=>j.participantId===app.id).map(j=>j.id));return {id:app.id,isFixture,householdId:app.householdId,program:app.program,stage:app.stage,journeyStatus:journeys.find(j=>j.participantId===app.id)?.status??null,activeSchoolYears:enrollmentRows.filter(e=>e.studentProfileId===app.studentProfileId&&e.programId===app.programId&&e.kind==="program"&&e.status==="active").map(e=>e.schoolYearId),offers:offers.filter(o=>o.applicationId===app.id).map(o=>({...o,respondedAt:o.respondedAt?.toISOString()??null,expiresAt:o.expiresAt?.toISOString()??null})),requirements:withForms.filter(r=>journeyIds.has(r.journeyId)).map(({metadata,...r})=>({...r,documents:uploadedDocuments.filter(d=>d.subjectId===r.id&&d.metadata.applicationId===app.id).map(d=>({id:d.id,fileName:d.fileName,uploadedAt:d.createdAt.toISOString(),reviewStatus:typeof d.metadata.reviewStatus==="string"?d.metadata.reviewStatus:"received",version:typeof d.metadata.version==="number"?d.metadata.version:1,isCurrent:d.metadata.isCurrent!==false})),evidence:r.evidence.filter(e=>(e.kind==="registrar_note"&&typeof e.text==="string")||(e.kind==="document_review"&&typeof e.status==="string")).map(e=>({kind:String(e.kind),text:typeof e.text==="string"?e.text:"",status:typeof e.status==="string"?e.status:"",reviewedAt:typeof e.reviewedAt==="string"?e.reviewedAt:"",documentId:typeof e.documentId==="string"?e.documentId:""}))})),readiness:enrollmentReadiness(requirements.filter(r=>journeyIds.has(r.journeyId)))};});
 });
 
-/** Development-only family checklist. Changes persist in canonical JourneyRequirements. */
+/** Registrar readiness review over canonical JourneyRequirements. */
 export const setFamilyRequirement=createServerFn({method:"POST"})
  .validator((data:unknown)=>requirementInput.extend({complete:z.boolean()}).parse(data))
  .handler(async({data})=>{
@@ -42,16 +52,26 @@ export const setFamilyRequirement=createServerFn({method:"POST"})
    const [journey]=await tx.select({id:s.journeys.id,status:s.journeys.status})
     .from(s.journeys).where(and(eq(s.journeys.participantType,"application"),eq(s.journeys.participantId,app.id))).for("update").limit(1);
    if(!journey||journey.status==="active"||journey.status==="complete"||journey.status==="cancelled")throw new Error("Journey cannot be edited");
-   const [requirement]=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status})
+   const [requirement]=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status,evidence:s.journeyRequirements.evidence,metadata:s.journeyRequirements.metadata})
     .from(s.journeyRequirements).where(and(eq(s.journeyRequirements.id,data.requirementId),eq(s.journeyRequirements.journeyId,journey.id))).limit(1);
    if(!requirement)throw new Error("Requirement does not belong to this application");
+   if(requirement.metadata.enrollmentForm!==undefined)
+    throw new Error("Signed form requirements must be completed through registrar form review, without a checklist waiver");
+   const documentReview=[...requirement.evidence].reverse().find(entry=>entry.kind==="document_review");
+   if(data.complete&&documentReview&&documentReview.status!=="accepted")
+    throw new Error("Review and accept the current enrollment document before completing this requirement");
    const next=data.complete?"complete":"needs_you";
    if(requirement.status===next)return {saved:true};
    await tx.update(s.journeyRequirements).set({status:next,completedAt:data.complete?new Date():null,updatedAt:new Date()}).where(eq(s.journeyRequirements.id,requirement.id));
    const all=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking}).from(s.journeyRequirements).where(eq(s.journeyRequirements.journeyId,journey.id));
    const everyBlockingComplete=all.every(r=>!r.blocking||(r.id===requirement.id?next:r.status)==="complete");
-   await tx.update(s.journeys).set({status:everyBlockingComplete?"ready":"in_progress",updatedAt:new Date()}).where(eq(s.journeys.id,journey.id));
-   await recordAudit(tx,actor,{action:"enrollment.requirement.set",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:requirement.status},after:{status:next},scope:{applicationId:app.id,programId:app.programId}});
+   const journeyStatus=everyBlockingComplete?"ready":"in_progress";
+   await tx.update(s.journeys).set({status:journeyStatus,updatedAt:new Date()}).where(eq(s.journeys.id,journey.id));
+   await recordAudit(tx,actor,{action:"enrollment.requirement.set",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:requirement.status,journeyStatus:journey.status},after:{status:next,journeyStatus},scope:{applicationId:app.id,programId:app.programId,journeyId:journey.id}});
+   await emitEvent(tx,{eventType:EventTypes.JourneyRequirementStatusChanged,aggregateType:"journey_requirement",
+    aggregateId:requirement.id,actorPersonId:actor.actorPersonId,programId:app.programId,
+    payload:{applicationId:app.id,journeyId:journey.id,before:{status:requirement.status,journeyStatus:journey.status},
+     after:{status:next,journeyStatus}}});
    return {saved:true};
   });
  });
@@ -81,7 +101,7 @@ export const addRequirementReviewNote=createServerFn({method:"POST"})
   });
  });
 
-/** Review state for synthetic document requirements. Does not upload or validate real files. */
+/** Registrar review of a requested or storage-verified enrollment document. */
 export const reviewRequirementDocument=createServerFn({method:"POST"})
  .validator((data:unknown)=>requirementInput.extend({status:z.enum(["requested","received","accepted","rejected"]),reason:z.string().trim().max(400,"Rejection requires a 5–400 character reason"),documentId:z.string().uuid().optional()}).refine(v=>v.status!=="rejected"||v.reason.length>=5,"Rejection requires a 5–400 character reason").parse(data))
  .handler(async({data})=>{
@@ -89,13 +109,16 @@ export const reviewRequirementDocument=createServerFn({method:"POST"})
   const reason=data.reason;
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
+   const scope=await authorizeEnrollmentApplication(actor,data.applicationId,tx);
+   if(["withdrawn","declined"].includes(scope.stage))throw new Error("This application is closed to enrollment document changes");
    const [app]=await tx.select({id:s.applications.id,metadata:s.applications.metadata,programId:s.applications.programId}).from(s.applications).where(eq(s.applications.id,data.applicationId)).limit(1);
    if(!app)throw new Error("Application not found");
    assertProgramGranted(actor,app.programId);
    const [journey]=await tx.select({id:s.journeys.id,status:s.journeys.status}).from(s.journeys).where(and(eq(s.journeys.participantType,"application"),eq(s.journeys.participantId,app.id))).for("update").limit(1);
    if(!journey||["active","complete","cancelled"].includes(journey.status))throw new Error("Journey cannot be edited");
-   const [requirement]=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status,evidence:s.journeyRequirements.evidence}).from(s.journeyRequirements).where(and(eq(s.journeyRequirements.id,data.requirementId),eq(s.journeyRequirements.journeyId,journey.id))).for("update").limit(1);
+   const [requirement]=await tx.select({id:s.journeyRequirements.id,status:s.journeyRequirements.status,evidence:s.journeyRequirements.evidence,metadata:s.journeyRequirements.metadata}).from(s.journeyRequirements).where(and(eq(s.journeyRequirements.id,data.requirementId),eq(s.journeyRequirements.journeyId,journey.id))).for("update").limit(1);
    if(!requirement)throw new Error("Requirement does not belong to this application");
+   if(requirement.metadata.enrollmentForm!==undefined)throw new Error("A signed form requires registrar form review, not document approval");
    const documentId=data.documentId??null;
    if(data.status==="accepted"&&!documentId)throw new Error("Select an uploaded document before accepting");
    let reviewedDocument:null|{id:string;metadata:Record<string,unknown>}=null;
@@ -134,6 +157,10 @@ export const reviewRequirementDocument=createServerFn({method:"POST"})
     })));
    }
    await recordAudit(tx,actor,{action:"enrollment.document.review",resourceType:"journey_requirement",resourceId:requirement.id,before:{status:previous?.status??null},after:{status:data.status,reason,documentId},scope:{applicationId:app.id,programId:app.programId}});
+   await emitEvent(tx,{eventType:EventTypes.EnrollmentDocumentReviewed,aggregateType:"journey_requirement",
+    aggregateId:requirement.id,actorPersonId:actor.actorPersonId,organizationId:scope.organizationId,
+    siteId:scope.siteId,programId:scope.programId,
+    payload:{applicationId:app.id,documentId,status:data.status,journeyStatus:ready?"ready":"in_progress"}});
    return {saved:true};
   });
  });

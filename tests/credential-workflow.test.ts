@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { decideCredentialReview } from "../src/domain/credential-workflow";
+import { credentialStatusFromDecision, decideCredentialReview } from "../src/domain/credential-workflow";
 const date=new Date("2026-10-15T12:00:00Z");
 const record={status:"pending" as const,subjectPersonId:"teacher",evidenceDocumentId:"file-1",expiry:new Date("2027-03-01")};
 describe("credential verification lifecycle",()=>{
+ it.each([
+  [undefined,"unverified"],[null,"unverified"],["submit","pending"],
+  ["approve","verified"],["reject","rejected"],["revoke","revoked"],
+ ])("derives status from the persisted decision %s",(decision,status)=>{
+  expect(credentialStatusFromDecision(decision)).toBe(status);
+ });
+ it.each(["approved","verified","unknown",""])("rejects unsupported persisted decision %s",decision=>{
+  expect(()=>credentialStatusFromDecision(decision)).toThrow("Unsupported credential verification decision");
+ });
  it("requires independent reviewer and evidence",()=>{
   expect(()=>decideCredentialReview(record,"approve","teacher",date)).toThrow();
   expect(()=>decideCredentialReview({...record,evidenceDocumentId:null},"approve","reviewer",date)).toThrow();

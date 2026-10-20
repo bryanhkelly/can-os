@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import {
 actions,
+deliveryArrangements,
 enrollments,
 instructionalCapacityOfferings,
 instructionalCapacityReservations,
@@ -15,6 +16,8 @@ import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configura
 import { assertCapability,assertProgramScope,assertSectionScope,assertSiteScope,AuthorizationError,type CommandContext } from "@/domain/command-context";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray,sql } from "drizzle-orm";
+import { currentCapacityReservationFilter } from "@/modules/staffing/reservation-policy";
+import { assignLaunchInstructor } from "@/modules/staffing/launch-staffing.server";
 
 type LifecycleContext = CommandContext & { actorPersonId: string };
 async function authorizedSection(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], context: LifecycleContext, sectionId: string) {
@@ -160,10 +163,17 @@ export async function replaceSectionTeacher(context: LifecycleContext, input:{se
         eq(instructionalCapacityOfferings.personId,input.oldPersonId),
         inArray(instructionalCapacityReservations.status,["held","committed"])));
     if(capacity.length)throw new Error("Outgoing instructor has reserved instructional capacity. Release it and commit replacement capacity before changing the teaching roster.");
-    await tx.insert(sectionTeachers).values({sectionId:section.id,personId:input.newPersonId,role:old.role,assignmentSource:"manual"})
-      .onConflictDoNothing();
+    if(section.siteId){
+      await assignLaunchInstructor(tx,context,{programId:section.programId,sectionId:section.id,teacherPersonId:input.newPersonId});
+      await tx.update(deliveryArrangements).set({status:"completed",updatedAt:new Date()}).where(and(
+        eq(deliveryArrangements.sectionId,section.id),eq(deliveryArrangements.instructorPersonId,input.oldPersonId),
+        eq(deliveryArrangements.status,"active")));
+    }else{
+      await tx.insert(sectionTeachers).values({sectionId:section.id,personId:input.newPersonId,role:old.role,assignmentSource:"manual"})
+        .onConflictDoNothing();
+    }
     await tx.delete(sectionTeachers).where(eq(sectionTeachers.id,old.id));
-    await notify(tx, {
+    if(!section.siteId)await notify(tx, {
       recipientPersonId:input.newPersonId,type:"teaching_assignment",title:"New teaching assignment",
       body:"You have been assigned to "+section.title,resourceType:"section",resourceId:section.id,
     });
@@ -244,7 +254,7 @@ async function assertOpenEnrollmentSeat(tx: Parameters<Parameters<typeof db.tran
     .from(instructionalCapacityReservations)
     .where(and(eq(instructionalCapacityReservations.sectionId,sectionId),
       eq(instructionalCapacityReservations.status,"committed"),
-      sql`(expires_at is null or expires_at > now())`));
+      currentCapacityReservationFilter(new Date())));
   const [roster] = await tx.select({ count: sql<number>`count(*)::int` }).from(enrollments)
     .where(and(eq(enrollments.sectionId,sectionId),eq(enrollments.status,"active")));
   const ceiling = Math.min(demand.seats,Number(committed?.seats??0));

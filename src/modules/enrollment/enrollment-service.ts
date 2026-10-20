@@ -7,6 +7,7 @@ guardianRelationships,
 householdMemberships,
 households,
 journeys,
+journeyRequirements,
 people,
 programs,
 schoolYears,
@@ -21,6 +22,9 @@ AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { assertEnrollmentFormApproved, enrollmentJourneyDefinitionKey } from "@/domain/enrollment-form";
+import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
+import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { and,eq } from "drizzle-orm";
@@ -105,7 +109,7 @@ export async function startFamilyApplication(
     }
 
     const [program] = await tx
-      .select({ id: programs.id, organizationId: programs.organizationId })
+      .select({ id: programs.id, organizationId: programs.organizationId, metadata: programs.metadata })
       .from(programs)
       .where(eq(programs.id, input.programId))
       .limit(1);
@@ -200,7 +204,7 @@ export async function startFamilyApplication(
 
     if (!application) throw new Error("Failed to create Application");
 
-    const definitionKey = input.journeyDefinitionKey ?? "family-enrollment";
+    const definitionKey = enrollmentJourneyDefinitionKey(program.metadata, input.journeyDefinitionKey);
 
     const { journeyId } = await instantiateJourneyFromDefinition(tx, {
       definitionKey,
@@ -258,6 +262,7 @@ export async function acceptApplication(
   assertCapability(context, "enrollment.decide");
 
   await db.transaction(async (tx) => {
+    await lockAdmissionsApplication(tx, applicationId);
     const [current] = await tx
       .select()
       .from(applications)
@@ -267,6 +272,7 @@ export async function acceptApplication(
 
     if (!current) throw new Error("Application not found");
     requireEnrollmentProgramScope(context, current.programId);
+    assertApplicationOffersAllowed(current);
     if (current.stage === "accepted") return;
     assertApplicationAcceptance(current.stage);
 
@@ -319,6 +325,7 @@ export async function activateEnrollmentFromApplication(
   assertCapability(context, "enrollment.activate");
 
   return db.transaction(async (tx) => {
+    await lockAdmissionsApplication(tx, applicationId);
     const [application] = await tx
       .select()
       .from(applications)
@@ -328,6 +335,7 @@ export async function activateEnrollmentFromApplication(
 
     if (!application) throw new Error("Application not found");
     requireEnrollmentProgramScope(context, application.programId);
+    assertApplicationOffersAllowed(application);
     if (application.stage !== "accepted") {
       throw new Error("Application must be accepted before activation");
     }
@@ -383,6 +391,7 @@ export async function activateEnrollmentFromApplication(
           eq(journeys.participantId, applicationId),
         ),
       )
+      .for("update")
       .limit(1);
 
     const [existing] = await tx
@@ -404,6 +413,13 @@ export async function activateEnrollmentFromApplication(
     if (!journey || journey.status !== "ready") {
       throw new Error("Enrollment Journey must be ready before activation");
     }
+    const blockingRequirements = await tx.select({
+      status: journeyRequirements.status, metadata: journeyRequirements.metadata, evidence: journeyRequirements.evidence,
+    }).from(journeyRequirements).where(and(eq(journeyRequirements.journeyId, journey.id), eq(journeyRequirements.blocking, true)));
+    if (blockingRequirements.some(requirement => requirement.status !== "complete"))
+      throw new Error("Blocking enrollment requirements remain.");
+    for (const requirement of blockingRequirements)
+      assertEnrollmentFormApproved(requirement.metadata, requirement.evidence);
 
     const [enrollment] = await tx
       .insert(enrollments)

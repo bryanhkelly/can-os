@@ -1,5 +1,5 @@
-import { and, desc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
+import { and, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { db, type Database } from "@/db/client";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {
   deliveryArrangements,
@@ -20,6 +20,7 @@ import {
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { isCurrentCapacityReservation } from "./reservation-policy";
 
 export async function createDeliveryArrangement(
   context: CommandContext,
@@ -59,6 +60,7 @@ export async function createDeliveryArrangement(
           id: instructionalCapacityReservations.id,
           sectionId: instructionalCapacityReservations.sectionId,
           status: instructionalCapacityReservations.status,
+          expiresAt: instructionalCapacityReservations.expiresAt,
           personId: instructionalCapacityOfferings.personId,
         })
         .from(instructionalCapacityReservations)
@@ -67,13 +69,13 @@ export async function createDeliveryArrangement(
           eq(instructionalCapacityOfferings.id, instructionalCapacityReservations.offeringId),
         )
         .where(eq(instructionalCapacityReservations.id, input.capacityReservationId))
-        .limit(1);
+        .limit(1).for("update");
 
       if (!reservation || reservation.sectionId !== input.sectionId) {
         throw new Error("Capacity reservation does not belong to section");
       }
-      if (!["held", "committed"].includes(reservation.status)) {
-        throw new Error("Capacity reservation is not active");
+      if (!isCurrentCapacityReservation(reservation, new Date())) {
+        throw new Error("Capacity reservation is inactive or expired");
       }
       if (instructorPersonId && instructorPersonId !== reservation.personId) {
         throw new Error("Delivery instructor must match reserved instructional capacity");
@@ -156,6 +158,27 @@ export async function activateDeliveryArrangement(
   assertCapability(context, "capacity.reserve");
 
   await db.transaction(async tx => {
+    const [lookup] = await tx
+      .select({ sectionId: deliveryArrangements.sectionId })
+      .from(deliveryArrangements)
+      .where(eq(deliveryArrangements.id, arrangementId))
+      .limit(1);
+    if (!lookup) throw new Error("Delivery arrangement not found");
+
+    const [section] = await tx
+      .select({ programId: sections.programId, siteId: sections.siteId })
+      .from(sections)
+      .where(eq(sections.id, lookup.sectionId))
+      .limit(1);
+    if (!section) throw new Error("Section not found");
+
+    assertSectionScope(context, lookup.sectionId);
+    assertProgramScope(context, section.programId);
+    assertSiteScope(context, section.siteId);
+    if (!section.siteId) throw new Error("Teaching assignment requires a school site");
+    await lockAttendanceConfigurationAtSite(tx, section.siteId);
+
+    // Read transition state only after the site lock, then lock the exact arrangement.
     const [arrangement] = await tx
       .select({
         id: deliveryArrangements.id,
@@ -165,36 +188,29 @@ export async function activateDeliveryArrangement(
         status: deliveryArrangements.status,
       })
       .from(deliveryArrangements)
-      .where(eq(deliveryArrangements.id, arrangementId))
-      .limit(1);
+      .where(and(eq(deliveryArrangements.id, arrangementId), eq(deliveryArrangements.sectionId, lookup.sectionId)))
+      .limit(1).for("update");
     if (!arrangement) throw new Error("Delivery arrangement not found");
-
-    const [section] = await tx
-      .select({ programId: sections.programId, siteId: sections.siteId })
-      .from(sections)
-      .where(eq(sections.id, arrangement.sectionId))
-      .limit(1);
-    if (!section) throw new Error("Section not found");
-
-    assertSectionScope(context, arrangement.sectionId);
-    assertProgramScope(context, section.programId);
-    assertSiteScope(context, section.siteId);
-    if (!section.siteId) throw new Error("Teaching assignment requires a school site");
-    await lockAttendanceConfigurationAtSite(tx, section.siteId);
+    if (arrangement.status === "completed") throw new Error("Completed delivery arrangements cannot be activated");
 
     if (arrangement.capacityReservationId) {
       const [reservation] = await tx
-        .select({ status: instructionalCapacityReservations.status })
+        .select({
+          status: instructionalCapacityReservations.status,
+          expiresAt: instructionalCapacityReservations.expiresAt,
+        })
         .from(instructionalCapacityReservations)
         .where(eq(instructionalCapacityReservations.id, arrangement.capacityReservationId))
-        .limit(1);
-      if (!reservation || !["held", "committed"].includes(reservation.status)) {
-        throw new Error("Delivery capacity is no longer reserved");
+        .limit(1).for("update");
+      if (!reservation || !isCurrentCapacityReservation(reservation, new Date())) {
+        throw new Error("Delivery capacity is no longer reserved or has expired");
       }
+      if (arrangement.status === "active") return;
       await tx.update(instructionalCapacityReservations)
         .set({ status: "committed", updatedAt: new Date() })
         .where(eq(instructionalCapacityReservations.id, arrangement.capacityReservationId));
     }
+    if (arrangement.status === "active") return;
 
     if (arrangement.instructorPersonId) {
       await tx.insert(sectionTeachers).values({
@@ -234,7 +250,12 @@ export async function activateDeliveryArrangement(
   });
 }
 
-export async function getActiveDeliveryArrangement(sectionId: string, executor: any = db) {
+export async function getActiveDeliveryArrangement(
+  sectionId: string,
+  executor: Pick<Database, "select"> = db,
+  at = new Date(),
+) {
+  if (!Number.isFinite(at.getTime())) throw new Error("Delivery evaluation time must be valid");
   const [row] = await executor
     .select({
       id: deliveryArrangements.id,
@@ -252,8 +273,10 @@ export async function getActiveDeliveryArrangement(sectionId: string, executor: 
     .where(and(
       eq(deliveryArrangements.sectionId, sectionId),
       eq(deliveryArrangements.status, "active"),
+      or(isNull(deliveryArrangements.effectiveFrom), lte(deliveryArrangements.effectiveFrom, at)),
+      or(isNull(deliveryArrangements.effectiveThrough), gt(deliveryArrangements.effectiveThrough, at)),
     ))
-    .orderBy(desc(deliveryArrangements.updatedAt))
+    .orderBy(desc(deliveryArrangements.updatedAt), desc(deliveryArrangements.id))
     .limit(1);
   return row ?? null;
 }

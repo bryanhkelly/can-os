@@ -1,14 +1,17 @@
 import { db } from "@/db/client";
-import { admissionOffers,admissionSeatPools,applications,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles } from "@/db/schema";
+import { admissionOffers,admissionSeatPools,applications,auditEvents,enrollments,guardianRelationships,journeyRequirements,journeys,programs,schoolYears,studentProfiles } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { transitionAdmissionsOffer,type OfferStatus } from "@/domain/admissions-offer-lifecycle";
 import { calculateSeatOccupancy } from "@/domain/admissions-seat-occupancy";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import { assertCapability,assertProgramScope,AuthorizationError,type CommandContext } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { assertEnrollmentFormApproved } from "@/domain/enrollment-form";
 import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
 import { emitEvent,notify,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray } from "drizzle-orm";
+import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
+import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
 
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
 const guarded=(context:AccessContext,role:"registrar"|"guardian")=>{
@@ -41,14 +44,15 @@ async function assertGuardian(tx:Transaction,actorId:string|null,studentProfileI
  if(!actorId)throw new Error("Guardian identity required");
  const [profile]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,studentProfileId)).limit(1);
  if(!profile)throw new Error("Student not found");
- const [relationship]=await tx.select({id:guardianRelationships.id}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.guardianPersonId,actorId),eq(guardianRelationships.canManageEnrollment,true))).limit(1);
+ const [relationship]=await tx.select({id:guardianRelationships.id}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.guardianPersonId,actorId),eq(guardianRelationships.canManageEnrollment,true))).for("share").limit(1);
  if(!relationship)throw new Error("Guardian is not authorized for enrollment");
 }
 async function ready(tx:Transaction,applicationId:string){
- const [journey]=await tx.select({id:journeys.id,status:journeys.status}).from(journeys).where(and(eq(journeys.participantType,"application"),eq(journeys.participantId,applicationId))).limit(1);
+ const [journey]=await tx.select({id:journeys.id,status:journeys.status}).from(journeys).where(and(eq(journeys.participantType,"application"),eq(journeys.participantId,applicationId))).for("update").limit(1);
  if(!journey||journey.status!=="ready")throw new Error("Enrollment Journey must be ready");
- const blocks=await tx.select({status:journeyRequirements.status}).from(journeyRequirements).where(and(eq(journeyRequirements.journeyId,journey.id),eq(journeyRequirements.blocking,true)));
+ const blocks=await tx.select({status:journeyRequirements.status,metadata:journeyRequirements.metadata,evidence:journeyRequirements.evidence}).from(journeyRequirements).where(and(eq(journeyRequirements.journeyId,journey.id),eq(journeyRequirements.blocking,true)));
  if(blocks.some(b=>b.status!=="complete"))throw new Error("Blocking requirements remain");
+ for(const block of blocks)assertEnrollmentFormApproved(block.metadata,block.evidence);
  return journey;
 }
 /** Expire elapsed offers while holding the same pool lock used for issuance. */
@@ -78,10 +82,12 @@ export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{
  if(!context.actorPersonId)throw new Error("Staff identity required");
  if(!input.idempotencyKey.trim()||!Number.isFinite(input.expiresAt.getTime())||input.expiresAt.getTime()<=Date.now())throw new Error("Invalid offer issuance input");
  return db.transaction(async tx=>{
+  await lockAdmissionsApplication(tx,input.applicationId);
   const [app]=await tx.select().from(applications).where(eq(applications.id,input.applicationId)).limit(1);
   if(!app)throw new Error("Application not found");
   requireAdmissionsProgramScope(context,app.programId);
   assertRecordWriteAllowed(app.metadata,"registrar");
+  assertApplicationOffersAllowed(app);
   const {pool}=await lockPool(tx,app.programId,input.schoolYearId);
   await expireElapsedOffers(tx,context,app.programId,input.schoolYearId,new Date());
   const [retry]=await tx.select().from(admissionOffers).where(eq(admissionOffers.idempotencyKey,input.idempotencyKey)).limit(1);
@@ -119,12 +125,14 @@ export async function respondToSyntheticAdmissionOffer(context:AccessContext,off
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
   requireAdmissionsProgramScope(context,lookup.programId);
+  await lockAdmissionsApplication(tx,lookup.applicationId);
   await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
   if(!app||app.programId!==offer!.programId)throw new Error("Offer application mismatch");
   await assertGuardian(tx,context.actorPersonId,app.studentProfileId);
   assertRecordWriteAllowed(app.metadata,"guardian");
+  if(action==="accept")assertApplicationOffersAllowed(app);
   if(offer!.status==="accepted"&&action==="accept")return offerId;
   if(offer!.status==="declined"&&action==="decline")return offerId;
   const changed=transitionAdmissionsOffer({status:offer!.status as OfferStatus,applicationId:app.id,schoolYearId:offer!.schoolYearId,expiresAt:offer!.expiresAt?.toISOString()??null},action,new Date());
@@ -151,12 +159,15 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
   requireAdmissionsProgramScope(context,lookup.programId);
+  await lockAdmissionsApplication(tx,lookup.applicationId);
   const {pool,organizationId}=await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(offer!.status!=="accepted")throw new Error("Guardian must accept offer first");
-  if(!offer!.respondedAt)throw new Error("Accepted offer must record a guardian response");
+  if(!offer!.respondedAt||!offer!.respondedByPersonId)throw new Error("Accepted offer must record a guardian response");
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
   if(!app||app.programId!==offer!.programId||app.stage!=="accepted")throw new Error("Application not accepted for this offer");
+  assertApplicationOffersAllowed(app);
+  await assertGuardian(tx,offer!.respondedByPersonId,app.studentProfileId);
   assertRecordWriteAllowed(app.metadata,"registrar");
   const [programSite]=await tx.select({siteId:programs.siteId,organizationId:programs.organizationId})
     .from(programs).where(eq(programs.id,offer!.programId)).limit(1);
@@ -185,5 +196,47 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   await writeAudit(tx,context,{action:"journey.activate",entityType:"journey",entityId:journey.id,scope:{programId:offer!.programId},before:{status:journey.status},after:{status:"active"},contextExtras:{offerId,enrollmentId:enrollment.id}});
   await writeAudit(tx,context,{action:"admissions.offer.activate",entityType:"enrollment",entityId:enrollment.id,scope:{programId:offer!.programId},after:{offerId,schoolYearId:offer!.schoolYearId,status:"active"}});
   return enrollment.id;
+ });
+}
+
+export async function withdrawAdmissionOffer(context:AccessContext,input:{offerId:string;reason:string}){
+ guarded(context,"registrar");assertCapability(context,"enrollment.decide");
+ const reason=input.reason.trim();
+ if(reason.length<10||reason.length>2000)throw new Error("Withdrawal reason must be 10 to 2000 characters");
+ return db.transaction(async tx=>{
+  const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,input.offerId)).limit(1);
+  if(!lookup)throw new Error("Offer not found");
+  requireAdmissionsProgramScope(context,lookup.programId);
+  await lockAdmissionsApplication(tx,lookup.applicationId);
+  await lockPool(tx,lookup.programId,lookup.schoolYearId);
+  const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,input.offerId)).limit(1);
+  const [app]=offer?await tx.select().from(applications).where(eq(applications.id,offer.applicationId)).limit(1):[];
+  if(!offer||!app||app.programId!==offer.programId)throw new Error("Offer application mismatch");
+  assertRecordWriteAllowed(app.metadata,"registrar");
+  if(offer.status==="revoked"){
+   const [audit]=await tx.select({after:auditEvents.after}).from(auditEvents).where(and(
+    eq(auditEvents.resourceId,offer.id),eq(auditEvents.action,"admissions.offer.withdraw"))).limit(1);
+   if(audit?.after?.reason!==reason)throw new Error("Offer already withdrawn with a different reason. Refresh to view its status.");
+   return {offerId:offer.id};
+  }
+  if(offer.status!=="issued")throw new Error("Only an unaccepted issued offer can be withdrawn");
+  const next=transitionAdmissionsOffer({status:offer.status,expiresAt:offer.expiresAt?.toISOString()??null,
+   applicationId:app.id,schoolYearId:offer.schoolYearId},"revoke",new Date());
+  await tx.update(admissionOffers).set({status:next.status,updatedAt:new Date()}).where(eq(admissionOffers.id,offer.id));
+  await writeAudit(tx,context,{action:"admissions.offer.withdraw",entityType:"admission_offer",entityId:offer.id,
+   scope:{programId:offer.programId},before:{status:offer.status},after:{status:next.status,reason}});
+  await emitEvent(tx,{eventType:EventTypes.AdmissionOfferRevoked,aggregateType:"admission_offer",aggregateId:offer.id,
+   actorPersonId:context.actorPersonId,payload:{applicationId:app.id,programId:offer.programId,schoolYearId:offer.schoolYearId}});
+  const [student]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles)
+   .where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
+  if(!student)throw new Error("Student profile missing");
+  const guardians=await tx.select({personId:guardianRelationships.guardianPersonId}).from(guardianRelationships)
+   .where(and(eq(guardianRelationships.studentPersonId,student.personId),eq(guardianRelationships.canManageEnrollment,true)));
+  await notifyMany(tx,[...new Set(guardians.map(guardian=>guardian.personId))].map(recipientPersonId=>({
+   recipientPersonId,type:"admission_offer_withdrawn",title:"Enrollment offer withdrawn",
+   body:"Admissions withdrew an unaccepted offer. Contact admissions for next steps.",
+   resourceType:"admission_offer",resourceId:offer.id,
+  })));
+  return {offerId:offer.id};
  });
 }

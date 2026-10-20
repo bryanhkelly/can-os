@@ -68,6 +68,8 @@ function LaunchWizardPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<{ programId: string; journeyId: string } | null>(null);
+  const [openingRecipients,setOpeningRecipients]=useState<Record<string,string>>({});
+  const [opened,setOpened]=useState<{siteId:string|null;name:string}|null>(null);
 
   const [type, setType] = useState<string>("church_hosted_academy");
   const [name, setName] = useState("");
@@ -167,7 +169,9 @@ function LaunchWizardPage() {
     setBusy(true);
     setError("");
     try {
-      await activateLaunch({ data: { programId } });
+      await activateLaunch({ data: { programId,recipientPersonId:openingRecipients[programId]||undefined } });
+      const launch=launches?.launches.find(item=>item.id===programId);
+      if(launch)setOpened({siteId:launch.siteId,name:launch.name});
       await router.invalidate();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to activate program");
@@ -203,6 +207,10 @@ function LaunchWizardPage() {
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>
         )}
+        {opened&&<p role="status" className="mt-4 rounded-lg border p-4 text-sm">
+          {opened.name} is active. {opened.siteId?<Link to="/sites/$siteId" params={{siteId:opened.siteId}}
+            className="underline">Open Site Today to review the named operator handoff →</Link>:"Opening is recorded."}
+        </p>}
 
         <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         <div className="mt-8 grid gap-6">
@@ -437,10 +445,22 @@ function LaunchWizardPage() {
                       </div>}
                     </div>
                     <div className="mt-4">
+                      {launch.siteId&&<label className="mb-3 block text-sm">Receiving site operator (required)
+                        <select aria-label={"Receiving site operator for "+launch.name} value={openingRecipients[launch.id]??""}
+                          onChange={event=>setOpeningRecipients(current=>({...current,[launch.id]:event.target.value}))}
+                          className={selectClass}>
+                          <option value="">Select the named receiving operator</option>
+                          {launch.openingOperators.map(operator=><option key={operator.personId} value={operator.personId}>
+                            {operator.firstName} {operator.lastName}
+                          </option>)}
+                        </select>
+                        <span className="mt-2 block text-xs text-muted-foreground">Only the selected active site registrar/operator can acknowledge receipt after opening. This does not waive readiness checks.</span>
+                        {!launch.openingOperators.length&&<span role="alert" className="mt-2 block text-xs">No active site registrar/operator is available. An existing authorized site grant is required.</span>}
+                      </label>}
                       <button
                         type="button"
                         className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                        disabled={busy || !activatable}
+                        disabled={busy || !activatable || Boolean(launch.siteId&&!openingRecipients[launch.id])}
                         onClick={() => activate(launch.id)}
                       >
                         Activate

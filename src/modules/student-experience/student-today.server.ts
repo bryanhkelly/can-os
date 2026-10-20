@@ -12,7 +12,8 @@ import {
 
 export type StudentTodayData = Awaited<ReturnType<typeof getStudentToday>>;
 
-export async function getStudentToday(studentProfileId: string, at = new Date()) {
+export async function getStudentToday(studentProfileId: string, at = new Date(),
+  scope?:{siteIds:string[];programIds:string[]}) {
   const [student] = await db
     .select({
       studentProfileId: studentProfiles.id,
@@ -43,6 +44,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date())
       eq(enrollments.kind, "section"),
       eq(enrollments.status, "active"),
       eq(sections.active, true),
+      ...(scope?[inArray(sections.siteId,scope.siteIds),inArray(sections.programId,scope.programIds)]:[]),
     ));
 
   const sectionIds = activeSections.map((row) => row.sectionId);
@@ -76,6 +78,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date())
     )
     .where(and(
       inArray(scheduledOccurrences.siteId, siteIds),
+      ...(scope?[or(isNull(scheduledOccurrences.programId),inArray(scheduledOccurrences.programId,scope.programIds))]:[]),
       gte(scheduledOccurrences.startsAt, startOfDay),
       lt(scheduledOccurrences.startsAt, endOfDay),
       or(
@@ -131,6 +134,8 @@ export async function getStudentToday(studentProfileId: string, at = new Date())
     .where(and(
       eq(actions.ownerPersonId, student.personId),
       eq(actions.status, "open"),
+      ...(scope?[or(isNull(actions.siteId),inArray(actions.siteId,scope.siteIds)),
+        or(isNull(actions.programId),inArray(actions.programId,scope.programIds))]:[]),
     ))
     .orderBy(asc(actions.dueAt));
 

@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useEffect,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {createAdmissionsInquiry,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
@@ -6,24 +6,38 @@ import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 const load=async()=>({records:await listAdmissionsIntake(),programs:await listAdmissionsIntakePrograms()});
 export const Route=createFileRoute("/admissions/intake")({
+ validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string}=>({
+  application:typeof search.application==="string"?search.application:undefined,
+  siteId:typeof search.siteId==="string"?search.siteId:undefined,
+  programId:typeof search.programId==="string"?search.programId:undefined,
+ }),
  loader:safeLoader(load,{authMessage:"Sign in as a registrar to manage admissions."}),
  component:IntakePage
 });
 function IntakePage(){
  const outcome=Route.useLoaderData();
+ const selected=Route.useSearch();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Admissions" title="Inquiry and decision pipeline" outcome={outcome}/>;
- return <Intake data={outcome.data}/>;
+ return <Intake key={`${selected.siteId??""}:${selected.programId??""}`} data={outcome.data}/>;
 }
 function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const router=useRouter();
- const programs=data.programs;
+ const selected=Route.useSearch();
+ const programs=data.programs.filter(program=>(!selected.programId||program.id===selected.programId)&&
+  (!selected.siteId||program.siteId===selected.siteId));
+ const scopedRecords=data.records.filter(row=>(!selected.siteId||row.siteId===selected.siteId)&&
+  (!selected.programId||row.programId===selected.programId));
+ const records=scopedRecords.filter(row=>!selected.application||row.id===selected.application);
  const [programId,setProgramId]=useState(programs[0]?.id??"");
  const [requestId,setRequestId]=useState(()=>crypto.randomUUID());
  const [existingApplicationId,setExistingApplicationId]=useState("");
  const [studentFirstName,setStudentFirstName]=useState(""),[studentLastName,setStudentLastName]=useState("");
  const [guardianFirstName,setGuardianFirstName]=useState(""),[guardianLastName,setGuardianLastName]=useState("");
  const [guardianEmail,setGuardianEmail]=useState(""),[gradeLevel,setGradeLevel]=useState("9"),[source,setSource]=useState("school_direct");
- const [notes,setNotes]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [notes,setNotes]=useState(""),[saving,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [interactive,setInteractive]=useState(false);
+ useEffect(()=>setInteractive(true),[]);
+ const busy=saving||!interactive;
  async function perform(fn:()=>Promise<unknown>,message:string){
   setBusy(true);setError("");setNotice("");
   try{await fn();await router.invalidate();setNotice(message);}catch(e){setError(e instanceof Error?e.message:"Unable to save");}finally{setBusy(false);}
@@ -31,7 +45,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const stages=["inquiry","application","eligibility","accepted","declined","withdrawn"];
  return <WorkspaceShell eyebrow="CAN OS · Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
-  actions={<Link to="/admissions" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
+  actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <section className="mt-8 rounded-xl border bg-card p-5">
@@ -66,10 +80,11 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
    </form>
   </section>
   <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3">
-   {stages.map(stage=><div key={stage} className="rounded-lg border p-3"><p className="text-xs capitalize text-muted-foreground">{stage}</p><p className="font-serif text-2xl">{data.records.filter(r=>r.stage===stage).length}</p></div>)}
+   {stages.map(stage=><div key={stage} className="rounded-lg border p-3"><p className="text-xs capitalize text-muted-foreground">{stage}</p><p className="font-serif text-2xl">{scopedRecords.filter(r=>r.stage===stage).length}</p></div>)}
   </div>
   <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
-   {data.records.map(r=><article key={r.id} className="rounded-xl border bg-card p-5">
+   {selected.application&&<Link to="/admissions/intake" search={{application:undefined,siteId:selected.siteId,programId:selected.programId}} className="inline-block text-sm underline">Show all applicants</Link>}
+   {records.map(r=><article key={r.id} className="rounded-xl border bg-card p-5">
     <div className="flex flex-wrap justify-between gap-3"><div><h3 className="text-lg font-semibold">{r.studentFirst} {r.studentLast}</h3>
      <p className="mt-1 text-xs text-muted-foreground">{r.programName} · {r.disposition??r.stage} · Last updated {new Date(r.updatedAt).toLocaleDateString()}</p></div>
      <span className="rounded-full border px-3 py-1 text-xs">{r.disposition??r.stage}</span>
@@ -105,7 +120,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
        Send secure guardian invitation
       </button>
       {r.disposition==="ready_for_offer" && <Link to="/admissions"
-        search={{siteId:undefined,programId:undefined}}
+        search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
         className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background">Issue enrollment offer →</Link>}
     </div>
     <div className="mt-4 flex flex-wrap gap-2">
@@ -117,8 +132,13 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
        <button key={decision} disabled={busy} onClick={()=>perform(()=>transitionAdmissionsStage({data:{applicationId:r.id,decision:decision as "application"|"eligibility"|"accept"|"decline"|"withdraw"|"waitlist"|"restore"}}),label+" saved.")}
         className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">{label}</button>)}
     </div>
+    <Link to="/admissions" search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
+      className="mt-3 inline-block text-xs underline">Review this application's offers and enrollment →</Link>
+    <p className="mt-2 text-xs text-muted-foreground">Withdraw unaccepted offers before waitlisting, declining or withdrawing an application.
+      Accepted offers and active enrollments require their enrollment workflow and cannot be cancelled here.</p>
    </article>)}
-   {!data.records.length&&<p className="rounded-lg border p-5 text-sm text-muted-foreground">No applications recorded in your authorized programs.</p>}
+   {!records.length&&<p role="status" className="rounded-lg border p-5 text-sm text-muted-foreground">{selected.application?
+    "This application is unavailable in your authorized programs.":"No applications recorded in your authorized programs."}</p>}
   </section>
  </WorkspaceShell>;
 }

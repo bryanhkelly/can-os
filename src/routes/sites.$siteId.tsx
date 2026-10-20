@@ -4,6 +4,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { OpeningHandoffs } from "@/components/operations/OpeningHandoffs";
 
 export const Route = createFileRoute("/sites/$siteId")({
   loader: ({ params }) =>
@@ -32,6 +33,7 @@ function SiteTodayPage() {
       ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/operations","/operations/launch","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
     </nav>
+    <OpeningHandoffs handoffs={data.openingHandoffs}/>
     <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {[
         ["Active enrollment", String(data.enrollment.count), data.enrollment.note],

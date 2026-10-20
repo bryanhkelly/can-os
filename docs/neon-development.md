@@ -39,6 +39,145 @@ present, their endpoints must differ, including pooled/direct variants.
 The integration command loads `.env.local` for the child test process only.
 Skipped tests do not count as database-backed acceptance verification.
 
+The focused watch-delivery history check is
+`node scripts/run-integration-tests.mjs delivery-history` (or append `--preflight`
+to check endpoint safeguards without running tests). It requires an application
+endpoint for comparison and uses the same disposable-database opt-in. Its
+synthetic identities, watches, events and deliveries are rolled back; it does
+not migrate or seed the application database.
+
+Use `node scripts/run-integration-tests.mjs qualification-readiness` for the
+focused credential-review-to-launch-readiness check; `--preflight` is also
+supported. It exercises actual review commands, immutable decisions, audit/
+outbox evidence, revocation and effective dates in a rollback transaction,
+with no application migration or persistent seed.
+
+The same `qualification-readiness` check exercises effective delivery dates:
+inclusive start/exclusive end, open-ended/undated windows, empty/inverted
+windows, future/ended/completed alternatives, and current-arrangement selection.
+It verifies readiness uses the supplied evaluation time without writing
+delivery evidence or changing stored arrangements.
+
+Use `node scripts/run-integration-tests.mjs capacity-expiry` for the focused
+instructional-reservation expiry check; `--preflight` is also supported. It
+uses a controlled clock and actual reservation/delivery commands to verify
+expiry boundaries, availability versus coverage, failed activation, renewal
+and release. It also checks activation retries, capability/scope denials on
+active retries, terminal-state rejection, unchanged timestamps and one-time
+audit/outbox evidence. These are single-connection rollback tests, not proof of
+multi-connection race behavior. Synthetic fixtures are rolled back and no
+migration is applied.
+
+Use `node scripts/run-integration-tests.mjs launch-staffing` for the configured
+staffing-to-opening check and the existing two-scenario GF3 launch regression.
+It also supports `--preflight`. Both files run in rollback transactions. When the
+policy-version enum lacks `published`, the fixture recreates that enum within
+its transaction and exercises migration `0024_quick_scalphunter.sql` there,
+so PostgreSQL permits using the new enum value without a committed migration.
+Fixture DDL, policies, credentials, assignments, audit/outbox records and program
+activation are rolled back. This is not approval to migrate the application
+database; deploy the reviewed enum migration before deploying its consumers.
+The handoff check also exercises teacher credential submission and independent
+review endpoints; private R2 signing/verification is mocked at the storage
+boundary. It does not upload objects, enable deployment upload switches or
+establish live-bucket CORS/conditional-write acceptance.
+Its shared qualification entry is created through the explicit-steward catalog
+command, including missing-grant, membership/scope, malformed-input and
+conflicting-retry denials. The catalog entry, steward fixture grant and its
+audit/outbox evidence are rolled back, and an independent query confirms the
+entry is absent. This creates no persistent catalog entries or real steward
+grants.
+
+Use `node scripts/run-integration-tests.mjs admissions-offers` for both
+final-seat concurrency and the registrar/guardian/student acceptance handoff.
+It uses the same isolated-database safeguards. The new handoff fixture invokes
+canonical application, readiness, offer, activation and section-placement
+commands inside a rollback transaction, then independently verifies its
+application, profile, enrollment and withdrawal audit are absent. It covers
+role/program/relationship denials, revoked offers, readiness regression,
+identity continuity, one-time evidence/notifications and family/student class
+visibility. The older separate-connection concurrency fixture persists its
+synthetic records in the disposable database; do not describe the entire mode
+as rollback-isolated. Neither test applies production migrations or grants.
+The handoff fixture also exercises guardian checklist/document requests,
+rejection, replacement, approval and readiness-to-activation. R2 signing and
+object verification are mocked; no private bytes leave the test process.
+Verification and outbox failures preserve the prior document state, changed
+upload retries fail, and independent cleanup queries check the document and
+outbox are absent after rollback. This does not enable live uploads.
+The mode also runs the older GF2 enrollment regression, for **three files**.
+The handoff fixture now exercises configured form materialization, authenticated
+guardian signing, mandatory registrar review, correction/re-signing, no-waiver
+denials, stale/changed retries, signer revocation, audit/outbox rollback, and
+program-selected packet creation through registrar intake. No genuine
+enrollment agreement is signed: all packet text and identities are synthetic.
+The older offer-concurrency and GF2 fixtures persist synthetic records in the
+disposable database; only the handoff fixture is fully rollback-isolated.
+Admissions mode also verifies waitlist/restore identity continuity, explicit
+offer withdrawal before intake closure, terminal application decisions, stale
+acceptance denials and stage-outbox rollback. The separate-connection fixture
+races the actual registrar waitlist command against offer issuance in both
+request orders, asserting exactly one committed decision and consistent
+application/offer state. These additional concurrency records are synthetic
+and persist only in the guarded disposable database.
+
+### Authenticated Admissions browser acceptance
+
+Run `npm run test:e2e:admissions` (or
+`node scripts/run-admissions-e2e.mjs --preflight` for guard checks only).
+It requires `TEST_DATABASE_URL`, `CAN_TEST_DB_WRITES_ENABLED=true`, and a
+different application endpoint supplied by `DATABASE_URL` or
+`CAN_APPLICATION_DB_HOST`, like the integration mode. Both pooled and direct
+variants of the same Neon endpoint are rejected. It does not use the
+application database as a fallback.
+
+The runner starts its own local app at `http://localhost:3187` with strict port
+selection and refuses to reuse an existing server. The shared dev app and
+browser sessions are not modified. It forwards the disposable database,
+synthetic-only session pepper and disabled R2 upload switches to that server.
+The dedicated Playwright configuration is separate from the default GF1 suite;
+direct invocations must satisfy the same test-environment/database guards.
+
+Fresh synthetic fixtures reuse the real account/session format; no login
+bypass or mocked server functions are added. The browser signs/corrects a
+form, completes mandatory registrar review, restores a waitlisted applicant,
+accepts an offer, activates enrollment and assigns a class. It checks student
+class visibility and denial of registrar access, and then queries persisted
+identity, signature/review, enrollment and event evidence.
+
+These browser transactions commit. Immutable audit history must not be deleted
+or its protections disabled: synthetic records and evidence remain on the
+disposable branch. Teardown revokes all fixture sessions, deactivates its
+grants, disables its accounts and independently verifies none remain usable,
+including on test failure. Fresh IDs make subsequent runs independent. This
+is not the rollback-isolated handoff fixture. No genuine agreement, production
+grant, real document upload or external notification delivery is performed.
+
+The focused attendance check is
+`node scripts/run-integration-tests.mjs attendance-handoff`; it also supports
+`--preflight` and requires the application-endpoint comparison. It runs the new
+cross-role attendance/calendar/schedule fixture and the earlier GF4 service
+regression. The new fixture rolls back its identities, configuration,
+attendance, excuses and evidence and independently checks absence afterward.
+Notification email is mocked so this acceptance run sends no external email.
+The earlier service regression persists synthetic records in the disposable
+database; do not describe the entire mode as rollback-isolated. No schema
+migration or production writes are part of the command.
+
+The focused curriculum release check is
+`node scripts/run-integration-tests.mjs curriculum-authoring`; `--preflight`
+uses the same isolated-database and application-endpoint safeguards. It runs
+the authoring-to-classroom fixture and the existing class-participation
+regression. Both use rollback transactions and independently check cleanup.
+The new fixture exercises real authoring/publication, immutable class pinning,
+completion preservation and publisher denials, and applies the synthetic
+studio seed twice inside its rollback transaction to verify repeatability.
+The manifest declares `curriculum-authoring.sql` after `new-experiences-v1.sql`;
+it is synthetic-only and has not been applied to any deployed environment.
+No real publisher grants, schema migrations or production writes are authorized
+by running this mode. Browser acceptance and verified private resource
+publication remain separate gates.
+
 ## Migrations
 
 The Drizzle schema is canonical in source control. Generate SQL migrations with:

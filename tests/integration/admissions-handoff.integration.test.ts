@@ -1,0 +1,514 @@
+import { describe,expect,it,vi } from "vitest";
+import { and,eq } from "drizzle-orm";
+import type { Database } from "@/db/client";
+import { roleCapabilities } from "@/domain/access-context";
+import type { Actor } from "@/modules/identity/actors.server";
+
+type Transaction=Parameters<Parameters<Database["transaction"]>[0]>[0];
+const state=vi.hoisted(()=>({tx:undefined as Transaction|undefined,actor:undefined as Actor|undefined,
+ verify:vi.fn(),sign:vi.fn(()=>"https://storage.example.invalid/signed"),failDocumentEvent:false,failStageEvent:false}));
+vi.mock("@/modules/enrollment/r2-documents.server",async importOriginal=>{
+ const original=await importOriginal<typeof import("@/modules/enrollment/r2-documents.server")>();
+ return {...original,verifyDocumentObject:state.verify,signR2Object:state.sign,r2Config:vi.fn(()=>({}))};
+});
+vi.mock("@/platform/mutation",async importOriginal=>{
+ const original=await importOriginal<typeof import("@/platform/mutation")>();
+ return {...original,emitEvent:async(...args:Parameters<typeof original.emitEvent>)=>{
+ if(state.failStageEvent&&args[1].eventType==="AdmissionsStageChanged")throw new Error("Injected stage outbox failure");
+  if(state.failDocumentEvent&&(args[1].eventType.startsWith("EnrollmentDocument")||
+   args[1].eventType.startsWith("EnrollmentForm")))throw new Error("Injected document outbox failure");
+  return original.emitEvent(...args);
+ }};
+});
+vi.mock("@/db/client",()=>({
+ get db(){if(!state.tx)throw new Error("Admissions handoff must stay in its rollback transaction");return state.tx;},
+}));
+vi.mock("@tanstack/react-start",()=>({
+ createServerFn:()=>({
+  parse:(value:unknown)=>value,
+  validator(parse:(value:unknown)=>unknown){this.parse=parse;return this;},
+  handler(callback:(input:{data:unknown})=>unknown){
+   return async(input?:{data:unknown})=>callback({data:this.parse(input?.data)});
+  },
+ }),
+}));
+vi.mock("@tanstack/react-start/server",()=>({getRequest:()=>new Request("http://localhost"),setResponseHeader:vi.fn()}));
+vi.mock("@/modules/identity/command-context.server",()=>({
+ getCommandContext:async()=>{if(!state.actor)throw new Error("Missing admissions actor");return state.actor;},
+}));
+function first<T>(rows:T[]):T{
+ const row=rows[0];if(!row)throw new Error("Missing admissions acceptance fixture");return row;
+}
+const integration=process.env.DATABASE_URL?describe:describe.skip;
+integration("cross-persona admissions through active classes",()=>{
+ it("uses actual commands for withdrawal, acceptance, readiness exceptions, activation and placement without re-keying identities",async()=>{
+  const {db:database}=await vi.importActual<{db:Database}>("@/db/client");
+  const s=await import("@/db/schema");
+  const {startFamilyApplication}=await import("@/modules/enrollment/enrollment-service");
+  const offers=await import("@/modules/enrollment/admissions-offer.functions");
+  const {getGuardianAdmissionOffers}=await import("@/modules/enrollment/guardian-admission-offers.functions");
+  const {setFamilyRequirement,reviewRequirementDocument,addRequirementReviewNote}=await import("@/modules/enrollment/family-readiness.functions");
+  const {getGuardianEnrollmentChecklist}=await import("@/modules/enrollment/guardian-enrollment-checklist.functions");
+  const documentFlow=await import("@/modules/enrollment/r2-document-upload.functions");
+  const formFlow=await import("@/modules/enrollment/enrollment-form.functions");
+  const {completeJourneyRequirement}=await import("@/modules/journeys/complete-requirement");
+  const intake=await import("@/modules/enrollment/admissions-intake.functions");
+  const {getAdmissionsDashboard}=await import("@/modules/enrollment/admissions-dashboard.functions");
+  const {placeEnrolledStudent,listEnrollmentPlacements}=await import("@/modules/enrollment/course-placement.functions");
+  const {getFamilyHome}=await import("@/modules/family/family-home.functions");
+  const {getMyStudentToday}=await import("@/modules/student-experience/student-today.functions");
+  const {accessibleClasses,authorizeClass}=await import("@/modules/learning/class-access.server");
+  const {getNotifications}=await import("@/modules/communication/notification-center.functions");
+  const rollback=new Error("rollback-admissions-handoff");
+  const suffix=crypto.randomUUID().slice(0,8);
+  let applicationId="",profileId="",enrollmentId="",withdrawnOfferId="",documentId="",formRequirementId="";
+  let checked=false;
+  try{
+   vi.stubEnv("CAN_R2_LIVE_UPLOADS_ENABLED","true");
+   state.verify.mockReset().mockResolvedValue(undefined);
+   await database.transaction(async tx=>{
+    state.tx=tx;
+    const org=first(await tx.insert(s.organizations).values({type:"christian_school",
+     name:"Admissions acceptance",slug:`admission-handoff-${suffix}`}).returning());
+    const site=first(await tx.insert(s.sites).values({organizationId:org.id,name:"Admissions site",
+     slug:`admission-handoff-${suffix}`}).returning());
+    const jurisdiction=first(await tx.insert(s.jurisdictions).values({
+     code:`admission-handoff-${suffix}`,name:"Synthetic acceptance jurisdiction"}).returning());
+    const program=first(await tx.insert(s.programs).values({organizationId:org.id,siteId:site.id,
+     jurisdictionId:jurisdiction.id,type:"full_school",status:"active",name:"Admissions Academy",
+     slug:`admission-handoff-${suffix}`,gradeRange:{min:"6",max:"12"},deliveryModel:{onsite:true},
+     academicProviderOrganizationId:org.id,creditIssuingOrganizationId:org.id}).returning());
+    const {createAcademicTimeFixture}=await import("./helpers/academic-time");
+    const time=await createAcademicTimeFixture({organizationId:org.id,siteId:site.id,programId:program.id,suffix});
+    await tx.insert(s.admissionSeatPools).values({programId:program.id,schoolYearId:time.schoolYear.id,capacity:1});
+    const guardian=first(await tx.insert(s.people).values({legalFirstName:"Admissions",legalLastName:"Guardian"}).returning());
+    const registrar=first(await tx.insert(s.people).values({legalFirstName:"Admissions",legalLastName:"Registrar"}).returning());
+    const outsider=first(await tx.insert(s.people).values({legalFirstName:"Unrelated",legalLastName:"Guardian"}).returning());
+    function act(role:"guardian"|"registrar"|"student",personId:string):Actor{
+     const actor:Actor={actorPersonId:personId,role,accountId:crypto.randomUUID(),sessionId:crypto.randomUUID(),
+      grantId:crypto.randomUUID(),capabilities:new Set(roleCapabilities[role]),
+      scope:{organizationIds:[org.id],siteIds:[site.id],programIds:[program.id]}};
+     state.actor=actor;return actor;
+    }
+    const key=`admission-handoff-${suffix}`;
+    await tx.insert(s.journeyDefinitions).values({key,version:"1",audience:"family",owningOrganizationId:org.id,
+     title:"Enrollment readiness",configuration:{requirements:[
+      {key:"review",title:"Registrar enrollment review",blocking:true,owner:"can"},
+      {key:"signed-form",title:"Configured enrollment form",blocking:true,owner:"family",enrollmentForm:{
+       version:"approved-test-v1",instructions:"Synthetic school-approved instructions. No real agreement is signed.",
+       consent:"I acknowledge this synthetic enrollment statement for the acceptance test.",
+       fields:[{key:"contact_plan",label:"Contact plan",type:"text",required:true},
+        {key:"school_contact",label:"May the school contact you?",type:"yes_no",required:true}]}}
+     ]}});
+    const family=act("guardian",guardian.id);
+    const app=await startFamilyApplication(family,{programId:program.id,idempotencyKey:key,journeyDefinitionKey:key,
+     student:{legalFirstName:"Accepted",legalLastName:"Learner",gradeLevel:"9"}});
+    applicationId=app.applicationId;profileId=app.studentProfileId;
+    const student=first(await tx.select().from(s.studentProfiles).where(eq(s.studentProfiles.id,profileId)));
+    const requirement=first(await tx.select().from(s.journeyRequirements).where(and(
+     eq(s.journeyRequirements.journeyId,app.journeyId),eq(s.journeyRequirements.key,"review"))));
+    const formRequirement=first(await tx.select().from(s.journeyRequirements).where(and(
+     eq(s.journeyRequirements.journeyId,app.journeyId),eq(s.journeyRequirements.key,"signed-form"))));
+    formRequirementId=formRequirement.id;
+    await tx.update(s.journeyDefinitions).set({configuration:{requirements:[]}}).where(eq(s.journeyDefinitions.key,key));
+    const staff=act("registrar",registrar.id);
+    const issuance={applicationId,schoolYearId:time.schoolYear.id};
+    await expect(offers.issueAdmissionOffer({data:{...issuance,applicationId:"not-a-uuid"}})).rejects.toThrow();
+    await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("Journey must be ready");
+    await setFamilyRequirement({data:{applicationId,requirementId:requirement.id,complete:true}});
+    await setFamilyRequirement({data:{applicationId,requirementId:requirement.id,complete:true}});
+    expect(await tx.select().from(s.domainEvents).where(and(
+     eq(s.domainEvents.aggregateId,requirement.id),eq(s.domainEvents.eventType,"JourneyRequirementStatusChanged")))).toHaveLength(1);
+    await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("Journey must be ready");
+    const formScope={applicationId,requirementId:formRequirement.id};
+    await expect(setFamilyRequirement({data:{...formScope,complete:true}})).rejects.toThrow("without a checklist waiver");
+    await expect(completeJourneyRequirement({...staff,capabilities:new Set([...staff.capabilities,"journey.requirement.complete"])},
+     formRequirement.id)).rejects.toThrow("registrar review workflow");
+    await tx.update(s.journeyRequirements).set({status:"complete"}).where(eq(s.journeyRequirements.id,formRequirement.id));
+    await tx.update(s.journeys).set({status:"ready"}).where(eq(s.journeys.id,app.journeyId));
+    await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("current guardian signature and registrar approval");
+    await tx.update(s.journeyRequirements).set({status:"needs_you"}).where(eq(s.journeyRequirements.id,formRequirement.id));
+    await tx.update(s.journeys).set({status:"in_progress"}).where(eq(s.journeys.id,app.journeyId));
+    await expect(reviewRequirementDocument({data:{...formScope,status:"accepted",reason:"Cannot replace consent"}}))
+     .rejects.toThrow("not document approval");
+    state.actor=family;
+    await expect(documentFlow.beginEnrollmentDocumentUpload({data:{...formScope,fileName:"signature.pdf",mimeType:"application/pdf",size:128}}))
+     .rejects.toThrow("cannot replace its signature");
+    const readForm=async()=>{
+     const row=first((await getGuardianEnrollmentChecklist({data:{applicationId}})).requirements.filter(item=>item.id===formRequirement.id));
+     if(!row.form)throw new Error("Missing configured form");
+     return row.form;
+    };
+    const configured=await readForm();
+    expect(configured.form.version).toBe("approved-test-v1");
+    const signed={...formScope,requestId:crypto.randomUUID(),formRevision:configured.revision,
+     answers:{contact_plan:"Email the authorized guardian.",school_contact:false},signerName:"Admissions Guardian",confirmed:true as const};
+    act("guardian",outsider.id);
+    await expect(formFlow.submitGuardianEnrollmentForm({data:signed})).rejects.toThrow("current managing guardian");
+    state.actor={...family,scope:{...family.scope,programIds:[]}};
+    await expect(formFlow.submitGuardianEnrollmentForm({data:signed})).rejects.toThrow("school and program scope");
+    state.actor=family;
+    await expect(formFlow.submitGuardianEnrollmentForm({data:{...signed,confirmed:false}})).rejects.toThrow();
+    await expect(formFlow.submitGuardianEnrollmentForm({data:{...signed,form:{consent:"Injected alternate consent"}}})).rejects.toThrow();
+    await expect(formFlow.submitGuardianEnrollmentForm({data:{...signed,answers:{contact_plan:""}}})).rejects.toThrow("Complete Contact plan");
+    await expect(formFlow.submitGuardianEnrollmentForm({data:{...signed,formRevision:"f".repeat(64)}})).rejects.toThrow("form changed");
+    state.failDocumentEvent=true;
+    await expect(formFlow.submitGuardianEnrollmentForm({data:signed})).rejects.toThrow("outbox failure");
+    state.failDocumentEvent=false;
+    expect((await readForm()).submission).toBeNull();
+    await formFlow.submitGuardianEnrollmentForm({data:signed});
+    expect(await formFlow.submitGuardianEnrollmentForm({data:signed})).toEqual({submissionId:signed.requestId});
+    await expect(formFlow.submitGuardianEnrollmentForm({data:{...signed,signerName:"Changed signer"}})).rejects.toThrow("different input");
+    await expect(formFlow.submitGuardianEnrollmentForm({data:{...signed,requestId:crypto.randomUUID()}})).rejects.toThrow("awaiting registrar review");
+    expect((await readForm()).submission).toMatchObject({signerPersonId:guardian.id,answers:signed.answers});
+    await expect(formFlow.decideEnrollmentForm({data:{...formScope,submissionId:signed.requestId,status:"accepted",reason:"Checked signed form.",confirmed:true}}))
+     .rejects.toThrow("registrar");
+    state.actor=staff;
+    await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("Journey must be ready");
+    const correction={...formScope,submissionId:signed.requestId,status:"rejected" as const,
+     reason:"Please provide the preferred contact window before signing again.",confirmed:true as const};
+    await formFlow.decideEnrollmentForm({data:correction});
+    await formFlow.decideEnrollmentForm({data:correction});
+    state.actor=family;
+    expect((await readForm()).review?.reason).toBe(correction.reason);
+    expect((await getNotifications()).find(row=>row.title==="Enrollment form needs correction")?.href)
+     .toContain(`application=${applicationId}`);
+    const corrected={...signed,requestId:crypto.randomUUID(),
+     answers:{contact_plan:"Email the authorized guardian after 3 PM.",school_contact:true}};
+    await formFlow.submitGuardianEnrollmentForm({data:corrected});
+    state.actor=staff;
+    await expect(formFlow.decideEnrollmentForm({data:correction})).rejects.toThrow("submission changed");
+    const approveForm={...correction,submissionId:corrected.requestId,status:"accepted" as const,reason:"Reviewed the corrected signed school form."};
+    await tx.update(s.guardianRelationships).set({canManageEnrollment:false}).where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
+    await expect(formFlow.decideEnrollmentForm({data:approveForm})).rejects.toThrow("signer is no longer authorized");
+    await tx.update(s.guardianRelationships).set({canManageEnrollment:true}).where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
+    state.failDocumentEvent=true;
+    await expect(formFlow.decideEnrollmentForm({data:approveForm})).rejects.toThrow("outbox failure");
+    state.failDocumentEvent=false;
+    expect(first(await tx.select().from(s.journeyRequirements).where(eq(s.journeyRequirements.id,formRequirement.id))).status).toBe("needs_can");
+    await formFlow.decideEnrollmentForm({data:approveForm});
+    await formFlow.decideEnrollmentForm({data:approveForm});
+    await expect(formFlow.decideEnrollmentForm({data:{...approveForm,reason:"Changed decision reason."}})).rejects.toThrow("different review");
+    state.actor=family;
+    await expect(formFlow.submitGuardianEnrollmentForm({data:{...corrected,requestId:crypto.randomUUID()}})).rejects.toThrow("already been approved");
+    state.actor=staff;
+    for(const eventType of ["EnrollmentFormSigned","EnrollmentFormReviewed"]){
+     expect(await tx.select().from(s.domainEvents).where(and(eq(s.domainEvents.aggregateId,formRequirement.id),
+      eq(s.domainEvents.eventType,eventType)))).toHaveLength(2);
+    }
+    const formAudits=await tx.select().from(s.auditEvents).where(eq(s.auditEvents.resourceId,formRequirement.id));
+    expect(formAudits.filter(row=>row.action==="enrollment.form.sign")).toHaveLength(2);
+    expect(formAudits.filter(row=>row.action==="enrollment.form.review")).toHaveLength(2);
+    expect(JSON.stringify(formAudits)).not.toContain(corrected.answers.contact_plan);
+    await tx.update(s.applications).set({stage:"eligibility"}).where(eq(s.applications.id,applicationId));
+    state.actor={...staff,scope:{...staff.scope,siteIds:[]}};
+    await expect(intake.transitionAdmissionsStage({data:{applicationId,decision:"waitlist"}}))
+     .rejects.toThrow("school and organization");
+    state.actor=family;
+    await expect(intake.transitionAdmissionsStage({data:{applicationId,decision:"waitlist"}})).rejects.toThrow("registrar");
+    state.actor=staff;
+    state.failStageEvent=true;
+    await expect(intake.transitionAdmissionsStage({data:{applicationId,decision:"waitlist"}})).rejects.toThrow("stage outbox failure");
+    state.failStageEvent=false;
+    expect(first(await tx.select().from(s.applications).where(eq(s.applications.id,applicationId))).metadata.admissionsDisposition).not.toBe("waitlisted");
+    await intake.transitionAdmissionsStage({data:{applicationId,decision:"waitlist"}});
+    await expect(intake.transitionAdmissionsStage({data:{applicationId,decision:"waitlist"}})).rejects.toThrow("not permitted");
+    await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("Restore the waitlisted");
+    expect(first(await getAdmissionsDashboard({data:{programId:program.id,siteId:site.id}})).disposition).toBe("waitlisted");
+    state.actor=family;
+    expect(first(await getGuardianAdmissionOffers({data:{}})).waitlisted).toBe(true);
+    state.actor=staff;
+    await intake.transitionAdmissionsStage({data:{applicationId,decision:"restore"}});
+    await expect(intake.transitionAdmissionsStage({data:{applicationId,decision:"restore"}})).rejects.toThrow("not permitted");
+    const restored=first(await tx.select().from(s.applications).where(eq(s.applications.id,applicationId)));
+    expect(restored).toMatchObject({householdId:app.householdId,studentProfileId:profileId,stage:"eligibility"});
+    for(const action of ["admissions.stage.waitlist","admissions.stage.restore"])
+     expect(await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.resourceId,applicationId),eq(s.auditEvents.action,action)))).toHaveLength(1);
+    expect(await tx.select().from(s.journeys).where(eq(s.journeys.participantId,applicationId))).toHaveLength(1);
+    const issued=await offers.issueAdmissionOffer({data:issuance});
+    withdrawnOfferId=issued.offerId;
+    expect(await offers.issueAdmissionOffer({data:issuance})).toEqual(issued);
+    for(const decision of ["waitlist","decline","withdraw"] as const)
+     await expect(intake.transitionAdmissionsStage({data:{applicationId,decision}})).rejects.toThrow("Withdraw each");
+    // Simulate pre-existing inconsistent data: stale issued offers must not revive a closed/waitlisted application.
+    for(const stage of ["withdrawn","declined","eligibility"] as const){
+     await tx.update(s.applications).set({stage,metadata:stage==="eligibility"?{admissionsDisposition:"waitlisted"}:{}})
+      .where(eq(s.applications.id,applicationId));
+     state.actor=family;
+     const staleOffer=first(await getGuardianAdmissionOffers({data:{}})).offers.find(offer=>offer.id===issued.offerId);
+     expect(staleOffer?.progress).toMatchObject({state:"application_unavailable",canAccept:false});
+     await expect(offers.respondToAdmissionOffer({data:{...issued,decision:"accept"}})).rejects.toThrow(/not open|Restore the waitlisted/);
+     state.actor=staff;
+     await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow(/not open|Restore the waitlisted/);
+     expect(first(await tx.select().from(s.admissionOffers).where(eq(s.admissionOffers.id,issued.offerId))).status).toBe("issued");
+    }
+    await tx.update(s.applications).set({stage:"eligibility",metadata:restored.metadata}).where(eq(s.applications.id,applicationId));
+    await expect(offers.activateOfferedEnrollment({data:issued})).rejects.toThrow("Guardian must accept");
+    act("guardian",guardian.id);
+    const withdraw={...issued,reason:"Correct the offer before a family accepts this seat.",confirmed:true as const};
+    await expect(offers.withdrawIssuedAdmissionOffer({data:withdraw})).rejects.toThrow("registrar admission");
+    state.actor=staff;
+    await expect(offers.withdrawIssuedAdmissionOffer({data:{...withdraw,confirmed:false}})).rejects.toThrow();
+    await expect(offers.withdrawIssuedAdmissionOffer({data:{...withdraw,reason:"short"}})).rejects.toThrow();
+    await offers.withdrawIssuedAdmissionOffer({data:withdraw});
+    await offers.withdrawIssuedAdmissionOffer({data:withdraw});
+    await expect(offers.withdrawIssuedAdmissionOffer({data:{...withdraw,reason:"Changed reason after withdrawal"}})).rejects.toThrow("different reason");
+    state.actor=family;
+    expect(first(first(await getGuardianAdmissionOffers({data:{}})).offers).progress.state).toBe("revoked");
+    await expect(offers.respondToAdmissionOffer({data:{...issued,decision:"accept"}})).rejects.toThrow("Invalid offer transition");
+    state.actor=staff;
+    await intake.transitionAdmissionsStage({data:{applicationId,decision:"waitlist"}});
+    await intake.transitionAdmissionsStage({data:{applicationId,decision:"restore"}});
+    const current=await offers.issueAdmissionOffer({data:issuance});
+    expect(current.offerId).not.toBe(issued.offerId);
+    state.actor={...staff,scope:{...staff.scope,programIds:[]}};
+    await expect(offers.activateOfferedEnrollment({data:current})).rejects.toThrow("admissions program membership");
+    state.actor=staff;
+    await setFamilyRequirement({data:{applicationId,requirementId:requirement.id,complete:false}});
+    state.actor=family;
+    const pending=first(await getGuardianAdmissionOffers({data:{}}));
+    expect(pending.blockers).toEqual([{id:requirement.id,title:requirement.title,status:"needs_you"}]);
+    expect(pending.offers.find(offer=>offer.id===current.offerId)?.progress.canAccept).toBe(false);
+    await expect(offers.respondToAdmissionOffer({data:{...current,decision:"accept"}})).rejects.toThrow("Journey must be ready");
+    act("guardian",outsider.id);
+    expect(await getGuardianAdmissionOffers({data:{}})).toEqual([]);
+    await expect(offers.respondToAdmissionOffer({data:{...current,decision:"accept"}})).rejects.toThrow("Guardian relationship");
+    state.actor=staff;
+    await setFamilyRequirement({data:{applicationId,requirementId:requirement.id,complete:true}});
+    state.actor=family;
+    expect((await getFamilyHome()).children).toEqual([]);
+    act("student",student.personId);
+    await expect(getMyStudentToday()).rejects.toThrow("active student membership");
+    state.actor=family;
+    await offers.respondToAdmissionOffer({data:{...current,decision:"accept"}});
+    await offers.respondToAdmissionOffer({data:{...current,decision:"accept"}});
+    expect(first(await getGuardianAdmissionOffers({data:{}})).offers.find(offer=>offer.id===current.offerId)?.progress.state)
+     .toBe("awaiting_activation");
+    state.actor=staff;
+    // Accepted offers cannot be closed through intake even if older data still says eligibility.
+    await tx.update(s.applications).set({stage:"eligibility"}).where(eq(s.applications.id,applicationId));
+    await expect(intake.transitionAdmissionsStage({data:{applicationId,decision:"withdraw"}})).rejects.toThrow("accepted offer");
+    await tx.update(s.applications).set({stage:"accepted"}).where(eq(s.applications.id,applicationId));
+    await expect(offers.withdrawIssuedAdmissionOffer({data:{...withdraw,...current}})).rejects.toThrow("unaccepted issued");
+    await setFamilyRequirement({data:{applicationId,requirementId:requirement.id,complete:false}});
+    await expect(offers.activateOfferedEnrollment({data:current})).rejects.toThrow("Journey must be ready");
+    const scope={applicationId,requirementId:requirement.id};
+    const request={...scope,status:"requested" as const,reason:"Please upload the requested enrollment evidence."};
+    await addRequirementReviewNote({data:{...scope,note:"Internal registrar discussion must not reach the family."}});
+    state.failDocumentEvent=true;
+    await expect(reviewRequirementDocument({data:request})).rejects.toThrow("outbox failure");
+    state.failDocumentEvent=false;
+    expect(await tx.select().from(s.notifications).where(and(eq(s.notifications.recipientPersonId,guardian.id),
+     eq(s.notifications.type,"enrollment_document_requested")))).toEqual([]);
+    await reviewRequirementDocument({data:request});
+    await reviewRequirementDocument({data:request});
+    await expect(setFamilyRequirement({data:{...scope,complete:true}})).rejects.toThrow("Review and accept");
+    state.actor=family;
+    const checklist=await getGuardianEnrollmentChecklist({data:{applicationId}});
+    expect(checklist).toMatchObject({closed:false,synthetic:false});
+    expect(first(checklist.requirements.filter(item=>item.id===requirement.id)))
+     .toMatchObject({correctionReason:request.reason,reviewStatus:"requested"});
+    const readDocumentRequirement=async()=>first((await getGuardianEnrollmentChecklist({data:{applicationId}}))
+     .requirements.filter(item=>item.id===requirement.id));
+    expect(JSON.stringify(checklist)).not.toContain("Internal registrar");
+    expect(JSON.stringify(checklist)).not.toContain("storageKey");
+    expect((await getNotifications()).find(row=>row.title==="Enrollment document requested")?.href)
+     .toBe(`/guardian/admission-offers?student=${student.personId}&application=${applicationId}`);
+    const upload={...scope,fileName:"enrollment.pdf",mimeType:"application/pdf",size:128};
+    vi.stubEnv("CAN_R2_LIVE_UPLOADS_ENABLED","false");
+    await expect(documentFlow.beginEnrollmentDocumentUpload({data:upload})).rejects.toThrow("not enabled");
+    vi.stubEnv("CAN_R2_LIVE_UPLOADS_ENABLED","true");
+    const firstUpload=await documentFlow.beginEnrollmentDocumentUpload({data:upload});
+    state.verify.mockRejectedValueOnce(new Error("Object size or signature mismatch"));
+    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.key}})).rejects.toThrow("signature mismatch");
+    expect(await tx.select().from(s.documents).where(eq(s.documents.subjectId,requirement.id))).toEqual([]);
+    state.failDocumentEvent=true;
+    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.key}})).rejects.toThrow("outbox failure");
+    state.failDocumentEvent=false;
+    expect(await tx.select().from(s.documents).where(eq(s.documents.subjectId,requirement.id))).toEqual([]);
+    const recorded=await documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.key}});
+    documentId=recorded.documentId;
+    expect(await documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.key}})).toEqual({...recorded,created:false});
+    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:firstUpload.key,fileName:"changed.pdf"}}))
+     .rejects.toThrow("different input");
+    expect(await readDocumentRequirement())
+     .toMatchObject({reviewStatus:"received",correctionReason:null,documents:[{id:documentId,current:true,canDownload:true}]});
+    state.actor=staff;
+    await expect(offers.activateOfferedEnrollment({data:current})).rejects.toThrow("Journey must be ready");
+    await expect(setFamilyRequirement({data:{...scope,complete:true}})).rejects.toThrow("Review and accept");
+    const rejection={...scope,status:"rejected" as const,documentId,reason:"The file is unreadable. Please upload a clear copy."};
+    await reviewRequirementDocument({data:rejection});
+    await reviewRequirementDocument({data:rejection});
+    state.actor=family;
+    expect((await readDocumentRequirement()).correctionReason).toBe(rejection.reason);
+    expect((await getNotifications()).filter(row=>row.title==="Enrollment document needs correction")).toHaveLength(1);
+    expect(await documentFlow.getEnrollmentDocumentDownload({data:{...scope,documentId}})).toMatchObject({expiresInSeconds:60});
+    const replacement=await documentFlow.beginEnrollmentDocumentUpload({data:upload});
+    const replaced=await documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:replacement.key}});
+    expect((await readDocumentRequirement()).documents).toEqual(expect.arrayContaining([
+     expect.objectContaining({id:documentId,current:false,canDownload:false}),
+     expect.objectContaining({id:replaced.documentId,current:true,reviewStatus:"received"}),
+    ]));
+    await expect(documentFlow.getEnrollmentDocumentDownload({data:{...scope,documentId}})).rejects.toThrow("current verified");
+    state.actor=staff;
+    await expect(reviewRequirementDocument({data:{...scope,status:"accepted",documentId,reason:""}})).rejects.toThrow("Superseded");
+    const acceptance={...scope,status:"accepted" as const,documentId:replaced.documentId,reason:"Evidence reviewed."};
+    await reviewRequirementDocument({data:acceptance});
+    await reviewRequirementDocument({data:acceptance});
+    expect(first(await tx.select().from(s.journeys).where(eq(s.journeys.id,app.journeyId))).status).toBe("ready");
+    state.actor=family;
+    state.verify.mockImplementationOnce(async()=>{
+     await tx.update(s.guardianRelationships).set({canManageEnrollment:false})
+      .where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
+    });
+    const lateUpload=await documentFlow.beginEnrollmentDocumentUpload({data:upload});
+    await expect(documentFlow.finishEnrollmentDocumentUpload({data:{...upload,key:lateUpload.key}})).rejects.toThrow("current managing guardian");
+    expect(await getGuardianAdmissionOffers({data:{}})).toEqual([]);
+    await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("current managing guardian");
+    expect((await getNotifications()).find(row=>row.title==="Enrollment document needs correction")?.href).toBeNull();
+    await tx.update(s.guardianRelationships).set({canManageEnrollment:true}).where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
+    state.actor={...family,scope:{...family.scope,siteIds:[]}};
+    await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("school and program scope");
+    await expect(documentFlow.beginEnrollmentDocumentUpload({data:upload})).rejects.toThrow("school and program scope");
+    state.actor={...family,capabilities:new Set()};
+    await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("enrollment.apply");
+    await expect(documentFlow.beginEnrollmentDocumentUpload({data:upload})).rejects.toThrow("enrollment.apply");
+    act("guardian",outsider.id);
+    await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("current managing guardian");
+    act("student",student.personId);
+    await expect(getGuardianEnrollmentChecklist({data:{applicationId}})).rejects.toThrow("guardian");
+    state.actor=family;
+    await expect(getGuardianEnrollmentChecklist({data:{applicationId:"not-a-uuid"}})).rejects.toThrow();
+    await expect(getGuardianEnrollmentChecklist({data:{applicationId,actorPersonId:guardian.id}})).rejects.toThrow();
+    state.actor=staff;
+    await tx.update(s.guardianRelationships).set({canManageEnrollment:false})
+     .where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),eq(s.guardianRelationships.studentPersonId,student.personId)));
+    await expect(offers.activateOfferedEnrollment({data:current})).rejects.toThrow("Guardian is not authorized");
+    await tx.update(s.guardianRelationships).set({canManageEnrollment:true})
+     .where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),eq(s.guardianRelationships.studentPersonId,student.personId)));
+    const activated=await offers.activateOfferedEnrollment({data:current});
+    enrollmentId=activated.enrollmentId;
+    expect(await offers.activateOfferedEnrollment({data:current})).toEqual(activated);
+    state.actor=family;
+    expect((await getGuardianEnrollmentChecklist({data:{applicationId}})).closed).toBe(true);
+    await expect(documentFlow.beginEnrollmentDocumentUpload({data:upload})).rejects.toThrow("closed or unavailable");
+    state.actor=staff;
+    await expect(reviewRequirementDocument({data:acceptance})).rejects.toThrow("Journey cannot be edited");
+    expect(first(await getAdmissionsDashboard({data:{programId:program.id,siteId:site.id}})).enrollments)
+     .toEqual([{schoolYearId:time.schoolYear.id,status:"active"}]);
+    state.actor=family;
+    expect(first((await getFamilyHome()).children)).toMatchObject({studentProfileId:profileId,awaitingSections:true});
+    expect(first(await getGuardianAdmissionOffers({data:{}})).offers.find(offer=>offer.id===current.offerId)?.progress.state)
+     .toBe("awaiting_classes");
+    const learner=act("student",student.personId);
+    expect((await getMyStudentToday()).sections).toEqual([]);
+    expect((await getNotifications()).filter(row=>row.title==="Enrollment confirmed")).toHaveLength(1);
+    state.actor={...learner,scope:{...learner.scope,programIds:[]}};
+    await expect(getMyStudentToday()).rejects.toThrow("active student membership");
+    const course=first(await tx.insert(s.courseTemplates).values({owningOrganizationId:org.id,code:key,title:"Enrolled Science",subject:"Science"}).returning());
+    const version=first(await tx.insert(s.courseTemplateVersions).values({courseTemplateId:course.id,version:1,status:"published"}).returning());
+    const section=first(await tx.insert(s.sections).values({programId:program.id,siteId:site.id,termId:time.term.id,
+     courseTemplateVersionId:version.id,code:key,title:"Enrolled Science"}).returning());
+    await tx.insert(s.sectionRegistrationPolicies).values({sectionId:section.id,enrollmentCapacity:1,
+     addDropEndsOn:"2099-01-01",withdrawalEndsOn:"2099-02-01"});
+    state.actor=staff;
+    expect((await listEnrollmentPlacements({data:{applicationId}})).active).toBe(true);
+    await placeEnrolledStudent({data:{applicationId,sectionId:section.id}});
+    expect(await placeEnrolledStudent({data:{applicationId,sectionId:section.id}})).toMatchObject({created:false});
+    state.actor=learner;
+    expect((await getMyStudentToday()).sections.map(row=>row.sectionId)).toEqual([section.id]);
+    expect((await accessibleClasses(learner)).map(row=>row.id)).toEqual([section.id]);
+    await authorizeClass(learner,section.id);
+    const unrelated=act("guardian",outsider.id);
+    await expect(authorizeClass(unrelated,section.id,student.personId)).rejects.toThrow();
+    state.actor=family;
+    expect(first((await getFamilyHome()).children)).toMatchObject({studentProfileId:profileId,sectionCount:1,awaitingSections:false});
+    expect(first(await getGuardianAdmissionOffers({data:{}})).offers.find(offer=>offer.id===current.offerId)?.progress.state).toBe("enrolled");
+    expect(first(await getGuardianAdmissionOffers({data:{}})).offers.find(offer=>offer.id===issued.offerId)?.progress.state).toBe("revoked");
+    await authorizeClass(family,section.id,student.personId);
+    state.actor={...family,scope:{...family.scope,programIds:[]}};
+    expect((await getFamilyHome()).children).toEqual([]);
+    expect(await getGuardianAdmissionOffers({data:{}})).toEqual([]);
+    state.actor=family;
+    const notices=await getNotifications();
+    expect(notices.some(row=>row.title==="Enrollment confirmed")).toBe(true);
+    expect(notices.filter(row=>row.title==="Enrollment confirmed")).toHaveLength(1);
+    expect(notices.filter(row=>row.title==="Enrollment offer withdrawn")).toHaveLength(1);
+    expect(notices.find(row=>row.title==="Enrollment offer withdrawn")?.href).toContain(`offer=${issued.offerId}`);
+    expect(JSON.stringify(notices)).not.toContain(withdraw.reason);
+    await tx.update(s.sections).set({active:false}).where(eq(s.sections.id,section.id));
+    expect(first(await getGuardianAdmissionOffers({data:{}})).offers.find(offer=>offer.id===current.offerId)?.progress.state)
+     .toBe("awaiting_classes");
+    expect(first((await getFamilyHome()).children).awaitingSections).toBe(true);
+    state.actor=learner;
+    expect((await getMyStudentToday()).sections).toEqual([]);
+    state.actor=staff;
+    await expect(setFamilyRequirement({data:{applicationId,requirementId:requirement.id,complete:false}}))
+     .rejects.toThrow("Journey cannot be edited");
+    expect(await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,profileId),eq(s.enrollments.kind,"program")))).toHaveLength(1);
+    expect(await tx.select().from(s.enrollments).where(and(eq(s.enrollments.studentProfileId,profileId),eq(s.enrollments.kind,"section")))).toHaveLength(1);
+    const persisted=first(await tx.select().from(s.applications).where(eq(s.applications.id,applicationId)));
+    expect(persisted).toMatchObject({householdId:app.householdId,studentProfileId:profileId,stage:"accepted"});
+    for(const id of [documentId,replaced.documentId]){
+     expect(await tx.select().from(s.domainEvents).where(and(eq(s.domainEvents.aggregateId,id),
+      eq(s.domainEvents.eventType,"EnrollmentDocumentSubmitted")))).toHaveLength(1);
+     expect(await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.resourceId,id),
+      eq(s.auditEvents.action,"enrollment.document.upload")))).toHaveLength(1);
+    }
+    expect(await tx.select().from(s.domainEvents).where(and(eq(s.domainEvents.aggregateId,requirement.id),
+     eq(s.domainEvents.eventType,"EnrollmentDocumentReviewed")))).toHaveLength(3);
+    for(const [id,event] of [[issued.offerId,"AdmissionOfferRevoked"],[current.offerId,"AdmissionOfferAccepted"],[enrollmentId,"EnrollmentActivated"]]){
+     expect(await tx.select().from(s.domainEvents).where(and(eq(s.domainEvents.aggregateId,id!),eq(s.domainEvents.eventType,event!)))).toHaveLength(1);
+    }
+    const audit=first(await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.resourceId,issued.offerId),
+     eq(s.auditEvents.action,"admissions.offer.withdraw"))));
+    expect(audit.after).toMatchObject({status:"revoked",reason:withdraw.reason});
+    for(const [id,action] of [[issued.offerId,"admissions.offer.withdraw"],[enrollmentId,"admissions.offer.activate"]]){
+     expect(await tx.select().from(s.auditEvents).where(and(
+      eq(s.auditEvents.resourceId,id!),eq(s.auditEvents.action,action!)))).toHaveLength(1);
+    }
+    const intakeKey=`configured-intake-${suffix}`;
+    await tx.insert(s.journeyDefinitions).values({key:intakeKey,version:"1",audience:"family",owningOrganizationId:org.id,
+     title:"Program-specific signed enrollment",configuration:{requirements:[
+      {key:"program-form",title:"Program form",blocking:true,enrollmentForm:configured.form}
+     ]}});
+    await tx.update(s.programs).set({metadata:{enrollmentJourneyDefinitionKey:intakeKey}}).where(eq(s.programs.id,program.id));
+    for(const decision of ["withdraw","decline"] as const){
+     const closed=await intake.createAdmissionsInquiry({data:{requestId:crypto.randomUUID(),programId:program.id,
+      studentFirstName:"Exception",studentLastName:decision,guardianFirstName:"Exception",guardianLastName:"Guardian",
+      guardianEmail:`admissions-${decision}-${suffix}@example.invalid`}});
+     await intake.transitionAdmissionsStage({data:{applicationId:closed.applicationId,decision:"application"}});
+     await intake.transitionAdmissionsStage({data:{applicationId:closed.applicationId,decision:"eligibility"}});
+     await intake.transitionAdmissionsStage({data:{applicationId:closed.applicationId,decision:"waitlist"}});
+     await intake.transitionAdmissionsStage({data:{applicationId:closed.applicationId,decision}});
+     await expect(intake.transitionAdmissionsStage({data:{applicationId:closed.applicationId,decision}})).rejects.toThrow("not permitted");
+     await expect(intake.transitionAdmissionsStage({data:{applicationId:closed.applicationId,decision:"restore"}})).rejects.toThrow("not permitted");
+     await expect(offers.issueAdmissionOffer({data:{...issuance,applicationId:closed.applicationId}})).rejects.toThrow("not open");
+     expect(first(await tx.select().from(s.applications).where(eq(s.applications.id,closed.applicationId))))
+      .toMatchObject({stage:decision==="withdraw"?"withdrawn":"declined",metadata:{admissionsDisposition:null}});
+     expect(await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.resourceId,closed.applicationId),
+      eq(s.auditEvents.action,`admissions.stage.${decision}`)))).toHaveLength(1);
+    }
+    const inquiry=await intake.createAdmissionsInquiry({data:{requestId:crypto.randomUUID(),programId:program.id,
+     studentFirstName:"Configured",studentLastName:"Applicant",guardianFirstName:"Configured",guardianLastName:"Guardian",
+     guardianEmail:`configured-${suffix}@example.invalid`}});
+    await intake.transitionAdmissionsStage({data:{applicationId:inquiry.applicationId,decision:"application"}});
+    await intake.transitionAdmissionsStage({data:{applicationId:inquiry.applicationId,decision:"eligibility"}});
+    const intakeJourney=first(await tx.select().from(s.journeys).where(eq(s.journeys.participantId,inquiry.applicationId)));
+    expect(first(await tx.select().from(s.journeyRequirements).where(eq(s.journeyRequirements.journeyId,intakeJourney.id))))
+     .toMatchObject({metadata:{enrollmentForm:{version:"approved-test-v1"}}});
+    checked=true;throw rollback;
+   });
+  }catch(error){if(error!==rollback)throw error;}
+  finally{state.tx=undefined;state.actor=undefined;state.failDocumentEvent=false;state.failStageEvent=false;vi.unstubAllEnvs();}
+  expect(checked).toBe(true);
+  expect(await database.select().from(s.applications).where(eq(s.applications.id,applicationId))).toEqual([]);
+  expect(await database.select().from(s.studentProfiles).where(eq(s.studentProfiles.id,profileId))).toEqual([]);
+  expect(await database.select().from(s.enrollments).where(eq(s.enrollments.id,enrollmentId))).toEqual([]);
+  expect(await database.select().from(s.auditEvents).where(eq(s.auditEvents.resourceId,withdrawnOfferId))).toEqual([]);
+  expect(await database.select().from(s.documents).where(eq(s.documents.id,documentId))).toEqual([]);
+  expect(await database.select().from(s.domainEvents).where(eq(s.domainEvents.aggregateId,documentId))).toEqual([]);
+  expect(await database.select().from(s.journeyRequirements).where(eq(s.journeyRequirements.id,formRequirementId))).toEqual([]);
+  expect(await database.select().from(s.auditEvents).where(eq(s.auditEvents.resourceId,formRequirementId))).toEqual([]);
+ },180_000);
+});

@@ -1,10 +1,13 @@
 import { db } from "@/db/client";
-import { accessAccounts,accountPersonGrants,applications,guardianRelationships,householdMemberships,households,journeyRequirements,journeys,people,programs,studentProfiles } from "@/db/schema";
+import { accessAccounts,accountPersonGrants,admissionOffers,applications,enrollments,guardianRelationships,householdMemberships,households,journeyRequirements,journeys,people,programs,studentProfiles } from "@/db/schema";
+import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
+import { offerHoldsSeat } from "@/domain/admissions-policy";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
+import { enrollmentJourneyDefinitionKey } from "@/domain/enrollment-form";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
@@ -26,7 +29,7 @@ async function registrar(){
 }
 export const listAdmissionsIntakePrograms=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await registrar();
- return db.select({id:programs.id,name:programs.name}).from(programs)
+ return db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs)
   .where(and(inArray(programs.id,actor.scope.programIds!),
     inArray(programs.organizationId,actor.scope.organizationIds??[])))
   .orderBy(programs.name);
@@ -158,15 +161,20 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
 export const transitionAdmissionsStage=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({applicationId:uuid,
   decision:z.enum(["application","eligibility","accept","decline","withdraw","waitlist","restore"]),
-  note:z.string().trim().max(2000).optional()}).parse(v))
+  note:z.string().trim().max(2000).optional()}).strict().parse(v))
  .handler(async({data})=>{
   const actor=await registrar();
   return db.transaction(async tx=>{
+   await lockAdmissionsApplication(tx,data.applicationId);
    const [app]=await tx.select().from(applications).where(eq(applications.id,data.applicationId))
     .for("update").limit(1);
    if(!app||!actor.scope.programIds?.includes(app.programId))
     throw new AuthorizationError("admissions application");
    assertRecordWriteAllowed(app.metadata,"registrar");
+   const [scope]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
+    .from(programs).where(eq(programs.id,app.programId)).limit(1);
+   if(!scope||!actor.scope.organizationIds?.includes(scope.organizationId)||
+    (scope.siteId!==null&&!actor.scope.siteIds?.includes(scope.siteId)))throw new AuthorizationError("admissions school and organization");
    const waitlisted=app.metadata.admissionsDisposition==="waitlisted";
    const expected:Record<string,string[]>={
     application:["inquiry"],eligibility:["application"],accept:["eligibility"],
@@ -177,6 +185,18 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
       ((data.decision==="restore")!==waitlisted && ["restore"].includes(data.decision)) ||
       (waitlisted&&!["restore","decline","withdraw"].includes(data.decision)))
     throw new Error("Decision is not permitted from the current admissions stage");
+   if(["decline","withdraw","waitlist"].includes(data.decision)){
+    const offers=await tx.select({status:admissionOffers.status,expiresAt:admissionOffers.expiresAt}).from(admissionOffers)
+     .where(eq(admissionOffers.applicationId,app.id));
+    if(offers.some(offer=>offer.status==="accepted"))
+     throw new Error("This application has an accepted offer. Resolve its enrollment through the enrollment workflow; intake cannot close or waitlist it.");
+    if(offers.some(offer=>offerHoldsSeat(offer)))
+     throw new Error("Withdraw each unaccepted enrollment offer before closing or waitlisting this application.");
+    const [activeEnrollment]=await tx.select({id:enrollments.id}).from(enrollments)
+     .where(and(eq(enrollments.studentProfileId,app.studentProfileId),eq(enrollments.programId,app.programId),
+      eq(enrollments.kind,"program"),eq(enrollments.status,"active"))).limit(1);
+    if(activeEnrollment)throw new Error("Active enrollment cannot be closed or waitlisted from admissions intake.");
+   }
    const next=data.decision==="application"?"application":data.decision==="eligibility"?"eligibility":
     data.decision==="accept"?app.stage:data.decision==="decline"?"declined":
     data.decision==="withdraw"?"withdrawn":app.stage;
@@ -184,12 +204,18 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
    if(data.decision==="waitlist")nextMetadata={...nextMetadata,admissionsDisposition:"waitlisted"};
    if(data.decision==="accept")nextMetadata={...nextMetadata,admissionsDisposition:"offer_ready"};
    if(data.decision==="restore")nextMetadata={...nextMetadata,admissionsDisposition:null};
+   if(["decline","withdraw"].includes(data.decision))nextMetadata={...nextMetadata,admissionsDisposition:null};
    if(data.decision==="eligibility" || data.decision==="accept"){
     const [journey]=await tx.select({id:journeys.id}).from(journeys)
      .where(and(eq(journeys.participantType,"application"),eq(journeys.participantId,app.id))).limit(1);
     if(data.decision==="eligibility" && !journey){
-     await instantiateJourneyFromDefinition(tx,{definitionKey:"family-enrollment",
+     const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId,metadata:programs.metadata})
+      .from(programs).where(eq(programs.id,app.programId)).for("share").limit(1);
+     if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
+       (program.siteId!==null&&!actor.scope.siteIds?.includes(program.siteId)))throw new AuthorizationError("enrollment school and organization");
+     await instantiateJourneyFromDefinition(tx,{definitionKey:enrollmentJourneyDefinitionKey(program.metadata),
       subjectType:"application",subjectId:app.id,programId:app.programId,ownerPersonId:actor.actorPersonId,
+      organizationId:program.organizationId,siteId:program.siteId,
       insertErrorLabel:"Family enrollment"});
     }
     if(data.decision==="accept"){

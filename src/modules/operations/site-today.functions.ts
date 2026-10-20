@@ -1,11 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, asc, eq, inArray, gte, lt, ne, isNull, notExists, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { actions, attendanceEvents, calendarEvents, calendarEventParticipants, enrollments, organizations, programs, scheduledOccurrences, sites } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
+import { listOpeningHandoffs,listOpeningOperators } from "@/modules/programs/opening-handoff.server";
+import { openingHandoffManagerCapability } from "@/modules/programs/opening-handoff.server";
+import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
+import type { Actor } from "@/modules/identity/actors.server";
 
 const requestSchema = z.object({ siteId: z.string().uuid() });
 const openStatuses = ["open", "in_progress", "waiting"] as const;
@@ -27,6 +31,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
     if (!site || !actor.scope.organizationIds?.includes(site.organizationId)) {
       throw new AuthorizationError("site.today.read");
     }
+    setResponseHeader("Cache-Control","private, no-store");
 
     const visiblePrograms = await db.select({
       id: programs.id, name: programs.name, status: programs.status,
@@ -35,6 +40,15 @@ export const getSiteToday = createServerFn({ method: "GET" })
     const permitted = new Set(actor.scope.programIds ?? []);
     const scopedPrograms = visiblePrograms.filter(p => permitted.has(p.id));
     const programIds = scopedPrograms.map(p => p.id);
+    const handoffs=await listOpeningHandoffs(programIds);
+    const openingOperators=await listOpeningOperators({organizationId:site.organizationId,siteId:site.id});
+    const canReceive=openingOperators.some(operator=>operator.personId===actor.actorPersonId);
+    const managerPrograms=new Set<string>();
+    for(const program of scopedPrograms){
+      if(await hasInstitutionalProgramCapability({...actor,actorPersonId:actor.actorPersonId} satisfies Actor,
+        {...program,organizationId:site.organizationId,siteId:site.id},openingHandoffManagerCapability))
+        managerPrograms.add(program.id);
+    }
     // Site-local day boundaries, including daylight-saving transitions.
     const now = new Date();
     const dayText = new Intl.DateTimeFormat("en-CA", {
@@ -104,6 +118,15 @@ export const getSiteToday = createServerFn({ method: "GET" })
     return {
       site, asOf: now.toISOString(), localDate: dayText,
       programs: scopedPrograms,
+      openingHandoffs:handoffs.map(row=>({...row,createdAt:row.createdAt.toISOString(),
+        resolvedAt:row.resolvedAt?.toISOString()??null,
+        recipientEligible:openingOperators.some(operator=>operator.personId===row.ownerPersonId),
+        replacementOperators:row.status==="open"&&row.programId&&managerPrograms.has(row.programId)&&
+          !openingOperators.some(operator=>operator.personId===row.ownerPersonId)&&
+          scopedPrograms.some(program=>program.id===row.programId&&program.status==="active")?openingOperators:[],
+        canAcknowledge:canReceive&&row.ownerPersonId===actor.actorPersonId&&row.status==="open"&&
+          scopedPrograms.some(program=>program.id===row.programId&&program.status==="active"),
+      })),
       enrollment: { count: enrollmentCount, note: "Distinct students in active non-section program enrollments" },
       attendance: {
         count: observations.length,

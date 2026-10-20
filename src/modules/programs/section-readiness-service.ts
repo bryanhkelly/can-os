@@ -1,20 +1,20 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { db } from "@/db/client";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { db, type Database } from "@/db/client";
 import {
-  deliveryArrangements,
   enrollments,
   instructionalCapacityReservations,
   qualificationClaims,
   qualificationVerificationEvents,
   sectionCapacityDemands,
-  sectionRegistrationPolicies,
   sections,
-  sectionTeachers,
   terms,
 } from "@/db/schema";
+import { credentialStatusFromDecision } from "@/domain/credential-workflow";
 import { getSectionMeetingPattern } from "@/modules/academic-time/section-schedule-service";
 import { getSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
 import { getActiveDeliveryArrangement } from "@/modules/staffing/delivery-arrangement-service";
+import { currentCapacityReservationFilter } from "@/modules/staffing/reservation-policy";
+import { evaluateLaunchStaffing } from "@/modules/staffing/launch-staffing.server";
 
 export type ReadinessState = "ready" | "needs_review" | "blocked";
 export type SectionReadinessItem = {
@@ -26,7 +26,9 @@ export type SectionReadinessItem = {
 
 export async function evaluateSectionReadiness(
   sectionId: string,
-  executor: any = db,
+  executor: Pick<Database, "select" | "selectDistinctOn"> = db,
+  now = new Date(),
+  purpose: "operations" | "launch" = "operations",
 ): Promise<{
   sectionId: string;
   ready: boolean;
@@ -59,7 +61,7 @@ export async function evaluateSectionReadiness(
   const [policy, pattern, arrangement, demandRows, enrollmentRows] = await Promise.all([
     getSectionRegistrationPolicy(sectionId, executor),
     getSectionMeetingPattern(sectionId, executor),
-    getActiveDeliveryArrangement(sectionId, executor),
+    getActiveDeliveryArrangement(sectionId, executor, now),
     executor
       .select({
         id: sectionCapacityDemands.id,
@@ -91,7 +93,7 @@ export async function evaluateSectionReadiness(
       .from(instructionalCapacityReservations)
       .where(and(
         eq(instructionalCapacityReservations.demandId, demand.id),
-        inArray(instructionalCapacityReservations.status, ["held", "committed"]),
+        currentCapacityReservationFilter(now),
       ));
     reservedInstructionalSeats = reservations.reduce(
       (sum: number, row: { seats: number }) => sum + row.seats,
@@ -148,11 +150,21 @@ export async function evaluateSectionReadiness(
     });
   }
 
-  if (!arrangement) {
+  if (purpose === "launch") {
+    const coverage = await evaluateLaunchStaffing(sectionId, executor);
+    items.push({
+      key: "launch_staffing",
+      state: coverage.ready ? "ready" : "blocked",
+      message: coverage.ready
+        ? "Assigned instructors satisfy published qualification policies and delivery covers the instructional window."
+        : coverage.reasons.join(" "),
+      evidence: { from: coverage.from, through: coverage.through, instructors: coverage.instructors },
+    });
+  } else if (!arrangement) {
     items.push({
       key: "delivery",
       state: "blocked",
-      message: "No active delivery arrangement is assigned.",
+      message: "No active delivery arrangement is effective at the evaluation time.",
     });
   } else {
     items.push({
@@ -167,35 +179,33 @@ export async function evaluateSectionReadiness(
     });
   }
 
-  if (arrangement?.instructorPersonId) {
+  if (purpose === "operations" && arrangement?.instructorPersonId) {
     const claims = await executor
-      .select({
+      .selectDistinctOn([qualificationClaims.id], {
         claimId: qualificationClaims.id,
+        issuedAt: qualificationClaims.issuedAt,
         expiresAt: qualificationClaims.expiresAt,
+        decision: qualificationVerificationEvents.decision,
       })
       .from(qualificationClaims)
-      .where(eq(qualificationClaims.personId, arrangement.instructorPersonId));
+      .leftJoin(qualificationVerificationEvents, eq(qualificationVerificationEvents.claimId, qualificationClaims.id))
+      .where(eq(qualificationClaims.personId, arrangement.instructorPersonId))
+      .orderBy(qualificationClaims.id, desc(qualificationVerificationEvents.sequence));
 
-    let verified = false;
-    for (const claim of claims) {
-      if (claim.expiresAt && claim.expiresAt < new Date()) continue;
-      const [latest] = await executor
-        .select({ decision: qualificationVerificationEvents.decision })
-        .from(qualificationVerificationEvents)
-        .where(eq(qualificationVerificationEvents.claimId, claim.claimId))
-        .orderBy(desc(qualificationVerificationEvents.sequence))
-        .limit(1);
-      if (latest?.decision === "verified" || latest?.decision === "approved") {
-        verified = true;
-        break;
-      }
-    }
+    const reviewedClaims = claims.map(claim => ({
+      ...claim, status: credentialStatusFromDecision(claim.decision),
+    }));
+    const verified = reviewedClaims.some(claim =>
+      claim.status === "verified" &&
+      (!claim.issuedAt || claim.issuedAt <= now) &&
+      (!claim.expiresAt || claim.expiresAt > now),
+    );
 
     items.push({
       key: "qualification_evidence",
       state: verified ? "ready" : "needs_review",
       message: verified
-        ? "Instructor has current verified qualification evidence."
+        ? "Instructor has current verified qualification evidence. Program-specific teaching eligibility still requires policy review."
         : "Instructor is assigned, but no current verified qualification evidence was found.",
     });
   }

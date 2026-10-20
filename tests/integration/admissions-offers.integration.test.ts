@@ -1,4 +1,19 @@
-import {describe,expect,it} from "vitest";
+import {describe,expect,it,vi} from "vitest";
+import type { Actor } from "@/modules/identity/actors.server";
+const state=vi.hoisted(()=>({actor:undefined as Actor|undefined}));
+vi.mock("@/modules/identity/command-context.server",()=>({
+ getCommandContext:async()=>{if(!state.actor)throw new Error("Missing admissions race actor");return state.actor;},
+}));
+vi.mock("@tanstack/react-start/server",()=>({getRequest:()=>new Request("http://localhost")}));
+vi.mock("@tanstack/react-start",()=>({
+ createServerFn:()=>({
+  parse:(value:unknown)=>value,
+  validator(parse:(value:unknown)=>unknown){this.parse=parse;return this;},
+  handler(callback:(input:{data:unknown})=>unknown){
+   return async(input?:{data:unknown})=>callback({data:this.parse(input?.data)});
+  },
+ }),
+}));
 /** Explicit opt-in only. Never write integration fixtures to a production DB automatically. */
 const integration=process.env.DATABASE_URL&&process.env.CAN_TEST_DB_WRITES_ENABLED==="true"&&process.env.APP_ENV==="test"&&process.env.NODE_ENV==="test"?describe:describe.skip;
 integration("synthetic admissions offer concurrency",()=>{
@@ -138,5 +153,34 @@ integration("synthetic admissions offer concurrency",()=>{
   expect(persistentOffers.filter(o=>o.status==="accepted")).toHaveLength(1);
   expect(persistentOffers.filter(o=>o.status==="issued")).toHaveLength(0);
 
+  const {transitionAdmissionsStage}=await import("@/modules/enrollment/admissions-intake.functions");
+  state.actor={...registrar,accountId:crypto.randomUUID(),sessionId:crypto.randomUUID(),grantId:crypto.randomUUID(),
+   scope:{organizationIds:[school.id],siteIds:[site.id],programIds:[program.id]}};
+  await db.update(s.admissionSeatPools).set({capacity:3}).where(eq(s.admissionSeatPools.programId,program.id));
+  // Real concurrent transactions: an offer and waitlist decision must never both commit.
+  for(let attempt=0;attempt<2;attempt++){
+   const racing=await startFamilyApplication(family,{programId:program.id,householdId:sharedHouseholdId,
+    idempotencyKey:`race-family-${suffix}-${attempt}`,journeyDefinitionKey:journeyKey,
+    student:{legalFirstName:`Race${attempt}`,legalLastName:"Student",gradeLevel:"9"}});
+   await db.update(s.applications).set({stage:"eligibility",metadata:{synthetic:true}}).where(eq(s.applications.id,racing.applicationId));
+   await db.update(s.journeys).set({status:"ready"}).where(eq(s.journeys.id,racing.journeyId));
+   const issue=()=>svc.issueSyntheticAdmissionOffer(registrar,{applicationId:racing.applicationId,schoolYearId:calendar.schoolYear.id,
+    idempotencyKey:`race-offer-${suffix}-${attempt}`,expiresAt:expiry});
+   const waitlist=()=>transitionAdmissionsStage({data:{applicationId:racing.applicationId,decision:"waitlist"}});
+   const results=await Promise.allSettled(attempt===0?[issue(),waitlist()]:[waitlist(),issue()]);
+   expect(results.filter(result=>result.status==="fulfilled")).toHaveLength(1);
+   const failure=results.find(result=>result.status==="rejected");
+   expect(failure?.status==="rejected"?String(failure.reason):"").toMatch(/Restore the waitlisted|Withdraw each/);
+   const [after]=await db.select().from(s.applications).where(eq(s.applications.id,racing.applicationId));
+   const issued=await db.select().from(s.admissionOffers).where(eq(s.admissionOffers.applicationId,racing.applicationId));
+   if(after.metadata.admissionsDisposition==="waitlisted")expect(issued).toHaveLength(0);
+   else{
+    expect(issued).toHaveLength(1);
+    expect(issued[0].status).toBe("issued");
+    await svc.withdrawAdmissionOffer(registrar,{offerId:issued[0].id,reason:"Complete synthetic concurrency acceptance."});
+    await transitionAdmissionsStage({data:{applicationId:racing.applicationId,decision:"withdraw"}});
+   }
+  }
+  state.actor=undefined;
  },90000);
 });

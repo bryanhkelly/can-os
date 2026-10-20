@@ -164,8 +164,8 @@ export const replaceStudioSchedulePeriods=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({scheduleTemplateId:uuid,periods:z.array(z.object({
   dayOfWeek:z.number().int().min(0).max(6),sequence:z.number().int().positive(),
   label:z.string().trim().min(1).max(80),
-  startsAtLocal:z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),
-  endsAtLocal:z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),
+  startsAtLocal:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  endsAtLocal:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   type:z.enum(["instruction","break","lunch","chapel","advisory"]),
  })).min(1).max(80)}).parse(v))
  .handler(async({data})=>{

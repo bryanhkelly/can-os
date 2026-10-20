@@ -10,7 +10,7 @@
  * Column names were verified against src/db/schema/*. (organizations.ts,
  * academic-time.ts, academics.ts, identity.ts, access.ts, work.ts).
  */
-import { neon } from "@neondatabase/serverless";
+import type { NeonQueryFunction } from "@neondatabase/serverless";
 import { randomBytes, randomUUID } from "node:crypto";
 import {
   accessSessionCookie,
@@ -18,7 +18,7 @@ import {
 } from "../../src/domain/access-tokens";
 import { TEST_ACCESS_TOKEN_PEPPER } from "./env";
 
-export type Sql = ReturnType<typeof neon>;
+export type Sql = NeonQueryFunction<false, false>;
 
 export interface Gf1Fixture {
   suffix: string;

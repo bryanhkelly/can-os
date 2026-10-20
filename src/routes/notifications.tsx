@@ -4,20 +4,30 @@ import {getNotifications,readNotification,readAllNotifications,setNotificationSt
 import {groupNotices} from "@/domain/notification-center";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-const loadNotifications=()=>getNotifications();
+import {z} from "zod";
+import {getDeliveryHistory} from "@/modules/communication/delivery-history.functions";
+import {DeliveryHistory} from "@/components/communication/DeliveryHistory";
+const loadNotifications=async(deliveryCursor?:string)=>{
+ const [notices,history]=await Promise.all([getNotifications(),
+  safeLoader(()=>getDeliveryHistory({data:{cursor:deliveryCursor}}))()]);
+ return {notices,history};
+};
 export const Route=createFileRoute("/notifications")({
- validateSearch:(search:Record<string,unknown>):{notification?:string}=>({
+ validateSearch:(search:Record<string,unknown>):{notification?:string;deliveryCursor?:string}=>({
   notification:typeof search.notification==="string"?search.notification:undefined,
+  deliveryCursor:z.string().uuid().optional().parse(search.deliveryCursor),
  }),
- loader:safeLoader(loadNotifications,{authMessage:"Sign in to view your notifications."}),component:NotificationsPage});
+ loaderDeps:({search})=>({deliveryCursor:search.deliveryCursor}),
+ loader:({deps})=>safeLoader(()=>loadNotifications(deps.deliveryCursor),{authMessage:"Sign in to view your notifications."})(),
+ component:NotificationsPage});
 function NotificationsPage(){
  const outcome=Route.useLoaderData();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Notifications" title="Notification center" outcome={outcome}/>;
- return <NotificationsView notices={outcome.data}/>;
+ return <NotificationsView notices={outcome.data.notices} history={outcome.data.history}/>;
 }
-function NotificationsView({notices}:{notices:Awaited<ReturnType<typeof loadNotifications>>}){
+function NotificationsView({notices,history}:Awaited<ReturnType<typeof loadNotifications>>){
  const router=useRouter();
- const {notification}=Route.useSearch();
+ const {notification,deliveryCursor}=Route.useSearch();
  const [busy,setBusy]=useState<string|null>(null);
  const [error,setError]=useState("");
  const center=groupNotices(notification?notices.filter(item=>item.id===notification):notices);
@@ -39,6 +49,12 @@ function NotificationsView({notices}:{notices:Awaited<ReturnType<typeof loadNoti
   catch(e){setError(e instanceof Error?e.message:"Unable to update notifications");}
   finally{setBusy(null);}
  }
+ async function refreshHistory(){
+  setBusy("refresh");setError("");
+  try{await router.invalidate();}
+  catch(e){setError(e instanceof Error?e.message:"Unable to refresh delivery history");}
+  finally{setBusy(null);}
+ }
  return <main className="mx-auto max-w-4xl px-5 py-10">
  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Notifications</p>
  <h1 className="mt-2 font-serif text-4xl">Notification center</h1>
@@ -49,5 +65,6 @@ function NotificationsView({notices}:{notices:Awaited<ReturnType<typeof loadNoti
  <div className="mt-6 flex items-center justify-between gap-4 rounded-xl border bg-card p-4"><span className="font-semibold">Unread notifications: {center.unreadCount}</span><button type="button" disabled={!center.unreadCount||busy!==null} onClick={markAllRead} className="rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">{busy==="all"?"Saving…":"Mark all as read"}</button></div>
  {([{label:"Needs attention",items:center.unread},{label:"Earlier updates",items:center.earlier}] as const).map(section=><section key={section.label} className="mt-8"><h2 className="font-serif text-2xl">{section.label}</h2>
  <div className="mt-4 space-y-3">{section.items.map(n=><article key={n.id} className="rounded-xl border bg-card p-5"><div className="flex flex-wrap items-center justify-between gap-3"><p className="font-semibold">{n.href?<Link to={n.href} href={n.href} className="hover:underline">{n.title}</Link>:n.title}</p><time className="text-xs text-muted-foreground">{new Date(n.date).toLocaleDateString()}</time></div><p className="mt-2 text-sm text-muted-foreground">{n.body}</p><div className="mt-3 flex flex-wrap items-center gap-4">{n.href?<Link to={n.href} href={n.href} className="text-xs font-semibold underline">Open related record →</Link>:<span className="text-xs text-muted-foreground">No supported deep link for this update.</span>}{n.status!=="unread"&&<button type="button" disabled={busy!==null} className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50" onClick={()=>changeStatus(n.id,"unread")}>Mark unread</button>}{n.status!=="dismissed"&&<button type="button" disabled={busy!==null} className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50" onClick={()=>changeStatus(n.id,"dismissed")}>Dismiss</button>}{n.status==="unread"&&<button type="button" disabled={busy!==null} className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50" onClick={()=>markRead(n.id)}>{busy===n.id?"Saving…":"Mark as read"}</button>}</div></article>)}{!section.items.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">Nothing here yet.</p>}</div></section>)}
+ <DeliveryHistory history={history.ok?history.data:null} cursor={deliveryCursor} notification={notification} refreshing={busy!==null} onRefresh={()=>void refreshHistory()}/>
  </main>;
 }

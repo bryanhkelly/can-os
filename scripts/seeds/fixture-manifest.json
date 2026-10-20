@@ -826,6 +826,25 @@
         "section_teachers"
       ]
     },
+    "/operations/curriculum": {
+      "persona": "registrar",
+      "seeds": ["new-experiences-v1.sql", "curriculum-authoring.sql"],
+      "recordCounts": {
+        "memberships": 1,
+        "role_assignments": 1,
+        "course_templates": 1,
+        "course_template_versions": 1
+      },
+      "interactions": [
+        "deny authoring without an explicit curriculum publisher grant",
+        "edit and save syllabus, ordered modules and lesson reading",
+        "publish a validated release with confirmation and a reason",
+        "provision a new section from the release without changing existing classes"
+      ],
+      "downstreamRecords": [
+        "course_templates", "course_template_versions", "sections", "audit_events", "domain_events"
+      ]
+    },
     "/operations/school-years": {
       "persona": "registrar",
       "seeds": [

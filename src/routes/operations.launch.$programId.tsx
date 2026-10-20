@@ -1,10 +1,13 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher} from "@/modules/programs/launch-academics.functions";
+import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,publishLaunchTeacherPolicy} from "@/modules/programs/launch-academics.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import {SectionLifecycleWorkspace} from "@/components/operations/SectionLifecycleManager";
+import {Qualifications} from "@/components/profiles/Qualifications";
+import {QualificationCatalog} from "@/components/profiles/QualificationCatalog";
+import {TeacherPolicyRevisions} from "@/components/profiles/TeacherPolicyRevisions";
 export const Route=createFileRoute("/operations/launch/$programId")({
  loader:({params})=>safeLoader(()=>getLaunchAcademicSetup({data:{programId:params.programId}}),
   {authMessage:"Sign in with a registrar grant for this program."})(),
@@ -22,6 +25,9 @@ function Setup({data}:{data:Snapshot}){
  const [versionId,setVersionId]=useState(data.catalog[0]?.versionId??"");
  const [code,setCode]=useState(""),[title,setTitle]=useState("");
  const [teacherId,setTeacherId]=useState("");
+ const [qualificationKeys,setQualificationKeys]=useState<string[]>([]);
+ const [policyConfirmed,setPolicyConfirmed]=useState(false);
+ const [reviewTeacherId,setReviewTeacherId]=useState("");
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  async function run(operation:()=>Promise<unknown>,message:string){
   setBusy(true);setError("");setNotice("");
@@ -50,6 +56,34 @@ function Setup({data}:{data:Snapshot}){
   {!data.catalog.length&&<p className="mt-6 rounded-lg border p-4 text-sm">
    No published course templates are available from this program's academic provider. Publish curriculum before creating sections.
   </p>}
+  <QualificationCatalog programId={data.program.id} canAuthor={data.canAuthorCatalog}
+   changed={async()=>{await router.invalidate();}}/>
+  <section className="mt-7 rounded-xl border bg-card p-5">
+   <h2 className="font-serif text-2xl">Teacher qualification policy</h2>
+   {data.policyPublished?<p className="mt-3 text-sm">Program requirements are published. Each instructor is checked against every applicable published policy for the full instructional window.</p>:
+    <form className="mt-3 space-y-3" onSubmit={e=>{
+     e.preventDefault();void run(()=>publishLaunchTeacherPolicy({data:{
+      programId:data.program.id,qualificationKeys,confirmed:true}}),"Teacher qualification policy published.");
+    }}>
+     <p className="text-sm">Assignment and opening require applicable published policies. Publish this program's reviewed requirements here; jurisdiction, organization and site policies also apply. Select every required qualification; all must be independently verified. Publishing does not certify legal or regulatory compliance.</p>
+     <div className="space-y-2">{data.qualificationCatalog.map(qualification=>
+      <label key={qualification.key} className="flex items-center gap-2 text-sm">
+       <input type="checkbox" checked={qualificationKeys.includes(qualification.key)} onChange={e=>
+        setQualificationKeys(keys=>e.target.checked?[...keys,qualification.key]:keys.filter(key=>key!==qualification.key))}/>
+       {qualification.title} <span className="text-xs text-muted-foreground">({qualification.key})</span>
+      </label>)}</div>
+     {!data.qualificationCatalog.length&&<p role="alert" className="text-sm">No qualification catalog entries exist. Configure the shared qualification catalog before publishing requirements.</p>}
+     <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={policyConfirmed}
+      onChange={e=>setPolicyConfirmed(e.target.checked)}/>
+      I confirm these requirements are reviewed for this program and apply to its instructional dates. Published requirements cannot be edited here.
+     </label>
+     <button disabled={busy||!policyConfirmed||!qualificationKeys.length} type="submit"
+      className="rounded border px-3 py-2 text-sm disabled:opacity-50">Publish reviewed requirements</button>
+    </form>}
+   <TeacherPolicyRevisions programId={data.program.id} policies={data.teacherPolicies}
+    catalog={data.qualificationCatalog} canRevise={data.canReviseTeacherPolicy}
+    changed={async()=>{await router.invalidate();}}/>
+  </section>
   <section className="mt-7 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Provision a class</h2>
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
@@ -84,6 +118,17 @@ function Setup({data}:{data:Snapshot}){
      programId:data.program.id,sectionId:section.id,teacherPersonId:personId}}),"Instructor assigned.")}/>)}
    {!data.sections.length&&<p className="rounded-lg border p-4 text-sm text-muted-foreground">No sections have been provisioned for this program.</p>}
   </section>
+  <section className="mt-7 rounded-xl border bg-card p-5">
+   <h2 className="font-serif text-2xl">Independent credential review</h2>
+   <p className="mt-2 text-sm">Teachers submit private evidence from their own profile. Review here requires an explicit credential-verifier grant and an institutional relationship; publishing requirements alone does not grant review authority.</p>
+   <label className="mt-3 block text-sm">Teacher to review<select value={reviewTeacherId}
+    onChange={event=>setReviewTeacherId(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
+    <option value="">Choose teacher</option>{data.teachingStaff.map(teacher=>
+     <option key={teacher.personId} value={teacher.personId}>{teacher.first} {teacher.last}</option>)}
+   </select></label>
+   {reviewTeacherId&&<Qualifications key={reviewTeacherId} personId={reviewTeacherId}
+    programId={data.program.id} onChanged={async()=>{await router.invalidate();}}/>}
+  </section>
   <SectionLifecycleWorkspace programId={data.program.id} staff={data.teachingStaff}/>
  </WorkspaceShell>;
 }
@@ -92,6 +137,7 @@ function SectionRow({section,staff,busy,assign}:{
  assign:(personId:string)=>Promise<void>
 }){
  const [personId,setPersonId]=useState("");
+ const candidate=section.candidates.find(candidate=>candidate.personId===personId);
  return <article className="rounded-lg border bg-card p-4">
   <h3 className="font-semibold">{section.title} · {section.code}</h3>
   <p className="mt-2 text-xs text-muted-foreground">
@@ -114,8 +160,13 @@ function SectionRow({section,staff,busy,assign}:{
     <option value="">Choose teacher</option>{staff.filter(t=>!section.teachers.some(a=>a.personId===t.personId))
       .map(t=><option key={t.personId} value={t.personId}>{t.first} {t.last}</option>)}
    </select></label>
-   <button type="button" disabled={busy||!personId} onClick={()=>assign(personId)}
-    className="rounded border px-3 py-2 text-sm disabled:opacity-50">Assign teacher</button>
+   <button type="button" disabled={busy||!section.active||!personId||!candidate?.eligible} onClick={()=>assign(personId)}
+    className="rounded border px-3 py-2 text-sm disabled:opacity-50">Add instructor</button>
   </div>
+  {candidate&&<div className="mt-3 text-sm" role="status">
+   <p>Instructional coverage: {candidate.from} to {candidate.through} (end exclusive).</p>
+   {candidate.eligible?<p>Eligible for this instructional window. Existing co-teachers retain their assignments.</p>:
+    <ul className="list-inside list-disc">{candidate.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul>}
+  </div>}
  </article>;
 }

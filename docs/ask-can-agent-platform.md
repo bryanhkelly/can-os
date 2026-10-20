@@ -44,6 +44,26 @@ One conversation, four interaction types. Users speak naturally; CAN identifies 
 
 A conversation produces **real objects in the operating system**, never text buried in chat history. A monitoring rule becomes an editable Subscription visible under "Things CAN Is Watching"; a scheduled summary becomes a visible recurring workflow. Parents can inspect, modify, pause, or revoke anything CAN does on their behalf.
 
+### Event-watch delivery history
+
+The shared `/notifications` center shows the authenticated person's persisted
+event-watch deliveries and reminders, including queued, processing, retrying,
+terminal failure and suppressed outcomes. History is paginated in groups of
+25 using an account-bound cursor. Refresh reads current canonical queue state;
+reading history does not trigger sends or change notification read status.
+History failures leave the notification list available and offer retry/reset.
+
+In-app success means a notification was created, not read. Email/SMS success
+means the provider accepted the send request, **not** verified inbox/handset
+delivery or a read receipt. Failure reasons are mapped to bounded explanations;
+raw provider errors, student content, subject IDs and event payloads are not
+returned. Paused/revoked watches retain their recipient's operational history,
+without restoring access to the underlying academic record.
+
+This is not yet a unified history of human messages, weekly digests, all
+transactional notifications or external delivery receipts. Provider webhooks,
+communication templates and broader escalation acceptance remain separate work.
+
 ## System 1: Conversation
 
 Durable, server-side conversations replace localStorage state.

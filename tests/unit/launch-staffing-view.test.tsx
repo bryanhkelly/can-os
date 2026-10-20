@@ -1,0 +1,105 @@
+import type { ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+import { Route } from "@/routes/operations.launch.$programId";
+import type { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
+
+const state = vi.hoisted(() => ({ data: null as unknown }));
+vi.mock("@tanstack/react-router", () => ({
+  createFileRoute: () => (options: object) => ({ options, useLoaderData: () => state.data }),
+  Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
+  useRouter: () => ({ invalidate: vi.fn() }),
+}));
+vi.mock("@/modules/programs/launch-academics.functions", () => ({
+  getLaunchAcademicSetup: vi.fn(), provisionLaunchSection: vi.fn(), assignLaunchTeacher: vi.fn(),
+  publishLaunchTeacherPolicy: vi.fn(),
+}));
+vi.mock("@/components/operations/SectionLifecycleManager", () => ({ SectionLifecycleWorkspace: () => null }));
+vi.mock("@/components/profiles/Qualifications", () => ({ Qualifications: () => null }));
+vi.mock("@/modules/profiles/qualification-catalog.functions",()=>({createQualificationCatalogEntry:vi.fn()}));
+vi.mock("@/modules/programs/teacher-policy.functions",()=>({reviseLaunchTeacherPolicy:vi.fn()}));
+
+type Snapshot = Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
+const snapshot: Snapshot = {
+  program: { id: "program", name: "School", status: "launching", organizationId: "org",
+    academicProviderOrganizationId: "org", siteId: "site", deliveryModel: { onsite: true } },
+  years: [], terms: [], catalog: [], teachingStaff: [{ personId: "teacher", first: "Alex", last: "Teacher" }],
+  qualificationCatalog: [{ key: "license", title: "Teaching license" }], policyPublished: false,canAuthorCatalog:false,
+  teacherPolicies: [], canReviseTeacherPolicy: false,
+  sections: [{
+    id: "section", title: "Science", code: "SCI", termId: "term", active: true, teachers: [],
+    candidates: [{ personId: "teacher", eligible: false, reasons: ["Qualification policy not configured."],
+      from: "2027-08-16T07:00:00.000Z", through: "2027-12-20T08:00:00.000Z" }],
+    readiness: { sectionId: "section", ready: false,
+      items: [{ key: "launch_staffing", state: "blocked", message: "Qualification policy not configured." }],
+      metrics: { enrollmentCapacity: 30, activeEnrollment: 0, expectedDemand: null, reservedInstructionalSeats: 0 } },
+  }],
+};
+function render(data: Snapshot) {
+  state.data = { ok: true, data };
+  const Page = Route.options.component;
+  if (typeof Page !== "function") throw new Error("Missing launch page");
+  return renderToStaticMarkup(<Page />);
+}
+describe("launch staffing presentation", () => {
+  it("shows missing policy blockers, catalog requirements and explicit publication confirmation", () => {
+    const html = render(snapshot);
+    expect(html).toContain("Qualification policy not configured.");
+    expect(html).toContain("Teaching license");
+    expect(html).toContain("independently verified");
+    expect(html).toContain("I confirm these requirements are reviewed");
+    expect(html).toContain("cannot be edited here");
+    expect(html).toContain("does not certify legal or regulatory compliance");
+    expect(html).toContain('disabled=""');
+    expect(html).toContain("Add instructor");
+    expect(html).not.toContain("Instructor assigned.");
+  });
+  it("shows published status without suggesting that publication verifies a teacher", () => {
+    const html = render({ ...snapshot, policyPublished: true });
+    expect(html).toContain("Program requirements are published");
+    expect(html).toContain("Qualification policy not configured.");
+    expect(html).not.toContain("Publish reviewed requirements");
+  });
+  it("makes an empty qualification catalog actionable instead of inventing requirements", () => {
+    const html = render({ ...snapshot, qualificationCatalog: [] });
+    expect(html).toContain("No qualification catalog entries exist");
+    expect(html).toContain("Configure the shared qualification catalog");
+  });
+  it("does not offer shared catalog writes to an ordinary registrar",()=>{
+    const html=render(snapshot);
+    expect(html).toContain("explicit qualification-catalog steward grant");
+    expect(html).not.toContain("Add shared definition");
+    expect(html).toContain("(license)");
+  });
+  it("offers create-only catalog authoring to a verified steward with confirmation",()=>{
+    const html=render({...snapshot,canAuthorCatalog:true});
+    expect(html).toContain("Stable qualification key");
+    expect(html).toContain("Classification key");
+    expect(html).toContain("Reason for shared catalog addition");
+    expect(html).toContain("I checked existing entries");
+    expect(html).toContain("cannot be edited here");
+    expect(html).toContain("Existing claims and published requirements will not change");
+    expect(html).toContain("Add shared definition");
+  });
+  const policies: Snapshot["teacherPolicies"] = [
+    {id:"v1",version:"1",status:"published",effectiveFrom:null,effectiveThrough:"2027-10-01T00:00:00.000Z",qualificationKeys:["license"]},
+    {id:"v2",version:"2",status:"published",effectiveFrom:"2027-10-01T00:00:00.000Z",effectiveThrough:null,qualificationKeys:["license"]},
+  ];
+  it("shows policy history without offering revisions to an ordinary registrar",()=>{
+    const html=render({...snapshot,policyPublished:true,teacherPolicies:policies});
+    expect(html).toContain("Version 1");
+    expect(html).toContain("Version 2");
+    expect(html).toContain("2027-10-01T00:00:00.000Z");
+    expect(html).toContain("explicit institutional staffing-policy publisher grant");
+    expect(html).not.toContain("Publish policy revision");
+  });
+  it("offers a complete future-dated revision with explicit confirmation to a publisher",()=>{
+    const html=render({...snapshot,policyPublished:true,teacherPolicies:policies,canReviseTeacherPolicy:true});
+    expect(html).toContain("complete replacement requirement set");
+    expect(html).toContain("Future effective date and time (UTC)");
+    expect(html).toContain("Reason for revision");
+    expect(html).toContain("Earlier policy history will be preserved");
+    expect(html).toContain("opening is blocked");
+    expect(html).toContain("Publish policy revision");
+  });
+});

@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
+import type { Database } from "@/db/client";
+import { enablePublishedPolicyInRollback } from "./helpers/published-policy";
 
-const launchState = vi.hoisted(() => ({ context: null as unknown }));
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+const launchState = vi.hoisted(() => ({ context: null as unknown, tx: undefined as Transaction | undefined }));
+vi.mock("@/db/client", () => ({
+  get db() { if (!launchState.tx) throw new Error("GF3 tests must stay in their rollback transaction"); return launchState.tx; },
+}));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({ validator() { return this; }, handler(callback: unknown) { return callback; } }),
 }));
@@ -14,6 +20,14 @@ const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
 integration("GF3 host / program launch", () => {
   it("launches a church-hosted academy and K-8 high-school extension through the same path", async () => {
+    const { db: database } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-gf3-launch");
+    let fixturePersonId = "";
+    let checked = false;
+    try {
+      await database.transaction(async tx => {
+        launchState.tx = tx;
+        await enablePublishedPolicyInRollback(tx);
     const [{ db }, schema, { eq, and }, programsModule, journeyModule, launchAcademics, launchFunctions] =
       await Promise.all([
         import("@/db/client"),
@@ -77,6 +91,10 @@ integration("GF3 host / program launch", () => {
         email: `operator-gf3-${suffix}@example.com`,
       })
       .returning();
+    fixturePersonId = operator.id;
+    const [operatorAccount]=await db.insert(schema.accessAccounts).values({
+      emailNormalized:`operator-gf3-${suffix}@example.com`,
+    }).returning();
 
     const contextFor = (hostId: string, siteId: string | null) => ({
       actorPersonId: operator!.id,
@@ -85,6 +103,8 @@ integration("GF3 host / program launch", () => {
         "journey.requirement.complete",
         "calendar.event.create",
         "program.activate",
+        "staffing.policy.publish",
+        "action.resolve",
       ]),
       scope: {
         organizationIds: [hostId],
@@ -131,6 +151,10 @@ integration("GF3 host / program launch", () => {
         .returning();
 
       const context = contextFor(host.id, site.id);
+      await db.insert(schema.accountPersonGrants).values({
+        accountId:operatorAccount.id,personId:operator.id,role:"registrar",
+        organizationId:host.id,siteId:site.id,active:true,
+      });
       const launchContext = {
         ...context,
         role: "registrar" as const,
@@ -228,6 +252,19 @@ integration("GF3 host / program launch", () => {
         personId: launchTeacher.id, organizationId: host.id, siteId: site.id,
         programId: launch.programId, roleKey: "teacher",
       });
+      const [qualification] = await db.insert(schema.qualificationDefinitions).values({
+        key: `gf3-license-${suffix}-${index}`, kind: "license", title: "Synthetic GF3 teaching qualification",
+      }).returning();
+      await launchAcademics.publishLaunchTeacherPolicy({ data: {
+        programId: launch.programId, qualificationKeys: [qualification.key], confirmed: true,
+      } });
+      const [claim] = await db.insert(schema.qualificationClaims).values({
+        personId: launchTeacher.id, definitionId: qualification.id,
+        issuedAt: new Date("2027-01-01"), expiresAt: new Date("2028-01-01"),
+      }).returning();
+      await db.insert(schema.qualificationVerificationEvents).values({
+        claimId: claim.id, sequence: 1, decision: "approve", actorPersonId: operator.id,
+      });
       await db.insert(schema.sectionRegistrationPolicies).values({
         sectionId: section!.id,
         enrollmentCapacity: 24,
@@ -320,7 +357,15 @@ integration("GF3 host / program launch", () => {
       ));
       expect(siteEvent.status).toBe("processed");
 
-      await programsModule.activateProgram(context, launch.programId);
+      await programsModule.activateProgram(context, launch.programId,{recipientPersonId:operator.id});
+      const {listOpeningHandoffs,acknowledgeOpeningHandoff}=await import("@/modules/programs/opening-handoff.server");
+      const handoffs=await listOpeningHandoffs([launch.programId]);
+      expect(handoffs).toHaveLength(1);
+      expect(handoffs[0]?.ownerPersonId).toBe(operator.id);
+      await acknowledgeOpeningHandoff(launchContext,{
+        actionId:handoffs[0]!.id,note:"As the opening and receiving operator, I reviewed and received daily operations.",
+      });
+      expect((await listOpeningHandoffs([launch.programId]))[0]?.status).toBe("resolved");
 
       const [activeProgram] = await db
         .select()
@@ -344,5 +389,18 @@ integration("GF3 host / program launch", () => {
       expect(orientationRows).toHaveLength(1);
       expect(orientationRows[0]!.sourceType).toBe("program_orientation");
     }
-  });
+        checked = true;
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    } finally {
+      launchState.tx = undefined;
+      launchState.context = null;
+    }
+    expect(checked).toBe(true);
+    const { people } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    expect(await database.select().from(people).where(eq(people.id, fixturePersonId))).toEqual([]);
+  }, 120_000);
 });

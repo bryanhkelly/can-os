@@ -13,6 +13,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.curriculum.tsx",
+      "route": "/operations/curriculum",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/counselor.tsx",
       "route": "/counselor",
       "owner": "support",

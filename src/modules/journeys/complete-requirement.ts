@@ -29,6 +29,8 @@ export async function completeJourneyRequirement(
         organizationId: journeys.organizationId,
         siteId: journeys.siteId,
         programId: journeys.programId,
+        metadata: journeyRequirements.metadata,
+        evidence: journeyRequirements.evidence,
       })
       .from(journeyRequirements)
       .innerJoin(journeys, eq(journeys.id, journeyRequirements.journeyId))
@@ -38,6 +40,8 @@ export async function completeJourneyRequirement(
 
     if (!current) throw new Error("Journey requirement not found");
     assertProgramScope(context, current.programId);
+    if (current.metadata.enrollmentForm !== undefined || current.evidence.some(item => item.kind === "document_review"))
+      throw new Error("Enrollment forms and documents must be completed through their registrar review workflow.");
     if (current.journeyStatus === "cancelled") {
       throw new Error("Cannot complete requirements for a cancelled Journey");
     }

@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import {
   attendanceEvents,
   attendanceExcuses,
+  auditEvents,
   guardianRelationships,
   people,
   programs,
@@ -445,6 +446,88 @@ export async function reviewAttendanceExcuse(
       }
     }
     return result;
+  });
+}
+
+export async function closeObsoleteAttendanceExcuse(
+  context: CommandContext,
+  input: { excuseId: string; reason: string; expectedCurrentEventId: string },
+): Promise<{ excuseId: string }> {
+  assertCapability(context, "attendance.excuse.review");
+  if ((context as CommandContext & { role?: string }).role !== "registrar" || !context.actorPersonId)
+    throw new Error("A verified registrar must close an obsolete excuse");
+  const reason = input.reason.trim();
+  if (reason.length < 10 || reason.length > 2000)
+    throw new Error("Closure reason must be 10 to 2000 characters");
+  return db.transaction(async tx => {
+    const [record] = await tx.select({
+      attendanceEventId: attendanceEvents.id,
+      studentProfileId: attendanceEvents.studentProfileId,
+      programId: attendanceEvents.programId, siteId: attendanceEvents.siteId,
+      occurrenceKey: attendanceEvents.occurrenceKey,
+      submittedByPersonId: attendanceExcuses.submittedByPersonId,
+    }).from(attendanceExcuses)
+      .innerJoin(attendanceEvents, eq(attendanceEvents.id, attendanceExcuses.attendanceEventId))
+      .where(eq(attendanceExcuses.id, input.excuseId)).limit(1);
+    if (!record) throw new Error("AttendanceExcuse not found");
+    if (!context.scope.programIds?.includes(record.programId) || !record.siteId ||
+        !context.scope.siteIds?.includes(record.siteId))
+      throw new Error("Excuse site/program scope is not authorized");
+    const [host] = await tx.select({ organizationId: programs.organizationId, siteId: programs.siteId })
+      .from(programs).where(eq(programs.id, record.programId)).limit(1);
+    if (!host || host.siteId !== record.siteId ||
+        !context.scope.organizationIds?.includes(host.organizationId))
+      throw new Error("Excuse school and organization scope is not authorized");
+    const lockKey = "attendance:" + record.studentProfileId + ":" + record.occurrenceKey;
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    const [excuse] = await tx.select({
+      status: attendanceExcuses.status, reviewNote: attendanceExcuses.reviewNote,
+    }).from(attendanceExcuses).where(eq(attendanceExcuses.id, input.excuseId)).for("update").limit(1);
+    if (!excuse) throw new Error("AttendanceExcuse not found");
+    if (excuse.status === "withdrawn") {
+      const [evidence] = await tx.select({ after: auditEvents.after }).from(auditEvents)
+        .where(and(eq(auditEvents.resourceId, input.excuseId),
+          eq(auditEvents.action, "attendance.excuse.withdraw"))).limit(1);
+      if (excuse.reviewNote !== reason || evidence?.after?.currentAttendanceEventId !== input.expectedCurrentEventId)
+        throw new Error("Excuse was already closed with different input. Refresh its history.");
+      return { excuseId: input.excuseId };
+    }
+    if (excuse.status !== "submitted")
+      throw new Error("Only a submitted obsolete excuse can be closed");
+    const [current] = await tx.select({ id: attendanceEvents.id, status: attendanceEvents.status })
+      .from(attendanceEvents).where(and(
+        eq(attendanceEvents.studentProfileId, record.studentProfileId),
+        eq(attendanceEvents.programId, record.programId),
+        eq(attendanceEvents.occurrenceKey, record.occurrenceKey),
+      )).orderBy(desc(attendanceEvents.recordedAt), desc(attendanceEvents.id)).limit(1);
+    if (!current || current.id === record.attendanceEventId)
+      throw new Error("This excuse still belongs to the current attendance record; review it instead");
+    if (current.id !== input.expectedCurrentEventId)
+      throw new Error("Attendance conflict: the school record changed. Refresh before closing this excuse.");
+    const now = new Date();
+    await tx.update(attendanceExcuses).set({
+      status: "withdrawn", reviewedByPersonId: context.actorPersonId,
+      reviewedAt: now, updatedAt: now, reviewNote: reason,
+    }).where(eq(attendanceExcuses.id, input.excuseId));
+    await writeAudit(tx, context, {
+      action: "attendance.excuse.withdraw", entityType: "attendance_excuse", entityId: input.excuseId,
+      scope: { programId: record.programId, siteId: record.siteId },
+      before: { status: "submitted", attendanceEventId: record.attendanceEventId },
+      after: { status: "withdrawn", currentAttendanceEventId: current.id, currentStatus: current.status, reason },
+    });
+    const eventId = await emitEvent(tx, {
+      eventType: EventTypes.AttendanceExcuseWithdrawn, aggregateType: "attendance_excuse",
+      aggregateId: input.excuseId, actorPersonId: context.actorPersonId,
+      programId: record.programId, siteId: record.siteId,
+      payload: { attendanceEventId: record.attendanceEventId, currentAttendanceEventId: current.id },
+    });
+    await notify(tx, {
+      recipientPersonId: record.submittedByPersonId, type: "attendance_excuse_withdrawn",
+      title: "Attendance excuse closed after a correction",
+      body: "The school closed your earlier excuse because attendance was corrected. The current attendance record was not changed.",
+      resourceType: "attendance_event", resourceId: record.attendanceEventId, eventId,
+    });
+    return { excuseId: input.excuseId };
   });
 }
 

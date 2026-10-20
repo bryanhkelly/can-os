@@ -28,11 +28,13 @@ export interface SignPrivateObjectOptions {
   keyPattern: RegExp;
   contentType?: string;
   expiresSeconds?: number;
+  preventOverwrite?: boolean;
 }
 
 /** Short-lived one-object SigV4 URL; credentials never leave the server. */
-export function signPrivateObjectUrl({ method, key, keyPattern, contentType, expiresSeconds = 180 }: SignPrivateObjectOptions): string {
+export function signPrivateObjectUrl({ method, key, keyPattern, contentType, expiresSeconds = 180, preventOverwrite = false }: SignPrivateObjectOptions): string {
   if (!Number.isInteger(expiresSeconds) || expiresSeconds < 1 || expiresSeconds > 900 || !keyPattern.test(key)) throw new Error("Invalid R2 signing request");
+  if (preventOverwrite && method !== "PUT") throw new Error("Conditional creation is only valid for uploads");
   const cfg = resolveR2Config();
   const now = new Date();
   const stamp = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
@@ -40,8 +42,9 @@ export function signPrivateObjectUrl({ method, key, keyPattern, contentType, exp
   const host = cfg.account + ".r2.cloudflarestorage.com";
   const scope = day + "/auto/s3/aws4_request";
   const path = "/" + cfg.bucket + "/" + escapeKey(key);
-  const signedHeaders = contentType ? "content-type;host" : "host";
-  const headers = contentType ? "content-type:" + contentType + "\nhost:" + host + "\n" : "host:" + host + "\n";
+  const signedHeaders = (contentType ? "content-type;host" : "host") + (preventOverwrite ? ";if-none-match" : "");
+  const headers = (contentType ? "content-type:" + contentType + "\nhost:" + host + "\n" : "host:" + host + "\n") +
+    (preventOverwrite ? "if-none-match:*\n" : "");
   const params = new URLSearchParams({
     "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
     "X-Amz-Credential": cfg.accessKey + "/" + scope,
@@ -70,16 +73,17 @@ export interface CreatePrivateUploadUrlOptions {
   minContentLength?: number;
   maxContentLength?: number;
   expiresSeconds?: number;
+  preventOverwrite?: boolean;
 }
 
 /** Presigned PUT URL for one private object upload; size and type bounds arrive as parameters. */
-export function createPrivateUploadUrl({ key, keyPattern, contentType, contentLength, minContentLength, maxContentLength, expiresSeconds }: CreatePrivateUploadUrlOptions): string {
+export function createPrivateUploadUrl({ key, keyPattern, contentType, contentLength, minContentLength, maxContentLength, expiresSeconds, preventOverwrite }: CreatePrivateUploadUrlOptions): string {
   if (contentLength !== undefined && (!Number.isSafeInteger(contentLength)
     || (minContentLength !== undefined && contentLength < minContentLength)
     || (maxContentLength !== undefined && contentLength > maxContentLength))) {
     throw new Error("Invalid R2 signing request");
   }
-  return signPrivateObjectUrl({ method: "PUT", key, keyPattern, contentType, expiresSeconds });
+  return signPrivateObjectUrl({ method: "PUT", key, keyPattern, contentType, expiresSeconds, preventOverwrite });
 }
 
 export interface VerifyPrivateObjectOptions {

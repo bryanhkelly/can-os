@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { actions, enrollments, instructionalCapacityReservations, programs, sectionCapacityDemands, sectionTeachers, sections } from "@/db/schema";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { currentCapacityReservationFilter } from "@/modules/staffing/reservation-policy";
 
 /** Live operational exceptions, not demo/synthetic fixture rows. */
 export async function getSchoolOperationsCommandCenter(context: CommandContext & { role?: string }) {
@@ -21,7 +22,7 @@ export async function getSchoolOperationsCommandCenter(context: CommandContext &
     db.select({sectionId:instructionalCapacityReservations.sectionId,seats:sql<number>`sum(seats)::int`})
       .from(instructionalCapacityReservations).where(and(
         inArray(instructionalCapacityReservations.sectionId,ids),eq(instructionalCapacityReservations.status,"committed"),
-        sql`(expires_at is null or expires_at > now())`))
+        currentCapacityReservationFilter(new Date())))
       .groupBy(instructionalCapacityReservations.sectionId),
     db.select({sectionId:actions.sectionId,id:actions.id}).from(actions).where(and(
       eq(actions.type,"section_waitlist"),inArray(actions.sectionId,ids),inArray(actions.status,["open","waiting"]))),

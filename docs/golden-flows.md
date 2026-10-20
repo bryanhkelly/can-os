@@ -56,6 +56,85 @@ GF22 owns inquiry → application → eligibility → acceptance. GF2 begins at 
 ### Proves
 Admissions-to-enrollment handoff, identity continuity, Household relationships, Program, Journey, documents, enrollment lifecycle, student/family workspaces.
 
+### Current acceptance evidence and remaining gates
+
+The focused `admissions-offers` integration mode now exercises actual registrar
+and guardian endpoints from canonical application creation through offer
+withdrawal/reissue, acceptance, readiness regression/review, program activation
+and section placement. It checks current guardian authority, role/program
+denials, identity continuity, duplicate-command evidence, Family Home,
+Student Today and student/guardian class access. The new handoff fixture rolls
+back all writes; the existing separate-connection fixture retains final-seat
+concurrency coverage on the disposable test database.
+
+The guardian workspace distinguishes acceptance from enrollment activation and
+class assignment, including outstanding blocking requirement titles without
+internal notes. Withdrawal requires registrar confirmation and an internal
+reason, releases only an unaccepted offer's seat, and preserves history.
+
+The guardian's existing offer workspace now opens an application-specific
+enrollment checklist, including requested/rejected document instructions,
+current files and superseded history. Request/rejection notifications link
+directly to that child and application. Guardians can submit or replace
+PDF/JPEG/PNG evidence when the corresponding deployment gate is enabled;
+submission resets readiness for registrar review rather than completing it.
+The generic registrar checkbox cannot complete a document awaiting review.
+Approval of the current verified file restores readiness. Closed checklists
+are historical, and every read/upload/download rechecks current resource
+authority. Internal registrar notes and storage keys are absent from the
+guardian DTO.
+
+The acceptance fixture now proves this request-to-correction-to-approval path
+through real endpoints, including storage-verification failure, outbox failure
+rollback, retry evidence, superseded-file denials, access revocation during
+upload verification and activation only after approval. R2 signing and object
+verification are mocked at the storage boundary; no objects are uploaded.
+
+School-configured enrollment forms now use the same JourneyRequirements.
+One currently managing guardian supplies typed answers, acknowledges the exact
+configured school statement and signs with their authenticated identity and
+typed name. The form/version, answers and signing instant are retained together.
+Mandatory registrar review either completes the requirement or returns it for
+correction and a new signature. The signer must retain enrollment-management
+authority when the registrar approves it. There is no generic completion,
+document-upload substitute or automatic waiver for a configured signature.
+Program-selected packet keys apply to both family applications and registrar
+intake; changing a definition does not rewrite an existing application's form.
+Acceptance checks the actual signed/approved evidence, not only checklist status.
+
+Admissions exception acceptance now also exercises waitlist/restore through
+the actual registrar command, strict role/school scope, closure after explicit
+offer withdrawal, declined/withdrawn terminal states and stale issued offers
+on closed or waitlisted Applications. A stale guardian response cannot revive
+the application, and issuance retries cannot bypass the current disposition.
+Restore preserves identities and the existing readiness/signature evidence;
+it is not a reopening operation for closed Applications. Intake does not
+cancel accepted offers or active enrollment. The handoff fixture verifies
+stage-outbox rollback and one-time decision evidence. Separate-connection
+transactions race waitlisting against issuance in both request orders; only
+one may commit, while the existing final-seat race remains covered.
+
+Authenticated browser acceptance now covers the same configured-form handoff
+on a separately started local application and the guarded disposable Neon
+database. Real synthetic guardian, registrar and student sessions exercise
+signing, return for correction, re-signing, approval, waitlist/restore,
+offer issuance/acceptance, activation and section assignment. The student sees
+the assigned class but cannot open registrar admissions. Database assertions
+verify identity continuity, two retained signatures/reviews, one active
+program and section enrollment, and one-time offer/activation events.
+The browser run exposed pre-hydration interactions on the forms and decision
+pages; their mutation controls now wait for handlers to be ready instead of
+silently losing input or clicks. The test uses no mocked application endpoints.
+
+This does not certify all GF2 steps: approved packet content and jurisdiction
+policy configuration, live private document upload, legal/electronic-signature
+and production-deployment acceptance remain separate release gates.
+Browser acceptance uses synthetic packet text and deliberately disables R2
+uploads; it does not certify object storage or external delivery.
+The tested readiness flow uses the
+existing configured application Journey; it does not introduce a second
+hard-coded workflow engine or automatically configure approved school forms.
+
 ---
 
 ## GF3 — Host / Program Launch
@@ -75,6 +154,14 @@ Prove CAN can launch multiple deployment models using one architecture.
 9. Blocking requirements reach Complete.
 10. Program moves to Ready, then Active.
 11. National/network workspace sees the new Program without special-case code for church vs school extension.
+
+For new site-based openings, step 10 also selects a named existing active site
+registrar/operator. Activation creates a canonical handoff Action and in-app
+notification atomically. The selected operator reviews Site Today and
+acknowledges receipt with a confirmed note; this is recorded separately from
+activation and does not certify legal compliance. Both cross-person receipt and
+an eligible opener receiving their own handoff must be tested. Earlier active
+programs are not implicitly marked acknowledged.
 
 ### Required acceptance scenarios
 - Church-hosted academy
@@ -105,6 +192,34 @@ Prove CAN can run a real physical/hybrid school day and reconcile site and famil
 
 ### Proves
 Site operations, attendance, family workflow, documents, notifications, audit, metrics, and the foundation for offline operation.
+
+### Current cross-role acceptance evidence
+
+The `attendance-handoff` integration mode verifies actual registrar, teacher,
+guardian and School-Year Studio endpoints. It covers configured expected
+rosters, absence notifications, guardian excuses, append-only corrections,
+registrar closure of obsolete excuses, reviewed excuses becoming excused, and
+teacher/family visibility. Family Home and Needs You no longer treat an old
+absent row as a current absence after a present correction.
+
+Calendar closures and removal of instructional schedule periods remove the
+student from the expected roster and block new marks. The final transactional
+calendar guard is exercised directly as well. A committed offline operation
+remains replayable after configuration changes; a stale uncommitted write
+cannot overwrite a newer mark. Losing the teacher assignment denies replay.
+The schedule period editor accepts valid `HH:mm` values and rejects invalid
+times; its previously double-escaped digit matcher is corrected.
+
+The obsolete-excuse path requires registrar authority, confirmation, a reason
+and the expected current event. It preserves all attendance rows, removes the
+excuse from the pending queue, retains guardian history and emits one audit,
+outbox event and in-app notice across retries. Tests include wrong-role,
+capability, scope, relationship, stale-content and terminal-state denials.
+
+This evidence does not certify live supporting-document upload, browser offline
+queue synchronization, separate-connection correction/closure races, outbound
+email delivery or jurisdiction-specific attendance policy. Those remain
+release acceptance gates rather than assumed functionality.
 
 ---
 
@@ -234,6 +349,25 @@ active enrollment blocks subsequent academic-thread reads/replies despite old
 participant rows. The isolated `class-participation` integration suite proves
 these command/read-model boundaries; it does not certify live notification
 delivery or authenticated browser acceptance.
+
+### Implemented curriculum authoring-to-classroom slice
+
+At `/operations/curriculum`, an explicitly granted registrar publisher creates
+an owning-organization course, saves a structured syllabus and ordered
+modules/lessons, then confirms publication with a reason. Incomplete or stale
+drafts fail explicitly; publication is immutable and repeat commands do not
+duplicate evidence. The studio links published releases to section setup.
+New sections consume the new release; existing classes retain their exact
+release, lesson content and completion records. Student, authorized parent and
+assigned teacher class views consume the same published content.
+
+The isolated `curriculum-authoring` integration mode exercises actual authoring,
+publication, section provisioning and class participation endpoints, including
+missing/revoked grants, inactive publishers, missing membership, wrong roles and
+scope, foreign course ownership, stale edits and forbidden published edits.
+It also verifies the synthetic studio seed is repeatable inside the rollback
+fixture. This closes the structured reading-content release path, not broad
+instructional planning, private asset publication or live browser acceptance.
 
 ---
 

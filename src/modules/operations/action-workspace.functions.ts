@@ -11,6 +11,7 @@ import { and,desc,eq,inArray,isNotNull,isNull,or } from "drizzle-orm";
 import { operationsSelectionSchema,resolveOperationsSelection } from "./operations-scope.server";
 import { resolveActionInTransaction } from "@/modules/actions/resolve-action";
 import { assertAcademicActionAuthority,assertAcademicActionStaff } from "@/modules/actions/academic-action-policy.server";
+import { openingHandoffType } from "@/modules/programs/opening-handoff.server";
 
 async function operator() {
  const actor=await getCommandContext(getRequest());
@@ -41,7 +42,8 @@ export const getOperationsActions=createServerFn({method:"GET"})
  })));
  const scopedItems=items.map(item=>{
   const record=records.find(record=>record.id===item.id);
-  return {...item,siteId:record?.siteId??null,ownerPersonId:record?.ownerPersonId??null,managedBySupport:record?.type==="support_referral"};
+  return {...item,siteId:record?.siteId??null,ownerPersonId:record?.ownerPersonId??null,
+   managedBySupport:record?.type==="support_referral",openingHandoff:record?.type===openingHandoffType};
  });
  const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor"])));
  const [siteChoices,programChoices]=await Promise.all([
@@ -63,6 +65,7 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    if(!record)throw new AuthorizationError("action scope");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
+   if(record.type===openingHandoffType)throw new Error("Use the named-recipient opening handoff in Site Today");
    const academic=record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId!==null;
    if(academic&&data.status==="resolved"){
     await resolveActionInTransaction(tx,actor,{actionId:record.id,resolutionNote:data.resolutionNote??""});
@@ -89,6 +92,7 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    if(!record||["resolved","cancelled"].includes(record.status))throw new AuthorizationError("active action scope");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
+   if(record.type===openingHandoffType)throw new Error("Use the named-recipient opening handoff in Site Today");
    const academic=record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId!==null;
    if(academic)await assertAcademicActionAuthority(tx,actor,record);
    if(data.ownerPersonId){

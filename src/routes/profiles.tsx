@@ -3,6 +3,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { getPersonProfile, beginProfilePhotoUpload, finishProfilePhotoUpload } from "@/modules/profiles/person-profile.functions";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
+import { Qualifications } from "@/components/profiles/Qualifications";
 import { WorkspaceShell, WorkspacePanel } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -54,5 +55,6 @@ export function PersonProfile({profile}:{profile:Awaited<ReturnType<typeof getPe
       </li>)}</ul>
       {!profile.sections.length&&<p className="text-sm text-muted-foreground">No active class relationships are recorded in this membership.</p>}
     </WorkspacePanel>
+    {profile.isSelf&&profile.viewerRole==="teacher"&&<Qualifications/>}
   </WorkspaceShell>;
 }

@@ -60,6 +60,16 @@ describe("authorized notification destinations",()=>{
     state.rows.guardian_relationships=[];
     expect((await getNotifications())[0]?.href).toBeNull();
   });
+  it("opens the exact child and application for a scoped document correction",async()=>{
+    notification("application","application","enrollment_document_rejected");
+    state.rows.applications=[{id:"application",studentPersonId:"child"}];
+    expect((await getNotifications())[0]?.href)
+      .toBe("/guardian/admission-offers?student=child&application=application");
+  });
+  it("does not produce a document correction link after application access is lost",async()=>{
+    notification("application","application","enrollment_document_rejected");
+    expect((await getNotifications())[0]?.href).toBeNull();
+  });
   it("preserves the assigned operations action",async()=>{
     state.role="registrar";
     notification("action","assigned","operations_action_assigned");

@@ -22,4 +22,8 @@ describe("admission offer selection",()=>{
   expect(canIssueAnotherOffer("application",1,[],year)).toBe(false);
   expect(canIssueAnotherOffer("accepted",0,[],year)).toBe(false);
  });
+ it("requires explicit waitlist restoration even with completed readiness",()=>{
+  expect(canIssueAnotherOffer("eligibility",0,[],year,new Date(),"waitlisted")).toBe(false);
+  expect(canIssueAnotherOffer("eligibility",0,[],year,new Date(),null)).toBe(true);
+ });
 });

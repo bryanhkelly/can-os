@@ -109,7 +109,7 @@ function GuardianAttendancePage() {
       {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance…</p>}
       {!loading && !error && <>
         {attendance&&<Link to="/guardian/attendance" search={{student}} className="mt-4 inline-block text-sm underline">View all attendance for this child</Link>}
-        {attendance&&!absences.some(item=>item.attendanceEventId===attendance)&&<p role="alert" className="mt-4 rounded-xl border p-4">This attendance record is unavailable in the current view.</p>}
+        {attendance&&!absences.some(item=>item.relatedAttendanceEventIds.includes(attendance))&&<p role="alert" className="mt-4 rounded-xl border p-4">This attendance record is unavailable in the current view.</p>}
         <div className="mt-6 grid grid-cols-3 gap-3" aria-label="Attendance summary">
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Recent attendance cases</p><p className="mt-1 text-2xl font-semibold">{absences.length}</p></div>
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Needs an excuse</p><p className="mt-1 text-2xl font-semibold">{needsExcuse.length}</p></div>
@@ -117,7 +117,7 @@ function GuardianAttendancePage() {
         </div>
         {absences.length === 0 && <p className="mt-8 text-sm">No recent absence or tardy cases were found for your students.</p>}
         {absences.length > 0 && <div className="mt-8 grid gap-4">
-          {absences.filter(item=>!attendance||item.attendanceEventId===attendance).map(absence => <section key={absence.attendanceEventId} className="rounded-xl border bg-card p-5">
+          {absences.filter(item=>!attendance||item.relatedAttendanceEventIds.includes(attendance)).map(absence => <section key={absence.attendanceEventId} className="rounded-xl border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">{absence.studentName}</h2>
@@ -128,6 +128,14 @@ function GuardianAttendancePage() {
               </span>
             </div>
             {absence.status === "present" && <p className="mt-3 text-xs text-muted-foreground">The school corrected this attendance case to present. No excuse is required.</p>}
+            {absence.historicalExcuses.length > 0 && <div className="mt-3 space-y-2" aria-label="Earlier excuse history">
+              <h3 className="text-sm font-semibold">Earlier excuses for this attendance case</h3>
+              {absence.historicalExcuses.map(excuse => <div key={excuse.excuseId} className="rounded border p-3 text-sm">
+                <p>Earlier excuse: {excuse.status}. This does not describe the current attendance mark.</p>
+                <p className="mt-1">{excuse.reason}</p>
+                {excuse.reviewNote && <p className="mt-1">School note: {excuse.reviewNote}</p>}
+              </div>)}
+            </div>}
             {absence.excuse && <div className="mt-3">
               <p className="rounded-lg bg-muted p-3 text-sm">Your excuse: {absence.excuse.reason}</p>
               <p className="mt-2 text-xs text-muted-foreground">{docCounts[absence.attendanceEventId] ?? 0} document(s) attached</p>

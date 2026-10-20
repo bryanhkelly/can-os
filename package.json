@@ -17,6 +17,7 @@
     "test:integration:study-group-lifecycle": "node scripts/run-integration-tests.mjs study-group-lifecycle",
     "test:integration:admissions": "node scripts/run-integration-tests.mjs admissions-offers",
     "test:e2e": "playwright test",
+    "test:e2e:admissions": "node scripts/run-admissions-e2e.mjs",
     "test:integration:academic-intervention": "node scripts/run-integration-tests.mjs academic-intervention"
   },
   "dependencies": {

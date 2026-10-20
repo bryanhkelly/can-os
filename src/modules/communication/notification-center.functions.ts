@@ -18,6 +18,38 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const rows=await db.select({id:s.notifications.id,type:s.notifications.type,title:s.notifications.title,body:s.notifications.body,
   status:s.notifications.status,resourceType:s.notifications.resourceType,resourceId:s.notifications.resourceId,createdAt:s.notifications.createdAt})
  .from(s.notifications).where(eq(s.notifications.recipientPersonId,personId)).orderBy(desc(s.notifications.createdAt)).limit(50);
+ const handoffIds=rows.filter(n=>n.type==="program_opening_handoff"&&n.resourceType==="action"&&n.resourceId)
+  .map(n=>n.resourceId!);
+ const handoffs=handoffIds.length&&context.role==="registrar"?await db.select({id:s.actions.id,siteId:s.actions.siteId})
+  .from(s.actions).where(and(inArray(s.actions.id,handoffIds),eq(s.actions.type,"program_opening_handoff"),
+   eq(s.actions.ownerPersonId,personId),inArray(s.actions.siteId,context.scope.siteIds??[]),
+   inArray(s.actions.programId,context.scope.programIds??[]),
+   inArray(s.actions.organizationId,context.scope.organizationIds??[]))):[];
+ const handoffSites=new Map(handoffs.map(handoff=>[handoff.id,handoff.siteId]));
+ const attendanceIds=rows.filter(row=>row.resourceType==="attendance_event"&&row.resourceId).map(row=>row.resourceId!);
+ const familyAttendance=attendanceIds.length&&context.role==="guardian"?await db.select({
+  id:s.attendanceEvents.id,studentPersonId:s.studentProfiles.personId,
+ }).from(s.attendanceEvents)
+  .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.attendanceEvents.studentProfileId))
+  .innerJoin(s.guardianRelationships,and(eq(s.guardianRelationships.studentPersonId,s.studentProfiles.personId),
+   eq(s.guardianRelationships.guardianPersonId,personId),eq(s.guardianRelationships.canViewAcademics,true)))
+  .where(and(inArray(s.attendanceEvents.id,attendanceIds),
+   inArray(s.attendanceEvents.siteId,context.scope.siteIds??[]),
+   inArray(s.attendanceEvents.programId,context.scope.programIds??[]))):[];
+ const attendanceStudent=new Map(familyAttendance.map(row=>[row.id,row.studentPersonId]));
+ const enrollmentApplicationIds=rows.filter(row=>row.resourceType==="application"&&
+  ["enrollment_document_requested","enrollment_document_rejected","enrollment_form_rejected"].includes(row.type)&&row.resourceId).map(row=>row.resourceId!);
+ const enrollmentApplications=enrollmentApplicationIds.length&&context.role==="guardian"?
+  await db.select({id:s.applications.id,studentPersonId:s.studentProfiles.personId}).from(s.applications)
+   .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
+   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.applications.studentProfileId))
+   .innerJoin(s.guardianRelationships,and(eq(s.guardianRelationships.studentPersonId,s.studentProfiles.personId),
+    eq(s.guardianRelationships.guardianPersonId,personId),eq(s.guardianRelationships.canManageEnrollment,true)))
+   .where(and(inArray(s.applications.id,enrollmentApplicationIds),
+    inArray(s.applications.programId,context.scope.programIds??[]),
+    inArray(s.programs.siteId,context.scope.siteIds??[]),
+    inArray(s.programs.organizationId,context.scope.organizationIds??[]))):[];
+ const enrollmentStudent=new Map(enrollmentApplications.map(row=>[row.id,row.studentPersonId]));
  const sessionIds=rows.filter(n=>n.resourceType==="study_group_session"&&n.resourceId).map(n=>n.resourceId as string);
  const sessions=sessionIds.length&&context.role==="student"?await db.selectDistinct({
   id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId
@@ -123,16 +155,20 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const missingAssessmentByAction=new Map(followUps.filter(a=>typeof a.metadata.assessmentId==="string").map(a=>[a.id,a.metadata.assessmentId as string]));
 
  return rows.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
-  date:n.createdAt.toISOString(),href:n.resourceType==="submission"&&n.resourceId&&bySubmission.has(n.resourceId)?
+  date:n.createdAt.toISOString(),href:n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
+   `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
+   n.resourceType==="submission"&&n.resourceId&&bySubmission.has(n.resourceId)?
    (context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:null):
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    (context.role==="student"?`/student/support?referral=${encodeURIComponent(n.resourceId)}`:null):
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:null):
+   n.resourceType==="application"&&n.resourceId&&enrollmentStudent.has(n.resourceId)?`/guardian/admission-offers?student=${encodeURIComponent(enrollmentStudent.get(n.resourceId)!)}&application=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?`/guardian/admission-offers?student=${encodeURIComponent(personByProfile.get(admissionOffers.find(offer=>offer.id===n.resourceId)!.studentProfileId)!)}&offer=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&context.role==="registrar"?`/admissions?application=${encodeURIComponent(admissionOffers.find(offer=>offer.id===n.resourceId)!.applicationId)}`:
    n.type==="study_group_consent_requested"&&context.role==="guardian"&&(
     n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)||
     n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${encodeURIComponent(n.resourceId!)}`:"/guardian/group-permissions"):
+   n.type==="program_opening_handoff"&&n.resourceId&&handoffSites.get(n.resourceId)?`/sites/${encodeURIComponent(handoffSites.get(n.resourceId)!)}`:
    n.type==="operations_action_assigned"&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&context.role==="registrar"?`/operations?action=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"?`/groups?group=${encodeURIComponent(n.resourceId)}`:context.role==="student"?`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`:null):
    context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));

@@ -84,6 +84,13 @@ of the prototype's components, stores, personas, or workflow state.
   and optional `section`, in addition to the existing exact `date`/`event` selection.
 - Admissions: optional canonical `stage` filter alongside `siteId`/`programId`;
   `application` opens the exact application's existing commands.
+- Guardian enrollment: `/guardian/admission-offers?student=<personId>&application=<applicationId>`
+  opens that application's canonical Journey checklist and document-correction
+  workflow. Offers may also retain their existing exact `offer` selection.
+  Document submission is not a signature, offer acceptance or activation.
+  Configured forms on that same checklist require an authenticated managing
+  guardian's explicit signature and registrar approval. Rejected forms require
+  correction and a new signature; no generic Complete/waiver control is exposed.
 - Staff Student 360: `/staff/students/<personId>?tab=overview|academics|attendance|support|relationships`.
 - Unknown or unauthorized targets show an explicit unavailable state instead
   of silently selecting another record. Filters never replace server authorization.
@@ -166,7 +173,16 @@ rendering, unavailable lessons, escaping and exact-child navigation. Real R2
 delivery and authenticated browser acceptance still require genuine sessions
 and storage configuration.
 
-Live/replay, broad course creation/authoring, PDF markup, planner/pathway and
+Governed structured curriculum authoring is now available at
+`/operations/curriculum`: owning-organization course creation, syllabus,
+ordered modules and reading lessons, HTTPS class resource links, draft cloning
+and immutable publication. It requires an explicit institutional publisher
+grant; new releases apply to new sections only. The rollback-isolated
+`curriculum-authoring` integration mode proves release-to-class delivery and
+preserved existing-class progress. Private asset publication and broader
+instructional planning remain outside this slice.
+
+Live/replay, broader multimedia course authoring, PDF markup, planner/pathway and
 generic family decision workflows remain explicitly deferred. No inert tabs,
 fake completion controls or simulated video services were introduced for them.
 

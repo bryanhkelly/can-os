@@ -5,6 +5,7 @@ organizations,
 programs,
 schoolYears,
 sections,
+sectionTeachers,
 sites,
 terms
 } from "@/db/schema";
@@ -22,6 +23,8 @@ import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createProjectionIfAbsent } from "@/platform/calendar/projection";
 import { and,eq,inArray,isNull,or } from "drizzle-orm";
 import { evaluateSectionReadiness } from "./section-readiness-service";
+import { lockLaunchTeacherClaims } from "@/modules/staffing/launch-staffing.server";
+import { assertOpeningOperator,createOpeningHandoff,listOpeningHandoffs } from "./opening-handoff.server";
 
 export async function startProgramLaunch(
   context: CommandContext,
@@ -228,6 +231,7 @@ export async function createProgramOrientation(
 export async function activateProgram(
   context: CommandContext,
   programId: string,
+  handoff?: { recipientPersonId: string },
 ): Promise<void> {
   assertCapability(context, "program.activate");
 
@@ -248,7 +252,12 @@ export async function activateProgram(
     }
     const [current] = await tx.select({ status: programs.status })
       .from(programs).where(eq(programs.id, programId)).limit(1);
-    if (current?.status === "active") return;
+    if (current?.status === "active") {
+      const existing=await listOpeningHandoffs([programId],tx);
+      if(handoff&&existing.length&&existing[0]?.ownerPersonId!==handoff.recipientPersonId)
+        throw new Error("Program already opened with a different handoff recipient");
+      return;
+    }
 
     const [journey] = await tx
       .select()
@@ -269,6 +278,8 @@ export async function activateProgram(
     // Prevent activation of an onsite school without its academic timetable.
     if(program.deliveryModel.onsite && !program.siteId)
       throw new Error("Onsite program requires a host site before activation");
+    const staffingEvidence:{sectionId:string;evidence:Record<string,unknown>}[]=[];
+    const openingSectionIds:string[]=[];
     if(program.siteId){
       const activeYears=await tx.select({id:schoolYears.id})
        .from(schoolYears).where(and(eq(schoolYears.siteId,program.siteId),
@@ -284,12 +295,22 @@ export async function activateProgram(
         eq(sections.active,true),inArray(sections.termId,academicTerms.map(t=>t.id)))):[];
       if(!sectionRows.length)throw new Error(
         "Provision at least one section in the active school year before launch");
+      const assignedTeachers=await tx.select({personId:sectionTeachers.personId}).from(sectionTeachers)
+        .where(inArray(sectionTeachers.sectionId,sectionRows.map(section=>section.id)));
+      await lockLaunchTeacherClaims(tx,[...new Set(assignedTeachers.map(teacher=>teacher.personId))]);
       for (const section of sectionRows) {
-        const readiness=await evaluateSectionReadiness(section.id,tx);
+        openingSectionIds.push(section.id);
+        const readiness=await evaluateSectionReadiness(section.id,tx,new Date(),"launch");
         const blockers=readiness.items.filter(item=>item.state==="blocked");
         if(blockers.length)throw new Error(
           "Section is not ready: "+blockers.map(item=>item.message).join(" "));
+        const staffing=readiness.items.find(item=>item.key==="launch_staffing");
+        if(staffing?.evidence)staffingEvidence.push({sectionId:section.id,evidence:staffing.evidence});
       }
+    }
+    if(program.siteId){
+      if(!handoff?.recipientPersonId)throw new Error("Select a named receiving site operator before opening");
+      await assertOpeningOperator(program,handoff.recipientPersonId,tx);
     }
     const activatedAt = new Date();
 
@@ -307,6 +328,10 @@ export async function activateProgram(
       })
       .where(eq(journeys.id, journey.id));
 
+    const handoffActionId=program.siteId&&handoff?await createOpeningHandoff(tx,context,{
+      program,recipientPersonId:handoff.recipientPersonId,journeyId:journey.id,
+      openedAt:activatedAt,sectionIds:openingSectionIds,
+    }):null;
     await emitEvent(tx, {
       eventType: EventTypes.ProgramActivated,
       aggregateType: "program",
@@ -316,6 +341,7 @@ export async function activateProgram(
         organizationId: program.organizationId,
         siteId: program.siteId,
         type: program.type,
+        handoffActionId,
       },
     });
 
@@ -330,7 +356,7 @@ export async function activateProgram(
         programId,
       },
       before: { status: program.status },
-      after: { status: "active" },
+      after: { status: "active", staffing:staffingEvidence,handoffActionId },
       context: {
         requestId: context.requestId ?? null,
         journeyId: journey.id,

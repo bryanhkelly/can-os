@@ -5,6 +5,7 @@ import {
   journeyRequirements,
   journeys,
 } from "@/db/schema";
+import { enrollmentFormSchema, type EnrollmentForm } from "@/domain/enrollment-form";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -17,6 +18,7 @@ export type JourneyRequirementDefinition = {
   blocking?: boolean;
   /** Owner persona label; only "can" and "third_party" change the initial status. */
   owner?: string;
+  enrollmentForm?: EnrollmentForm;
 };
 
 export type JourneyDefinitionConfiguration = {
@@ -47,6 +49,7 @@ export function materializeJourneyRequirements(
   title: string;
   blocking: boolean;
   status: InitialRequirementStatus;
+  metadata?: { enrollmentForm: EnrollmentForm };
 }> {
   return (configuration.requirements ?? []).map((requirement) => ({
     journeyId,
@@ -54,6 +57,8 @@ export function materializeJourneyRequirements(
     title: requirement.title,
     blocking: requirement.blocking ?? false,
     status: initialRequirementStatus(requirement.owner),
+    ...(requirement.enrollmentForm === undefined ? {} :
+      { metadata: { enrollmentForm: enrollmentFormSchema.parse(requirement.enrollmentForm) } }),
   }));
 }
 
@@ -91,6 +96,10 @@ export async function instantiateJourneyFromDefinition(
   if (!definition) {
     throw new Error(`Journey definition not found: ${input.definitionKey}`);
   }
+  const configuration = definition.configuration as JourneyDefinitionConfiguration;
+  if (configuration.requirements?.some(requirement => requirement.enrollmentForm !== undefined) &&
+      definition.owningOrganizationId && definition.owningOrganizationId !== input.organizationId)
+    throw new Error("Journey definition belongs to another organization.");
 
   const [journey] = await tx
     .insert(journeys)
@@ -119,7 +128,7 @@ export async function instantiateJourneyFromDefinition(
 
   const rows = materializeJourneyRequirements(
     journey.id,
-    definition.configuration as JourneyDefinitionConfiguration,
+    configuration,
   );
 
   if (rows.length > 0) {

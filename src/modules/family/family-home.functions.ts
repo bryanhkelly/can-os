@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 
 /**
  * Family Home is a read model over canonical domain state.
@@ -12,6 +13,7 @@ import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
  */
 async function guardianActor() {
  const context = await getCommandContext(getRequest());
+ setResponseHeader("Cache-Control","private, no-store");
  assertCapability(context, "student:related-read");
  if (context.role !== "guardian" || !context.actorPersonId || !context.scope.siteIds?.length) {
   throw new AuthorizationError("guardian family membership");
@@ -21,7 +23,7 @@ async function guardianActor() {
 
 type Schema = typeof import("@/db/schema");
 
-async function guardianStudents(s: Schema, guardianPersonId: string, siteIds: string[]) {
+async function guardianStudents(s: Schema, guardianPersonId: string, siteIds: string[],programIds:string[]) {
  const { db } = await import("@/db/client");
  const rows = await db.select({
   studentPersonId: s.guardianRelationships.studentPersonId,
@@ -46,12 +48,13 @@ async function guardianStudents(s: Schema, guardianPersonId: string, siteIds: st
    eq(s.enrollments.status, "active"),
    inArray(s.enrollments.kind, ["program", "school_year", "section"]),
    inArray(s.programs.siteId, siteIds),
+   inArray(s.programs.id,programIds),
   ));
  const enrolledIds = new Set(withEnrollment.map(row => row.studentProfileId));
  return unique.filter(row => enrolledIds.has(row.studentProfileId));
 }
 
-async function activeSectionIds(s: Schema, studentProfileId: string, siteIds: string[]) {
+async function activeSectionIds(s: Schema, studentProfileId: string, siteIds: string[],programIds:string[]) {
  const { db } = await import("@/db/client");
  const rows = await db.select({ sectionId: s.enrollments.sectionId })
   .from(s.enrollments)
@@ -59,7 +62,9 @@ async function activeSectionIds(s: Schema, studentProfileId: string, siteIds: st
   .where(and(
    eq(s.enrollments.studentProfileId, studentProfileId),
    eq(s.enrollments.status, "active"),
+   eq(s.sections.active,true),
    inArray(s.sections.siteId, siteIds),
+   inArray(s.sections.programId,programIds),
   ));
  return rows.map(row => row.sectionId).filter((id): id is string => !!id);
 }
@@ -68,12 +73,12 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
  const context = await guardianActor();
  const siteIds = context.scope.siteIds!;
  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
- const students = await guardianStudents(s, context.actorPersonId!, siteIds);
+ const students = await guardianStudents(s, context.actorPersonId!, siteIds,context.scope.programIds??[]);
  const now = new Date();
  const absenceWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
  const children = await Promise.all(students.map(async student => {
-  const sectionIds = await activeSectionIds(s, student.studentProfileId, siteIds);
+  const sectionIds = await activeSectionIds(s, student.studentProfileId, siteIds,context.scope.programIds??[]);
   let missingCount = 0;
   let nextDueAt: string | null = null;
   if (sectionIds.length) {
@@ -105,8 +110,13 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     }
    }
   }
-  const absences = await db.select({
-   eventId: s.attendanceEvents.id,
+  const attendance = await db.select({
+   id: s.attendanceEvents.id,
+   studentProfileId: s.attendanceEvents.studentProfileId,
+   programId: s.attendanceEvents.programId,
+   occurrenceKey: s.attendanceEvents.occurrenceKey,
+   recordedAt: s.attendanceEvents.recordedAt,
+   status: s.attendanceEvents.status,
    excuseId: s.attendanceExcuses.id,
   }).from(s.attendanceEvents)
    .leftJoin(s.attendanceExcuses, and(
@@ -115,10 +125,12 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
    ))
    .where(and(
     eq(s.attendanceEvents.studentProfileId, student.studentProfileId),
-    eq(s.attendanceEvents.status, "absent"),
+    inArray(s.attendanceEvents.siteId,siteIds),
+    inArray(s.attendanceEvents.programId,context.scope.programIds??[]),
     gte(s.attendanceEvents.expectedAt, absenceWindow),
    ));
-  const unexcusedAbsences = absences.filter(row => !row.excuseId).length;
+  const unexcusedAbsences = effectiveAttendanceEvents(attendance)
+   .filter(row => row.status === "absent" && !row.excuseId).length;
   return {
    studentPersonId: student.studentPersonId,
    studentProfileId: student.studentProfileId,
@@ -170,27 +182,32 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   .orderBy(desc(s.actions.createdAt))
   .limit(20);
 
- const students = await guardianStudents(s, actor, siteIds);
+ const students = await guardianStudents(s, actor, siteIds,context.scope.programIds??[]);
  const excuseWindow = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
  const excuseItems: { id: string; title: string; childName: string; studentPersonId: string; expectedAt: string }[] = [];
  for (const student of students) {
   const rows = await db.select({
-   eventId: s.attendanceEvents.id,
+   id: s.attendanceEvents.id,
+   studentProfileId: s.attendanceEvents.studentProfileId,
+   programId: s.attendanceEvents.programId,
+   occurrenceKey: s.attendanceEvents.occurrenceKey,
+   recordedAt: s.attendanceEvents.recordedAt,
+   status: s.attendanceEvents.status,
    expectedAt: s.attendanceEvents.expectedAt,
    excuseId: s.attendanceExcuses.id,
   }).from(s.attendanceEvents)
    .leftJoin(s.attendanceExcuses, eq(s.attendanceExcuses.attendanceEventId, s.attendanceEvents.id))
    .where(and(
     eq(s.attendanceEvents.studentProfileId, student.studentProfileId),
-    eq(s.attendanceEvents.status, "absent"),
+    inArray(s.attendanceEvents.siteId,siteIds),
+    inArray(s.attendanceEvents.programId,context.scope.programIds??[]),
     gte(s.attendanceEvents.expectedAt, excuseWindow),
    ))
-   .orderBy(desc(s.attendanceEvents.expectedAt))
-   .limit(10);
-  for (const row of rows) {
+   .orderBy(desc(s.attendanceEvents.expectedAt));
+  for (const row of effectiveAttendanceEvents(rows).filter(row=>row.status==="absent").slice(0,10)) {
    if (!row.excuseId) {
     excuseItems.push({
-     id: row.eventId,
+     id: row.id,
      title: "Absence needs an excuse",
      childName: student.firstName ?? student.legalFirstName,
      studentPersonId: student.studentPersonId,

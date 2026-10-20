@@ -18,6 +18,7 @@ if (!DATABASE_URL) {
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  testIgnore: "admissions.spec.ts",
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

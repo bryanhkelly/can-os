@@ -112,6 +112,55 @@ View modes: Today / This Week / School Year. Mobile prioritizes first three acti
 **Wave 3**: Program provisioning, post-activation handoff, site deep workspaces, expansion/replanning; later financial subledger and CAN-level portfolio insights.
 
 ## F. Acceptance criteria and tests
+
+The current bounded staffing implementation is described in
+[Educational capacity: launch staffing](./educational-capacity-model.md#launch-staffing-and-qualification-coverage).
+It connects scoped policy publication, server-enforced assignment, teacher class
+visibility, instructional-window readiness, opening and Site Today through
+canonical records. Its isolated automated evidence does not establish the full
+Launch Studio or browser acceptance criteria below. Teacher profiles now provide
+private evidence submission, and launch setup provides explicitly authorized
+independent review. Explicitly granted catalog stewards can add basic shared
+qualification definitions without editing existing entries or program policy.
+Explicit institutional policy publishers can now publish future-dated
+pre-opening revisions with complete requirement sets, reasons, confirmation and
+version history. Earlier requirements retain their original instructional
+interval; revised requirements can block opening without removing assignments.
+Live storage acceptance, specialized catalog attribute authoring, active-program
+policy changes and exception approvals remain outstanding.
+
+New site-based openings now require an explicitly selected active site
+registrar/operator. Program activation, the named operator's canonical handoff
+Action, recipient notification and immutable evidence commit together.
+The activation screen links to Site Today after success; the program no longer
+disappears from the launch list without a destination. Site Today displays
+pending and acknowledged receipt, the named operator, recorded opening instant
+and section count, and links to current classes, school-year setup and operations.
+It distinguishes live operational views from the historical opening record.
+
+Only the selected recipient can acknowledge receipt, with a note and explicit
+confirmation, after reauthorization against current site operator access.
+Opening registrar and receiving operator may be the same person when eligible.
+Generic Operations controls link to Site Today instead of offering reassignment
+or resolution. Receipt does not gate the already-committed activation, replace
+readiness checks, grant access or certify compliance. Existing active programs
+without a handoff display an explicit unrecorded state, not invented completion.
+Revoked-recipient recovery is now available in Site Today only to a scoped
+registrar with an explicit institutional `program.opening.handoff.manage`
+RoleAssignment capability, active Person and same-organization membership.
+The command requires a pending handoff, an ineligible existing recipient,
+an eligible replacement, an expected revision, reason and confirmation. It
+locks the Action, rechecks authority on every invocation (including retries),
+preserves the opening snapshot, records immutable previous/new ownership
+evidence and notifies the replacement. The replacement must independently
+acknowledge receipt. The previous recipient's existing notification remains
+historical but no longer has a handoff deep link. Identical retries do not
+duplicate evidence or notifications; stale or changed requests reject.
+No access grants are created, no acknowledgment is fabricated, and recovery
+does not change Program activation. Automatic escalation, external delivery verification, full
+readiness-evidence review and broader director daily-operations acceptance remain
+outstanding.
+
 1. Create two synthetic school launch drafts under authorized organization, resume one after refresh, compare grade-9 scenarios without mutating current Site.
 2. Forbidden organization/site/program launch and reads are rejected server-side; user cannot bypass with URL manipulation.
 3. School founder selects an existing K–8 Site and creates a high-school extension; duplicate Site/Person/Household records are not created.

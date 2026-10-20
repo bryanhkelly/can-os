@@ -6,6 +6,23 @@ import { defineLifecycle } from "@/platform/lifecycle";
  */
 export type VerificationStatus = "unverified" | "pending" | "verified" | "rejected" | "revoked";
 export type VerificationDecision = "submit" | "approve" | "reject" | "revoke";
+export function credentialStatusFromDecision(decision: string | null | undefined): VerificationStatus {
+  switch (decision) {
+    case null:
+    case undefined:
+      return "unverified";
+    case "submit":
+      return "pending";
+    case "approve":
+      return "verified";
+    case "reject":
+      return "rejected";
+    case "revoke":
+      return "revoked";
+    default:
+      throw new Error(`Unsupported credential verification decision: ${decision}`);
+  }
+}
 const credentialLifecycle = defineLifecycle<VerificationStatus, VerificationDecision>({
   states: ["unverified", "pending", "verified", "rejected", "revoked"],
   transitions: {

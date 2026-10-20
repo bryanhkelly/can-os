@@ -1,10 +1,10 @@
 import { listEnrollmentPlacements, placeEnrolledStudent } from "@/modules/enrollment/course-placement.functions";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
 import { listMySites } from "@/modules/operations/site-directory.functions";
 import { listAdmissionsPrograms } from "@/modules/enrollment/admissions-program-directory.functions";
-import { getAdmissionOfferOptions, issueAdmissionOffer, activateOfferedEnrollment } from "@/modules/enrollment/admissions-offer.functions";
+import { getAdmissionOfferOptions, issueAdmissionOffer, activateOfferedEnrollment,withdrawIssuedAdmissionOffer } from "@/modules/enrollment/admissions-offer.functions";
 import { admissionsPipelineSummary, pipelineStages, type AdmissionsStage } from "@/domain/admissions-pipeline";
 import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions-offer-selection";
 import { WorkspaceShell, StatCard, EmptyState, DetailNavigation, StatusBadge } from "@/components/workspace";
@@ -50,7 +50,10 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
   };
   const summary = admissionsPipelineSummary(rows);
   const router = useRouter();
-  const [busy, setBusy] = useState<string | null>(null), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const [pending, setBusy] = useState<string | null>(null), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const [interactive,setInteractive]=useState(false);
+  useEffect(()=>setInteractive(true),[]);
+  const busy=interactive?pending:"hydrating";
 
   async function transact(id: string, fn: () => Promise<unknown>) {
     setBusy(id); setError(""); setNotice("");
@@ -103,14 +106,15 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
         <thead className="border-b bg-muted/50"><tr><th scope="col" className="p-4">Applicant</th><th scope="col" className="p-4">Program</th><th scope="col" className="p-4">Stage</th><th scope="col" className="p-4">Next step</th></tr></thead>
         <tbody className="divide-y">{rows.filter(row=>!selected.stage||row.stage===selected.stage).map(row=>{
          const offer=selectActionableOffer(row.offers);
-         const next=row.outstandingRequirements>0?`Review ${row.outstandingRequirements} blocking requirement(s)`:
-          row.stage==="declined"||row.stage==="withdrawn"?"Review closed application":
+         const next=row.stage==="declined"||row.stage==="withdrawn"?"Review closed application":
+          row.disposition==="waitlisted"?"Restore waitlisted application to review":
+          row.outstandingRequirements>0?`Review ${row.outstandingRequirements} blocking requirement(s)`:
           offer?.status==="issued"?"Awaiting family response":
           offer?.status==="accepted"&&!row.enrollments.some(enrollment=>enrollment.schoolYearId===offer.schoolYearId)?"Activate accepted enrollment":
           row.enrollments.length?"Review class placement":row.stage==="accepted"?"Review offer eligibility":"Review application evidence";
          return <tr key={row.id} className="align-top hover:bg-muted/40">
           <th scope="row" className="p-4 font-semibold"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:row.id}} className="underline">{row.studentName??row.id}</Link><span className="mt-1 block text-xs font-normal text-muted-foreground">{row.submittedAt?`Submitted ${new Date(row.submittedAt).toLocaleDateString()}`:"Not submitted"}</span></th>
-          <td className="p-4">{row.program}</td><td className="p-4"><StatusBadge tone={row.outstandingRequirements>0?"attention":"neutral"}>{row.stage}</StatusBadge></td>
+          <td className="p-4">{row.program}</td><td className="p-4"><StatusBadge tone={row.outstandingRequirements>0?"attention":"neutral"}>{row.disposition==="waitlisted"?"waitlisted":row.stage}</StatusBadge></td>
           <td className="p-4"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:row.id}} className="underline">{next}</Link></td>
          </tr>;
         })}</tbody>
@@ -128,13 +132,16 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           <h3 className="mb-2 font-serif text-2xl">{x.studentName??x.id}</h3>
           <p className="font-semibold"><Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="hover:underline">{x.program}</Link></p>
           <p className="mt-1 text-sm capitalize text-muted-foreground">{x.stage} · {x.outstandingRequirements} outstanding blocking requirements</p>
+          {x.disposition==="waitlisted"&&<p role="status" className="mt-2 text-sm">Waitlisted - restore this application to review in admissions intake before issuing an offer.</p>}
+          <Link to="/admissions/intake" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-2 inline-block text-xs underline">Manage admissions decisions and waitlist →</Link>
           <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o => <span key={o.id} className="rounded-lg border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt ? ` · Expires ${new Date(o.expiresAt).toLocaleDateString()}` : ""}</span>)}{!latest && <span className="text-xs text-muted-foreground">No currently actionable offer</span>}</div>
           {activated && <p className="mt-3 text-sm font-semibold">Enrollment active · Student is enrolled in this school year</p>}
           <div className="mt-4 flex flex-wrap gap-2">
-            {years.filter(year => canIssueAnotherOffer(x.stage, x.outstandingRequirements, x.offers, year.id)).map(year => <button key={year.id} disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => issueAdmissionOffer({ data: { applicationId: x.id, schoolYearId: year.id } }))}>Registrar: Issue offer · {year.name}</button>)}
+            {years.filter(year => canIssueAnotherOffer(x.stage, x.outstandingRequirements, x.offers, year.id,new Date(),x.disposition)).map(year => <button key={year.id} disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => issueAdmissionOffer({ data: { applicationId: x.id, schoolYearId: year.id } }))}>Registrar: Issue offer · {year.name}</button>)}
             {latest?.status === "issued" && <p className="text-xs text-muted-foreground">Waiting for guardian response in the guardian enrollment-offers workspace.</p>}
-            {latest?.status === "accepted" && !activated && <button disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => activateOfferedEnrollment({ data: { offerId: latest.id } }))}>Registrar: Activate enrollment</button>}
+            {latest?.status === "accepted" && !activated && <button disabled={busy !== null||x.outstandingRequirements>0} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => activateOfferedEnrollment({ data: { offerId: latest.id } }))}>Registrar: Activate enrollment</button>}
           </div>
+          {x.offers.filter(offer=>offer.status==="issued").map(offer=><OfferWithdrawal key={offer.id} offerId={offer.id}/>)}
           {x.enrollments.length > 0 && <CoursePlacement applicationId={x.id} />}
           <Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
         </article>;
@@ -142,6 +149,35 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
         {!rows.length && <EmptyState title="No applications are available in your authorized programs." />}</div>
     </WorkspaceShell>
   );
+}
+
+function OfferWithdrawal({offerId}:{offerId:string}){
+ const router=useRouter();
+ const [reason,setReason]=useState(""),[confirmed,setConfirmed]=useState(false);
+ const [busy,setBusy]=useState(false),[error,setError]=useState("");
+ return <details className="mt-3 rounded border p-3 text-sm">
+  <summary>Withdraw an unaccepted offer</summary>
+  <p className="mt-2">This releases the offered seat without deleting the application or its history.
+   Accepted offers and active enrollments cannot be withdrawn here.</p>
+  <form className="mt-3 space-y-3" onSubmit={async event=>{
+   event.preventDefault();
+   if(!confirmed||reason.trim().length<10){setError("Enter a withdrawal reason and confirm the family notification.");return;}
+   setBusy(true);setError("");
+   try{await withdrawIssuedAdmissionOffer({data:{offerId,reason,confirmed:true}});await router.invalidate();}
+   catch(failure){setError(failure instanceof Error?failure.message:"Unable to withdraw offer");}
+   finally{setBusy(false);}
+  }}>
+   <label className="block">Reason for withdrawal (internal)
+    <textarea required minLength={10} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}
+     className="mt-1 block w-full rounded border bg-background p-2"/>
+   </label>
+   <label className="flex items-start gap-2"><input type="checkbox" required checked={confirmed}
+    onChange={event=>setConfirmed(event.target.checked)}/>I confirm withdrawal of this unaccepted offer. The family will be notified.</label>
+   <button type="submit" disabled={busy||!confirmed||reason.trim().length<10}
+    className="rounded border px-3 py-2 disabled:opacity-50">Withdraw offer</button>
+   {error&&<p role="alert">{error}</p>}
+  </form>
+ </details>;
 }
 
 function CoursePlacement({ applicationId }: { applicationId: string }) {
