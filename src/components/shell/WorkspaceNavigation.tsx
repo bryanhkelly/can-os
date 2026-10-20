@@ -13,7 +13,7 @@ export const workspaceLinks:Record<string,{title:string;path:string}[]>={
  student:[{title:"Today",path:"/student"},{title:"Assignments",path:"/student/assignments"},{title:"My classes",path:"/student/courses"},{title:"Study groups",path:"/student/study-groups"},{title:"Support",path:"/student/support"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
  guardian:[{title:"Family",path:"/guardian"},{title:"Classes",path:"/classes"},{title:"Academics",path:"/guardian/academics"},{title:"Attendance",path:"/guardian/attendance"},{title:"Offers",path:"/guardian/admission-offers"},{title:"Messages",path:"/messages"}],
  teacher:[{title:"Today",path:"/teacher"},{title:"Classes",path:"/classes"},{title:"Gradebook",path:"/teacher/gradebook"},{title:"Students",path:"/staff/students"},{title:"Teachers",path:"/staff/teachers"},{title:"Study groups",path:"/teacher/study-groups"},{title:"Referrals",path:"/student/support"},{title:"Missing work",path:"/teacher/missing-work"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- registrar:[{title:"Operations",path:"/operations"},{title:"Admissions",path:"/admissions"},{title:"Sites",path:"/sites"},{title:"Students",path:"/staff/students"},{title:"School years",path:"/operations/school-years"},{title:"Curriculum",path:"/operations/curriculum"}],
+ registrar:[{title:"Operations",path:"/operations"},{title:"Admissions",path:"/admissions"},{title:"Sites",path:"/sites"},{title:"Students",path:"/staff/students"},{title:"School years",path:"/operations/school-years"},{title:"Curriculum",path:"/operations/curriculum"},{title:"Administration",path:"/admin"}],
  specialist:[{title:"Caseload",path:"/coach"},{title:"Referrals & services",path:"/support"},{title:"Students",path:"/staff/students"},{title:"Insights",path:"/operations/insights"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
  counselor:[{title:"Counselor caseload",path:"/counselor"},{title:"Referrals & services",path:"/support"},{title:"Students",path:"/staff/students"},{title:"Insights",path:"/operations/insights"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}]
 };
@@ -91,13 +91,14 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
    </label>}
    {current&&<><button type="button" onClick={()=>setTray("notifications")} aria-haspopup="dialog" className="rounded-lg border px-3 py-2 text-xs font-semibold"><Bell className="mr-1 inline size-3" aria-hidden="true"/>Notifications</button>
     <button type="button" onClick={()=>setTray("ask")} aria-haspopup="dialog" className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background"><MessageCircle className="mr-1 inline size-3" aria-hidden="true"/>Ask CAN</button></>}
-   {authenticated&&<label className="text-xs text-muted-foreground">Workspace
-    <select aria-label="Active membership" disabled={changing} value={authenticated.activeGrantId} onChange={event=>{void changeSession(()=>switchGrant(event.target.value));}} className="ml-2 max-w-64 rounded-lg border bg-background p-2">
+   {authenticated&&<label className="text-xs text-muted-foreground">{authenticated.demoFacilitator?"Demo user":"Workspace"}
+    <select aria-label={authenticated.demoFacilitator?"Demo user":"Active membership"} disabled={changing} value={authenticated.activeGrantId} onChange={event=>{void changeSession(()=>switchGrant(event.target.value));}} className="ml-2 max-w-64 rounded-lg border bg-background p-2">
      {grants.map(g=><option key={g.id} value={g.id}>{g.firstName} {g.lastName} · {g.role}</option>)}
     </select>
    </label>}
    {authenticated?<button type="button" disabled={changing} onClick={()=>void changeSession(signOut)} className="text-xs font-semibold">Sign out</button>:session&&<Link to="/access" className="text-xs font-semibold">Sign in</Link>}
    {(error||sessionError)&&<p role="alert" className="w-full rounded-lg border border-amber-500 p-3 text-sm">{error||sessionError}</p>}
+   {authenticated?.demoFacilitator&&<p role="status" className="w-full rounded-lg border border-amber-500 p-2 text-xs">Demo admin session: acting as {current?.firstName} {current?.lastName} ({current?.role}). Changes affect shared synthetic data. User switches are audited.</p>}
   </div>
  </header>{children}</div></div>
  {current&&<><ContextTray title="Workspace navigation" open={menuOpen} onClose={()=>setMenuOpen(false)}>

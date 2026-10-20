@@ -30,7 +30,70 @@ CAN OS is a real multi-user application with a shared Neon-backed synthetic demo
 
 ## Local synthetic demo sign-in
 
-In the existing access form, the four seeded synthetic email addresses reveal a code field and use the fixed code `CANOS-LOCAL-TEST` without email delivery in local development or test runs. Other addresses keep the standard email-link flow. Enable demo-code redemption explicitly with `CAN_DEMO_FIXED_ACCESS_ENABLED=true`; the server also requires `NODE_ENV` to be `development` or `test`. Production environments reject this sign-in path even if the flag is accidentally set. It only accepts the four allowlisted `.invalid` demo emails with an active synthetic grant, creates a regular audited server session, and does not mark the email as verified. Never use this code for real accounts or shared production access.
+In the existing access form, the six seeded synthetic email addresses reveal a code field and use the fixed code `CANOS-LOCAL-TEST` without email delivery in local development or test runs. Other addresses keep the standard email-link flow. Enable demo-code redemption explicitly with `CAN_DEMO_FIXED_ACCESS_ENABLED=true`; the server also requires `NODE_ENV` to be `development` or `test`. Production environments reject this sign-in path even if the flag is accidentally set. It only accepts the six allowlisted `.invalid` demo emails with an active synthetic grant, creates a regular audited server session, and does not mark the email as verified. Never use this code for real accounts or shared production access.
+
+### Demo school management
+
+Use `alex.registrar@can-os.invalid` for the registrar workspace. Jordan, Riley,
+Casey and Morgan retain their separate student, teacher, specialist and guardian
+roles. Registrar access is site-scoped to Synthetic Bay Campus in the existing
+CAN Synthetic Demonstration School, not an unrestricted network administrator.
+
+Explicitly provision the registrar's account, organization membership and
+institutional grants with:
+
+```powershell
+$env:NODE_ENV = "development"
+npm run demo:provision-registrar -- --apply
+```
+
+The command provisions both Alex and the separate Demo Admin. It loads `.env.local` and requires both
+`CAN_DEMO_FIXED_ACCESS_ENABLED=true` and `CAN_DEMO_WRITES_ENABLED=true`.
+It refuses production, missing/non-synthetic school scope, disabled accounts,
+inactive/conflicting grants and non-synthetic existing records. It does not
+reactivate revoked access. It is transactional and retry-safe, and appends
+operator-bootstrap audit/outbox evidence only when provisioning changes data.
+No account or grant is provisioned implicitly during login.
+
+The institutional site grant enables credential review, qualification-catalog
+creation, teacher-policy publication, curriculum publication and opening-handoff
+management. Existing registrar capabilities cover school years, admissions,
+enrollment activation, capacity, attendance and staff administration. Resource,
+scope, independent-review and workflow checks still apply; missing readiness
+evidence must be completed rather than waived. Guardian signatures and offer
+acceptance still require an authorized guardian context, not registrar authority.
+
+### Demo Admin user switching
+
+Sign in as `admin.demo@can-os.invalid` with the same local demo code. Demo Admin
+starts in a site-scoped registrar workspace. The top-bar **Demo user** selector
+can switch to Jordan, Riley, Casey, Morgan or Alex and back to Demo Admin without
+signing out. A persistent banner identifies the effective person and role.
+Each switch performs a document navigation to discard the previous user's
+mounted state and caches.
+
+This is explicit, development/test-only facilitator delegation, not arbitrary
+production impersonation. The admin account owns a separate synthetic
+`demo_facilitator` grant and selects the original allowlisted user grants without
+duplicating staff memberships. Each request
+and selection rechecks that facilitator grant, the source user's active
+synthetic grant, active person, enabled source account and exact school scope.
+Revoking the source or facilitator grant removes access; provisioning never
+reactivates it. Production or disabling either local demo flag denies existing
+admin sessions as well as new logins.
+
+The authenticated account remains Demo Admin while capabilities and relationships
+come from the selected person/role. Student mode does not retain registrar
+permissions. Guardian decisions can be demonstrated in Morgan's delegated
+context, not while acting as registrar. Login and switch audit records identify
+the facilitator; context-based domain audit helpers preserve both facilitator
+and acting identity. This does not claim to complete the broader legacy audit
+attribution migration documented below.
+
+After changing local environment flags, restart the development server.
+To validate provisioning, login, scope denials and transactional rollback on the
+guarded disposable database, run
+`node scripts/run-integration-tests.mjs demo-registrar`.
 
 ## Original implementation sequence (historical, not a live task list)
 

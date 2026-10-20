@@ -47,7 +47,7 @@ vi.mock("@/modules/programs/opening-handoff.functions",()=>({acknowledgeLaunchHa
 vi.mock("@/modules/enrollment/course-placement.functions",()=>({listEnrollmentPlacements:vi.fn(),placeEnrolledStudent:vi.fn()}));
 vi.mock("@/modules/enrollment/admissions-dashboard.functions",()=>({getAdmissionsDashboard:vi.fn()}));
 vi.mock("@/modules/enrollment/admissions-intake.functions",()=>({
- listAdmissionsIntake:vi.fn(),listAdmissionsIntakePrograms:vi.fn(),createAdmissionsInquiry:vi.fn(),
+ listAdmissionsIntake:vi.fn(),listAdmissionsIntakePrograms:vi.fn(),listAdmissionsExistingStudents:vi.fn(),createAdmissionsInquiry:vi.fn(),
  provisionInquiryGuardianAccount:vi.fn(),sendAdmissionsGuardianInvitation:vi.fn(),
  verifyAdmissionsGuardianRelationship:vi.fn(),transitionAdmissionsStage:vi.fn(),
 }));
@@ -209,7 +209,7 @@ describe("application contextual navigation",()=>{
 
   it("keeps the selected Admissions intake application when resolving an offer exception",()=>{
     state.search={application:"application"};
-    successful({programs:[],records:[
+    successful({programs:[],existingStudents:[],records:[
       {id:"application",studentFirst:"Selected",studentLast:"Applicant",programId:"program",siteId:"school",
         programName:"Academy",stage:"eligibility",disposition:"waitlisted",updatedAt:"2030-01-01"},
       {id:"other",studentFirst:"Unrelated",studentLast:"Applicant",programId:"program",
@@ -220,6 +220,26 @@ describe("application contextual navigation",()=>{
     expect(html).not.toContain('>Unrelated Applicant</h3>');
     expect(html).toContain("Restore to review");
     expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;application=application"');
+  });
+
+  it("offers existing students only from the selected intake program without replacing new-student intake",()=>{
+    state.search={programId:"program"};
+    successful({programs:[{id:"program",name:"Academy",siteId:"school"}],records:[],existingStudents:[
+      {programId:"program",studentProfileId:"existing",guardianPersonId:"guardian",householdId:"household",
+        studentFirstName:"Existing",studentLastName:"Learner",guardianFirstName:"Managing",guardianLastName:"Guardian"},
+      {programId:"program",studentProfileId:"unlinked",guardianPersonId:"unlinked-guardian",householdId:null,
+        studentFirstName:"Unlinked",studentLastName:"Learner",guardianFirstName:"Unlinked",guardianLastName:"Guardian"},
+      {programId:"other",studentProfileId:"outside",guardianPersonId:"other-guardian",householdId:"other-household",
+        studentFirstName:"Outside",studentLastName:"Learner",guardianFirstName:"Other",guardianLastName:"Guardian"},
+    ]});
+    const html=render(Intake);
+    expect(html).toContain("Existing Learner");
+    expect(html).toContain("Managing Guardian");
+    expect(html).toContain("new household required");
+    expect(html).not.toContain("Outside Learner");
+    expect(html).toContain("Create a new student");
+    expect(html).toContain("Student first name");
+    expect(html).toContain("Creating an inquiry does not activate enrollment.");
   });
 
   it("filters the admissions pipeline by stage without dropping scope from applicant links",()=>{

@@ -72,6 +72,7 @@ export async function recordAudit(
       accountId: actor.accountId,
       sessionId: actor.sessionId,
       role: actor.role,
+      ...(actor.demoFacilitator ? { demoFacilitator: actor.demoFacilitator } : {}),
       ...(actor.requestId ? { requestId: actor.requestId } : {}),
     },
   });

@@ -6,7 +6,7 @@ import type { Actor } from "@/modules/identity/actors.server";
 
 type Transaction=Parameters<Parameters<Database["transaction"]>[0]>[0];
 const state=vi.hoisted(()=>({tx:undefined as Transaction|undefined,actor:undefined as Actor|undefined,
- verify:vi.fn(),sign:vi.fn(()=>"https://storage.example.invalid/signed"),failDocumentEvent:false,failStageEvent:false}));
+ verify:vi.fn(),sign:vi.fn(()=>"https://storage.example.invalid/signed"),failDocumentEvent:false,failStageEvent:false,failInquiryEvent:false}));
 vi.mock("@/modules/enrollment/r2-documents.server",async importOriginal=>{
  const original=await importOriginal<typeof import("@/modules/enrollment/r2-documents.server")>();
  return {...original,verifyDocumentObject:state.verify,signR2Object:state.sign,r2Config:vi.fn(()=>({}))};
@@ -14,6 +14,7 @@ vi.mock("@/modules/enrollment/r2-documents.server",async importOriginal=>{
 vi.mock("@/platform/mutation",async importOriginal=>{
  const original=await importOriginal<typeof import("@/platform/mutation")>();
  return {...original,emitEvent:async(...args:Parameters<typeof original.emitEvent>)=>{
+ if(state.failInquiryEvent&&args[1].eventType==="AdmissionsInquiryCreated")throw new Error("Injected inquiry outbox failure");
  if(state.failStageEvent&&args[1].eventType==="AdmissionsStageChanged")throw new Error("Injected stage outbox failure");
   if(state.failDocumentEvent&&(args[1].eventType.startsWith("EnrollmentDocument")||
    args[1].eventType.startsWith("EnrollmentForm")))throw new Error("Injected document outbox failure");
@@ -497,10 +498,166 @@ integration("cross-persona admissions through active classes",()=>{
     const intakeJourney=first(await tx.select().from(s.journeys).where(eq(s.journeys.participantId,inquiry.applicationId)));
     expect(first(await tx.select().from(s.journeyRequirements).where(eq(s.journeyRequirements.journeyId,intakeJourney.id))))
      .toMatchObject({metadata:{enrollmentForm:{version:"approved-test-v1"}}});
+    const returningPerson=first(await tx.insert(s.people).values({
+     legalFirstName:"Existing",legalLastName:"Classmate",metadata:{synthetic:true},
+    }).returning());
+    const returningProfile=first(await tx.insert(s.studentProfiles).values({
+     personId:returningPerson.id,gradeLevel:"10",metadata:{synthetic:true},
+    }).returning());
+    const returningHousehold=first(await tx.insert(s.households).values({displayName:"Existing household"}).returning());
+    await tx.insert(s.householdMemberships).values([
+     {householdId:returningHousehold.id,personId:returningPerson.id,relationshipLabel:"student"},
+     {householdId:returningHousehold.id,personId:guardian.id,relationshipLabel:"guardian"},
+    ]);
+    await tx.insert(s.guardianRelationships).values({guardianPersonId:guardian.id,studentPersonId:returningPerson.id,relationshipLabel:"guardian",
+     canManageEnrollment:true,metadata:{verification:"verified"}});
+    const originalClassEnrollment=first(await tx.insert(s.enrollments).values({
+     studentProfileId:returningProfile.id,organizationId:org.id,programId:program.id,
+     kind:"section",status:"active",sectionId:section.id,schoolYearId:time.schoolYear.id,
+    }).returning());
+    const returningInput={requestId:crypto.randomUUID(),programId:program.id,
+     existingStudent:{studentProfileId:returningProfile.id,guardianPersonId:guardian.id,householdId:returningHousehold.id}};
+    const originalPeople=await tx.select({id:s.people.id}).from(s.people);
+    const originalProfiles=await tx.select({id:s.studentProfiles.id}).from(s.studentProfiles);
+    const originalHouseholds=await tx.select({id:s.households.id}).from(s.households);
+    const originalRelations=await tx.select().from(s.guardianRelationships);
+    const originalHouseholdMembers=await tx.select().from(s.householdMemberships);
+    state.actor=family;
+    await expect(intake.listAdmissionsExistingStudents()).rejects.toThrow("registrar");
+    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("registrar");
+    state.actor={...staff,capabilities:new Set()};
+    await expect(intake.listAdmissionsExistingStudents()).rejects.toThrow("enrollment.decide");
+    state.actor={...staff,scope:{...staff.scope,siteIds:[]}};
+    expect(await intake.listAdmissionsExistingStudents()).toEqual([]);
+    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("school and organization");
+    state.actor={...staff,scope:{...staff.scope,organizationIds:[]}};
+    expect(await intake.listAdmissionsExistingStudents()).toEqual([]);
+    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("school and organization");
+    state.actor={...staff,scope:{...staff.scope,programIds:[crypto.randomUUID()]}};
+    expect(await intake.listAdmissionsExistingStudents()).toEqual([]);
+    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("admissions program");
+    state.actor=staff;
+    expect(await intake.listAdmissionsExistingStudents()).toContainEqual(expect.objectContaining({
+     studentProfileId:returningProfile.id,householdId:returningHousehold.id,guardianPersonId:guardian.id,
+    }));
+    await expect(intake.createAdmissionsInquiry({data:{...returningInput,
+     existingStudent:{...returningInput.existingStudent,guardianPersonId:outsider.id}}})).rejects.toThrow("household scope");
+    await expect(intake.createAdmissionsInquiry({data:{...returningInput,existingApplicationId:inquiry.applicationId}}))
+     .rejects.toThrow();
+    await expect(intake.createAdmissionsInquiry({data:{...returningInput,studentFirstName:"Overwrite"}})).rejects.toThrow();
+    await tx.update(s.guardianRelationships).set({canManageEnrollment:false})
+     .where(eq(s.guardianRelationships.studentPersonId,returningPerson.id));
+    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("household scope");
+    await tx.update(s.guardianRelationships).set({canManageEnrollment:true})
+     .where(eq(s.guardianRelationships.studentPersonId,returningPerson.id));
+    await tx.update(s.householdMemberships).set({personId:outsider.id}).where(and(
+     eq(s.householdMemberships.householdId,returningHousehold.id),eq(s.householdMemberships.personId,guardian.id)));
+    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("household scope");
+    await tx.update(s.householdMemberships).set({personId:guardian.id}).where(and(
+     eq(s.householdMemberships.householdId,returningHousehold.id),eq(s.householdMemberships.personId,outsider.id)));
+    vi.stubEnv("CAN_DEMO_WRITES_ENABLED","false");
+    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("Synthetic writes are disabled");
+    vi.stubEnv("CAN_DEMO_WRITES_ENABLED","true");
+    state.failInquiryEvent=true;
+    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("inquiry outbox failure");
+    state.failInquiryEvent=false;
+    expect(await tx.select().from(s.applications).where(eq(s.applications.idempotencyKey,
+     "registrar-inquiry:"+returningInput.requestId))).toEqual([]);
+    const returning=await intake.createAdmissionsInquiry({data:returningInput});
+    expect(await intake.createAdmissionsInquiry({data:returningInput})).toEqual(returning);
+    await expect(intake.createAdmissionsInquiry({data:{...returningInput,requestId:crypto.randomUUID()}}))
+     .rejects.toThrow("already has an open application");
+    expect(first(await tx.select().from(s.applications).where(eq(s.applications.id,returning.applicationId))))
+     .toMatchObject({studentProfileId:returningProfile.id,householdId:returningHousehold.id,stage:"inquiry",
+      metadata:{synthetic:true,existingStudent:true,contactPersonId:guardian.id}});
+    expect(await tx.select({id:s.people.id}).from(s.people)).toEqual(originalPeople);
+    expect(await tx.select({id:s.studentProfiles.id}).from(s.studentProfiles)).toEqual(originalProfiles);
+    expect(await tx.select({id:s.households.id}).from(s.households)).toEqual(originalHouseholds);
+    expect((await tx.select().from(s.guardianRelationships)).map(({updatedAt,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id)))
+     .toEqual(originalRelations.map(({updatedAt,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id)));
+    expect((await tx.select().from(s.householdMemberships)).map(({updatedAt,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id)))
+     .toEqual(originalHouseholdMembers.map(({updatedAt,...row})=>row).sort((a,b)=>a.id.localeCompare(b.id)));
+    expect(first(await tx.select().from(s.enrollments).where(eq(s.enrollments.id,originalClassEnrollment.id))))
+     .toEqual(originalClassEnrollment);
+    expect(await tx.select().from(s.domainEvents).where(and(eq(s.domainEvents.aggregateId,returning.applicationId),
+     eq(s.domainEvents.eventType,"AdmissionsInquiryCreated")))).toHaveLength(1);
+    expect(first(await tx.select().from(s.auditEvents).where(eq(s.auditEvents.resourceId,returning.applicationId))))
+     .toMatchObject({action:"admissions.inquiry.create",after:{studentProfileId:returningProfile.id,
+      householdId:returningHousehold.id,guardianPersonId:guardian.id,existingStudent:true}});
+    const returningKey=`existing-intake-${suffix}`;
+    await tx.insert(s.journeyDefinitions).values({key:returningKey,version:"1",audience:"family",owningOrganizationId:org.id,
+     title:"Existing student readiness",configuration:{requirements:[
+      {key:"review",title:"Registrar review",blocking:true,owner:"can"},
+     ]}});
+    await tx.update(s.programs).set({metadata:{enrollmentJourneyDefinitionKey:returningKey}}).where(eq(s.programs.id,program.id));
+    await intake.transitionAdmissionsStage({data:{applicationId:returning.applicationId,decision:"application"}});
+    await intake.transitionAdmissionsStage({data:{applicationId:returning.applicationId,decision:"eligibility"}});
+    await expect(intake.transitionAdmissionsStage({data:{applicationId:returning.applicationId,decision:"accept"}}))
+     .rejects.toThrow("Complete blocking enrollment requirements");
+    const returningJourney=first(await tx.select().from(s.journeys).where(eq(s.journeys.participantId,returning.applicationId)));
+    const returningRequirement=first(await tx.select().from(s.journeyRequirements).where(eq(s.journeyRequirements.journeyId,returningJourney.id)));
+    await setFamilyRequirement({data:{applicationId:returning.applicationId,requirementId:returningRequirement.id,complete:true}});
+    await intake.transitionAdmissionsStage({data:{applicationId:returning.applicationId,decision:"accept"}});
+    await tx.update(s.admissionSeatPools).set({capacity:2}).where(eq(s.admissionSeatPools.programId,program.id));
+    const returningOffer=await offers.issueAdmissionOffer({data:{applicationId:returning.applicationId,schoolYearId:time.schoolYear.id}});
+    await expect(offers.activateOfferedEnrollment({data:returningOffer})).rejects.toThrow("Guardian must accept");
+    state.actor=family;
+    await offers.respondToAdmissionOffer({data:{...returningOffer,decision:"accept"}});
+    state.actor=staff;
+    const returningEnrollment=await offers.activateOfferedEnrollment({data:returningOffer});
+    expect(await offers.activateOfferedEnrollment({data:returningOffer})).toEqual(returningEnrollment);
+    expect(first(await tx.select().from(s.enrollments).where(eq(s.enrollments.id,returningEnrollment.enrollmentId))))
+     .toMatchObject({studentProfileId:returningProfile.id,programId:program.id,kind:"program",status:"active"});
+    expect(await tx.select().from(s.enrollments).where(eq(s.enrollments.studentProfileId,returningProfile.id))).toHaveLength(2);
+    expect(first(await tx.select().from(s.enrollments).where(eq(s.enrollments.id,originalClassEnrollment.id))))
+     .toEqual(originalClassEnrollment);
+    const unlinkedGuardian=first(await tx.insert(s.people).values({
+     legalFirstName:"Unlinked",legalLastName:"Guardian",
+    }).returning());
+    const unlinkedPerson=first(await tx.insert(s.people).values({
+     legalFirstName:"Unlinked",legalLastName:"Student",
+    }).returning());
+    const unlinkedProfile=first(await tx.insert(s.studentProfiles).values({personId:unlinkedPerson.id}).returning());
+    await tx.insert(s.guardianRelationships).values({guardianPersonId:unlinkedGuardian.id,studentPersonId:unlinkedPerson.id,
+     relationshipLabel:"guardian",canManageEnrollment:true});
+    await tx.insert(s.enrollments).values({studentProfileId:unlinkedProfile.id,organizationId:org.id,
+     programId:program.id,kind:"section",status:"active",sectionId:section.id,schoolYearId:time.schoolYear.id});
+    const unlinkedInput={requestId:crypto.randomUUID(),programId:program.id,
+     existingStudent:{studentProfileId:unlinkedProfile.id,guardianPersonId:unlinkedGuardian.id,createHousehold:true as const}};
+    expect(await intake.listAdmissionsExistingStudents()).toContainEqual(expect.objectContaining({
+     studentProfileId:unlinkedProfile.id,guardianPersonId:unlinkedGuardian.id,householdId:null,
+    }));
+    await expect(intake.createAdmissionsInquiry({data:{...unlinkedInput,existingStudent:{
+     studentProfileId:unlinkedProfile.id,guardianPersonId:unlinkedGuardian.id,
+    }}})).rejects.toThrow("explicitly confirm");
+    await expect(intake.createAdmissionsInquiry({data:{...unlinkedInput,existingStudent:{
+     ...unlinkedInput.existingStudent,householdId:returningHousehold.id,
+    }}})).rejects.toThrow("explicitly confirm");
+    const householdCountBefore=await tx.select({id:s.households.id}).from(s.households);
+    state.failInquiryEvent=true;
+    vi.stubEnv("CAN_DEMO_WRITES_ENABLED","false");
+    await expect(intake.createAdmissionsInquiry({data:unlinkedInput})).rejects.toThrow("inquiry outbox failure");
+    state.failInquiryEvent=false;
+    expect(await tx.select({id:s.households.id}).from(s.households)).toEqual(householdCountBefore);
+    expect(await tx.select().from(s.householdMemberships).where(eq(s.householdMemberships.personId,unlinkedPerson.id)))
+     .toEqual([]);
+    const unlinkedInquiry=await intake.createAdmissionsInquiry({data:unlinkedInput});
+    expect(await intake.createAdmissionsInquiry({data:unlinkedInput})).toEqual(unlinkedInquiry);
+    const unlinkedApplication=first(await tx.select().from(s.applications).where(eq(s.applications.id,unlinkedInquiry.applicationId)));
+    expect(unlinkedApplication).toMatchObject({studentProfileId:unlinkedProfile.id,
+     metadata:{existingStudent:true,synthetic:false,createdHousehold:true,contactPersonId:unlinkedGuardian.id}});
+    expect(await tx.select().from(s.householdMemberships).where(eq(s.householdMemberships.householdId,unlinkedApplication.householdId)))
+     .toHaveLength(2);
+    expect(first(await tx.select().from(s.auditEvents).where(eq(s.auditEvents.resourceId,unlinkedInquiry.applicationId))))
+     .toMatchObject({after:{createdHousehold:true,householdId:unlinkedApplication.householdId}});
+    await expect(intake.createAdmissionsInquiry({data:{...unlinkedInput,requestId:returningInput.requestId}}))
+     .rejects.toThrow("reused for another student");
+    await expect(intake.createAdmissionsInquiry({data:{...unlinkedInput,requestId:crypto.randomUUID()}}))
+     .rejects.toThrow("already has an open application");
     checked=true;throw rollback;
    });
   }catch(error){if(error!==rollback)throw error;}
-  finally{state.tx=undefined;state.actor=undefined;state.failDocumentEvent=false;state.failStageEvent=false;vi.unstubAllEnvs();}
+  finally{state.tx=undefined;state.actor=undefined;state.failDocumentEvent=false;state.failStageEvent=false;state.failInquiryEvent=false;vi.unstubAllEnvs();}
   expect(checked).toBe(true);
   expect(await database.select().from(s.applications).where(eq(s.applications.id,applicationId))).toEqual([]);
   expect(await database.select().from(s.studentProfiles).where(eq(s.studentProfiles.id,profileId))).toEqual([]);

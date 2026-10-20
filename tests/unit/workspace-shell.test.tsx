@@ -96,6 +96,19 @@ describe("persistent server-initialized workspace shell", () => {
     view.queryClient.clear();
   });
 
+  it("labels delegated demo switching without expanding the active student's navigation", async () => {
+    if (!signedIn.session?.authenticated) throw new Error("Expected authenticated fixture");
+    const view = await shell({
+      ...signedIn, session: { ...signedIn.session, demoFacilitator: true },
+    });
+    const html = view.markup();
+    expect(html).toContain('aria-label="Demo user"');
+    expect(html).toContain("Demo admin session: acting as Test Learner (student)");
+    expect(html).not.toContain("/admissions");
+    expect(html).not.toContain('aria-label="Active membership"');
+    view.queryClient.clear();
+  });
+
   it("renders signed-out state and session failures explicitly, without inventing a membership", async () => {
     const guest = await shell(signedOut);
     expect(guest.markup()).toContain("Sign in");

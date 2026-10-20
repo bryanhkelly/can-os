@@ -10,6 +10,7 @@ export type CommandContext = {
   capabilities: ReadonlySet<string>;
   scope: AuthorizationScope;
   requestId?: string;
+  demoFacilitator?: { accountId: string; personId: string; sourceAccountId: string };
 };
 
 export class AuthorizationError extends Error {

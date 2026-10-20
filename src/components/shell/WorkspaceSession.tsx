@@ -19,6 +19,7 @@ export function workspaceSessionIdentity(result: WorkspaceSessionResult) {
   if (!result.session.authenticated) return "signed-out";
   return JSON.stringify({
     grant: result.session.activeGrantId,
+    demoFacilitator: result.session.demoFacilitator ?? false,
     grants: [...result.session.grants].sort((a, b) => a.id.localeCompare(b.id)),
     scope: Object.fromEntries(Object.entries(result.session.activeContext).map(([key, ids]) => [key, [...ids].sort()])),
   });

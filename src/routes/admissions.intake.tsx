@@ -1,10 +1,15 @@
 import {useEffect,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {createAdmissionsInquiry,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
+import {createAdmissionsInquiry,listAdmissionsExistingStudents,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
-const load=async()=>({records:await listAdmissionsIntake(),programs:await listAdmissionsIntakePrograms()});
+const load=async()=>{
+ const [records,programs,existingStudents]=await Promise.all([
+  listAdmissionsIntake(),listAdmissionsIntakePrograms(),listAdmissionsExistingStudents(),
+ ]);
+ return {records,programs,existingStudents};
+};
 export const Route=createFileRoute("/admissions/intake")({
  validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string}=>({
   application:typeof search.application==="string"?search.application:undefined,
@@ -31,6 +36,12 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const [programId,setProgramId]=useState(programs[0]?.id??"");
  const [requestId,setRequestId]=useState(()=>crypto.randomUUID());
  const [existingApplicationId,setExistingApplicationId]=useState("");
+ const [existingStudentKey,setExistingStudentKey]=useState("");
+ const [createHouseholdConfirmed,setCreateHouseholdConfirmed]=useState(false);
+ const existingStudents=data.existingStudents.filter(student=>student.programId===programId);
+ const studentKey=(student:typeof existingStudents[number])=>
+  `${student.studentProfileId}:${student.guardianPersonId}:${student.householdId??"new"}`;
+ const existingStudent=existingStudents.find(student=>studentKey(student)===existingStudentKey);
  const [studentFirstName,setStudentFirstName]=useState(""),[studentLastName,setStudentLastName]=useState("");
  const [guardianFirstName,setGuardianFirstName]=useState(""),[guardianLastName,setGuardianLastName]=useState("");
  const [guardianEmail,setGuardianEmail]=useState(""),[gradeLevel,setGradeLevel]=useState("9"),[source,setSource]=useState("school_direct");
@@ -51,12 +62,38 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   <section className="mt-8 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">New inquiry</h2>
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void perform(
-    async()=>{await createAdmissionsInquiry({data:{requestId,programId,...(existingApplicationId?{existingApplicationId}:{}),studentFirstName,studentLastName,
-     guardianFirstName,guardianLastName,guardianEmail,gradeLevel,source,notes}});
-     setRequestId(crypto.randomUUID());setExistingApplicationId("");},"Inquiry created.");}}>
-    <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");}}>
+    async()=>{
+     if(existingStudentKey&&!existingStudent)throw new Error("The selected student is no longer available. Choose a student again.");
+     if(existingStudent&&!existingStudent.householdId&&!createHouseholdConfirmed)
+      throw new Error("Confirm creation of the missing household before continuing.");
+     await createAdmissionsInquiry({data:existingStudent?{
+      requestId,programId,source,notes,existingStudent:{studentProfileId:existingStudent.studentProfileId,
+       guardianPersonId:existingStudent.guardianPersonId,...(existingStudent.householdId?
+        {householdId:existingStudent.householdId}:{createHousehold:true})},
+     }:{requestId,programId,...(existingApplicationId?{existingApplicationId}:{}),studentFirstName,studentLastName,
+      guardianFirstName,guardianLastName,guardianEmail,gradeLevel,source,notes}});
+     setRequestId(crypto.randomUUID());setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);},"Inquiry created; continue the normal admissions and enrollment checklist.");}}>
+    <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);}}>
      <option value="">Choose program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
     </select></label>
+    <label className="text-sm sm:col-span-2">Student identity
+     <select className="mt-1 block w-full rounded border bg-background p-2" value={existingStudentKey}
+      onChange={e=>{setExistingStudentKey(e.target.value);setExistingApplicationId("");setCreateHouseholdConfirmed(false);}}>
+      <option value="">Create a new student</option>
+      {existingStudents.map(student=><option key={studentKey(student)} value={studentKey(student)}>
+       {student.studentFirstName} {student.studentLastName} — guardian: {student.guardianFirstName} {student.guardianLastName}
+       {!student.householdId?" (new household required)":""}
+      </option>)}
+     </select>
+     <span className="mt-1 block text-xs text-muted-foreground">
+      Existing students reuse their identity and managing guardian. Existing households are preserved. Creating an inquiry does not activate enrollment.
+     </span>
+    </label>
+    {existingStudent&&!existingStudent.householdId&&<label className="text-sm sm:col-span-2">
+     <input type="checkbox" required checked={createHouseholdConfirmed} onChange={e=>setCreateHouseholdConfirmed(e.target.checked)}/>
+     {" "}I confirm creating the missing household for this existing student and managing guardian. Neither currently belongs to a household.
+    </label>}
+    {!existingStudent&&<>
     <label className="text-sm sm:col-span-2">Existing household (optional, for siblings)
       <select className="mt-1 block w-full rounded border bg-background p-2"
         value={existingApplicationId} onChange={e=>setExistingApplicationId(e.target.value)}>
@@ -74,6 +111,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     <label className="text-sm">Guardian last name<input required value={guardianLastName} onChange={e=>setGuardianLastName(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
     <label className="text-sm">Guardian email<input required type="email" value={guardianEmail} onChange={e=>setGuardianEmail(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
     <label className="text-sm">Entering grade<input value={gradeLevel} onChange={e=>setGradeLevel(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
+    </>}
     <label className="text-sm">Inquiry source<select value={source} onChange={e=>setSource(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"><option value="school_direct">School inquiry</option><option value="church_referral">Church referral</option><option value="family_referral">Family referral</option><option value="event">Event</option><option value="other">Other</option></select></label>
     <label className="text-sm sm:col-span-2">Notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} className="mt-1 w-full rounded border bg-background p-2" rows={2}/></label>
     <button type="submit" disabled={busy||!programId} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create inquiry</button>

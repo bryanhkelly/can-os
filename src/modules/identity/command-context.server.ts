@@ -4,6 +4,8 @@ import {accessAccounts,accessSessions,accountPersonGrants,programs,sites as scho
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret} from "@/domain/access-tokens";
+import {LOCAL_DEMO_ADMIN} from "@/domain/local-demo-access";
+import {listDemoFacilitatorGrants} from "./demo-facilitator.server";
 
 /**
  * Resolve the account and active persona from a server-issued session.
@@ -26,14 +28,22 @@ export async function getCommandContext(request: Request): Promise<AccessContext
    eq(accessAccounts.disabled,false)))
   .limit(1);
  if(!session) throw new AuthorizationError("authenticated session");
- const grants=await db.select({
+ const grants=session.accountId===LOCAL_DEMO_ADMIN.accountId?await listDemoFacilitatorGrants(db):await db.select({
   id:accountPersonGrants.id,accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
   role:accountPersonGrants.role,organizationId:accountPersonGrants.organizationId,
   siteId:accountPersonGrants.siteId,active:accountPersonGrants.active,
  }).from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,session.accountId),eq(accountPersonGrants.active,true)));
+ const selected=grants.find(grant=>grant.id===session.activeGrantId);
  const context=resolveAccessContext({
-  accountId:session.accountId,sessionId:session.id,activeGrantId:session.activeGrantId,
+  accountId:session.accountId===LOCAL_DEMO_ADMIN.accountId&&selected?selected.accountId:session.accountId,
+  sessionId:session.id,activeGrantId:session.activeGrantId,
  },grants);
+ if(session.accountId===LOCAL_DEMO_ADMIN.accountId){
+  context.demoFacilitator={
+   accountId:LOCAL_DEMO_ADMIN.accountId,personId:LOCAL_DEMO_ADMIN.personId,sourceAccountId:context.accountId,
+  };
+  context.accountId=session.accountId;
+ }
  // Program authorization derives from the verified active organization grant, not a browser claim.
  const organizations=context.scope.organizationIds??[];
  const grantSites=context.scope.siteIds??[];

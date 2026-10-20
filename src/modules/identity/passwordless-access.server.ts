@@ -2,7 +2,8 @@ import { db } from "@/db/client";
 import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader } from "@/domain/access-tokens";
-import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS } from "@/domain/local-demo-access";
+import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
+import { listDemoFacilitatorGrants } from "./demo-facilitator.server";
 import { writeAudit } from "@/platform/mutation";
 import { and,eq,gt,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
@@ -115,7 +116,9 @@ export async function redeemLocalDemoAccess(
    isSynthetic:accountPersonGrants.isSynthetic,
   }).from(accountPersonGrants)
    .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)));
-  const grant=grants.find(candidate=>candidate.isSynthetic&&Object.hasOwn(roleCapabilities,candidate.role));
+  const grant=account.id===LOCAL_DEMO_ADMIN.accountId
+   ?(await listDemoFacilitatorGrants(tx)).find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
+   :grants.find(candidate=>candidate.isSynthetic&&Object.hasOwn(roleCapabilities,candidate.role));
   if(!grant)throw new Error("Invalid local demo credentials");
   const secret=issueOpaqueSecret();
   const [session]=await tx.insert(accessSessions).values({
@@ -130,7 +133,9 @@ export async function redeemLocalDemoAccess(
    action:"identity.session.started",
    resourceType:"account",
    resourceId:account.id,
-   context:{method:"local_demo_code",sessionId:session.id,grantId:grant.id},
+   context:{method:"local_demo_code",sessionId:session.id,grantId:grant.id,
+    ...(account.id===LOCAL_DEMO_ADMIN.accountId?{demoFacilitator:LOCAL_DEMO_ADMIN.personId}:{}),
+   },
   });
   return {
    accountId:account.id,
@@ -153,7 +158,9 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
 /** Selection is restricted to a grant assigned to the authenticated account. */
 export async function selectAccessGrant(sessionId:string,accountId:string,grantId:string):Promise<void> {
  await db.transaction(async tx=>{
-  const [grant]=await tx.select({id:accountPersonGrants.id,personId:accountPersonGrants.personId,role:accountPersonGrants.role})
+  const delegated=accountId===LOCAL_DEMO_ADMIN.accountId?(await listDemoFacilitatorGrants(tx)).find(grant=>grant.id===grantId):undefined;
+  if(accountId===LOCAL_DEMO_ADMIN.accountId&&!delegated)throw new Error("Demo user unavailable");
+  const [grant]=delegated?[delegated]:await tx.select({id:accountPersonGrants.id,personId:accountPersonGrants.personId,role:accountPersonGrants.role})
    .from(accountPersonGrants)
    .where(and(eq(accountPersonGrants.id,grantId),eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true))).limit(1);
   if(!grant || !Object.hasOwn(roleCapabilities,grant.role))throw new Error("Membership unavailable");
@@ -163,6 +170,8 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
    .returning({id:accessSessions.id});
   if(!changed)throw new Error("Session expired");
   await writeAudit(tx, {actorPersonId:grant.personId,action:"identity.membership.selected",
-   resourceType:"account",resourceId:accountId,context:{sessionId,grantId}});
+   resourceType:"account",resourceId:accountId,context:{sessionId,grantId,
+    ...(accountId===LOCAL_DEMO_ADMIN.accountId?{demoFacilitator:LOCAL_DEMO_ADMIN.personId}:{}),
+   }});
  });
 }

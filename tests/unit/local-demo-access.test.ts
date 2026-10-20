@@ -17,6 +17,8 @@ describe("local synthetic demo access",()=>{
    "riley.teacher@can-os.invalid",
    "casey.specialist@can-os.invalid",
    "morgan.guardian@can-os.invalid",
+   "alex.registrar@can-os.invalid",
+   "admin.demo@can-os.invalid",
   ]);
  });
 });

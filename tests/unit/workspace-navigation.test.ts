@@ -21,6 +21,9 @@ describe("canonical workspace navigation",()=>{
   expect(paths("guardian")).not.toContain("/student/assignments");
   expect(paths("teacher")).toContain("/teacher/gradebook");
   expect(paths("registrar")).toContain("/admissions");
+  expect(paths("registrar")).toContain("/admin");
+  expect(paths("student")).not.toContain("/admin");
+  expect(paths("guardian")).not.toContain("/admin");
   expect(paths("specialist")).toContain("/coach");
   expect(paths("specialist")).toContain("/support");
   expect(paths("counselor")).toContain("/counselor");

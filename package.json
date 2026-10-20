@@ -10,6 +10,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "demo:provision-registrar": "node --import tsx scripts/provision-demo-registrar.mjs",
     "test": "vitest run --exclude 'tests/integration/**' --exclude 'tests/e2e/**'",
     "test:integration": "node scripts/run-integration-tests.mjs",
     "typecheck": "tsc --noEmit",

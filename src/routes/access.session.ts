@@ -7,6 +7,7 @@ import {getCommandContext} from "@/modules/identity/command-context.server";
 import {selectAccessGrant} from "@/modules/identity/passwordless-access.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {assertGrantSelection} from "@/domain/access-context";
+import {listDemoFacilitatorGrants} from "@/modules/identity/demo-facilitator.server";
 
 /** The browser may ask to change memberships, but cannot declare a person or role. */
 export const Route=createFileRoute("/access/session")({
@@ -28,7 +29,9 @@ export const Route=createFileRoute("/access/session")({
     const body:unknown=await request.json();
     const grantId=body&&typeof body==="object"&&"grantId" in body?(body as {grantId:unknown}).grantId:null;
     if(typeof grantId!=="string")return Response.json({error:"Invalid membership"},{status:400});
-    const grants=await db.select({
+    const grants=context.demoFacilitator
+     ?(await listDemoFacilitatorGrants(db)).map(grant=>({...grant,accountId:context.accountId}))
+     :await db.select({
      id:accountPersonGrants.id,accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
      role:accountPersonGrants.role,organizationId:accountPersonGrants.organizationId,
      siteId:accountPersonGrants.siteId,active:accountPersonGrants.active,
