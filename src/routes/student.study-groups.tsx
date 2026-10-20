@@ -1,18 +1,18 @@
 import {useEffect,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {listStudyGroups,getStudyGroupDetail} from "@/modules/study-groups/study-group-queries.functions";
+import {listStudyGroups,listStudentStudyGroupSections,listStudentStudyGroupClassmates,getStudyGroupDetail} from "@/modules/study-groups/study-group-queries.functions";
 import {getStudyGroupAvailability} from "@/modules/study-groups/canonical-workspace.functions";
 import {createCanonicalGroupPost as postStudyGroupMessage,reportCanonicalGroupPost as reportStudyGroupPost} from "@/modules/study-groups/canonical-moderation.functions";
 import {rsvpCanonicalGroupSession as rsvpStudyGroupSession} from "@/modules/study-groups/canonical-sessions.functions";
-import {requestCanonicalGroupMembership,leaveCanonicalGroup} from "@/modules/study-groups/canonical-membership.functions";
+import {createStudentStudyGroup,requestCanonicalGroupMembership,leaveCanonicalGroup} from "@/modules/study-groups/canonical-membership.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 const loadStudyGroups=async()=>{
- const {enabled,writesEnabled,membershipEnabled,contentEnabled}=await getStudyGroupAvailability();
- if(!enabled)return {enabled,writesEnabled,membershipEnabled,contentEnabled,groups:[]};
- const groups=await listStudyGroups();
+ const {enabled,writesEnabled,membershipEnabled,creationEnabled,contentEnabled}=await getStudyGroupAvailability();
+ if(!enabled)return {enabled,writesEnabled,membershipEnabled,creationEnabled,contentEnabled,groups:[],sections:[]};
+ const [groups,sections]=await Promise.all([listStudyGroups(),listStudentStudyGroupSections()]);
  // Student pages must not require facilitator-only permissions to render.
- return {enabled,writesEnabled,membershipEnabled,contentEnabled,groups};
+ return {enabled,writesEnabled,membershipEnabled,creationEnabled,contentEnabled,groups,sections};
 };
 export const Route=createFileRoute("/student/study-groups")({validateSearch:(search:Record<string,unknown>):{group?:string;session?:string}=>({group:typeof search.group==="string"?search.group:undefined,session:typeof search.session==="string"?search.session:undefined}),loader:safeLoader(loadStudyGroups,{authMessage:"Sign in with an authorized student account to view study groups."}),component:StudyGroups});
 function StudyGroups(){
@@ -21,10 +21,27 @@ function StudyGroups(){
  return <StudyGroupsView data={outcome.data}/>;
 }
 function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>>}){
- const {enabled,writesEnabled,membershipEnabled,contentEnabled,groups}=data;const router=useRouter();const search=Route.useSearch();
+ const {enabled,writesEnabled,membershipEnabled,creationEnabled,contentEnabled,groups,sections}=data;const router=useRouter();const search=Route.useSearch();
  const [selected,setSelected]=useState<string|null>(null),[detail,setDetail]=useState<Awaited<ReturnType<typeof getStudyGroupDetail>>|null>(null),[notice,setNotice]=useState("");
  const [message,setMessage]=useState("");
  const [opening,setOpening]=useState(false),[openError,setOpenError]=useState("");
+ const [sectionId,setSectionId]=useState(sections[0]?.id??"");
+ const [classmates,setClassmates]=useState<Awaited<ReturnType<typeof listStudentStudyGroupClassmates>>>([]);
+ const [inviteeIds,setInviteeIds]=useState<string[]>([]);
+ const [groupTitle,setGroupTitle]=useState(""),[groupDescription,setGroupDescription]=useState("");
+ const [rosterLoading,setRosterLoading]=useState(false),[rosterError,setRosterError]=useState("");
+ const [creating,setCreating]=useState(false),[createError,setCreateError]=useState("");
+ useEffect(()=>{
+  let active=true;
+  setClassmates([]);setInviteeIds([]);setRosterError("");
+  if(!sectionId)return;
+  setRosterLoading(true);
+  listStudentStudyGroupClassmates({data:{sectionId}})
+   .then(result=>{if(active)setClassmates(result);})
+   .catch(error=>{if(active)setRosterError(error instanceof Error?error.message:"Unable to load classmates.");})
+   .finally(()=>{if(active)setRosterLoading(false);});
+  return()=>{active=false;};
+ },[sectionId]);
  useEffect(()=>{
   setSelected(null);setDetail(null);setMessage("");setNotice("");setOpenError("");setOpening(false);
   if(!enabled||!search.group)return;
@@ -40,6 +57,57 @@ function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>
  return <main className="mx-auto max-w-6xl space-y-6 px-6 py-10">
  <header><h1 className="font-serif text-4xl">Study Groups</h1><p className="mt-2 text-muted-foreground">Learn together across classes and interests. Membership is facilitator-approved.</p>{!writesEnabled&&<p role="status" className="mt-2 text-sm text-muted-foreground">You may join approved groups, participate in their moderated discussions, and report concerning content. Session RSVPs remain unavailable until the session workflow is released.</p>}</header>
  {notice&&<p role="status" className="rounded-lg border p-3">{notice}</p>}
+ {sections.length===0&&<p role="status" className="rounded-lg border p-4">No active enrolled classes are currently available for creating a study group.</p>}
+ {sections.length>0&&(!creationEnabled||!writesEnabled)&&<p role="status" className="rounded-lg border p-4">Creating study groups is unavailable right now.</p>}
+ {sections.length>0&&creationEnabled&&writesEnabled&&<section className="space-y-4 rounded-2xl border p-5" aria-labelledby="create-study-group-title">
+  <div><h2 id="create-study-group-title" className="text-xl font-semibold">Create a study group</h2>
+   <p className="mt-1 text-sm text-muted-foreground">Start a group for one of your classes and invite classmates. Your class teacher will facilitate the group, and membership approvals still apply.</p></div>
+  <form className="grid gap-4" onSubmit={event=>{
+   event.preventDefault();setCreateError("");
+   if(creating)return;
+   setCreating(true);
+   void createStudentStudyGroup({data:{
+    sectionId,title:groupTitle,description:groupDescription,inviteePersonIds:inviteeIds,
+    maxMembers:Math.max(20,inviteeIds.length+1),
+   }}).then(async()=>{
+    setGroupTitle("");setGroupDescription("");setInviteeIds([]);
+    setNotice("Group created and invitations sent. Your membership is awaiting guardian permission and facilitator approval.");
+    await router.invalidate();
+   }).catch(error=>setCreateError(error instanceof Error?error.message:"Unable to create the study group."))
+    .finally(()=>setCreating(false));
+  }}>
+   <label className="text-sm">Class
+    <select className="mt-1 block w-full rounded border bg-background p-2" value={sectionId}
+     onChange={event=>setSectionId(event.target.value)} required>
+     {sections.map(section=><option key={section.id} value={section.id}>{section.title}</option>)}
+    </select>
+   </label>
+   <label className="text-sm">Group name
+    <input className="mt-1 block w-full rounded border bg-background p-2" value={groupTitle}
+     onChange={event=>setGroupTitle(event.target.value)} minLength={3} maxLength={100} required/>
+   </label>
+   <label className="text-sm">What will you study together?
+    <textarea className="mt-1 block w-full rounded border bg-background p-2" value={groupDescription}
+     onChange={event=>setGroupDescription(event.target.value)} minLength={10} maxLength={2000} required/>
+   </label>
+   <fieldset className="space-y-2">
+    <legend className="text-sm font-medium">Invite classmates</legend>
+    {rosterLoading&&<p role="status" className="text-sm text-muted-foreground">Loading classmates...</p>}
+    {rosterError&&<p role="alert" className="text-sm text-destructive">{rosterError}</p>}
+    {!rosterLoading&&!rosterError&&classmates.length===0&&<p className="text-sm text-muted-foreground">There are no other currently enrolled classmates in this class.</p>}
+    {classmates.map(classmate=><label className="flex items-center gap-2 text-sm" key={classmate.id}>
+     <input type="checkbox" checked={inviteeIds.includes(classmate.id)} onChange={event=>setInviteeIds(ids=>
+      event.target.checked?[...ids,classmate.id]:ids.filter(id=>id!==classmate.id))}/>
+     {classmate.firstName} {classmate.lastName}
+    </label>)}
+   </fieldset>
+   {createError&&<p role="alert" className="text-sm text-destructive">{createError}</p>}
+   <button disabled={creating||rosterLoading||!sectionId||inviteeIds.length===0}
+    className="w-fit rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+    {creating?"Creating group...":"Create group and send invitations"}
+   </button>
+  </form>
+ </section>}
  {search.group&&<Link to="/student/study-groups" search={{}} className="inline-block text-sm underline">All study groups</Link>}
  {opening&&<p role="status">Opening study group...</p>}
  {openError&&<p role="alert" className="rounded-lg border p-3">{openError}</p>}

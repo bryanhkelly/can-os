@@ -339,14 +339,16 @@ Prove that distributed CAN students can form durable, safe academic peer connect
 
 ### Flow
 1. Student discovers an eligible Study Group from a Section, subject, campus, cohort, or approved recommendation.
-2. Eligibility/safety rules determine whether the student can join directly or requires approval.
-3. Membership creates a real relationship, not merely a chat-room subscription.
-4. Group has scheduled sessions tied to the canonical calendar.
-5. Students can see agenda/resources and approved peer interaction.
-6. Teacher/tutor/facilitator can attach LearningActivities, office hours, or support resources.
-7. Attendance/participation can be recorded where educationally useful without turning peer interaction into surveillance.
-8. Student can leave/report/escalate safely.
-9. Group health/participation can inform retention/support Insights without exposing private peer content broadly.
+2. A student may create a course group from an actively enrolled Section and invite classmates with active enrollment in that same Section; a current Section teacher remains the facilitator.
+3. Group creation starts the organizer's existing membership and guardian-consent review. Invitations notify classmates but do not bypass guardian consent or facilitator approval when they request membership.
+4. Eligibility/safety rules determine whether the student can join directly or requires approval.
+5. Membership creates a real relationship, not merely a chat-room subscription.
+6. Group has scheduled sessions tied to the canonical calendar.
+7. Students can see agenda/resources and approved peer interaction.
+8. Teacher/tutor/facilitator can attach LearningActivities, office hours, or support resources.
+9. Attendance/participation can be recorded where educationally useful without turning peer interaction into surveillance.
+10. Student can leave/report/escalate safely.
+11. Group health/participation can inform retention/support Insights without exposing private peer content broadly.
 
 ### Calendar visibility invariants
 - A Study Group session is visible only while its Group is active and the viewer has current access: an approved member with active Program enrollment, or the scoped facilitator.

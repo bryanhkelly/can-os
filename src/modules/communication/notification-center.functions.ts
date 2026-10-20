@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { eq, desc, and, inArray, isNull, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability } from "@/domain/command-context";
@@ -43,10 +44,32 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   .from(s.studyGroups).where(and(inArray(s.studyGroups.id,groupIds),
    inArray(s.studyGroups.siteId,context.scope.siteIds??[]),
    or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,context.scope.programIds??[])))):[];
+ const invitationIds=rows.filter(n=>n.type==="study_group_invitation"&&
+  n.resourceType==="study_group"&&n.resourceId).map(n=>n.resourceId!);
+ const invitedSectionEnrollment=alias(s.enrollments,"study_group_invitation_section_enrollment");
+ const invitedGroups=invitationIds.length&&context.role==="student"?await db.select({id:s.studyGroups.id})
+  .from(s.studyGroups)
+  .innerJoin(s.studentProfiles,eq(s.studentProfiles.personId,personId))
+  .innerJoin(s.enrollments,and(eq(s.enrollments.studentProfileId,s.studentProfiles.id),
+   eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+   eq(s.enrollments.programId,s.studyGroups.programId)))
+  .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+  .innerJoin(invitedSectionEnrollment,and(
+   eq(invitedSectionEnrollment.studentProfileId,s.studentProfiles.id),
+   eq(invitedSectionEnrollment.kind,"section"),eq(invitedSectionEnrollment.status,"active"),
+   eq(invitedSectionEnrollment.sectionId,s.studyGroups.sectionId)))
+  .innerJoin(s.sections,and(eq(s.sections.id,s.studyGroups.sectionId),
+   eq(s.sections.active,true),eq(s.sections.siteId,s.studyGroups.siteId),
+   eq(s.sections.programId,s.studyGroups.programId)))
+  .where(and(inArray(s.studyGroups.id,invitationIds),eq(s.studyGroups.status,"active"),
+   eq(s.programs.siteId,s.studyGroups.siteId),
+   inArray(s.studyGroups.siteId,context.scope.siteIds??[]),
+   inArray(s.studyGroups.programId,context.scope.programIds??[]))):[];
  const memberRows=groupIds.length?await db.select({groupId:s.studyGroupMemberships.groupId})
   .from(s.studyGroupMemberships).where(and(inArray(s.studyGroupMemberships.groupId,groupIds),eq(s.studyGroupMemberships.personId,personId),eq(s.studyGroupMemberships.status,"approved"))):[];
  const permittedGroups=new Set(groupRows.filter(g=>g.facilitator===personId).map(g=>g.id));
  for(const row of memberRows)if(groupRows.some(group=>group.id===row.groupId))permittedGroups.add(row.groupId);
+ for(const group of invitedGroups)permittedGroups.add(group.id);
  const admissionOfferIds=rows.filter(n=>n.resourceType==="admission_offer"&&n.resourceId).map(n=>n.resourceId as string);
  const admissionOffers=admissionOfferIds.length?await db.select({id:s.admissionOffers.id,applicationId:s.admissionOffers.applicationId,issuedByPersonId:s.admissionOffers.issuedByPersonId,programId:s.admissionOffers.programId,studentProfileId:s.applications.studentProfileId})
   .from(s.admissionOffers).innerJoin(s.applications,eq(s.applications.id,s.admissionOffers.applicationId))

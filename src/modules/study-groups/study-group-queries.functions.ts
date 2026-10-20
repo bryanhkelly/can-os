@@ -2,7 +2,8 @@ import {createServerFn} from "@tanstack/react-start";
 import {getRequest} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
-import{and,eq,desc,inArray,sql,isNull,or} from "drizzle-orm";
+import{and,eq,desc,inArray,sql,isNull,or,asc,ne}from"drizzle-orm";
+import{alias}from"drizzle-orm/pg-core";
 import{z} from "zod";
 import {canAccessGroup} from "@/domain/study-groups";
 import {eligibleStudent} from "./canonical-membership.server";
@@ -67,6 +68,58 @@ export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
  return rows.filter(group=>enrolled.some(row=>row.siteId===group.siteId&&
   (!group.programId||row.programId===group.programId))&&(!group.sectionId||sections.some(section=>section.id===group.sectionId)));
 });
+
+export const listStudentStudyGroupSections=createServerFn({method:"GET"}).handler(async()=>{
+ const actor=await groupActor("student");
+ const {db,s}=await context();
+ const programEnrollment=alias(s.enrollments,"study_group_program_enrollment");
+ return db.selectDistinct({
+  id:s.sections.id,title:s.sections.title,
+ }).from(s.enrollments)
+ .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+ .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+ .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+ .innerJoin(programEnrollment,and(
+  eq(programEnrollment.studentProfileId,s.studentProfiles.id),
+  eq(programEnrollment.kind,"program"),eq(programEnrollment.status,"active"),
+  eq(programEnrollment.programId,s.sections.programId)))
+ .where(and(eq(s.studentProfiles.personId,actor.actorPersonId!),
+  eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+  eq(s.sections.active,true),eq(s.programs.status,"active"),
+  inArray(s.sections.siteId,actor.sites),
+  inArray(s.sections.programId,actor.scope.programIds??[])))
+ .orderBy(asc(s.sections.title));
+});
+
+export const listStudentStudyGroupClassmates=createServerFn({method:"GET"})
+ .validator(z.object({sectionId:z.string().uuid()}).parse)
+ .handler(async({data})=>{
+  const actor=await groupActor("student");
+  const {db,s}=await context();
+  const [section]=await db.select({
+   id:s.sections.id,siteId:s.sections.siteId,programId:s.sections.programId,
+  }).from(s.sections).innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+  .where(and(eq(s.sections.id,data.sectionId),eq(s.sections.active,true),
+   eq(s.programs.status,"active"),inArray(s.sections.siteId,actor.sites),
+   inArray(s.sections.programId,actor.scope.programIds??[]))).limit(1);
+  if(!section?.siteId)throw new AuthorizationError("active enrolled section");
+  const groupScope={...section,sectionId:section.id};
+  await eligibleStudent(db,actor.actorPersonId!,groupScope,actor.scope.programIds??[]);
+  const programEnrollment=alias(s.enrollments,"study_group_classmate_program_enrollment");
+  return db.select({
+   id:s.people.id,firstName:s.people.legalFirstName,lastName:s.people.legalLastName,
+  }).from(s.enrollments)
+  .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+  .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
+  .innerJoin(programEnrollment,and(
+   eq(programEnrollment.studentProfileId,s.studentProfiles.id),
+   eq(programEnrollment.kind,"program"),eq(programEnrollment.status,"active"),
+   eq(programEnrollment.programId,section.programId)))
+  .where(and(eq(s.enrollments.sectionId,section.id),
+   eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+   ne(s.people.id,actor.actorPersonId!)))
+  .orderBy(asc(s.people.legalFirstName),asc(s.people.legalLastName));
+ });
 export const getStudyGroupDetail=createServerFn({method:"GET"}).validator(z.object({groupId:z.string().min(1)}).parse).handler(async({data})=>{
  const actor=await groupActor("student");
  const {db,s}=await context();

@@ -6,11 +6,123 @@ import { validateGroupInput } from "@/domain/study-groups";
 import { recordAudit,requireActor } from "@/modules/identity/actors.server";
 import { emitEvent,notify,notifyMany } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
-import { and,desc,eq,inArray,isNull,sql } from "drizzle-orm";
+import { and,asc,desc,eq,inArray,isNull,sql } from "drizzle-orm";
 import { z } from "zod";
 import { assertGroupScope,eligibleStudent } from "./canonical-membership.server";
 
 const uuid = z.string().uuid();
+
+export const createStudentStudyGroup = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    sectionId: uuid,
+    title: z.string().min(3).max(100),
+    description: z.string().min(10).max(2000),
+    inviteePersonIds: z.array(uuid).min(1).max(30)
+      .refine(ids => new Set(ids).size === ids.length, "Choose each classmate only once."),
+    maxMembers: z.number().int().min(2).max(50),
+  }).refine(input => input.inviteePersonIds.length < input.maxMembers, {
+    message: "Group capacity must include every invite and the organizer.",
+    path: ["maxMembers"],
+  }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(["student"]);
+    const valid = validateGroupInput({ ...data, kind: "course" });
+    return db.transaction(async tx => {
+      const [section] = await tx.select({
+        id: s.sections.id, siteId: s.sections.siteId, programId: s.sections.programId,
+        facilitatorPersonId: s.sectionTeachers.personId,
+      }).from(s.sections)
+        .innerJoin(s.programs, eq(s.programs.id, s.sections.programId))
+        .innerJoin(s.sectionTeachers, eq(s.sectionTeachers.sectionId, s.sections.id))
+        .where(and(eq(s.sections.id, data.sectionId), eq(s.sections.active, true),
+          eq(s.programs.status, "active"),
+          inArray(s.sections.siteId, actor.scope.siteIds ?? []),
+          inArray(s.sections.programId, actor.scope.programIds ?? [])))
+        .orderBy(asc(s.sectionTeachers.createdAt), asc(s.sectionTeachers.id))
+        .limit(1);
+      if (!section?.siteId) throw new AuthorizationError("active class with an assigned facilitator");
+      const scope = { ...section, sectionId: section.id };
+      assertGroupScope(actor, scope);
+      await eligibleStudent(tx, actor.actorPersonId, scope, actor.scope.programIds ?? []);
+      if (data.inviteePersonIds.includes(actor.actorPersonId))
+        throw new Error("Choose classmates other than yourself.");
+      for (const inviteePersonId of data.inviteePersonIds)
+        await eligibleStudent(tx, inviteePersonId, scope, actor.scope.programIds ?? []);
+
+      const [group] = await tx.insert(s.studyGroups).values({
+        ...valid, sectionId: section.id, siteId: section.siteId, programId: section.programId,
+        facilitatorPersonId: section.facilitatorPersonId, visibility: "site",
+        requiresApproval: true,
+        metadata: { createdByStudentPersonId: actor.actorPersonId },
+      }).returning({ id: s.studyGroups.id });
+      if (!group) throw new Error("Unable to create study group");
+      const guardians = await tx.select({
+        guardianPersonId: s.guardianRelationships.guardianPersonId,
+      }).from(s.guardianRelationships).where(guardianRelationshipPredicate({
+        studentPersonId: actor.actorPersonId, access: "enrollment",
+      }));
+      if (!guardians.length)
+        throw new Error("A linked guardian is required for study group participation.");
+      const [membership] = await tx.insert(s.studyGroupMemberships).values({
+        groupId: group.id, personId: actor.actorPersonId, role: "student", status: "pending",
+      }).returning({ id: s.studyGroupMemberships.id });
+      if (!membership) throw new Error("Unable to request study group membership");
+      for (const guardianPersonId of new Set(guardians.map(g => g.guardianPersonId))) {
+        await tx.insert(s.actions).values({
+          type: "study_group_consent", status: "open", priority: "normal",
+          title: "Study group permission: " + valid.title,
+          ownerPersonId: guardianPersonId, siteId: section.siteId,
+          programId: section.programId, subjectType: "study_group", subjectId: group.id,
+          metadata: { studentPersonId: actor.actorPersonId, membershipId: membership.id },
+        });
+      }
+      await notifyMany(tx, [
+        ...[...new Set(guardians.map(g => g.guardianPersonId))].map(recipientPersonId => ({
+          recipientPersonId, type: "study_group_consent_requested", status: "unread" as const,
+          title: "Study group permission requested", body: "Review a student's group request.",
+          resourceType: "study_group", resourceId: group.id,
+        })),
+        { recipientPersonId: section.facilitatorPersonId,
+          type: "study_group_membership_request", status: "unread" as const,
+          title: "Study group membership requested", body: "A student requested to join " + valid.title,
+          resourceType: "study_group", resourceId: group.id },
+        ...data.inviteePersonIds.map(recipientPersonId => ({
+          recipientPersonId, type: "study_group_invitation", status: "unread" as const,
+          title: "Study group invitation",
+          body: `You were invited to ${valid.title}. Request membership in Study Groups; guardian permission and facilitator approval may be required.`,
+          resourceType: "study_group", resourceId: group.id,
+        })),
+      ]);
+      await recordAudit(tx, actor, {
+        action: "study_group.create", resourceType: "study_group", resourceId: group.id,
+        scope: { siteId: section.siteId, programId: section.programId, sectionId: section.id },
+        after: {
+          title: valid.title, kind: valid.kind, maxMembers: valid.maxMembers,
+          invitedClassmateCount: data.inviteePersonIds.length,
+        },
+      });
+      await recordAudit(tx, actor, {
+        action: "study_group.membership.request", resourceType: "study_group_membership",
+        resourceId: membership.id,
+        scope: { siteId: section.siteId, programId: section.programId, sectionId: section.id },
+        after: { status: "pending", studentPersonId: actor.actorPersonId },
+      });
+      await emitEvent(tx, {
+        eventType: "StudyGroupCreated", aggregateType: "study_group",
+        aggregateId: group.id, actorPersonId: actor.actorPersonId,
+        payload: {
+          sectionId: section.id, siteId: section.siteId, programId: section.programId,
+          createdByStudent: true, invitedClassmateCount: data.inviteePersonIds.length,
+        },
+      });
+      await emitEvent(tx, {
+        eventType: "StudyGroupMembershipRequested", aggregateType: "study_group_membership",
+        aggregateId: membership.id, actorPersonId: actor.actorPersonId,
+        payload: { groupId: group.id },
+      });
+      return { groupId: group.id };
+    });
+  });
 
 export const createFacilitatedGroup = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.union([z.object({

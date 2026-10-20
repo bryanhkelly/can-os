@@ -77,4 +77,12 @@ describe("authorized notification destinations",()=>{
     state.rows.study_groups=[{id:"group",facilitator:"actor"}];
     expect((await getNotifications())[0]?.href).toBe("/groups?group=group");
   });
+  it("opens a group for a currently enrolled invited classmate",async()=>{
+    state.role="student";
+    notification("study_group","group","study_group_invitation");
+    state.rows.study_groups=[{id:"group",facilitator:"teacher",siteId:"school",
+      programId:"program",sectionId:"section"}];
+    expect((await getNotifications())[0]?.href)
+      .toBe("/student/study-groups?group=group");
+  });
 });

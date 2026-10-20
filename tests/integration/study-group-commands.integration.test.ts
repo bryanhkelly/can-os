@@ -4,7 +4,7 @@ import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import type { Actor, ActorRole } from "@/modules/identity/actors.server";
 import {
-  createFacilitatedGroup, requestCanonicalGroupMembership,
+  createFacilitatedGroup, createStudentStudyGroup, requestCanonicalGroupMembership,
   decideCanonicalGroupConsent, decideCanonicalGroupMembership,
 } from "@/modules/study-groups/canonical-membership.functions";
 import {
@@ -16,12 +16,21 @@ import {
 } from "@/modules/study-groups/canonical-moderation.functions";
 import { createAcademicTimeFixture } from "./helpers/academic-time";
 import { listCanonicalGuardianGroupConsents } from "@/modules/study-groups/canonical-workspace.functions";
+import {
+  listStudentStudyGroupClassmates, listStudentStudyGroupSections,
+} from "@/modules/study-groups/study-group-queries.functions";
 
 const state = vi.hoisted(() => ({ actor: null as Actor | null }));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({ validator() { return this; }, handler(callback: unknown) { return callback; } }),
 }));
-vi.mock("@tanstack/react-start/server", () => ({ setResponseHeader: vi.fn() }));
+vi.mock("@tanstack/react-start/server", () => ({
+  getRequest: () => new Request("https://can.local"),
+  setResponseHeader: vi.fn(),
+}));
+vi.mock("@/modules/identity/command-context.server", () => ({
+  getCommandContext: async () => state.actor,
+}));
 vi.mock("@/modules/identity/actors.server", async importOriginal => ({
   ...await importOriginal<typeof import("@/modules/identity/actors.server")>(),
   requireActor: async (roles: readonly ActorRole[]) => {
@@ -72,6 +81,11 @@ describe("canonical study group commands", () => {
       courseTemplateVersionId: version!.id, code: suffix, title: "Group Section",
     }).returning();
     await db.insert(s.sectionTeachers).values({ sectionId: section!.id, personId: teacher!.id });
+    await db.insert(s.enrollments).values(profiles.map(profile => ({
+      studentProfileId: profile.id, kind: "section" as const, status: "active" as const,
+      organizationId: org!.id, programId: program!.id, sectionId: section!.id,
+      schoolYearId: time.schoolYear.id,
+    })));
     await db.insert(s.guardianRelationships).values({
       guardianPersonId: guardian!.id, studentPersonId: student!.id, relationshipLabel: "parent",
     });
@@ -89,6 +103,47 @@ describe("canonical study group commands", () => {
     expect(group).toMatchObject({ kind: "interest", programId: null, sectionId: null });
 
     state.actor = actor("student", student!.id);
+    await expect(listStudentStudyGroupSections()).resolves.toEqual([
+      { id: section!.id, title: "Group Section" },
+    ]);
+    await expect(listStudentStudyGroupClassmates({ data: { sectionId: section!.id } }))
+      .resolves.toEqual([expect.objectContaining({
+        id: otherStudent!.id, firstName: "OtherStudent", lastName: suffix,
+      })]);
+    const { groupId: studentGroupId } = await createStudentStudyGroup({ data: {
+      sectionId: section!.id, title: "Science study circle",
+      description: "A student-organized group to review science together.",
+      inviteePersonIds: [otherStudent!.id], maxMembers: 10,
+    } });
+    const [studentGroup] = await db.select().from(s.studyGroups)
+      .where(eq(s.studyGroups.id, studentGroupId));
+    expect(studentGroup).toMatchObject({
+      sectionId: section!.id, siteId: site!.id, programId: program!.id,
+      facilitatorPersonId: teacher!.id, requiresApproval: true,
+      metadata: { createdByStudentPersonId: student!.id },
+    });
+    const [organizerMembership] = await db.select().from(s.studyGroupMemberships)
+      .where(and(eq(s.studyGroupMemberships.groupId, studentGroupId),
+        eq(s.studyGroupMemberships.personId, student!.id)));
+    expect(organizerMembership?.status).toBe("pending");
+    expect(await db.select().from(s.actions).where(and(
+      eq(s.actions.subjectId, studentGroupId),
+      eq(s.actions.ownerPersonId, guardian!.id),
+    ))).toHaveLength(1);
+    const [invitation] = await db.select().from(s.notifications).where(and(
+      eq(s.notifications.recipientPersonId, otherStudent!.id),
+      eq(s.notifications.resourceId, studentGroupId),
+      eq(s.notifications.type, "study_group_invitation"),
+    ));
+    expect(invitation?.body).toContain("guardian permission and facilitator approval");
+    await expect(createStudentStudyGroup({ data: {
+      sectionId: section!.id, title: "Invalid invite group",
+      description: "This invitation should be rejected safely.",
+      inviteePersonIds: [outsider!.id], maxMembers: 10,
+    } })).rejects.toThrow();
+    expect(await db.select().from(s.studyGroups)
+      .where(eq(s.studyGroups.title, "Invalid invite group"))).toHaveLength(0);
+
     const relationship = and(eq(s.guardianRelationships.guardianPersonId, guardian!.id),
       eq(s.guardianRelationships.studentPersonId, student!.id));
     await db.update(s.guardianRelationships).set({
