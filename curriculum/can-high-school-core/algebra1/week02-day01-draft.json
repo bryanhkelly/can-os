@@ -1,0 +1,80 @@
+{
+  "courseCode": "CAN-ALG1",
+  "unitId": "algebra1-u01",
+  "week": 2,
+  "status": "draft",
+  "readiness": "teacher_review_required",
+  "scope": "Publisher-authored Week 2 instructional content for incorporation into a future controlled course release. Not a separate unit adoption or an active-class change.",
+  "title": "Week 2 · Multi-Step Equations and Literal Formulas",
+  "plannedInstructionalDays": 5,
+  "authoredDays": 1,
+  "suggestedMinutesPerDay": 55,
+  "lessons": [
+    {
+      "id": "u01-w02-d01",
+      "title": "Week 2 · Day 1 · Fractional-Coefficient Linear Equations",
+      "body": "ALGEBRA I • UNIT 1 • WEEK 2 • DAY 1 OF 5 • 55 MINUTES\nEssential question: How can we preserve equality while solving equations with fractions?\nLearning targets: Solve rational-coefficient linear equations; explain equality-preserving steps; verify solutions by substitution. Standards: A-REI.1 and A-REI.3. Prerequisites: signed-number arithmetic, equivalent equations, and fraction operations.\n\nLAUNCH (5 min)\nA classmate says that the solution to (3/4)x + 5 = 11 is x = 4 because 3 + 4 = 7 and 7 + 5 = 12, which is close to 11. Explain why \"close\" does not establish an equation solution. Estimate whether x should be smaller than, equal to, or greater than 4. Substitute x = 4 and x = 8 in the original equation; record the left side for each. We will use equality-preserving operations to reach an exact, checkable answer.\n\nEXPLICIT INSTRUCTION (12 min)\nAn equation is a statement that two expressions have the same value. Adding, subtracting, multiplying, or dividing BOTH sides by the same nonzero number produces an equivalent equation. When fractions appear, you may isolate a term using inverse operations or multiply every term on both sides by a common nonzero denominator. Do not multiply just one term or only one side.\n\nWORKED MODEL 1: Solve (3/4)x + 5 = 11.\nStep 1: Subtract 5 from both sides, obtaining (3/4)x = 6.\nStep 2: Multiply both sides by 4/3, obtaining x = 8.\nCheck: (3/4)(8) + 5 = 6 + 5 = 11.\nReason: the reciprocal is valid because 3/4 is not zero.\n\nWORKED MODEL 2: Solve x/4 + x/6 = 5.\nStep 1: The least common denominator is 12. Multiply EACH term of BOTH sides by 12: 3x + 2x = 60.\nStep 2: Combine like terms: 5x = 60.\nStep 3: Divide both sides by 5: x = 12.\nCheck: 12/4 + 12/6 = 3 + 2 = 5.\n\nWORKED MODEL 3: Solve -(3/5)y + 4 = 10.\nStep 1: Subtract 4: -(3/5)y = 6.\nStep 2: Multiply by -5/3: y = -10.\nCheck: -(3/5)(-10) + 4 = 6 + 4 = 10.\nA negative coefficient changes the solution's sign; it does not reverse an equality sign. Avoid confusing this with solving inequalities.\n\nGUIDED PRACTICE (12 min)\nWork with a partner or teacher. For each problem, record what you did to both sides, why it is legal, and a substitution check.\nA. Solve (3/5)t + 2 = 8. Identify the coefficient's reciprocal.\nB. Solve (p - 2)/4 = -3. Explain what multiplying by 4 does to the entire left side.\nC. Solve (x + 1)/2 + (x - 2)/3 = 4. Choose a common denominator and show how it applies to every term, including 4. Verify the result in the original equation.\nPause after A to compare symbolic steps rather than final answers alone. If students disagree on C, substitute the two proposed values into the original equation and investigate the first invalid transformation.\n\nINDEPENDENT PRACTICE (16 min)\nShow all intermediate equations, check each numerical solution, and label whether your method used inverse operations or denominator clearing.\n1. Solve (5/6)x + 1 = 11.\n2. Solve (q - 3)/5 = -2.\n3. Solve (2/5)y - 7 = -11.\n4. Solve x/3 + x/4 = 7, showing the whole-equation multiplication step.\n5. Error analysis: A student transforms x/4 + 3 = 6 into x + 3 = 6 by multiplying only the x/4 term by 4. Explain why this changes the equation's solutions, then solve the original equation correctly.\n6. Choice/challenge: Create a fractional-coefficient linear equation with solution x = -6. Exchange with a peer, solve, and verify using substitution. Describe what must remain true when both sides are multiplied by a nonzero number.\nTurn in your reasoning and substitution checks as practice evidence; this practice is not automatically a grade.\n\nEXIT TICKET (10 min)\nIndependently solve (x - 6)/4 = 3/2. Name the operation applied to both sides and show a substitution check. Then write one sentence critiquing the statement \"clearing denominators means removing fractions wherever they appear.\" Submit the ticket for teacher feedback; avoid using a calculator as a replacement for an algebraic justification.\n\nSELF-CHECK AND SUPPORT\nBefore submitting, ask: Did I perform every operation on both sides? Did I multiply every term when clearing a denominator? Did I preserve negative signs? Does substitution make the original left and right sides equal? If stuck, start with the simpler form a(x + b) = c and isolate the grouped expression. Fractions can be represented with fraction bars or spoken as \"(three fourths) times x\" for accessibility; record equivalent symbolic forms carefully. An exact answer is supported by steps plus a substitution check, not by whether it seems close.",
+      "resources": [],
+      "learningTargets": [
+        "Solve multi-step linear equations with fractional coefficients.",
+        "Justify inverse operations and clearing denominators as equivalent equations.",
+        "Verify and interpret a solution by substituting into the original equation."
+      ],
+      "standards": [
+        "A-REI.1",
+        "A-REI.3"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u01-w02-d01-a1",
+          "kind": "launch",
+          "title": "LAUNCH",
+          "estimatedMinutes": 5,
+          "evidence": "practice",
+          "instructions": "A classmate says that the solution to (3/4)x + 5 = 11 is x = 4 because 3 + 4 = 7 and 7 + 5 = 12, which is close to 11. Explain why \"close\" does not establish an equation solution. Estimate whether x should be smaller than, equal to, or greater than 4. Substitute x = 4 and x = 8 in the original equation; record the left side for each. We will use equality-preserving operations to reach an exact, checkable answer."
+        },
+        {
+          "id": "u01-w02-d01-a2",
+          "kind": "instruction",
+          "title": "EXPLICIT INSTRUCTION",
+          "estimatedMinutes": 12,
+          "evidence": "practice",
+          "instructions": "An equation is a statement that two expressions have the same value. Adding, subtracting, multiplying, or dividing BOTH sides by the same nonzero number produces an equivalent equation. When fractions appear, you may isolate a term using inverse operations or multiply every term on both sides by a common nonzero denominator. Do not multiply just one term or only one side.\n\nWORKED MODEL 1: Solve (3/4)x + 5 = 11.\nStep 1: Subtract 5 from both sides, obtaining (3/4)x = 6.\nStep 2: Multiply both sides by 4/3, obtaining x = 8.\nCheck: (3/4)(8) + 5 = 6 + 5 = 11.\nReason: the reciprocal is valid because 3/4 is not zero.\n\nWORKED MODEL 2: Solve x/4 + x/6 = 5.\nStep 1: The least common denominator is 12. Multiply EACH term of BOTH sides by 12: 3x + 2x = 60.\nStep 2: Combine like terms: 5x = 60.\nStep 3: Divide both sides by 5: x = 12.\nCheck: 12/4 + 12/6 = 3 + 2 = 5.\n\nWORKED MODEL 3: Solve -(3/5)y + 4 = 10.\nStep 1: Subtract 4: -(3/5)y = 6.\nStep 2: Multiply by -5/3: y = -10.\nCheck: -(3/5)(-10) + 4 = 6 + 4 = 10.\nA negative coefficient changes the solution's sign; it does not reverse an equality sign. Avoid confusing this with solving inequalities."
+        },
+        {
+          "id": "u01-w02-d01-a3",
+          "kind": "guided_practice",
+          "title": "GUIDED PRACTICE",
+          "estimatedMinutes": 12,
+          "evidence": "practice",
+          "instructions": "Work with a partner or teacher. For each problem, record what you did to both sides, why it is legal, and a substitution check.\nA. Solve (3/5)t + 2 = 8. Identify the coefficient's reciprocal.\nB. Solve (p - 2)/4 = -3. Explain what multiplying by 4 does to the entire left side.\nC. Solve (x + 1)/2 + (x - 2)/3 = 4. Choose a common denominator and show how it applies to every term, including 4. Verify the result in the original equation.\nPause after A to compare symbolic steps rather than final answers alone. If students disagree on C, substitute the two proposed values into the original equation and investigate the first invalid transformation."
+        },
+        {
+          "id": "u01-w02-d01-a4",
+          "kind": "independent_practice",
+          "title": "INDEPENDENT PRACTICE",
+          "estimatedMinutes": 16,
+          "evidence": "practice",
+          "instructions": "Show all intermediate equations, check each numerical solution, and label whether your method used inverse operations or denominator clearing.\n1. Solve (5/6)x + 1 = 11.\n2. Solve (q - 3)/5 = -2.\n3. Solve (2/5)y - 7 = -11.\n4. Solve x/3 + x/4 = 7, showing the whole-equation multiplication step.\n5. Error analysis: A student transforms x/4 + 3 = 6 into x + 3 = 6 by multiplying only the x/4 term by 4. Explain why this changes the equation's solutions, then solve the original equation correctly.\n6. Choice/challenge: Create a fractional-coefficient linear equation with solution x = -6. Exchange with a peer, solve, and verify using substitution. Describe what must remain true when both sides are multiplied by a nonzero number.\nTurn in your reasoning and substitution checks as practice evidence; this practice is not automatically a grade."
+        },
+        {
+          "id": "u01-w02-d01-a5",
+          "kind": "exit_ticket",
+          "title": "EXIT TICKET",
+          "estimatedMinutes": 10,
+          "evidence": "teacher_review",
+          "instructions": "Independently solve (x - 6)/4 = 3/2. Name the operation applied to both sides and show a substitution check. Then write one sentence critiquing the statement \"clearing denominators means removing fractions wherever they appear.\" Submit the ticket for teacher feedback; avoid using a calculator as a replacement for an algebraic justification."
+        },
+        {
+          "id": "u01-w02-d01-a6",
+          "kind": "self_check",
+          "title": "SELF-CHECK AND SUPPORT",
+          "evidence": "practice",
+          "instructions": "Before submitting, ask: Did I perform every operation on both sides? Did I multiply every term when clearing a denominator? Did I preserve negative signs? Does substitution make the original left and right sides equal? If stuck, start with the simpler form a(x + b) = c and isolate the grouped expression. Fractions can be represented with fraction bars or spoken as \"(three fourths) times x\" for accessibility; record equivalent symbolic forms carefully. An exact answer is supported by steps plus a substitution check, not by whether it seems close."
+        }
+      ]
+    }
+  ],
+  "assessments": []
+}
