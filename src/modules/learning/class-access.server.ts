@@ -18,7 +18,7 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
     id: s.sections.id, title: s.sections.title, code: s.sections.code, siteId: s.sections.siteId,
     programId: s.sections.programId, versionId: s.sections.courseTemplateVersionId,
     curriculum: s.courseTemplateVersions.curriculum, contentStatus: s.courseTemplateVersions.status,
-    description: s.courseTemplates.description, subject: s.courseTemplates.subject,
+    description: s.courseTemplates.description, subject: s.courseTemplates.subject, courseCode: s.courseTemplates.code,
   }).from(s.sections)
     .innerJoin(s.courseTemplateVersions, eq(s.courseTemplateVersions.id, s.sections.courseTemplateVersionId))
     .innerJoin(s.courseTemplates, eq(s.courseTemplates.id, s.courseTemplateVersions.courseTemplateId))
