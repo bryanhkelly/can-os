@@ -30,11 +30,13 @@ describe("36-week Algebra I curriculum development plan",()=>{
  });
  it("treats Week 1 as typed activities rendered by existing /classes lesson contract",()=>{
   const learning=classContentSchema.parse({
-   version:1,syllabus:"Review pending; not credit-ready",
+   version:1,syllabus:"Review pending; not credit-ready",blueprint,
    modules:[{id:week1.unitId,title:week1.title,lessons:week1.lessons}],
    resources:[],
   });
   expect(learning.modules[0]?.lessons).toHaveLength(5);
+  expect(learning.blueprint?.weeks).toHaveLength(36);
+  expect(learning.blueprint?.creditStatus).toBe("not_credit_ready");
   for(const lesson of learning.modules[0]!.lessons){
    expect(lesson.estimatedMinutes).toBe(55);
    expect(lesson.learningTargets?.length).toBeGreaterThan(0);
