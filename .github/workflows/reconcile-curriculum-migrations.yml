@@ -1,0 +1,36 @@
+name: Reconcile curriculum Drizzle migrations
+on:
+  push:
+    branches:
+      - feature/curriculum-marketplace-valor-core
+    paths:
+      - .github/workflows/reconcile-curriculum-migrations.yml
+permissions:
+  contents: write
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/curriculum-marketplace-valor-core
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Reconcile from last canonical snapshot
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; const p='drizzle/meta/_journal.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.entries=j.entries.filter(e=>e.idx<=25);fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
+          rm -f drizzle/0026_curriculum_marketplace.sql drizzle/0027_curriculum_resources_and_interop.sql
+          npm run db:generate
+          git add drizzle
+          git diff --cached --stat
+      - name: Commit generated migration
+        run: |
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(db): reconcile marketplace migration with Drizzle snapshots"
+          git push origin HEAD:feature/curriculum-marketplace-valor-core
