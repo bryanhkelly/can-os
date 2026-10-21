@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { ClassContent } from "@/domain/class-content";
 import type { ClassTeacherGuides } from "@/domain/class-teacher-guides";
 import { PublisherTeacherGuideEditor } from "./PublisherTeacherGuideEditor";
-import { saveAuthoredCurriculum, publishAuthoredCurriculum } from "@/modules/learning/curriculum-authoring.functions";
+import { saveAuthoredCurriculum, publishAuthoredCurriculum, saveAuthoredLesson } from "@/modules/learning/curriculum-authoring.functions";
 
 export function CurriculumEditor({programId,courseCode,release,onSaved}:{
  programId:string;courseCode:string;
@@ -23,6 +23,33 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
    saved.current=JSON.stringify(content);guidesSaved.current=JSON.stringify(teacherGuides);
    setRevision(result.revision);setNotice("Publisher lesson content and protected teacher guides saved as draft.");
   }catch(cause){setError(cause instanceof Error?cause.message:"Unable to save curriculum");}
+  finally{setBusy(false);}
+ }
+ async function saveOneLesson(moduleId:string,lessonId:string){
+  const persisted:ClassContent=JSON.parse(saved.current);
+  const original=persisted.modules.find(m=>m.id===moduleId)?.lessons.find(l=>l.id===lessonId);
+  const changed=content.modules.find(m=>m.id===moduleId)?.lessons.find(l=>l.id===lessonId);
+  if(!original||!changed){setError("This lesson has not been saved as part of the course outline yet.");return;}
+  // A single-lesson operation must not silently discard other pending changes.
+  const exceptSelected={...content,modules:content.modules.map(m=>m.id!==moduleId?m:{
+   ...m,lessons:m.lessons.map(l=>l.id===lessonId?original:l),
+  })};
+  if(JSON.stringify(exceptSelected)!==saved.current||JSON.stringify(teacherGuides)!==guidesSaved.current){
+   setError("Save the complete draft first to preserve other unsaved changes before saving one lesson.");return;
+  }
+  setBusy(true);setError("");setNotice("");
+  try{
+   const result=await saveAuthoredLesson({data:{
+    programId,versionId:release.id,expectedRevision:revision,moduleId,lessonId,lesson:changed,
+   }});
+   const nextSaved={...persisted,modules:persisted.modules.map(m=>m.id!==moduleId?m:{
+    ...m,lessons:m.lessons.map(l=>l.id===lessonId?changed:l),
+   })};
+   saved.current=JSON.stringify(nextSaved);
+   setRevision(result.revision);
+   setNotice(result.changed?"Publisher lesson saved within this course draft.":"Lesson was already up to date.");
+   await onSaved();
+  }catch(e){setError(e instanceof Error?e.message:"Unable to save this lesson.");}
   finally{setBusy(false);}
  }
  function moduleChange(index:number,change:Partial<ClassContent["modules"][number]>){
@@ -116,6 +143,8 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
        }]}))}>Add activity</button>
       <p className="text-xs text-muted-foreground">Activities and student instructions are publisher content. Keep answer keys in the protected teacher guide, not here.</p>
      </section>
+     <button type="button" disabled={busy} className="rounded border px-3 py-2 text-sm disabled:opacity-50"
+      onClick={()=>void saveOneLesson(module.id,lesson.id)}>Save this lesson only</button>
      <div className="flex gap-3">
       <button type="button" className="rounded border px-3 py-2 text-sm" onClick={()=>moduleChange(index,{
        lessons:module.lessons.filter(item=>item.id!==lesson.id)})}>Remove lesson</button>
