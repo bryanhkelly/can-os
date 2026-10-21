@@ -72,8 +72,8 @@ export function exportOneRoster12Roster(input:OneRosterInput):Record<string,stri
    courses.map(x=>[x.id,year?.id??"",x.title,x.code,"",org.id,x.subject,""]));
  rows["classes.csv"]=csv(["sourcedId","title","grades","courseSourcedId","classCode","classType","location","schoolSourcedId","termSourcedIds","subjects","subjectCodes"],
    classes.map(x=>[x.id,x.title,"",x.courseId,x.code,"scheduled","",org.id,x.termId,"",""]));
- rows["users.csv"]=csv(["sourcedId","enabledUser","username","userIds","givenName","familyName","middleName","identifier","email","sms","phone","agentSourcedIds","grades","password","primaryOrgSourcedId","userMasterIdentifier","preferredGivenName","preferredMiddleName","preferredFamilyName","pronouns"],
-   people.map(x=>[x.id,"true","can-"+x.id,"",x.givenName,x.familyName,"","","","","","",x.grade??"","",org.id,"","","","",""]));
+ rows["users.csv"]=csv(["sourcedId","enabledUser","username","userIds","givenName","familyName","middleName","identifier","email","sms","phone","agentSourcedIds","grades","password","userMasterIdentifier","preferredGivenName","preferredMiddleName","preferredFamilyName","primaryOrgSourcedId","pronouns"],
+   people.map(x=>[x.id,"true","can-"+x.id,"",x.givenName,x.familyName,"","","","","","",x.grade??"","","","","","",org.id,""]));
  const distinctRoleIds=new Set<string>();
  const roles: {id:string;personId:string;role:"student"|"teacher"}[]=[];
  for(const r of registrations) {
@@ -87,8 +87,13 @@ export function exportOneRoster12Roster(input:OneRosterInput):Record<string,stri
      const type=primary.has(r.personId)?"secondary":"primary";primary.add(r.personId);
      return [r.id,r.personId,type,r.role,"","",org.id,""];
    }));
+ const primaryTeacherByClass=new Set<string>();
  rows["enrollments.csv"]=csv(["sourcedId","classSourcedId","schoolSourcedId","userSourcedId","role","primary","beginDate","endDate"],
-   registrations.map(r=>[r.id,r.classId,org.id,r.personId,r.role,r.role==="teacher"?"true":"","",""]));
+   registrations.map(r=>{
+     const isPrimary=r.role==="teacher"&&!primaryTeacherByClass.has(r.classId);
+     if(isPrimary)primaryTeacherByClass.add(r.classId);
+     return [r.id,r.classId,org.id,r.personId,r.role,r.role==="teacher"?(isPrimary?"true":"false"):"","",""];
+   }));
  rows["manifest.csv"]=csv(["propertyName","value"],[
   ["manifest.version","1.0"],["oneroster.version","1.2"],
   ...manifestFiles.map(f=>["file."+f,rows[f+".csv"]?"bulk":"absent"]),
