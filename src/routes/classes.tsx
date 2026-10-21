@@ -129,7 +129,22 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {!data.content && <p role="status" className="rounded-xl border p-5 text-sm">No published learning content is configured for this class.</p>}
       {lessonId && !lesson && <p role="alert" className="rounded-xl border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
       {lesson ? <WorkspacePanel title={lesson.title} actions={<Link to="/classes" search={{ ...search, tab: "lessons" }} className="text-sm underline">All lessons</Link>}>
-        <div className="whitespace-pre-wrap text-sm leading-8">{lesson.body || "No lesson text provided."}</div>
+        {lesson.estimatedMinutes && <p className="mb-3 text-xs text-muted-foreground">Estimated lesson time: {lesson.estimatedMinutes} minutes</p>}
+        {lesson.learningTargets?.length ? <section className="mb-5 rounded-lg border p-4">
+          <h3 className="text-sm font-semibold">Learning targets</h3>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{lesson.learningTargets.map(target=><li key={target}>{target}</li>)}</ul>
+        </section> : null}
+        {lesson.activities?.length ? <ol className="space-y-5">
+          {lesson.activities.map((activity,index)=><li key={activity.id} className="rounded-lg border p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-semibold">{index+1}. {activity.title}</h3>
+              <span className="text-xs text-muted-foreground">{activity.estimatedMinutes ? `${activity.estimatedMinutes} min · ` : ""}{activity.kind.replaceAll("_"," ")}</span>
+            </div>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-7">{activity.instructions}</p>
+            {activity.evidence==="teacher_review" && <p className="mt-3 text-xs text-muted-foreground">Discuss or submit this evidence for teacher review. Opening this step does not grant a grade.</p>}
+          </li>)}
+        </ol> : <div className="whitespace-pre-wrap text-sm leading-8">{lesson.body || "No lesson text provided."}</div>}
+        {lesson.standards?.length ? <p className="mt-4 text-xs text-muted-foreground">Learning standards: {lesson.standards.join(", ")}</p> : null}
         {lesson.resources.length > 0 && <div className="mt-5">{resources(lesson.resources)}</div>}
         {supplements.some(item=>item.lessonId===lesson.id) && <div className="mt-5 space-y-2">
           <h3 className="font-semibold">School and classroom supplements</h3>
