@@ -88,7 +88,7 @@ integration("governed curriculum authoring through classroom delivery",()=>{
     const {createAcademicTimeFixture}=await import("./helpers/academic-time");
     const time=await createAcademicTimeFixture({organizationId:org.id,siteId:site.id,programId:program.id,suffix});
     const provision={programId:program.id,termId:time.term.id,courseTemplateVersionId:versionId,code:`A-${suffix}`,title:"Science A"};
-    await expect(provisionLaunchSection({data:provision})).rejects.toThrow("published curriculum provider");
+    await expect(provisionLaunchSection({data:provision})).rejects.toThrow("Choose a published course");
     const publication={...scope,versionId,expectedRevision:initial.revision,confirmed:true as const,reason:"Reviewed foundational science curriculum for release."};
     await expect(flow.publishAuthoredCurriculum({data:publication})).rejects.toThrow("syllabus");
     const content:ClassContent={version:1,syllabus:"Investigate evidence through reading and practice.",
@@ -156,6 +156,47 @@ integration("governed curriculum authoring through classroom delivery",()=>{
     const foreign=first(await tx.insert(s.organizations).values({type:"christian_school",name:"Foreign owner",slug:`foreign-${suffix}`}).returning());
     const foreignCourse=first(await tx.insert(s.courseTemplates).values({owningOrganizationId:foreign.id,code:suffix,title:"Foreign curriculum",subject:"Science"}).returning());
     await expect(flow.startCurriculumDraft({data:{...request,courseId:foreignCourse.id,requestId:crypto.randomUUID()}})).rejects.toThrow("owning organization");
+    // A third-party publisher is NOT the school's academic provider.
+    // A published pack, active entitlement, and program adoption must all exist.
+    const externalVersion=first(await tx.insert(s.courseTemplateVersions).values({
+      courseTemplateId:foreignCourse.id,version:1,status:"published",publishedAt:new Date(),
+      curriculum:{learning:content},
+    }).returning());
+    const programIdentity={id:program.id,organizationId:org.id,academicProviderOrganizationId:org.id};
+    const {listLaunchEligibleCourses,assertLaunchEligibleCourse}=await import("@/modules/programs/launch-curriculum-eligibility.server");
+    await expect(assertLaunchEligibleCourse(programIdentity,externalVersion.id,tx)).rejects.toThrow("Choose a published course");
+    const pack=first(await tx.insert(s.curriculumPacks).values({
+      publisherOrganizationId:foreign.id,slug:`pack-${suffix}`,name:"Foreign Published Science",
+      description:"Third-party published curriculum",visibility:"public",licenseCode:"CC-BY-4.0",
+    }).returning());
+    const packVersion=first(await tx.insert(s.curriculumPackVersions).values({
+      packId:pack.id,version:1,status:"published",publishedAt:new Date(),
+    }).returning());
+    await tx.insert(s.curriculumPackItems).values({
+      packVersionId:packVersion.id,courseTemplateVersionId:externalVersion.id,position:1,
+    });
+    const entitlement=first(await tx.insert(s.curriculumEntitlements).values({
+      organizationId:org.id,packId:pack.id,termsAcceptedAt:new Date(),
+      acceptedByPersonId:publisher.id,
+    }).returning());
+    await expect(assertLaunchEligibleCourse(programIdentity,externalVersion.id,tx)).rejects.toThrow("Choose a published course");
+    const adoption=first(await tx.insert(s.curriculumAdoptions).values({
+      organizationId:org.id,programId:program.id,siteId:site.id,packId:pack.id,
+      packVersionId:packVersion.id,adoptedByPersonId:publisher.id,
+    }).returning());
+    expect((await listLaunchEligibleCourses(programIdentity,tx)).some(c=>c.versionId===externalVersion.id)).toBe(true);
+    const thirdParty=await provisionLaunchSection({data:{
+      ...provision,courseTemplateVersionId:externalVersion.id,code:`EXT-${suffix}`,title:"Licensed Science",
+    }});
+    expect(first(await tx.select().from(s.sections).where(eq(s.sections.id,thirdParty.sectionId))).courseTemplateVersionId).toBe(externalVersion.id);
+    await tx.update(s.curriculumEntitlements).set({status:"revoked"}).where(eq(s.curriculumEntitlements.id,entitlement.id));
+    await expect(provisionLaunchSection({data:{
+      ...provision,courseTemplateVersionId:externalVersion.id,code:`DENY-${suffix}`,title:"Denied Science",
+    }})).rejects.toThrow("Choose a published course");
+    await tx.update(s.curriculumEntitlements).set({status:"active"}).where(eq(s.curriculumEntitlements.id,entitlement.id));
+    await tx.update(s.curriculumAdoptions).set({status:"inactive"}).where(eq(s.curriculumAdoptions.id,adoption.id));
+    await expect(assertLaunchEligibleCourse(programIdentity,externalVersion.id,tx)).rejects.toThrow("Choose a published course");
+
     await tx.update(s.people).set({active:false}).where(eq(s.people.id,publisher.id));
     await expect(flow.getCurriculumStudio({data:scope})).rejects.toThrow("explicit curriculum publisher");
     await tx.update(s.people).set({active:true}).where(eq(s.people.id,publisher.id));
