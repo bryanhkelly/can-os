@@ -171,6 +171,41 @@
       ],
       "downstreamRecords": []
     },
+    "/admissions/applications/$applicationId": {
+      "persona": "registrar",
+      "seeds": [
+        "gf2-admissions-test.sql",
+        "valor-admissions-config.sql"
+      ],
+      "recordCounts": {
+        "applications": 1,
+        "journey_definitions": 1,
+        "journeys": 1,
+        "admission_seat_pools": 1
+      },
+      "interactions": [
+        "open one applicant from the admissions pipeline",
+        "see the computed next registrar or family step and the ordered admissions checklist",
+        "review the submitted application packet",
+        "verify the guardian relationship, provision access and record stage decisions",
+        "complete enrollment requirements, issue an offer, activate enrollment and place courses"
+      ],
+      "downstreamRecords": ["audit_events", "domain_events", "journey_requirements", "admission_offers", "enrollments"]
+    },
+    "/apply": {
+      "persona": "applicant family",
+      "seeds": [
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "programs": 1
+      },
+      "interactions": [
+        "start, save, reload and validate a sectioned family application packet",
+        "submit the latest edits in one action into registrar intake"
+      ],
+      "downstreamRecords": ["applications", "audit_events", "domain_events"]
+    },
     "/ask": {
       "persona": "guardian",
       "seeds": [
@@ -763,6 +798,40 @@
         "review Site Today indicators",
         "review site actions and schedule",
         "open related operating area"
+      ],
+      "downstreamRecords": []
+    },
+    "/sites/$siteId/profile": {
+      "persona": "staff",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "organizations": 1,
+        "sites": 1,
+        "programs": 1
+      },
+      "interactions": [
+        "view authorized Site identity and location",
+        "review Programs delivered at the Site",
+        "open the owning Organization profile"
+      ],
+      "downstreamRecords": []
+    },
+    "/organizations/$organizationId": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "organizations": 1,
+        "sites": 1,
+        "programs": 1
+      },
+      "interactions": [
+        "view authorized Organization identity",
+        "review authorized Sites and Programs",
+        "open a Site profile"
       ],
       "downstreamRecords": []
     },

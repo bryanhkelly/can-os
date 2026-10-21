@@ -26,7 +26,7 @@ export async function createAdmissionsFixture(sql: Sql): Promise<AdmissionsFixtu
         values ($1, $2, 'guardian'), ($1, $3, 'student')`, [f.householdId, f.guardianPersonId, f.studentPersonId]),
       sql.query(`insert into applications (id, household_id, student_profile_id, program_id, stage,
         idempotency_key, submitted_by_person_id, submitted_at, metadata)
-        values ($1, $2, $3, $4, 'eligibility', $5, $6, now(), '{"synthetic":true}')`,
+        values ($1, $2, $3, $4, 'eligibility', $5, $6, now(), '{}'::jsonb)`,
       [f.applicationId, f.householdId, f.studentProfileId, f.programId, `browser-admissions-${f.suffix}`, f.guardianPersonId]),
       sql.query(`insert into journey_definitions (id, key, version, owning_organization_id, audience, title, configuration)
         values ($1, $2, '1', $3, 'family', 'Synthetic browser enrollment', $4::jsonb)`,
@@ -55,6 +55,7 @@ export async function createAdmissionsFixture(sql: Sql): Promise<AdmissionsFixtu
 export async function retireAdmissionsFixture(sql: Sql, f: AdmissionsFixture) {
   const accountIds = [f.studentAccountId, f.guardianAccountId, f.teacherAccountId, f.specialistAccountId];
   await sql.transaction([
+    sql.query("update programs set metadata = metadata || '{\"admissionsOpen\":false}'::jsonb where id = $1", [f.programId]),
     sql.query("update access_sessions set revoked_at = now() where account_id = any($1::uuid[])", [accountIds]),
     sql.query("update account_person_grants set active = false where account_id = any($1::uuid[])", [accountIds]),
     sql.query("update access_accounts set disabled = true where id = any($1::uuid[])", [accountIds]),

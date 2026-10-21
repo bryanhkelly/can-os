@@ -21,7 +21,6 @@ export const accountPersonGrants = pgTable("account_person_grants", {
  organizationId: uuid("organization_id"),
  siteId: uuid("site_id"),
  active: boolean("active").notNull().default(true),
- isSynthetic: boolean("is_synthetic").notNull().default(false),
  createdAt: createdAt(),
  updatedAt: updatedAt(),
 }, t => [index("account_person_grants_account_idx").on(t.accountId),index("account_person_grants_person_idx").on(t.personId)]);

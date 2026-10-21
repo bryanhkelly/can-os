@@ -555,6 +555,81 @@ deployment or live storage acceptance.
   was performed. Automatic escalation, proactive credential-change handling,
   full readiness-evidence acceptance and broader daily operations remain open.
 
+## Working-tree evidence: daily site Action triage
+
+- The shared registrar Operations queue and Site Today now use the same
+  deadline-first triage for canonical open Actions: overdue, due within 24
+  hours, future-dated, then undated; operational priority and deadline break
+  ties. Each view exposes status, deadline urgency and current owner; summary
+  counts call out overdue, near-deadline and unassigned work. The Operations
+  queue query is deadline-ordered and bounded to the earliest 500 rows.
+- Domain-owned referrals and named opening handoffs continue to link to their
+  owning workflow rather than acquiring generic resolution controls. Reads and
+  writes retain the existing server-side site/program authorization.
+- Added deterministic policy tests, selected Site Today/Operations rendering
+  coverage and live-endpoint rollback-fixture checks for same-site owner,
+  overdue, near-due and unassigned Actions. No new workflow engine or schema
+  migration was introduced.
+- Verification: **27 focused unit tests passed**, the **2-test isolated
+  launch/staffing integration run passed**, the production build passed, and
+  scoped `git diff --check` passed. Workspace typecheck remains blocked by
+  unrelated unresolved `applications` references in
+  `src/modules/enrollment/r2-document-upload.functions.ts` (lines 31); that
+  concurrent file was not changed for this work.
+- This closes one measurable daily-triage gap in the School administration
+  priority; it does not close the entire site-director workspace. Escalation,
+  outbound delivery verification and full cross-role daily-operations
+  acceptance remain separate work.
+
+## Working-tree evidence: Site Today coverage exceptions
+
+- Site Today now includes active-section staffing, instructional-capacity and
+  section-waitlist exceptions from the existing live Operations command-center
+  read model. Each exception links to its owning program operations workspace;
+  the panel appears only when the verified actor has `program.launch.start`.
+  The query is narrowed to the current authorized site and its permitted
+  programs. It introduces no new state or generic workflow.
+- The rollback-isolated launch/staffing acceptance verifies the projected
+  active-section count against persisted sections and checks that the panel
+  data is scoped to the site program. It also removes the capability from the
+  actor and confirms the panel data is omitted. UI coverage checks exception
+  rendering and the program link.
+- Verification passed: **27 focused unit/navigation tests**, **2 isolated
+  integration tests**, typecheck, production build and scoped whitespace check.
+- This adds an operational signal to the site-director view, but does not
+  finish the full School administration priority or replace staffing and
+  school-year management flows.
+
+## Working-tree evidence: effective-dated schedule revisions
+
+- School-Year Studio can create a future-dated revision from the latest
+  open-ended schedule template. The prior template ends the day before the new
+  effective date; its periods remain unchanged. New periods are copied into
+  the revision, which can be edited until it takes effect. Effective templates
+  in an active SchoolYear are read-only; same-scope stale-source revisions and
+  non-future active-year revisions reject.
+- Revision transactions serialize with attendance configuration writes at the
+  Site, preserve before/after schedule-range and period evidence, and emit
+  `ScheduleTemplateChanged`. Attendance expectations consume the canonical
+  effective date ranges. Section-specific schedule assignments remain
+  separately managed and are linked to the program setup workspace.
+- The rollback-isolated attendance acceptance verifies prior-date expectations
+  remain stable, a future closure in the schedule pattern changes expectations
+  on its effective day only, a later revision restores the expected day, and
+  the prior schedule/periods are retained. No schema migration was needed.
+- Verification: **2 isolated attendance integration tests** passed. Earlier,
+  **24 focused navigation tests**, mutation hygiene and scoped whitespace
+  checks passed. A later unit rerun cannot load because the concurrent
+  `src/modules/enrollment/family-application.functions.ts` import requires a
+  protected test database configuration; no database writes were attempted.
+  Current typecheck also reports errors in that file, while the latest build
+  stops on syntax in the concurrently modified
+  `src/components/shell/WorkspaceNavigation.tsx`. Typecheck/build passed during
+  implementation before those concurrent edits.
+- This advances GF23 effective-date and downstream attendance propagation
+  requirements; broader section assignment migration and full school-year
+  acceptance remain open.
+
 ## Admissions acceptance-to-class handoff
 
 - Shifted work from launch refinements to the P0 admissions cross-persona path.
@@ -616,6 +691,12 @@ deployment or live storage acceptance.
   uncommitted writes fail, and revoked teacher assignments block replay.
   The schedule editor's double-escaped time validator was corrected: valid
   `08:30`/`15:00` times now work, while invalid hours remain rejected.
+- Offline queue persistence now rejects malformed, oversized and unwritable
+  device queues without silently truncating or claiming an entry was saved.
+  Synchronization removes only successfully replayed mutation IDs from the
+  latest stored queue, preserving entries added while a sync is in progress;
+  overlapping sync attempts are ignored. Five focused tests cover corruption,
+  the 500-entry limit, storage failures, and retaining concurrent pending work.
 - Verification passed **22 focused unit files / 137 tests**, **2 attendance
   integration files / 2 tests**, and the **2 admissions integration files /
   2 tests** as a shared-family regression, plus typecheck, production build,
@@ -623,9 +704,15 @@ deployment or live storage acceptance.
   attendance fixture is rollback-isolated and independently verifies cleanup;
   the older GF4 service fixture persists synthetic records only in the
   disposable test database. Email transport is mocked in the new fixture.
+- The new offline-queue unit file / **5 tests**, typecheck and production build
+  also passed for this increment. The guarded Attendance browser suite now
+  verifies offline capture without a server write, reconnect synchronization
+  into one canonical attendance event, and quota-failure reporting without a
+  server mutation. It runs only against the disposable database; real-device
+  behavior and production certification remain unverified.
 - Closed the stuck obsolete-excuse path and corrected cross-role attendance
   read consistency. This is not a declaration that every Attendance or P0
-  release gate is complete. Live supporting-document acceptance, browser
+  release gate is complete. Live supporting-document acceptance, real-device
   offline queue behavior, separate-connection correction/closure races,
   outbound delivery and jurisdiction-specific policies remain unverified.
   No production mutation, schema migration, grant change or deployment occurred.
@@ -742,6 +829,31 @@ deployment or live storage acceptance.
   the newly added `/actions/$actionId` route's missing declaration.
   That route was not changed for Admissions;
   this is not a claim that all workspace validation is green.
+
+## Working-tree evidence: split-instructor coverage planning
+
+- Launch academic setup now lets a registrar assign an instructor for an
+  inclusive school-year-local date range. Assignment rechecks role scope and
+  published qualification policy against those effective dates; the immutable
+  AuditEvent and `DeliveryArrangementActivated` event record the range and
+  qualification evidence.
+- Opening readiness joins active instructor delivery arrangements across the
+  full section window, allowing adjacent or overlapping instructors while
+  blocking any uncovered gap. Each instructor is independently checked only
+  for dates they are assigned. Qualification windows and delivery ranges retain
+  exclusive end instants internally; the planner presents inclusive dates in
+  the school-year timezone.
+- Verification passed **15 focused unit tests**, **2 isolated integration
+  tests**, typecheck, production build and scoped whitespace checks. The
+  integration fixture proves a split plan, a teacher qualified only for their
+  assigned dates, and a remaining coverage gap that blocks opening; its writes
+  are rolled back.
+- This closes the split-instructor planning gap in the Teacher management
+  priority. Live Operations and Site Today now re-evaluate active sections
+  against the full effective instructor coverage window and applicable
+  qualification policies; gaps are visible for staff review. Automatic
+  assignment revocation, operational remediation and complete coverage
+  planning across all workflows remain open.
 - This supersedes the earlier statement that no configured form/signature
   interaction exists. It does not constitute approval of real school packet
   text, legal/electronic-signature policy, jurisdiction-specific requirements or
@@ -750,6 +862,27 @@ deployment or live storage acceptance.
   earlier unrelated study-group navigation fixture failure remains outside this
   change. No production packet, grant, upload switch, migration or deployment
   was changed.
+
+## Working-tree evidence: post-opening staffing coverage monitoring
+
+- The Operations command center previously treated any section-teacher link as
+  sufficient staffing. It now reuses the canonical launch staffing evaluator
+  for active sections with assigned teachers, checking effective delivery
+  coverage and current qualification policy across the instructional window.
+  Sections without a teacher remain separately counted as unstaffed.
+- Operations and Site Today show the new staffing-gap count and link each
+  blocker to the program workspace. Ask CAN's operations overview reports the
+  same scoped count from the command-center projection.
+- The rollback-isolated launch staffing integration test creates a split plan,
+  then introduces an uncovered interval and verifies that the Operations
+  projection reports the gap. Focused UI tests (**31 tests**), typecheck and
+  production build pass. The isolated staffing test passes; the combined runner
+  also ran the GF3 program-launch regression, which failed its existing
+  asynchronous outbox-status assertion (`pending` instead of `processed`).
+- This is read-time monitoring, not automatic revocation, schedule repair,
+  teacher reassignment or an automatically created Action. Those changes still
+  require explicit, authorized domain workflows. No migration, production
+  mutation or deployment occurred.
 
 ## Admissions exception consistency
 
@@ -876,6 +1009,85 @@ deployment or live storage acceptance.
 - These are local release-validation and live database-state results, not
   evidence of remote CI, application deployment, live external delivery or
   production browser acceptance.
+
+## Production migration 0026: tenant-scoped demo records
+
+- After explicit operator approval, migration
+  `0026_charming_dark_beast.sql` was applied to project `can-os`
+  (`sweet-hall-62441909`), branch `production` (`br-restless-sea-ar9ooo55`),
+  endpoint `ep-autumn-glade-ar9r1t5q`. Neon management metadata independently
+  confirmed the target before the write.
+- The project branch quota initially blocked recovery creation. With explicit
+  operator approval, the obsolete `gf26-study-groups-validation` branch
+  (`br-shy-river-arn2xiwi`) was deleted and replaced with the fresh recovery
+  branch `production-pre-0026-2026-10-20T16-46-37-985Z`
+  (`br-delicate-mode-art59p1b`, parent LSN `0/32C2D90`).
+  Its endpoint is `ep-green-lab-arcrb0xl`; retain this recovery branch until
+  post-deployment acceptance and recovery retention are reviewed.
+- The exact migration was rehearsed transactionally on the recovery branch.
+  The legacy column was removed, all 12 grant rows and their remaining fields
+  were unchanged, and rollback restored the column. The recovery baseline
+  remains unmigrated. No application fixtures or seeds were run there.
+- Production verification at **2026-10-20 16:47:22 UTC** confirmed **27**
+  migration ledger entries, zero pending migrations, the exact new migration
+  hash, and absence of `account_person_grants.is_synthetic`. A before/after
+  fingerprint confirmed all 12 grant rows and their remaining fields were
+  preserved. Existing migration hashes matched source before application,
+  allowing checkout line-ending normalization.
+- This records database migration only, not application deployment, complete
+  tenant-isolation acceptance or cross-persona workflow acceptance. No seeds,
+  dataset resets or migrations of other environment branches were performed.
+
+## Family application entry and Valor browser evidence (2026-10-20)
+
+- Added canonical `/apply` and `/apply/access` with explicit program publication
+  in registrar intake, verified-email applicant registration, and tenant-bound
+  Valor access using new `@valorschool.demo` accounts and `000000`. No schema
+  migration or record-level synthetic flag is needed for this feature.
+- Applicant-only grants do not establish guardianship. Draft/save/submit/status
+  use the existing Application, Person, StudentProfile, Household and pending
+  GuardianRelationship, with scope/ownership/revision checks and transactional
+  audit/outbox evidence. Registrar verification/provisioning reuses those same
+  identities before normal offers and enrollment.
+- With explicit operator approval, opened only the Valor high-school program
+  and created Taylor Demo's application for Avery Demo through the local
+  browser. Save/reload/edit/submit and cross-account registrar visibility were
+  verified. Application `9a15ca68-3f22-4520-8cef-5b17f4e07d14` remains in
+  `application`, with one submission event and no enrollment. No authentic
+  records, broad seeds or resets were involved.
+- Focused rollback family-application integration tests passed **1 file /
+  2 tests**; the existing admissions handoff suite passed **3 files / 3 tests**.
+  The isolated GF22 family-application browser test passed **1 test**; focused
+  unit regressions passed **6 files / 88 tests**. Typecheck, production build,
+  route contracts and mutation hygiene checks passed.
+  See [admissions offers](./admissions-offers.md) and
+  [identity/access](./identity-and-demo-access.md) for behavior and limitations.
+  External email delivery, hosted publication and the full synthetic school
+  acceptance remain unverified.
+
+## Core family application packet (2026-10-20)
+
+- Expanded the application starter into an ordinary `/apply` dashboard and
+  sectioned core packet: instructions, student details, family/households,
+  siblings, previous schools/interests, and full review/submission.
+  Documents, acknowledgments, payments and packet-authoring administration
+  were explicitly deferred by the operator.
+- Versioned, validated packet evidence is stored on the same canonical
+  Application. Existing drafts retain their previous fields and require the
+  missing sections before a new submission; submitted history is not rewritten.
+  Registrar intake reads the same packet. Contacts/history are self-reported,
+  not verified guardians, authorized accounts or official transcript records.
+- Reused Journey definitions/instances/requirements for section progress,
+  including ready-to-incomplete regression. The `admissions_application`
+  participant keeps collection separate from the existing enrollment Journey.
+  Saves/submission retain scope, ownership, version, audit and outbox checks.
+- Verification: focused unit tests **6 files / 92 tests**; rollback family
+  integration **1 file / 2 tests**; admissions handoff integration **3 files /
+  3 tests**; isolated full-core-packet browser acceptance **1 test**. Typecheck,
+  production build, route contracts and mutation hygiene passed.
+  These runs are local/disposable-database evidence, not hosted deployment or
+  real email delivery. No application database records were edited to populate
+  the new fields, and no schema migration/backfill was required.
 
 ## Updating this snapshot
 

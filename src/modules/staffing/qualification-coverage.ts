@@ -16,6 +16,28 @@ export type CoveragePolicy = CoverageWindow & {
   id: string; code: string; expression: Record<string, unknown>; evidencePolicy: Record<string, unknown>;
 };
 
+export function coverageGaps(window: CoverageWindow, intervals: CoverageWindow[]): CoverageWindow[] {
+  if (!Number.isFinite(window.from.getTime()) || !Number.isFinite(window.through.getTime()) || window.from >= window.through) {
+    throw new Error("Invalid instructional coverage window");
+  }
+  const sorted = intervals
+    .filter(interval => Number.isFinite(interval.from.getTime()) && Number.isFinite(interval.through.getTime()) &&
+      interval.from < interval.through && interval.through > window.from && interval.from < window.through)
+    .map(interval => ({
+      from: new Date(Math.max(interval.from.getTime(), window.from.getTime())),
+      through: new Date(Math.min(interval.through.getTime(), window.through.getTime())),
+    }))
+    .sort((left, right) => left.from.getTime() - right.from.getTime());
+  const gaps: CoverageWindow[] = [];
+  let coveredThrough = window.from;
+  for (const interval of sorted) {
+    if (interval.from > coveredThrough) gaps.push({ from: coveredThrough, through: interval.from });
+    if (interval.through > coveredThrough) coveredThrough = interval.through;
+  }
+  if (coveredThrough < window.through) gaps.push({ from: coveredThrough, through: window.through });
+  return gaps;
+}
+
 export function instructionalWindow(input: {
   startsAt: Date | null; endsAt: Date | null; startsOn: string; endsOn: string; timezone: string;
 }): CoverageWindow {

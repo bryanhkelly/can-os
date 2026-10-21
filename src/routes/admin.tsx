@@ -13,7 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, useZodForm } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const Route = createFileRoute("/admin")({ component: AdminConsolePage });
+export const Route = createFileRoute("/admin")({
+  validateSearch: (search: Record<string, unknown>) =>
+    z.object({ organizationId: z.string().uuid().optional() }).parse(search),
+  component: AdminConsolePage,
+});
 
 const roles = ["teacher", "registrar", "specialist", "counselor"] as const;
 
@@ -22,6 +26,7 @@ const inviteSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(80),
   role: z.enum(roles),
+  organizationId: z.string(),
   siteId: z.string(),
 });
 
@@ -30,9 +35,11 @@ const inviteDefaults: z.input<typeof inviteSchema> = {
   firstName: "",
   lastName: "",
   role: "teacher",
+  organizationId: "",
   siteId: "",
 };
 
+type Organization = Awaited<ReturnType<typeof listScopedSites>>["organizations"][number];
 type Site = Awaited<ReturnType<typeof listScopedSites>>["sites"][number];
 type Account = Awaited<ReturnType<typeof listAccessAccounts>>["accounts"][number];
 type Person = Awaited<ReturnType<typeof listPeople>>["people"][number];
@@ -40,7 +47,9 @@ type Person = Awaited<ReturnType<typeof listPeople>>["people"][number];
 const authMessage = "Sign in with an authorized registrar account to manage access.";
 
 function AdminConsolePage() {
+  const selection = Route.useSearch();
   const [sites, setSites] = useState<Site[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [requireSiteSelection,setRequireSiteSelection]=useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -49,6 +58,7 @@ function AdminConsolePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [grantToSwitch, setGrantToSwitch] = useState<{grantId:string;organizationId:string;organizationName:string}|null>(null);
 
   const [query, setQuery] = useState("");
 
@@ -59,8 +69,15 @@ function AdminConsolePage() {
     Promise.all([listScopedSites(), listAccessAccounts(), listPeople({ data: {} })])
       .then(([siteResult, accountResult, peopleResult]) => {
         if (!active) return;
+        setOrganizations(siteResult.organizations);
         setSites(siteResult.sites);
         setRequireSiteSelection(siteResult.requireSiteSelection);
+        const initialOrganizationId = siteResult.organizations.some(
+          organization => organization.id === selection.organizationId,
+        )
+          ? selection.organizationId!
+          : siteResult.organizations[0]?.id ?? "";
+        form.setValue("organizationId", initialOrganizationId);
         if(siteResult.requireSiteSelection&&siteResult.sites.length===1)
           form.setValue("siteId",siteResult.sites[0]?.id??"");
         setAccounts(accountResult.accounts);
@@ -71,7 +88,7 @@ function AdminConsolePage() {
         if (active) { setAuthError(authMessage); setLoading(false); }
       });
     return () => { active = false; };
-  }, []);
+  }, [selection.organizationId]);
 
   useEffect(() => {
     if (authError) return;
@@ -102,13 +119,21 @@ function AdminConsolePage() {
           firstName: values.firstName,
           lastName: values.lastName,
           role: values.role,
+          organizationId: values.organizationId || undefined,
           ...(values.siteId ? { siteId: values.siteId } : {}),
         },
       });
       setNotice(result.created
-        ? `Invitation recorded for ${values.email}. Trigger the access-link flow so they receive their sign-in challenge.`
-        : `${values.email} already has this grant; no changes were made.`);
-      form.reset({...inviteDefaults,siteId:requireSiteSelection&&sites.length===1?sites[0]?.id??"":""});
+        ? `Access grant recorded for ${values.email} in ${result.organizationName}. This does not send email.`
+        : `${values.email} already has this grant in ${result.organizationName}; no changes were made.`);
+      setGrantToSwitch(result.active && result.isCurrentAccount && values.role === "registrar"
+        ? { grantId: result.grantId, organizationId: result.organizationId, organizationName: result.organizationName }
+        : null);
+      form.reset({
+        ...inviteDefaults,
+        organizationId: values.organizationId,
+        siteId: requireSiteSelection && sites.length === 1 ? sites[0]?.id ?? "" : "",
+      });
       await refresh();
     } catch {
       setError("Unable to invite this staff member. Check the details and your permissions.");
@@ -127,7 +152,27 @@ function AdminConsolePage() {
     }
   }
 
+  async function switchToGrantedOrganization() {
+    if (!grantToSwitch) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/access/session", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grantId: grantToSwitch.grantId }),
+      });
+      if (!response.ok) throw new Error("Unable to switch to the newly granted Organization.");
+      window.location.assign(`/organizations/${grantToSwitch.organizationId}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to switch memberships.");
+      setBusy(false);
+    }
+  }
+
   const fieldClass = "mt-2 w-full rounded-lg border bg-background p-3";
+  const selectedOrganizationId = form.watch("organizationId");
 
   return (
     <WorkspaceShell
@@ -141,7 +186,11 @@ function AdminConsolePage() {
 
         <section className="mt-8 rounded-xl border bg-card p-5">
           <h2 className="text-lg font-semibold">Invite staff</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Create a person, access account, and grant in one step. This does not send email.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Create a person, access account, and explicit scoped Organization/Site grant. Creating an Organization does not grant access to it.</p>
+          {grantToSwitch && <button type="button" disabled={busy} onClick={() => void switchToGrantedOrganization()}
+            className="mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+            Switch to {grantToSwitch.organizationName} profile
+          </button>}
           <Form {...form}>
             <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={form.handleSubmit(submitInvite)}>
               <FormField control={form.control} name="email" render={({ field }) => (
@@ -182,20 +231,35 @@ function AdminConsolePage() {
                   <FormMessage />
                 </FormItem>
               )} />
+              <FormField control={form.control} name="organizationId" render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel className="text-sm font-semibold">Organization</FormLabel>
+                  <FormControl>
+                    <select className={fieldClass} {...field} onChange={event => {
+                      field.onChange(event);
+                      form.setValue("siteId", "");
+                    }}>
+                      <option value="">Select an authorized Organization</option>
+                      {organizations.map(organization => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <FormField control={form.control} name="siteId" render={({ field }) => (
                 <FormItem className="sm:col-span-2">
                   <FormLabel className="text-sm font-semibold">Site {requireSiteSelection?"(required for your membership)":"(optional)"}</FormLabel>
                   <FormControl>
                     <select className={fieldClass} {...field}>
                       <option value="">{requireSiteSelection?"Select a permitted school":"Organization-wide"}</option>
-                      {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
+                      {sites.filter(site => site.organizationId === selectedOrganizationId).map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
                     </select>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <div className="sm:col-span-2">
-                <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy||(requireSiteSelection&&!form.watch("siteId"))}>
+                <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy||!form.watch("organizationId")||(requireSiteSelection&&!form.watch("siteId"))}>
                   {busy ? "Inviting…" : "Invite staff member"}
                 </button>
               </div>

@@ -17,6 +17,7 @@ export async function handleAcademicInterventionEvent(
         guardianPersonIds: string[];
         studentName: string;
         assessmentTitle: string;
+        organizationId: string | null;
       }
     | undefined;
 
@@ -77,13 +78,14 @@ export async function handleAcademicInterventionEvent(
       guardianPersonIds: context.guardianPersonIds,
       studentName: context.studentName,
       assessmentTitle: context.assessmentTitle,
+      organizationId: context.organizationId,
     };
   });
 
   if (guardianEmailNotice && guardianEmailNotice.guardianPersonIds.length > 0) {
-    const { guardianPersonIds, studentName, assessmentTitle } =
+    const { guardianPersonIds, studentName, assessmentTitle, organizationId } =
       guardianEmailNotice;
-    const emails = await emailNotificationRecipients(guardianPersonIds);
+    const emails = await emailNotificationRecipients(guardianPersonIds, organizationId);
     const origin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
     const actionUrl = origin ? `${new URL(origin).origin}/guardian` : undefined;
     await Promise.all(
@@ -92,6 +94,7 @@ export async function handleAcademicInterventionEvent(
         if (!to) return;
         await sendNotificationEmail({
           to,
+          organizationId,
           subject: `${assessmentTitle} is missing`,
           text: `${studentName} has a missing assignment: ${assessmentTitle}. Sign in to CAN OS to review it and follow up.`,
           actionUrl,

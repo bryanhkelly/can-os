@@ -7,8 +7,9 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and,asc,eq,inArray } from "drizzle-orm";
+import { and,asc,desc,eq,inArray,isNull } from "drizzle-orm";
 import { z } from "zod";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { activateSchoolYear,createAcademicCalendar,createGradingPeriod,createScheduleTemplate,createSchoolYear,createTerm,setAcademicCalendarDay } from "./school-year-service";
 
 const uuid = z.string().uuid();
@@ -44,7 +45,8 @@ export const getSchoolYearStudio = createServerFn({method:"GET"}).handler(async 
     .from(terms).where(eq(terms.schoolYearId,y.id)).orderBy(asc(terms.startsOn)),
    db.select({id:academicCalendars.id,name:academicCalendars.name}).from(academicCalendars)
     .where(eq(academicCalendars.schoolYearId,y.id)),
-   db.select({id:scheduleTemplates.id,name:scheduleTemplates.name}).from(scheduleTemplates)
+   db.select({id:scheduleTemplates.id,name:scheduleTemplates.name,programId:scheduleTemplates.programId,
+    effectiveFrom:scheduleTemplates.effectiveFrom,effectiveThrough:scheduleTemplates.effectiveThrough}).from(scheduleTemplates)
     .where(eq(scheduleTemplates.schoolYearId,y.id)),
   ]);
   const dayRows=calendarRows.length?await db.select({
@@ -63,7 +65,10 @@ export const getSchoolYearStudio = createServerFn({method:"GET"}).handler(async 
   const periods = termRows.length ? await db.select({termId:gradingPeriods.termId,id:gradingPeriods.id,name:gradingPeriods.name})
     .from(gradingPeriods).where(inArray(gradingPeriods.termId,termRows.map(t=>t.id))) : [];
   return {...y,terms:termRows.map(t=>({...t,periods:periods.filter(p=>p.termId===t.id)})),
-   calendars:calendarRows.map(cal=>({...cal,days:dayRows.filter(d=>d.academicCalendarId===cal.id)})),schedules:scheduleRows.map(s=>({...s,periods:schedulePeriods.filter(p=>p.scheduleTemplateId===s.id)}))};
+   calendars:calendarRows.map(cal=>({...cal,days:dayRows.filter(d=>d.academicCalendarId===cal.id)})),
+   schedules:scheduleRows.map(s=>({...s,editable:y.status!=="active"||
+    s.effectiveFrom>dateKeyInTimezone(new Date().toISOString(),siteRows.find(site=>site.id===y.siteId)?.timezone??"UTC"),
+    periods:schedulePeriods.filter(p=>p.scheduleTemplateId===s.id)}))};
  }));
  const programRows = actor.scope.programIds?.length ? await db.select({id:programs.id,name:programs.name,siteId:programs.siteId,organizationId:programs.organizationId})
   .from(programs).where(inArray(programs.id,actor.scope.programIds)) : [];
@@ -125,6 +130,71 @@ export const addStudioSchedule = createServerFn({method:"POST"})
  .handler(async({data})=>({scheduleId:await createScheduleTemplate(await operator(),{...data,periods:[1,2,3,4,5].map(dayOfWeek=>({
   dayOfWeek,sequence:1,label:"Instruction",startsAtLocal:"08:30",endsAtLocal:"15:00",type:"instruction",
  }))})}));
+export const createStudioScheduleRevision=createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({scheduleTemplateId:uuid,name:z.string().trim().min(2).max(100),
+  effectiveFrom:day}).parse(v))
+ .handler(async({data})=>{
+  const actor=await operator();
+  return db.transaction(async tx=>{
+   const [record]=await tx.select({
+    id:scheduleTemplates.id,schoolYearId:scheduleTemplates.schoolYearId,
+    programId:scheduleTemplates.programId,siteId:scheduleTemplates.siteId,
+    effectiveFrom:scheduleTemplates.effectiveFrom,effectiveThrough:scheduleTemplates.effectiveThrough,
+    yearStatus:schoolYears.status,yearStartsOn:schoolYears.startsOn,yearEndsOn:schoolYears.endsOn,
+    organizationId:schoolYears.organizationId,timezone:sites.timezone,
+   }).from(scheduleTemplates).innerJoin(schoolYears,eq(schoolYears.id,scheduleTemplates.schoolYearId))
+    .innerJoin(sites,eq(sites.id,scheduleTemplates.siteId))
+    .where(eq(scheduleTemplates.id,data.scheduleTemplateId)).limit(1);
+   if(!record||!actor.scope.organizationIds?.includes(record.organizationId)||
+    (actor.scope.siteIds?.length&&!actor.scope.siteIds.includes(record.siteId))||
+    (record.programId&&!actor.scope.programIds?.includes(record.programId)))
+    throw new AuthorizationError("schedule revision");
+   if(data.effectiveFrom<=record.effectiveFrom||data.effectiveFrom>record.yearEndsOn)
+    throw new Error("Schedule revision must start after its source and within the SchoolYear");
+   if(record.yearStatus==="active"&&data.effectiveFrom<=dateKeyInTimezone(new Date().toISOString(),record.timezone))
+    throw new Error("An active SchoolYear schedule revision must take effect in the future");
+   await lockAttendanceConfigurationAtSite(tx,record.siteId);
+   const siblings=await tx.select({id:scheduleTemplates.id,effectiveFrom:scheduleTemplates.effectiveFrom})
+    .from(scheduleTemplates).where(and(eq(scheduleTemplates.schoolYearId,record.schoolYearId),
+     eq(scheduleTemplates.siteId,record.siteId),eq(scheduleTemplates.active,true),
+     record.programId?eq(scheduleTemplates.programId,record.programId):isNull(scheduleTemplates.programId)))
+    .orderBy(desc(scheduleTemplates.effectiveFrom));
+   if(siblings[0]?.id!==record.id||siblings[1]?.effectiveFrom===record.effectiveFrom||record.effectiveThrough)
+    throw new Error("Create a revision from the latest open-ended schedule version");
+   const priorPeriods=await tx.select({
+    dayOfWeek:scheduleTemplatePeriods.dayOfWeek,sequence:scheduleTemplatePeriods.sequence,
+    label:scheduleTemplatePeriods.label,startsAtLocal:scheduleTemplatePeriods.startsAtLocal,
+    endsAtLocal:scheduleTemplatePeriods.endsAtLocal,type:scheduleTemplatePeriods.type,
+   }).from(scheduleTemplatePeriods).where(eq(scheduleTemplatePeriods.scheduleTemplateId,record.id));
+   if(!priorPeriods.length)throw new Error("A schedule revision requires source periods");
+   const through=new Date(data.effectiveFrom+"T00:00:00.000Z");
+   through.setUTCDate(through.getUTCDate()-1);
+   const effectiveThrough=through.toISOString().slice(0,10);
+   await tx.update(scheduleTemplates).set({effectiveThrough,updatedAt:new Date()})
+    .where(eq(scheduleTemplates.id,record.id));
+   const [revision]=await tx.insert(scheduleTemplates).values({
+    schoolYearId:record.schoolYearId,programId:record.programId,siteId:record.siteId,
+    name:data.name,active:true,effectiveFrom:data.effectiveFrom,
+   }).returning({id:scheduleTemplates.id});
+   if(!revision)throw new Error("Failed to create schedule revision");
+   await tx.insert(scheduleTemplatePeriods).values(priorPeriods.map(period=>({
+    ...period,scheduleTemplateId:revision.id,
+   })));
+   const scope={organizationId:record.organizationId,siteId:record.siteId,programId:record.programId};
+   await writeAudit(tx,actor,{action:"schedule_template.revise",entityType:"schedule_template",
+    entityId:record.id,scope,before:{effectiveFrom:record.effectiveFrom,effectiveThrough:null},
+    after:{effectiveFrom:record.effectiveFrom,effectiveThrough,successorId:revision.id}});
+   await writeAudit(tx,actor,{action:"schedule_template.revise",entityType:"schedule_template",
+    entityId:revision.id,scope,after:{basedOnScheduleTemplateId:record.id,
+     effectiveFrom:data.effectiveFrom,effectiveThrough:null,periodCount:priorPeriods.length}});
+   await emitEvent(tx,{eventType:EventTypes.ScheduleTemplateChanged,
+    aggregateType:"schedule_template",aggregateId:revision.id,actorPersonId:actor.actorPersonId,
+    payload:{operation:"revise",previousScheduleTemplateId:record.id,schoolYearId:record.schoolYearId,
+     siteId:record.siteId,programId:record.programId,effectiveFrom:data.effectiveFrom,
+     periodCount:priorPeriods.length}});
+   return {scheduleId:revision.id};
+  });
+ });
 export const activateStudioYear = createServerFn({method:"POST"}).validator(id.parse)
  .handler(async({data})=>{await activateSchoolYear(await operator("academic_year.activate"),data.schoolYearId);return {ok:true}});
 
@@ -188,14 +258,24 @@ export const replaceStudioSchedulePeriods=createServerFn({method:"POST"})
    const [record]=await tx.select({
     id:scheduleTemplates.id,siteId:scheduleTemplates.siteId,
     programId:scheduleTemplates.programId,organizationId:schoolYears.organizationId,
+    yearStatus:schoolYears.status,effectiveFrom:scheduleTemplates.effectiveFrom,
+    timezone:sites.timezone,
    }).from(scheduleTemplates).innerJoin(schoolYears,
      eq(schoolYears.id,scheduleTemplates.schoolYearId))
+    .innerJoin(sites,eq(sites.id,scheduleTemplates.siteId))
     .where(eq(scheduleTemplates.id,data.scheduleTemplateId)).limit(1);
    if(!record||!actor.scope.organizationIds?.includes(record.organizationId)||
     (actor.scope.siteIds?.length&&!actor.scope.siteIds.includes(record.siteId))||
     (record.programId&&!actor.scope.programIds?.includes(record.programId)))
     throw new AuthorizationError("schedule edit");
+   if(record.yearStatus==="active"&&record.effectiveFrom<=dateKeyInTimezone(new Date().toISOString(),record.timezone))
+    throw new Error("An effective schedule is immutable; create a future schedule revision");
    await lockAttendanceConfigurationAtSite(tx,record.siteId);
+   const before=await tx.select({
+    dayOfWeek:scheduleTemplatePeriods.dayOfWeek,sequence:scheduleTemplatePeriods.sequence,
+    label:scheduleTemplatePeriods.label,startsAtLocal:scheduleTemplatePeriods.startsAtLocal,
+    endsAtLocal:scheduleTemplatePeriods.endsAtLocal,type:scheduleTemplatePeriods.type,
+   }).from(scheduleTemplatePeriods).where(eq(scheduleTemplatePeriods.scheduleTemplateId,record.id));
    await tx.delete(scheduleTemplatePeriods)
     .where(eq(scheduleTemplatePeriods.scheduleTemplateId,record.id));
    await tx.insert(scheduleTemplatePeriods).values(data.periods.map(p=>({
@@ -207,7 +287,7 @@ export const replaceStudioSchedulePeriods=createServerFn({method:"POST"})
    await writeAudit(tx,actor,{
     action:"schedule.periods.replace",entityType:"schedule_template",entityId:record.id,
     scope:{organizationId:record.organizationId,siteId:record.siteId,programId:record.programId},
-    after:{periods:data.periods}});
+    before:{periods:before},after:{periods:data.periods}});
    return {updated:true};
   });
  });

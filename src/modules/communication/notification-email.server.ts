@@ -7,11 +7,13 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants } from "@/db/schema";
+import { isDemoTenantOrganization } from "@/domain/local-demo-access";
 
 export type NotificationEmailMessage = {
   to: string;
   subject: string;
   text: string;
+  organizationId: string | null;
   actionUrl?: string;
 };
 
@@ -34,6 +36,10 @@ export async function sendNotificationEmail(
   message: NotificationEmailMessage,
   idempotencyKey?: string,
 ): Promise<boolean> {
+  if (!message.organizationId || isDemoTenantOrganization(message.organizationId)) {
+    console.info("[notification-email] Delivery suppressed for the synthetic tenant");
+    return false;
+  }
   const apiKey = process.env.RESEND_API_KEY;
   const from =
     process.env.CAN_NOTIFICATIONS_FROM_EMAIL ??
@@ -86,8 +92,10 @@ export async function sendNotificationEmail(
  */
 export async function emailNotificationRecipients(
   personIds: string[],
+  organizationId: string | null,
 ): Promise<Map<string, string>> {
   const recipients = new Map<string, string>();
+  if (!organizationId || isDemoTenantOrganization(organizationId)) return recipients;
   const uniqueIds = [...new Set(personIds)];
   if (uniqueIds.length === 0) return recipients;
 

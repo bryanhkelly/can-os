@@ -1,12 +1,16 @@
 import { db } from "@/db/client";
-import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants } from "@/db/schema";
+import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,people } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader } from "@/domain/access-tokens";
-import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
-import { listDemoFacilitatorGrants } from "./demo-facilitator.server";
+import {
+ isDemoAccountEmail,isDemoSchoolGrant,isLocalDemoAccessEnabled,isPublicDemoAccessEnabled,
+ LOCAL_DEMO_ACCESS_CODE,LOCAL_DEMO_ADMIN,
+} from "@/domain/local-demo-access";
 import { writeAudit } from "@/platform/mutation";
 import { and,eq,gt,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
+import { readSessionGrants } from "./session-grants.server";
+import { AuthorizationError } from "@/domain/command-context";
 
 const CHALLENGE_LIFETIME_MS=10*60*1000;
 const REQUEST_COOLDOWN_MS=60*1000;
@@ -25,6 +29,7 @@ function publicOrigin():string {
 /** Deliberately never provisions arbitrary accounts from an unverified email. */
 export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSender=sendAccessLinkViaResend):Promise<typeof genericResult> {
  const email=normalizeAccessEmail(rawEmail);
+ if(isDemoAccountEmail(email))return genericResult;
  const [account]=await db.select({id:accessAccounts.id}).from(accessAccounts)
   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false))).limit(1);
  if(!account || email.endsWith(".invalid"))return genericResult;
@@ -70,9 +75,11 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   if(!claimed)throw new Error("Invalid or expired access link");
   // A redeemed challenge is single-use even under simultaneous POSTs: the UPDATE
   // above atomically requires consumedAt IS NULL and returns at most one row.
-  const [account]=await tx.select({id:accessAccounts.id}).from(accessAccounts)
+  const [account]=await tx.select({
+   id:accessAccounts.id,email:accessAccounts.emailNormalized,
+  }).from(accessAccounts)
    .where(and(eq(accessAccounts.id,claimed.accountId),eq(accessAccounts.disabled,false))).limit(1);
-  if(!account)throw new Error("Account unavailable");
+  if(!account||isDemoAccountEmail(account.email))throw new Error("Account unavailable");
   const grants=await tx.select({id:accountPersonGrants.id,role:accountPersonGrants.role}).from(accountPersonGrants)
    .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)));
   const activeGrant=grants.find(g=>Object.hasOwn(roleCapabilities,g.role));
@@ -91,16 +98,18 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
  });
 }
 /** Local/test-only sign-in for the seeded synthetic demo accounts. */
-export async function redeemLocalDemoAccess(
+export async function redeemDemoAccess(
  rawEmail:string,
  code:string,
 ):Promise<{setCookie:string;accountId:string;role:string}> {
- if(!isLocalDemoAccessEnabled(process.env) || code!==LOCAL_DEMO_ACCESS_CODE) {
-  throw new Error("Invalid local demo credentials");
+ const localAccess=isLocalDemoAccessEnabled(process.env);
+ const publicAccess=isPublicDemoAccessEnabled(process.env);
+ if((!localAccess&&!publicAccess) || code!==LOCAL_DEMO_ACCESS_CODE) {
+  throw new Error("Invalid demo credentials");
  }
  const email=normalizeAccessEmail(rawEmail);
- if(!LOCAL_DEMO_ACCOUNTS.some(account=>account.email===email)) {
-  throw new Error("Invalid local demo credentials");
+ if(!isDemoAccountEmail(email)) {
+  throw new Error("Invalid demo credentials");
  }
  const now=new Date();
  return db.transaction(async tx=>{
@@ -108,18 +117,17 @@ export async function redeemLocalDemoAccess(
    .from(accessAccounts)
    .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false)))
    .limit(1);
-  if(!account)throw new Error("Invalid local demo credentials");
+  if(!account)throw new Error("Invalid demo credentials");
   const grants=await tx.select({
    id:accountPersonGrants.id,
    personId:accountPersonGrants.personId,
    role:accountPersonGrants.role,
-   isSynthetic:accountPersonGrants.isSynthetic,
-  }).from(accountPersonGrants)
-   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)));
-  const grant=account.id===LOCAL_DEMO_ADMIN.accountId
-   ?(await listDemoFacilitatorGrants(tx)).find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
-   :grants.find(candidate=>candidate.isSynthetic&&Object.hasOwn(roleCapabilities,candidate.role));
-  if(!grant)throw new Error("Invalid local demo credentials");
+   organizationId:accountPersonGrants.organizationId,
+   siteId:accountPersonGrants.siteId,
+  }).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId))
+   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),eq(people.active,true)));
+  const grant=grants.find(candidate=>isDemoSchoolGrant(candidate)&&Object.hasOwn(roleCapabilities,candidate.role));
+  if(!grant)throw new Error("Invalid demo credentials");
   const secret=issueOpaqueSecret();
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,
@@ -133,9 +141,7 @@ export async function redeemLocalDemoAccess(
    action:"identity.session.started",
    resourceType:"account",
    resourceId:account.id,
-   context:{method:"local_demo_code",sessionId:session.id,grantId:grant.id,
-    ...(account.id===LOCAL_DEMO_ADMIN.accountId?{demoFacilitator:LOCAL_DEMO_ADMIN.personId}:{}),
-   },
+   context:{method:"demo_access_code",sessionId:session.id,grantId:grant.id},
   });
   return {
    accountId:account.id,
@@ -155,23 +161,25 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
  });
  return clearSessionCookieHeader();
 }
-/** Selection is restricted to a grant assigned to the authenticated account. */
+/** Demo admin sessions may select eligible demo memberships, never arbitrary accounts. */
 export async function selectAccessGrant(sessionId:string,accountId:string,grantId:string):Promise<void> {
  await db.transaction(async tx=>{
-  const delegated=accountId===LOCAL_DEMO_ADMIN.accountId?(await listDemoFacilitatorGrants(tx)).find(grant=>grant.id===grantId):undefined;
-  if(accountId===LOCAL_DEMO_ADMIN.accountId&&!delegated)throw new Error("Demo user unavailable");
-  const [grant]=delegated?[delegated]:await tx.select({id:accountPersonGrants.id,personId:accountPersonGrants.personId,role:accountPersonGrants.role})
-   .from(accountPersonGrants)
-   .where(and(eq(accountPersonGrants.id,grantId),eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true))).limit(1);
-  if(!grant || !Object.hasOwn(roleCapabilities,grant.role))throw new Error("Membership unavailable");
+  const [account]=await tx.select({email:accessAccounts.emailNormalized}).from(accessAccounts)
+   .where(and(eq(accessAccounts.id,accountId),eq(accessAccounts.disabled,false))).limit(1);
+  if(!account)throw new AuthorizationError("authenticated account");
+  if(isDemoAccountEmail(account.email)&&!isLocalDemoAccessEnabled(process.env)&&!isPublicDemoAccessEnabled(process.env))
+   throw new AuthorizationError("enabled demo-school access");
+  const {grants,demoAccountSwitching}=await readSessionGrants(accountId,account.email,tx);
+  const grant=grants.find(candidate=>candidate.id===grantId);
+  if(!grant)throw new AuthorizationError("active membership");
   const [changed]=await tx.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
     isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date())))
    .returning({id:accessSessions.id});
   if(!changed)throw new Error("Session expired");
-  await writeAudit(tx, {actorPersonId:grant.personId,action:"identity.membership.selected",
+  await writeAudit(tx, {actorPersonId:demoAccountSwitching?LOCAL_DEMO_ADMIN.personId:grant.personId,action:"identity.membership.selected",
    resourceType:"account",resourceId:accountId,context:{sessionId,grantId,
-    ...(accountId===LOCAL_DEMO_ADMIN.accountId?{demoFacilitator:LOCAL_DEMO_ADMIN.personId}:{}),
+    ...(demoAccountSwitching?{method:"demo_admin_switch",sessionAccountId:accountId,effectiveAccountId:grant.accountId,effectivePersonId:grant.personId}:{}),
    }});
  });
 }

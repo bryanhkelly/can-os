@@ -10,7 +10,8 @@ import { credentialStatusFromDecision } from "@/domain/credential-workflow";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import { emitEvent, notify, writeAudit } from "@/platform/mutation";
-import { evaluateQualificationCoverage, instructionalWindow, type CoveragePolicy } from "./qualification-coverage";
+import { dateTimeInputInTimezone } from "@/modules/calendar/timezone";
+import { coverageGaps, evaluateQualificationCoverage, instructionalWindow, type CoveragePolicy, type CoverageWindow } from "./qualification-coverage";
 
 type Reader = Pick<Database, "select" | "selectDistinctOn">;
 
@@ -37,8 +38,18 @@ export async function launchStaffingContext(sectionId: string, executor: Reader 
   return { ...section, siteId: section.siteId, window: instructionalWindow(section) };
 }
 
-export async function evaluateLaunchTeacher(sectionId: string, personId: string, executor: Reader = db) {
+export async function evaluateLaunchTeacher(
+  sectionId: string,
+  personId: string,
+  executor: Reader = db,
+  requestedWindow?: CoverageWindow,
+) {
   const section = await launchStaffingContext(sectionId, executor);
+  const window = requestedWindow ?? section.window;
+  if (!Number.isFinite(window.from.getTime()) || !Number.isFinite(window.through.getTime()) ||
+    window.from >= window.through || window.from < section.window.from || window.through > section.window.through) {
+    throw new Error("Teacher qualification window must fit within the section instructional window");
+  }
   const [role] = await executor.select({ id: roleAssignments.id }).from(roleAssignments)
     .innerJoin(people,eq(people.id,roleAssignments.personId)).where(and(
     eq(roleAssignments.personId, personId), eq(roleAssignments.roleKey, "teacher"),
@@ -48,7 +59,7 @@ export async function evaluateLaunchTeacher(sectionId: string, personId: string,
     or(isNull(roleAssignments.programId), eq(roleAssignments.programId, section.programId)),
   )).orderBy(roleAssignments.id).limit(1);
   if (!role) return { eligible: false, reasons: ["Teacher role is not granted for this program and site."],
-    policyRuleIds: [], claimIds: [], verificationEventIds: [], roleAssignmentId: null, window: section.window };
+    policyRuleIds: [], claimIds: [], verificationEventIds: [], roleAssignmentId: null, window };
 
   const policies = await executor.select({
     id: compliancePolicyRules.id, code: compliancePolicyRules.code,
@@ -75,8 +86,8 @@ export async function evaluateLaunchTeacher(sectionId: string, personId: string,
     ...policy,
     id: policy.id ?? "missing-rule", code: policy.code ?? "empty-framework",
     expression: policy.expression ?? {}, evidencePolicy: policy.evidencePolicy ?? {},
-    from: new Date(Math.max(section.window.from.getTime(), policy.versionFrom?.getTime() ?? -Infinity, policy.appliesFrom?.getTime() ?? -Infinity)),
-    through: new Date(Math.min(section.window.through.getTime(), policy.versionThrough?.getTime() ?? Infinity, policy.appliesThrough?.getTime() ?? Infinity)),
+    from: new Date(Math.max(window.from.getTime(), policy.versionFrom?.getTime() ?? -Infinity, policy.appliesFrom?.getTime() ?? -Infinity)),
+    through: new Date(Math.min(window.through.getTime(), policy.versionThrough?.getTime() ?? Infinity, policy.appliesThrough?.getTime() ?? Infinity)),
   })).filter(policy => policy.from < policy.through);
   const claims = await executor.selectDistinctOn([qualificationClaims.id], {
     id: qualificationClaims.id, type: qualificationDefinitions.key, issuer: qualificationClaims.issuerName,
@@ -94,10 +105,10 @@ export async function evaluateLaunchTeacher(sectionId: string, personId: string,
     verified: credentialStatusFromDecision(claim.decision) === "verified",
     validFrom: claim.issuedAt, expiresAt: claim.expiresAt,
   }));
-  return { ...evaluateQualificationCoverage(section.window, bounded, evidence),
+  return { ...evaluateQualificationCoverage(window, bounded, evidence),
     claimIds: claims.map(claim => claim.id),
     verificationEventIds: claims.map(claim => claim.verificationEventId).filter((id): id is string => id !== null),
-    roleAssignmentId: role.id, window: section.window };
+    roleAssignmentId: role.id, window };
 }
 
 export async function evaluateLaunchStaffing(sectionId: string, executor: Reader = db) {
@@ -110,19 +121,65 @@ export async function evaluateLaunchStaffing(sectionId: string, executor: Reader
     .where(eq(sectionTeachers.sectionId, sectionId));
   const reasons: string[] = [];
   const instructors: {personId: string; policyRuleIds: string[]; verificationEventIds: string[]}[] = [];
-  if (!arrangements.some(arrangement => arrangement.instructorId &&
-    teachers.some(teacher => teacher.personId === arrangement.instructorId) &&
-    (!arrangement.from || arrangement.from <= section.window.from) &&
-    (!arrangement.through || arrangement.through >= section.window.through))) {
+  const assignedPeople = new Set(teachers.map(teacher => teacher.personId));
+  const windowsByInstructor = new Map<string, CoverageWindow[]>();
+  for (const arrangement of arrangements) {
+    if (!arrangement.instructorId || !assignedPeople.has(arrangement.instructorId)) continue;
+    const from = arrangement.from ?? section.window.from;
+    const through = arrangement.through ?? section.window.through;
+    if (from >= through) {
+      reasons.push("An instructor delivery arrangement has an invalid effective window.");
+      continue;
+    }
+    const bounded = {
+      from: new Date(Math.max(from.getTime(), section.window.from.getTime())),
+      through: new Date(Math.min(through.getTime(), section.window.through.getTime())),
+    };
+    if (bounded.from >= bounded.through) continue;
+    windowsByInstructor.set(arrangement.instructorId, [
+      ...(windowsByInstructor.get(arrangement.instructorId) ?? []), bounded,
+    ]);
+  }
+  const coverageWindows = [...windowsByInstructor.values()].flat();
+  if (!coverageWindows.length) {
     reasons.push("No assigned instructor delivery arrangement covers the full instructional window.");
+  } else if (coverageGaps(section.window, coverageWindows).length) {
+    reasons.push("Active instructor delivery arrangements do not cover the full instructional window without gaps.");
   }
   for (const personId of new Set(teachers.map(teacher => teacher.personId))) {
-    const result = await evaluateLaunchTeacher(sectionId, personId, executor);
-    if (!result.eligible) reasons.push(...result.reasons);
-    instructors.push({personId,policyRuleIds:result.policyRuleIds,verificationEventIds:result.verificationEventIds});
+    const teacherWindows = windowsByInstructor.get(personId) ?? [];
+    if (!teacherWindows.length) {
+      reasons.push("An assigned teacher has no active delivery arrangement.");
+      continue;
+    }
+    const policyRuleIds = new Set<string>();
+    const verificationEventIds = new Set<string>();
+    for (const window of teacherWindows) {
+      const result = await evaluateLaunchTeacher(sectionId, personId, executor, window);
+      if (!result.eligible) reasons.push(...result.reasons);
+      result.policyRuleIds.forEach(id => policyRuleIds.add(id));
+      result.verificationEventIds.forEach(id => verificationEventIds.add(id));
+    }
+    instructors.push({personId,policyRuleIds:[...policyRuleIds],verificationEventIds:[...verificationEventIds]});
   }
   return { ready: reasons.length === 0, reasons: [...new Set(reasons)],
     from: section.window.from.toISOString(), through: section.window.through.toISOString(), instructors };
+}
+
+function inclusiveDateWindow(fromDate: string, throughDate: string, section: Awaited<ReturnType<typeof launchStaffingContext>>) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(throughDate) || fromDate > throughDate) {
+    throw new Error("Choose a valid instructor assignment date range");
+  }
+  const nextDate = new Date(`${throughDate}T00:00:00Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  const start = new Date(dateTimeInputInTimezone(`${fromDate}T00:00`, section.timezone));
+  const end = new Date(dateTimeInputInTimezone(`${nextDate.toISOString().slice(0, 10)}T00:00`, section.timezone));
+  const window = {
+    from: new Date(Math.max(start.getTime(), section.window.from.getTime())),
+    through: new Date(Math.min(end.getTime(), section.window.through.getTime())),
+  };
+  if (window.from >= window.through) throw new Error("Instructor assignment dates do not overlap the section instructional window");
+  return window;
 }
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -136,7 +193,7 @@ export async function lockLaunchTeacherClaims(tx: Transaction, personIds: string
 
 export async function assignLaunchInstructor(
   tx: Transaction, context: CommandContext,
-  input: { programId: string; sectionId: string; teacherPersonId: string },
+  input: { programId: string; sectionId: string; teacherPersonId: string; effectiveFromDate?: string; effectiveThroughDate?: string },
 ) {
   assertCapability(context, "program.launch.start");
   const initial = await launchStaffingContext(input.sectionId, tx);
@@ -150,15 +207,21 @@ export async function assignLaunchInstructor(
   }
   if (section.siteId !== initial.siteId) throw new Error("Section site changed; reload launch setup before assigning");
   if (!section.active) throw new Error("Cannot assign an instructor to an inactive section");
+  if (Boolean(input.effectiveFromDate) !== Boolean(input.effectiveThroughDate)) {
+    throw new Error("Both instructor assignment dates are required");
+  }
+  const assignmentWindow = input.effectiveFromDate && input.effectiveThroughDate
+    ? inclusiveDateWindow(input.effectiveFromDate, input.effectiveThroughDate, section)
+    : section.window;
   await lockLaunchTeacherClaims(tx, [input.teacherPersonId]);
-  const eligibility = await evaluateLaunchTeacher(input.sectionId, input.teacherPersonId, tx);
+  const eligibility = await evaluateLaunchTeacher(input.sectionId, input.teacherPersonId, tx, assignmentWindow);
   if (!eligibility.eligible) throw new Error("Instructor is not eligible: " + eligibility.reasons.join(" "));
   const [existing] = await tx.select({ id: deliveryArrangements.id }).from(deliveryArrangements).where(and(
     eq(deliveryArrangements.sectionId, section.id),
     eq(deliveryArrangements.instructorPersonId, input.teacherPersonId),
     eq(deliveryArrangements.status, "active"),
-    or(isNull(deliveryArrangements.effectiveFrom), lte(deliveryArrangements.effectiveFrom, section.window.from)),
-    or(isNull(deliveryArrangements.effectiveThrough), gte(deliveryArrangements.effectiveThrough, section.window.through)),
+    or(isNull(deliveryArrangements.effectiveFrom), lte(deliveryArrangements.effectiveFrom, assignmentWindow.from)),
+    or(isNull(deliveryArrangements.effectiveThrough), gte(deliveryArrangements.effectiveThrough, assignmentWindow.through)),
   )).limit(1);
   const [assignment] = await tx.insert(sectionTeachers).values({
     sectionId: section.id, personId: input.teacherPersonId, role: "teacher", assignmentSource: "launch",
@@ -170,15 +233,15 @@ export async function assignLaunchInstructor(
   const [arrangement] = existing ? [existing] : await tx.insert(deliveryArrangements).values({
     sectionId: section.id, academicProviderOrganizationId: section.providerId,
     instructorPersonId: input.teacherPersonId, modality, status: "active",
-    effectiveFrom: section.window.from, effectiveThrough: section.window.through,
+    effectiveFrom: assignmentWindow.from, effectiveThrough: assignmentWindow.through,
   }).returning({ id: deliveryArrangements.id });
   if (!arrangement) throw new Error("Failed to create launch delivery arrangement");
   const roleAssignmentId=eligibility.roleAssignmentId;
   if (!roleAssignmentId) throw new Error("Eligible launch teacher must have a scoped role assignment");
   const evaluations = await tx.insert(staffingEligibilityEvaluations).values(eligibility.policyRuleIds.map(policyRuleId => ({
     roleAssignmentId, policyRuleId, result: "eligible",
-    explanation: { sectionId: section.id, from: section.window.from.toISOString(),
-      through: section.window.through.toISOString(), claimIds: eligibility.claimIds, evaluator: "launch-v1" },
+    explanation: { sectionId: section.id, from: assignmentWindow.from.toISOString(),
+      through: assignmentWindow.through.toISOString(), claimIds: eligibility.claimIds, evaluator: "launch-v1" },
     evidenceIds: eligibility.verificationEventIds,
   }))).returning({id:staffingEligibilityEvaluations.id});
   if (assignment) await notify(tx, {
@@ -190,13 +253,15 @@ export async function assignLaunchInstructor(
     eventType: "DeliveryArrangementActivated", aggregateType: "delivery_arrangement",
     aggregateId: arrangement.id, actorPersonId: context.actorPersonId,
     organizationId: section.organizationId, siteId: section.siteId, programId: section.programId,
-    sectionId: section.id, payload: { instructorPersonId: input.teacherPersonId, eligibilityEvaluationIds:evaluations.map(row=>row.id) },
+    sectionId: section.id, payload: { instructorPersonId: input.teacherPersonId,
+      effectiveFrom: assignmentWindow.from.toISOString(), effectiveThrough: assignmentWindow.through.toISOString(),
+      eligibilityEvaluationIds:evaluations.map(row=>row.id) },
   });
   await writeAudit(tx, context, {
     action: "launch.teacher.assign", entityType: "delivery_arrangement", entityId: arrangement.id,
     scope: { organizationId: section.organizationId, siteId: section.siteId, programId: section.programId, sectionId: section.id },
     after: { personId: input.teacherPersonId, modality,
-      from: section.window.from.toISOString(), through: section.window.through.toISOString(),
+      from: assignmentWindow.from.toISOString(), through: assignmentWindow.through.toISOString(),
       policyRuleIds: eligibility.policyRuleIds, claimIds: eligibility.claimIds,
       verificationEventIds:eligibility.verificationEventIds,eligibilityEvaluationIds:evaluations.map(row=>row.id) },
   });

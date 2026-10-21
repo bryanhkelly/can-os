@@ -209,33 +209,31 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
       ],
     );
 
-    // People. The student (and peers) must carry metadata.synthetic=true: the
-    // teacher missing-work queue and the synthetic assignment mutations only
-    // touch explicitly synthetic records.
-    const synthetic = JSON.stringify({ synthetic: true, fixture: "gf1-e2e" });
+    // Fixture provenance is useful during test cleanup; domain behavior uses ordinary records.
+    const fixtureMetadata = JSON.stringify({ fixture: "gf1-e2e" });
     fixture.teacherPersonId = await insertId(
       sql,
       `insert into people (legal_first_name, legal_last_name, email, metadata)
        values ('E2E Riley', $1, $2, $3::jsonb) returning id`,
-      [`Teacher-${suffix}`, `e2e-teacher-${suffix}@can-os.invalid`, synthetic],
+      [`Teacher-${suffix}`, `e2e-teacher-${suffix}@can-os.invalid`, fixtureMetadata],
     );
     fixture.studentPersonId = await insertId(
       sql,
       `insert into people (legal_first_name, legal_last_name, preferred_name, email, metadata)
        values ('E2E Jordan', $1, 'Jordan', $2, $3::jsonb) returning id`,
-      [`Student-${suffix}`, `e2e-student-${suffix}@can-os.invalid`, synthetic],
+      [`Student-${suffix}`, `e2e-student-${suffix}@can-os.invalid`, fixtureMetadata],
     );
     fixture.guardianPersonId = await insertId(
       sql,
       `insert into people (legal_first_name, legal_last_name, email, metadata)
        values ('E2E Morgan', $1, $2, $3::jsonb) returning id`,
-      [`Guardian-${suffix}`, `e2e-guardian-${suffix}@can-os.invalid`, synthetic],
+      [`Guardian-${suffix}`, `e2e-guardian-${suffix}@can-os.invalid`, fixtureMetadata],
     );
     fixture.specialistPersonId = await insertId(
       sql,
       `insert into people (legal_first_name, legal_last_name, email, metadata)
        values ('E2E Casey', $1, $2, $3::jsonb) returning id`,
-      [`Specialist-${suffix}`, `e2e-specialist-${suffix}@can-os.invalid`, synthetic],
+      [`Specialist-${suffix}`, `e2e-specialist-${suffix}@can-os.invalid`, fixtureMetadata],
     );
 
     fixture.studentProfileId = await insertId(
@@ -285,7 +283,7 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
         fixture.assessmentTitle,
         availableAt.toISOString(),
         dueAt.toISOString(),
-        JSON.stringify({ synthetic: true, fixture: "gf1-e2e" }),
+        fixtureMetadata,
         fixture.teacherPersonId,
       ],
     );
@@ -315,8 +313,8 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
       insertId(
         sql,
         `insert into account_person_grants (
-           account_id, person_id, role, organization_id, site_id, active, is_synthetic
-         ) values ($1, $2, $3, $4, $5, true, true) returning id`,
+           account_id, person_id, role, organization_id, site_id, active
+         ) values ($1, $2, $3, $4, $5, true) returning id`,
         [accountId, personId, role, fixture.hostOrgId, fixture.siteId],
       );
     fixture.studentGrantId = await grantFor(fixture.studentAccountId, fixture.studentPersonId, "student");
@@ -367,13 +365,7 @@ export async function destroyGf1Fixture(
     ...[fixture.studentPersonId, fixture.guardianPersonId, fixture.teacherPersonId, fixture.specialistPersonId].map(
       (id) => one(`delete from notifications where recipient_person_id = $1`, id),
     ),
-    ...[fixture.submissionId, fixture.assessmentId].map((id) =>
-      one(`delete from audit_events where resource_id = $1`, id),
-    ),
     one(`delete from insights where section_id = $1`, fixture.sectionId),
-    ...[fixture.submissionId, fixture.assessmentId].map((id) =>
-      one(`delete from domain_events where aggregate_id = $1`, id),
-    ),
     // Auth graph.
     ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId, fixture.specialistAccountId].map(
       (id) => one(`delete from access_sessions where account_id = $1`, id),
@@ -402,8 +394,11 @@ export async function destroyGf1Fixture(
         : undefined,
     ],
     one(`delete from student_profiles where id = $1`, fixture.studentProfileId),
+    // Keep actors referenced by append-only history; deleting them would mutate its actor reference.
     ...[fixture.teacherPersonId, fixture.studentPersonId, fixture.guardianPersonId, fixture.specialistPersonId].map(
-      (id) => one(`delete from people where id = $1`, id),
+      (id) => one(`delete from people where id = $1
+        and not exists (select 1 from audit_events where actor_person_id = $1)
+        and not exists (select 1 from domain_events where actor_person_id = $1)`, id),
     ),
     // Delivery hierarchy, children before parents.
     one(`delete from programs where id = $1`, fixture.programId),

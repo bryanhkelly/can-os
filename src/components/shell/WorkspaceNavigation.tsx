@@ -8,8 +8,9 @@ import {useWorkspaceSession} from "./WorkspaceSession";
 const NotificationTray=lazy(()=>import("./NotificationTray").then(module=>({default:module.NotificationTray})));
 const AskCanConversation=lazy(()=>import("@/components/conversation/AskCanConversation").then(module=>({default:module.AskCanConversation})));
 
-export const workspaceHome:Record<string,string>={student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor"};
+export const workspaceHome:Record<string,string>={applicant:"/apply",student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor"};
 export const workspaceLinks:Record<string,{title:string;path:string}[]>={
+ applicant:[{title:"My applications",path:"/apply"}],
  student:[{title:"Today",path:"/student"},{title:"Assignments",path:"/student/assignments"},{title:"My classes",path:"/student/courses"},{title:"Study groups",path:"/student/study-groups"},{title:"Support",path:"/student/support"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
  guardian:[{title:"Family",path:"/guardian"},{title:"Classes",path:"/classes"},{title:"Academics",path:"/guardian/academics"},{title:"Attendance",path:"/guardian/attendance"},{title:"Offers",path:"/guardian/admission-offers"},{title:"Messages",path:"/messages"}],
  teacher:[{title:"Today",path:"/teacher"},{title:"Classes",path:"/classes"},{title:"Gradebook",path:"/teacher/gradebook"},{title:"Students",path:"/staff/students"},{title:"Teachers",path:"/staff/teachers"},{title:"Study groups",path:"/teacher/study-groups"},{title:"Referrals",path:"/student/support"},{title:"Missing work",path:"/teacher/missing-work"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
@@ -36,8 +37,10 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const {session,error:sessionError}=useWorkspaceSession();
  const [error,setError]=useState("");
  const [changing,setChanging]=useState(false);
+ const [interactive,setInteractive]=useState(false);
  const [tray,setTray]=useState<"notifications"|"ask"|null>(null);
  const [menuOpen,setMenuOpen]=useState(false);
+ useEffect(()=>setInteractive(true),[]);
  useEffect(()=>{setTray(null);setMenuOpen(false)},[location.pathname]);
  const authenticated=session?.authenticated?session:null;
  const grants=authenticated?.grants??[];
@@ -91,14 +94,13 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
    </label>}
    {current&&<><button type="button" onClick={()=>setTray("notifications")} aria-haspopup="dialog" className="rounded-lg border px-3 py-2 text-xs font-semibold"><Bell className="mr-1 inline size-3" aria-hidden="true"/>Notifications</button>
     <button type="button" onClick={()=>setTray("ask")} aria-haspopup="dialog" className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background"><MessageCircle className="mr-1 inline size-3" aria-hidden="true"/>Ask CAN</button></>}
-   {authenticated&&<label className="text-xs text-muted-foreground">{authenticated.demoFacilitator?"Demo user":"Workspace"}
-    <select aria-label={authenticated.demoFacilitator?"Demo user":"Active membership"} disabled={changing} value={authenticated.activeGrantId} onChange={event=>{void changeSession(()=>switchGrant(event.target.value));}} className="ml-2 max-w-64 rounded-lg border bg-background p-2">
-     {grants.map(g=><option key={g.id} value={g.id}>{g.firstName} {g.lastName} · {g.role}</option>)}
+   {authenticated&&<label className="text-xs text-muted-foreground">{authenticated.demoAccountSwitching?"Demo account":"Workspace"}
+    <select aria-label={authenticated.demoAccountSwitching?"Demo account":"Active membership"} disabled={changing||!interactive} value={authenticated.activeGrantId} onChange={event=>{void changeSession(()=>switchGrant(event.target.value));}} className="ml-2 max-w-64 rounded-lg border bg-background p-2">
+     {grants.map(g=><option key={g.id} value={g.id}>{g.firstName} {g.lastName} · {g.role}{g.email?` · ${g.email}`:""}</option>)}
     </select>
    </label>}
-   {authenticated?<button type="button" disabled={changing} onClick={()=>void changeSession(signOut)} className="text-xs font-semibold">Sign out</button>:session&&<Link to="/access" className="text-xs font-semibold">Sign in</Link>}
+   {authenticated?<button type="button" disabled={changing||!interactive} onClick={()=>void changeSession(signOut)} className="text-xs font-semibold">Sign out</button>:session&&<Link to="/access" className="text-xs font-semibold">Sign in</Link>}
    {(error||sessionError)&&<p role="alert" className="w-full rounded-lg border border-amber-500 p-3 text-sm">{error||sessionError}</p>}
-   {authenticated?.demoFacilitator&&<p role="status" className="w-full rounded-lg border border-amber-500 p-2 text-xs">Demo admin session: acting as {current?.firstName} {current?.lastName} ({current?.role}). Changes affect shared synthetic data. User switches are audited.</p>}
   </div>
  </header>{children}</div></div>
  {current&&<><ContextTray title="Workspace navigation" open={menuOpen} onClose={()=>setMenuOpen(false)}>

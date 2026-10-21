@@ -72,7 +72,7 @@ export function GuardianEnrollmentChecklist({ applicationId }: { applicationId: 
     {notice && <p role="status">{notice}</p>}
     {!data && !error && <p role="status">Loading enrollment checklist...</p>}
     {data && <EnrollmentChecklistItems checklist={data.checklist}
-      uploadsEnabled={data.checklist.synthetic ? data.availability.demo : data.availability.live}
+      uploadsEnabled={data.checklist.demoTenant ? data.availability.demo : data.availability.live}
       busy={busy} files={files} onFile={(id, file) => setFiles(current => ({ ...current, [id]: file }))}
       onUpload={upload} onOpen={openDocument} onChanged={async () => {
         setAttempt(value => value + 1); await router.invalidate();

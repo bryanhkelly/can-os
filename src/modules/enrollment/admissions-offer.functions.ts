@@ -1,4 +1,3 @@
-import {assertRecordWriteAllowed} from "@/modules/_demo/record-write-gate";
 import {createServerFn} from "@tanstack/react-start";
 import {and,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
@@ -50,12 +49,11 @@ export const issueAdmissionOffer=createServerFn({method:"POST"})
 .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),schoolYearId:z.string().uuid()}).strict().parse(data)).handler(async({data})=>{
  const app=await loadApplication(data.applicationId);
  const actor=await authorizedActor("registrar","enrollment.decide",app.programId);
- assertRecordWriteAllowed(app.metadata,"registrar");
  // A stable key makes concurrent retries safe; the domain service rejects a second active offer.
  // Explicit reissuance after expiration/decline requires a distinct attempt identifier.
  const previous=await db.select({id:admissionOffers.id,status:admissionOffers.status,idempotencyKey:admissionOffers.idempotencyKey,expiresAt:admissionOffers.expiresAt}).from(admissionOffers).where(and(eq(admissionOffers.applicationId,app.id),eq(admissionOffers.schoolYearId,data.schoolYearId)));
  const active=previous.find(o=>o.status==="accepted"||(o.status==="issued"&&(!o.expiresAt||o.expiresAt.getTime()>Date.now())));
- const key=active?.idempotencyKey??"synthetic-offer:"+app.id+":"+data.schoolYearId+":attempt-"+(previous.length+1);
+ const key=active?.idempotencyKey??"admission-offer:"+app.id+":"+data.schoolYearId+":attempt-"+(previous.length+1);
  const expiresAt=new Date(Date.now()+14*24*60*60*1000);
  return {offerId:await issueSyntheticAdmissionOffer(actor,{applicationId:app.id,schoolYearId:data.schoolYearId,idempotencyKey:key,expiresAt})};
 });
@@ -64,7 +62,6 @@ export const respondToAdmissionOffer=createServerFn({method:"POST"})
  if(!["accept","decline"].includes(data.decision))throw new Error("Invalid decision");
  const {offer,app}=await loadOffer(data.offerId);
  const actor=await authorizedActor("guardian","enrollment.apply",app.programId);
- assertRecordWriteAllowed(app.metadata,"guardian");
  const [profile]=await db.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
  if(!profile)throw new Error("Student profile missing");
  const [guardian]=await db.select({id:guardianRelationships.guardianPersonId}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.canManageEnrollment,true),eq(guardianRelationships.guardianPersonId,actor.actorPersonId!))).limit(1);
@@ -75,7 +72,6 @@ export const activateOfferedEnrollment=createServerFn({method:"POST"})
 .validator((data:unknown)=>z.object({offerId:z.string().uuid()}).strict().parse(data)).handler(async({data})=>{
  const {offer,app}=await loadOffer(data.offerId);
  const actor=await authorizedActor("registrar","enrollment.activate",app.programId);
- assertRecordWriteAllowed(app.metadata,"registrar");
  return {enrollmentId:await activateSyntheticOfferedEnrollment(actor,offer.id)};
 });
 

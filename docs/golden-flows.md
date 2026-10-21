@@ -143,8 +143,8 @@ hard-coded workflow engine or automatically configure approved school forms.
 Prove CAN can launch multiple deployment models using one architecture.
 
 ### Flow
-1. Partner Organization is created.
-2. Site is created if the deployment has a local site.
+1. Partner Organization profile is created or an existing authorized Organization is selected. Creating a child Organization does not grant access; an authorized registrar issues an explicit scoped membership grant before setup continues in that scope.
+2. Site profile is created if the deployment has a local site, including its location and timezone.
 3. Program is created with type, grade range, delivery model, Jurisdiction, host, academic provider, issuing authority, and calendar.
 4. Launch Journey is instantiated from configuration.
 5. Required staff/role assignments are completed.
@@ -170,6 +170,10 @@ programs are not implicitly marked acknowledged.
 ### Proves
 Organization -> Site -> Program, Journey engine, role/scope model, configuration, calendar propagation, generalized host architecture.
 
+Organization and Site profile pages aggregate these same canonical records and
+authorized related Programs; they do not create separate profile stores. Program
+is the educational offering, distinct from its operating Organization and Site.
+
 ---
 
 ## GF4 — Attendance + Parent Excuse
@@ -192,6 +196,23 @@ Prove CAN can run a real physical/hybrid school day and reconcile site and famil
 
 ### Proves
 Site operations, attendance, family workflow, documents, notifications, audit, metrics, and the foundation for offline operation.
+
+The registrar Operations queue and Site Today consume the same site-scoped
+canonical Actions. Their daily triage surfaces deadline urgency, priority,
+status, owner and unassigned/overdue counts, while domain-owned Actions retain
+their owning workflow and server authorization.
+
+Site Today also surfaces the existing authorized section-coverage,
+instructional-capacity and waitlist exceptions, linking each issue to its
+program operations workspace. It uses the same live command-center projection
+as Operations and is shown only to actors with the launch-start capability.
+For active sections with assigned teachers, that projection re-evaluates
+effective instructor coverage and qualification-policy eligibility across the
+instructional window; a teacher link alone no longer hides an expired,
+incomplete or ineligible staffing plan. The separate unstaffed count still
+identifies sections without any teacher relationship. This is read-time
+monitoring for authorized human review, not automatic reassignment or
+revocation.
 
 ### Current cross-role acceptance evidence
 
@@ -216,10 +237,20 @@ excuse from the pending queue, retains guardian history and emits one audit,
 outbox event and in-app notice across retries. Tests include wrong-role,
 capability, scope, relationship, stale-content and terminal-state denials.
 
-This evidence does not certify live supporting-document upload, browser offline
-queue synchronization, separate-connection correction/closure races, outbound
-email delivery or jurisdiction-specific attendance policy. Those remain
-release acceptance gates rather than assumed functionality.
+The device queue now preserves malformed/oversized data, reports storage write
+failures instead of claiming success, and removes only successfully synchronized
+mutation IDs, retaining entries added during a sync. Focused unit tests cover
+these persistence rules. Guarded browser acceptance also verifies offline
+capture without a server write, reconnect synchronization to one canonical
+AttendanceEvent, and quota-failure reporting without a server mutation. The
+browser fixture writes only to the disposable database and retains immutable
+audit/domain history during cleanup; this evidence does not certify real-device
+behavior or production operation.
+
+This evidence does not certify live supporting-document upload,
+separate-connection correction/closure races, outbound email delivery or
+jurisdiction-specific attendance policy. Those remain release acceptance gates
+rather than assumed functionality.
 
 ---
 
@@ -289,6 +320,14 @@ This is a platform prerequisite, not a back-office convenience. GF1, GF4, Studen
 
 ### Proves
 SchoolYear, Term, GradingPeriod, GradeScale, AcademicCalendar, ScheduleTemplate, effective dating, calendar propagation, and a trustworthy time model.
+
+The School-Year Studio now supports a future-dated schedule revision from the
+latest open-ended version. It closes the prior date range, copies periods into
+the new version, and emits audit/domain-event evidence; effective versions
+cannot be edited in place. Attendance expectations select the applicable
+version by date. Section-specific assignments remain explicit in program
+setup, so this does not by itself certify every GF23 downstream scheduling
+scenario.
 
 ---
 

@@ -39,7 +39,6 @@ import { createAcademicTimeFixture } from "./helpers/academic-time";
  *
  * Run only via `npm run test:integration` against a disposable Neon branch.
  */
-process.env.CAN_DEMO_WRITES_ENABLED = "true";
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
@@ -519,22 +518,17 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
     expect(journey!.status).toBe("active");
   }, 60000);
 
-  it("scenario 4: the demo kill switch rejects synthetic records while authentic applications proceed", async () => {
-    // The synthetic write gate protects fixture records whenever demo writes
-    // are disabled; authentic (non-synthetic) applications are canonical and
-    // unaffected by the demo flag.
+  it("scenario 4: admissions commands apply identically to records with or without legacy synthetic metadata", async () => {
     process.env.CAN_DEMO_WRITES_ENABLED = "false";
+    let demoOfferId: string;
     let authenticOfferId: string;
     try {
-      await expect(
-        issueSyntheticAdmissionOffer(registrarCtx(), {
-          applicationId: appA.id,
-          schoolYearId: year1.id,
-          idempotencyKey: `gf2-offer-killswitch-${suffix}`,
-          expiresAt: expires(),
-        }),
-      ).rejects.toThrow("Synthetic writes are disabled");
-
+      demoOfferId = await issueSyntheticAdmissionOffer(registrarCtx(), {
+        applicationId: appA.id,
+        schoolYearId: year1.id,
+        idempotencyKey: `gf2-offer-tenant-${suffix}`,
+        expiresAt: expires(),
+      });
       authenticOfferId = await issueSyntheticAdmissionOffer(registrarCtx(), {
         applicationId: appNonSynthetic.id,
         schoolYearId: year1.id,
@@ -545,24 +539,18 @@ integration("GF2 enrollment lifecycle (self-contained fixtures)", () => {
       process.env.CAN_DEMO_WRITES_ENABLED = "true";
     }
 
-    const blocked = await db
-      .select()
-      .from(admissionOffers)
-      .where(eq(admissionOffers.idempotencyKey, `gf2-offer-killswitch-${suffix}`));
-    expect(blocked).toHaveLength(0);
-
-    const blockedAudit = await db
-      .select()
-      .from(auditEvents)
-      .where(eq(auditEvents.action, "admissions.offer.issue"));
-    expect(
-      blockedAudit.filter((row) => blocked.some((o) => o.id === row.resourceId)),
-    ).toHaveLength(0);
-
-    // Leave no held seat behind for the later capacity scenarios.
+    const issued = await db.select().from(admissionOffers)
+      .where(inArray(admissionOffers.id, [demoOfferId!, authenticOfferId!]));
+    expect(issued).toHaveLength(2);
+    expect(issued.every(offer => offer.status === "issued")).toBe(true);
     await respondToSyntheticAdmissionOffer(
       guardianCtx(guardian1.id),
       authenticOfferId!,
+      "decline",
+    );
+    await respondToSyntheticAdmissionOffer(
+      guardianCtx(guardian1.id),
+      demoOfferId!,
       "decline",
     );
     const [declined] = await db

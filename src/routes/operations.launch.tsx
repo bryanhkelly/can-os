@@ -8,6 +8,7 @@ import {
   listLaunches,
   listLaunchOptions,
   startLaunch,
+  createLaunchOrganization,
   createLaunchSite,
   scheduleLaunchOrientation,
 } from "@/modules/programs/launch.functions";
@@ -23,6 +24,14 @@ const programTypes = [
 ] as const;
 
 const grades = ["TK", "K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+const organizationTypes = [
+  ["church", "Church"],
+  ["christian_school", "Christian school"],
+  ["microschool_operator", "Microschool operator"],
+  ["denomination", "Denomination / network partner"],
+  ["consortium", "Consortium"],
+  ["other_partner", "Other partner"],
+] as const;
 
 const typeLabels: Record<string, string> = {
   church_hosted_academy: "Church-hosted academy",
@@ -85,9 +94,19 @@ function LaunchWizardPage() {
   const [academicProviderOrganizationId, setAcademicProviderOrganizationId] = useState("");
   const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState("");
   const [siteId, setSiteId] = useState(selection.siteId??"");
+  const [newOrganizationType,setNewOrganizationType]=useState<string>("christian_school");
+  const [newOrganizationName,setNewOrganizationName]=useState("");
+  const [newOrganizationLegalName,setNewOrganizationLegalName]=useState("");
+  const [newOrganizationSlug,setNewOrganizationSlug]=useState("");
+  const [createdOrganization,setCreatedOrganization]=useState<{id:string;name:string}|null>(null);
   const [newSiteName,setNewSiteName]=useState("");
   const [newSiteSlug,setNewSiteSlug]=useState("");
   const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
+  const [newSiteLine1,setNewSiteLine1]=useState("");
+  const [newSiteCity,setNewSiteCity]=useState("");
+  const [newSiteRegion,setNewSiteRegion]=useState("");
+  const [newSitePostalCode,setNewSitePostalCode]=useState("");
+  const [newSiteCountry,setNewSiteCountry]=useState("");
   const [orientationFor,setOrientationFor]=useState("");
   const [orientationStart,setOrientationStart]=useState("");
   const [orientationEnd,setOrientationEnd]=useState("");
@@ -107,10 +126,35 @@ function LaunchWizardPage() {
     if(!hostOrganizationId)return;
     setBusy(true);setError("");
     try{
-      await createLaunchSite({data:{organizationId:hostOrganizationId,name:newSiteName,
-        slug:newSiteSlug,timezone:newSiteTimezone}});
-      await router.invalidate();setNewSiteName("");setNewSiteSlug("");
+      const site=await createLaunchSite({data:{organizationId:hostOrganizationId,name:newSiteName,
+        slug:newSiteSlug,timezone:newSiteTimezone,address:{
+          ...(newSiteLine1.trim()?{line1:newSiteLine1.trim()}:{}),
+          ...(newSiteCity.trim()?{city:newSiteCity.trim()}:{}),
+          ...(newSiteRegion.trim()?{region:newSiteRegion.trim()}:{}),
+          ...(newSitePostalCode.trim()?{postalCode:newSitePostalCode.trim()}:{}),
+          ...(newSiteCountry.trim()?{country:newSiteCountry.trim()}:{}),
+        }}});
+      setSiteId(site.siteId);
+      await router.invalidate();setNewSiteName("");setNewSiteSlug("");setNewSiteLine1("");
+      setNewSiteCity("");setNewSiteRegion("");setNewSitePostalCode("");
     }catch(e){setError(e instanceof Error?e.message:"Unable to create site");}
+    finally{setBusy(false);}
+  }
+
+  async function addOrganization(){
+    if(!hostOrganizationId)return;
+    setBusy(true);setError("");
+    try{
+      const organization=await createLaunchOrganization({data:{
+        parentOrganizationId:hostOrganizationId,
+        type:newOrganizationType as (typeof organizationTypes)[number][0],
+        name:newOrganizationName,
+        legalName:newOrganizationLegalName,
+        slug:newOrganizationSlug,
+      }});
+      setCreatedOrganization({id:organization.organizationId,name:organization.name});
+      setNewOrganizationName("");setNewOrganizationLegalName("");setNewOrganizationSlug("");
+    }catch(e){setError(e instanceof Error?e.message:"Unable to create Organization profile");}
     finally{setBusy(false);}
   }
 
@@ -300,8 +344,25 @@ function LaunchWizardPage() {
                   Organizations & jurisdiction
                 </legend>
                 <div className="mt-2 space-y-3">
-                  <label className="block text-xs">
-                    Host organization
+                          {options.canCreateOrganizationAndSite&&<div className="rounded-lg border p-3">
+                            <p className="text-xs font-semibold">Create Organization profile</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Creates the Organization record under the selected scoped parent. It does not grant anyone access to the new Organization.</p>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <select aria-label="New organization type" className={selectClass} value={newOrganizationType} onChange={e=>setNewOrganizationType(e.target.value)}>
+                                {organizationTypes.map(([value,label])=><option key={value} value={value}>{label}</option>)}
+                              </select>
+                              <input aria-label="New organization name" placeholder="Organization name" className={inputClass} value={newOrganizationName} onChange={e=>setNewOrganizationName(e.target.value)}/>
+                              <input aria-label="New organization legal name" placeholder="Legal name (optional)" className={inputClass} value={newOrganizationLegalName} onChange={e=>setNewOrganizationLegalName(e.target.value)}/>
+                              <input aria-label="New organization slug" placeholder="organization-slug" className={inputClass} value={newOrganizationSlug} onChange={e=>setNewOrganizationSlug(e.target.value)}/>
+                            </div>
+                            <button type="button" disabled={busy||!hostOrganizationId||newOrganizationName.trim().length<2||!newOrganizationSlug.trim()} onClick={addOrganization} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Create Organization profile</button>
+                            {createdOrganization&&<p role="status" className="mt-3 text-xs">
+                              {createdOrganization.name} is created. An authorized registrar must issue an explicit Organization-scoped grant before continuing.
+                              {" "}<Link to="/admin" search={{organizationId:createdOrganization.id}} className="underline">Open administration to grant access →</Link>
+                            </p>}
+                          </div>}
+                          <label className="block text-xs">
+                            Host organization
                     <select
                       aria-label="Host organization"
                       className={selectClass}
@@ -318,6 +379,7 @@ function LaunchWizardPage() {
                       ))}
                     </select>
                   </label>
+                  {hostOrganizationId&&<Link to="/organizations/$organizationId" params={{organizationId:hostOrganizationId}} className="text-xs underline">Open Organization profile →</Link>}
                   <label className="block text-xs">
                     Site (optional)
                     <select aria-label="Site" className={selectClass} value={siteId} onChange={(e) => setSiteId(e.target.value)} disabled={!hostOrganizationId}>
@@ -327,15 +389,21 @@ function LaunchWizardPage() {
                       ))}
                     </select>
                   </label>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs font-semibold">New host site</p>
+                  {siteId&&<Link to="/sites/$siteId/profile" params={{siteId}} className="text-xs underline">Open Site profile →</Link>}
+                  {options.canCreateOrganizationAndSite&&<div className="rounded-lg border p-3">
+                    <p className="text-xs font-semibold">Create Site profile</p>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
                       <input aria-label="New site name" placeholder="Campus name" className={inputClass} value={newSiteName} onChange={e=>setNewSiteName(e.target.value)}/>
                       <input aria-label="New site slug" placeholder="campus-slug" className={inputClass} value={newSiteSlug} onChange={e=>setNewSiteSlug(e.target.value)}/>
                       <input aria-label="New site timezone" placeholder="Timezone" className={inputClass} value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}/>
+                      <input aria-label="Site street address" placeholder="Street address" className={inputClass} value={newSiteLine1} onChange={e=>setNewSiteLine1(e.target.value)}/>
+                      <input aria-label="Site city" placeholder="City" className={inputClass} value={newSiteCity} onChange={e=>setNewSiteCity(e.target.value)}/>
+                      <input aria-label="Site state or region" placeholder="State / region" className={inputClass} value={newSiteRegion} onChange={e=>setNewSiteRegion(e.target.value)}/>
+                      <input aria-label="Site postal code" placeholder="Postal code" className={inputClass} value={newSitePostalCode} onChange={e=>setNewSitePostalCode(e.target.value)}/>
+                      <input aria-label="Site country" placeholder="Country" className={inputClass} value={newSiteCountry} onChange={e=>setNewSiteCountry(e.target.value)}/>
                     </div>
                     <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Create site</button>
-                  </div>
+                  </div>}
                   <label className="block text-xs">
                     Jurisdiction
                     <select aria-label="Jurisdiction" className={selectClass} value={jurisdictionId} onChange={(e) => setJurisdictionId(e.target.value)} required>
@@ -369,7 +437,7 @@ function LaunchWizardPage() {
               <button
                 type="submit"
                 className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                disabled={busy || !options.organizations.length}
+                disabled={busy || !options.organizations.length || !!createdOrganization}
               >
                 Start launch
               </button>

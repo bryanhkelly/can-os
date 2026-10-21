@@ -19,7 +19,6 @@ const result = spawnSync(process.execPath, [
     CAN_APPLICATION_DB_HOST: process.env.CAN_APPLICATION_DB_HOST ?? new URL(process.env.DATABASE_URL).hostname,
     APP_ENV: "test", NODE_ENV: "test", PLAYWRIGHT_BASE_URL: "http://localhost:3187",
     CAN_ACCESS_TOKEN_PEPPER: "admissions-e2e-pepper-0123456789abcdef",
-    CAN_DEMO_WRITES_ENABLED: "true",
     CAN_R2_LIVE_UPLOADS_ENABLED: "false", CAN_R2_DEMO_UPLOADS_ENABLED: "false",
   },
 });

@@ -11,7 +11,10 @@ vi.mock("@/db/client", () => ({
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({ validator() { return this; }, handler(callback: unknown) { return callback; } }),
 }));
-vi.mock("@tanstack/react-start/server", () => ({ getRequest: () => new Request("http://localhost") }));
+vi.mock("@tanstack/react-start/server", () => ({
+  getRequest: () => new Request("http://localhost"),
+  setResponseHeader: vi.fn(),
+}));
 vi.mock("@/modules/identity/command-context.server", () => ({
   getCommandContext: async () => launchState.context as AccessContext,
 }));
@@ -59,6 +62,104 @@ integration("GF3 host / program launch", () => {
       })
       .returning();
 
+    const [operator] = await db
+      .insert(schema.people)
+      .values({
+        legalFirstName: "Alex",
+        legalLastName: `Operator-${suffix}`,
+        email: `operator-gf3-${suffix}@example.com`,
+      })
+      .returning();
+    fixturePersonId = operator.id;
+    const [operatorAccount]=await db.insert(schema.accessAccounts).values({
+      emailNormalized:`operator-gf3-${suffix}@example.com`,
+    }).returning();
+    const contextFor = (hostId: string, siteId: string | null) => ({
+      actorPersonId: operator!.id,
+      capabilities: new Set([
+        "program.launch.start",
+        "journey.requirement.complete",
+        "calendar.event.create",
+        "program.activate",
+        "organization.create",
+        "institution.profile.read",
+        "admin.manage",
+        "program.read",
+        "staffing.policy.publish",
+        "action.resolve",
+      ]),
+      scope: {
+        organizationIds: [hostId],
+        ...(siteId ? { siteIds: [siteId] } : {}),
+      },
+      requestId: `gf3-${suffix}`,
+    });
+
+    const [networkGrant] = await db.insert(schema.accountPersonGrants).values({
+      accountId: operatorAccount.id,
+      personId: operator.id,
+      role: "registrar",
+      organizationId: canOrg.id,
+      siteId: null,
+      active: true,
+    }).returning();
+    const networkContext = {
+      ...contextFor(canOrg.id, null),
+      accountId: operatorAccount.id,
+      sessionId: `gf3-session-${suffix}`,
+      grantId: networkGrant!.id,
+      role: "registrar" as const,
+      scope: { organizationIds: [canOrg.id], siteIds: [] as string[], programIds: [] as string[] },
+    };
+    launchState.context = networkContext;
+    const { organizationId: partnerOrganizationId } = await launchFunctions.createLaunchOrganization({
+      data: {
+        parentOrganizationId: canOrg.id,
+        type: "christian_school",
+        name: `Partner School ${suffix}`,
+        legalName: `Partner School Legal ${suffix}`,
+        slug: `partner-school-${suffix}`,
+      },
+    });
+    expect(await db.select().from(schema.domainEvents).where(and(
+      eq(schema.domainEvents.aggregateId, partnerOrganizationId),
+      eq(schema.domainEvents.eventType, "OrganizationCreated"),
+    ))).toHaveLength(1);
+    expect(await db.select().from(schema.auditEvents).where(and(
+      eq(schema.auditEvents.resourceId, partnerOrganizationId),
+      eq(schema.auditEvents.action, "organization.create"),
+    ))).toHaveLength(1);
+    const adminFunctions = await import("@/modules/identity/admin.functions");
+    const adminOptions = await adminFunctions.listScopedSites();
+    expect(adminOptions.organizations.some((organization) => organization.id === partnerOrganizationId)).toBe(true);
+    const partnerGrant = await adminFunctions.inviteStaffMember({ data: {
+      email: operator.email!,
+      firstName: operator.legalFirstName,
+      lastName: operator.legalLastName,
+      role: "registrar",
+      organizationId: partnerOrganizationId,
+    } });
+    expect(partnerGrant).toMatchObject({
+      organizationId: partnerOrganizationId,
+      organizationName: `Partner School ${suffix}`,
+      active: true,
+      created: true,
+    });
+    const partnerContext = {
+      ...networkContext,
+      grantId: partnerGrant.grantId,
+      scope: { organizationIds: [partnerOrganizationId], siteIds: [] as string[], programIds: [] as string[] },
+    };
+    launchState.context = partnerContext;
+    const partnerSite = await launchFunctions.createLaunchSite({ data: {
+      organizationId: partnerOrganizationId,
+      name: "Partner Main Campus",
+      slug: `partner-main-${suffix}`,
+      timezone: "America/Los_Angeles",
+      address: { line1: "100 Main Street", city: "Oakland", region: "CA", postalCode: "94612", country: "United States" },
+    } });
+    partnerContext.scope.siteIds = [partnerSite.siteId];
+
     await db.insert(schema.journeyDefinitions).values({
       key: "program-launch",
       version: `test-${suffix}`,
@@ -83,35 +184,39 @@ integration("GF3 host / program launch", () => {
       },
     });
 
-    const [operator] = await db
-      .insert(schema.people)
-      .values({
-        legalFirstName: "Alex",
-        legalLastName: `Operator-${suffix}`,
-        email: `operator-gf3-${suffix}@example.com`,
-      })
-      .returning();
-    fixturePersonId = operator.id;
-    const [operatorAccount]=await db.insert(schema.accessAccounts).values({
-      emailNormalized:`operator-gf3-${suffix}@example.com`,
-    }).returning();
-
-    const contextFor = (hostId: string, siteId: string | null) => ({
-      actorPersonId: operator!.id,
-      capabilities: new Set([
-        "program.launch.start",
-        "journey.requirement.complete",
-        "calendar.event.create",
-        "program.activate",
-        "staffing.policy.publish",
-        "action.resolve",
-      ]),
-      scope: {
-        organizationIds: [hostId],
-        ...(siteId ? { siteIds: [siteId] } : {}),
-      },
-      requestId: `gf3-${suffix}`,
+    const partnerProgram = await programsModule.startProgramLaunch(partnerContext, {
+      hostOrganizationId: partnerOrganizationId,
+      siteId: partnerSite.siteId,
+      jurisdictionId: jurisdiction.id,
+      type: "full_school",
+      name: `Partner K-8 ${suffix}`,
+      slug: `partner-k8-${suffix}`,
+      gradeRange: { min: "K", max: "8" },
+      deliveryModel: { onsite: true },
+      academicProviderOrganizationId: canOrg.id,
+      creditIssuingOrganizationId: canOrg.id,
     });
+    partnerContext.scope.programIds = [partnerProgram.programId];
+    const institutionProfiles = await import("@/modules/profiles/institution-profiles.functions");
+    const organizationProfile = await institutionProfiles.getOrganizationProfile({
+      data: { id: partnerOrganizationId },
+    });
+    expect(organizationProfile.organization).toMatchObject({
+      name: `Partner School ${suffix}`,
+      legalName: `Partner School Legal ${suffix}`,
+      type: "christian_school",
+    });
+    expect(organizationProfile.sites.map((site) => site.id)).toContain(partnerSite.siteId);
+    expect(organizationProfile.programs.map((program) => program.id)).toContain(partnerProgram.programId);
+    const siteProfile = await institutionProfiles.getSiteProfile({ data: { id: partnerSite.siteId } });
+    expect(siteProfile.site.address).toMatchObject({
+      line1: "100 Main Street",
+      city: "Oakland",
+      region: "CA",
+    });
+    expect(siteProfile.programs.map((program) => program.id)).toEqual([partnerProgram.programId]);
+    await expect(institutionProfiles.getSiteProfile({ data: { id: crypto.randomUUID() } }))
+      .rejects.toThrow("site profile scope");
 
     const scenarios = [
       {
@@ -150,15 +255,22 @@ integration("GF3 host / program launch", () => {
         })
         .returning();
 
-      const context = contextFor(host.id, site.id);
-      await db.insert(schema.accountPersonGrants).values({
+      const [siteGrant] = await db.insert(schema.accountPersonGrants).values({
         accountId:operatorAccount.id,personId:operator.id,role:"registrar",
         organizationId:host.id,siteId:site.id,active:true,
-      });
+      }).returning();
+      const [organizationGrant] = await db.insert(schema.accountPersonGrants).values({
+        accountId:operatorAccount.id,personId:operator.id,role:"registrar",
+        organizationId:host.id,siteId:null,active:true,
+      }).returning();
+      const context = contextFor(host.id, site.id);
       const launchContext = {
         ...context,
+        accountId: operatorAccount.id,
+        sessionId: `gf3-session-${suffix}-${index}`,
+        grantId: organizationGrant!.id,
         role: "registrar" as const,
-        scope: { ...context.scope, programIds: [] as string[] },
+        scope: { ...context.scope, siteIds: [] as string[], programIds: [] as string[] },
       };
       launchState.context = launchContext;
 
@@ -333,12 +445,24 @@ integration("GF3 host / program launch", () => {
         eq(schema.auditEvents.action, "program.orientation.schedule"),
       ))).toHaveLength(1);
 
-      launchContext.scope.siteIds = [];
+      launchState.context = {
+        ...launchContext,
+        grantId: siteGrant!.id,
+        scope: { ...launchContext.scope, siteIds: [site.id] },
+      };
+      await expect(launchFunctions.createLaunchSite({ data: {
+        organizationId: host.id,
+        name: "Unauthorized Additional Campus",
+        slug: `unauthorized-${suffix}-${index}`,
+        timezone: "America/Los_Angeles",
+      } })).rejects.toThrow("organization-wide registrar grant");
+      launchState.context = launchContext;
       const extraSite = await launchFunctions.createLaunchSite({ data: {
         organizationId: host.id,
         name: "Additional Campus",
         slug: `additional-${suffix}-${index}`,
         timezone: "America/Los_Angeles",
+        address: { line1: "200 Campus Way", city: "Oakland", region: "CA" },
       } });
       launchContext.scope.siteIds = [site.id];
       expect(await db.select().from(schema.domainEvents).where(and(
@@ -356,6 +480,11 @@ integration("GF3 host / program launch", () => {
         eq(schema.domainEvents.eventType, "SiteCreated"),
       ));
       expect(siteEvent.status).toBe("processed");
+      const [organizationEvent] = await db.select().from(schema.domainEvents).where(and(
+        eq(schema.domainEvents.aggregateId, partnerOrganizationId),
+        eq(schema.domainEvents.eventType, "OrganizationCreated"),
+      ));
+      expect(organizationEvent.status).toBe("processed");
 
       await programsModule.activateProgram(context, launch.programId,{recipientPersonId:operator.id});
       const {listOpeningHandoffs,acknowledgeOpeningHandoff}=await import("@/modules/programs/opening-handoff.server");

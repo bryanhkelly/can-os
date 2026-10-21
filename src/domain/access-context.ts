@@ -17,6 +17,7 @@ export type SessionPrincipal = {
 };
 export type AccessContext = CommandContext & {
  accountId: string;
+ sessionAccountId?: string;
  sessionId: string;
  grantId: string;
  role: string;
@@ -24,12 +25,13 @@ export type AccessContext = CommandContext & {
 
 /** Capability mapping is centralized; domain-specific relationship checks are still required. */
 export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Object.freeze({
- student: ["student:read","assignments:submit","study-groups:participate","notifications:manage","communication.send","calendar.event.create"],
- teacher: ["teacher:read","profiles.credentials.submit","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate","communication.send","attendance.write","attendance.excuse.review","action.create","action.resolve","program.read","calendar.event.create","calendar.event.manage","insights:read","capacity.read"],
- guardian: ["guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read","communication.send","attendance.excuse.submit","calendar.event.create","conference.book"],
- registrar: ["curriculum.publish","program.opening.handoff.manage","admissions:read","profiles.catalog.create","profiles.credentials.verify","notifications:manage","admissions:decide","enrollment.decide","enrollment.activate","enrollment:manage","registrations:approve","attendance.write","attendance.excuse.review","communication.send","program.read","program.launch.start","program.activate","staffing.policy.publish","calendar.event.create","calendar.event.manage","academic_year.manage","academic_year.activate","action.resolve","journey.requirement.complete","admin.manage","insights:read","insights:manage","capacity.read","capacity.manage","capacity.demand.manage","capacity.reserve"],
- specialist: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage","communication.send","action.resolve","action.create","calendar.event.create","insights:read"],
- counselor: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage","communication.send","action.resolve","action.create","calendar.event.create","insights:read"],
+ applicant: ["enrollment.apply"],
+ student: ["student:read","assignments:submit","study-groups:participate","notifications:manage","communication.send","calendar.event.create","institution.profile.read"],
+ teacher: ["teacher:read","profiles.credentials.submit","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate","communication.send","attendance.write","attendance.excuse.review","action.create","action.resolve","program.read","calendar.event.create","calendar.event.manage","insights:read","capacity.read","institution.profile.read"],
+ guardian: ["guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read","communication.send","attendance.excuse.submit","calendar.event.create","conference.book","institution.profile.read"],
+ registrar: ["curriculum.publish","program.opening.handoff.manage","admissions:read","profiles.catalog.create","profiles.credentials.verify","notifications:manage","admissions:decide","enrollment.decide","enrollment.activate","enrollment:manage","registrations:approve","attendance.write","attendance.excuse.review","communication.send","program.read","program.launch.start","program.activate","organization.create","institution.profile.read","staffing.policy.publish","calendar.event.create","calendar.event.manage","academic_year.manage","academic_year.activate","action.resolve","journey.requirement.complete","admin.manage","insights:read","insights:manage","capacity.read","capacity.manage","capacity.demand.manage","capacity.reserve"],
+ specialist: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage","communication.send","action.resolve","action.create","calendar.event.create","insights:read","institution.profile.read"],
+ counselor: ["referrals:read","notifications:manage","referrals:manage","support-plans:manage","communication.send","action.resolve","action.create","calendar.event.create","insights:read","institution.profile.read"],
 });
 
 /** This may be called only after authenticating a server session and fetching grants from Neon. */

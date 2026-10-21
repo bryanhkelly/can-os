@@ -1,9 +1,12 @@
 import {useEffect,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {createAdmissionsInquiry,listAdmissionsExistingStudents,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
+import {createAdmissionsInquiry,listAdmissionsExistingStudents,listAdmissionsIntake,listAdmissionsIntakePrograms} from "@/modules/enrollment/admissions-intake.functions";
+import {AdmissionsDecisionPanel} from "@/components/enrollment/AdmissionsDecisionPanel";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
+import {setOnlineApplications} from "@/modules/enrollment/family-application.functions";
+import {ApplicationPacketReview} from "@/components/enrollment/ApplicationPacketReview";
 const load=async()=>{
  const [records,programs,existingStudents]=await Promise.all([
   listAdmissionsIntake(),listAdmissionsIntakePrograms(),listAdmissionsExistingStudents(),
@@ -59,6 +62,17 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
+  <section className="mt-6 space-y-3 rounded-xl border p-5">
+   <h2 className="font-serif text-2xl">Family online applications</h2>
+   <p className="text-sm text-muted-foreground">Open applications for an active program to publish it to families. Applicants verify their email; Valor School applicants use @valorschool.demo and code 000000. Guardian authority still requires independent review.</p>
+   {programs.map(program=><div key={program.id} className="flex flex-wrap items-center gap-3">
+    <span>{program.name} · {program.onlineApplicationsOpen?"Open":"Closed"}</span>
+    <button type="button" disabled={busy} className="rounded border px-3 py-2 text-sm"
+     onClick={()=>void perform(()=>setOnlineApplications({data:{programId:program.id,open:!program.onlineApplicationsOpen}}),"Online application settings saved.")}>
+     {program.onlineApplicationsOpen?"Close applications":"Open applications"}</button>
+    {program.onlineApplicationsOpen&&<Link to="/apply" search={{program:program.id}} className="text-sm underline">Family application link</Link>}
+   </div>)}
+  </section>
   <section className="mt-8 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">New inquiry</h2>
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void perform(
@@ -127,53 +141,18 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
      <p className="mt-1 text-xs text-muted-foreground">{r.programName} · {r.disposition??r.stage} · Last updated {new Date(r.updatedAt).toLocaleDateString()}</p></div>
      <span className="rounded-full border px-3 py-1 text-xs">{r.disposition??r.stage}</span>
     </div>
-    <p className="mt-3 text-xs text-muted-foreground">
-      Guardian verification: <strong>{r.guardianVerified?"Verified":"Required"}</strong> ·
-      {" "}Sign-in access: <strong>{r.guardianLoginProvisioned?"Provisioned":"Not provisioned"}</strong>.
-      Verify the relationship independently before granting or inviting access.
-    </p>
-    <div className="mt-3 flex flex-wrap gap-2">
-      <button disabled={busy||r.guardianVerified} onClick={()=>{
-        const evidenceNote=window.prompt("Verification record: describe the independent documentation or identification reviewed.");
-        if(!evidenceNote)return;
-        const method=window.prompt("Method: in_person_id, verified_school_record, or live_video_verification","verified_school_record");
-        if(!method||!["in_person_id","verified_school_record","live_video_verification"].includes(method))return;
-        void perform(()=>verifyAdmissionsGuardianRelationship({data:{
-         applicationId:r.id,method:method as "in_person_id"|"verified_school_record"|"live_video_verification",evidenceNote,
-        }}),"Guardian relationship verified and family permissions enabled.");
-       }}
-       className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-       {r.guardianVerified?"Relationship verified":"Verify guardian relationship"}
-      </button>
-      <button disabled={busy||!r.guardianVerified||r.guardianLoginProvisioned}
-        onClick={()=>perform(()=>provisionInquiryGuardianAccount({data:{applicationId:r.id}}),
-          "Verified guardian sign-in access provisioned.")}
-        className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-        {r.guardianLoginProvisioned?"Login provisioned":"Provision guardian login"}
-      </button>
-      <button disabled={busy||!r.guardianLoginProvisioned}
-       onClick={()=>perform(()=>sendAdmissionsGuardianInvitation({data:{applicationId:r.id}}),
-        "A secure email sign-in invitation was requested for this guardian.")}
-       className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-       Send secure guardian invitation
-      </button>
-      {r.disposition==="ready_for_offer" && <Link to="/admissions"
-        search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
-        className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background">Issue enrollment offer →</Link>}
+    {r.applicantDraft&&<p className="mt-3 text-xs font-semibold">Family draft — awaiting submission.</p>}
+    {r.applicantStatement&&<p className="mt-3 whitespace-pre-wrap text-sm">Family statement: {r.applicantStatement}</p>}
+    {r.applicationPacket&&<details className="mt-4 rounded-lg border p-4">
+      <summary className="cursor-pointer font-semibold">Review application packet</summary>
+      <div className="mt-4"><ApplicationPacketReview packet={r.applicationPacket} statement={r.applicantStatement??""}/></div>
+    </details>}
+    <AdmissionsDecisionPanel record={r}/>
+    <div className="mt-3 flex flex-wrap gap-4 text-xs">
+     <Link to="/admissions/applications/$applicationId" params={{applicationId:r.id}} className="font-semibold underline">Open applicant detail and next steps →</Link>
+     {!r.applicantDraft&&<Link to="/admissions" search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
+      className="underline">{r.disposition==="ready_for_offer"?"Issue enrollment offer →":"Review this application's offers and enrollment →"}</Link>}
     </div>
-    <div className="mt-4 flex flex-wrap gap-2">
-     {(r.stage==="inquiry"?[["application","Start application"],["decline","Decline"],["withdraw","Withdraw"]]:
-       r.stage==="application"?[["eligibility","Begin eligibility review"],["decline","Decline"],["withdraw","Withdraw"]]:
-       r.stage==="eligibility"?(r.disposition==="waitlisted"?[["restore","Restore to review"],["decline","Decline"],["withdraw","Withdraw"]]:
-        r.disposition==="ready_for_offer"?[["waitlist","Waitlist"],["decline","Decline"],["withdraw","Withdraw"]]:
-        [["accept","Approve for offer"],["waitlist","Waitlist"],["decline","Decline"],["withdraw","Withdraw"]]):[]).map(([decision,label])=>
-       <button key={decision} disabled={busy} onClick={()=>perform(()=>transitionAdmissionsStage({data:{applicationId:r.id,decision:decision as "application"|"eligibility"|"accept"|"decline"|"withdraw"|"waitlist"|"restore"}}),label+" saved.")}
-        className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">{label}</button>)}
-    </div>
-    <Link to="/admissions" search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
-      className="mt-3 inline-block text-xs underline">Review this application's offers and enrollment →</Link>
-    <p className="mt-2 text-xs text-muted-foreground">Withdraw unaccepted offers before waitlisting, declining or withdrawing an application.
-      Accepted offers and active enrollments require their enrollment workflow and cannot be cancelled here.</p>
    </article>)}
    {!records.length&&<p role="status" className="rounded-lg border p-5 text-sm text-muted-foreground">{selected.application?
     "This application is unavailable in your authorized programs.":"No applications recorded in your authorized programs."}</p>}

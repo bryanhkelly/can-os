@@ -9,4 +9,8 @@ UPDATE assessments SET metadata = metadata || jsonb_build_object(
   'rubricVersion',1
 )
 WHERE id='f6000000-0000-4000-8000-000000000001'
-  AND metadata->>'synthetic'='true';
+  AND EXISTS (
+    SELECT 1 FROM sections
+    WHERE sections.id=assessments.section_id
+      AND sections.site_id='f1000000-0000-4000-8000-000000000003'
+  );

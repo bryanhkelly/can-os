@@ -11,9 +11,10 @@ import {calculateSeatOccupancy} from "@/domain/admissions-seat-occupancy";
  */
 describe("GF2 persisted synthetic enrollment consistency (Neon)",()=>{
  it("has synthetic admissions fixtures, valid seat pools and no duplicate active program enrollments",async()=>{
-  const rows=await db.select({id:applications.id,metadata:applications.metadata,programId:applications.programId,studentProfileId:applications.studentProfileId}).from(applications);
-  const synthetic=rows.filter(a=>a.metadata.synthetic===true);
-  expect(synthetic.length,"Seed at least one synthetic application on the disposable test branch").toBeGreaterThan(0);
+  const rows=await db.select({id:applications.id,programId:applications.programId,studentProfileId:applications.studentProfileId}).from(applications);
+  const demoProgramId="f1000000-0000-4000-8000-000000000004";
+  const demoApplications=rows.filter(a=>a.programId===demoProgramId);
+  expect(demoApplications.length,"Seed at least one application for the demo program on the disposable test branch").toBeGreaterThan(0);
   const offers=await db.select().from(admissionOffers);
   const active=await db.select({id:enrollments.id,programId:enrollments.programId,schoolYearId:enrollments.schoolYearId,studentProfileId:enrollments.studentProfileId}).from(enrollments).where(and(eq(enrollments.kind,"program"),eq(enrollments.status,"active")));
   const unique=new Set(active.map(e=>[e.programId,e.schoolYearId,e.studentProfileId].join(":")));
@@ -21,7 +22,7 @@ describe("GF2 persisted synthetic enrollment consistency (Neon)",()=>{
   const pools=await db.select().from(admissionSeatPools);
   const years=await db.select({id:schoolYears.id,programId:schoolYears.programId}).from(schoolYears);
   for(const offer of offers){
-   const app=synthetic.find(a=>a.id===offer.applicationId);
+   const app=demoApplications.find(a=>a.id===offer.applicationId);
    if(!app)continue;
    expect(app?.programId,"Offer must stay with its synthetic application's program").toBe(offer.programId);
    const year=years.find(y=>y.id===offer.schoolYearId);
@@ -43,8 +44,8 @@ describe("GF2 persisted synthetic enrollment consistency (Neon)",()=>{
   }
  });
  it("does not report a ready enrollment journey with incomplete blocking requirements",async()=>{
-  const apps=await db.select({id:applications.id,metadata:applications.metadata}).from(applications);
-  const ids=apps.filter(a=>a.metadata.synthetic===true).map(a=>a.id);
+  const apps=await db.select({id:applications.id,programId:applications.programId}).from(applications);
+  const ids=apps.filter(a=>a.programId==="f1000000-0000-4000-8000-000000000004").map(a=>a.id);
   expect(ids.length).toBeGreaterThan(0);
   const all=await db.select({id:journeys.id,participantId:journeys.participantId,status:journeys.status}).from(journeys).where(and(eq(journeys.participantType,"application"),inArray(journeys.participantId,ids)));
   for(const j of all.filter(j=>j.status==="ready"||j.status==="active")){

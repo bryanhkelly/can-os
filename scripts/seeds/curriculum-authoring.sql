@@ -3,19 +3,19 @@
 BEGIN;
 INSERT INTO memberships (person_id, organization_id, title, metadata)
 VALUES ('f7000000-0000-4000-8000-000000000001',
- 'f1000000-0000-4000-8000-000000000002','Synthetic curriculum publisher','{"synthetic":true}')
+ 'f1000000-0000-4000-8000-000000000002','Synthetic curriculum publisher','{}')
 ON CONFLICT (person_id, organization_id) DO NOTHING;
 
 INSERT INTO role_assignments (id, person_id, organization_id, site_id, program_id, role_key, capabilities, metadata)
 VALUES ('c7200000-0000-4000-8000-000000000001',
  'f7000000-0000-4000-8000-000000000001','f1000000-0000-4000-8000-000000000002',
  'f1000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000004',
- 'curriculum_publisher','["curriculum.publish"]','{"synthetic":true}')
+ 'curriculum_publisher','["curriculum.publish"]','{}')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO course_templates (id, owning_organization_id, code, title, subject, metadata)
 VALUES ('c7200000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000002',
- 'SYNTH-CURRICULUM','Synthetic Curriculum Workshop','Science','{"synthetic":true}')
+ 'SYNTH-CURRICULUM','Synthetic Curriculum Workshop','Science','{}')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO course_template_versions (id, course_template_id, version, status, curriculum)

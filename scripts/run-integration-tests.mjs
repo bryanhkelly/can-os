@@ -31,6 +31,10 @@ function endpoint(value) {
 
 const testEndpoint = endpoint(testUrl);
 const mode = process.argv[2];
+if (mode === "family-applications") {
+  if (!process.env.CAN_APPLICATION_DB_HOST && !process.env.DATABASE_URL)
+    fail("family applications testing requires an application endpoint comparison.");
+}
 if (mode === "demo-registrar") {
   if (!process.env.CAN_APPLICATION_DB_HOST && !process.env.DATABASE_URL) {
     fail("demo registrar testing requires an application endpoint comparison.");
@@ -61,9 +65,10 @@ if (process.argv.includes("--preflight")) {
   process.exit(0);
 }
 
-const targeted = mode === "demo-registrar" || mode === "curriculum-authoring" || mode === "attendance-handoff" || mode === "study-groups" || mode === "study-group-lifecycle" || mode === "admissions-offers" || mode === "academic-intervention" || mode === "class-participation" || mode === "delivery-history" || mode === "qualification-readiness" || mode === "capacity-expiry" || mode === "launch-staffing";
+const targeted = mode === "family-applications" || mode === "demo-registrar" || mode === "curriculum-authoring" || mode === "attendance-handoff" || mode === "study-groups" || mode === "study-group-lifecycle" || mode === "admissions-offers" || mode === "academic-intervention" || mode === "class-participation" || mode === "delivery-history" || mode === "qualification-readiness" || mode === "capacity-expiry" || mode === "launch-staffing";
 const suite = mode === "demo-registrar" ? ["tests/integration/demo-registrar.integration.test.ts"] : mode === "curriculum-authoring" ? ["tests/integration/curriculum-authoring.integration.test.ts", "tests/integration/class-participation.integration.test.ts"] : mode === "attendance-handoff" ? ["tests/integration/attendance-handoff.integration.test.ts", "tests/integration/attendance.integration.test.ts"] : mode === "study-groups" ? ["tests/integration/study-group-commands.integration.test.ts", "tests/integration/study-group-fixture-integrity.test.ts"] : mode === "study-group-lifecycle" ? ["tests/integration/study-group-session-lifecycle.test.ts"] : mode === "admissions-offers" ? ["tests/integration/admissions-offers.integration.test.ts"] : mode === "academic-intervention" ? ["tests/integration/academic-intervention.integration.test.ts"] : mode === "class-participation" ? ["tests/integration/class-participation.integration.test.ts"] : mode === "delivery-history" ? ["tests/integration/delivery-history.integration.test.ts"] : mode === "qualification-readiness" ? ["tests/integration/qualification-readiness.integration.test.ts"] : mode === "capacity-expiry" ? ["tests/integration/capacity-expiry.integration.test.ts"] : mode === "launch-staffing" ? ["tests/integration/launch-staffing.integration.test.ts"] : ["tests/integration"];
 if (mode === "launch-staffing") suite.push("tests/integration/program-launch.integration.test.ts");
+if (mode === "family-applications") suite.splice(0, suite.length, "tests/integration/family-applications.integration.test.ts");
 if (mode === "admissions-offers") suite.push("tests/integration/admissions-handoff.integration.test.ts", "tests/integration/enrollment.integration.test.ts");
 const args = targeted ? process.argv.slice(3) : process.argv.slice(2);
 // Integration files share one disposable database; running them in parallel

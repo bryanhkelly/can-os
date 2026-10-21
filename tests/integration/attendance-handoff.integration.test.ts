@@ -35,7 +35,7 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
   const s=await import("@/db/schema");
   const flow=await import("@/modules/attendance/onsite-attendance-workflow.functions");
   const {closeObsoleteAttendanceExcuse,recordAttendanceRevision}=await import("@/modules/attendance/attendance-service");
-  const {addStudioCalendarDay,replaceStudioSchedulePeriods}=await import("@/modules/academic-time/school-year-studio.functions");
+  const {addStudioCalendarDay,createStudioScheduleRevision,replaceStudioSchedulePeriods}=await import("@/modules/academic-time/school-year-studio.functions");
   const {getFamilyHome,getGuardianNeedsYou}=await import("@/modules/family/family-home.functions");
   const {getNotifications}=await import("@/modules/communication/notification-center.functions");
   const {siteDate}=await import("@/domain/expected-attendance");
@@ -72,8 +72,10 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
     await tx.insert(s.academicCalendarDays).values({academicCalendarId:calendar.id,calendarDate:date,type:"instructional",instructionalMinutes:360});
     const schedule=first(await tx.insert(s.scheduleTemplates).values({schoolYearId:schoolYear.id,programId:program.id,
      siteId:site.id,name:"Onsite day",effectiveFrom:schoolYear.startsOn,active:true}).returning());
-    await tx.insert(s.scheduleTemplatePeriods).values({scheduleTemplateId:schedule.id,dayOfWeek:new Date(date+"T12:00:00Z").getUTCDay(),
-     sequence:1,label:"Instruction",startsAtLocal:"08:30",endsAtLocal:"15:00",type:"instruction"});
+    await tx.insert(s.scheduleTemplatePeriods).values(Array.from({length:7},(_,dayOfWeek)=>({
+     scheduleTemplateId:schedule.id,dayOfWeek,sequence:1,label:"Instruction",
+     startsAtLocal:"08:30",endsAtLocal:"15:00",type:"instruction",
+    })));
     const learner=first(await tx.insert(s.people).values({legalFirstName:"Attendance",legalLastName:"Learner"}).returning());
     const guardian=first(await tx.insert(s.people).values({legalFirstName:"Attendance",legalLastName:"Guardian"}).returning());
     const teacher=first(await tx.insert(s.people).values({legalFirstName:"Attendance",legalLastName:"Teacher"}).returning());
@@ -131,10 +133,50 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
      startsAtLocal:"08:30",endsAtLocal:"15:00",type:"instruction" as const};
     await expect(replaceStudioSchedulePeriods({data:{scheduleTemplateId:schedule.id,
      periods:[{...period,startsAtLocal:"25:00"}]}})).rejects.toThrow();
-    await replaceStudioSchedulePeriods({data:{scheduleTemplateId:schedule.id,periods:[{...period,type:"break"}]}});
-    expect((await flow.listExpectedOnsiteRoster({data:{date}})).students).toEqual([]);
-    await expect(flow.markExpectedOnsiteAttendance({data:correction})).rejects.toThrow("No authorized scheduled");
-    await replaceStudioSchedulePeriods({data:{scheduleTemplateId:schedule.id,periods:[period]}});
+    const nextSiteDay=siteDate(new Date(Date.now()+2*86400000),"America/Los_Angeles");
+    await addStudioCalendarDay({data:{academicCalendarId:calendar.id,calendarDate:nextSiteDay,
+     type:"instructional",instructionalMinutes:360}});
+    const scheduleRevision=await createStudioScheduleRevision({data:{scheduleTemplateId:schedule.id,
+     name:"Future attendance schedule",effectiveFrom:nextSiteDay}});
+    const previousVersion=first(await tx.select({effectiveThrough:s.scheduleTemplates.effectiveThrough})
+     .from(s.scheduleTemplates).where(eq(s.scheduleTemplates.id,schedule.id)));
+    const previousSiteDate=new Date(nextSiteDay+"T12:00:00Z");
+    previousSiteDate.setUTCDate(previousSiteDate.getUTCDate()-1);
+    expect(previousVersion.effectiveThrough).toBe(siteDate(previousSiteDate,"America/Los_Angeles"));
+    expect(await tx.select({id:s.scheduleTemplatePeriods.id}).from(s.scheduleTemplatePeriods)
+     .where(eq(s.scheduleTemplatePeriods.scheduleTemplateId,schedule.id))).toHaveLength(7);
+    const revisionAudit=first(await tx.select().from(s.auditEvents).where(and(
+     eq(s.auditEvents.resourceId,schedule.id),eq(s.auditEvents.action,"schedule_template.revise"))));
+    expect(revisionAudit).toMatchObject({
+     before:{effectiveFrom:schoolYear.startsOn,effectiveThrough:null},
+     after:{effectiveFrom:schoolYear.startsOn,effectiveThrough:previousVersion.effectiveThrough,
+      successorId:scheduleRevision.scheduleId},
+    });
+    expect(await tx.select().from(s.domainEvents).where(and(
+     eq(s.domainEvents.aggregateId,scheduleRevision.scheduleId),
+     eq(s.domainEvents.eventType,"ScheduleTemplateChanged")))).toHaveLength(1);
+    await expect(createStudioScheduleRevision({data:{scheduleTemplateId:schedule.id,
+     name:"Stale schedule revision",effectiveFrom:nextSiteDay}})).rejects.toThrow("latest open-ended");
+    await expect(replaceStudioSchedulePeriods({data:{scheduleTemplateId:schedule.id,periods:[period]}}))
+     .rejects.toThrow("effective schedule is immutable");
+    const changedDay=new Date(nextSiteDay+"T12:00:00Z").getUTCDay();
+    const revisedPeriods=Array.from({length:7},(_,dayOfWeek)=>({...period,dayOfWeek,
+     type:dayOfWeek===changedDay?"break" as const:"instruction" as const}));
+    await replaceStudioSchedulePeriods({data:{scheduleTemplateId:scheduleRevision.scheduleId,periods:revisedPeriods}});
+    expect((await flow.listExpectedOnsiteRoster({data:{date}})).students).toHaveLength(1);
+    expect((await flow.listExpectedOnsiteRoster({data:{date:nextSiteDay}})).programs[0]?.expectedDays).toBe(0);
+    const laterSiteDate=new Date(nextSiteDay+"T12:00:00Z");
+    laterSiteDate.setUTCDate(laterSiteDate.getUTCDate()+1);
+    const laterSiteDay=siteDate(laterSiteDate,"America/Los_Angeles");
+    await addStudioCalendarDay({data:{academicCalendarId:calendar.id,calendarDate:laterSiteDay,
+     type:"instructional",instructionalMinutes:360}});
+    const laterRevision=await createStudioScheduleRevision({data:{scheduleTemplateId:scheduleRevision.scheduleId,
+     name:"Restored future schedule",effectiveFrom:laterSiteDay}});
+    const laterWeekday=new Date(laterSiteDay+"T12:00:00Z").getUTCDay();
+    const restoredPeriods=revisedPeriods.map(value=>({...value,type:value.dayOfWeek===laterWeekday
+     ?"instruction" as const:value.type}));
+    await replaceStudioSchedulePeriods({data:{scheduleTemplateId:laterRevision.scheduleId,periods:restoredPeriods}});
+    expect((await flow.listExpectedOnsiteRoster({data:{date:laterSiteDay}})).programs[0]?.expectedDays).toBe(1);
     const present=await flow.markExpectedOnsiteAttendance({data:correction});
     await expect(flow.markExpectedOnsiteAttendance({data:{...absent,mutationId:crypto.randomUUID()}})).rejects.toThrow("Attendance conflict");
     await expect(flow.reviewCurrentAttendanceExcuse({data:{excuseId,decision:"approved"}})).rejects.toThrow("Attendance changed");

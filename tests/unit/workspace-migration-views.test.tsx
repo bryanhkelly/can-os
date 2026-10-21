@@ -104,7 +104,7 @@ describe("enrolled learning workspace", () => {
       assessmentId: "essay", sectionId: "english", title: "English essay", instructions: null,
       dueAt: null, pointsPossible: "10", submissionId: null, status: null, timeliness: null,
       submittedAt: null, gradedAt: null, score: null, course: "English", attemptNumber: null,
-      metadata: { rubric: "", criteria: [], synthetic: false }, assessmentStatus: "published" as const,
+      metadata: { rubric: "", criteria: [] }, assessmentStatus: "published" as const,
       attempts: [], rubricResult: null, responseText: "", feedbackText: "", response: undefined, feedback: undefined,
     };
     vi.mocked(getAssignments).mockResolvedValue({ connected: true, assignments: [

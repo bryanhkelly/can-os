@@ -96,16 +96,35 @@ describe("persistent server-initialized workspace shell", () => {
     view.queryClient.clear();
   });
 
-  it("labels delegated demo switching without expanding the active student's navigation", async () => {
+  it("uses ordinary membership switching without exposing a demo impersonation mode", async () => {
+    const view = await shell(signedIn);
+    const html = view.markup();
+    expect(html).toContain('aria-label="Active membership"');
+    expect(html).not.toContain('aria-label="Demo user"');
+    expect(html).not.toContain("Demo admin session:");
+    expect(html).not.toContain("/admissions");
+    view.queryClient.clear();
+  });
+
+  it("keeps the demo account selector visible while admin is viewing a student", async () => {
     if (!signedIn.session?.authenticated) throw new Error("Expected authenticated fixture");
     const view = await shell({
-      ...signedIn, session: { ...signedIn.session, demoFacilitator: true },
+      session: {
+        ...signedIn.session, demoAccountSwitching: true,
+        grants: [
+          { ...signedIn.session.grants[0]!, email: "jordan.student@valorschool.demo" },
+          {
+            ...signedIn.session.grants[0]!, id: "admin-grant", role: "registrar",
+            firstName: "Demo", lastName: "Admin", email: "admin.demo@valorschool.demo",
+          },
+        ],
+      }, error: null,
     });
     const html = view.markup();
-    expect(html).toContain('aria-label="Demo user"');
-    expect(html).toContain("Demo admin session: acting as Test Learner (student)");
-    expect(html).not.toContain("/admissions");
-    expect(html).not.toContain('aria-label="Active membership"');
+    expect(html).toContain('aria-label="Demo account"');
+    expect(html).toContain("admin.demo@valorschool.demo");
+    expect(html).toContain("jordan.student@valorschool.demo");
+    expect(html).not.toContain('href="/admissions"');
     view.queryClient.clear();
   });
 

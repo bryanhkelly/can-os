@@ -14,9 +14,6 @@ const { transaction, select, values, update } = vi.hoisted(() => ({
   update: vi.fn(),
 }));
 vi.mock("@/db/client", () => ({ db: { transaction } }));
-vi.mock("@/modules/_demo/demo-write-gate", () => ({
-  assertSyntheticMutation: vi.fn(),
-}));
 
 function rows(data: unknown[]) {
   const result = Promise.resolve(data);

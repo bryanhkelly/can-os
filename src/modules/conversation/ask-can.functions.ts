@@ -31,6 +31,12 @@ async function actor(): Promise<AgentContext> {
   return { ...context, actorPersonId: context.actorPersonId };
 }
 
+function currentOrganizationId(context: AgentContext): string {
+  const organizationIds = context.scope.organizationIds ?? [];
+  if (organizationIds.length !== 1) throw new AuthorizationError("single organization scope for SMS settings");
+  return organizationIds[0]!;
+}
+
 export const sendAskCanMessage = createServerFn({ method: "POST" })
   .validator((value: unknown) =>
     z
@@ -197,7 +203,7 @@ export const requestMySmsVerification = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ phone: z.string().regex(/^\+[1-9]\d{7,14}$/) }).parse(value))
   .handler(async ({ data }) => {
     const context = await actor();
-    await beginSmsVerification(context.actorPersonId, data.phone);
+    await beginSmsVerification(context.actorPersonId, data.phone, currentOrganizationId(context));
     return { ok: true };
   });
 
@@ -209,7 +215,7 @@ export const verifyMySmsConsent = createServerFn({ method: "POST" })
   }).parse(value))
   .handler(async ({ data }) => {
     const context = await actor();
-    await confirmSmsVerification(context.actorPersonId, data.phone, data.code);
+    await confirmSmsVerification(context.actorPersonId, data.phone, data.code, currentOrganizationId(context));
     return { ok: true };
   });
 

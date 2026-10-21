@@ -34,6 +34,30 @@ function SiteTodayPage() {
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
     </nav>
     <OpeningHandoffs handoffs={data.openingHandoffs}/>
+    {data.sectionOperations && <section className="mt-7 rounded-xl border bg-card p-5">
+      <h2 className="font-serif text-2xl">Section coverage and capacity</h2>
+      <div className="mt-3 flex flex-wrap gap-4 text-sm">
+        <span>{data.sectionOperations.summary.sections} active sections</span>
+        <span>{data.sectionOperations.summary.unstaffed} unstaffed</span>
+        <span>{data.sectionOperations.summary.staffingGaps} staffing gaps</span>
+        <span>{data.sectionOperations.summary.underCapacity} capacity gaps</span>
+        <span>{data.sectionOperations.summary.waitlisted} waitlisted students</span>
+      </div>
+      <div className="mt-4 space-y-2">
+        {data.sectionOperations.issues.map(issue => <article key={issue.kind + issue.sectionId}
+          className="rounded border p-3 text-sm">
+          <strong>{issue.title}</strong>
+          <p className="text-muted-foreground">{issue.description}</p>
+          <Link className="mt-2 inline-block underline" to="/operations/launch/$programId"
+            params={{programId:issue.programId}} search={{siteId:data.site.id,programId:undefined}}>
+            Review program operations →
+          </Link>
+        </article>)}
+        {!data.sectionOperations.issues.length && <p className="text-sm text-muted-foreground">
+          No section staffing, qualification, capacity, or waitlist exceptions detected.
+        </p>}
+      </div>
+    </section>}
     <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {[
         ["Active enrollment", String(data.enrollment.count), data.enrollment.note],
@@ -49,16 +73,22 @@ function SiteTodayPage() {
     <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <section>
         <h2 className="font-serif text-2xl">Needs your attention</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Outstanding work assigned to this site. Open Operations to review actions.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Outstanding work assigned to this site. Overdue and near-deadline work is listed first.</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <span className="rounded border px-2 py-1">Overdue: {data.actionSummary.overdue}</span>
+          <span className="rounded border px-2 py-1">Due within 24 hours: {data.actionSummary.dueWithin24Hours}</span>
+          <span className="rounded border px-2 py-1">Unassigned: {data.actionSummary.unassigned}</span>
+        </div>
         <div className="mt-4 space-y-3">
           {data.actions.map(action => <article key={action.id} className="rounded-xl border bg-card p-4">
             <div className="flex flex-wrap justify-between gap-2">
               <h3 className="font-medium"><Link to="/operations" search={{siteId:data.site.id,programId:undefined,action:action.id}} className="hover:underline">{action.title}</Link></h3>
-              <span className="text-xs uppercase text-muted-foreground">{action.priority} · {action.status.replaceAll("_", " ")}</span>
+              <span className="text-xs uppercase text-muted-foreground">{action.urgency==="overdue"?"Overdue · ":""}{action.priority} · {action.status.replaceAll("_", " ")}</span>
             </div>
             {action.description && <p className="mt-2 text-sm text-muted-foreground">{action.description}</p>}
             <div className="mt-3 flex flex-wrap justify-between gap-3 text-xs">
-              <span>{action.dueAt ? "Due " + new Date(action.dueAt).toLocaleDateString() : "No due date"}</span>
+              <span>{action.dueAt ? (action.urgency==="overdue"?"Overdue · ":action.urgency==="due_soon"?"Due within 24 hours · ":"Due · ")+new Date(action.dueAt).toLocaleString() : "No due date"}</span>
+              <span>{action.ownerName?`Assigned to ${action.ownerName}`:action.ownerPersonId?"Assigned owner unavailable":"Unassigned"}</span>
               <Link className="underline" to="/operations" search={{siteId:data.site.id,programId:undefined,action:action.id}}>Review action →</Link>
             </div>
           </article>)}

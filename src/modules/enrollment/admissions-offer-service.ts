@@ -7,11 +7,11 @@ import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configura
 import { assertCapability,assertProgramScope,AuthorizationError,type CommandContext } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { assertEnrollmentFormApproved } from "@/domain/enrollment-form";
-import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
 import { emitEvent,notify,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray } from "drizzle-orm";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
+import { schoolYearServesProgram } from "@/domain/admissions-seat-pool";
 
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
 const guarded=(context:AccessContext,role:"registrar"|"guardian")=>{
@@ -27,10 +27,7 @@ async function lockPool(tx:Transaction,programId:string,schoolYearId:string){
  if(!pool)throw new Error("A configured seat pool is required");
  const [year]=await tx.select({programId:schoolYears.programId,organizationId:schoolYears.organizationId,siteId:schoolYears.siteId}).from(schoolYears).where(eq(schoolYears.id,schoolYearId)).limit(1);
  const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId}).from(programs).where(eq(programs.id,programId)).limit(1);
- if(!year||!program||year.organizationId!==program.organizationId||
-  (year.programId!==null&&year.programId!==programId)||
-  (program.siteId!==null&&year.siteId!==program.siteId)||
-  (year.programId===null&&(!program.siteId||year.siteId!==program.siteId)))
+ if(!year||!program||!schoolYearServesProgram(year,{...program,id:programId}))
   throw new Error("School year does not belong to this program or host site");
  return {pool,organizationId:program.organizationId};
 }
@@ -86,7 +83,6 @@ export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{
   const [app]=await tx.select().from(applications).where(eq(applications.id,input.applicationId)).limit(1);
   if(!app)throw new Error("Application not found");
   requireAdmissionsProgramScope(context,app.programId);
-  assertRecordWriteAllowed(app.metadata,"registrar");
   assertApplicationOffersAllowed(app);
   const {pool}=await lockPool(tx,app.programId,input.schoolYearId);
   await expireElapsedOffers(tx,context,app.programId,input.schoolYearId,new Date());
@@ -131,7 +127,6 @@ export async function respondToSyntheticAdmissionOffer(context:AccessContext,off
   const [app]=await tx.select().from(applications).where(eq(applications.id,offer!.applicationId)).limit(1);
   if(!app||app.programId!==offer!.programId)throw new Error("Offer application mismatch");
   await assertGuardian(tx,context.actorPersonId,app.studentProfileId);
-  assertRecordWriteAllowed(app.metadata,"guardian");
   if(action==="accept")assertApplicationOffersAllowed(app);
   if(offer!.status==="accepted"&&action==="accept")return offerId;
   if(offer!.status==="declined"&&action==="decline")return offerId;
@@ -168,7 +163,6 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   if(!app||app.programId!==offer!.programId||app.stage!=="accepted")throw new Error("Application not accepted for this offer");
   assertApplicationOffersAllowed(app);
   await assertGuardian(tx,offer!.respondedByPersonId,app.studentProfileId);
-  assertRecordWriteAllowed(app.metadata,"registrar");
   const [programSite]=await tx.select({siteId:programs.siteId,organizationId:programs.organizationId})
     .from(programs).where(eq(programs.id,offer!.programId)).limit(1);
   if(!programSite||programSite.organizationId!==organizationId)
@@ -212,7 +206,6 @@ export async function withdrawAdmissionOffer(context:AccessContext,input:{offerI
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,input.offerId)).limit(1);
   const [app]=offer?await tx.select().from(applications).where(eq(applications.id,offer.applicationId)).limit(1):[];
   if(!offer||!app||app.programId!==offer.programId)throw new Error("Offer application mismatch");
-  assertRecordWriteAllowed(app.metadata,"registrar");
   if(offer.status==="revoked"){
    const [audit]=await tx.select({after:auditEvents.after}).from(auditEvents).where(and(
     eq(auditEvents.resourceId,offer.id),eq(auditEvents.action,"admissions.offer.withdraw"))).limit(1);

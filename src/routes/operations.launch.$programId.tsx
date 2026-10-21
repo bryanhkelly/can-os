@@ -60,7 +60,7 @@ function Setup({data}:{data:Snapshot}){
    changed={async()=>{await router.invalidate();}}/>
   <section className="mt-7 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Teacher qualification policy</h2>
-   {data.policyPublished?<p className="mt-3 text-sm">Program requirements are published. Each instructor is checked against every applicable published policy for the full instructional window.</p>:
+   {data.policyPublished?<p className="mt-3 text-sm">Program requirements are published. Each instructor is checked against every applicable policy for their assigned instructional dates.</p>:
     <form className="mt-3 space-y-3" onSubmit={e=>{
      e.preventDefault();void run(()=>publishLaunchTeacherPolicy({data:{
       programId:data.program.id,qualificationKeys,confirmed:true}}),"Teacher qualification policy published.");
@@ -114,8 +114,9 @@ function Setup({data}:{data:Snapshot}){
    <h2 className="font-serif text-2xl">Teaching assignments</h2>
    {data.sections.map(section=><SectionRow key={section.id} section={section}
     staff={data.teachingStaff} busy={busy}
-    assign={(personId)=>run(()=>assignLaunchTeacher({data:{
-     programId:data.program.id,sectionId:section.id,teacherPersonId:personId}}),"Instructor assigned.")}/>)}
+    assign={(personId,effectiveFromDate,effectiveThroughDate)=>run(()=>assignLaunchTeacher({data:{
+     programId:data.program.id,sectionId:section.id,teacherPersonId:personId,
+     effectiveFromDate,effectiveThroughDate}}),"Instructor coverage window assigned.")}/>)}
    {!data.sections.length&&<p className="rounded-lg border p-4 text-sm text-muted-foreground">No sections have been provisioned for this program.</p>}
   </section>
   <section className="mt-7 rounded-xl border bg-card p-5">
@@ -134,15 +135,23 @@ function Setup({data}:{data:Snapshot}){
 }
 function SectionRow({section,staff,busy,assign}:{
  section:Snapshot["sections"][number],staff:Snapshot["teachingStaff"],busy:boolean,
- assign:(personId:string)=>Promise<void>
+ assign:(personId:string,effectiveFromDate:string,effectiveThroughDate:string)=>Promise<void>
 }){
  const [personId,setPersonId]=useState("");
+ const firstCandidate=section.candidates[0];
+ const [effectiveFromDate,setEffectiveFromDate]=useState(firstCandidate?.fromDate??"");
+ const [effectiveThroughDate,setEffectiveThroughDate]=useState(firstCandidate?.throughDate??"");
  const candidate=section.candidates.find(candidate=>candidate.personId===personId);
  return <article className="rounded-lg border bg-card p-4">
   <h3 className="font-semibold">{section.title} · {section.code}</h3>
   <p className="mt-2 text-xs text-muted-foreground">
    {section.teachers.length?section.teachers.map(t=>t.first+" "+t.last).join(", "):"Instructor not yet assigned"}
   </p>
+  {section.coverage.length>0&&<ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+   {section.coverage.map((window,index)=><li key={`${window.personId}-${index}`}>
+    {window.first} {window.last}: {window.fromDate??"section start"}–{window.throughDate??"section end"}
+   </li>)}
+  </ul>}
   <div className="mt-3 grid gap-2 sm:grid-cols-4">
    <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Enrollment</span><br/>{section.readiness.metrics.activeEnrollment}/{section.readiness.metrics.enrollmentCapacity}</div>
    <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Forecast</span><br/>{section.readiness.metrics.expectedDemand??"Not set"}</div>
@@ -157,16 +166,25 @@ function SectionRow({section,staff,busy,assign}:{
   </div>
   <div className="mt-3 flex flex-wrap items-end gap-2">
    <label className="min-w-48 flex-1 text-xs">Assign instructor<select className="mt-1 block w-full rounded border bg-background p-2" value={personId} onChange={e=>setPersonId(e.target.value)}>
-    <option value="">Choose teacher</option>{staff.filter(t=>!section.teachers.some(a=>a.personId===t.personId))
-      .map(t=><option key={t.personId} value={t.personId}>{t.first} {t.last}</option>)}
+    <option value="">Choose teacher</option>{staff.map(t=><option key={t.personId} value={t.personId}>{t.first} {t.last}</option>)}
    </select></label>
-   <button type="button" disabled={busy||!section.active||!personId||!candidate?.eligible} onClick={()=>assign(personId)}
-    className="rounded border px-3 py-2 text-sm disabled:opacity-50">Add instructor</button>
+   <label className="text-xs">First teaching date<input type="date" value={effectiveFromDate}
+    min={firstCandidate?.fromDate} max={firstCandidate?.throughDate}
+    onChange={event=>setEffectiveFromDate(event.target.value)}
+    className="mt-1 block rounded border bg-background p-2"/></label>
+   <label className="text-xs">Last teaching date<input type="date" value={effectiveThroughDate}
+    min={firstCandidate?.fromDate} max={firstCandidate?.throughDate}
+    onChange={event=>setEffectiveThroughDate(event.target.value)}
+    className="mt-1 block rounded border bg-background p-2"/></label>
+   <button type="button" disabled={busy||!section.active||!personId||!effectiveFromDate||!effectiveThroughDate||
+    effectiveFromDate>effectiveThroughDate} onClick={()=>assign(personId,effectiveFromDate,effectiveThroughDate)}
+    className="rounded border px-3 py-2 text-sm disabled:opacity-50">Assign coverage</button>
   </div>
   {candidate&&<div className="mt-3 text-sm" role="status">
-   <p>Instructional coverage: {candidate.from} to {candidate.through} (end exclusive).</p>
-   {candidate.eligible?<p>Eligible for this instructional window. Existing co-teachers retain their assignments.</p>:
-    <ul className="list-inside list-disc">{candidate.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul>}
+   <p>Qualification requirements are checked for {effectiveFromDate} through {effectiveThroughDate} in the school-year timezone.</p>
+   {candidate.eligible?<p>Eligible for the full section window. Existing co-teachers retain their assignments.</p>:
+    <><p>This teacher is not eligible for the full section window; the selected interval will be checked independently.</p>
+     <ul className="list-inside list-disc">{candidate.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul></>}
   </div>}
  </article>;
 }

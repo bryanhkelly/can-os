@@ -1,6 +1,6 @@
 
 INSERT INTO people(id,legal_first_name,legal_last_name,preferred_name,metadata)
-VALUES('f3000000-0000-4000-8000-000000000007','Morgan','Example','Morgan','{"synthetic":true,"fixture":"student-calendar-comms-office-hours","role":"guardian"}'::jsonb)
+VALUES('f3000000-0000-4000-8000-000000000007','Morgan','Example','Morgan','{"fixture":"student-calendar-comms-office-hours","role":"guardian"}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 
 INSERT INTO guardian_relationships(id,guardian_person_id,student_person_id,relationship_label,can_view_academics)
@@ -14,7 +14,7 @@ VALUES
 ON CONFLICT(id) DO NOTHING;
 
 INSERT INTO conference_series(id,site_id,teacher_person_id,title,starts_at,ends_at,slot_minutes,status,metadata)
-VALUES('f3000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000006','Synthetic teacher office hours','2026-10-22T21:00:00Z','2026-10-22T22:00:00Z',20,'published','{"synthetic":true,"fixture":"student-calendar-comms-office-hours"}'::jsonb)
+VALUES('f3000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000006','Synthetic teacher office hours','2026-10-22T21:00:00Z','2026-10-22T22:00:00Z',20,'published','{"fixture":"student-calendar-comms-office-hours"}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 
 INSERT INTO conference_slots(id,conference_series_id,starts_at,ends_at,status)

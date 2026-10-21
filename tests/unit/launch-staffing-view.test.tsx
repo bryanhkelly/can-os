@@ -28,8 +28,11 @@ const snapshot: Snapshot = {
   teacherPolicies: [], canReviseTeacherPolicy: false,
   sections: [{
     id: "section", title: "Science", code: "SCI", termId: "term", active: true, teachers: [],
+    coverage: [{ personId: "teacher", first: "Alex", last: "Teacher",
+      fromDate: "2027-08-16", throughDate: "2027-10-31" }],
     candidates: [{ personId: "teacher", eligible: false, reasons: ["Qualification policy not configured."],
-      from: "2027-08-16T07:00:00.000Z", through: "2027-12-20T08:00:00.000Z" }],
+      from: "2027-08-16T07:00:00.000Z", through: "2027-12-20T08:00:00.000Z",
+      fromDate: "2027-08-16", throughDate: "2027-12-19" }],
     readiness: { sectionId: "section", ready: false,
       items: [{ key: "launch_staffing", state: "blocked", message: "Qualification policy not configured." }],
       metrics: { enrollmentCapacity: 30, activeEnrollment: 0, expectedDemand: null, reservedInstructionalSeats: 0 } },
@@ -45,13 +48,17 @@ describe("launch staffing presentation", () => {
   it("shows missing policy blockers, catalog requirements and explicit publication confirmation", () => {
     const html = render(snapshot);
     expect(html).toContain("Qualification policy not configured.");
+    expect(html).toContain("First teaching date");
+    expect(html).toContain("Last teaching date");
+    expect(html).toContain("Assign coverage");
+    expect(html).toContain("Alex Teacher: 2027-08-16–2027-10-31");
     expect(html).toContain("Teaching license");
     expect(html).toContain("independently verified");
     expect(html).toContain("I confirm these requirements are reviewed");
     expect(html).toContain("cannot be edited here");
     expect(html).toContain("does not certify legal or regulatory compliance");
     expect(html).toContain('disabled=""');
-    expect(html).toContain("Add instructor");
+    expect(html).toContain("Assign coverage");
     expect(html).not.toContain("Instructor assigned.");
   });
   it("shows published status without suggesting that publication verifies a teacher", () => {

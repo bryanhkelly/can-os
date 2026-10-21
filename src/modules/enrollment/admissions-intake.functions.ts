@@ -5,16 +5,17 @@ import { offerHoldsSeat } from "@/domain/admissions-policy";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
-import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { enrollmentJourneyDefinitionKey } from "@/domain/enrollment-form";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray,isNull,or } from "drizzle-orm";
+import { and,desc,eq,inArray,isNull,or,sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
+import { createProspectiveStudent } from "./prospective-student.server";
+import { readApplicationPacket } from "@/domain/application-packet";
 const uuid=z.string().uuid();
 const existingStudentSchema=z.object({
  studentProfileId:uuid,guardianPersonId:uuid,householdId:uuid.optional(),createHousehold:z.literal(true).optional(),
@@ -41,7 +42,8 @@ async function registrar(){
 }
 export const listAdmissionsIntakePrograms=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await registrar();
- return db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs)
+ return db.select({id:programs.id,name:programs.name,siteId:programs.siteId,
+  onlineApplicationsOpen:sql<boolean>`${programs.metadata}->'admissionsOpen' = 'true'::jsonb`}).from(programs)
   .where(and(inArray(programs.id,actor.scope.programIds!),
     inArray(programs.organizationId,actor.scope.organizationIds??[])))
   .orderBy(programs.name);
@@ -115,6 +117,9 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
    g.organizationId===r.organizationId&&(!g.siteId||g.siteId===r.siteId));
   return {
    ...rest,guardianVerified:verified,guardianLoginProvisioned:loginProvisioned,
+   applicantDraft:metadata.applicantDraft===true,
+   applicantStatement:typeof metadata.applicantStatement==="string"?metadata.applicantStatement:null,
+   applicationPacket:readApplicationPacket(metadata),
    createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
    disposition:metadata.admissionsDisposition==="waitlisted"?"waitlisted":metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
   };
@@ -131,7 +136,6 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
   return db.transaction(async tx=>{
    let existingStudent:typeof studentProfiles.$inferSelect|undefined;
    let existingChoice:Awaited<ReturnType<typeof existingStudentChoices>>[number]|undefined;
-   let synthetic=false;
    if(data.existingStudent){
     const [choice]=await existingStudentChoices(tx,actor,data.programId,data.existingStudent);
     if(!choice)throw new AuthorizationError("existing student, guardian and household scope");
@@ -143,12 +147,9 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     [existingChoice]=await existingStudentChoices(tx,actor,data.programId,data.existingStudent);
     if(!existingChoice)
      throw new AuthorizationError("existing student, guardian and household scope");
-    const [person]=await tx.select({metadata:people.metadata}).from(people)
+    const [person]=await tx.select({id:people.id}).from(people)
      .where(eq(people.id,existingStudent.personId)).limit(1);
     if(!person)throw new AuthorizationError("existing student identity");
-    assertRecordWriteAllowed(existingStudent.metadata,"registrar");
-    assertRecordWriteAllowed(person.metadata,"registrar");
-    synthetic=existingStudent.metadata.synthetic===true||person.metadata.synthetic===true;
    }
    const idempotencyKey="registrar-inquiry:"+data.requestId;
    const [repeat]=await tx.select({id:applications.id,programId:applications.programId,
@@ -211,7 +212,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
      // created until a registrar explicitly provisions guardian access.
      const [guardian]=await tx.insert(people).values({
       legalFirstName:data.guardianFirstName,legalLastName:data.guardianLastName,email:data.guardianEmail,
-      metadata:{synthetic:false,origin:"registrar_intake"},
+      metadata:{origin:"registrar_intake"},
      }).returning({id:people.id});
      const [household]=await tx.insert(households).values({
       displayName:data.guardianLastName+" Household",primaryEmail:data.guardianEmail,
@@ -221,22 +222,11 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
       householdId,personId:guardianPersonId,relationshipLabel:"guardian",isPrimaryContact:true,
      });
     }
-    const [studentPerson]=await tx.insert(people).values({
-     legalFirstName:data.studentFirstName,legalLastName:data.studentLastName,
-     metadata:{synthetic:false,origin:"registrar_intake"},
-    }).returning({id:people.id});
-    const [student]=await tx.insert(studentProfiles).values({
-     personId:studentPerson!.id,gradeLevel:data.gradeLevel||null,metadata:{synthetic:false,origin:"registrar_intake"},
-    }).returning({id:studentProfiles.id});
-    await tx.insert(householdMemberships).values({
-     householdId,personId:studentPerson!.id,relationshipLabel:"student",
+    const student=await createProspectiveStudent(tx,{
+     householdId,guardianPersonId,firstName:data.studentFirstName,lastName:data.studentLastName,
+     gradeLevel:data.gradeLevel,origin:"registrar_intake",
     });
-    await tx.insert(guardianRelationships).values({
-     guardianPersonId,studentPersonId:studentPerson!.id,relationshipLabel:"guardian",
-     canViewAcademics:false,canManageEnrollment:false,canSubmitAttendanceExcuse:false,
-     metadata:{verification:"pending",source:"registrar_intake"},
-    });
-    studentProfileId=student!.id;
+    studentProfileId=student.studentProfileId;
    } else {
     throw new AuthorizationError("existing student");
    }
@@ -244,7 +234,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     householdId,studentProfileId,programId:data.programId,
     submittedByPersonId:actor.actorPersonId!,stage:"inquiry",
     idempotencyKey,
-    metadata:{synthetic,source:data.source,notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardianPersonId,
+    metadata:{source:data.source,notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardianPersonId,
      ...(data.existingStudent?{existingStudent:true,createdHousehold:data.existingStudent.createHousehold===true}:{})},
    }).returning({id:applications.id});
    await emitEvent(tx,{eventType:"AdmissionsInquiryCreated",aggregateType:"application",
@@ -271,7 +261,7 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
     .for("update").limit(1);
    if(!app||!actor.scope.programIds?.includes(app.programId))
     throw new AuthorizationError("admissions application");
-   assertRecordWriteAllowed(app.metadata,"registrar");
+   if(app.metadata.applicantDraft===true)throw new Error("The family must submit this draft before admissions review");
    const [scope]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
     .from(programs).where(eq(programs.id,app.programId)).limit(1);
    if(!scope||!actor.scope.organizationIds?.includes(scope.organizationId)||
@@ -362,7 +352,6 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
     (actor.scope.siteIds?.length&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))
     throw new AuthorizationError("guardian membership scope");
-   assertRecordWriteAllowed(app.metadata,"registrar");
    const contactId=String(app.metadata.contactPersonId??"");
    const [contact]=await tx.select({id:people.id,email:people.email})
     .from(people).where(eq(people.id,contactId)).limit(1);
@@ -407,7 +396,6 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    const [newGrant]=await tx.insert(accountPersonGrants).values({
     accountId:account!.id,personId:contact.id,role:"guardian",
     organizationId:program.organizationId,siteId:program.siteId,
-    isSynthetic:app.metadata.synthetic===true,
    }).returning({id:accountPersonGrants.id});
    await writeAudit(tx,actor,{
     action:"admissions.guardian_access.provision",entityType:"account_person_grant",
@@ -483,7 +471,6 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
    }).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
    if(!app||!actor.scope.programIds?.includes(app.programId))
     throw new AuthorizationError("guardian relationship verification");
-   assertRecordWriteAllowed(app.metadata,"registrar");
    const contactId=String(app.metadata.contactPersonId??"");
    const [learner]=await tx.select({personId:studentProfiles.personId})
     .from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);

@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { actions, enrollments, instructionalCapacityReservations, programs, sectionCapacityDemands, sectionTeachers, sections } from "@/db/schema";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { currentCapacityReservationFilter } from "@/modules/staffing/reservation-policy";
+import { evaluateLaunchStaffing } from "@/modules/staffing/launch-staffing.server";
 
 /** Live operational exceptions, not demo/synthetic fixture rows. */
 export async function getSchoolOperationsCommandCenter(context: CommandContext & { role?: string }) {
@@ -14,7 +15,7 @@ export async function getSchoolOperationsCommandCenter(context: CommandContext &
       ...(context.scope.programIds?[inArray(sections.programId,context.scope.programIds)]:[]),
       ...(context.scope.siteIds?[inArray(sections.siteId,context.scope.siteIds)]:[])));
   const ids=accessible.map(x=>x.id);
-  if(!ids.length)return {summary:{sections:0,unstaffed:0,underCapacity:0,waitlisted:0},issues:[]};
+  if(!ids.length)return {summary:{sections:0,unstaffed:0,staffingGaps:0,underCapacity:0,waitlisted:0},issues:[]};
   const [teachers,demands,commitments,waiting]=await Promise.all([
     db.select({sectionId:sectionTeachers.sectionId}).from(sectionTeachers).where(inArray(sectionTeachers.sectionId,ids)),
     db.select({sectionId:sectionCapacityDemands.sectionId,seats:sectionCapacityDemands.expectedSeats})
@@ -33,8 +34,14 @@ export async function getSchoolOperationsCommandCenter(context: CommandContext &
   for(const w of waiting)if(w.sectionId)waitsBySection.set(w.sectionId,(waitsBySection.get(w.sectionId)??0)+1);
   const issues:{kind:string;sectionId:string;title:string;description:string;programId:string}[]=[];
   for(const section of accessible.filter(x=>x.active)){
-    if(!teacherIds.has(section.id))issues.push({kind:"unstaffed",sectionId:section.id,programId:section.programId,
-      title:section.title+" needs an instructor",description:"Assign a qualified teacher or commit a compatible capacity offering."});
+    if(!teacherIds.has(section.id)){
+      issues.push({kind:"unstaffed",sectionId:section.id,programId:section.programId,
+        title:section.title+" needs an instructor",description:"Assign a qualified teacher or commit a compatible capacity offering."});
+    }else{
+      const staffing=await evaluateLaunchStaffing(section.id);
+      if(!staffing.ready)issues.push({kind:"staffing_gap",sectionId:section.id,programId:section.programId,
+        title:section.title+" has a staffing coverage gap",description:staffing.reasons.join(" ")});
+    }
     const demand=demands.find(x=>x.sectionId===section.id);
     if(demand && (commitmentsBySection.get(section.id)??0)<demand.seats)
       issues.push({kind:"capacity",sectionId:section.id,programId:section.programId,title:section.title+" has a capacity gap",
@@ -45,6 +52,7 @@ export async function getSchoolOperationsCommandCenter(context: CommandContext &
   }
   return {
     summary:{sections:accessible.filter(s=>s.active).length,unstaffed:issues.filter(x=>x.kind==="unstaffed").length,
+      staffingGaps:issues.filter(x=>x.kind==="staffing_gap").length,
       underCapacity:issues.filter(x=>x.kind==="capacity").length,waitlisted:waiting.length},
     issues,
   };

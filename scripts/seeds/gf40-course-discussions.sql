@@ -12,7 +12,7 @@ VALUES (
  'f1000000-0000-4000-8000-000000000040',
  'f1000000-0000-4000-8000-000000000006',
  now(),
- '{"synthetic":true,"fixture":"gf40-discussions","kind":"course_discussion","locked":false}'::jsonb
+ '{"fixture":"gf40-discussions","kind":"course_discussion","locked":false}'::jsonb
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -25,7 +25,7 @@ ON CONFLICT (thread_id,participant_type,participant_id) DO NOTHING;
 INSERT INTO communication_messages (id,thread_id,sender_person_id,body,metadata)
 VALUES
  ('f7200000-0000-4000-8000-000000000021','f7200000-0000-4000-8000-000000000001','f1000000-0000-4000-8000-000000000006',
-  'Which primary source did you find most persuasive this week, and why?','{"synthetic":true,"fixture":"gf40-discussions"}'::jsonb),
+  'Which primary source did you find most persuasive this week, and why?','{"fixture":"gf40-discussions"}'::jsonb),
  ('f7200000-0000-4000-8000-000000000022','f7200000-0000-4000-8000-000000000001','f1000000-0000-4000-8000-000000000005',
-  'I found the diary entry most persuasive because it shows the daily stakes behind the policy.','{"synthetic":true,"fixture":"gf40-discussions","parentMessageId":"f7200000-0000-4000-8000-000000000021"}'::jsonb)
+  'I found the diary entry most persuasive because it shows the daily stakes behind the policy.','{"fixture":"gf40-discussions","parentMessageId":"f7200000-0000-4000-8000-000000000021"}'::jsonb)
 ON CONFLICT (id) DO NOTHING;

@@ -18,7 +18,7 @@ INSERT INTO applications (id,household_id,student_profile_id,program_id,stage,id
 ('f9000000-0000-4000-8000-000000000003','f9000000-0000-4000-8000-000000000001',
 'f1000000-0000-4000-8000-000000000007','f1000000-0000-4000-8000-000000000004',
 'application','gf2-test-app-1','f3000000-0000-4000-8000-000000000007',now(),
-'{"synthetic":true,"fixture":"gf2-test"}') ON CONFLICT (id) DO NOTHING;
+'{"fixture":"gf2-test"}') ON CONFLICT (id) DO NOTHING;
 INSERT INTO journeys (id,type,status,participant_type,participant_id,organization_id,site_id,program_id,journey_definition_id,definition_version) VALUES
 ('f9000000-0000-4000-8000-000000000004','enrollment','ready','application',
 'f9000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000002',

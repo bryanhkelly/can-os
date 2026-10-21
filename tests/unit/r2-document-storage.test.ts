@@ -24,6 +24,20 @@ describe("private Cloudflare R2 upload controls",()=>{
   expect(url.toString()).not.toContain("do-not-expose-secret");
   expect(()=>signR2Object("PUT","enrollment/../../other","application/pdf")).toThrow();
  });
+ it("uses separate demo-tenant credentials and refuses a missing demo bucket",()=>{
+  process.env.CAN_R2_DEMO_ACCOUNT_ID="b".repeat(32);
+  process.env.CAN_R2_DEMO_BUCKET="can-os-demo";
+  process.env.CAN_R2_DEMO_ACCESS_KEY_ID="demo-access";
+  process.env.CAN_R2_DEMO_SECRET_ACCESS_KEY="demo-secret";
+  const url=new URL(signR2Object("PUT",newDocumentKey(app,req),"application/pdf",180,"demo"));
+  expect(url.hostname).toBe("b".repeat(32)+".r2.cloudflarestorage.com");
+  expect(url.pathname).toContain("/can-os-demo/enrollment/");
+  expect(url.toString()).not.toContain("demo-secret");
+
+  delete process.env.CAN_R2_DEMO_ACCOUNT_ID;
+  expect(()=>signR2Object("PUT",newDocumentKey(app,req),"application/pdf",180,"demo"))
+   .toThrow("Isolated demo R2 storage is not configured");
+ });
  it("requires safe file names, size and supported MIME types",()=>{
   expect(()=>validateDocumentUpload("report.pdf","application/pdf",2048)).not.toThrow();
   expect(()=>validateDocumentUpload("report.pdf","application/pdf",15)).toThrow();

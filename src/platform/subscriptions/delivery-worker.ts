@@ -4,10 +4,19 @@ import { domainEvents, subscriptionDeliveries, subscriptions, conversationMessag
 import { emailNotificationRecipients, sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { getSubscriptionPolicy } from "./policy";
 import { getNotificationPreferences, nextAllowedDelivery, sendOptedInSms } from "./preferences";
+import { isDemoTenantOrganization } from "@/domain/local-demo-access";
 
 const LEASE_MS = 120_000;
 const MAX_ATTEMPTS = 5;
 const RETRY_MS = (attempt: number) => Math.min(60_000 * 2 ** Math.max(0, attempt - 1), 3_600_000);
+
+function readOrganizationId(context: unknown): string {
+  if (typeof context !== "object" || context === null ||
+    !("organizationId" in context) || typeof context.organizationId !== "string") {
+    throw new Error("Subscription policy did not provide an organization scope");
+  }
+  return context.organizationId;
+}
 
 /**
  * The scheduled job may overlap across instances. Row leasing plus SKIP LOCKED
@@ -71,11 +80,19 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
         return {
           channel: row.channel, attempt: row.attempts + 1,
           personId: subscription.subscriberPersonId,
+          organizationId: readOrganizationId(context),
           sourceConversationId: subscription.sourceConversationId,
           content: policy!.content(context!, row.kind === "initial" ? "initial" : "reminder"),
         };
       });
       if (!delivery) continue;
+      if (isDemoTenantOrganization(delivery.organizationId)) {
+        await db.update(subscriptionDeliveries).set({
+          status: "suppressed", lastError: "synthetic_tenant_external_delivery_disabled",
+          leaseUntil: null, updatedAt: now,
+        }).where(and(eq(subscriptionDeliveries.id, id), eq(subscriptionDeliveries.status, "processing")));
+        continue;
+      }
       const prefs = await getNotificationPreferences(delivery.personId);
       const quietUntil = prefs ? nextAllowedDelivery(now, prefs.timezone, prefs.quietStart, prefs.quietEnd) : null;
       if (quietUntil) {
@@ -87,13 +104,14 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
       let ok = false;
       let error = "channel_not_supported";
       if (delivery.channel === "email") {
-        const emails = await emailNotificationRecipients([delivery.personId]);
+        const emails = await emailNotificationRecipients([delivery.personId], delivery.organizationId);
         const email = emails.get(delivery.personId);
         if (!email) error = "no_active_email";
         else {
           ok = await sendNotificationEmail({
             to: email, subject: delivery.content.title,
             text: delivery.content.body ?? delivery.content.title,
+            organizationId: delivery.organizationId,
           }, id);
           error = "email_provider_failed";
         }
@@ -103,7 +121,11 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
           error = "sms_consent_required";
         } else {
           // SMS previews must remain low-sensitivity; the guardian opens CAN for detail.
-          ok = await sendOptedInSms(prefs.smsVerifiedPhone, "CAN OS: An assignment reminder needs your attention. Sign in to CAN OS to review.");
+          ok = await sendOptedInSms(
+            prefs.smsVerifiedPhone,
+            "CAN OS: An assignment reminder needs your attention. Sign in to CAN OS to review.",
+            delivery.organizationId,
+          );
           error = "sms_provider_failed";
         }
       }

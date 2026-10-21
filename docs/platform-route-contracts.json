@@ -4,6 +4,24 @@
   "generatedFromBranch": "main",
   "routes": [
     {
+      "file": "src/routes/apply.index.tsx",
+      "route": "/apply/",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/apply.access.ts",
+      "route": "/apply/access",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/actions.$actionId.tsx",
       "route": "/actions/$actionId",
       "owner": "actions",
@@ -114,6 +132,15 @@
     {
       "file": "src/routes/admissions.capacity.tsx",
       "route": "/admissions/capacity",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admissions.applications.$applicationId.tsx",
+      "route": "/admissions/applications/$applicationId",
       "owner": "enrollment",
       "verification": "pending",
       "roleJourney": "pending",
@@ -448,6 +475,24 @@
       "file": "src/routes/sites.index.tsx",
       "route": "/sites/",
       "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/sites.$siteId.profile.tsx",
+      "route": "/sites/$siteId/profile",
+      "owner": "profiles",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/organizations.$organizationId.tsx",
+      "route": "/organizations/$organizationId",
+      "owner": "profiles",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",

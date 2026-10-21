@@ -51,6 +51,7 @@ vi.mock("@/modules/enrollment/admissions-intake.functions",()=>({
  provisionInquiryGuardianAccount:vi.fn(),sendAdmissionsGuardianInvitation:vi.fn(),
  verifyAdmissionsGuardianRelationship:vi.fn(),transitionAdmissionsStage:vi.fn(),
 }));
+vi.mock("@/modules/enrollment/family-application.functions",()=>({setOnlineApplications:vi.fn()}));
 vi.mock("@/modules/operations/site-directory.functions",()=>({listMySites:vi.fn()}));
 vi.mock("@/modules/enrollment/admissions-program-directory.functions",()=>({listAdmissionsPrograms:vi.fn()}));
 vi.mock("@/modules/enrollment/admissions-offer.functions",()=>({
@@ -129,15 +130,20 @@ describe("application contextual navigation",()=>{
     state.search={action:"referral",siteId:"school",programId:"program"};
     state.data={
       operations:{items:[
-        {id:"referral",kind:"action",title:"Academic referral",detail:"Support team follow-up",priority:"normal",managedBySupport:true,href:"/operations"},
-        {id:"other",kind:"action",title:"Unrelated action",detail:"Other",priority:"normal",managedBySupport:false,href:"/operations"},
-      ],sites:[],programs:[],assignees:[],summary:{total:2,urgent:0,needsResponse:2}},
+        {id:"referral",kind:"action",title:"Academic referral",detail:"Support team follow-up",priority:"normal",status:"open",
+          dueAt:"2030-01-01T10:00:00Z",urgency:"overdue",ownerPersonId:null,ownerName:null,managedBySupport:true,href:"/operations"},
+        {id:"other",kind:"action",title:"Unrelated action",detail:"Other",priority:"normal",status:"open",
+          dueAt:null,urgency:"unscheduled",ownerPersonId:null,ownerName:null,managedBySupport:false,href:"/operations"},
+      ],sites:[],programs:[],assignees:[],summary:{total:2,urgent:0,needsResponse:2,overdue:1,dueWithin24Hours:0,unassigned:2}},
       health:{buildId:"test",schemaStatus:"compatible",details:"Ready"},commandCenter:null,authError:"",
     };
     const html=render(Operations);
     expect(html).toContain("Academic referral");
     expect(html).not.toContain("Unrelated action");
     expect(html).toContain("Managed by the support team");
+    expect(html).toContain("Overdue");
+    expect(html).toContain("1/1/2030");
+    expect(html).toContain("Unassigned");
     expect(html).not.toContain('href="/student/support');
     expect(html).not.toContain(">Resolve</button>");
     expect(html).toContain('href="/operations?siteId=school&amp;programId=program&amp;action=referral"');
@@ -148,7 +154,13 @@ describe("application contextual navigation",()=>{
       site:{id:"school",name:"Test school",organizationName:"Test organization",timezone:"America/Los_Angeles"},
       localDate:"2030-01-01",asOf:"2030-01-01T12:00:00Z",
       enrollment:{count:1,note:"Active"},attendance:{count:1,present:1,absent:0,tardy:0,note:"Recorded"},
-      actions:[{id:"task",title:"Review staffing",status:"open",priority:"normal",description:null,dueAt:null}],
+      actions:[{id:"task",title:"Review staffing",status:"open",priority:"normal",description:null,
+        dueAt:"2030-01-01T10:00:00.000Z",createdAt:"2030-01-01T00:00:00.000Z",urgency:"overdue",
+        ownerPersonId:null,ownerName:null}],
+      actionSummary:{overdue:1,dueWithin24Hours:0,unassigned:1},
+      sectionOperations:{summary:{sections:1,unstaffed:1,staffingGaps:0,underCapacity:0,waitlisted:0},
+        issues:[{kind:"unstaffed",sectionId:"section",programId:"program",title:"Science needs an instructor",
+          description:"Assign a qualified teacher or commit a compatible capacity offering."}]},
       events:[{id:"event",title:"Evening assembly",startsAt:"2030-01-02T01:00:00Z",type:"assembly"}],
       programs:[{id:"program",name:"Test program",status:"active",type:"full_school",gradeRange:{min:"9",max:"12"}}],
       openingHandoffs:[],
@@ -159,13 +171,19 @@ describe("application contextual navigation",()=>{
     expect(html).toContain('href="/admissions?siteId=school"');
     expect(html).toContain('href="/operations/launch/program?siteId=school"');
     expect(html).toContain('href="/calendar?date=2030-01-01&amp;event=event"');
+    expect(html).toContain("Overdue: 1");
+    expect(html).toContain("Unassigned: 1");
+    expect(html).toContain("Review staffing");
+    expect(html).toContain("Section coverage and capacity");
+    expect(html).toContain("Science needs an instructor");
   });
 
   it("routes a handoff to its owning workspace without generic resolve or reassignment controls",()=>{
     state.data={
       operations:{items:[{id:"handoff",kind:"action",title:"Opening handoff",detail:"Named recipient receipt",
-        priority:"high",openingHandoff:true,siteId:"school",ownerPersonId:"receiver"}],
-        sites:[],programs:[],assignees:[],summary:{total:1,urgent:0,needsResponse:1}},
+        priority:"high",status:"open",dueAt:null,urgency:"unscheduled",ownerName:"Receiving operator",
+        openingHandoff:true,siteId:"school",ownerPersonId:"receiver"}],
+        sites:[],programs:[],assignees:[],summary:{total:1,urgent:0,needsResponse:1,overdue:0,dueWithin24Hours:0,unassigned:0}},
       health:{buildId:"test",schemaStatus:"compatible",details:"Ready"},commandCenter:null,authError:"",
     };
     const html=render(Operations);
@@ -189,7 +207,7 @@ describe("application contextual navigation",()=>{
 
   it("returns from household readiness to the same admissions application",()=>{
     state.search={siteId:"school",programId:"program",application:"application"};
-    successful([{id:"application",householdId:"household",program:"Test program",stage:"inquiry",isFixture:false,
+    successful([{id:"application",householdId:"household",program:"Test program",stage:"inquiry",demoTenant:true,
       offers:[],activeSchoolYears:[],requirements:[],readiness:{completed:0,total:0,blockers:0},journeyStatus:null}]);
     expect(render(Families)).toContain('href="/admissions?siteId=school&amp;programId=program&amp;application=application"');
   });
@@ -255,7 +273,7 @@ describe("application contextual navigation",()=>{
     expect(html).toContain("Jordan Sample");
     expect(html).not.toContain("Casey Sample");
     expect(html).toContain("Review 2 blocking requirement(s)");
-    expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;application=jordan"');
+    expect(html).toContain('href="/admissions/applications/jordan"');
     expect(html).toContain('href="/admissions?siteId=school&amp;programId=program&amp;stage=inquiry" aria-current="page"');
   });
 
@@ -335,7 +353,7 @@ describe("application contextual navigation",()=>{
   });
 
   it("does not let the registrar enrollment checklist bypass pending document review",()=>{
-    successful([{id:"application",householdId:"household",program:"Academy",stage:"application",isFixture:false,
+    successful([{id:"application",householdId:"household",program:"Academy",stage:"application",demoTenant:true,
       offers:[],activeSchoolYears:[],journeyStatus:"in_progress",readiness:{completed:0,total:1,blockers:1},
       requirements:[{id:"document",title:"Enrollment evidence",status:"needs_you",blocking:true,documents:[],
         evidence:[{kind:"document_review",status:"received",text:"Awaiting review"}]}]}]);
@@ -379,7 +397,7 @@ describe("application contextual navigation",()=>{
       offers:[{...row.offers[0],status:"accepted"}]}]});
     const accepted=render(Admissions);
     expect(accepted).not.toContain("Withdraw offer");
-    expect(accepted).toMatch(/<button disabled=""[^>]*>Registrar: Activate enrollment<\/button>/);
+    expect(accepted).toMatch(/<button[^>]*disabled=""[^>]*>Registrar: Activate enrollment<\/button>/);
   });
 
   it("does not replace an unavailable group permission request with another",()=>{

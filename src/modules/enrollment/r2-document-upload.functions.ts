@@ -1,8 +1,8 @@
 import { db } from "@/db/client";
 import { applications,documents,journeyRequirements,journeys } from "@/db/schema";
-import { assertR2DemoEnabled } from "@/domain/r2-document-access";
+import { assertDemoTenantStorageEnabled } from "@/domain/r2-document-access";
+import { isDemoTenantOrganization } from "@/domain/local-demo-access";
 import { EventTypes } from "@/domain/event-types";
-import { assertSyntheticMutation } from "@/modules/_demo/demo-write-gate";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -12,19 +12,20 @@ import { z } from "zod";
 import { newDocumentKey,r2Config,signR2Object,validateDocumentUpload,verifyDocumentObject } from "./r2-documents.server";
 import { authorizeEnrollmentApplication } from "./enrollment-access.server";
 async function uploadsEnabled(applicationId:string,mode:"upload"|"download"="upload"){
-
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId)throw new Error("Authenticated person required");
  const app=await authorizeEnrollmentApplication(context,applicationId);
  if(mode==="upload"&&["withdrawn","declined"].includes(app.stage))
   throw new Error("This application is closed to enrollment document changes");
- if(mode==="upload"&&app.metadata.synthetic===true){
-  assertR2DemoEnabled(process.env.CAN_R2_DEMO_UPLOADS_ENABLED);
-  assertSyntheticMutation(context.role);
+ const demoTenant=isDemoTenantOrganization(app.organizationId);
+ const namespace=demoTenant?"demo":"live";
+ if(mode==="upload"&&demoTenant){
+  assertDemoTenantStorageEnabled(process.env.CAN_R2_DEMO_UPLOADS_ENABLED);
  }else if(mode==="upload"&&process.env.CAN_R2_LIVE_UPLOADS_ENABLED!=="true"){
   throw new Error("Live enrollment document uploads are not enabled for this deployment");
  }
- return {...context,actorPersonId:context.actorPersonId};
+ r2Config(namespace);
+ return {...context,actorPersonId:context.actorPersonId,demoTenant};
 }
 async function requirementScope(applicationId:string,requirementId:string,allowClosed=false){
  const [app]=await db.select({id:applications.id}).from(applications).where(eq(applications.id,applicationId)).limit(1);
@@ -38,10 +39,10 @@ async function requirementScope(applicationId:string,requirementId:string,allowC
 export const beginEnrollmentDocumentUpload=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),fileName:z.string().min(1).max(150),mimeType:z.enum(["application/pdf","image/jpeg","image/png"]),size:z.number().int().min(16).max(10*1024*1024)}).parse(data))
  .handler(async({data})=>{
-  await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
+  const actor=await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
   await requirementScope(data.applicationId,data.requirementId);
   const key=newDocumentKey(data.applicationId,data.requirementId);
-  return {key,uploadUrl:signR2Object("PUT",key,data.mimeType,180),expiresInSeconds:180};
+  return {key,uploadUrl:signR2Object("PUT",key,data.mimeType,180,actor.demoTenant?"demo":"live"),expiresInSeconds:180};
  });
 export const finishEnrollmentDocumentUpload=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),key:z.string().regex(/^enrollment\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i),fileName:z.string().min(1).max(150),mimeType:z.enum(["application/pdf","image/jpeg","image/png"]),size:z.number().int().min(16).max(10*1024*1024)}).parse(data))
@@ -49,7 +50,7 @@ export const finishEnrollmentDocumentUpload=createServerFn({method:"POST"})
   const actor=await uploadsEnabled(data.applicationId);validateDocumentUpload(data.fileName,data.mimeType,data.size);
   if(!data.key.startsWith("enrollment/"+data.applicationId+"/"+data.requirementId+"/"))throw new Error("Document belongs to another application");
   await requirementScope(data.applicationId,data.requirementId);
-  await verifyDocumentObject(data.key,data.mimeType,data.size);
+  await verifyDocumentObject(data.key,data.mimeType,data.size,actor.demoTenant?"demo":"live");
   return db.transaction(async tx=>{
    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.requirementId}))`);
    const app=await authorizeEnrollmentApplication(actor,data.applicationId,tx);
@@ -88,8 +89,7 @@ export const finishEnrollmentDocumentUpload=createServerFn({method:"POST"})
    await tx.update(journeys).set({status:"in_progress",completedAt:null,updatedAt:now}).where(eq(journeys.id,journey.id));
    await writeAudit(tx, {actorPersonId:actor.actorPersonId,action:"enrollment.document.resubmitted",resourceType:"journey_requirement",resourceId:requirement.id,
     before:{status:requirement.status},after:{status:"needs_you",documentId:document.id,version},context:{applicationId:data.applicationId}});
-   const [appRecord]=await tx.select({metadata:applications.metadata}).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
-   await writeAudit(tx, {actorPersonId:actor.actorPersonId,action:"enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{applicationId:data.applicationId,synthetic:appRecord?.metadata.synthetic===true}});
+   await writeAudit(tx, {actorPersonId:actor.actorPersonId,action:"enrollment.document.upload",resourceType:"document",resourceId:document.id,after:{requirementId:data.requirementId,storageProvider:"cloudflare_r2"},context:{applicationId:data.applicationId}});
    await emitEvent(tx,{eventType:EventTypes.EnrollmentDocumentSubmitted,aggregateType:"document",aggregateId:document.id,
     actorPersonId:actor.actorPersonId,organizationId:app.organizationId,siteId:app.siteId,programId:app.programId,
     payload:{applicationId:app.id,requirementId:requirement.id,version}});
@@ -101,15 +101,15 @@ export const finishEnrollmentDocumentUpload=createServerFn({method:"POST"})
 export const getEnrollmentDocumentDownload=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({applicationId:z.string().uuid(),requirementId:z.string().uuid(),documentId:z.string().uuid()}).parse(data))
  .handler(async({data})=>{
-  await uploadsEnabled(data.applicationId,"download");
+  const actor=await uploadsEnabled(data.applicationId,"download");
   await requirementScope(data.applicationId,data.requirementId,true);
   const [record]=await db.select({id:documents.id,storageKey:documents.storageKey,metadata:documents.metadata})
    .from(documents).where(and(eq(documents.id,data.documentId),eq(documents.subjectType,"journey_requirement"),eq(documents.subjectId,data.requirementId),eq(documents.storageProvider,"cloudflare_r2"))).limit(1);
   if(!record||record.metadata.applicationId!==data.applicationId||record.metadata.isCurrent===false||
-    (record.metadata.storageVerified!==true&&record.metadata.synthetic!==true))throw new Error("Document not found within the current verified enrollment requirement");
+    record.metadata.storageVerified!==true)throw new Error("Document not found within the current verified enrollment requirement");
   const expectedPrefix="enrollment/"+data.applicationId+"/"+data.requirementId+"/";
   if(!record.storageKey.startsWith(expectedPrefix))throw new Error("Document storage scope mismatch");
-  return {downloadUrl:signR2Object("GET",record.storageKey,undefined,60),expiresInSeconds:60};
+  return {downloadUrl:signR2Object("GET",record.storageKey,undefined,60,actor.demoTenant?"demo":"live"),expiresInSeconds:60};
  });
 
 /** Deployment switches only; never exposes R2 credentials. */
@@ -117,10 +117,12 @@ export const getEnrollmentDocumentUploadAvailability=createServerFn({method:"GET
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId||!["registrar","guardian"].includes(context.role))
   throw new Error("Enrollment document access denied");
- let configured=true;
- try{r2Config()}catch{configured=false}
+ let liveConfigured=true;
+ try{r2Config("live")}catch{liveConfigured=false}
+ let demoConfigured=true;
+ try{r2Config("demo")}catch{demoConfigured=false}
  return {
-  live:configured&&process.env.CAN_R2_LIVE_UPLOADS_ENABLED==="true",
-  demo:configured&&process.env.CAN_R2_DEMO_UPLOADS_ENABLED==="true",
+  live:liveConfigured&&process.env.CAN_R2_LIVE_UPLOADS_ENABLED==="true",
+  demo:demoConfigured&&process.env.CAN_R2_DEMO_UPLOADS_ENABLED==="true",
  };
 });

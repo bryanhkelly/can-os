@@ -13,7 +13,7 @@ vi.mock("@/modules/enrollment/r2-document-upload.functions", () => ({
   getEnrollmentDocumentDownload: vi.fn(), getEnrollmentDocumentUploadAvailability: vi.fn(),
 }));
 type Checklist = Awaited<ReturnType<typeof getGuardianEnrollmentChecklist>>;
-const checklist: Checklist = { applicationId: "application", closed: false, synthetic: false, journeyStatus: "in_progress",
+const checklist: Checklist = { applicationId: "application", closed: false, demoTenant: false, journeyStatus: "in_progress",
   requirements: [{ id: "requirement", title: "Enrollment evidence", blocking: true, status: "needs_you",
     reviewStatus: "rejected", correctionReason: "Please supply a clear copy.", form: null,
     documents: [

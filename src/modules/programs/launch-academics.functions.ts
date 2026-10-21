@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import {
 courseTemplates,courseTemplateVersions,
 complianceFrameworks,complianceFrameworkVersions,compliancePolicyApplicability,compliancePolicyRules,
+deliveryArrangements,
 people,
 programs,roleAssignments,schoolYears,
 qualificationDefinitions,
@@ -13,10 +14,11 @@ import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configura
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
-import { and,asc,eq,inArray,isNull,or } from "drizzle-orm";
+import { and,asc,eq,inArray,isNotNull,isNull,or } from "drizzle-orm";
 import { z } from "zod";
 import { evaluateSectionReadiness } from "./section-readiness-service";
 import { assignLaunchInstructor,evaluateLaunchTeacher } from "@/modules/staffing/launch-staffing.server";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { canAuthorQualificationCatalog } from "@/modules/profiles/qualification-catalog.server";
 import { requireActor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
@@ -54,7 +56,7 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
     eq(complianceFrameworkVersions.status,"published"))).limit(1);
   const years=program.siteId?await db.select({
    id:schoolYears.id,name:schoolYears.name,status:schoolYears.status,
-   siteId:schoolYears.siteId,programId:schoolYears.programId,
+   siteId:schoolYears.siteId,programId:schoolYears.programId,timezone:schoolYears.timezone,
   }).from(schoolYears).where(and(eq(schoolYears.siteId,program.siteId),
    eq(schoolYears.organizationId,program.organizationId),
    or(isNull(schoolYears.programId),eq(schoolYears.programId,program.id)))):[];
@@ -90,14 +92,34 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
    first:people.legalFirstName,last:people.legalLastName,
   }).from(sectionTeachers).innerJoin(people,eq(people.id,sectionTeachers.personId))
    .where(inArray(sectionTeachers.sectionId,sectionRows.map(s=>s.id))):[];
+  const activeArrangements=sectionRows.length?await db.select({
+   sectionId:deliveryArrangements.sectionId,personId:deliveryArrangements.instructorPersonId,
+   first:people.legalFirstName,last:people.legalLastName,
+   from:deliveryArrangements.effectiveFrom,through:deliveryArrangements.effectiveThrough,
+  }).from(deliveryArrangements).innerJoin(people,eq(people.id,deliveryArrangements.instructorPersonId))
+   .where(and(inArray(deliveryArrangements.sectionId,sectionRows.map(s=>s.id)),
+    eq(deliveryArrangements.status,"active"),isNotNull(deliveryArrangements.instructorPersonId)))
+   .orderBy(asc(deliveryArrangements.effectiveFrom)):[];
+  const timezoneByTerm=new Map(termRows.map(term=>[
+   term.id,years.find(year=>year.id===term.schoolYearId)?.timezone??"UTC",
+  ]));
   const sectionSnapshots=await Promise.all(sectionRows.map(async row=>{
    const readiness=await evaluateSectionReadiness(row.id,db,new Date(),"launch");
+   const timezone=timezoneByTerm.get(row.termId)??"UTC";
    const candidates=await Promise.all(teachingStaff.map(async teacher=>{
     const eligibility=await evaluateLaunchTeacher(row.id,teacher.personId);
     return {personId:teacher.personId,eligible:eligibility.eligible,reasons:eligibility.reasons,
-     from:eligibility.window.from.toISOString(),through:eligibility.window.through.toISOString()};
+    from:eligibility.window.from.toISOString(),through:eligibility.window.through.toISOString(),
+    fromDate:dateKeyInTimezone(eligibility.window.from.toISOString(),timezone),
+    throughDate:dateKeyInTimezone(new Date(eligibility.window.through.getTime()-1).toISOString(),timezone)};
    }));
    return {...row,teachers:assignments.filter(a=>a.sectionId===row.id),
+    coverage:activeArrangements.filter(arrangement=>arrangement.sectionId===row.id).map(arrangement=>({
+     personId:arrangement.personId,first:arrangement.first,last:arrangement.last,
+     fromDate:arrangement.from?dateKeyInTimezone(arrangement.from.toISOString(),timezone):null,
+     throughDate:arrangement.through?
+      dateKeyInTimezone(new Date(arrangement.through.getTime()-1).toISOString(),timezone):null,
+    })),
     candidates,
     readiness:{...readiness,items:readiness.items.map(({evidence,...item})=>item)}};
   }));
@@ -161,7 +183,9 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
   });
  });
 export const assignLaunchTeacher=createServerFn({method:"POST"})
- .validator((v:unknown)=>z.object({programId:uuid,sectionId:uuid,teacherPersonId:uuid}).parse(v))
+ .validator((v:unknown)=>z.object({programId:uuid,sectionId:uuid,teacherPersonId:uuid,
+  effectiveFromDate:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  effectiveThroughDate:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()}).parse(v))
  .handler(async({data})=>{
   const {actor,program}=await setupContext(data.programId);
   if(!program.siteId)throw new Error("Teaching assignment requires an onsite school site");

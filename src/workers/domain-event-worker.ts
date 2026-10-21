@@ -41,6 +41,14 @@ registerDomainEventHandler(EventTypes.ActionResolved, handleAcademicPassThroughE
 // Lifecycle facts already have transactional evidence. Pass through to shared
 // subscriptions and complete the outbox; delivery depends on registered consumers.
 for (const eventType of [
+  EventTypes.ApplicantRegistered,
+  EventTypes.ApplicantSchoolJoined,
+  EventTypes.OnlineApplicationsConfigured,
+  EventTypes.ApplicationDraftCreated,
+  EventTypes.ApplicationDraftSaved,
+  EventTypes.ApplicationSubmitted,
+  EventTypes.JourneyRequirementStatusChanged,
+  EventTypes.JourneyReady,
   EventTypes.ApplicationStarted,
   EventTypes.ApplicationAccepted,
   EventTypes.AdmissionOfferIssued,
@@ -50,6 +58,7 @@ for (const eventType of [
   EventTypes.EnrollmentActivated,
   EventTypes.ProgramLaunchStarted,
   EventTypes.ProgramActivated,
+  EventTypes.OrganizationCreated,
   EventTypes.SiteCreated,
   EventTypes.SchoolYearCreated,
   EventTypes.SchoolYearActivated,

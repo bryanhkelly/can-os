@@ -18,6 +18,15 @@ const programTypes = [
   "homeschool_cohort",
   "summer_enrichment",
 ] as const;
+const organizationTypes = [
+  "can_network",
+  "denomination",
+  "church",
+  "christian_school",
+  "microschool_operator",
+  "consortium",
+  "other_partner",
+] as const;
 
 const uuid = z.string().uuid();
 
@@ -59,20 +68,46 @@ async function registrarContext(capability: string) {
   return context;
 }
 
+async function requireOrganizationWideRegistrar(
+  context: Awaited<ReturnType<typeof registrarContext>>,
+  organizationId: string,
+) {
+  const [{ db }, { accountPersonGrants }, { and, eq, isNull }] = await Promise.all([
+    import("@/db/client"),
+    import("@/db/schema"),
+    import("drizzle-orm"),
+  ]);
+  const [grant] = await db
+    .select({ organizationId: accountPersonGrants.organizationId })
+    .from(accountPersonGrants)
+    .where(
+      and(
+        eq(accountPersonGrants.id, context.grantId),
+        eq(accountPersonGrants.accountId, context.accountId),
+        eq(accountPersonGrants.active, true),
+        isNull(accountPersonGrants.siteId),
+      ),
+    )
+    .limit(1);
+  if (!grant || grant.organizationId !== organizationId) {
+    throw new AuthorizationError("organization-wide registrar grant");
+  }
+}
+
 /** Wizard dropdown options, scoped to the registrar's verified organization grant. */
 export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
   async () => {
     const context = await registrarContext("program.read");
     const organizationIds = context.scope.organizationIds ?? [];
     if (!organizationIds.length) {
-      return { organizations: [], sites: [], jurisdictions: [] };
+      return { organizations: [], sites: [], jurisdictions: [], canCreateOrganizationAndSite: false };
     }
-    const [{ db }, s, { asc, inArray }] = await Promise.all([
+    const [{ db }, s, { and, asc, eq, inArray }] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
     ]);
-    const [organizationRows, siteRows, jurisdictionRows] = await Promise.all([
+    const [organizationRows, siteRows, jurisdictionRows, activeGrant] = await Promise.all([
       db
         .select({ id: s.organizations.id, name: s.organizations.name, type: s.organizations.type })
         .from(s.organizations)
@@ -92,14 +127,88 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
         .select({ id: s.jurisdictions.id, code: s.jurisdictions.code, name: s.jurisdictions.name })
         .from(s.jurisdictions)
         .orderBy(asc(s.jurisdictions.name)),
+      db
+        .select({ siteId: s.accountPersonGrants.siteId })
+        .from(s.accountPersonGrants)
+        .where(and(
+          eq(s.accountPersonGrants.id, context.grantId),
+          eq(s.accountPersonGrants.accountId, context.accountId),
+          eq(s.accountPersonGrants.active, true),
+        ))
+        .limit(1)
     ]);
     return {
       organizations: organizationRows,
       sites: siteRows,
       jurisdictions: jurisdictionRows,
+      canCreateOrganizationAndSite: activeGrant[0]?.siteId === null,
     };
   },
 );
+
+/** Create a child Organization profile; access to the new scope is granted separately. */
+export const createLaunchOrganization = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z.object({
+      parentOrganizationId: uuid,
+      type: z.enum(organizationTypes),
+      name: z.string().trim().min(2).max(200),
+      legalName: z.string().trim().max(240).optional(),
+      slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const actor = await registrarContext("organization.create");
+    assertCapability(actor, "admin.manage");
+    if (!actor.scope.organizationIds?.includes(data.parentOrganizationId)) {
+      throw new AuthorizationError("parent organization scope");
+    }
+    await requireOrganizationWideRegistrar(actor, data.parentOrganizationId);
+
+    const [{ db }, { organizations }] = await Promise.all([
+      import("@/db/client"),
+      import("@/db/schema"),
+    ]);
+    return db.transaction(async (tx) => {
+      const [organization] = await tx
+        .insert(organizations)
+        .values({
+          parentOrganizationId: data.parentOrganizationId,
+          type: data.type,
+          name: data.name,
+          legalName: data.legalName || null,
+          slug: data.slug,
+        })
+        .returning({ id: organizations.id });
+      if (!organization) throw new Error("Failed to create Organization");
+
+      await emitEvent(tx, {
+        eventType: EventTypes.OrganizationCreated,
+        aggregateType: "organization",
+        aggregateId: organization.id,
+        actorPersonId: actor.actorPersonId,
+        organizationId: data.parentOrganizationId,
+        payload: {
+          parentOrganizationId: data.parentOrganizationId,
+          organizationType: data.type,
+        },
+      });
+      await writeAudit(tx, actor, {
+        action: "organization.create",
+        entityType: "organization",
+        entityId: organization.id,
+        scope: { organizationId: data.parentOrganizationId },
+        after: {
+          parentOrganizationId: data.parentOrganizationId,
+          type: data.type,
+          name: data.name,
+          legalName: data.legalName || null,
+          slug: data.slug,
+        },
+      });
+      return { organizationId: organization.id, name: data.name };
+    });
+  });
 
 /** Start a GF3 host/program launch: creates the Program and instantiates its Launch Journey. */
 export const startLaunch = createServerFn({ method: "POST" })
@@ -224,14 +333,26 @@ export const createLaunchSite = createServerFn({method:"POST"})
   organizationId:uuid,name:z.string().trim().min(2).max(160),
   slug:z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   timezone:z.string().trim().min(3).max(80),
+  address:z.object({
+   line1:z.string().trim().max(160).optional(),
+   city:z.string().trim().max(100).optional(),
+   region:z.string().trim().max(100).optional(),
+   postalCode:z.string().trim().max(24).optional(),
+   country:z.string().trim().max(80).optional(),
+  }).optional(),
  }).parse(v))
  .handler(async({data})=>{
   const actor=await registrarContext("program.launch.start");
-  if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.scope.siteIds?.length)
+  if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId))
    throw new AuthorizationError("organization-wide site creation");
+  await requireOrganizationWideRegistrar(actor,data.organizationId);
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
-   const [site]=await tx.insert(s.sites).values({...data}).returning({id:s.sites.id});
+   const address=Object.fromEntries(Object.entries(data.address??{}).filter(([,value])=>value));
+   const [site]=await tx.insert(s.sites).values({
+    organizationId:data.organizationId,name:data.name,slug:data.slug,timezone:data.timezone,
+    address:Object.keys(address).length?address:null,
+   }).returning({id:s.sites.id});
    if(!site)throw new Error("Failed to create Site");
    await emitEvent(tx,{
     eventType:EventTypes.SiteCreated,aggregateType:"site",aggregateId:site.id,
@@ -241,8 +362,8 @@ export const createLaunchSite = createServerFn({method:"POST"})
    await writeAudit(tx,actor,{
     action:"site.create",entityType:"site",entityId:site.id,
     scope:{organizationId:data.organizationId,siteId:site.id},
-    after:{name:data.name,timezone:data.timezone}});
-   return {siteId:site.id};
+    after:{name:data.name,timezone:data.timezone,address:Object.keys(address).length?address:null}});
+   return {siteId:site.id,name:data.name};
   });
  });
 /** Create a unique orientation event and expose it to site/program calendars. */

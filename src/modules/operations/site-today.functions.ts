@@ -3,13 +3,15 @@ import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, asc, eq, inArray, gte, lt, ne, isNull, notExists, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions, attendanceEvents, calendarEvents, calendarEventParticipants, enrollments, organizations, programs, scheduledOccurrences, sites } from "@/db/schema";
+import { actions, attendanceEvents, calendarEvents, calendarEventParticipants, enrollments, organizations, people, programs, scheduledOccurrences, sites } from "@/db/schema";
+import { triageOperationalActions } from "@/domain/operational-action-triage";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { listOpeningHandoffs,listOpeningOperators } from "@/modules/programs/opening-handoff.server";
 import { openingHandoffManagerCapability } from "@/modules/programs/opening-handoff.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import type { Actor } from "@/modules/identity/actors.server";
+import { getSchoolOperationsCommandCenter } from "./command-center-service";
 
 const requestSchema = z.object({ siteId: z.string().uuid() });
 const openStatuses = ["open", "in_progress", "waiting"] as const;
@@ -66,12 +68,13 @@ export const getSiteToday = createServerFn({ method: "GET" })
     const hasParticipants = db.select({id:calendarEventParticipants.id})
       .from(calendarEventParticipants)
       .where(eq(calendarEventParticipants.calendarEventId,calendarEvents.id));
-    const [actionRows, eventRows, attendanceRows, enrolledRows] = await Promise.all([
+    const [actionRows, eventRows, attendanceRows, enrolledRows, sectionOperations] = await Promise.all([
       db.select({
         id: actions.id, title: actions.title, description: actions.description,
         priority: actions.priority, status: actions.status, dueAt: actions.dueAt,
-        programId: actions.programId, type: actions.type,
-      }).from(actions)
+        programId: actions.programId, type: actions.type,createdAt:actions.createdAt,
+        ownerPersonId:actions.ownerPersonId,ownerFirstName:people.legalFirstName,ownerLastName:people.legalLastName,
+      }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId))
         .where(and(eq(actions.siteId, site.id), inArray(actions.status, [...openStatuses]),
           or(isNull(actions.programId),inArray(actions.programId,programIds))))
         .orderBy(asc(actions.dueAt)).limit(100),
@@ -99,9 +102,18 @@ export const getSiteToday = createServerFn({ method: "GET" })
         studentProfileId: enrollments.studentProfileId, programId: enrollments.programId,
       }).from(enrollments).where(and(inArray(enrollments.programId, programIds),
         eq(enrollments.status, "active"), ne(enrollments.kind, "section"))) : Promise.resolve([]),
+      actor.capabilities.has("program.launch.start")
+        ? getSchoolOperationsCommandCenter({
+          ...actor,
+          scope: { ...actor.scope, siteIds: [site.id], programIds },
+        })
+        : Promise.resolve(null),
     ]);
 
-    const filteredActions = actionRows.filter(row => !row.programId || permitted.has(row.programId));
+    const filteredActions = actionRows.filter(row => !row.programId || permitted.has(row.programId))
+      .map(row=>({...row,dueAt:row.dueAt?.toISOString()??null,createdAt:row.createdAt.toISOString(),
+        ownerName:row.ownerFirstName?`${row.ownerFirstName} ${row.ownerLastName??""}`.trim():null}));
+    const actionTriage=triageOperationalActions(filteredActions,now);
     const todayEvents = eventRows.filter(row =>
       (!row.programId || permitted.has(row.programId)) && localDate(row.startsAt) === dayText);
     // Multiple revisions/section occurrences are not unique student attendance.
@@ -135,9 +147,9 @@ export const getSiteToday = createServerFn({ method: "GET" })
         tardy: observations.filter(row => row.status === "tardy").length,
         note: "Latest event per student, program and occurrence today; not a percent of expected students",
       },
-      actions: filteredActions.map(row => ({
-        ...row, dueAt: row.dueAt?.toISOString() ?? null,
-      })),
+      actionSummary:actionTriage.summary,
+      actions:actionTriage.items,
+      sectionOperations,
       events: todayEvents.map(row => ({
         ...row, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt?.toISOString() ?? null,
       })),

@@ -8,6 +8,7 @@ import { requireActor } from "@/modules/identity/actors.server";
 import { authorizeEnrollmentApplication } from "./enrollment-access.server";
 import { enrollmentFormState } from "@/domain/enrollment-form";
 import { enrollmentFormRevision } from "./enrollment-form.server";
+import { isDemoTenantOrganization } from "@/domain/local-demo-access";
 
 export const getGuardianEnrollmentChecklist = createServerFn({ method: "GET" })
   .validator((input: unknown) => z.object({ applicationId: z.string().uuid() }).strict().parse(input))
@@ -31,7 +32,8 @@ export const getGuardianEnrollmentChecklist = createServerFn({ method: "GET" })
       .orderBy(asc(documents.createdAt), asc(documents.id)) : [];
     const closed = ["active", "complete", "cancelled"].includes(journey.status) ||
       ["withdrawn", "declined"].includes(application.stage);
-    return { applicationId: application.id, journeyStatus: journey.status, closed, synthetic: application.metadata.synthetic === true,
+    return { applicationId: application.id, journeyStatus: journey.status, closed,
+      demoTenant: isDemoTenantOrganization(application.organizationId),
       requirements: requirements.map(requirement => {
         const review = [...requirement.evidence].reverse().find(entry => entry.kind === "document_review");
         const state = enrollmentFormState(requirement.metadata, requirement.evidence);
@@ -45,8 +47,7 @@ export const getGuardianEnrollmentChecklist = createServerFn({ method: "GET" })
               id: file.id, fileName: file.fileName, uploadedAt: file.createdAt.toISOString(),
               current: file.metadata.isCurrent !== false,
               reviewStatus: typeof file.metadata.reviewStatus === "string" ? file.metadata.reviewStatus : "received",
-              canDownload: file.metadata.isCurrent !== false &&
-                (file.metadata.storageVerified === true || file.metadata.synthetic === true),
+              canDownload: file.metadata.isCurrent !== false && file.metadata.storageVerified === true,
             })),
         };
       }),

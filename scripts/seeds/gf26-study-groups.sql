@@ -7,16 +7,24 @@ DECLARE sid uuid := 'f1000000-0000-4000-8000-000000000003';
  gid uuid := 'f2600000-0000-4000-8000-000000000001';
  iid uuid := 'f2600000-0000-4000-8000-000000000002';
 BEGIN
- IF NOT EXISTS(SELECT 1 FROM sites WHERE id=sid AND metadata @> '{"synthetic":true}')
-    OR NOT EXISTS(SELECT 1 FROM people WHERE id=teacher AND metadata @> '{"synthetic":true}')
-    OR NOT EXISTS(SELECT 1 FROM people WHERE id=student AND metadata @> '{"synthetic":true}') THEN
+ IF NOT EXISTS(SELECT 1 FROM sites WHERE id=sid AND organization_id='f1000000-0000-4000-8000-000000000002')
+    OR NOT EXISTS(
+      SELECT 1 FROM account_person_grants
+      WHERE person_id=teacher AND organization_id='f1000000-0000-4000-8000-000000000002'
+        AND site_id=sid AND active
+    )
+    OR NOT EXISTS(
+      SELECT 1 FROM account_person_grants
+      WHERE person_id=student AND organization_id='f1000000-0000-4000-8000-000000000002'
+        AND site_id=sid AND active
+    ) THEN
   RAISE EXCEPTION 'GF26 synthetic prerequisites not found; refusing incomplete seed';
  END IF;
  INSERT INTO study_groups(id,title,description,kind,site_id,facilitator_person_id,metadata)
- VALUES(gid,'Algebra II Study Circle','Weekly collaborative practice, questions and exam preparation.','course',sid,teacher,'{"synthetic":true,"fixture":"gf26"}')
+ VALUES(gid,'Algebra II Study Circle','Weekly collaborative practice, questions and exam preparation.','course',sid,teacher,'{"fixture":"gf26"}')
  ON CONFLICT(id) DO NOTHING;
  INSERT INTO study_groups(id,title,description,kind,site_id,facilitator_person_id,metadata)
- VALUES(iid,'Creative Writing Collective','Cross-course writing feedback and peer workshops.','interest',sid,teacher,'{"synthetic":true,"fixture":"gf26"}')
+ VALUES(iid,'Creative Writing Collective','Cross-course writing feedback and peer workshops.','interest',sid,teacher,'{"fixture":"gf26"}')
  ON CONFLICT(id) DO NOTHING;
  INSERT INTO study_group_memberships(group_id,person_id,status,role,reviewed_by_person_id,joined_at)
  VALUES(gid,student,'approved','student',teacher,'2026-10-01T16:00:00Z')
@@ -49,7 +57,7 @@ BEGIN
  ELSE 'f2600000-0000-4000-8000-000000000041'::uuid END,
  'study_group',session.title,session.agenda,session.starts_at,session.ends_at,
  site.timezone,site.organization_id,sid,'study_group_session',session.id,teacher,
- jsonb_build_object('synthetic',true,'fixture','gf26','groupId',gid)
+ jsonb_build_object('fixture','gf26','groupId',gid)
  FROM study_group_sessions session JOIN sites site ON site.id=sid
  WHERE session.id IN ('f2600000-0000-4000-8000-000000000010','f2600000-0000-4000-8000-000000000011')
  ON CONFLICT(id) DO NOTHING;

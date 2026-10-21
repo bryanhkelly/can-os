@@ -12,11 +12,16 @@ export interface R2Config {
   secret: string;
 }
 
-/** Resolve the private bucket connection, failing closed on missing or malformed configuration. */
-export function resolveR2Config(): R2Config {
-  const { CAN_R2_ACCOUNT_ID: account, CAN_R2_BUCKET: bucket, CAN_R2_ACCESS_KEY_ID: accessKey, CAN_R2_SECRET_ACCESS_KEY: secret } = process.env;
+export type R2Namespace = "live" | "demo";
+
+/** Resolve a private live or isolated demo bucket, failing closed on missing configuration. */
+export function resolveR2Config(namespace: R2Namespace = "live"): R2Config {
+  const account = namespace === "demo" ? process.env.CAN_R2_DEMO_ACCOUNT_ID : process.env.CAN_R2_ACCOUNT_ID;
+  const bucket = namespace === "demo" ? process.env.CAN_R2_DEMO_BUCKET : process.env.CAN_R2_BUCKET;
+  const accessKey = namespace === "demo" ? process.env.CAN_R2_DEMO_ACCESS_KEY_ID : process.env.CAN_R2_ACCESS_KEY_ID;
+  const secret = namespace === "demo" ? process.env.CAN_R2_DEMO_SECRET_ACCESS_KEY : process.env.CAN_R2_SECRET_ACCESS_KEY;
   if (!account || !/^[a-f0-9]{32}$/.test(account) || !bucket || !/^[a-z0-9][a-z0-9.-]{2,62}$/.test(bucket) || !accessKey || !secret) {
-    throw new Error("Private R2 storage is not configured");
+    throw new Error(namespace === "demo" ? "Isolated demo R2 storage is not configured" : "Private R2 storage is not configured");
   }
   return { account, bucket, accessKey, secret };
 }
@@ -29,13 +34,14 @@ export interface SignPrivateObjectOptions {
   contentType?: string;
   expiresSeconds?: number;
   preventOverwrite?: boolean;
+  namespace?: R2Namespace;
 }
 
 /** Short-lived one-object SigV4 URL; credentials never leave the server. */
-export function signPrivateObjectUrl({ method, key, keyPattern, contentType, expiresSeconds = 180, preventOverwrite = false }: SignPrivateObjectOptions): string {
+export function signPrivateObjectUrl({ method, key, keyPattern, contentType, expiresSeconds = 180, preventOverwrite = false, namespace = "live" }: SignPrivateObjectOptions): string {
   if (!Number.isInteger(expiresSeconds) || expiresSeconds < 1 || expiresSeconds > 900 || !keyPattern.test(key)) throw new Error("Invalid R2 signing request");
   if (preventOverwrite && method !== "PUT") throw new Error("Conditional creation is only valid for uploads");
-  const cfg = resolveR2Config();
+  const cfg = resolveR2Config(namespace);
   const now = new Date();
   const stamp = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
   const day = stamp.slice(0, 8);
@@ -74,16 +80,17 @@ export interface CreatePrivateUploadUrlOptions {
   maxContentLength?: number;
   expiresSeconds?: number;
   preventOverwrite?: boolean;
+  namespace?: R2Namespace;
 }
 
 /** Presigned PUT URL for one private object upload; size and type bounds arrive as parameters. */
-export function createPrivateUploadUrl({ key, keyPattern, contentType, contentLength, minContentLength, maxContentLength, expiresSeconds, preventOverwrite }: CreatePrivateUploadUrlOptions): string {
+export function createPrivateUploadUrl({ key, keyPattern, contentType, contentLength, minContentLength, maxContentLength, expiresSeconds, preventOverwrite, namespace = "live" }: CreatePrivateUploadUrlOptions): string {
   if (contentLength !== undefined && (!Number.isSafeInteger(contentLength)
     || (minContentLength !== undefined && contentLength < minContentLength)
     || (maxContentLength !== undefined && contentLength > maxContentLength))) {
     throw new Error("Invalid R2 signing request");
   }
-  return signPrivateObjectUrl({ method: "PUT", key, keyPattern, contentType, expiresSeconds, preventOverwrite });
+  return signPrivateObjectUrl({ method: "PUT", key, keyPattern, contentType, expiresSeconds, preventOverwrite, namespace });
 }
 
 export interface VerifyPrivateObjectOptions {
@@ -93,14 +100,15 @@ export interface VerifyPrivateObjectOptions {
   expectedContentType?: string;
   /** Magic-byte check for the declared type; the bounded 16-byte range read runs only when provided. */
   verifySignature?: (contentType: string, bytes: Uint8Array) => boolean;
+  namespace?: R2Namespace;
 }
 
 /** Confirm a private object was actually uploaded and matches its declared size, type and signature. */
-export async function verifyPrivateObject({ key, keyPattern, expectedSize, expectedContentType, verifySignature }: VerifyPrivateObjectOptions): Promise<void> {
+export async function verifyPrivateObject({ key, keyPattern, expectedSize, expectedContentType, verifySignature, namespace = "live" }: VerifyPrivateObjectOptions): Promise<void> {
   if (!keyPattern.test(key) || !Number.isSafeInteger(expectedSize) || expectedSize < 1) {
     throw new Error("Invalid private object verification request");
   }
-  const head = await fetch(signPrivateObjectUrl({ method: "HEAD", key, keyPattern, expiresSeconds: 30 }), { method: "HEAD" });
+  const head = await fetch(signPrivateObjectUrl({ method: "HEAD", key, keyPattern, expiresSeconds: 30, namespace }), { method: "HEAD" });
   if (!head.ok) throw new Error("Private object upload could not be verified");
   if (Number(head.headers.get("content-length")) !== expectedSize) {
     throw new Error("Uploaded object size does not match the expected size");
@@ -113,7 +121,7 @@ export async function verifyPrivateObject({ key, keyPattern, expectedSize, expec
   }
   if (!verifySignature || expectedContentType === undefined) return;
   if (expectedSize < 16) throw new Error("Uploaded object is smaller than the signature sample");
-  const sample = await fetch(signPrivateObjectUrl({ method: "GET", key, keyPattern, expiresSeconds: 30 }), {
+  const sample = await fetch(signPrivateObjectUrl({ method: "GET", key, keyPattern, expiresSeconds: 30, namespace }), {
     headers: { Range: "bytes=0-15" },
   });
   if (sample.status !== 206 || sample.headers.get("content-range") !== `bytes 0-15/${expectedSize}`) {

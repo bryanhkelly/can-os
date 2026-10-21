@@ -1,11 +1,13 @@
 import {and,eq,gt,isNull,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,accountPersonGrants,programs,sites as schoolSites} from "@/db/schema";
+import {accessAccounts,accessSessions,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret} from "@/domain/access-tokens";
-import {LOCAL_DEMO_ADMIN} from "@/domain/local-demo-access";
-import {listDemoFacilitatorGrants} from "./demo-facilitator.server";
+import {
+ isDemoAccountEmail,isLocalDemoAccessEnabled,isPublicDemoAccessEnabled,
+} from "@/domain/local-demo-access";
+import {readSessionGrants} from "./session-grants.server";
 
 /**
  * Resolve the account and active persona from a server-issued session.
@@ -21,29 +23,29 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  const digest=hashAccessSecret(value,pepper);
  const now=new Date();
  const [session]=await db.select({
-  id:accessSessions.id,accountId:accessSessions.accountId,activeGrantId:accessSessions.activeGrantId
+  id:accessSessions.id,accountId:accessSessions.accountId,activeGrantId:accessSessions.activeGrantId,
+  email:accessAccounts.emailNormalized,
+  emailVerifiedAt:accessAccounts.emailVerifiedAt,
  }).from(accessSessions)
   .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
   .where(and(eq(accessSessions.secretHash,digest),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
    eq(accessAccounts.disabled,false)))
   .limit(1);
  if(!session) throw new AuthorizationError("authenticated session");
- const grants=session.accountId===LOCAL_DEMO_ADMIN.accountId?await listDemoFacilitatorGrants(db):await db.select({
-  id:accountPersonGrants.id,accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
-  role:accountPersonGrants.role,organizationId:accountPersonGrants.organizationId,
-  siteId:accountPersonGrants.siteId,active:accountPersonGrants.active,
- }).from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,session.accountId),eq(accountPersonGrants.active,true)));
+ const publicDemoAccount=isDemoAccountEmail(session.email);
+ if(publicDemoAccount&&!isPublicDemoAccessEnabled(process.env)&&!isLocalDemoAccessEnabled(process.env)){
+  throw new AuthorizationError("enabled demo-school access");
+ }
+ const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email);
  const selected=grants.find(grant=>grant.id===session.activeGrantId);
+ if(!selected)throw new AuthorizationError("active membership");
  const context=resolveAccessContext({
-  accountId:session.accountId===LOCAL_DEMO_ADMIN.accountId&&selected?selected.accountId:session.accountId,
+  accountId:selected.accountId,
   sessionId:session.id,activeGrantId:session.activeGrantId,
  },grants);
- if(session.accountId===LOCAL_DEMO_ADMIN.accountId){
-  context.demoFacilitator={
-   accountId:LOCAL_DEMO_ADMIN.accountId,personId:LOCAL_DEMO_ADMIN.personId,sourceAccountId:context.accountId,
-  };
-  context.accountId=session.accountId;
- }
+ if(demoAccountSwitching)context.sessionAccountId=session.accountId;
+ if(context.role==="applicant"&&!publicDemoAccount&&!session.emailVerifiedAt)
+  throw new AuthorizationError("verified applicant email");
  // Program authorization derives from the verified active organization grant, not a browser claim.
  const organizations=context.scope.organizationIds??[];
  const grantSites=context.scope.siteIds??[];

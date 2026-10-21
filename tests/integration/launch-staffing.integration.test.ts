@@ -53,6 +53,7 @@ integration("registrar staffing to launch handoff", () => {
     const { evaluateLaunchTeacher, evaluateLaunchStaffing } = await import("@/modules/staffing/launch-staffing.server");
     const { accessibleClasses, authorizeClass } = await import("@/modules/learning/class-access.server");
     const { getSiteToday } = await import("@/modules/operations/site-today.functions");
+    const { getSchoolOperationsCommandCenter } = await import("@/modules/operations/command-center-service");
     const { activateLaunch,listLaunches }=await import("@/modules/programs/launch.functions");
     const { acknowledgeLaunchHandoff,transferLaunchHandoff }=await import("@/modules/programs/opening-handoff.functions");
     const { updateOperationsAction,assignOperationsAction,getOperationsActions }=await import("@/modules/operations/action-workspace.functions");
@@ -141,6 +142,15 @@ integration("registrar staffing to launch handoff", () => {
           return actor;
         }
         const registrarActor = act("registrar", registrar.id);
+        const actionTime=Date.now();
+        await tx.insert(s.actions).values([
+          {type:"site_operations",status:"open",priority:"high",title:"Past-due site review",
+            organizationId:org.id,siteId:site.id,programId:program.id,subjectType:"program",subjectId:program.id,
+            dueAt:new Date(actionTime-60*60*1000)},
+          {type:"site_operations",status:"open",priority:"normal",title:"Upcoming site review",
+            organizationId:org.id,siteId:site.id,programId:program.id,ownerPersonId:receiver.id,
+            subjectType:"program",subjectId:program.id,dueAt:new Date(actionTime+6*60*60*1000)},
+        ]);
         const catalogInput={programId:program.id,key:`launch-license-${suffix}`,kind:"license",
           title:"Synthetic teaching license",reason:"New synthetic catalog entry for cross-role launch acceptance",
           confirmed:true as const};
@@ -319,7 +329,7 @@ integration("registrar staffing to launch handoff", () => {
         state.actor = { ...registrarActor, scope: { ...registrarActor.scope, siteIds: [crypto.randomUUID()] } };
         await expect(launch.assignLaunchTeacher({ data: assignment })).rejects.toThrow("organization/site scope");
         state.actor = registrarActor;
-        await verifiedClaim(coTeacher.id);
+        const coTeacherClaim = await verifiedClaim(coTeacher.id);
         await launch.assignLaunchTeacher({ data: { ...assignment, teacherPersonId: coTeacher.id } });
         expect((await tx.select().from(s.deliveryArrangements).where(and(
           eq(s.deliveryArrangements.sectionId, section.sectionId), eq(s.deliveryArrangements.status, "active"),
@@ -336,12 +346,55 @@ integration("registrar staffing to launch handoff", () => {
         await expect(launch.provisionLaunchSection({ data: { ...second, title: "Different class" } })).rejects.toThrow("different class");
         expect((await tx.select().from(s.deliveryArrangements).where(eq(s.deliveryArrangements.sectionId, secondSection.sectionId))).length).toBe(1);
 
-        await tx.update(s.deliveryArrangements).set({ effectiveFrom: new Date("2027-09-01") })
-          .where(eq(s.deliveryArrangements.sectionId, secondSection.sectionId));
+        await tx.update(s.qualificationClaims).set({ expiresAt: new Date("2027-11-01T07:00:00Z") })
+          .where(eq(s.qualificationClaims.id, coTeacherClaim.id));
+        expect((await evaluateLaunchTeacher(secondSection.sectionId, coTeacher.id, tx)).eligible).toBe(false);
+        await expect(launch.assignLaunchTeacher({ data: {
+          ...assignment, sectionId: secondSection.sectionId, teacherPersonId: coTeacher.id,
+        } })).rejects.toThrow("No current verified credential");
+        await launch.assignLaunchTeacher({ data: {
+          ...assignment, sectionId: secondSection.sectionId, teacherPersonId: coTeacher.id,
+          effectiveFromDate: "2027-08-16", effectiveThroughDate: "2027-10-31",
+        } });
+        await expect(launch.assignLaunchTeacher({ data: {
+          ...assignment, sectionId: secondSection.sectionId, teacherPersonId: coTeacher.id,
+          effectiveFromDate: "2027-11-01", effectiveThroughDate: "2027-12-19",
+        } })).rejects.toThrow("No current verified credential");
+        await tx.update(s.qualificationClaims).set({ expiresAt: new Date("2028-01-01") })
+          .where(eq(s.qualificationClaims.id, coTeacherClaim.id));
+        await launch.assignLaunchTeacher({ data: {
+          ...assignment, sectionId: secondSection.sectionId, teacherPersonId: coTeacher.id,
+          effectiveFromDate: "2027-11-01", effectiveThroughDate: "2027-12-19",
+        } });
+        const [secondTeacherDelivery] = await tx.select({ id: s.deliveryArrangements.id })
+          .from(s.deliveryArrangements).where(and(
+            eq(s.deliveryArrangements.sectionId, secondSection.sectionId),
+            eq(s.deliveryArrangements.instructorPersonId, teacher.id),
+          ));
+        if (!secondTeacherDelivery) throw new Error("Missing split-plan teacher arrangement");
+        await tx.update(s.deliveryArrangements).set({ effectiveThrough: new Date("2027-11-01T07:00:00Z") })
+          .where(eq(s.deliveryArrangements.id, secondTeacherDelivery.id));
+        const [lateCoTeacherDelivery] = await tx.select({ id: s.deliveryArrangements.id })
+          .from(s.deliveryArrangements).where(and(
+            eq(s.deliveryArrangements.sectionId, secondSection.sectionId),
+            eq(s.deliveryArrangements.instructorPersonId, coTeacher.id),
+            eq(s.deliveryArrangements.effectiveFrom, new Date("2027-11-01T07:00:00Z")),
+          ));
+        if (!lateCoTeacherDelivery) throw new Error("Missing late split-plan arrangement");
+        expect((await evaluateLaunchStaffing(secondSection.sectionId, tx)).ready).toBe(true);
+        await tx.update(s.deliveryArrangements).set({ effectiveFrom: new Date("2027-12-01T08:00:00Z") })
+          .where(eq(s.deliveryArrangements.id, lateCoTeacherDelivery.id));
         expect((await evaluateLaunchStaffing(secondSection.sectionId, tx)).ready).toBe(false);
+        const operations = await getSchoolOperationsCommandCenter({
+          ...registrarActor, capabilities: new Set([...registrarActor.capabilities, "program.launch.start"]),
+        });
+        expect(operations.issues).toContainEqual(expect.objectContaining({
+          kind: "staffing_gap", sectionId: secondSection.sectionId,
+          description: expect.stringContaining("without gaps"),
+        }));
         await expect(activateProgram(registrarActor, program.id)).rejects.toThrow("full instructional window");
-        await tx.update(s.deliveryArrangements).set({ effectiveFrom: new Date("2027-08-16T07:00:00Z") })
-          .where(eq(s.deliveryArrangements.sectionId, secondSection.sectionId));
+        await tx.update(s.deliveryArrangements).set({ effectiveFrom: new Date("2027-11-01T07:00:00Z") })
+          .where(eq(s.deliveryArrangements.id, lateCoTeacherDelivery.id));
         await credentials.decideQualification({ data: { personId: teacher.id, programId: program.id,
           claimId: claim.id, decision: "revoke", expectedSequence: 2, reason: "Synthetic revocation check" } });
         await expect(activateProgram(registrarActor, program.id)).rejects.toThrow("No current verified credential");
@@ -425,6 +478,25 @@ integration("registrar staffing to launch handoff", () => {
           effectiveFrom:"2027-12-01T00:00:00.000Z"}})).rejects.toThrow("pre-opening");
         const today = await getSiteToday({ data: { siteId: site.id } });
         expect(today.programs.find(row => row.id === program.id)?.status).toBe("active");
+        const activeSectionRows=await tx.select({id:s.sections.id}).from(s.sections)
+          .where(and(eq(s.sections.programId,program.id),eq(s.sections.active,true)));
+        expect(today.sectionOperations?.summary.sections).toBe(activeSectionRows.length);
+        expect(activeSectionRows.length).toBeGreaterThan(0);
+        expect(today.sectionOperations?.issues.every(issue=>issue.programId===program.id)).toBe(true);
+        state.actor={...registrarActor,capabilities:new Set([...registrarActor.capabilities]
+          .filter(capability=>capability!=="program.launch.start"))};
+        expect((await getSiteToday({data:{siteId:site.id}})).sectionOperations).toBeNull();
+        state.actor=registrarActor;
+        expect(today.actionSummary).toEqual({overdue:1,dueWithin24Hours:1,unassigned:1});
+        expect(today.actions.slice(0,2).map(action=>action.title))
+          .toEqual(["Past-due site review","Upcoming site review"]);
+        expect(today.actions[0]).toMatchObject({urgency:"overdue",ownerName:null,ownerPersonId:null});
+        expect(today.actions[1]).toMatchObject({urgency:"due_soon",ownerName:"Synthetic ReceivingOperator",
+          ownerPersonId:receiver.id});
+        const operationalQueue=await getOperationsActions({data:{siteId:site.id,programId:program.id}});
+        expect(operationalQueue.summary).toMatchObject({overdue:1,dueWithin24Hours:1,unassigned:1});
+        expect(operationalQueue.items.slice(0,2).map(action=>action.title))
+          .toEqual(["Past-due site review","Upcoming site review"]);
         expect(today.openingHandoffs).toHaveLength(1);
         const handoff=first(today.openingHandoffs);
         handoffActionId=handoff.id;
@@ -544,21 +616,21 @@ integration("registrar staffing to launch handoff", () => {
         const arrangements = await tx.select().from(s.deliveryArrangements).where(inArray(s.deliveryArrangements.sectionId,
           [section.sectionId, secondSection.sectionId]));
         const assignmentAudits = await tx.select().from(s.auditEvents).where(inArray(s.auditEvents.resourceId, arrangements.map(row => row.id)));
-        expect(assignmentAudits.filter(row => row.action === "launch.teacher.assign")).toHaveLength(3);
+        expect(assignmentAudits.filter(row => row.action === "launch.teacher.assign")).toHaveLength(5);
         expect(first(assignmentAudits.filter(row => row.action === "launch.teacher.assign")).after?.verificationEventIds).toBeDefined();
         const evaluations=await tx.select().from(s.staffingEligibilityEvaluations)
           .where(inArray(s.staffingEligibilityEvaluations.roleAssignmentId,
             (await tx.select({id:s.roleAssignments.id}).from(s.roleAssignments)
               .where(inArray(s.roleAssignments.personId,[teacher.id,coTeacher.id]))).map(row=>row.id)));
-        expect(evaluations).toHaveLength(3);
+        expect(evaluations).toHaveLength(5);
         expect(evaluations.every(row=>row.result==="eligible"&&row.evidenceIds.length>0)).toBe(true);
         const events = await tx.select().from(s.domainEvents).where(inArray(s.domainEvents.aggregateId,
           [program.id, published.versionId, ...arrangements.map(row => row.id)]));
         expect(events.filter(row => row.eventType === "ProgramActivated")).toHaveLength(1);
         expect(events.filter(row => row.eventType === "TeacherQualificationPolicyPublished")).toHaveLength(1);
-        expect(events.filter(row => row.eventType === "DeliveryArrangementActivated")).toHaveLength(3);
+        expect(events.filter(row => row.eventType === "DeliveryArrangementActivated")).toHaveLength(5);
         const notices = await tx.select().from(s.notifications).where(inArray(s.notifications.recipientPersonId, [teacher.id, coTeacher.id]));
-        expect(notices.filter(row => row.type === "teaching_assignment")).toHaveLength(3);
+        expect(notices.filter(row => row.type === "teaching_assignment")).toHaveLength(4);
         expect(storage.verifyPrivateObject).toHaveBeenCalledWith(expect.objectContaining({
           keyPattern: expect.any(RegExp), expectedSize: 128, expectedContentType: "application/pdf", verifySignature: expect.any(Function),
         }));

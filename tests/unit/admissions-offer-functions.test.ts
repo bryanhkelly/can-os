@@ -83,13 +83,11 @@ describe("canonical admission offer server functions", () => {
     }));
   });
 
-  it("retains the historical key namespace for the next issuance attempt", async () => {
-    select.mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([{
-      id: "old-offer", status: "declined", expiresAt: null, idempotencyKey: "old-key",
-    }]));
+  it("uses a canonical key namespace for the next issuance attempt", async () => {
+    select.mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([]));
     await issueAdmissionOffer({ data: input });
     expect(issue).toHaveBeenCalledWith(registrar, expect.objectContaining({
-      idempotencyKey: "synthetic-offer:application:year:attempt-2",
+      idempotencyKey: "admission-offer:application:year:attempt-1",
     }));
   });
 
@@ -104,11 +102,12 @@ describe("canonical admission offer server functions", () => {
     expect(issue).not.toHaveBeenCalled();
   });
 
-  it("continues to require the explicit write gate for synthetic records", async () => {
+  it("applies the same authorized command to records with legacy synthetic metadata", async () => {
     vi.stubEnv("CAN_DEMO_WRITES_ENABLED", "false");
-    select.mockReturnValueOnce(rows([{ ...application, metadata: { synthetic: true } }]));
-    await expect(issueAdmissionOffer({ data: input })).rejects.toThrow();
-    expect(issue).not.toHaveBeenCalled();
+    select.mockReturnValueOnce(rows([{ ...application, metadata: { synthetic: true } }]))
+      .mockReturnValueOnce(rows([]));
+    await expect(issueAdmissionOffer({ data: input })).resolves.toEqual({ offerId: "offer" });
+    expect(issue).toHaveBeenCalledWith(registrar, expect.objectContaining(input));
   });
 
   it("denies a guardian response without the current enrollment relationship", async () => {

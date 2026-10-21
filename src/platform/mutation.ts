@@ -103,7 +103,6 @@ export async function writeAudit(
     after: entry.after ?? null,
     context: {
       requestId: context.requestId ?? null,
-      ...(context.demoFacilitator ? { demoFacilitator: context.demoFacilitator } : {}),
       ...(entry.contextExtras ?? {}),
     },
   });

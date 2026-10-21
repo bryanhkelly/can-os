@@ -306,7 +306,7 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(setFamilyRequirement({data:{...scope,complete:true}})).rejects.toThrow("Review and accept");
     state.actor=family;
     const checklist=await getGuardianEnrollmentChecklist({data:{applicationId}});
-    expect(checklist).toMatchObject({closed:false,synthetic:false});
+    expect(checklist).toMatchObject({closed:false,demoTenant:false});
     expect(first(checklist.requirements.filter(item=>item.id===requirement.id)))
      .toMatchObject({correctionReason:request.reason,reviewStatus:"requested"});
     const readDocumentRequirement=async()=>first((await getGuardianEnrollmentChecklist({data:{applicationId}}))
@@ -555,9 +555,6 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("household scope");
     await tx.update(s.householdMemberships).set({personId:guardian.id}).where(and(
      eq(s.householdMemberships.householdId,returningHousehold.id),eq(s.householdMemberships.personId,outsider.id)));
-    vi.stubEnv("CAN_DEMO_WRITES_ENABLED","false");
-    await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("Synthetic writes are disabled");
-    vi.stubEnv("CAN_DEMO_WRITES_ENABLED","true");
     state.failInquiryEvent=true;
     await expect(intake.createAdmissionsInquiry({data:returningInput})).rejects.toThrow("inquiry outbox failure");
     state.failInquiryEvent=false;
@@ -569,7 +566,7 @@ integration("cross-persona admissions through active classes",()=>{
      .rejects.toThrow("already has an open application");
     expect(first(await tx.select().from(s.applications).where(eq(s.applications.id,returning.applicationId))))
      .toMatchObject({studentProfileId:returningProfile.id,householdId:returningHousehold.id,stage:"inquiry",
-      metadata:{synthetic:true,existingStudent:true,contactPersonId:guardian.id}});
+      metadata:{existingStudent:true,contactPersonId:guardian.id}});
     expect(await tx.select({id:s.people.id}).from(s.people)).toEqual(originalPeople);
     expect(await tx.select({id:s.studentProfiles.id}).from(s.studentProfiles)).toEqual(originalProfiles);
     expect(await tx.select({id:s.households.id}).from(s.households)).toEqual(originalHouseholds);
@@ -635,7 +632,6 @@ integration("cross-persona admissions through active classes",()=>{
     }}})).rejects.toThrow("explicitly confirm");
     const householdCountBefore=await tx.select({id:s.households.id}).from(s.households);
     state.failInquiryEvent=true;
-    vi.stubEnv("CAN_DEMO_WRITES_ENABLED","false");
     await expect(intake.createAdmissionsInquiry({data:unlinkedInput})).rejects.toThrow("inquiry outbox failure");
     state.failInquiryEvent=false;
     expect(await tx.select({id:s.households.id}).from(s.households)).toEqual(householdCountBefore);
@@ -645,7 +641,7 @@ integration("cross-persona admissions through active classes",()=>{
     expect(await intake.createAdmissionsInquiry({data:unlinkedInput})).toEqual(unlinkedInquiry);
     const unlinkedApplication=first(await tx.select().from(s.applications).where(eq(s.applications.id,unlinkedInquiry.applicationId)));
     expect(unlinkedApplication).toMatchObject({studentProfileId:unlinkedProfile.id,
-     metadata:{existingStudent:true,synthetic:false,createdHousehold:true,contactPersonId:unlinkedGuardian.id}});
+     metadata:{existingStudent:true,createdHousehold:true,contactPersonId:unlinkedGuardian.id}});
     expect(await tx.select().from(s.householdMemberships).where(eq(s.householdMemberships.householdId,unlinkedApplication.householdId)))
      .toHaveLength(2);
     expect(first(await tx.select().from(s.auditEvents).where(eq(s.auditEvents.resourceId,unlinkedInquiry.applicationId))))

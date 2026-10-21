@@ -11,9 +11,16 @@ describe("authenticated academic journey fixtures", () => {
   const studentPersonId="f1000000-0000-4000-8000-000000000005";
   const teacherPersonId="f1000000-0000-4000-8000-000000000006";
   const guardianPersonId="f3000000-0000-4000-8000-000000000007";
+  const organizationId="f1000000-0000-4000-8000-000000000002";
+  const siteId="f1000000-0000-4000-8000-000000000003";
   const memberships=await db.select({role:accountPersonGrants.role,personId:accountPersonGrants.personId})
    .from(accountPersonGrants).innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
-   .where(and(eq(accountPersonGrants.active,true),eq(accountPersonGrants.isSynthetic,true),eq(accessAccounts.disabled,false)));
+   .where(and(
+    eq(accountPersonGrants.active,true),
+    eq(accountPersonGrants.organizationId,organizationId),
+    eq(accountPersonGrants.siteId,siteId),
+    eq(accessAccounts.disabled,false),
+   ));
   for(const [role,personId] of [["student",studentPersonId],["teacher",teacherPersonId],["guardian",guardianPersonId]])
    expect(memberships.some(m=>m.role===role&&m.personId===personId),`Missing active ${role} demo membership`).toBe(true);
   const guardians=await db.select().from(guardianRelationships).where(and(
@@ -33,8 +40,8 @@ describe("authenticated academic journey fixtures", () => {
    .innerJoin(sections,eq(sections.id,sectionTeachers.sectionId))
    .where(and(eq(sectionTeachers.personId,teacherPersonId),inArray(sectionTeachers.sectionId,sectionIds)));
   expect(teacherSections.length).toBeGreaterThan(0);
-  const published=await db.select({id:assessments.id,metadata:assessments.metadata}).from(assessments)
+  const published=await db.select({id:assessments.id}).from(assessments)
    .where(and(inArray(assessments.sectionId,teacherSections.map(x=>x.sectionId)),eq(assessments.status,"published")));
-  expect(published.some(x=>x.metadata.synthetic===true)).toBe(true);
+  expect(published.length).toBeGreaterThan(0);
  });
 });

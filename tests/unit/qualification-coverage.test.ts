@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateQualificationCoverage, instructionalWindow, type CoveragePolicy } from "@/modules/staffing/qualification-coverage";
+import { coverageGaps, evaluateQualificationCoverage, instructionalWindow, type CoveragePolicy } from "@/modules/staffing/qualification-coverage";
 
 const from = new Date("2030-01-01T00:00:00Z");
 const through = new Date("2030-07-01T00:00:00Z");
@@ -10,6 +10,21 @@ const policy: CoveragePolicy = {
 const evidence = [{ type: "license", verified: true, validFrom: from, expiresAt: through }];
 
 describe("instructional qualification coverage", () => {
+  it("accepts adjacent and overlapping instructor windows, but identifies uncovered intervals", () => {
+    const middle = new Date("2030-04-01");
+    const later = new Date("2030-05-01");
+    expect(coverageGaps(window, [
+      { from, through: middle }, { from: middle, through },
+    ])).toEqual([]);
+    expect(coverageGaps(window, [
+      { from, through: middle }, { from: later, through },
+    ])).toEqual([{ from: middle, through: later }]);
+    expect(coverageGaps(window, [
+      { from: new Date("2029-12-01"), through: middle },
+      { from: new Date("2030-03-01"), through: through },
+    ])).toEqual([]);
+    expect(coverageGaps(window, [])).toEqual([window]);
+  });
   it("blocks absent, draft-filtered, empty and unknown policies", () => {
     expect(evaluateQualificationCoverage(window, [], evidence).eligible).toBe(false);
     for (const expression of [{}, { op: "all", rules: [] }, { op: "unknown" },

@@ -1,4 +1,10 @@
 export const EventTypes = {
+  ApplicantRegistered: "ApplicantRegistered",
+  ApplicantSchoolJoined: "ApplicantSchoolJoined",
+  OnlineApplicationsConfigured: "OnlineApplicationsConfigured",
+  ApplicationDraftCreated: "ApplicationDraftCreated",
+  ApplicationDraftSaved: "ApplicationDraftSaved",
+  ApplicationSubmitted: "ApplicationSubmitted",
   ApplicationStarted: "ApplicationStarted",
   ApplicationAccepted: "ApplicationAccepted",
   AdmissionOfferIssued: "AdmissionOfferIssued",
@@ -41,6 +47,7 @@ export const EventTypes = {
   EnrollmentFormReviewed: "EnrollmentFormReviewed",
   SchoolYearCreated: "SchoolYearCreated",
   SchoolYearActivated: "SchoolYearActivated",
+  OrganizationCreated: "OrganizationCreated",
   SiteCreated: "SiteCreated",
   AcademicCalendarChanged: "AcademicCalendarChanged",
   ScheduleTemplateChanged: "ScheduleTemplateChanged",

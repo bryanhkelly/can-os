@@ -51,6 +51,15 @@ A Student may participate in more than one Household.
 ### GuardianRelationship
 Explicit Person-to-Student relationship including legal/visibility rules.
 
+Admissions application packets contain versioned applicant-provided student,
+household/contact and school-history statements on the canonical Application.
+Those statements are not verified GuardianRelationships, account grants,
+official transcripts or imported grades. Packet saves preserve existing
+Person/StudentProfile identity and project section completeness into the shared
+Journey tables. The admissions packet uses participant type
+`admissions_application`, distinct from the `application`-participant enrollment
+Journey, so packet completion cannot satisfy enrollment requirements.
+
 ### School-support staff
 `counselor` and `specialist` are distinct verified membership roles sharing the
 school-support workspace. Caseload, referrals, plans, services and outreach use
@@ -66,13 +75,37 @@ A legal, operating, network, or host entity.
 
 Examples: CAN, denomination, church, Christian school, consortium, microschool operator.
 
+An Organization profile is an authorized projection of the canonical Organization,
+its visible Sites, and its visible Programs; it is not a second profile record or
+store. Its initial identity includes type, name, legal name, and slug. A user's
+Organization and Program scope limits which related records appear.
+
 ### Site
 A physical or operational location belonging to an Organization.
+
+The Site profile projects the canonical Site identity, location, timezone, owning
+Organization, and Programs delivered at that Site. It is separate from Site Today:
+the profile describes the institution/location, while Site Today is its operational
+workspace. Address and linked records are returned only after current scoped access
+is verified.
 
 ### Program
 A defined educational offering operated by or at an Organization/Site.
 
 Required because CAN supports church-hosted academies, K-8 high-school extensions, microschools, hybrid programs, and other models without changing the underlying architecture.
+
+Program is the offering, not another name for the Organization or Site. It defines
+the grades served, delivery model, jurisdiction, host, academic provider, and
+credit-issuing authority; school-year and calendar records configure when it
+operates, and Sections are the classes provisioned within it. One Site can host
+multiple Programs, and a Program may be remote or span Sites.
+
+Launch progressively provisions these canonical records as the institution's
+profile: Organization identity, optional Site identity/location, then Program
+definition and readiness. Creating an Organization does not grant access to its
+new scope. An authorized administrator must issue an explicit scoped membership
+grant before the recipient can manage that Organization, its Sites, or its Programs.
+Profiles aggregate these records rather than duplicating launch answers.
 
 Suggested fields:
 
@@ -382,6 +415,16 @@ Open -> In Progress -> Waiting -> Resolved
 ```
 
 An Action may have owners, due dates, dependencies, evidence, related entities, and resolution notes.
+
+Site Operations and Site Today project the same scoped open Actions. Daily
+triage orders overdue work first, then work due within 24 hours, future-dated
+and undated work; priority and deadline break ties. Queue summaries call out
+overdue, near-deadline and unassigned work. The owner remains visible even
+when no longer in the active staff picker, and the action's owning workflow
+continues to control any domain-specific transition.
+The site-director view may also project authorized section staffing, capacity
+and waitlist exceptions from the existing Operations command center. These are
+read-only signals that link back to their owning program workflows.
 
 ### Journey
 Reusable readiness/onboarding engine.

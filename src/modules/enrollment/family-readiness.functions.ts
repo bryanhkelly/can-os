@@ -6,6 +6,7 @@ import { EventTypes } from "@/domain/event-types";
 import { authorizeEnrollmentApplication } from "./enrollment-access.server";
 import { enrollmentFormState } from "@/domain/enrollment-form";
 import { enrollmentFormRevision } from "./enrollment-form.server";
+import { isDemoTenantOrganization } from "@/domain/local-demo-access";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,eq,inArray } from "drizzle-orm";
@@ -21,12 +22,12 @@ export const getFamilyReadiness=createServerFn({method:"GET"})
  if(!scoped.programIds.length)return [];
  if(!process.env.DATABASE_URL)return [];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,metadata:s.applications.metadata,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).where(inArray(s.applications.programId,scoped.programIds)).limit(150);
- const synthetic=apps;
- if(!synthetic.length)return [];
- const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId,status:s.journeys.status}).from(s.journeys).where(and(eq(s.journeys.participantType,"application"),inArray(s.journeys.participantId,synthetic.map(x=>x.id))));
- const enrollmentRows=await db.select({studentProfileId:s.enrollments.studentProfileId,programId:s.enrollments.programId,schoolYearId:s.enrollments.schoolYearId,status:s.enrollments.status,kind:s.enrollments.kind}).from(s.enrollments).where(inArray(s.enrollments.studentProfileId,[...new Set(synthetic.map(a=>a.studentProfileId))]));
- const offers=await db.select({applicationId:s.admissionOffers.applicationId,status:s.admissionOffers.status,schoolYearId:s.admissionOffers.schoolYearId,respondedAt:s.admissionOffers.respondedAt,expiresAt:s.admissionOffers.expiresAt}).from(s.admissionOffers).where(inArray(s.admissionOffers.applicationId,synthetic.map(x=>x.id)));
+ const apps=await db.select({id:s.applications.id,householdId:s.applications.householdId,stage:s.applications.stage,program:s.programs.name,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId,organizationId:s.programs.organizationId}).from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId)).where(inArray(s.applications.programId,scoped.programIds)).limit(150);
+ const scopedApps=apps;
+ if(!scopedApps.length)return [];
+ const journeys=await db.select({id:s.journeys.id,participantId:s.journeys.participantId,status:s.journeys.status}).from(s.journeys).where(and(eq(s.journeys.participantType,"application"),inArray(s.journeys.participantId,scopedApps.map(x=>x.id))));
+ const enrollmentRows=await db.select({studentProfileId:s.enrollments.studentProfileId,programId:s.enrollments.programId,schoolYearId:s.enrollments.schoolYearId,status:s.enrollments.status,kind:s.enrollments.kind}).from(s.enrollments).where(inArray(s.enrollments.studentProfileId,[...new Set(scopedApps.map(a=>a.studentProfileId))]));
+ const offers=await db.select({applicationId:s.admissionOffers.applicationId,status:s.admissionOffers.status,schoolYearId:s.admissionOffers.schoolYearId,respondedAt:s.admissionOffers.respondedAt,expiresAt:s.admissionOffers.expiresAt}).from(s.admissionOffers).where(inArray(s.admissionOffers.applicationId,scopedApps.map(x=>x.id)));
  const requirements=journeys.length?await db.select({id:s.journeyRequirements.id,journeyId:s.journeyRequirements.journeyId,title:s.journeyRequirements.title,status:s.journeyRequirements.status,blocking:s.journeyRequirements.blocking,evidence:s.journeyRequirements.evidence,metadata:s.journeyRequirements.metadata}).from(s.journeyRequirements).where(inArray(s.journeyRequirements.journeyId,journeys.map(x=>x.id))):[];
  const withForms=requirements.map(requirement=>{
   const state=enrollmentFormState(requirement.metadata,requirement.evidence);
@@ -35,7 +36,7 @@ export const getFamilyReadiness=createServerFn({method:"GET"})
  const requirementIds=requirements.map(r=>r.id);
  const uploadedDocuments=requirementIds.length?await db.select({id:s.documents.id,subjectId:s.documents.subjectId,fileName:s.documents.fileName,createdAt:s.documents.createdAt,metadata:s.documents.metadata})
   .from(s.documents).where(and(eq(s.documents.subjectType,"journey_requirement"),eq(s.documents.storageProvider,"cloudflare_r2"),inArray(s.documents.subjectId,requirementIds))):[];
- return synthetic.map(app=>{const isFixture=app.metadata.synthetic===true;const journeyIds=new Set(journeys.filter(j=>j.participantId===app.id).map(j=>j.id));return {id:app.id,isFixture,householdId:app.householdId,program:app.program,stage:app.stage,journeyStatus:journeys.find(j=>j.participantId===app.id)?.status??null,activeSchoolYears:enrollmentRows.filter(e=>e.studentProfileId===app.studentProfileId&&e.programId===app.programId&&e.kind==="program"&&e.status==="active").map(e=>e.schoolYearId),offers:offers.filter(o=>o.applicationId===app.id).map(o=>({...o,respondedAt:o.respondedAt?.toISOString()??null,expiresAt:o.expiresAt?.toISOString()??null})),requirements:withForms.filter(r=>journeyIds.has(r.journeyId)).map(({metadata,...r})=>({...r,documents:uploadedDocuments.filter(d=>d.subjectId===r.id&&d.metadata.applicationId===app.id).map(d=>({id:d.id,fileName:d.fileName,uploadedAt:d.createdAt.toISOString(),reviewStatus:typeof d.metadata.reviewStatus==="string"?d.metadata.reviewStatus:"received",version:typeof d.metadata.version==="number"?d.metadata.version:1,isCurrent:d.metadata.isCurrent!==false})),evidence:r.evidence.filter(e=>(e.kind==="registrar_note"&&typeof e.text==="string")||(e.kind==="document_review"&&typeof e.status==="string")).map(e=>({kind:String(e.kind),text:typeof e.text==="string"?e.text:"",status:typeof e.status==="string"?e.status:"",reviewedAt:typeof e.reviewedAt==="string"?e.reviewedAt:"",documentId:typeof e.documentId==="string"?e.documentId:""}))})),readiness:enrollmentReadiness(requirements.filter(r=>journeyIds.has(r.journeyId)))};});
+ return scopedApps.map(app=>{const demoTenant=isDemoTenantOrganization(app.organizationId);const journeyIds=new Set(journeys.filter(j=>j.participantId===app.id).map(j=>j.id));return {id:app.id,demoTenant,householdId:app.householdId,program:app.program,stage:app.stage,journeyStatus:journeys.find(j=>j.participantId===app.id)?.status??null,activeSchoolYears:enrollmentRows.filter(e=>e.studentProfileId===app.studentProfileId&&e.programId===app.programId&&e.kind==="program"&&e.status==="active").map(e=>e.schoolYearId),offers:offers.filter(o=>o.applicationId===app.id).map(o=>({...o,respondedAt:o.respondedAt?.toISOString()??null,expiresAt:o.expiresAt?.toISOString()??null})),requirements:withForms.filter(r=>journeyIds.has(r.journeyId)).map(({metadata,...r})=>({...r,documents:uploadedDocuments.filter(d=>d.subjectId===r.id&&d.metadata.applicationId===app.id).map(d=>({id:d.id,fileName:d.fileName,uploadedAt:d.createdAt.toISOString(),reviewStatus:typeof d.metadata.reviewStatus==="string"?d.metadata.reviewStatus:"received",version:typeof d.metadata.version==="number"?d.metadata.version:1,isCurrent:d.metadata.isCurrent!==false,canDownload:d.metadata.storageVerified===true})),evidence:r.evidence.filter(e=>(e.kind==="registrar_note"&&typeof e.text==="string")||(e.kind==="document_review"&&typeof e.status==="string")).map(e=>({kind:String(e.kind),text:typeof e.text==="string"?e.text:"",status:typeof e.status==="string"?e.status:"",reviewedAt:typeof e.reviewedAt==="string"?e.reviewedAt:"",documentId:typeof e.documentId==="string"?e.documentId:""}))})),readiness:enrollmentReadiness(requirements.filter(r=>journeyIds.has(r.journeyId)))};});
 });
 
 /** Registrar readiness review over canonical JourneyRequirements. */
@@ -111,7 +112,7 @@ export const reviewRequirementDocument=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const scope=await authorizeEnrollmentApplication(actor,data.applicationId,tx);
    if(["withdrawn","declined"].includes(scope.stage))throw new Error("This application is closed to enrollment document changes");
-   const [app]=await tx.select({id:s.applications.id,metadata:s.applications.metadata,programId:s.applications.programId}).from(s.applications).where(eq(s.applications.id,data.applicationId)).limit(1);
+   const [app]=await tx.select({id:s.applications.id,programId:s.applications.programId}).from(s.applications).where(eq(s.applications.id,data.applicationId)).limit(1);
    if(!app)throw new Error("Application not found");
    assertProgramGranted(actor,app.programId);
    const [journey]=await tx.select({id:s.journeys.id,status:s.journeys.status}).from(s.journeys).where(and(eq(s.journeys.participantType,"application"),eq(s.journeys.participantId,app.id))).for("update").limit(1);
@@ -127,7 +128,7 @@ export const reviewRequirementDocument=createServerFn({method:"POST"})
       .where(and(eq(s.documents.id,documentId),eq(s.documents.subjectType,"journey_requirement"),eq(s.documents.subjectId,requirement.id),eq(s.documents.storageProvider,"cloudflare_r2"))).for("update").limit(1);
     if(!record||record.metadata.applicationId!==app.id)throw new Error("Document is outside this enrollment requirement");
     if(record.metadata.isCurrent===false)throw new Error("Superseded documents cannot be reviewed");
-    if(record.metadata.storageVerified!==true&&record.metadata.synthetic!==true)
+    if(record.metadata.storageVerified!==true)
      throw new Error("The uploaded file has not passed storage verification");
     reviewedDocument=record;
    }

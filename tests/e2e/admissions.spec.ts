@@ -112,3 +112,134 @@ test("GF2: guardian correction and registrar review through accepted offer, acti
     await Promise.all([guardian.context.close(), registrar.context.close(), student.context.close()]);
   }
 });
+
+test("GF22: family saves, reloads and submits the same application into registrar intake", async ({ browser }) => {
+  const guardian = await signedIn(browser, fixture.guardianSecret);
+  const registrar = await signedIn(browser, fixture.teacherSecret);
+  guardian.page.setDefaultTimeout(20_000);
+  registrar.page.setDefaultTimeout(20_000);
+  try {
+    await registrar.page.goto(`/admissions/intake?programId=${fixture.programId}`);
+    const publication = registrar.page.locator("section").filter({
+      has: registrar.page.getByRole("heading", { name: "Family online applications", exact: true }),
+    }).locator("div").filter({ hasText: "E2E High School" });
+    await publication.getByRole("button", { name: "Open applications", exact: true }).click();
+    await expect(publication.getByRole("link", { name: "Family application link" }))
+      .toHaveAttribute("href", `/apply?program=${fixture.programId}`);
+
+    await guardian.page.goto(`/apply?program=${fixture.programId}`);
+    await guardian.page.waitForLoadState("networkidle");
+    await guardian.page.getByRole("button", { name: "Start an application", exact: true }).click();
+    await expect(guardian.page.getByLabel("Date of birth", { exact: true })).toHaveAttribute("aria-invalid", "true");
+    await guardian.page.getByLabel("Student first name", { exact: true }).fill("Browser");
+    await guardian.page.getByLabel("Student last name", { exact: true }).fill(`Applicant-${fixture.suffix}`);
+    await guardian.page.getByRole("combobox", { name: "Entering grade", exact: true }).selectOption("9");
+    await guardian.page.getByLabel("Date of birth", { exact: true }).fill("2011-04-12");
+    await expect(guardian.page.getByLabel("Date of birth", { exact: true })).toHaveAttribute("aria-invalid", "false");
+    await guardian.page.getByLabel("Primary language", { exact: true }).fill("English");
+    await guardian.page.getByLabel("Requested school year", { exact: true }).fill("2026-2027");
+    await guardian.page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await expect(guardian.page.getByText("Draft saved. Review it and submit when ready.", { exact: true })).toBeVisible();
+    await guardian.page.reload();
+    await guardian.page.waitForLoadState("networkidle");
+    await guardian.page.getByRole("button", { name: "Continue draft", exact: true }).click();
+    const editor = guardian.page.getByRole("region", { name: "Application packet", exact: true });
+    await expect(editor).toBeFocused();
+    await expect(editor.getByRole("heading", { name: "Edit application draft", exact: true })).toBeInViewport({ ratio: 1 });
+    // Reopening the already selected draft must also reveal its editor.
+    await guardian.page.getByRole("button", { name: "Continue draft", exact: true }).click();
+    await expect(editor).toBeFocused();
+    await expect(editor.getByRole("heading", { name: "Edit application draft", exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(guardian.page.getByLabel("Date of birth", { exact: true })).toHaveValue("2011-04-12");
+    await guardian.page.getByRole("button", { name: "Review and submit", exact: true }).click();
+    await expect(guardian.page.getByRole("button", { name: "Submit application", exact: true })).toBeDisabled();
+    await expect(guardian.page.getByText("Before you can submit", { exact: true })).toBeVisible();
+    await guardian.page.getByRole("button", { name: "Family and households", exact: false }).click();
+    const household = guardian.page.getByRole("region", { name: "Household 1", exact: true });
+    await household.getByLabel("Household name", { exact: true }).fill("Synthetic Browser Household");
+    await household.getByLabel("Address line 1", { exact: true }).fill("123 Example Lane");
+    await household.getByLabel("City", { exact: true }).fill("Example City");
+    await household.getByLabel("State / province", { exact: true }).fill("CA");
+    await household.getByLabel("Postal code", { exact: true }).fill("90000");
+    await household.getByLabel("Country", { exact: true }).fill("US");
+    await household.getByLabel("Contact first name", { exact: true }).fill("Morgan");
+    await household.getByLabel("Contact last name", { exact: true }).fill("Example");
+    await household.getByLabel("Relationship to student", { exact: true }).fill("Parent");
+    await household.getByLabel("Contact email", { exact: true }).fill("dsdsfds");
+    await household.getByLabel("Contact phone", { exact: true }).fill("202-555-0100");
+    await expect(household.getByLabel("Contact email", { exact: true })).toHaveAttribute("aria-invalid", "true");
+    await expect(household.getByLabel("Contact email", { exact: true })).toHaveClass(/border-red-600/);
+    await guardian.page.getByRole("button", { name: "Add second household", exact: true }).click();
+    await expect(guardian.page.getByRole("region", { name: "Household 2", exact: true })).toBeVisible();
+    await guardian.page.getByRole("button", { name: "Remove household 2", exact: true }).click();
+    await guardian.page.getByRole("button", { name: "Add sibling", exact: true }).click();
+    await guardian.page.getByLabel("Sibling full name", { exact: true }).fill("Synthetic Sibling");
+    await guardian.page.getByLabel("Sibling grade / age", { exact: true }).fill("6");
+    await guardian.page.getByLabel("Sibling school or not attending", { exact: true }).fill("Example School");
+    await guardian.page.getByRole("button", { name: "Previous schools and interests", exact: false }).click();
+    await guardian.page.getByRole("button", { name: "Add previous school", exact: true }).click();
+    await guardian.page.getByLabel("School name", { exact: true }).fill("Example Middle School");
+    await guardian.page.getByLabel("School city / country", { exact: true }).fill("Example City, US");
+    await guardian.page.getByLabel("Last grade attended", { exact: true }).fill("8");
+    await guardian.page.getByLabel("Reason for leaving", { exact: true }).fill("Entering high school");
+    await guardian.page.getByLabel("Student's learning interests", { exact: true }).fill("Science and music");
+    await guardian.page.getByRole("textbox", { name: "Why are you interested in this program?", exact: true })
+      .fill("Synthetic browser test: updated interest in project learning.");
+    await guardian.page.getByRole("button", { name: "Review and submit", exact: true }).click();
+    await expect(guardian.page.getByText("Example Middle School", { exact: true })).toBeVisible();
+    await expect(guardian.page.getByText("123 Example Lane", { exact: false })).toBeVisible();
+    await guardian.page.getByRole("button", { name: "Household 1: Enter a valid contact email", exact: true }).click();
+    await expect(household.getByLabel("Contact email", { exact: true })).toBeFocused();
+    await expect(household.getByLabel("Contact email", { exact: true })).toHaveAttribute("aria-describedby", /.+-error/);
+    await guardian.page.getByRole("button", { name: "Review and submit", exact: true }).click();
+    await expect(guardian.page.getByRole("button", { name: "Family and households", exact: false })).not.toContainText("Ready");
+    await guardian.page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await expect(guardian.page.getByRole("alert")).toContainText("Correct the highlighted invalid fields");
+    await expect(household.getByLabel("Contact email", { exact: true })).toBeFocused();
+    await household.getByLabel("Contact email", { exact: true }).fill("morgan@example.test");
+    await expect(household.getByLabel("Contact email", { exact: true })).toHaveAttribute("aria-invalid", "false");
+    await guardian.page.getByRole("button", { name: "Review and submit", exact: true }).click();
+    await expect(guardian.page.getByText("Before you can submit", { exact: true })).toHaveCount(0);
+    await expect(guardian.page.getByText("Your latest changes will be saved when you submit.", { exact: true })).toBeVisible();
+    await expect(guardian.page.getByRole("button", { name: "Submit application", exact: true })).toBeDisabled();
+    await guardian.page.getByRole("checkbox").check();
+    await guardian.page.getByRole("button", { name: "Submit application", exact: true }).click();
+    await expect(guardian.page.getByText("Application submitted. The school will review it; your student is not enrolled yet.", { exact: true })).toBeVisible();
+    await guardian.page.reload();
+    await expect(guardian.page.getByText("Status: application", { exact: true })).toBeVisible();
+    await expect(guardian.page.getByText("Guardian relationship verification is pending.", { exact: false })).toBeVisible();
+    await guardian.page.getByText("View submitted application packet", { exact: true }).click();
+    await expect(guardian.page.getByText("Example Middle School", { exact: true })).toBeVisible();
+
+    const rows = await sql.query(`select a.id, a.student_profile_id, a.stage, a.submitted_at,
+      a.metadata->>'applicantVersion' as version, r.can_view_academics, r.can_manage_enrollment,
+      r.can_submit_attendance_excuse
+      from applications a join student_profiles sp on sp.id = a.student_profile_id
+      join guardian_relationships r on r.student_person_id = sp.person_id and r.guardian_person_id = a.submitted_by_person_id
+      where a.program_id = $1 and a.submitted_by_person_id = $2 and a.metadata->>'origin' = 'family_application'`,
+    [fixture.programId, fixture.guardianPersonId]);
+    expect(rows).toHaveLength(1);
+    const application = rows[0];
+    if (!application) throw new Error("Family application was not persisted.");
+    expect(application).toMatchObject({ stage: "application", version: "2",
+      can_view_academics: false, can_manage_enrollment: false, can_submit_attendance_excuse: false });
+    expect(application.submitted_at).not.toBeNull();
+    expect(await sql.query("select id from enrollments where student_profile_id = $1", [application.student_profile_id])).toEqual([]);
+    expect(await sql.query("select id from domain_events where aggregate_id = $1 and event_type = 'ApplicationSubmitted'", [application.id])).toHaveLength(1);
+    expect(await sql.query("select id from audit_events where resource_id = $1 and action = 'admissions.application.submitted'", [application.id])).toHaveLength(1);
+    const packetJourneys = await sql.query("select id, status from journeys where participant_type = 'admissions_application' and participant_id = $1", [application.id]);
+    expect(packetJourneys).toEqual([expect.objectContaining({ status: "ready" })]);
+    await registrar.page.goto(`/admissions/intake?programId=${fixture.programId}&application=${application.id}`);
+    await registrar.page.waitForLoadState("networkidle");
+    const intake = registrar.page.locator("article").filter({ hasText: `Applicant-${fixture.suffix}` });
+    await expect(intake).toContainText("Synthetic browser test: updated interest in project learning.");
+    await expect(intake).toContainText("application");
+    await intake.getByText("Review application packet", { exact: true }).click();
+    await expect(intake).toContainText("Example Middle School");
+    await expect(intake).toContainText("Synthetic Sibling");
+    await registrar.page.goto(`/admissions?programId=${fixture.programId}`);
+    await expect(registrar.page.getByRole("row").filter({ hasText: `Applicant-${fixture.suffix}` })).toContainText("application");
+  } finally {
+    await Promise.all([guardian.context.close(), registrar.context.close()]);
+  }
+});

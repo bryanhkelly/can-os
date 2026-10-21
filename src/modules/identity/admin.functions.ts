@@ -18,7 +18,7 @@ async function requireRegistrar(): Promise<Actor & { organizationIds: string[]; 
   const [grant]=await db.select({siteId:accountPersonGrants.siteId})
    .from(accountPersonGrants).where(and(
     eq(accountPersonGrants.id,actor.grantId),
-    eq(accountPersonGrants.accountId,actor.demoFacilitator?.sourceAccountId??actor.accountId),
+    eq(accountPersonGrants.accountId,actor.accountId),
     eq(accountPersonGrants.active,true))).limit(1);
   if(!grant)throw new AuthorizationError("active registrar grant");
   return { ...actor, organizationIds, grantSiteId:grant.siteId };
@@ -28,15 +28,33 @@ async function requireRegistrar(): Promise<Actor & { organizationIds: string[]; 
 export const listScopedSites = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await requireRegistrar();
   const { db } = await import("@/db/client");
-  const { sites } = await import("@/db/schema");
+  const { organizations, sites } = await import("@/db/schema");
+  const { asc, inArray } = await import("drizzle-orm");
   const scopedSiteIds = actor.scope.siteIds ?? [];
+  const childOrganizations = actor.grantSiteId
+    ? []
+    : await db.select({
+        id: organizations.id,
+        name: organizations.name,
+      }).from(organizations).where(inArray(organizations.parentOrganizationId, actor.organizationIds));
+  const scopedOrganizations = await db.select({
+    id: organizations.id,
+    name: organizations.name,
+  }).from(organizations).where(inArray(organizations.id, actor.organizationIds));
+  const grantOrganizations = [...scopedOrganizations, ...childOrganizations]
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const grantOrganizationIds = grantOrganizations.map((organization) => organization.id);
   const rows = await db.select({
     id: sites.id, name: sites.name, organizationId: sites.organizationId,
   }).from(sites).where(and(
-    inArray(sites.organizationId, actor.organizationIds),
-    inArray(sites.id, scopedSiteIds),
-  ));
-  return { sites: rows, requireSiteSelection:actor.grantSiteId!==null };
+    inArray(sites.organizationId, grantOrganizationIds),
+    actor.grantSiteId ? inArray(sites.id, scopedSiteIds) : undefined,
+  )).orderBy(asc(sites.name));
+  return {
+    organizations: grantOrganizations,
+    sites: rows,
+    requireSiteSelection: actor.grantSiteId !== null,
+  };
 });
 
 /**
@@ -154,22 +172,35 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
     firstName: z.string().trim().min(1).max(80),
     lastName: z.string().trim().min(1).max(80),
     role: z.enum(assignableRoles),
+    organizationId: z.string().uuid().optional(),
     siteId: z.string().uuid().optional(),
   }).parse(value))
   .handler(async ({ data }) => {
     const actor = await requireRegistrar();
     const { db } = await import("@/db/client");
-    const { people, accessAccounts, accountPersonGrants, sites } = await import("@/db/schema");
-    const organizationId = actor.organizationIds[0]!;
-    if(actor.grantSiteId && data.siteId!==actor.grantSiteId)
+    const { people, accessAccounts, accountPersonGrants, organizations, sites } = await import("@/db/schema");
+    const organizationId = data.organizationId ?? actor.organizationIds[0]!;
+    const [targetOrganization] = await db.select({
+      id: organizations.id,
+      name: organizations.name,
+      parentOrganizationId: organizations.parentOrganizationId,
+    }).from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+    const isScopedOrganization = actor.organizationIds.includes(organizationId);
+    const isScopedChild = !actor.grantSiteId &&
+      !!targetOrganization?.parentOrganizationId &&
+      actor.organizationIds.includes(targetOrganization.parentOrganizationId);
+    if (!targetOrganization || (!isScopedOrganization && !isScopedChild)) {
+      throw new AuthorizationError("grant organization relationship");
+    }
+    if(actor.grantSiteId && (organizationId!==actor.organizationIds[0]||data.siteId!==actor.grantSiteId))
       throw new AuthorizationError("site-limited registrar cannot create organization-wide or sibling school grants");
     let siteId: string | null = null;
     if (data.siteId) {
       const [site] = await db.select({ id: sites.id }).from(sites)
-        .where(and(eq(sites.id, data.siteId), inArray(sites.organizationId, actor.organizationIds)))
+        .where(and(eq(sites.id, data.siteId), eq(sites.organizationId, organizationId)))
         .limit(1);
       const scopedSiteIds = actor.scope.siteIds ?? [];
-      if (!site || !scopedSiteIds.includes(site.id)) {
+      if (!site || (isScopedOrganization && actor.grantSiteId && !scopedSiteIds.includes(site.id))) {
         throw new AuthorizationError("site scope");
       }
       siteId = site.id;
@@ -209,7 +240,16 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
       const [existingGrant] = await tx.select({ id: accountPersonGrants.id, active: accountPersonGrants.active })
         .from(accountPersonGrants).where(and(...grantConditions)).limit(1);
       if (existingGrant) {
-        return { accountId: account!.id, personId, grantId: existingGrant.id, created: false as const };
+        return {
+          accountId: account!.id,
+          personId,
+          grantId: existingGrant.id,
+          organizationId,
+          organizationName: targetOrganization.name,
+          isCurrentAccount: account!.id === actor.accountId,
+          active: existingGrant.active,
+          created: false as const,
+        };
       }
       const [grant] = await tx.insert(accountPersonGrants).values({
         accountId: account!.id, personId, role: data.role, organizationId, siteId,
@@ -218,7 +258,16 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         action: "admin.grant.create", resourceType: "account_person_grant", resourceId: grant!.id,
         after: { accountId: account!.id, personId, role: data.role, organizationId, siteId },
       });
-      return { accountId: account!.id, personId, grantId: grant!.id, created: true as const };
+      return {
+        accountId: account!.id,
+        personId,
+        grantId: grant!.id,
+        organizationId,
+        organizationName: targetOrganization.name,
+        isCurrentAccount: account!.id === actor.accountId,
+        active: true,
+        created: true as const,
+      };
     });
   });
 

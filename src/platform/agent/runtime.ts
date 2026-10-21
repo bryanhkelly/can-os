@@ -177,7 +177,7 @@ export async function sendMessage(
     } else if (plan.intent === "ask" && plan.kind === "operations_overview") {
       const overview = await getSchoolOperationsCommandCenter(context);
       const lines = [
-        `There are ${overview.summary.sections} active sections, ${overview.summary.unstaffed} without instructors, ${overview.summary.underCapacity} with instructional capacity gaps, and ${overview.summary.waitlisted} waitlisted students.`,
+        `There are ${overview.summary.sections} active sections, ${overview.summary.unstaffed} without instructors, ${overview.summary.staffingGaps} with staffing or qualification coverage gaps, ${overview.summary.underCapacity} with instructional capacity gaps, and ${overview.summary.waitlisted} waitlisted students.`,
         ...overview.issues.slice(0,10).map(issue=>`- ${issue.title}: ${issue.description}`),
       ];
       reply = await addMessage(tx,{conversationId,role:"agent",body:lines.join("\n"),

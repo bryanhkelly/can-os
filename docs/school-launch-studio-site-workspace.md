@@ -59,6 +59,29 @@ First inspect existing `organizations`, `programs`, `journeys`, `documents`, and
 - **Person workspace**: local director, teacher, guardian, network leader; composition driven by authorization, not separate stores.
 Support a site with multiple programs and a remote program without a physical site.
 
+### Institution profiles and launch capture
+Organization and Site each have a profile page backed by their canonical records;
+the profile is an authorized read model, not a parallel profile table or launch
+snapshot. The Organization profile composes its identity, visible Sites, and
+visible Programs. A Site profile composes its identity, authorized location and
+timezone, owning Organization, and Programs delivered there. Site Today remains
+the operational workspace rather than the Site profile.
+
+Launch captures the initial Organization identity (type, name, optional legal
+name, slug), optional Site location (name, address, timezone, slug), and Program
+definition (offering type, grades, delivery model, jurisdiction, host and
+academic/credit authorities). This sequence builds the profiles from the start;
+it does not copy launch answers into separate profile records. Program means the
+educational offering—not the operator or location—and one Site may have multiple
+Programs.
+
+Creating a child Organization under a scoped parent does not automatically grant
+the creator access to the new Organization. An authorized parent registrar uses
+the existing administration flow to make an explicit scoped grant; only then can
+that member continue Site/Program setup within the new scope. Site and
+Organization profile reads recheck current capability and scope, and profile
+views show only related Programs and Sites authorized to the current membership.
+
 ### Routes
 - `/schools` or `/sites`: scope-filtered institution portfolio, searchable.
 - `/sites/$siteId`: site home / Today / Needs You with canonical indicators, exception queue, director briefing, program cards and quick actions.

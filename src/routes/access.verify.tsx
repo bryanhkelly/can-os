@@ -8,9 +8,9 @@ export const Route=createFileRoute("/access/verify")({
    try{value=await request.json();}catch{return Response.json({error:"Invalid request"},{status:400});}
    const payload=value&&typeof value==="object"?value:null;
    try{
-    const {redeemLocalDemoAccess,redeemOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
+    const {redeemDemoAccess,redeemOneTimeAccess}=await import("@/modules/identity/passwordless-access.server");
     const result=payload&&"email" in payload&&typeof payload.email==="string"&&"code" in payload&&typeof payload.code==="string"
-     ?await redeemLocalDemoAccess(payload.email,payload.code)
+     ?await redeemDemoAccess(payload.email,payload.code)
      :payload&&"token" in payload&&typeof payload.token==="string"
       ?await redeemOneTimeAccess(payload.token)
       :null;
@@ -35,7 +35,7 @@ function VerifyAccess(){
    if(!res.ok){setStatus("This access link is invalid or expired.");return;}
    setToken(null);
    const body=await res.json() as {role?:string};
-   const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/coach",counselor:"/counselor"};
+   const home:Record<string,string>={applicant:"/apply",student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/coach",counselor:"/counselor"};
    window.location.replace(home[body.role??""]??"/access");
   }catch{setStatus("Unable to complete sign-in.");}finally{setWorking(false);}
  }
