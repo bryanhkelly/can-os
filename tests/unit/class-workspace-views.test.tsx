@@ -75,7 +75,7 @@ describe("published class workspace", () => {
     const data={...workspace,content};
     const overview=renderToStaticMarkup(<ClassWorkspace data={data}/>);
     expect(overview).toContain("Yearlong course roadmap");
-    expect(overview).toContain("1 of 36 weeks authored");
+    expect(overview.replaceAll("<!-- -->","")).toContain("1 of 36 weeks authored");
     expect(overview).toContain("not certified as credit-ready");
     expect(overview).toContain("Planning only");
     const day=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="u01-d01"/>);
