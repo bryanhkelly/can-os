@@ -33,6 +33,7 @@ vi.mock("@/modules/learning/discussion-post.functions", () => ({ postDiscussionM
 const workspace: ComponentProps<typeof ClassWorkspace>["data"] = {
   role: "student", section: { id: "english", title: "English", code: "ENG", description: "Read and revise.",
     subject: "English", versionId: "published-version", contentStatus: "published" },
+  teacherGuides: null,
   studentPersonId: "child", teachers: [{ personId: "teacher", name: "Taylor Teacher" }],
   content: classContentSchema.parse({
     version: 1, syllabus: "<script>unsafe()</script>",
@@ -85,6 +86,28 @@ describe("published class workspace", () => {
     expect(day).toContain("Independent Practice");
     expect(day).toContain("Mark lesson complete");
     expect(day).not.toContain("ALGEBRA I • UNIT 1 • DAY 1 OF 5");
+  });
+  it("shows validated answer keys only in the teacher-only classroom guide",()=>{
+    const guide=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/unit01-teacher-guide.json",import.meta.url),"utf8"));
+    const teacherData={...workspace,role:"teacher" as const,teacherGuides:guide};
+    const teacher=renderToStaticMarkup(<ClassWorkspace data={teacherData} tab="teacher-guide"/>);
+    expect(teacher).toContain("Assessment answer guides");
+    expect(teacher).toContain("Net revenue");
+    expect(teacher).toContain("6=5");
+    expect(teacher).toContain("teacher-only");
+    const student=renderToStaticMarkup(<ClassWorkspace data={{...teacherData,role:"student"}} tab="teacher-guide"/>);
+    const guardian=renderToStaticMarkup(<ClassWorkspace data={{...teacherData,role:"guardian"}} tab="teacher-guide"/>);
+    for(const html of [student,guardian]){
+      expect(html).not.toContain("Assessment answer guides");
+      expect(html).not.toContain("Net revenue");
+      expect(html).not.toContain("correctResponse");
+      expect(html).toContain("Teacher-only materials are unavailable");
+      expect(html).not.toContain("tab=teacher-guide");
+    }
+    const studentOverview=renderToStaticMarkup(<ClassWorkspace data={{...teacherData,role:"student"}}/>);
+    expect(studentOverview).not.toContain("teacher-guide");
+    const teacherOverview=renderToStaticMarkup(<ClassWorkspace data={teacherData}/>);
+    expect(teacherOverview).toContain("Teacher guide");
   });
   it("retains the selected child in parent class and assignment links", () => {
     const html = renderToStaticMarkup(<ClassWorkspace data={{ ...workspace, role: "guardian", roster: [] }} tab="lessons"/>);
