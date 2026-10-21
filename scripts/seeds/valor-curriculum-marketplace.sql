@@ -1,5 +1,5 @@
 -- Synthetic-only CAN High School Core pack / ValorSchool acceptance fixture.
--- This seed must be executed solely against a disposable Neon branch after migrations 0026/0027.
+-- This seed must be executed solely against a disposable Neon branch after migration 0026 (including the resource and interop tables).
 -- SET can.seed_authorized = 'valorschool' in the SAME SESSION before execution.
 BEGIN;
 DO $block$
@@ -211,4 +211,53 @@ VALUES ('f9260000-0000-4000-8000-000000000006',
  md5('can-core-version:CAN-USHIST')::uuid,'primary','extension',
  '{"synthetic":true}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
+-- Synthetic teacher-created instructional activity for the four sample sections.
+WITH assignment(code,title,instructions) AS (VALUES
+ ('CAN-ALG1','Model a Linear Relationship','Choose an everyday cost scenario. Define variables, write and graph a linear equation, and explain the slope and intercept.'),
+ ('CAN-BIO','Cell Structure Evidence Diagram','Draw an annotated cell showing membrane, nucleus, mitochondria and ribosomes. Explain how the structures work together.'),
+ ('CAN-ENG9','Literary Evidence Paragraph','Write an analytical paragraph with a claim, quotation and interpretation of evidence from a public-domain short story.'),
+ ('CAN-USHIST','Primary Source Context Analysis','Analyze a public archival U.S. history source by author, purpose, audience, context and evidentiary limitations.')
+)
+INSERT INTO assessments(id,section_id,title,instructions,status,points_possible,available_at,due_at,metadata,created_by_person_id)
+SELECT md5('can-core-assessment:'||assignment.code)::uuid,s.id,assignment.title,assignment.instructions,
+ 'published',20,'2026-10-19T08:00:00Z'::timestamptz,'2026-11-06T23:59:00Z'::timestamptz,
+ '{"synthetic":true,"preview":true,"notForCredit":true}'::jsonb,teacher.person_id
+FROM assignment
+JOIN sections s ON s.code=assignment.code AND s.metadata->>'synthetic'='true'
+JOIN programs p ON p.id=s.program_id AND p.slug='synthetic-hybrid'
+JOIN organizations o ON o.id=p.organization_id AND o.slug='can-synthetic-demo' AND o.metadata->>'synthetic'='true'
+JOIN section_teachers teacher ON teacher.section_id=s.id
+JOIN access_accounts account ON account.email_normalized='riley.teacher@valorschool.demo'
+JOIN account_person_grants grant ON grant.account_id=account.id AND grant.person_id=teacher.person_id AND grant.role='teacher' AND grant.active=true
+ON CONFLICT(id) DO NOTHING;
+
+-- Two different synthetic grading states for student and teacher workflows.
+WITH work(code,response,status,score,feedback) AS (VALUES
+ ('CAN-ALG1','{"text":"Let x be meals produced; y=4x+12 models fixed and variable cost. The slope is 4 dollars per meal and the intercept is 12 dollars.","synthetic":true}'::jsonb,'submitted',NULL::numeric,'{}'::jsonb),
+ ('CAN-ENG9','{"text":"The character''s decision reveals loyalty under pressure. A quotation provides evidence, followed by a textual interpretation.","synthetic":true}'::jsonb,'graded',17::numeric,'{"comment":"Strong claim and analysis; improve quotation context.","synthetic":true}'::jsonb))
+INSERT INTO submissions(id,assessment_id,student_profile_id,status,timeliness,attempt_number,submitted_at,graded_at,score,grader_person_id,response,feedback)
+SELECT md5('can-core-submission:'||work.code)::uuid,a.id,e.student_profile_id,
+ work.status::submission_status,'on_time',1,'2026-10-20T17:00:00Z'::timestamptz,
+ CASE WHEN work.status='graded' THEN '2026-10-21T10:00:00Z'::timestamptz ELSE NULL END,
+ work.score,CASE WHEN work.status='graded' THEN st.person_id ELSE NULL END,
+ work.response,work.feedback
+FROM work
+JOIN sections s ON s.code=work.code AND s.metadata->>'synthetic'='true'
+JOIN assessments a ON a.section_id=s.id AND a.metadata->>'synthetic'='true'
+JOIN enrollments e ON e.section_id=s.id AND e.kind='section' AND e.status='active' AND e.metadata->>'synthetic'='true'
+JOIN section_teachers st ON st.section_id=s.id
+ON CONFLICT(id) DO NOTHING;
+
+-- Lesson progress references the published immutable course version rather than free-standing demo content.
+INSERT INTO lesson_progress(section_id,student_profile_id,course_template_version_id,lesson_id,completed_at)
+SELECT s.id,e.student_profile_id,s.course_template_version_id,
+ v.curriculum->'learning'->'modules'->0->'lessons'->0->>'id',
+ CASE WHEN s.code IN('CAN-ALG1','CAN-ENG9') THEN '2026-10-19T18:00:00Z'::timestamptz ELSE NULL END
+FROM sections s
+JOIN enrollments e ON e.section_id=s.id AND e.kind='section' AND e.status='active' AND e.metadata->>'synthetic'='true'
+JOIN course_template_versions v ON v.id=s.course_template_version_id
+WHERE s.code IN('CAN-ALG1','CAN-BIO','CAN-ENG9','CAN-USHIST') AND s.metadata->>'synthetic'='true'
+AND jsonb_array_length(v.curriculum->'learning'->'modules'->0->'lessons')>0
+ON CONFLICT(student_profile_id,section_id,course_template_version_id,lesson_id) DO NOTHING;
+
 COMMIT;
