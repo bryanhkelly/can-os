@@ -48,3 +48,10 @@ No distinct account, organization or demo-only route is created. The existing Va
 - `src/modules/learning/curriculum-resource-upload.functions.ts` signs resource-scoped private PUTs, verifies actual PDF objects, records the resource/document/overlay atomically and audits the action. The classroom download command checks current enrollment/teacher/guardian relationships before signing a GET. Uploads fail closed without the explicit environment gate.
 - Neither the Common Cartridge validator nor the upload flow changes grades, enrollments, school records or published source course versions.
 - R2 e2e, large-cartridge resource ingestion, QTI question/answer-key mapping, LTI 1.3 registration/launch/AGS, and OneRoster class/grade exchange are still **required work**, not completed capabilities.
+
+## OneRoster CSV validation boundary (October 21 follow-up)
+
+- `src/domain/oneroster-csv.ts` parses bounded CSV files for organizations, people, courses, classes, enrollments, sessions, line items and results. It preserves `sourcedId` identifiers, detects duplicate IDs, missing required columns and cross-file dangling references. Validation errors are reported, not silently corrected.
+- `src/modules/learning/oneroster-import.functions.ts` exposes an authorized registrar-only **validation and audit-staging** command. Reports are stored in `curriculum_import_jobs` with content SHA-256 and source ownership scope. It deliberately does **not** change `people`, `enrollments`, class memberships, gradebooks, assignment scores, or provider identifiers.
+- 1EdTech OneRoster 1.2 CSV/REST **conformance is not claimed**. Supported headers are a guarded subset; implement specification-level profiles, optional data, interoperability partner tests, exports, and authenticated delta/grade synchronization before marking this production-ready.
+- Keep this preview non-disruptive to existing ValorSchool accounts. Real school data must require source-system authorization, a reconciliation report, explicit record matching, consent/privacy review and a reversible staged apply workflow.
