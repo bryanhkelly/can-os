@@ -29,6 +29,7 @@ const lesson = z.object({
   estimatedMinutes:z.number().int().min(1).max(180).optional(),
   activities:z.array(activity).max(20).optional(),
 });
+export const classLessonSchema = lesson;
 export const classModuleSchema = z.object({
   id: key, title: z.string().min(1).max(200), lessons: z.array(lesson).max(200),
 });

@@ -154,6 +154,58 @@ export async function saveCurriculumDraft(actor: Actor, input: {
   });
 }
 
+/**
+ * Patch one lesson in the existing publisher course draft without transmitting
+ * the whole academic year from the browser. The course release stays the
+ * versioning boundary. Every update is compared against the full draft revision.
+ */
+export async function saveCurriculumLesson(actor: Actor, input: {
+ programId:string;versionId:string;moduleId:string;lessonId:string;expectedRevision:string;
+ lesson:ClassContent["modules"][number]["lessons"][number];
+}){
+ if(input.lesson.id!==input.lessonId)throw new Error("Existing publisher lesson IDs must remain stable.");
+ return db.transaction(async tx=>{
+  const program=await authorize(actor,input.programId,tx);
+  const [lookup]=await tx.select().from(courseTemplateVersions)
+    .where(eq(courseTemplateVersions.id,input.versionId)).limit(1);
+  if(!lookup)throw new Error("Curriculum version not found.");
+  const course=await ownedCourse(tx,lookup.courseTemplateId,program.organizationId);
+  const [version]=await tx.select().from(courseTemplateVersions)
+    .where(eq(courseTemplateVersions.id,input.versionId)).for("update").limit(1);
+  if(!version||version.status!=="draft")throw new Error("Published curriculum is immutable. Create a new draft.");
+  if(revision(version.curriculum)!==input.expectedRevision)
+    throw new Error("This draft changed. Reload before saving your lesson.");
+  const content=readClassContent(version.curriculum);
+  if(!content)throw new Error("Create a publisher course outline before saving lessons individually.");
+  const module=content.modules.find(m=>m.id===input.moduleId);
+  if(!module||!module.lessons.some(l=>l.id===input.lessonId))
+    throw new Error("The existing lesson must belong to the selected publisher module.");
+  const original=module.lessons.find(l=>l.id===input.lessonId)!;
+  const next=curriculumDraftContent.parse({
+   ...content,modules:content.modules.map(m=>m.id===input.moduleId?{
+    ...m,lessons:m.lessons.map(l=>l.id===input.lessonId?input.lesson:l),
+   }:m),
+  });
+  const guides=readClassTeacherGuides(version.curriculum);
+  if(guides)assertTeacherGuidesMatchCourse(next,guides,course.code);
+  const curriculum={...version.curriculum,learning:next};
+  const nextRevision=revision(curriculum);
+  if(nextRevision===input.expectedRevision)return {revision:nextRevision,changed:false};
+  await tx.update(courseTemplateVersions).set({curriculum,updatedAt:new Date()})
+    .where(eq(courseTemplateVersions.id,version.id));
+  await writeAudit(tx,actor,{action:"curriculum.draft.lesson.save",
+   entityType:"course_template_version",entityId:version.id,
+   scope:{programId:program.id,organizationId:program.organizationId},
+   before:{moduleId:input.moduleId,lessonId:input.lessonId,lesson:original},
+   after:{moduleId:input.moduleId,lessonId:input.lessonId,lesson:input.lesson,revision:nextRevision}});
+  await emitEvent(tx,{eventType:EventTypes.CurriculumDraftSaved,
+   aggregateType:"course_template_version",aggregateId:version.id,
+   actorPersonId:actor.actorPersonId,programId:program.id,
+   payload:{lessonId:input.lessonId,moduleId:input.moduleId,revision:nextRevision}});
+  return {revision:nextRevision,changed:true};
+ });
+}
+
 export async function publishCurriculumDraft(actor: Actor, input: {
   programId: string; versionId: string; expectedRevision: string; reason: string;
 }) {

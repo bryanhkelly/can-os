@@ -3,9 +3,10 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { curriculumDraftContent } from "@/domain/curriculum-authoring";
 import { classTeacherGuidesSchema } from "@/domain/class-teacher-guides";
+import { classLessonSchema } from "@/domain/class-content";
 import { requireActor } from "@/modules/identity/actors.server";
 import { createCurriculumCourse, createCurriculumDraft, publishCurriculumDraft,
-  readCurriculumPrograms, readCurriculumStudio, saveCurriculumDraft } from "./curriculum-authoring.server";
+  readCurriculumPrograms, readCurriculumStudio, saveCurriculumDraft, saveCurriculumLesson } from "./curriculum-authoring.server";
 
 const program = z.object({ programId: z.string().uuid() });
 const version = program.extend({ versionId: z.string().uuid(), expectedRevision: z.string().regex(/^[a-f0-9]{64}$/) });
@@ -35,6 +36,13 @@ export const saveAuthoredCurriculum = createServerFn({ method: "POST" })
   .validator((value: unknown) => version.extend({ content: curriculumDraftContent,
     teacherGuides: classTeacherGuidesSchema.nullable().optional() }).strict().parse(value))
   .handler(async ({ data }) => saveCurriculumDraft(await actor(), data));
+export const saveAuthoredLesson = createServerFn({ method: "POST" })
+  .validator((value: unknown) => version.extend({
+    moduleId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
+    lessonId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
+    lesson: classLessonSchema,
+  }).strict().parse(value))
+  .handler(async ({ data }) => saveCurriculumLesson(await actor(), data));
 export const publishAuthoredCurriculum = createServerFn({ method: "POST" })
   .validator((value: unknown) => version.extend({ reason: z.string().trim().min(10).max(2000),
     confirmed: z.literal(true) }).strict().parse(value))
