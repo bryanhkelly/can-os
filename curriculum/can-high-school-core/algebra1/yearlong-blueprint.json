@@ -1,0 +1,534 @@
+{
+  "schemaVersion": 1,
+  "courseCode": "CAN-ALG1",
+  "title": "CAN Algebra I | 36-week curriculum development blueprint",
+  "targetInstructionalWeeks": 36,
+  "reviewStatus": "planning",
+  "creditStatus": "not_credit_ready",
+  "scopeNote": "A provisional teaching sequence, not a school-approved course of study. All standards, lesson content, assessments, instructional time, support plans and graduation or UC A-G course recognition require qualified educator and school review. The 165-hour estimate assumes 36x5x55-minute sessions and is not evidence of delivered instruction.",
+  "standardsAuthorityUrl": "https://www.cde.ca.gov/be/st/ss/mathstandard.asp",
+  "weeks": [
+    {
+      "week": 1,
+      "unitId": "algebra1-u01",
+      "title": "Expressions, equations and inequality foundations",
+      "focus": "Distinguish expressions, justify equation-solving steps, solve and interpret basic inequalities.",
+      "standards": [
+        "A-SSE.1",
+        "A-CED.1",
+        "A-REI.1",
+        "A-REI.3"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "authored"
+    },
+    {
+      "week": 2,
+      "unitId": "algebra1-u01",
+      "title": "Multi-step equations and formulas",
+      "focus": "Solve literal and multi-step linear equations and justify transformations in contextual formulas.",
+      "standards": [
+        "A-CED.4",
+        "A-REI.1",
+        "A-REI.3"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 3,
+      "unitId": "algebra1-u01",
+      "title": "Linear problem solving and constraints",
+      "focus": "Represent contextual quantities, units, bounds and inequalities in a mathematically justified model.",
+      "standards": [
+        "N-Q.1",
+        "A-CED.1",
+        "A-REI.3"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 4,
+      "unitId": "algebra1-u01",
+      "title": "Unit 1 cumulative assessment and reteaching",
+      "focus": "Demonstrate algebraic fluency and modeling with a scored checkpoint and targeted reassessment.",
+      "standards": [
+        "A-SSE.1",
+        "A-CED.1",
+        "A-REI.1",
+        "A-REI.3"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 5,
+      "unitId": "algebra1-u02",
+      "title": "Functions, inputs, outputs and domains",
+      "focus": "Interpret functions as relationships, evaluate notation and select sensible input domains.",
+      "standards": [
+        "F-IF.1",
+        "F-IF.2"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 6,
+      "unitId": "algebra1-u02",
+      "title": "Tables, graphs and multiple representations",
+      "focus": "Connect function tables, graphs and verbal descriptions and interpret key features.",
+      "standards": [
+        "F-IF.4",
+        "F-IF.5"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 7,
+      "unitId": "algebra1-u02",
+      "title": "Average rate of change",
+      "focus": "Calculate and explain changing quantities using function representations and units.",
+      "standards": [
+        "F-IF.6",
+        "F-LE.1"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 8,
+      "unitId": "algebra1-u02",
+      "title": "Functions unit review and transfer",
+      "focus": "Compare representations and communicate domain, range and rate evidence on an assessed task.",
+      "standards": [
+        "F-IF.1",
+        "F-IF.4",
+        "F-IF.6"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 9,
+      "unitId": "algebra1-u03",
+      "title": "Slope and linear equations",
+      "focus": "Find rate of change from graphs, tables and contexts; distinguish slope from initial value.",
+      "standards": [
+        "F-LE.1",
+        "F-IF.6",
+        "A-CED.2"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 10,
+      "unitId": "algebra1-u03",
+      "title": "Equivalent linear forms and graphing",
+      "focus": "Move among slope-intercept, point-slope and standard forms to graph relationships.",
+      "standards": [
+        "A-CED.2",
+        "A-REI.10"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 11,
+      "unitId": "algebra1-u03",
+      "title": "Fitting and interpreting linear models",
+      "focus": "Choose useful linear models for data and explain reasonable errors and constraints.",
+      "standards": [
+        "S-ID.6",
+        "S-ID.7",
+        "S-ID.8"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 12,
+      "unitId": "algebra1-u03",
+      "title": "Linear model design challenge",
+      "focus": "Build, critique and present a contextual linear model with teacher-reviewed evidence.",
+      "standards": [
+        "A-CED.2",
+        "S-ID.6",
+        "F-IF.6"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 13,
+      "unitId": "algebra1-u04",
+      "title": "Systems by graphing",
+      "focus": "Interpret the intersection of two linear functions as a solution to two constraints.",
+      "standards": [
+        "A-REI.6",
+        "A-REI.11"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 14,
+      "unitId": "algebra1-u04",
+      "title": "Systems by substitution",
+      "focus": "Solve systems symbolically and verify ordered pairs in both original equations.",
+      "standards": [
+        "A-REI.6"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 15,
+      "unitId": "algebra1-u04",
+      "title": "Systems by elimination",
+      "focus": "Select a solution strategy, handle no/infinitely many solutions and explain meaning.",
+      "standards": [
+        "A-REI.6"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 16,
+      "unitId": "algebra1-u04",
+      "title": "Systems application and assessment",
+      "focus": "Model pricing and supply constraints using systems and communicate solutions.",
+      "standards": [
+        "A-CED.3",
+        "A-REI.6",
+        "A-REI.12"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 17,
+      "unitId": "algebra1-u05",
+      "title": "Integer exponents and growth",
+      "focus": "Apply exponent properties and explain multiplicative rather than additive change.",
+      "standards": [
+        "N-RN.1",
+        "A-SSE.3"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 18,
+      "unitId": "algebra1-u05",
+      "title": "Arithmetic and geometric patterns",
+      "focus": "Identify recursive and explicit sequence rules and relate patterns to functions.",
+      "standards": [
+        "F-BF.2",
+        "F-LE.2"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 19,
+      "unitId": "algebra1-u05",
+      "title": "Exponential functions",
+      "focus": "Build growth and decay models and interpret initial values and growth factors.",
+      "standards": [
+        "F-LE.1",
+        "F-LE.2",
+        "F-LE.5"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 20,
+      "unitId": "algebra1-u05",
+      "title": "Linear and exponential comparison",
+      "focus": "Select models from data, critique extrapolation and complete a scored model comparison.",
+      "standards": [
+        "F-LE.3",
+        "F-LE.5"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 21,
+      "unitId": "algebra1-u06",
+      "title": "Polynomial operations",
+      "focus": "Add, subtract and multiply polynomials, attending to structure and the distributive property.",
+      "standards": [
+        "A-APR.1",
+        "A-SSE.1"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 22,
+      "unitId": "algebra1-u06",
+      "title": "Factoring quadratic expressions",
+      "focus": "Use factoring to express equivalent quadratics and interpret zero-product solutions.",
+      "standards": [
+        "A-SSE.3",
+        "A-REI.4"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 23,
+      "unitId": "algebra1-u06",
+      "title": "Quadratic identities and structure",
+      "focus": "Relate equivalent polynomial forms and identify why each is useful.",
+      "standards": [
+        "A-SSE.2",
+        "A-SSE.3"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 24,
+      "unitId": "algebra1-u06",
+      "title": "Polynomials unit mastery and reteaching",
+      "focus": "Demonstrate polynomial operations and factoring on assessed problems with error analysis.",
+      "standards": [
+        "A-APR.1",
+        "A-SSE.3"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 25,
+      "unitId": "algebra1-u07",
+      "title": "Graphs of quadratic functions",
+      "focus": "Interpret vertex, zeros, symmetry and direction of quadratic graphs in context.",
+      "standards": [
+        "F-IF.4",
+        "F-IF.7"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 26,
+      "unitId": "algebra1-u07",
+      "title": "Finding roots by factoring",
+      "focus": "Solve quadratic equations using factoring and check solutions.",
+      "standards": [
+        "A-REI.4",
+        "F-IF.8"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 27,
+      "unitId": "algebra1-u07",
+      "title": "Complete the square and quadratic formula",
+      "focus": "Select symbolic quadratic solution methods and explain roots in different cases.",
+      "standards": [
+        "A-REI.4",
+        "A-SSE.3"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 28,
+      "unitId": "algebra1-u07",
+      "title": "Quadratic model investigations",
+      "focus": "Fit and critique quadratic situations and communicate vertex and intercept meaning.",
+      "standards": [
+        "A-CED.2",
+        "F-IF.4",
+        "F-IF.7"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 29,
+      "unitId": "algebra1-u08",
+      "title": "Square roots and real-number structure",
+      "focus": "Reason about radicals, square-root values and when solutions are real.",
+      "standards": [
+        "N-RN.2",
+        "A-REI.4"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 30,
+      "unitId": "algebra1-u08",
+      "title": "Quadratic equations in context",
+      "focus": "Translate measurement or motion contexts into solvable quadratic equations.",
+      "standards": [
+        "A-CED.1",
+        "A-REI.4"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 31,
+      "unitId": "algebra1-u08",
+      "title": "Transformations and function comparison",
+      "focus": "Compare function transformations and explain changing parameters.",
+      "standards": [
+        "F-BF.3",
+        "F-IF.9"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 32,
+      "unitId": "algebra1-u08",
+      "title": "Nonlinear unit assessment",
+      "focus": "Demonstrate method selection and interpretation on a teacher-scored transfer task.",
+      "standards": [
+        "F-IF.7",
+        "A-REI.4",
+        "F-BF.3"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 33,
+      "unitId": "algebra1-u09",
+      "title": "Describing one-variable data",
+      "focus": "Represent distributions and explain center, variability and outliers.",
+      "standards": [
+        "S-ID.1",
+        "S-ID.2",
+        "S-ID.3"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 34,
+      "unitId": "algebra1-u09",
+      "title": "Bivariate data and residuals",
+      "focus": "Fit lines to scatterplots, evaluate residuals and critique data collection.",
+      "standards": [
+        "S-ID.6",
+        "S-ID.7",
+        "S-ID.8"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 35,
+      "unitId": "algebra1-u09",
+      "title": "Course synthesis capstone",
+      "focus": "Model a real question using functions, equations and data with a documented source.",
+      "standards": [
+        "A-CED.1",
+        "F-IF.6",
+        "S-ID.6"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 2,
+      "status": "planned"
+    },
+    {
+      "week": 36,
+      "unitId": "algebra1-u09",
+      "title": "Final assessment and targeted reassessment",
+      "focus": "Complete the cumulative Algebra I assessment, teacher feedback, reflection and interventions.",
+      "standards": [
+        "A-REI.3",
+        "A-REI.6",
+        "F-IF.4",
+        "A-REI.4",
+        "S-ID.6"
+      ],
+      "plannedInstructionalDays": 5,
+      "estimatedMinutesPerDay": 55,
+      "plannedAssessmentCount": 3,
+      "status": "planned"
+    }
+  ]
+}
