@@ -3,7 +3,7 @@
  * lesson completion. Neither is, by itself, a mastery or transcript-credit award.
  */
 export type ClassAssessment = {
- id:string; title:string; pointsPossible:string|null; status:"published"|"closed"|"draft";
+ id:string; title:string; pointsPossible:string|null; status:"published"|"closed"|"draft"|"archived";
  metadata:Record<string,unknown>;
 };
 export type AssessmentAttempt = {
