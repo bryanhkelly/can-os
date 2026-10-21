@@ -18,5 +18,5 @@ export function assertPublishableCurriculum(content: ClassContent) {
     throw new Error("Every published module must contain at least one lesson.");
   if (content.modules.some(module => module.lessons.some(lesson =>
       !lesson.body.trim() && !(lesson.activities?.some(activity => activity.instructions.trim())))))
-    throw new Error("Every published lesson must contain readable text or structured activities.");
+    throw new Error("Every published lesson must contain reading content or structured activities.");
 }
