@@ -2,6 +2,8 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
 import { CurriculumEditor } from "@/components/learning/CurriculumEditor";
+import { PublisherPackComposer } from "@/components/learning/PublisherPackComposer";
+import { getPublisherPackStudio } from "@/modules/learning/publisher-pack-authoring.functions";
 import { createAuthoredCourse, getCurriculumPrograms, getCurriculumStudio, startCurriculumDraft } from "@/modules/learning/curriculum-authoring.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -12,6 +14,7 @@ export const Route=createFileRoute("/operations/curriculum")({
  loader:({deps})=>safeLoader(async()=>({
   programs:await getCurriculumPrograms(),
   studio:deps.programId?await getCurriculumStudio({data:{programId:deps.programId}}):null,
+  publisherPacks:deps.programId?await getPublisherPackStudio({data:{programId:deps.programId}}):null,
  }),{authMessage:"Sign in with an explicitly authorized curriculum publisher membership."})(),
  component:CurriculumStudio,
 });
@@ -22,6 +25,7 @@ function CurriculumStudio(){
 }
 function StudioView({data}:{data:{
  programs:Awaited<ReturnType<typeof getCurriculumPrograms>>;studio:Awaited<ReturnType<typeof getCurriculumStudio>>|null;
+ publisherPacks:Awaited<ReturnType<typeof getPublisherPackStudio>>|null;
 }}){
  const router=useRouter();
  const [error,setError]=useState(""),[busy,setBusy]=useState(false);
@@ -84,6 +88,7 @@ function StudioView({data}:{data:{
     </details>)}
    </section>)}
    {!studio.courses.length&&<p>No courses are owned by this program's organization yet.</p>}
+   {data.publisherPacks&&<PublisherPackComposer key={studio.programId} studio={data.publisherPacks} onSaved={async()=>{await router.invalidate();}}/>}
   </>}
  </main>;
 }
