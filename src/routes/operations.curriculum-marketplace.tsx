@@ -45,7 +45,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
   finally{setBusy(false);}
  }
  const installed=market?.packs.filter(pack=>pack.entitlement==="active")??[];
- const adopted=installed.filter(pack=>pack.adoption?.status==="active");
+ const adopted=installed.filter(pack=>pack.adoption?.status==="active" && pack.adoption.versionId===pack.versionId);
  const choices=adopted.flatMap(pack=>pack.courses.map(course=>({...course,pack:pack.name})));
  const chosenSections=market?.sections.filter(section=>section.courseVersionId===courseVersionId)??[];
  return <main className="mx-auto max-w-6xl space-y-6 px-5 py-10">
