@@ -12,6 +12,8 @@ This directory separates **current specifications** from **historical implementa
 - **Focused current implementation note:** [admissions offers](./admissions-offers.md). Historic labels: [feature tracks](./FEATURE-TRACKS.md).
 - **Release evidence:** [synthetic pilot gate](./synthetic-pilot-release-gate.md). A `HOLD` snapshot is not production authorization and requires up-to-date verification.
 
+New architecture specification: [Curriculum marketplace and portability](./curriculum-marketplace-architecture.md).
+
 ## Historical records
 
 Documents under [archive/2026-10](./archive/2026-10/) preserve early demo designs, phase handoffs, and development checklists. They may mention branches, flags, routes, identities or unimplemented capabilities that are now obsolete. **Do not implement from archived instructions.** Source code is the evidence for the current implementation; run tests and security review for acceptance.

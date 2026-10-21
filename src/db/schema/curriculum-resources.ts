@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { createdAt, id, updatedAt } from "./common";
 import { organizations } from "./organizations";
 import { documents } from "./documents";
-import { curriculumPackVersions, curriculumOverlays } from "./curriculum-marketplace";
+import { curriculumPackVersions } from "./curriculum-marketplace";
 import { courseTemplateVersions } from "./academics";
 
 /** Canonical reusable asset independent of any course, lesson, site or LMS interchange format. */
