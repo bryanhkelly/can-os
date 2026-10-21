@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { classContentSchema, classModuleSchema, type ClassContent } from "./class-content";
-import { classTeacherGuidesSchema, type ClassTeacherGuides } from "./class-teacher-guides";
+import { classTeacherGuideUnitSchema,classTeacherGuidesSchema, type ClassTeacherGuides } from "./class-teacher-guides";
 
 const key=z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/);
 export const unitDraftSchema=z.object({
   unitKey:key,
   module:classModuleSchema,
-  teacherGuide:classTeacherGuidesSchema.shape.units.element.optional(),
+  teacherGuide:classTeacherGuideUnitSchema.optional(),
 }).strict().superRefine((value,ctx)=>{
   if(value.module.id!==value.unitKey)ctx.addIssue({code:"custom",message:"Unit ID must match its module ID."});
   if(value.teacherGuide && (value.teacherGuide.unitId!==value.unitKey ||
@@ -58,7 +58,7 @@ export function composeClassTeacherGuides(
  courseCode:string,base:ClassTeacherGuides|null,units:PublishedUnit[],
 ):ClassTeacherGuides|null{
  const guides=units.filter(u=>u.teacherGuide).map(u=>{
-   const parsed=classTeacherGuidesSchema.shape.units.element.parse(u.teacherGuide);
+   const parsed=classTeacherGuideUnitSchema.parse(u.teacherGuide);
    if(parsed.unitId!==u.unitKey)throw new Error("Adopted teacher guide identity mismatch.");
    const module=classModuleSchema.parse(u.module);
    if(parsed.lessons.length!==module.lessons.length||
