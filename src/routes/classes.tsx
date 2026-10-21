@@ -164,13 +164,13 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
         {lesson.standards?.length ? <p className="mt-4 text-xs text-muted-foreground">Learning standards: {lesson.standards.join(", ")}</p> : null}
         {lesson.resources.length > 0 && <div className="mt-5">{resources(lesson.resources)}</div>}
         {supplements.some(item=>item.lessonId===lesson.id) && <div className="mt-5 space-y-2">
-          <h3 className="font-semibold">School and classroom supplements</h3>
+          <h3 className="font-semibold">Publisher, school and teacher resources</h3>
           <ul className="space-y-2">{supplements.filter(item=>item.lessonId===lesson.id).map(item=>
             <li key={item.id} className="rounded border p-3 text-sm">{item.url?
               <a href={item.url} rel="noopener noreferrer" target="_blank" className="underline">{item.title} ({item.kind})</a>
               :item.kind==="pdf"?<button type="button" disabled={busy}
                 onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
-                {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>}</li>)}</ul>
+                {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>} <span className="text-xs text-muted-foreground">· {item.source}</span></li>)}</ul>
         </div>}
         {data.role === "student" && <button type="button" disabled={busy} onClick={() => void run(() => setLessonCompletion({ data: {
           sectionId: data.section.id, versionId: data.section.versionId, lessonId: lesson.id, completed: !completed.has(lesson.id),
@@ -225,6 +225,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
            :item.kind==="pdf"?<button type="button" disabled={busy}
               onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
               {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>}
+          <span className="ml-2 text-xs text-muted-foreground">· {item.source}</span>
         </li>)}</ul>
       </section>}
       {(!data.content || !classResources(data.content).length) && !supplements.length && <p className="text-sm text-muted-foreground">No resources have been published.</p>}
