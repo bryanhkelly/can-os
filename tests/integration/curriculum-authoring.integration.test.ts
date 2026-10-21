@@ -126,13 +126,24 @@ integration("governed curriculum authoring through classroom delivery",()=>{
     const revised:ClassContent={...content,syllabus:"New release syllabus.",modules:content.modules.map(module=>({...module,
      lessons:module.lessons.map(lesson=>({...lesson,body:"New release reading, intentionally different."}))}))};
     const nextSaved=await flow.saveAuthoredCurriculum({data:{...scope,versionId:next.versionId,expectedRevision:copied.revision,content:revised}});
+    // A targeted lesson edit preserves the rest of the course and published
+    // classroom's pinned v1, while advancing the course-draft revision.
+    const lesson=first(revised.modules[0]!.lessons);
+    const editedLesson={...lesson,title:"Observation with revised feedback"};
+    const lessonSaved=await flow.saveAuthoredLesson({data:{...scope,versionId:next.versionId,
+     expectedRevision:nextSaved.revision,moduleId:revised.modules[0]!.id,lessonId:lesson.id,lesson:editedLesson}});
+    expect(lessonSaved.changed).toBe(true);
+    await expect(flow.saveAuthoredLesson({data:{...scope,versionId:next.versionId,
+     expectedRevision:nextSaved.revision,moduleId:revised.modules[0]!.id,lessonId:lesson.id,lesson:editedLesson}})
+    ).rejects.toThrow("draft changed");
+    revised.modules[0]!.lessons[0]=editedLesson;
     state.actor=learnerActor;
     const duringDraft=await getClassWorkspace({data:{sectionId:oldSection.sectionId}});
     expect(duringDraft.content).toEqual(content);
     expect(duringDraft.progress).toHaveLength(1);
     await expect(flow.getCurriculumStudio({data:scope})).rejects.toThrow();
     state.actor=staff;
-    await flow.publishAuthoredCurriculum({data:{...publish,versionId:next.versionId,expectedRevision:nextSaved.revision}});
+    await flow.publishAuthoredCurriculum({data:{...publish,versionId:next.versionId,expectedRevision:lessonSaved.revision}});
     const newSection=await provisionLaunchSection({data:{...provision,courseTemplateVersionId:next.versionId,code:`B-${suffix}`,title:"Science B"}});
     await tx.insert(s.sectionTeachers).values({sectionId:newSection.sectionId,personId:teacher.id});
     await tx.insert(s.enrollments).values({studentProfileId:student.id,kind:"section",status:"active",organizationId:org.id,
