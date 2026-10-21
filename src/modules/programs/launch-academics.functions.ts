@@ -1,6 +1,5 @@
 import { db } from "@/db/client";
 import {
-courseTemplates,courseTemplateVersions,
 complianceFrameworks,complianceFrameworkVersions,compliancePolicyApplicability,compliancePolicyRules,
 people,
 programs,roleAssignments,schoolYears,
@@ -21,6 +20,7 @@ import { canAuthorQualificationCatalog } from "@/modules/profiles/qualification-
 import { requireActor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { listLaunchTeacherPolicies,teacherPolicyPublisherCapability } from "./teacher-policy.server";
+import { listLaunchEligibleCourses, assertLaunchEligibleCourse } from "./launch-curriculum-eligibility.server";
 const uuid=z.string().uuid();
 
 async function setupContext(programId:string){
@@ -63,14 +63,7 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
    endsOn:terms.endsOn,
   }).from(terms).where(inArray(terms.schoolYearId,years.map(y=>y.id)))
    .orderBy(asc(terms.startsOn)):[];
-  const catalog=await db.select({
-   versionId:courseTemplateVersions.id,version:courseTemplateVersions.version,
-   title:courseTemplates.title,code:courseTemplates.code,subject:courseTemplates.subject,
-  }).from(courseTemplateVersions)
-   .innerJoin(courseTemplates,eq(courseTemplates.id,courseTemplateVersions.courseTemplateId))
-   .where(and(eq(courseTemplateVersions.status,"published"),
-    inArray(courseTemplates.owningOrganizationId,
-     [program.organizationId,program.academicProviderOrganizationId])));
+  const catalog=await listLaunchEligibleCourses(program);
   const personnel=await db.select({
    personId:roleAssignments.personId,first:people.legalFirstName,last:people.legalLastName,
   }).from(roleAssignments)
@@ -122,15 +115,9 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
   if(!term||term.siteId!==program.siteId||term.organizationId!==program.organizationId||
    (term.programId&&term.programId!==program.id))
    throw new AuthorizationError("academic term does not belong to this launch");
-  const [template]=await db.select({orgId:courseTemplates.owningOrganizationId})
-   .from(courseTemplateVersions)
-   .innerJoin(courseTemplates,eq(courseTemplates.id,courseTemplateVersions.courseTemplateId))
-   .where(and(eq(courseTemplateVersions.id,data.courseTemplateVersionId),
-    eq(courseTemplateVersions.status,"published"))).limit(1);
-  if(!template||![program.organizationId,program.academicProviderOrganizationId].includes(template.orgId))
-   throw new AuthorizationError("published curriculum provider");
   return db.transaction(async tx=>{
    await lockAttendanceConfigurationAtSite(tx,program.siteId!);
+   await assertLaunchEligibleCourse(program, data.courseTemplateVersionId, tx);
    const [created]=await tx.insert(sections).values({
     programId:program.id,siteId:program.siteId,termId:data.termId,
     courseTemplateVersionId:data.courseTemplateVersionId,
