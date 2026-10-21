@@ -38,7 +38,7 @@ function requireStorage() {
   resolveR2Config();
 }
 async function authorizeInput(input: z.infer<typeof context>) {
-  const actor = await requireActor(["registrar"], "curriculum.publish");
+  const actor = await requireActor(["registrar"]);
   const market = await readMarketplace(actor, input.programId);
   if (!market.packs.some(p => p.entitlement === "active" && p.adoption?.status === "active" &&
     p.courses.some(c => c.courseVersionId === input.courseVersionId)))
