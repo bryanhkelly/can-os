@@ -54,6 +54,6 @@ describe("36-week Algebra I curriculum development plan",()=>{
   expect(()=>assertPublishableCurriculum(structured)).not.toThrow();
   const invalid={...structured,modules:[{id:"empty",title:"Empty",lessons:[
    {id:"empty-lesson",title:"Empty",body:"",resources:[]}]}]};
-  expect(()=>assertPublishableCurriculum(invalid)).toThrow(/readable text or structured activities/);
+  expect(()=>assertPublishableCurriculum(invalid)).toThrow(/reading content or structured activities/);
  });
 });
