@@ -82,9 +82,22 @@ integration("class participation cross-workspace flow", () => {
         owningOrganizationId: org.id, code: `class-${suffix}`, title: "Close reading", subject: "English",
       }).returning());
       const resourceDocumentId = crypto.randomUUID();
+      const teacherGuides={
+        version:1 as const,courseCode:template.code,visibility:"teacher_only" as const,
+        units:[{unitId:"reading",reviewStatus:"draft" as const,
+          teacherOverview:"Review evidence-based claims and provide specific written feedback.",
+          lessons:[{lessonId:"evidence",
+            preparation:"Prepare a publicly licensed passage with several supported interpretations.",
+            workedAnswers:[{prompt:"What supports the central claim?",answer:"A relevant quotation, explanation, and a precise connection to the claim."}],
+            misconceptions:["Retelling the plot does not demonstrate why cited evidence supports a claim."],
+            interventions:["Model a claim, select one sentence, and write two explanatory sentences connecting them."],
+            extensions:[],
+          }],assessments:[],
+        }],
+      };
       const version = first(await tx.insert(s.courseTemplateVersions).values({
         courseTemplateId: template.id, version: 1, status: "published", publishedAt: new Date(),
-        curriculum: { learning: { version: 1, syllabus: "Read, discuss and revise.", modules: [
+        curriculum: { teacherGuides, learning: { version: 1, syllabus: "Read, discuss and revise.", modules: [
           { id: "reading", title: "Close reading", lessons: [{ id: "evidence", title: "Use evidence", body: "Read the passage closely." }] },
         ], resources: [{ id: "library", title: "Library", url: "https://www.loc.gov/" },
           { id: "reading", title: "Private reading", documentId: resourceDocumentId }] } },
@@ -131,6 +144,18 @@ integration("class participation cross-workspace flow", () => {
       expect((await classes.getClassDirectory()).classes.map(row => row.id)).toEqual([section.id]);
       const studentView = await classes.getClassWorkspace({ data: { sectionId: section.id } });
       expect(studentView.content?.modules[0]?.lessons[0]?.title).toBe("Use evidence");
+      expect(studentView.teacherGuides).toBeNull();
+      act("teacher",teacher.id);
+      const teacherView=await classes.getClassWorkspace({data:{sectionId:section.id}});
+      expect(teacherView.teacherGuides?.units[0]?.lessons[0]?.workedAnswers[0]?.answer)
+        .toContain("relevant quotation");
+      act("guardian",parent.id);
+      const guardianView=await classes.getClassWorkspace({data:{sectionId:section.id,studentPersonId:student.id}});
+      expect(guardianView.teacherGuides).toBeNull();
+      act("teacher",unrelated.id);
+      await expect(classes.getClassWorkspace({data:{sectionId:section.id}})).rejects.toThrow("assigned teacher");
+      act("student",student.id);
+
       expect(studentView.roster).toEqual([]);
       const { signPrivateObjectUrl } = await import("@/platform/storage/r2");
       const download = { sectionId: section.id, resourceId: "reading" };
