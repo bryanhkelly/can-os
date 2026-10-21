@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { buildClassAssessmentEvidence, summarizeClassAssessmentEvidence } from "@/domain/class-assessment-evidence";
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
 import { AuthorizationError } from "@/domain/command-context";
@@ -34,6 +35,29 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     const progress = studentProfileId ? await db.select({ lessonId: s.lessonProgress.lessonId, completedAt: s.lessonProgress.completedAt })
       .from(s.lessonProgress).where(and(eq(s.lessonProgress.sectionId, section.id),
         eq(s.lessonProgress.courseTemplateVersionId, section.versionId), eq(s.lessonProgress.studentProfileId, studentProfileId))) : [];
+    // Actual class assessments, not a generated progress estimate. A student or
+    // related guardian only sees their own latest attempts; teachers see counts
+    // and use the authorized gradebook for individual learners' grades.
+    const assessmentRows = await db.select({
+      id:s.assessments.id,title:s.assessments.title,
+      status:s.assessments.status,pointsPossible:s.assessments.pointsPossible,
+      metadata:s.assessments.metadata,
+    }).from(s.assessments).where(and(
+      eq(s.assessments.sectionId,section.id),
+      inArray(s.assessments.status,["published","closed"]),
+    )).orderBy(s.assessments.createdAt);
+    const assessmentIds=assessmentRows.map(row=>row.id);
+    const attemptRows=studentProfileId && assessmentIds.length
+      ?await db.select({
+        assessmentId:s.submissions.assessmentId,
+        attemptNumber:s.submissions.attemptNumber,
+        status:s.submissions.status,score:s.submissions.score,
+      }).from(s.submissions).where(and(
+        inArray(s.submissions.assessmentId,assessmentIds),
+        eq(s.submissions.studentProfileId,studentProfileId),
+      )).orderBy(desc(s.submissions.attemptNumber))
+      :[];
+    const assessmentEvidence=buildClassAssessmentEvidence(assessmentRows,attemptRows);
     const roster = actor.role === "teacher" ? await db.select({ profileId: s.studentProfiles.id, personId: s.people.id,
       firstName: s.people.legalFirstName, lastName: s.people.legalLastName, preferredName: s.people.preferredName })
       .from(s.enrollments).innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
@@ -98,6 +122,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,
         subject: section.subject, versionId: section.versionId, contentStatus: section.contentStatus },
       studentPersonId, content, supplements:allSupplements,
+      assessmentEvidence, assessmentEvidenceSummary:summarizeClassAssessmentEvidence(assessmentEvidence),
       teachers: teachers.map(row => ({ personId: row.personId, name: `${row.preferredName ?? row.firstName} ${row.lastName}` })),
       progress: progress.filter(row => lessonIds.has(row.lessonId)).map(row => ({ lessonId: row.lessonId, completedAt: row.completedAt?.toISOString() ?? null })),
       roster: [...new Map(roster.map(row => [row.profileId, {
