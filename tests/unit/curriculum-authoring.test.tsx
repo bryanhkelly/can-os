@@ -4,19 +4,20 @@ import type { ClassContent } from "@/domain/class-content";
 import { assertPublishableCurriculum, curriculumDraftContent, assertTeacherGuidesMatchCourse } from "@/domain/curriculum-authoring";
 import { CurriculumEditor } from "@/components/learning/CurriculumEditor";
 import { Route } from "@/routes/operations.curriculum";
-import { createAuthoredCourse, publishAuthoredCurriculum, saveAuthoredCurriculum } from "@/modules/learning/curriculum-authoring.functions";
+import { createAuthoredCourse, publishAuthoredCurriculum, saveAuthoredCurriculum, saveAuthoredLesson } from "@/modules/learning/curriculum-authoring.functions";
 
 const state=vi.hoisted(()=>({
  data:null as unknown,
  actor:{role:"registrar",actorPersonId:"publisher",capabilities:new Set(["curriculum.publish"]),scope:{}},
- save:vi.fn(),publish:vi.fn(),create:vi.fn(),draft:vi.fn(),
+ save:vi.fn(),lesson:vi.fn(),publish:vi.fn(),create:vi.fn(),draft:vi.fn(),
 }));
 vi.mock("@/modules/learning/publisher-pack-authoring.server",()=>({
  readPublisherPackStudio:vi.fn(),createPublisherPack:vi.fn(),createPublisherPackDraft:vi.fn(),
  savePublisherPackDraft:vi.fn(),publishPublisherPack:vi.fn(),
 }));
 vi.mock("@/modules/learning/curriculum-authoring.server",()=>({
- saveCurriculumDraft:state.save,publishCurriculumDraft:state.publish,createCurriculumCourse:state.create,
+ saveCurriculumDraft:state.save,saveCurriculumLesson:state.lesson,
+ publishCurriculumDraft:state.publish,createCurriculumCourse:state.create,
  createCurriculumDraft:state.draft,readCurriculumStudio:vi.fn(),readCurriculumPrograms:vi.fn(),
 }));
 vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:async()=>state.actor}));
@@ -94,14 +95,24 @@ describe("curriculum release contract",()=>{
  });
  it("rejects blank titles and oversized combined content",()=>{
   expect(()=>curriculumDraftContent.parse({...content,modules:[{...content.modules[0]!,title:"   "}]})).toThrow("cannot be blank");
-  expect(()=>curriculumDraftContent.parse({...content,modules:[{id:"large",title:"Large",lessons:Array.from({length:6},
-   (_,index)=>({id:`lesson-${index}`,title:"Long",body:"x".repeat(100000),resources:[]}))}]})).toThrow("500,000");
+  expect(()=>curriculumDraftContent.parse({...content,modules:[{id:"large",title:"Large",lessons:Array.from({length:31},
+   (_,index)=>({id:`lesson-${index}`,title:"Long",body:"x".repeat(100000),resources:[]}))}]})).toThrow("3,000,000");
  });
 });
 describe("curriculum public command boundaries",()=>{
  it("forwards a validated explicit publisher save",async()=>{
   await saveAuthoredCurriculum({data:{...ids,content}});
   expect(state.save).toHaveBeenCalledWith(state.actor,{...ids,content});
+ });
+ it("supports secure, validated single-lesson saves for full-year publisher courses",async()=>{
+  const lesson=content.modules[0]!.lessons[0]!;
+  const input={...ids,moduleId:"module",lessonId:"lesson",lesson};
+  await saveAuthoredLesson({data:input});
+  expect(state.lesson).toHaveBeenCalledWith(state.actor,input);
+  await expect(saveAuthoredLesson({data:{...input,lesson:{...lesson,activities:[{
+   id:"bad",kind:"unknown",title:"Invalid",instructions:"Not a valid activity",
+  }]}}})).rejects.toThrow();
+  expect(state.lesson).toHaveBeenCalledTimes(1);
  });
  it("requires publication confirmation and reason",async()=>{
   for(const data of [{...ids,reason:"Reviewed release.",confirmed:false},{...ids,reason:"short",confirmed:true},
@@ -131,7 +142,7 @@ describe("curriculum studio presentation",()=>{
  it("offers a structured draft editor rather than a raw JSON store",()=>{
   const html=renderToStaticMarkup(<CurriculumEditor programId={ids.programId} courseCode="SCI"
    release={{id:ids.versionId,revision:ids.expectedRevision,content}} onSaved={async()=>{}}/>);
-  for(const label of ["Syllabus","Module title","Lesson title","Lesson reading","Add module","Add lesson","Add resource link","Save draft"])
+  for(const label of ["Syllabus","Module title","Lesson title","Lesson reading","Add module","Add lesson","Add resource link","Save draft","Save this lesson only"])
    expect(html).toContain(label);
   expect(html).toContain("Publication is immutable and does not upgrade existing classes");
   expect(html).toContain('required="" minLength="10" maxLength="2000"');
