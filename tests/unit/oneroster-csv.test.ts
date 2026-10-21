@@ -15,7 +15,7 @@ describe("OneRoster CSV interchange validation",()=>{
  });
  it("rejects duplicated IDs and nonportable malformed rows",()=>{
   expect(previewOneRosterCsv("orgs",orgs+"school-1,Duplicate,school\n").errors.join(" ")).toContain("duplicate sourcedId");
-  expect(previewOneRosterCsv("orgs","sourcedId,name\norg,A")).toThrow("required columns");
+  expect(()=>previewOneRosterCsv("orgs","sourcedId,name\norg,A")).toThrow("required columns");
   expect(previewOneRosterCsv("orgs","sourcedId,name,type\norg,Unclosed,school,extra").errors).toHaveLength(1);
   expect(()=>previewOneRosterCsv("orgs",'sourcedId,name,type\norg,"Broken,school')).toThrow("Unclosed");
   expect(()=>previewOneRosterCsv("orgs","sourcedId,name,type\nschool,,")).not.toThrow();
