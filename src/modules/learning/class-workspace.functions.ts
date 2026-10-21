@@ -33,6 +33,10 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     // authorizeClass has already verified the current section-teacher assignment.
     const teacherGuides=actor.role==="teacher" && section.contentStatus==="published"
       ? readClassTeacherGuides(section.curriculum) : null;
+    if(teacherGuides && (teacherGuides.courseCode!==section.courseCode ||
+       teacherGuides.units.some(unit=>!content?.modules.some(module=>module.id===unit.unitId &&
+         unit.lessons.every(lesson=>module.lessons.some(item=>item.id===lesson.lessonId))))))
+      throw new Error("Teacher guide does not match the published class release.");
     const teachers = await db.select({ personId: s.people.id, firstName: s.people.legalFirstName,
       lastName: s.people.legalLastName, preferredName: s.people.preferredName }).from(s.sectionTeachers)
       .innerJoin(s.people, eq(s.people.id, s.sectionTeachers.personId))
