@@ -12,16 +12,18 @@ import {
  * entitlement + published pack/course are the required additional grants.
  * Returning course ids alone is not an authorization decision.
  */
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export async function listLaunchEligibleCourses(program: {
   id: string;
   organizationId: string;
   academicProviderOrganizationId: string | null;
-}) {
+}, query: Pick<Transaction, "select"> = db) {
   const owners = [...new Set([
     program.organizationId, program.academicProviderOrganizationId,
   ].filter((id): id is string => Boolean(id)))];
 
-  const owned = await db.select({
+  const owned = await query.select({
     versionId: courseTemplateVersions.id, version: courseTemplateVersions.version,
     title: courseTemplates.title, code: courseTemplates.code,
     subject: courseTemplates.subject,
@@ -33,7 +35,7 @@ export async function listLaunchEligibleCourses(program: {
       inArray(courseTemplates.owningOrganizationId, owners),
     ));
 
-  const adopted = await db.select({
+  const adopted = await query.select({
     versionId: courseTemplateVersions.id, version: courseTemplateVersions.version,
     title: courseTemplates.title, code: courseTemplates.code,
     subject: courseTemplates.subject,
@@ -70,8 +72,8 @@ export async function listLaunchEligibleCourses(program: {
 }
 
 /** Keep the section-creation authorization exactly aligned with the picker. */
-export async function assertLaunchEligibleCourse(program: Parameters<typeof listLaunchEligibleCourses>[0], versionId: string) {
-  const courses = await listLaunchEligibleCourses(program);
+export async function assertLaunchEligibleCourse(program: Parameters<typeof listLaunchEligibleCourses>[0], versionId: string, query: Pick<Transaction, "select"> = db) {
+  const courses = await listLaunchEligibleCourses(program, query);
   if (!courses.some(course => course.versionId === versionId)) {
     throw new Error("Choose a published course owned by your institution or covered by an active program adoption and license.");
   }
