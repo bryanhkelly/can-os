@@ -1,3 +1,4 @@
+import { curriculumResources } from "./curriculum-resources";
 import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
 import { organizations, programs, sites } from "./organizations";
@@ -88,6 +89,7 @@ export const curriculumOverlays = pgTable("curriculum_overlays", {
   kind: text("kind").notNull(),
   url: text("url"),
   documentId: uuid("document_id").references(() => documents.id, { onDelete: "restrict" }),
+  resourceId: uuid("resource_id").references(() => curriculumResources.id, { onDelete: "restrict" }),
   status: text("status").default("active").notNull(),
   createdByPersonId: uuid("created_by_person_id").notNull().references(() => people.id, { onDelete: "restrict" }),
   metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
