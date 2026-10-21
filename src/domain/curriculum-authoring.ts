@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { classContentSchema, classResources, type ClassContent } from "./class-content";
+import { classTeacherGuidesSchema, type ClassTeacherGuides } from "./class-teacher-guides";
 
 export const curriculumDraftContent = classContentSchema.superRefine((content, context) => {
   if (JSON.stringify(content).length > 500_000)
@@ -19,4 +20,22 @@ export function assertPublishableCurriculum(content: ClassContent) {
   if (content.modules.some(module => module.lessons.some(lesson =>
       !lesson.body.trim() && !(lesson.activities?.some(activity => activity.instructions.trim())))))
     throw new Error("Every published lesson must contain reading content or structured activities.");
+}
+
+/**
+ * Teacher-only publisher guidance must belong to the same immutable course.
+ * Validate both while saving a draft and immediately before publication.
+ */
+export function assertTeacherGuidesMatchCourse(content:ClassContent,raw:ClassTeacherGuides,courseCode:string){
+ const guides=classTeacherGuidesSchema.parse(raw);
+ if(guides.courseCode!==courseCode)throw new Error("Teacher guide course code must match its publisher course.");
+ for(const unit of guides.units){
+  const module=content.modules.find(m=>m.id===unit.unitId);
+  if(!module)throw new Error("Teacher guide refers to a module outside this course.");
+  const ids=new Set(module.lessons.map(l=>l.id));
+  for(const lesson of unit.lessons){
+   if(!ids.has(lesson.lessonId))throw new Error("Teacher guide lesson must exist inside its matching course module.");
+  }
+ }
+ return guides;
 }
