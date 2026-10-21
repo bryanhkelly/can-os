@@ -16,6 +16,7 @@ export function assertPublishableCurriculum(content: ClassContent) {
   if (!content.syllabus.trim()) throw new Error("Add a syllabus before publishing.");
   if (!content.modules.length || content.modules.some(module => !module.lessons.length))
     throw new Error("Every published module must contain at least one lesson.");
-  if (content.modules.some(module => module.lessons.some(lesson => !lesson.body.trim())))
-    throw new Error("Every published lesson must contain reading content.");
+  if (content.modules.some(module => module.lessons.some(lesson =>
+      !lesson.body.trim() && !(lesson.activities?.some(activity => activity.instructions.trim())))))
+    throw new Error("Every published lesson must contain reading content or structured activities.");
 }

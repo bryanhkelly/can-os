@@ -121,6 +121,17 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
         </ul>}
         <div className="mt-3 text-sm">{classwork}</div>
       </WorkspacePanel>
+      {data.content?.blueprint && <WorkspacePanel title="Yearlong course roadmap"
+        description="Curriculum planning progress, not a list of completed lessons or a credit-award decision. Planned weeks are not yet available for instruction.">
+        <p className="text-sm">{data.content.blueprint.weeks.filter(week=>week.status!=="planned").length} of {data.content.blueprint.targetInstructionalWeeks} weeks authored · School review: {data.content.blueprint.reviewStatus.replaceAll("_"," ")}</p>
+        {data.content.blueprint.creditStatus!=="credit_ready" && <p className="mt-2 text-sm text-muted-foreground">This course remains in curriculum development and is not certified as credit-ready.</p>}
+        <details className="mt-3"><summary className="cursor-pointer text-sm underline">Explore the proposed weekly sequence</summary>
+          <ol className="mt-3 max-h-80 space-y-2 overflow-y-auto text-sm">{data.content.blueprint.weeks.map(week=><li key={week.week} className="flex flex-wrap justify-between gap-2 border-b py-2">
+            <span>Week {week.week}: {week.title}</span>
+            <span className="text-muted-foreground">{week.status==="planned"?"Planning only":week.status==="authored"?"Authored; teacher review pending":week.status}</span>
+          </li>)}</ol>
+        </details>
+      </WorkspacePanel>}
       <WorkspacePanel title="Teaching team"><ul className="space-y-2 text-sm">{data.teachers.map(teacher => <li key={teacher.personId}><Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link></li>)}</ul>
         {!data.teachers.length && <p className="text-sm text-muted-foreground">No teaching team is assigned.</p>}
       </WorkspacePanel>
@@ -129,7 +140,22 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {!data.content && <p role="status" className="rounded-xl border p-5 text-sm">No published learning content is configured for this class.</p>}
       {lessonId && !lesson && <p role="alert" className="rounded-xl border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
       {lesson ? <WorkspacePanel title={lesson.title} actions={<Link to="/classes" search={{ ...search, tab: "lessons" }} className="text-sm underline">All lessons</Link>}>
-        <div className="whitespace-pre-wrap text-sm leading-8">{lesson.body || "No lesson text provided."}</div>
+        {lesson.estimatedMinutes && <p className="mb-3 text-xs text-muted-foreground">Estimated lesson time: {lesson.estimatedMinutes} minutes</p>}
+        {lesson.learningTargets?.length ? <section className="mb-5 rounded-lg border p-4">
+          <h3 className="text-sm font-semibold">Learning targets</h3>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{lesson.learningTargets.map(target=><li key={target}>{target}</li>)}</ul>
+        </section> : null}
+        {lesson.activities?.length ? <ol className="space-y-5">
+          {lesson.activities.map((activity,index)=><li key={activity.id} className="rounded-lg border p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-semibold">{index+1}. {activity.title}</h3>
+              <span className="text-xs text-muted-foreground">{activity.estimatedMinutes ? `${activity.estimatedMinutes} min · ` : ""}{activity.kind.replaceAll("_"," ")}</span>
+            </div>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-7">{activity.instructions}</p>
+            {activity.evidence==="teacher_review" && <p className="mt-3 text-xs text-muted-foreground">Discuss or submit this evidence for teacher review. Opening this step does not grant a grade.</p>}
+          </li>)}
+        </ol> : <div className="whitespace-pre-wrap text-sm leading-8">{lesson.body || "No lesson text provided."}</div>}
+        {lesson.standards?.length ? <p className="mt-4 text-xs text-muted-foreground">Learning standards: {lesson.standards.join(", ")}</p> : null}
         {lesson.resources.length > 0 && <div className="mt-5">{resources(lesson.resources)}</div>}
         {supplements.some(item=>item.lessonId===lesson.id) && <div className="mt-5 space-y-2">
           <h3 className="font-semibold">School and classroom supplements</h3>
