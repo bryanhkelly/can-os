@@ -52,6 +52,8 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const announcementId = useRef<string | null>(null);
   const search = { section: data.section.id, student: data.role === "guardian" ? data.studentPersonId ?? undefined : undefined };
   const supplements = data.supplements ?? [];
+  const assessmentEvidence = data.assessmentEvidence ?? [];
+  const assessmentSummary = data.assessmentEvidenceSummary;
   const lessons = data.content?.modules.flatMap(module => module.lessons) ?? [];
   const lesson = lessons.find(item => item.id === lessonId);
   const completed = new Set(data.progress.filter(item => item.completedAt).map(item => item.lessonId));
@@ -102,6 +104,22 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       <WorkspacePanel title="Learning progress" description="Student-reported lesson completion is not a grade, mastery score or attendance record.">
         <p className="text-sm">{data.role === "teacher" ? `${lessons.length} published lessons · ${data.roster.length} enrolled students` : `${completed.size} / ${lessons.length} published lessons marked complete`}</p>
         <Link to="/classes" search={{ ...search, tab: "lessons" }} className="mt-3 inline-block text-sm underline">Open lessons</Link>
+      </WorkspacePanel>
+      <WorkspacePanel title="Assessment evidence" description="Teacher-reviewed submissions are different from lesson completion. Scores shown here are not a mastery decision or course credit.">
+        <p className="text-sm">{assessmentEvidence.length} published class assessments
+          {data.role !== "teacher" && assessmentSummary ? ` · ${assessmentSummary.graded} graded · ${assessmentSummary.awaitingFeedback} awaiting feedback` : ""}</p>
+        {data.role !== "teacher" && assessmentEvidence.length>0 && <ul className="mt-3 divide-y text-sm">
+          {assessmentEvidence.map(item=><li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+            <span>{item.title}</span>
+            <span className="text-muted-foreground">{item.score !== null && item.pointsPossible !== null
+              ? `Reviewed: ${item.score} / ${item.pointsPossible} points`
+              : item.status==="submitted"?"Submitted · awaiting teacher review"
+              : item.status==="draft"?"Response in progress"
+              : item.status==="returned"?"Returned for revision"
+              : "Not graded"}</span>
+          </li>)}
+        </ul>}
+        <div className="mt-3 text-sm">{classwork}</div>
       </WorkspacePanel>
       <WorkspacePanel title="Teaching team"><ul className="space-y-2 text-sm">{data.teachers.map(teacher => <li key={teacher.personId}><Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link></li>)}</ul>
         {!data.teachers.length && <p className="text-sm text-muted-foreground">No teaching team is assigned.</p>}
