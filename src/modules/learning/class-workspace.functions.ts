@@ -57,16 +57,22 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     // The authorized section determines program, site and version; browser input cannot widen the scope.
     const overlayRows = await db.select({
       id:s.curriculumOverlays.id,title:s.curriculumOverlays.title,kind:s.curriculumOverlays.kind,
-      url:s.curriculumOverlays.url,siteId:s.curriculumOverlays.siteId,
+      url:s.curriculumOverlays.url,resourceId:s.curriculumOverlays.resourceId,siteId:s.curriculumOverlays.siteId,
       sectionId:s.curriculumOverlays.sectionId,lessonId:s.curriculumOverlays.lessonId,
     }).from(s.curriculumOverlays).where(and(
       eq(s.curriculumOverlays.programId,section.programId),
       eq(s.curriculumOverlays.courseTemplateVersionId,section.versionId),
       eq(s.curriculumOverlays.status,"active")));
+    const attachedResourceIds=overlayRows.map(item=>item.resourceId).filter((id):id is string=>!!id);
+    const attached=attachedResourceIds.length?await db.select({
+      id:s.curriculumResources.id,url:s.curriculumResources.url,
+    }).from(s.curriculumResources).where(inArray(s.curriculumResources.id,attachedResourceIds)):[];
     const supplements=overlayRows.filter(item=>
       item.sectionId ? item.sectionId===section.id :
       item.siteId ? item.siteId===section.siteId : true,
-    ).map(item=>({id:item.id,title:item.title,kind:item.kind,url:item.url,lessonId:item.lessonId}));
+    ).map(item=>({id:item.id,title:item.title,kind:item.kind,
+      url:item.resourceId?attached.find(resource=>resource.id===item.resourceId)?.url??null:item.url,
+      lessonId:item.lessonId}));
     const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.map(lesson => lesson.id)) ?? []);
     return {
       role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,

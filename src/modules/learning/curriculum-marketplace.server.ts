@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
  curriculumAdoptions, curriculumEntitlements, curriculumOverlays, curriculumPackItems,
- curriculumPacks, curriculumPackVersions, courseTemplates, courseTemplateVersions,
+ curriculumPacks, curriculumPackVersions, curriculumResources, courseTemplates, courseTemplateVersions,
  programs, sections,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
@@ -47,14 +47,22 @@ export async function readMarketplace(actor: Actor, programId: string) {
   .where(eq(curriculumEntitlements.organizationId,program.organizationId));
  const adoptions=await db.select().from(curriculumAdoptions)
   .where(eq(curriculumAdoptions.programId,program.id));
- const overlays=await db.select({
-  id:curriculumOverlays.id,courseTemplateVersionId:curriculumOverlays.courseTemplateVersionId,
+ const overlayRows=await db.select({
+  id:curriculumOverlays.id,resourceId:curriculumOverlays.resourceId,
+  courseTemplateVersionId:curriculumOverlays.courseTemplateVersionId,
   sectionId:curriculumOverlays.sectionId,siteId:curriculumOverlays.siteId,
   lessonId:curriculumOverlays.lessonId,title:curriculumOverlays.title,
   kind:curriculumOverlays.kind,url:curriculumOverlays.url,
   status:curriculumOverlays.status,
  }).from(curriculumOverlays).where(and(eq(curriculumOverlays.programId,program.id),
   eq(curriculumOverlays.status,"active"))).orderBy(asc(curriculumOverlays.createdAt));
+ const resourceIds=overlayRows.map(row=>row.resourceId).filter((id):id is string=>!!id);
+ const linkedResources=resourceIds.length?await db.select({
+  id:curriculumResources.id,url:curriculumResources.url,title:curriculumResources.title,
+ }).from(curriculumResources).where(inArray(curriculumResources.id,resourceIds)):[];
+ const overlays=overlayRows.map(row=>({
+  ...row,url:row.resourceId?linkedResources.find(resource=>resource.id===row.resourceId)?.url??null:row.url,
+ }));
  const classSections=await db.select({id:sections.id,title:sections.title,courseVersionId:sections.courseTemplateVersionId})
   .from(sections).where(eq(sections.programId,program.id)).orderBy(asc(sections.title));
  return {
@@ -170,18 +178,24 @@ export async function addCurriculumSupplement(actor:Actor,input:{
   }
   const url=new URL(input.url);
   if(url.protocol!=="https:"||url.username||url.password)throw new Error("Supplement requires a safe HTTPS URL.");
+  const [resource]=await tx.insert(curriculumResources).values({
+    ownerOrganizationId:program.organizationId,kind:input.kind,title:input.title,url:input.url,
+    licenseCode:"USER-SUPPLIED",sourceUrl:input.url,
+    metadata:{source:"organization_supplement",scope:input.scope,reviewStatus:"unverified"}
+  }).returning({id:curriculumResources.id});
+  if(!resource)throw new Error("Unable to create curriculum resource.");
   const [row]=await tx.insert(curriculumOverlays).values({
     organizationId:program.organizationId,programId:program.id,
     siteId:input.scope==="site"||input.scope==="section"?program.siteId:null,
     sectionId:input.scope==="section"?input.sectionId:null,
     courseTemplateVersionId:input.courseVersionId,lessonId:input.lessonId??null,
-    title:input.title,kind:input.kind,url:input.url,createdByPersonId:actor.actorPersonId,
+    title:input.title,kind:input.kind,resourceId:resource.id,createdByPersonId:actor.actorPersonId,
     metadata:{scope:input.scope,source:"local_supplement"}
   }).returning({id:curriculumOverlays.id});
   if(!row)throw new Error("Unable to save supplement.");
   await writeAudit(tx,actor,{action:"curriculum.supplement.add",entityType:"curriculum_overlay",
     entityId:row.id,scope:{organizationId:program.organizationId,programId:program.id,siteId:program.siteId,sectionId:input.sectionId??null},
-    after:{courseVersionId:input.courseVersionId,lessonId:input.lessonId??null,kind:input.kind,title:input.title,scope:input.scope}});
+    after:{courseVersionId:input.courseVersionId,resourceId:resource.id,lessonId:input.lessonId??null,kind:input.kind,title:input.title,scope:input.scope}});
   await emitEvent(tx,{eventType:"CurriculumSupplementAdded",aggregateType:"curriculum_overlay",
    aggregateId:row.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,
    programId:program.id,siteId:program.siteId});
