@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { yearlongCourseBlueprintSchema } from "./yearlong-course-blueprint";
 
 const key = z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/);
 const httpsUrl = z.string().url().max(2048).refine(value => {
@@ -31,6 +32,7 @@ const lesson = z.object({
 export const classContentSchema = z.object({
   version: z.literal(1),
   syllabus: z.string().max(100_000).default(""),
+  blueprint: yearlongCourseBlueprintSchema.optional(),
   modules: z.array(z.object({
     id: key, title: z.string().min(1).max(200), lessons: z.array(lesson).max(200),
   })).max(100).default([]),
