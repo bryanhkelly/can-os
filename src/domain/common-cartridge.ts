@@ -42,8 +42,10 @@ function attributes(value:string):Record<string,string>{
   const attrs:Record<string,string>={};
   const regex=/([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
   for(const m of value.matchAll(regex)){
-    if(Object.prototype.hasOwnProperty.call(attrs,m[1]))throw new Error("Duplicate XML attribute.");
-    attrs[m[1]]=decodeXml(m[2]??m[3]??"");
+    const name=m[1];
+    if(!name)throw new Error("Malformed XML attribute.");
+    if(Object.prototype.hasOwnProperty.call(attrs,name))throw new Error("Duplicate XML attribute.");
+    attrs[name]=decodeXml(m[2]??m[3]??"");
   }
   return attrs;
 }
@@ -69,7 +71,9 @@ function parseXml(xml:string):Node{
       const closed=value.endsWith("/>");
       const m=value.match(/^<([A-Za-z_][\w:.-]*)([\s\S]*?)\/?\s*>$/);
       if(!m)throw new Error("Malformed Common Cartridge XML tag.");
-      const node:Node={name:m[1],attrs:attributes(m[2]),text:"",children:[]};
+      const name=m[1];
+      if(!name)throw new Error("Missing XML tag name.");
+      const node:Node={name,attrs:attributes(m[2]??""),text:"",children:[]};
       if(stack.length)stack.at(-1)!.children.push(node);else roots.push(node);
       if(!closed)stack.push(node);
       if(stack.length>64)throw new Error("Manifest nesting limit exceeded.");
@@ -78,9 +82,10 @@ function parseXml(xml:string):Node{
     }else if(value.trim())throw new Error("Text outside the XML document.");
     if(roots.length>1)throw new Error("Multiple XML root elements.");
   }
-  if(stack.length||roots.length!==1||tag(roots[0].name)!=="manifest")
+  const root=roots[0];
+  if(stack.length||roots.length!==1||!root||tag(root.name)!=="manifest")
     throw new Error("Invalid Common Cartridge manifest root.");
-  return roots[0];
+  return root;
 }
 const named=(node:Node,name:string)=>node.children.filter(n=>tag(n.name)===name);
 function parseItem(node:Node):CartridgeItem{
