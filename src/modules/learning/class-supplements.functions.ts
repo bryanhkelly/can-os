@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { curriculumOverlays, curriculumResources, programs } from "@/db/schema";
-import { readClassContent } from "@/domain/class-content";
+import { assertPublisherLessonReference } from "@/domain/publisher-course-references";
 import { AuthorizationError } from "@/domain/command-context";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { authorizeClass, classActor } from "./class-access.server";
@@ -27,9 +27,7 @@ export const addClassSupplement = createServerFn({method:"POST"})
      const {section}=await authorizeClass(actor,data.sectionId,undefined,tx);
      if(section.contentStatus!=="published")
        throw new AuthorizationError("published curriculum class");
-     const content=readClassContent(section.curriculum);
-     if(data.lessonId&&!content?.modules.some(m=>m.lessons.some(l=>l.id===data.lessonId)))
-       throw new Error("Choose a lesson in this published publisher course.");
+     assertPublisherLessonReference(section.curriculum,section.contentStatus,data.lessonId);
      const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
        .from(programs).where(eq(programs.id,section.programId)).limit(1);
      if(!program||program.siteId!==section.siteId)
