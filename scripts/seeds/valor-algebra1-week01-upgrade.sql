@@ -104,6 +104,22 @@ AND metadata->>'synthetic'='true' AND EXISTS(SELECT 1 FROM curriculum_adoptions 
 WHERE a.program_id='f1000000-0000-4000-8000-000000000004' AND a.pack_version_id=md5('can-core-pack-version:week01:v2')::uuid AND a.status='active')
 RETURNING id;
 -- CAN_STATEMENT_BREAK
+INSERT INTO audit_events(id,actor_person_id,action,resource_type,resource_id,scope,before,after,context)
+SELECT md5('can-core-algebra1-week01-class-upgrade-audit')::uuid,g.person_id,
+'curriculum.synthetic_pilot.week01_upgrade','section','7b6eb18e-8191-fbd5-bc2d-cd860e6b26a0',
+'{"organizationId":"f1000000-0000-4000-8000-000000000002","programId":"f1000000-0000-4000-8000-000000000004","synthetic":true}'::jsonb,
+jsonb_build_object('courseVersionId','bf36382c-1a56-484b-72e1-a037d3203626'),
+jsonb_build_object('courseVersionId',md5('can-core-version:CAN-ALG1:week01:v2')::text,
+'packVersionId',md5('can-core-pack-version:week01:v2')::text,
+'progressPreserved',true,'fiveLessons',true,'twoAssessments',true,'creditReadiness','review_required'),
+'{"source":"guarded_synthetic_curriculum_seed","unit":"algebra1-u01"}'::jsonb
+FROM access_accounts a JOIN account_person_grants g ON g.account_id=a.id
+JOIN sections section ON section.id='7b6eb18e-8191-fbd5-bc2d-cd860e6b26a0'
+WHERE a.email_normalized='alex.registrar@valorschool.demo'
+AND g.role='registrar' AND g.active=true AND g.organization_id='f1000000-0000-4000-8000-000000000002'
+AND section.course_template_version_id=md5('can-core-version:CAN-ALG1:week01:v2')::uuid
+ON CONFLICT(id) DO NOTHING RETURNING id;
+-- CAN_STATEMENT_BREAK
 DO $verify$ DECLARE v_count integer; a_count integer; BEGIN
 SELECT COUNT(*) INTO v_count FROM course_template_versions WHERE id=md5('can-core-version:CAN-ALG1:week01:v2')::uuid AND status='published';
 SELECT COUNT(*) INTO a_count FROM assessments WHERE section_id='7b6eb18e-8191-fbd5-bc2d-cd860e6b26a0' AND metadata->>'unitId'='algebra1-u01';
