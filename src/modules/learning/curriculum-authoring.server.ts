@@ -4,8 +4,9 @@ import { db } from "@/db/client";
 import { auditEvents, courseTemplates, courseTemplateVersions, programs, sections } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import { assertPublishableCurriculum, curriculumDraftContent } from "@/domain/curriculum-authoring";
+import { assertPublishableCurriculum, curriculumDraftContent, assertTeacherGuidesMatchCourse } from "@/domain/curriculum-authoring";
 import { readClassContent, type ClassContent } from "@/domain/class-content";
+import { readClassTeacherGuides, type ClassTeacherGuides } from "@/domain/class-teacher-guides";
 import type { Actor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -59,7 +60,8 @@ export async function readCurriculumStudio(actor: Actor, programId: string) {
     id: course.id, code: course.code, title: course.title, subject: course.subject,
     releases: releases.filter(release => release.courseId === course.id).map(release => ({
       id: release.id, version: release.version, status: release.status, revision: revision(release.curriculum),
-      content: readClassContent(release.curriculum), publishedAt: release.publishedAt?.toISOString() ?? null,
+      content: readClassContent(release.curriculum), teacherGuides: readClassTeacherGuides(release.curriculum),
+      publishedAt: release.publishedAt?.toISOString() ?? null,
     })),
   })) };
 }
@@ -124,16 +126,22 @@ export async function createCurriculumDraft(actor: Actor, input: {
 
 export async function saveCurriculumDraft(actor: Actor, input: {
   programId: string; versionId: string; expectedRevision: string; content: ClassContent;
+  teacherGuides?: ClassTeacherGuides;
 }) {
   const content = curriculumDraftContent.parse(input.content);
   return db.transaction(async tx => {
     const program = await authorize(actor, input.programId, tx);
     const [lookup] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).limit(1);
     if (!lookup) throw new Error("Curriculum version not found.");
-    await ownedCourse(tx, lookup.courseTemplateId, program.organizationId);
+    const course = await ownedCourse(tx, lookup.courseTemplateId, program.organizationId);
     const [version] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).for("update").limit(1);
     if (!version || version.status !== "draft") throw new Error("Published curriculum is immutable. Create a new draft.");
-    const curriculum = { ...version.curriculum, learning: content };
+    const teacherGuides = input.teacherGuides
+      ? assertTeacherGuidesMatchCourse(content, input.teacherGuides, course.code)
+      : readClassTeacherGuides(version.curriculum);
+    if (teacherGuides) assertTeacherGuidesMatchCourse(content, teacherGuides, course.code);
+    const curriculum = { ...version.curriculum, learning: content,
+      ...(teacherGuides ? {teacherGuides} : {}) };
     if (revision(curriculum) === revision(version.curriculum)) return { revision: revision(curriculum) };
     if (revision(version.curriculum) !== input.expectedRevision) throw new Error("This draft changed. Reload before saving; your edits have not been applied.");
     await tx.update(courseTemplateVersions).set({ curriculum, updatedAt: new Date() }).where(eq(courseTemplateVersions.id, version.id));
@@ -153,7 +161,7 @@ export async function publishCurriculumDraft(actor: Actor, input: {
     const program = await authorize(actor, input.programId, tx);
     const [lookup] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).limit(1);
     if (!lookup) throw new Error("Curriculum version not found.");
-    await ownedCourse(tx, lookup.courseTemplateId, program.organizationId);
+    const course = await ownedCourse(tx, lookup.courseTemplateId, program.organizationId);
     const [version] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).for("update").limit(1);
     if (!version || revision(version.curriculum) !== input.expectedRevision)
       throw new Error("This draft changed. Reload and review before publishing.");
@@ -166,6 +174,8 @@ export async function publishCurriculumDraft(actor: Actor, input: {
     const content = readClassContent(version.curriculum);
     if (!content) throw new Error("Add curriculum content before publishing.");
     assertPublishableCurriculum(content);
+    const teacherGuides=readClassTeacherGuides(version.curriculum);
+    if(teacherGuides)assertTeacherGuidesMatchCourse(content,teacherGuides,course.code);
     const [existingSection] = await tx.select({ id: sections.id }).from(sections)
       .where(eq(sections.courseTemplateVersionId, version.id)).limit(1);
     if (existingSection) throw new Error("A section already references this draft. Reconcile its version before publishing; existing classes cannot be changed here.");
