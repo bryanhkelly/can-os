@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { buildClassAssessmentEvidence, summarizeClassAssessmentEvidence } from "@/domain/class-assessment-evidence";
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
+import { readClassTeacherGuides } from "@/domain/class-teacher-guides";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
@@ -28,6 +29,10 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     const { section, studentProfileId, studentPersonId } = await authorizeClass(actor, data.sectionId, data.studentPersonId);
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const content = section.contentStatus === "published" ? readClassContent(section.curriculum) : null;
+    // Answer keys are intentionally excluded from all student/guardian server responses.
+    // authorizeClass has already verified the current section-teacher assignment.
+    const teacherGuides=actor.role==="teacher" && section.contentStatus==="published"
+      ? readClassTeacherGuides(section.curriculum) : null;
     const teachers = await db.select({ personId: s.people.id, firstName: s.people.legalFirstName,
       lastName: s.people.legalLastName, preferredName: s.people.preferredName }).from(s.sectionTeachers)
       .innerJoin(s.people, eq(s.people.id, s.sectionTeachers.personId))
@@ -121,7 +126,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     return {
       role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,
         subject: section.subject, versionId: section.versionId, contentStatus: section.contentStatus },
-      studentPersonId, content, supplements:allSupplements,
+      studentPersonId, content, teacherGuides, supplements:allSupplements,
       assessmentEvidence, assessmentEvidenceSummary:summarizeClassAssessmentEvidence(assessmentEvidence),
       teachers: teachers.map(row => ({ personId: row.personId, name: `${row.preferredName ?? row.firstName} ${row.lastName}` })),
       progress: progress.filter(row => lessonIds.has(row.lessonId)).map(row => ({ lessonId: row.lessonId, completedAt: row.completedAt?.toISOString() ?? null })),
