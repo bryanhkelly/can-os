@@ -9,9 +9,24 @@ const resource = z.object({
   id: key, title: z.string().min(1).max(200),
   url: httpsUrl.optional(), documentId: z.string().uuid().optional(),
 }).refine(value => Boolean(value.url) !== Boolean(value.documentId), "A resource requires exactly one URL or document");
+const activity = z.object({
+  id:key,
+  kind:z.enum(["launch","instruction","worked_example","guided_practice",
+    "independent_practice","exit_ticket","reflection","self_check"]),
+  title:z.string().min(2).max(200),
+  instructions:z.string().trim().min(5).max(30_000),
+  estimatedMinutes:z.number().int().min(1).max(180).optional(),
+  evidence:z.enum(["practice","formative","teacher_review"]).optional(),
+}).strict();
 const lesson = z.object({
   id: key, title: z.string().min(1).max(200), body: z.string().max(100_000),
   resources: z.array(resource).max(100).default([]),
+  // Structured activities complement legacy lesson text. They are visible to
+  // enrolled learners, not a place to store teacher answer keys.
+  learningTargets:z.array(z.string().trim().min(5).max(300)).max(12).optional(),
+  standards:z.array(z.string().min(3).max(40)).max(20).optional(),
+  estimatedMinutes:z.number().int().min(1).max(180).optional(),
+  activities:z.array(activity).max(20).optional(),
 });
 export const classContentSchema = z.object({
   version: z.literal(1),
@@ -25,6 +40,7 @@ export const classContentSchema = z.object({
     ["module", value.modules.map(item => item.id)],
     ["lesson", value.modules.flatMap(item => item.lessons.map(lesson => lesson.id))],
     ["resource", [...value.resources, ...value.modules.flatMap(item => item.lessons.flatMap(lesson => lesson.resources))].map(item => item.id)],
+    ["activity", value.modules.flatMap(module => module.lessons.flatMap(lesson => lesson.activities ?? [])).map(item => item.id)],
   ] as const) {
     if (new Set(ids).size !== ids.length) context.addIssue({ code: z.ZodIssueCode.custom, message: `Duplicate ${label} ID` });
   }
