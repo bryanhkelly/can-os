@@ -6,6 +6,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { getCurriculumPrograms } from "@/modules/learning/curriculum-authoring.functions";
 import { getCurriculumMarketplace, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
 import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploadAvailability } from "@/modules/learning/curriculum-resource-upload.functions";
+import { validateCommonCartridgeImport, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
 
 const searchSchema=z.object({programId:z.string().uuid().optional()});
 export const Route=createFileRoute("/operations/curriculum-marketplace")({
@@ -15,6 +16,7 @@ export const Route=createFileRoute("/operations/curriculum-marketplace")({
   programs:await getCurriculumPrograms(),
   marketplace:deps.programId?await getCurriculumMarketplace({data:{programId:deps.programId}}):null,
   pdfUpload:await curriculumPdfUploadAvailability().catch(()=>({enabled:false})),
+  imports:deps.programId?await listCommonCartridgeImports({data:{programId:deps.programId}}):[],
  }),{authMessage:"An authorized institutional curriculum publisher is required."})(),
  component:CurriculumMarketplacePage,
 });
@@ -24,7 +26,7 @@ function CurriculumMarketplacePage(){
  if(!outcome.ok)return <LoaderFailure title="Curriculum Marketplace" outcome={outcome}/>;
  return <MarketView key={outcome.data.marketplace?.program.id??"none"} data={outcome.data}/>;
 }
-function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumPrograms>>;marketplace:Market|null;pdfUpload:{enabled:boolean}}}){
+function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumPrograms>>;marketplace:Market|null;pdfUpload:{enabled:boolean};imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
  const router=useRouter();
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [accepted,setAccepted]=useState<Record<string,boolean>>({});
@@ -33,6 +35,8 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const [title,setTitle]=useState(""),[kind,setKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link"),[url,setUrl]=useState("");
  const [pdfFile,setPdfFile]=useState<File|null>(null),[rightsConfirmed,setRightsConfirmed]=useState(false);
  const [pdfKey,setPdfKey]=useState(0);
+ const [cartridgeFile,setCartridgeFile]=useState<File|null>(null);
+ const [cartridgeReport,setCartridgeReport]=useState<Awaited<ReturnType<typeof validateCommonCartridgeImport>>|null>(null);
  const market=data.marketplace;
  async function perform(task:()=>Promise<unknown>,success:string){
   setBusy(true);setError("");setNotice("");
@@ -152,6 +156,41 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      {item.url&&<a href={item.url} target="_blank" rel="noopener noreferrer" className="ml-1 underline">Open</a>}
     </li>)}</ul>
     {!market.overlays.length&&<p className="text-sm text-muted-foreground">No supplemental materials yet.</p>}
+   </section>
+
+   <section className="space-y-3 rounded-xl border p-5">
+     <h2 className="font-serif text-2xl">Import Common Cartridge</h2>
+     <p className="text-sm text-muted-foreground">Inspect a publisher-supplied 1EdTech Common Cartridge or Thin Common Cartridge (.imscc) without rebuilding it manually. The first stage validates the ZIP manifest, preserves publisher IDs and reports unsupported assessment or application resources. It does not yet publish a course or import embedded files.</p>
+     <label className="block text-sm">Cartridge package (.imscc, 2 MB maximum)
+       <input type="file" accept=".imscc,.zip" disabled={busy} className="mt-2 block"
+         onChange={e=>{setCartridgeReport(null);setCartridgeFile(e.currentTarget.files?.[0]??null);}}/>
+     </label>
+     <button type="button" disabled={busy||!cartridgeFile}
+       className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+       onClick={()=>void perform(async()=>{
+        if(!cartridgeFile)throw new Error("Select a Common Cartridge file.");
+        if(cartridgeFile.size>2_000_000)throw new Error("Use a package of 2 MB or smaller for direct validation.");
+        const array=new Uint8Array(await cartridgeFile.arrayBuffer());
+        let binary="";
+        for(let offset=0;offset<array.length;offset+=32768)binary+=String.fromCharCode(...array.subarray(offset,offset+32768));
+        const result=await validateCommonCartridgeImport({data:{
+          programId:market.program.id,fileName:cartridgeFile.name,base64:btoa(binary),
+        }});
+        setCartridgeReport(result);
+       },"Cartridge manifest validated and audit-staged. Review the notices before publishing any content.")}>
+       Validate cartridge
+     </button>
+     {cartridgeReport&&<div className="space-y-2 rounded-lg border p-4 text-sm" role="status">
+       <p><strong>Validated source:</strong> {cartridgeReport.preview.profile.replaceAll("_"," ")} · {cartridgeReport.preview.resources.length} resources · {cartridgeReport.preview.outline.length} top-level units</p>
+       <p><strong>Publication:</strong> Validation only. Source package contents are not yet installed as student lessons.</p>
+       <ul className="list-disc pl-5">{cartridgeReport.preview.notices.map((n,i)=><li key={i}>{n}</li>)}</ul>
+       {!cartridgeReport.preview.notices.length&&<p>No unresolved resource references were detected in the manifest.</p>}
+     </div>}
+     <h3 className="font-semibold">Recent validation jobs</h3>
+     <ul className="space-y-1 text-sm">{data.imports.map(item=><li key={item.id}>
+       {item.sourceName} · {item.format.replaceAll("_"," ")} · {item.status} · {item.resourceCount} resources · {item.noticeCount} notices
+     </li>)}</ul>
+     {!data.imports.length&&<p className="text-sm text-muted-foreground">No Common Cartridge imports have been staged for this organization.</p>}
    </section>
   </>}
  </main>;
