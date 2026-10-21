@@ -19,7 +19,8 @@
     "test:integration:admissions": "node scripts/run-integration-tests.mjs admissions-offers",
     "test:e2e": "playwright test",
     "test:e2e:admissions": "node scripts/run-admissions-e2e.mjs",
-    "test:integration:academic-intervention": "node scripts/run-integration-tests.mjs academic-intervention"
+    "test:integration:academic-intervention": "node scripts/run-integration-tests.mjs academic-intervention",
+    "test:e2e:curriculum": "playwright test --config playwright.curriculum.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
