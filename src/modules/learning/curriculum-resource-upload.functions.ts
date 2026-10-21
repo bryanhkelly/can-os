@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { documents, curriculumResources, curriculumOverlays, sections, courseTemplateVersions, curriculumAdoptions, curriculumEntitlements, curriculumPackItems, programs } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { readClassContent } from "@/domain/class-content";
+import { curriculumPdfKeyPattern, maxCurriculumPdfBytes, hasPdfMagic, isCurriculumPdfKeyForResource } from "@/domain/curriculum-resource-file";
 import { requireActor } from "@/modules/identity/actors.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { createPrivateUploadUrl, verifyPrivateObject, resolveR2Config } from "@/platform/storage/r2";
@@ -83,12 +84,11 @@ export const finishCurriculumPdfUpload = createServerFn({method:"POST"})
   .handler(async ({data}) => {
     requireStorage();
     const {actor,market} = await authorizeInput(data);
-    if (!data.key.startsWith(`learning/supplements/${data.resourceId}/`))
+    if (!isCurriculumPdfKeyForResource(data.key, data.resourceId))
       throw new AuthorizationError("matching private resource key");
     await verifyPrivateObject({
       key:data.key,keyPattern,expectedSize:data.size,expectedContentType:"application/pdf",
-      verifySignature: (_type,bytes) => bytes.length >= 5 && bytes[0]===37 && bytes[1]===80 &&
-        bytes[2]===68 && bytes[3]===70 && bytes[4]===45,
+      verifySignature: (_type,bytes) => hasPdfMagic(bytes),
     });
     return db.transaction(async tx => {
       // Revalidate the course entitlement in the mutation transaction.
