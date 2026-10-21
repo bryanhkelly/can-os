@@ -68,6 +68,7 @@ export const exportOneRosterBulkRoster = createServerFn({method:"POST"})
       .where(inArray(sectionTeachers.sectionId,sectionIds)).limit(5001):Promise.resolve([]),
   ]);
   if(studentRows.length>20000||teacherRows.length>5000)throw new Error("Large roster requires a scheduled export.");
+  if(studentRows.some(row=>!row.sectionId))throw new AuthorizationError("section-scoped active enrollment");
   const personMap=new Map<string,OneRosterInput["people"][number]>();
   for(const s of studentRows)personMap.set(s.personId,{id:s.personId,givenName:s.givenName,
     familyName:s.familyName,grade:s.grade});
@@ -92,7 +93,7 @@ export const exportOneRosterBulkRoster = createServerFn({method:"POST"})
       courseId:row.courseId,termId:row.termId})),
     people:[...personMap.values()],
     registrations:[
-      ...studentRows.map(row=>({id:row.id,classId:row.sectionId,
+      ...studentRows.map(row=>({id:row.id,classId:row.sectionId!,
         personId:row.personId,role:"student" as const})),
       ...teacherRows.map(row=>({id:row.id,classId:row.sectionId,
         personId:row.personId,role:"teacher" as const})),
