@@ -3,8 +3,8 @@ import { classContentSchema, classResources, type ClassContent } from "./class-c
 import { classTeacherGuidesSchema, type ClassTeacherGuides } from "./class-teacher-guides";
 
 export const curriculumDraftContent = classContentSchema.superRefine((content, context) => {
-  if (JSON.stringify(content).length > 500_000)
-    context.addIssue({ code: z.ZodIssueCode.custom, message: "Curriculum must be at most 500,000 characters." });
+  if (JSON.stringify(content).length > 3_000_000)
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Curriculum must be at most 3,000,000 characters. Save lessons individually for larger courses." });
   if (content.modules.some(module => !module.title.trim() || module.lessons.some(lesson => !lesson.title.trim())) ||
       classResources(content).some(resource => !resource.title.trim()))
     context.addIssue({ code: z.ZodIssueCode.custom, message: "Module, lesson and resource titles cannot be blank." });
