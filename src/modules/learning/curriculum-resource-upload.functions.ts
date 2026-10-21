@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { documents, curriculumResources, curriculumOverlays, sections, courseTemplateVersions, curriculumAdoptions, curriculumEntitlements, curriculumPackItems } from "@/db/schema";
+import { documents, curriculumResources, curriculumOverlays, sections, courseTemplateVersions, curriculumAdoptions, curriculumEntitlements, curriculumPackItems, programs } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { readClassContent } from "@/domain/class-content";
 import { requireActor } from "@/modules/identity/actors.server";
@@ -122,25 +122,17 @@ export const finishCurriculumPdfUpload = createServerFn({method:"POST"})
         metadata:{size:data.size,storageVerified:true,source:"curriculum_marketplace"},
       }).returning({id:documents.id});
       if (!doc) throw new Error("Unable to record verified resource.");
+      const [program] = await tx.select({organizationId:programs.organizationId,
+        siteId:programs.siteId}).from(programs).where(eq(programs.id,data.programId)).limit(1);
+      if (!program || program.siteId !== market.program.siteId)
+        throw new AuthorizationError("active program site and school");
       await tx.insert(curriculumResources).values({
-        id:data.resourceId,ownerOrganizationId:market.program.id ? (
-          // The program identity has been checked; fetch ownership from the database below.
-          await (async () => {
-            const [program] = await tx.select({organizationId:(await import("@/db/schema")).programs.organizationId})
-              .from((await import("@/db/schema")).programs).where(eq((await import("@/db/schema")).programs.id,data.programId)).limit(1);
-            if (!program) throw new AuthorizationError("program");
-            return program.organizationId;
-          })()
-        ) : "",kind:"pdf",title:data.title,documentId:doc.id,licenseCode:"USER-SUPPLIED",
+        id:data.resourceId,ownerOrganizationId:program.organizationId,
+        kind:"pdf",title:data.title,documentId:doc.id,licenseCode:"USER-SUPPLIED",
         metadata:{source:"school_upload",rightsAcknowledged:true,aiProcessingAllowed:false,size:data.size},
       });
       const [overlay] = await tx.insert(curriculumOverlays).values({
-        organizationId:(await (async()=>{
-          const [program] = await tx.select({organizationId:(await import("@/db/schema")).programs.organizationId})
-            .from((await import("@/db/schema")).programs).where(eq((await import("@/db/schema")).programs.id,data.programId)).limit(1);
-          if(!program)throw new AuthorizationError("program");
-          return program.organizationId;
-        })()),
+        organizationId:program.organizationId,
         programId:data.programId,
         siteId:data.scope==="site"||data.scope==="section"?market.program.siteId:null,
         sectionId:data.scope==="section"?data.sectionId:null,
