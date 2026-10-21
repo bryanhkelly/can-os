@@ -46,6 +46,8 @@ function TeacherGradebookPage() {
  const [title, setTitle] = useState("");
  const [points, setPoints] = useState("");
  const [due, setDue] = useState("");
+ const [assignmentKind,setAssignmentKind]=useState<"homework"|"classwork"|"quiz"|"test"|"project"|"discussion">("classwork");
+ const [curriculumLessonId,setCurriculumLessonId]=useState("");
  const [assessmentDueDates,setAssessmentDueDates]=useState<Record<string,string>>({});
  const reviewKey=gradingKey||detailKey;
  const reviewCell=gradebook?.cells.find(cell=>`${cell.studentProfileId}:${cell.assessmentId}`===reviewKey);
@@ -196,12 +198,15 @@ function TeacherGradebookPage() {
     sectionId: selected,
     title,
     pointsPossible: pointsValue,
+    assignmentKind,
+    ...(curriculumLessonId?{curriculumLessonId}:{}),
     ...(due ? { dueAt: new Date(`${due}T23:59:00`).toISOString() } : {}),
    } });
    setNotice(result.status === "published" ? "Assessment published and assigned to enrolled students." : "Assessment saved as a draft.");
    setTitle("");
    setPoints("");
    setDue("");
+   setCurriculumLessonId("");
    if (selected) await loadGradebook(selected);
   } catch (cause) {
    setNotice(cause instanceof Error ? cause.message : "Unable to create the assessment.");
@@ -326,6 +331,24 @@ function TeacherGradebookPage() {
        <input className="mt-2 w-full rounded-lg border bg-background p-3" type="date" value={due} onChange={event => setDue(event.target.value)} />
       </label>
      </div>
+     <div className="mt-4 grid gap-4 sm:grid-cols-2">
+       <label className="text-sm font-semibold">Class activity type
+        <select aria-label="Class activity type" value={assignmentKind}
+          onChange={event=>setAssignmentKind(event.target.value as typeof assignmentKind)}
+          className="mt-2 w-full rounded-lg border bg-background p-3">
+          {(["homework","classwork","quiz","test","project","discussion"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
+        </select>
+       </label>
+       <label className="text-sm font-semibold">Publisher lesson (optional)
+        <select aria-label="Publisher lesson for assignment" value={curriculumLessonId}
+          onChange={event=>setCurriculumLessonId(event.target.value)}
+          className="mt-2 w-full rounded-lg border bg-background p-3">
+          <option value="">General class activity</option>
+          {gradebook.curriculumLessons.map(lesson=><option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
+        </select>
+       </label>
+     </div>
+     <p className="mt-2 text-xs text-muted-foreground">The assignment belongs to this teacher's class. Linking to a publisher lesson preserves the original curriculum.</p>
      <p className="mt-3 text-xs text-muted-foreground">Assessments with a due date are published and assigned to enrolled students; without one they are saved as drafts.</p>
      <button disabled={busy} onClick={submitAssessment} className="mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Create assessment</button>
     </section></details>
@@ -341,6 +364,7 @@ function TeacherGradebookPage() {
          <span className="block text-xs font-normal text-muted-foreground">
           {assessment.dueAt ? `Due ${new Date(assessment.dueAt).toLocaleDateString()}` : "No due date"} · {assessment.pointsPossible ?? "—"} pts
           {assessment.rubric.length > 0 && ` · ${assessment.rubric.length} criteria`}
+          {" · "+assessment.kind}
           {" · "+assessment.status}
          </span>
          <label className="mt-2 block text-xs font-normal">New due date
