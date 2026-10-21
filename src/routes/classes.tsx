@@ -2,7 +2,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
 import { classResources, type ClassContent } from "@/domain/class-content";
-import { getClassDirectory, getClassWorkspace, getClassResourceDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
+import { getClassDirectory, getClassWorkspace, getClassResourceDownload, getClassSupplementDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
@@ -67,6 +67,14 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       window.location.assign(result.downloadUrl);
     }, "");
   }
+  async function downloadSupplement(supplementId:string) {
+    await run(async()=>{
+      const result=await getClassSupplementDownload({data:{
+        sectionId:data.section.id,studentPersonId:search.student,supplementId,
+      }});
+      window.location.assign(result.downloadUrl);
+    },"");
+  }
   function resources(items: ClassContent["resources"]) {
     return <ul className="space-y-3">{items.map(item => <li key={item.id} className="rounded-lg border p-3 text-sm">
       {item.url ? <a href={item.url} target="_blank" rel="noopener noreferrer" className="underline">{item.title} (external)</a> :
@@ -110,7 +118,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
           <ul className="space-y-2">{supplements.filter(item=>item.lessonId===lesson.id).map(item=>
             <li key={item.id} className="rounded border p-3 text-sm">{item.url?
               <a href={item.url} rel="noopener noreferrer" target="_blank" className="underline">{item.title} ({item.kind})</a>
-              :<span>{item.title} (school document)</span>}</li>)}</ul>
+              :item.kind==="pdf"?<button type="button" disabled={busy}
+                onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
+                {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>}</li>)}</ul>
         </div>}
         {data.role === "student" && <button type="button" disabled={busy} onClick={() => void run(() => setLessonCompletion({ data: {
           sectionId: data.section.id, versionId: data.section.versionId, lessonId: lesson.id, completed: !completed.has(lesson.id),
@@ -129,7 +139,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {supplements.length>0 && <section className="mt-5 space-y-2"><h3 className="font-semibold">School supplements</h3>
         <ul className="space-y-2">{supplements.map(item=><li key={item.id} className="rounded border p-3 text-sm">
           {item.url?<a href={item.url} target="_blank" rel="noopener noreferrer" className="underline">{item.title} ({item.kind})</a>
-           :<span>{item.title} (verified school document)</span>}
+           :item.kind==="pdf"?<button type="button" disabled={busy}
+              onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
+              {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>}
         </li>)}</ul>
       </section>}
       {(!data.content || !classResources(data.content).length) && !supplements.length && <p className="text-sm text-muted-foreground">No resources have been published.</p>}

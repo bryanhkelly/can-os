@@ -5,6 +5,8 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getCurriculumPrograms } from "@/modules/learning/curriculum-authoring.functions";
 import { getCurriculumMarketplace, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
+import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploadAvailability } from "@/modules/learning/curriculum-resource-upload.functions";
+import { validateCommonCartridgeImport, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
 
 const searchSchema=z.object({programId:z.string().uuid().optional()});
 export const Route=createFileRoute("/operations/curriculum-marketplace")({
@@ -13,6 +15,8 @@ export const Route=createFileRoute("/operations/curriculum-marketplace")({
  loader:({deps})=>safeLoader(async()=>({
   programs:await getCurriculumPrograms(),
   marketplace:deps.programId?await getCurriculumMarketplace({data:{programId:deps.programId}}):null,
+  pdfUpload:await curriculumPdfUploadAvailability().catch(()=>({enabled:false})),
+  imports:deps.programId?await listCommonCartridgeImports({data:{programId:deps.programId}}):[],
  }),{authMessage:"An authorized institutional curriculum publisher is required."})(),
  component:CurriculumMarketplacePage,
 });
@@ -22,13 +26,17 @@ function CurriculumMarketplacePage(){
  if(!outcome.ok)return <LoaderFailure title="Curriculum Marketplace" outcome={outcome}/>;
  return <MarketView key={outcome.data.marketplace?.program.id??"none"} data={outcome.data}/>;
 }
-function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumPrograms>>;marketplace:Market|null}}){
+function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumPrograms>>;marketplace:Market|null;pdfUpload:{enabled:boolean};imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
  const router=useRouter();
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [accepted,setAccepted]=useState<Record<string,boolean>>({});
  const [courseVersionId,setCourseVersionId]=useState(""),[scope,setScope]=useState<"program"|"site"|"section">("site");
  const [sectionId,setSectionId]=useState(""),[lessonId,setLessonId]=useState("");
  const [title,setTitle]=useState(""),[kind,setKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link"),[url,setUrl]=useState("");
+ const [pdfFile,setPdfFile]=useState<File|null>(null),[rightsConfirmed,setRightsConfirmed]=useState(false);
+ const [pdfKey,setPdfKey]=useState(0);
+ const [cartridgeFile,setCartridgeFile]=useState<File|null>(null);
+ const [cartridgeReport,setCartridgeReport]=useState<Awaited<ReturnType<typeof validateCommonCartridgeImport>>|null>(null);
  const market=data.marketplace;
  async function perform(task:()=>Promise<unknown>,success:string){
   setBusy(true);setError("");setNotice("");
@@ -108,6 +116,39 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      </select></label>
      <label className="text-sm sm:col-span-2">HTTPS resource URL<input required type="url" maxLength={2048} className="mt-1 block w-full rounded border bg-background p-2" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://..."/></label>
      <button disabled={busy||!courseVersionId||(scope==="section"&&!sectionId)} className="justify-self-start rounded bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">Add supplement</button>
+     <fieldset className="sm:col-span-2 space-y-3 rounded-lg border p-4">
+      <legend className="px-2 text-sm font-semibold">Upload a private PDF</legend>
+      <p className="text-xs text-muted-foreground">Upload a PDF directly to CAN's private storage. It is visible only in the selected program, site or class and downloadable by authorized class members.</p>
+      <input key={pdfKey} type="file" accept=".pdf,application/pdf" disabled={busy||!data.pdfUpload.enabled}
+        onChange={e=>setPdfFile(e.currentTarget.files?.[0]??null)} className="block w-full text-sm" aria-label="Supplemental PDF"/>
+      <label className="flex items-start gap-2 text-xs">
+       <input type="checkbox" checked={rightsConfirmed} disabled={busy||!data.pdfUpload.enabled}
+        onChange={e=>setRightsConfirmed(e.currentTarget.checked)}/>
+       <span>I have permission to share this material with authorized learners. Uploading does not authorize AI training or public redistribution.</span>
+      </label>
+      <button type="button" disabled={busy||!data.pdfUpload.enabled||!pdfFile||!rightsConfirmed||!courseVersionId||
+          !title.trim()||(scope==="section"&&!sectionId)}
+       className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+       onClick={()=>void perform(async()=>{
+         if(!pdfFile)throw new Error("Select a PDF.");
+         if(pdfFile.size<16||pdfFile.size>10*1024*1024)throw new Error("PDF must be between 16 bytes and 10 MB.");
+         const params={programId:market.program.id,courseVersionId,scope,title,
+           ...(scope==="section"?{sectionId}:{}),
+           ...(lessonId.trim()?{lessonId:lessonId.trim()}:{}),
+           fileName:pdfFile.name,size:pdfFile.size};
+         const signed=await beginCurriculumPdfUpload({data:params});
+         const uploaded=await fetch(signed.uploadUrl,{
+           method:"PUT",headers:{"Content-Type":"application/pdf","If-None-Match":"*"},
+           body:pdfFile,
+         });
+         if(!uploaded.ok)throw new Error("Private PDF upload failed. No curriculum resource was created.");
+         await finishCurriculumPdfUpload({data:{...params,
+           resourceId:signed.resourceId,key:signed.key,acknowledgedRights:true}});
+         setPdfFile(null);setPdfKey(v=>v+1);setRightsConfirmed(false);
+       },"Private PDF uploaded and attached to the selected curriculum scope.")}>Upload PDF</button>
+      {!data.pdfUpload.enabled&&<p className="text-xs text-muted-foreground" role="status">
+        Private PDF uploads require CAN_R2_CURRICULUM_UPLOADS_ENABLED=true and a configured private R2 bucket. External HTTPS PDF links remain available above.</p>}
+     </fieldset>
     </form>}
     <h3 className="font-semibold">Current supplements</h3>
     <ul className="space-y-2 text-sm">{market.overlays.map(item=><li className="rounded border p-3" key={item.id}>
@@ -115,6 +156,41 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      {item.url&&<a href={item.url} target="_blank" rel="noopener noreferrer" className="ml-1 underline">Open</a>}
     </li>)}</ul>
     {!market.overlays.length&&<p className="text-sm text-muted-foreground">No supplemental materials yet.</p>}
+   </section>
+
+   <section className="space-y-3 rounded-xl border p-5">
+     <h2 className="font-serif text-2xl">Import Common Cartridge</h2>
+     <p className="text-sm text-muted-foreground">Inspect a publisher-supplied 1EdTech Common Cartridge or Thin Common Cartridge (.imscc) without rebuilding it manually. The first stage validates the ZIP manifest, preserves publisher IDs and reports unsupported assessment or application resources. It does not yet publish a course or import embedded files.</p>
+     <label className="block text-sm">Cartridge package (.imscc, 2 MB maximum)
+       <input type="file" accept=".imscc,.zip" disabled={busy} className="mt-2 block"
+         onChange={e=>{setCartridgeReport(null);setCartridgeFile(e.currentTarget.files?.[0]??null);}}/>
+     </label>
+     <button type="button" disabled={busy||!cartridgeFile}
+       className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+       onClick={()=>void perform(async()=>{
+        if(!cartridgeFile)throw new Error("Select a Common Cartridge file.");
+        if(cartridgeFile.size>2_000_000)throw new Error("Use a package of 2 MB or smaller for direct validation.");
+        const array=new Uint8Array(await cartridgeFile.arrayBuffer());
+        let binary="";
+        for(let offset=0;offset<array.length;offset+=32768)binary+=String.fromCharCode(...array.subarray(offset,offset+32768));
+        const result=await validateCommonCartridgeImport({data:{
+          programId:market.program.id,fileName:cartridgeFile.name,base64:btoa(binary),
+        }});
+        setCartridgeReport(result);
+       },"Cartridge manifest validated and audit-staged. Review the notices before publishing any content.")}>
+       Validate cartridge
+     </button>
+     {cartridgeReport&&<div className="space-y-2 rounded-lg border p-4 text-sm" role="status">
+       <p><strong>Validated source:</strong> {cartridgeReport.preview.profile.replaceAll("_"," ")} · {cartridgeReport.preview.resources.length} resources · {cartridgeReport.preview.outline.length} top-level units</p>
+       <p><strong>Publication:</strong> Validation only. Source package contents are not yet installed as student lessons.</p>
+       <ul className="list-disc pl-5">{cartridgeReport.preview.notices.map((n,i)=><li key={i}>{n}</li>)}</ul>
+       {!cartridgeReport.preview.notices.length&&<p>No unresolved resource references were detected in the manifest.</p>}
+     </div>}
+     <h3 className="font-semibold">Recent validation jobs</h3>
+     <ul className="space-y-1 text-sm">{data.imports.map(item=><li key={item.id}>
+       {item.sourceName} · {item.format.replaceAll("_"," ")} · {item.status} · {item.resourceCount} resources · {item.noticeCount} notices
+     </li>)}</ul>
+     {!data.imports.length&&<p className="text-sm text-muted-foreground">No Common Cartridge imports have been staged for this organization.</p>}
    </section>
   </>}
  </main>;

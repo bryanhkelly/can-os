@@ -170,3 +170,57 @@ export const getClassResourceDownload = createServerFn({ method: "POST" })
     return { downloadUrl: signPrivateObjectUrl({ method: "GET", key: document.key,
       keyPattern: /^learning\/resources\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i, expiresSeconds: 60 }) };
   });
+
+
+/** Never expose an R2 key to callers. A private supplement requires a current class
+ * relationship, a matching program/site/course, and a verified resource document. */
+export const getClassSupplementDownload = createServerFn({method:"POST"})
+  .validator((value:unknown)=>classSelection.extend({supplementId:z.string().uuid()}).strict().parse(value))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await classActor();
+    const {section}=await authorizeClass(actor,data.sectionId,data.studentPersonId);
+    if(section.contentStatus!=="published")throw new AuthorizationError("published class");
+    const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+    const [entry]=await db.select({
+      overlay:s.curriculumOverlays,
+      resourceId:s.curriculumResources.id,
+      ownerOrganizationId:s.curriculumResources.ownerOrganizationId,
+      documentId:s.curriculumResources.documentId,
+      docKey:s.documents.storageKey,
+      docType:s.documents.mimeType,
+      docVerified:s.documents.verifiedAt,
+      docCategory:s.documents.category,
+      docSubject:s.documents.subjectType,
+      docSubjectId:s.documents.subjectId,
+      docSensitivity:s.documents.sensitivityTier,
+      docProvider:s.documents.storageProvider,
+      docExpires:s.documents.expiresAt,
+    }).from(s.curriculumOverlays)
+      .innerJoin(s.curriculumResources,eq(s.curriculumResources.id,s.curriculumOverlays.resourceId))
+      .innerJoin(s.documents,eq(s.documents.id,s.curriculumResources.documentId))
+      .innerJoin(s.programs,eq(s.programs.id,s.curriculumOverlays.programId))
+      .where(and(
+        eq(s.curriculumOverlays.id,data.supplementId),
+        eq(s.curriculumOverlays.programId,section.programId),
+        eq(s.curriculumOverlays.courseTemplateVersionId,section.versionId),
+        eq(s.curriculumOverlays.status,"active"),
+        eq(s.curriculumResources.kind,"pdf"),
+        eq(s.curriculumResources.ownerOrganizationId,s.programs.organizationId),
+        verifiedPrivateDocumentPredicate({
+          subjectType:"curriculum_resource",subjectId:s.curriculumResources.id,
+          category:"curriculum_supplement",sensitivityTier:"standard",
+        }),
+      )).limit(1);
+    if(!entry || (entry.overlay.sectionId && entry.overlay.sectionId!==section.id) ||
+      (entry.overlay.siteId && entry.overlay.siteId!==section.siteId) ||
+      !entry.docKey.startsWith(`learning/supplements/${entry.resourceId}/`) ||
+      !/^learning\/supplements\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i.test(entry.docKey) ||
+      entry.docType!=="application/pdf")
+      throw new AuthorizationError("verified private curriculum supplement");
+    return {downloadUrl:signPrivateObjectUrl({
+      method:"GET",key:entry.docKey,
+      keyPattern:/^learning\/supplements\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i,
+      expiresSeconds:60,
+    })};
+  });
