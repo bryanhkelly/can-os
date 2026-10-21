@@ -1,6 +1,5 @@
 import { db } from "@/db/client";
 import {
-courseTemplates,courseTemplateVersions,
 complianceFrameworks,complianceFrameworkVersions,compliancePolicyApplicability,compliancePolicyRules,
 people,
 programs,roleAssignments,schoolYears,
@@ -116,9 +115,9 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
   if(!term||term.siteId!==program.siteId||term.organizationId!==program.organizationId||
    (term.programId&&term.programId!==program.id))
    throw new AuthorizationError("academic term does not belong to this launch");
-  await assertLaunchEligibleCourse(program, data.courseTemplateVersionId);
   return db.transaction(async tx=>{
    await lockAttendanceConfigurationAtSite(tx,program.siteId!);
+   await assertLaunchEligibleCourse(program, data.courseTemplateVersionId, tx);
    const [created]=await tx.insert(sections).values({
     programId:program.id,siteId:program.siteId,termId:data.termId,
     courseTemplateVersionId:data.courseTemplateVersionId,
