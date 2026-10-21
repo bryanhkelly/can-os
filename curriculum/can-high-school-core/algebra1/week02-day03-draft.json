@@ -1,0 +1,80 @@
+{
+  "courseCode": "CAN-ALG1",
+  "unitId": "algebra1-u01",
+  "week": 2,
+  "status": "draft",
+  "readiness": "teacher_review_required",
+  "scope": "Publisher-owned Algebra I Unit 1 course-draft lesson, not a separately adopted week or a change to an active class.",
+  "title": "Week 2 · Multi-Step Equations and Literal Formulas",
+  "plannedInstructionalDays": 5,
+  "authoredDays": 1,
+  "suggestedMinutesPerDay": 55,
+  "lessons": [
+    {
+      "id": "u01-w02-d03",
+      "title": "Week 2 · Day 3 · Variables on Both Sides and Clearing Denominators",
+      "body": "ALGEBRA I • UNIT 1 • WEEK 2 • DAY 3 OF 5 • 55 MINUTES\nEssential question: How can we transform equations with fractions and variables on both sides while keeping the same solution set?\nLearning targets: Multiply complete equations by nonzero common denominators, solve linear equations with variables on both sides, identify identities and contradictions, and check in the original equation. Standards: A-REI.1 and A-REI.3. Prerequisites: solving one-variable equations, fraction operations, and equivalence.\n\nLAUNCH (5 min)\nA student wants to solve (x+2)/3 = (2x−1)/4. One classmate multiplies the LEFT side by 12 and writes 4(x+2) = (2x−1)/4. Another multiplies BOTH sides of the original equation by 12 and writes 4(x+2) = 3(2x−1). Which equation must preserve the original solutions? Explain why, before solving. Predict whether the answer can be a fraction and describe how substitution into the original equation could settle a disagreement.\n\nEXPLICIT INSTRUCTION (12 min)\nWe can solve linear equations with variables on both sides by choosing equality-preserving operations. To clear constant denominators, multiply EVERY term on BOTH sides by the same nonzero common denominator. Parentheses preserve grouped numerators when the multiplication is distributed.\n\nWORKED MODEL 1: Solve (x+2)/3 = (2x−1)/4.\nStep 1: Multiply both sides by 12, the least common positive denominator: 4(x+2) = 3(2x−1).\nStep 2: Distribute: 4x+8 = 6x−3.\nStep 3: Subtract 4x and add 3: 11 = 2x.\nStep 4: Divide by 2: x = 11/2.\nCheck in the ORIGINAL equation: left = (11/2+2)/3 = (15/2)/3 = 5/2; right = (2·11/2−1)/4 = (11−1)/4 = 5/2. Both equal 2.5, so the solution is valid.\n\nWORKED MODEL 2: Solve x/2 + 1 = (x+6)/3.\nMultiply the ENTIRE equation by 6: 3x + 6 = 2(x+6). Expand: 3x+6 = 2x+12. Therefore x = 6. Check: 6/2+1 = 4 and (6+6)/3=4. Multiplying only the fractional terms would be an invalid transformation; the constant 1 also becomes 6.\n\nWORKED MODEL 3: Classify (3x−1)/2 = (x+5)/2 + x.\nMultiply by 2: 3x−1 = x+5+2x. Simplify: 3x−1 = 3x+5, leading to −1=5. This false statement means the ORIGINAL equation has no solution. By contrast, (x+2)/4 = x/4 + 1/2 becomes x+2=x+2 when multiplied by 4; that identity holds for every real x.\n\nEFFICIENT CHOICE: When denominators are constant, multiply the entire equation by their least common multiple first, then collect like terms. Alternatively use rational operations consistently. Neither strategy licenses canceling a variable that could equal zero: if a denominator contains a variable, investigate its domain separately. Today's examples use only fixed nonzero denominators.\n\nGUIDED PRACTICE (12 min)\nFor every equation: (1) circle all denominators, (2) multiply each side by one common denominator, (3) show parentheses around numerators, (4) solve, (5) check in the original equation.\nA. (x−1)/3 = (x+5)/6. Explain how the factor of 6 applies to BOTH sides.\nB. x/4 + 2 = (x+4)/2. Explain what happens to the constant 2 when multiplying by 4.\nC. (2y+1)/5 = (y+3)/2. Predict whether the solution is negative before substituting to verify.\nCompare B with a peer: a missing factor on the constant term often gives a plausible but incorrect answer. The check must use the equation exactly as written, not the transformed version.\n\nINDEPENDENT PRACTICE (16 min)\nRecord your clearing-denominator step and every equivalent equation. Check all numerical answers in the original problem.\n1. Solve (x+3)/2 = (3x−1)/4.\n2. Solve x/3 + 1 = (x+9)/6.\n3. Solve (2y+3)/4 = (y+9)/6.\n4. Solve (3a−2)/4 = (a+2)/2.\n5. CLASSIFY: Is (2x+4)/2 = x+2 true for exactly one x, no x, or every real x? Explain without dividing by x.\n6. CLASSIFY: Is (2x+4)/2 = x+3 true for exactly one x, no x, or every real x? Name the final statement that supports your conclusion.\n7. ERROR ANALYSIS: A student claims that multiplying only the left side of (x+1)/3 = (x+4)/6 by 6 gives the equivalent equation 2(x+1) = (x+4)/6. Diagnose the error, write a valid first transformation, then solve and verify.\n8. MODELING: A club offers two plans. Plan A charges $12 plus $0.75 per visit; Plan B charges $18 plus $0.25 per visit. Write an equation for equal total cost after v visits, use denominator clearing to solve, and check the cost of both plans. Explain why v should be a nonnegative whole number.\n\nComplete at least three checks and a written critique for problem 7. Numerical answers without shown transformations are not enough to establish mathematical reasoning.\n\nEXIT TICKET (10 min)\nIndependently solve (x+1)/2 = (x+4)/3. Show the exact multiplication used to clear denominators, solve, and substitute your answer into the ORIGINAL equation. Then explain in one sentence why multiplying only one side by 6 would be invalid. Submit for formative teacher review; lesson completion alone does not determine an assessment score.\n\nSELF-CHECK AND SUPPORT\nAsk yourself: Did I multiply every term on BOTH sides? Did I distribute through entire numerators? Did I combine variable terms with correct signs? Does my proposed value make the original left and right sides equal? Did I classify identities and contradictions without falsely dividing by zero? If you need support, draw two equal balances and write the same operation under each side; or work with a common denominator of 2 before increasing complexity. Fractions may be represented with a horizontal bar or clearly grouped parentheses. If your answer is a fraction, that is allowed; do not round before the substitution check.",
+      "resources": [],
+      "learningTargets": [
+        "I can clear constant denominators by applying the same nonzero operation to both sides of an equation.",
+        "I can solve linear equations containing the variable on both sides and check the original statement.",
+        "I can distinguish one solution, no solution, and infinitely many solutions using valid symbolic transformations."
+      ],
+      "standards": [
+        "A-REI.1",
+        "A-REI.3"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u01-w02-d03-a1",
+          "kind": "launch",
+          "title": "LAUNCH",
+          "instructions": "A student wants to solve (x+2)/3 = (2x−1)/4. One classmate multiplies the LEFT side by 12 and writes 4(x+2) = (2x−1)/4. Another multiplies BOTH sides of the original equation by 12 and writes 4(x+2) = 3(2x−1). Which equation must preserve the original solutions? Explain why, before solving. Predict whether the answer can be a fraction and describe how substitution into the original equation could settle a disagreement.",
+          "estimatedMinutes": 5,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w02-d03-a2",
+          "kind": "instruction",
+          "title": "EXPLICIT INSTRUCTION",
+          "instructions": "We can solve linear equations with variables on both sides by choosing equality-preserving operations. To clear constant denominators, multiply EVERY term on BOTH sides by the same nonzero common denominator. Parentheses preserve grouped numerators when the multiplication is distributed.\n\nWORKED MODEL 1: Solve (x+2)/3 = (2x−1)/4.\nStep 1: Multiply both sides by 12, the least common positive denominator: 4(x+2) = 3(2x−1).\nStep 2: Distribute: 4x+8 = 6x−3.\nStep 3: Subtract 4x and add 3: 11 = 2x.\nStep 4: Divide by 2: x = 11/2.\nCheck in the ORIGINAL equation: left = (11/2+2)/3 = (15/2)/3 = 5/2; right = (2·11/2−1)/4 = (11−1)/4 = 5/2. Both equal 2.5, so the solution is valid.\n\nWORKED MODEL 2: Solve x/2 + 1 = (x+6)/3.\nMultiply the ENTIRE equation by 6: 3x + 6 = 2(x+6). Expand: 3x+6 = 2x+12. Therefore x = 6. Check: 6/2+1 = 4 and (6+6)/3=4. Multiplying only the fractional terms would be an invalid transformation; the constant 1 also becomes 6.\n\nWORKED MODEL 3: Classify (3x−1)/2 = (x+5)/2 + x.\nMultiply by 2: 3x−1 = x+5+2x. Simplify: 3x−1 = 3x+5, leading to −1=5. This false statement means the ORIGINAL equation has no solution. By contrast, (x+2)/4 = x/4 + 1/2 becomes x+2=x+2 when multiplied by 4; that identity holds for every real x.\n\nEFFICIENT CHOICE: When denominators are constant, multiply the entire equation by their least common multiple first, then collect like terms. Alternatively use rational operations consistently. Neither strategy licenses canceling a variable that could equal zero: if a denominator contains a variable, investigate its domain separately. Today's examples use only fixed nonzero denominators.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w02-d03-a3",
+          "kind": "guided_practice",
+          "title": "GUIDED PRACTICE",
+          "instructions": "For every equation: (1) circle all denominators, (2) multiply each side by one common denominator, (3) show parentheses around numerators, (4) solve, (5) check in the original equation.\nA. (x−1)/3 = (x+5)/6. Explain how the factor of 6 applies to BOTH sides.\nB. x/4 + 2 = (x+4)/2. Explain what happens to the constant 2 when multiplying by 4.\nC. (2y+1)/5 = (y+3)/2. Predict whether the solution is negative before substituting to verify.\nCompare B with a peer: a missing factor on the constant term often gives a plausible but incorrect answer. The check must use the equation exactly as written, not the transformed version.",
+          "estimatedMinutes": 12,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w02-d03-a4",
+          "kind": "independent_practice",
+          "title": "INDEPENDENT PRACTICE",
+          "instructions": "Record your clearing-denominator step and every equivalent equation. Check all numerical answers in the original problem.\n1. Solve (x+3)/2 = (3x−1)/4.\n2. Solve x/3 + 1 = (x+9)/6.\n3. Solve (2y+3)/4 = (y+9)/6.\n4. Solve (3a−2)/4 = (a+2)/2.\n5. CLASSIFY: Is (2x+4)/2 = x+2 true for exactly one x, no x, or every real x? Explain without dividing by x.\n6. CLASSIFY: Is (2x+4)/2 = x+3 true for exactly one x, no x, or every real x? Name the final statement that supports your conclusion.\n7. ERROR ANALYSIS: A student claims that multiplying only the left side of (x+1)/3 = (x+4)/6 by 6 gives the equivalent equation 2(x+1) = (x+4)/6. Diagnose the error, write a valid first transformation, then solve and verify.\n8. MODELING: A club offers two plans. Plan A charges $12 plus $0.75 per visit; Plan B charges $18 plus $0.25 per visit. Write an equation for equal total cost after v visits, use denominator clearing to solve, and check the cost of both plans. Explain why v should be a nonnegative whole number.\n\nComplete at least three checks and a written critique for problem 7. Numerical answers without shown transformations are not enough to establish mathematical reasoning.",
+          "estimatedMinutes": 16,
+          "evidence": "practice"
+        },
+        {
+          "id": "u01-w02-d03-a5",
+          "kind": "exit_ticket",
+          "title": "EXIT TICKET",
+          "instructions": "Independently solve (x+1)/2 = (x+4)/3. Show the exact multiplication used to clear denominators, solve, and substitute your answer into the ORIGINAL equation. Then explain in one sentence why multiplying only one side by 6 would be invalid. Submit for formative teacher review; lesson completion alone does not determine an assessment score.",
+          "estimatedMinutes": 10,
+          "evidence": "teacher_review"
+        },
+        {
+          "id": "u01-w02-d03-a6",
+          "kind": "self_check",
+          "title": "SELF-CHECK AND SUPPORT",
+          "instructions": "Ask yourself: Did I multiply every term on BOTH sides? Did I distribute through entire numerators? Did I combine variable terms with correct signs? Does my proposed value make the original left and right sides equal? Did I classify identities and contradictions without falsely dividing by zero? If you need support, draw two equal balances and write the same operation under each side; or work with a common denominator of 2 before increasing complexity. Fractions may be represented with a horizontal bar or clearly grouped parentheses. If your answer is a fraction, that is allowed; do not round before the substitution check.",
+          "evidence": "practice"
+        }
+      ]
+    }
+  ],
+  "assessments": []
+}
