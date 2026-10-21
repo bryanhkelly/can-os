@@ -1,21 +1,27 @@
 import { useRef, useState } from "react";
 import type { ClassContent } from "@/domain/class-content";
+import type { ClassTeacherGuides } from "@/domain/class-teacher-guides";
+import { PublisherTeacherGuideEditor } from "./PublisherTeacherGuideEditor";
 import { saveAuthoredCurriculum, publishAuthoredCurriculum } from "@/modules/learning/curriculum-authoring.functions";
 
-export function CurriculumEditor({programId,release,onSaved}:{
- programId:string;release:{id:string;revision:string;content:ClassContent|null};onSaved:()=>Promise<void>;
+export function CurriculumEditor({programId,courseCode,release,onSaved}:{
+ programId:string;courseCode:string;
+ release:{id:string;revision:string;content:ClassContent|null;teacherGuides?:ClassTeacherGuides|null};onSaved:()=>Promise<void>;
 }){
  const [content,setContent]=useState<ClassContent>(release.content??{version:1,syllabus:"",modules:[],resources:[]});
  const [revision,setRevision]=useState(release.revision);
+ const [teacherGuides,setTeacherGuides]=useState<ClassTeacherGuides|null>(release.teacherGuides??null);
  const [reason,setReason]=useState(""),[confirmed,setConfirmed]=useState(false);
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const saved=useRef(JSON.stringify(release.content??{version:1,syllabus:"",modules:[],resources:[]}));
- const dirty=JSON.stringify(content)!==saved.current;
+ const guidesSaved=useRef(JSON.stringify(release.teacherGuides??null));
+ const dirty=JSON.stringify(content)!==saved.current||JSON.stringify(teacherGuides)!==guidesSaved.current;
  async function save(){
   setBusy(true);setError("");setNotice("");
   try{
-   const result=await saveAuthoredCurriculum({data:{programId,versionId:release.id,expectedRevision:revision,content}});
-   saved.current=JSON.stringify(content);setRevision(result.revision);setNotice("Draft saved. Not visible in classes until published.");
+   const result=await saveAuthoredCurriculum({data:{programId,versionId:release.id,expectedRevision:revision,content,teacherGuides}});
+   saved.current=JSON.stringify(content);guidesSaved.current=JSON.stringify(teacherGuides);
+   setRevision(result.revision);setNotice("Publisher lesson content and protected teacher guides saved as draft.");
   }catch(cause){setError(cause instanceof Error?cause.message:"Unable to save curriculum");}
   finally{setBusy(false);}
  }
@@ -149,6 +155,8 @@ export function CurriculumEditor({programId,release,onSaved}:{
    <div><button type="button" onClick={()=>void save()} className="rounded border px-4 py-2 text-sm">Save draft</button>
     {dirty&&<span className="ml-3 text-sm">Unsaved changes</span>}</div>
   </fieldset>
+  <fieldset disabled={busy}><PublisherTeacherGuideEditor courseCode={courseCode} content={content}
+   guides={teacherGuides} onChange={setTeacherGuides}/></fieldset>
   <form className="space-y-3 rounded border p-4" onSubmit={async event=>{
    event.preventDefault();setError("");setNotice("");
    if(dirty||!confirmed||reason.trim().length<10){setError("Save your draft, provide a reason and confirm publication first.");return;}
