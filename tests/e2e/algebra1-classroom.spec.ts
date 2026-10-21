@@ -153,8 +153,8 @@ test("Algebra I: student lessons and submissions -> teacher guide and rubric gra
     await expect(student.page.getByRole("link",{name:new RegExp(lesson.title.replaceAll(/[.*+?^${}()|[\]\\]/g,"\\$&"))})).toBeVisible();
    }
    const response=await student.page.goto(`/classes?section=${f.sectionId}&tab=lessons&lesson=u01-d01`);
-   await expect(student.page.getByText("Guided Practice",{exact:true})).toBeVisible();
-   await expect(student.page.getByText("Independent Practice",{exact:true})).toBeVisible();
+   await expect(student.page.getByRole("heading",{name:/Guided Practice/})).toBeVisible();
+   await expect(student.page.getByRole("heading",{name:/Independent Practice/})).toBeVisible();
    await expect(student.page.getByText("Mark lesson complete")).toBeVisible();
    expect((await response!.text())).not.toContain("Assessment answer guides");
    expect((await response!.text())).not.toContain("A learner may combine unlike terms");
@@ -181,11 +181,31 @@ test("Algebra I: student lessons and submissions -> teacher guide and rubric gra
   });
  }finally{await student.context.close();}
 
+ const guardian=await signedIn(browser,f.guardianSecret);
+ try {
+  await test.step("authorized guardian can view the child class but not teacher answers",async()=>{
+   const response=await guardian.page.goto(`/classes?section=${f.sectionId}&student=${f.studentPersonId}&tab=teacher-guide`);
+   await expect(guardian.page.getByText("Teacher-only materials are unavailable")).toBeVisible();
+   expect((await response!.text())).not.toContain("Assessment answer guides");
+   await expect(guardian.page.getByRole("link",{name:"Teacher guide"})).toHaveCount(0);
+  });
+ }finally{await guardian.context.close();}
+
+ const unrelated=await signedIn(browser,f.specialistSecret);
+ try {
+  await test.step("unrelated specialist cannot load the Algebra I class or answer guide",async()=>{
+   const response=await unrelated.page.goto(`/classes?section=${f.sectionId}&tab=teacher-guide`);
+   await expect(unrelated.page.getByText("Sign in with an authorized student, parent or teacher account to open classes.")).toBeVisible();
+   expect((await response!.text())).not.toContain("Assessment answer guides");
+  });
+ }finally{await unrelated.context.close();}
+
  const teacher=await signedIn(browser,f.teacherSecret);
  try{
   await test.step("only the assigned teacher sees worked answers and interventions",async()=>{
    await teacher.page.goto(`/classes?section=${f.sectionId}&tab=teacher-guide`);
    await expect(teacher.page.getByText("Assessment answer guides")).toBeVisible();
+   await teacher.page.locator("details").first().locator("summary").click();
    await expect(teacher.page.getByText("Common misconceptions")).toBeVisible();
    await expect(teacher.page.getByText("Interventions")).toBeVisible();
   });
