@@ -155,6 +155,10 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
      </nav>
      <p className="text-xs text-muted-foreground">{chosen.course}</p>
      <h2 className="mt-2 font-serif text-2xl">{chosen.title}</h2>
+     <p className="mt-2 text-xs text-muted-foreground">Teacher activity: {chosen.metadata.assignmentKind}</p>
+     {chosen.metadata.curriculumLessonId&&<Link to="/classes"
+       search={{section:chosen.sectionId,tab:"lessons",lesson:chosen.metadata.curriculumLessonId}}
+       className="mt-2 inline-block text-sm underline">Review publisher lesson: {chosen.metadata.curriculumLessonTitle??chosen.metadata.curriculumLessonId}</Link>}
      <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{chosen.instructions??"Follow your teacher's instructions."}</p>
      <p className="mt-3 text-xs text-muted-foreground">Due {formatDate(chosen.dueAt)} · {chosen.assessmentStatus}</p>
      <div className="mt-3"><StatusBadge tone={chosen.timeliness==="missing"?"attention":chosen.status==="graded"?"success":"neutral"}>{chosen.status??"Assigned"}{chosen.timeliness==="missing"?" · Missing":chosen.timeliness==="late"?" · Late":""}</StatusBadge></div>
