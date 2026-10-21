@@ -44,6 +44,7 @@ function TeacherGradebookPage() {
  const [rubricInputs, setRubricInputs] = useState<Record<string, string>>({});
  const gridRef = useRef<HTMLDivElement | null>(null);
  const [title, setTitle] = useState("");
+ const [instructions, setInstructions] = useState("");
  const [points, setPoints] = useState("");
  const [due, setDue] = useState("");
  const [assignmentKind,setAssignmentKind]=useState<"homework"|"classwork"|"quiz"|"test"|"project"|"discussion">("classwork");
@@ -197,6 +198,7 @@ function TeacherGradebookPage() {
    const result = await createAssessment({ data: {
     sectionId: selected,
     title,
+    instructions,
     pointsPossible: pointsValue,
     assignmentKind,
     ...(curriculumLessonId?{curriculumLessonId}:{}),
@@ -204,6 +206,7 @@ function TeacherGradebookPage() {
    } });
    setNotice(result.status === "published" ? "Assessment published and assigned to enrolled students." : "Assessment saved as a draft.");
    setTitle("");
+   setInstructions("");
    setPoints("");
    setDue("");
    setCurriculumLessonId("");
@@ -348,6 +351,10 @@ function TeacherGradebookPage() {
         </select>
        </label>
      </div>
+     <label className="mt-4 block text-sm font-semibold">Student instructions
+      <textarea aria-label="Student assignment instructions" className="mt-2 w-full rounded-lg border bg-background p-3" rows={5} maxLength={20000}
+       value={instructions} onChange={event=>setInstructions(event.target.value)} placeholder="Directions, deliverables, submission requirements and allowed resources." />
+     </label>
      <p className="mt-2 text-xs text-muted-foreground">The assignment belongs to this teacher's class. Linking to a publisher lesson preserves the original curriculum.</p>
      <p className="mt-3 text-xs text-muted-foreground">Assessments with a due date are published and assigned to enrolled students; without one they are saved as drafts.</p>
      <button disabled={busy} onClick={submitAssessment} className="mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Create assessment</button>
