@@ -3,7 +3,7 @@ import { EventTypes } from "@/domain/event-types";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
-import { readClassContent } from "@/domain/class-content";
+import { assertPublisherLessonReference,publisherLessonChoices } from "@/domain/publisher-course-references";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
@@ -204,8 +204,7 @@ export const getGradebook = createServerFn({ method: "GET" })
   return {
    connected: true as const,
    section:{id:section.id,code:section.code,title:section.title},
-   curriculumLessons:section.status==="published"
-     ?readClassContent(section.curriculum)?.modules.flatMap(m=>m.lessons.map(l=>({id:l.id,title:l.title})))??[]:[],
+   curriculumLessons:publisherLessonChoices(section.curriculum,section.status),
    students: studentRows.map(row => ({
     studentProfileId: row.studentProfileId,
     personId: row.personId,
@@ -323,10 +322,7 @@ export const createAssessment = createServerFn({ method: "POST" })
      inArray(s.sections.programId,context.scope.programIds??[])))
     .limit(1);
    if(!teachingSection)throw new AuthorizationError("active teaching assignment in authorized school/program");
-   if(data.curriculumLessonId && (teachingSection.status!=="published" ||
-     !readClassContent(teachingSection.curriculum)?.modules.some(module=>
-       module.lessons.some(lesson=>lesson.id===data.curriculumLessonId))))
-     throw new Error("Select a lesson in the currently published publisher curriculum.");
+   assertPublisherLessonReference(teachingSection.curriculum,teachingSection.status,data.curriculumLessonId);
    const status = dueAt ? "published" as const : "draft" as const;
    const [assessment] = await tx.insert(s.assessments).values({
     sectionId: data.sectionId,
