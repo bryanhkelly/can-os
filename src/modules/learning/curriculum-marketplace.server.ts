@@ -27,7 +27,7 @@ export async function readMarketplace(actor: Actor, programId: string) {
   id: curriculumPacks.id, slug: curriculumPacks.slug, name: curriculumPacks.name,
   description: curriculumPacks.description, publisherOrganizationId: curriculumPacks.publisherOrganizationId,
   licenseCode: curriculumPacks.licenseCode, versionId: curriculumPackVersions.id,
-  version: curriculumPackVersions.version, metadata: curriculumPacks.metadata,
+  version: curriculumPackVersions.version,
  }).from(curriculumPacks).innerJoin(curriculumPackVersions,eq(curriculumPackVersions.packId,curriculumPacks.id))
   .where(and(eq(curriculumPackVersions.status,"published"),
    or(eq(curriculumPacks.visibility,"public"),
