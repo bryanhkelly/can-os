@@ -116,7 +116,7 @@ export async function reviewClassUnitDraft(actor:Actor,input:{sectionId:string;u
    throw new Error("The selected unit is not an editable draft for this class.");
   const module=classModuleSchema.parse(unit.module);
   const guide=unit.teacherGuide;
-  const parsed=unitDraftSchema.parse({unitKey:unit.unitKey,module,teacherGuide:guide});
+  const parsed=unitDraftSchema.parse({unitKey:unit.unitKey,module,teacherGuide:guide??undefined});
   if(!parsed.teacherGuide)throw new Error("Add the complete teacher guide before review.");
   const reviewed={...parsed.teacherGuide,reviewStatus:"teacher_reviewed" as const};
   assertUnitPublishable({...parsed,teacherGuide:reviewed});
@@ -142,7 +142,7 @@ export async function publishClassUnit(actor:Actor,input:{programId:string;unitV
   if(unit.status==="published")return {unitVersionId:unit.id,published:false};
   if(unit.status!=="teacher_reviewed"||!unit.reviewedByPersonId||!unit.reviewedAt)
    throw new Error("An assigned teacher must review the complete unit before school publication.");
-  const parsed=unitDraftSchema.parse({unitKey:unit.unitKey,module:unit.module,teacherGuide:unit.teacherGuide});
+  const parsed=unitDraftSchema.parse({unitKey:unit.unitKey,module:unit.module,teacherGuide:unit.teacherGuide??undefined});
   assertUnitPublishable(parsed);
   const approved={...parsed.teacherGuide!,reviewStatus:"school_approved" as const};
   await tx.update(curriculumUnitVersions).set({
