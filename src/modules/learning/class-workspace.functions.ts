@@ -5,6 +5,8 @@ import { buildClassAssessmentEvidence, summarizeClassAssessmentEvidence } from "
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
 import { readClassTeacherGuides } from "@/domain/class-teacher-guides";
+import { composeClassUnits,composeClassTeacherGuides } from "@/domain/class-unit-releases";
+import { readAdoptedClassUnits } from "./class-units.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
@@ -28,11 +30,15 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     const actor = await classActor();
     const { section, studentProfileId, studentPersonId } = await authorizeClass(actor, data.sectionId, data.studentPersonId);
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-    const content = section.contentStatus === "published" ? readClassContent(section.curriculum) : null;
-    // Answer keys are intentionally excluded from all student/guardian server responses.
-    // authorizeClass has already verified the current section-teacher assignment.
-    const teacherGuides=actor.role==="teacher" && section.contentStatus==="published"
-      ? readClassTeacherGuides(section.curriculum) : null;
+    const baseContent=section.contentStatus==="published"?readClassContent(section.curriculum):null;
+    // Only explicitly adopted, published and available unit releases are visible.
+    // The section's base course/marketplace version is never reassigned.
+    const pinnedUnits=baseContent?await readAdoptedClassUnits(section,db):[];
+    const {content,units:availableUnits}=composeClassUnits(baseContent,pinnedUnits);
+    // Never deserialize or return teacher keys for students and guardians.
+    const teacherGuides=actor.role==="teacher"&&section.contentStatus==="published"
+      ?composeClassTeacherGuides(section.courseCode,readClassTeacherGuides(section.curriculum),availableUnits)
+      :null;
     if(teacherGuides && (teacherGuides.courseCode!==section.courseCode ||
        teacherGuides.units.some(unit=>!content?.modules.some(module=>module.id===unit.unitId &&
          unit.lessons.every(lesson=>module.lessons.some(item=>item.id===lesson.lessonId))))))
@@ -156,8 +162,11 @@ export const setLessonCompletion = createServerFn({ method: "POST" })
       if (!studentProfileId || section.contentStatus !== "published" || section.versionId !== data.versionId) {
         throw new Error("This published course version is no longer available. Reload your class.");
       }
-      const content = readClassContent(section.curriculum);
-      if (!content?.modules.some(module => module.lessons.some(lesson => lesson.id === data.lessonId))) throw new Error("Lesson unavailable in this course version.");
+      const base=readClassContent(section.curriculum);
+      const units=await readAdoptedClassUnits(section,tx);
+      const {content}=composeClassUnits(base,units);
+      if (!content?.modules.some(module => module.lessons.some(lesson => lesson.id === data.lessonId)))
+        throw new Error("Lesson unavailable in this published section release.");
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"lesson:"+section.id+":"+studentProfileId+":"+data.lessonId}))`);
       const [existing] = await tx.select().from(s.lessonProgress).where(and(
         eq(s.lessonProgress.sectionId, section.id), eq(s.lessonProgress.studentProfileId, studentProfileId),

@@ -33,6 +33,7 @@ const guideUnit=z.object({
   ["assessment",unit.assessments.map(a=>a.assessmentKey)],
  ] as const) if(new Set(ids).size!==ids.length)ctx.addIssue({code:"custom",message:"Duplicate "+kind+" guide"});
 });
+export const classTeacherGuideUnitSchema=guideUnit;
 export const classTeacherGuidesSchema=z.object({
  version:z.literal(1),
  courseCode:id,

@@ -29,13 +29,14 @@ const lesson = z.object({
   estimatedMinutes:z.number().int().min(1).max(180).optional(),
   activities:z.array(activity).max(20).optional(),
 });
+export const classModuleSchema = z.object({
+  id: key, title: z.string().min(1).max(200), lessons: z.array(lesson).max(200),
+});
 export const classContentSchema = z.object({
   version: z.literal(1),
   syllabus: z.string().max(100_000).default(""),
   blueprint: yearlongCourseBlueprintSchema.optional(),
-  modules: z.array(z.object({
-    id: key, title: z.string().min(1).max(200), lessons: z.array(lesson).max(200),
-  })).max(100).default([]),
+  modules: z.array(classModuleSchema).max(100).default([]),
   resources: z.array(resource).max(500).default([]),
 }).superRefine((value, context) => {
   for (const [label, ids] of [
