@@ -50,3 +50,12 @@ Continue Week 2 on equations, formulas, quantitative relationships and review in
 - **Review gates:** curriculum-authoring schema validates nonempty activities and ID uniqueness; `yearlongCourseBlueprintSchema` rejects holes, duplicate weeks and premature credit-ready status. Tests check 36-week totals, every lesson's structured steps and correct rubric point totals.
 
 **Design decision for future bites:** Do not create an immutable course-and-marketplace release for every new week. Introduce separately versioned, teacher-reviewed instructional units with explicit section adoption, maintaining stable section course IDs, then verify grade/progress continuity in an integration test before enabling that workflow for a live school.
+
+## Bite 3: Teacher-restricted classroom guides
+
+- `curriculum/can-high-school-core/algebra1/unit01-teacher-guide.json` contains lesson-by-lesson worked solutions, anticipated misconceptions, interventions, extensions and scoring evidence for the Week 1 guided problem set and mastery checkpoint.
+- `curriculum.teacherGuides` is a separate **teacher-only** property attached to a published course version, never a field under `curriculum.learning`. The class server returns it only for a currently assigned teacher. The `/classes` **Teacher guide** tab is absent from student and guardian navigation and cannot render answers for those roles.
+- The server cross-checks the guide's course code, unit IDs and lesson IDs against the currently pinned published class release before returning the guide. Integration tests use real class, enrollment, guardian and teacher assignment tables inside a rollback transaction.
+- The guide is **draft**, not educator- or school-approved. It does not confer credit, a mastery determination or standardized assessment certification.
+- The teacher guide is added to the **guarded synthetic Algebra I v2 upgrade SQL**. Because that database update has not yet been accepted, Week 1 content and private teacher keys will not appear in the live ValorSchool demonstration class merely by merging this PR.
+- Future full-year unit releases should hold teacher guides independently of student-facing units and require authorized review. The current v2 fixture is a compatibility bridge, not the final unit-versioning design.
