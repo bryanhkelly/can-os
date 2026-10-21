@@ -33,7 +33,7 @@ export const startCurriculumDraft = createServerFn({ method: "POST" })
   .handler(async ({ data }) => createCurriculumDraft(await actor(), data));
 export const saveAuthoredCurriculum = createServerFn({ method: "POST" })
   .validator((value: unknown) => version.extend({ content: curriculumDraftContent,
-    teacherGuides: classTeacherGuidesSchema.optional() }).strict().parse(value))
+    teacherGuides: classTeacherGuidesSchema.nullable().optional() }).strict().parse(value))
   .handler(async ({ data }) => saveCurriculumDraft(await actor(), data));
 export const publishAuthoredCurriculum = createServerFn({ method: "POST" })
   .validator((value: unknown) => version.extend({ reason: z.string().trim().min(10).max(2000),
