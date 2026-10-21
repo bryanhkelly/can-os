@@ -5,8 +5,6 @@ import { buildClassAssessmentEvidence, summarizeClassAssessmentEvidence } from "
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
 import { readClassTeacherGuides } from "@/domain/class-teacher-guides";
-import { composeClassUnits,composeClassTeacherGuides } from "@/domain/class-unit-releases";
-import { readAdoptedClassUnits } from "./class-units.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
@@ -30,15 +28,12 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     const actor = await classActor();
     const { section, studentProfileId, studentPersonId } = await authorizeClass(actor, data.sectionId, data.studentPersonId);
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-    const baseContent=section.contentStatus==="published"?readClassContent(section.curriculum):null;
-    // Only explicitly adopted, published and available unit releases are visible.
-    // The section's base course/marketplace version is never reassigned.
-    const pinnedUnits=baseContent?await readAdoptedClassUnits(section,db):[];
-    const {content,units:availableUnits}=composeClassUnits(baseContent,pinnedUnits);
-    // Never deserialize or return teacher keys for students and guardians.
+    // The publisher's accepted course version defines the full learning sequence.
+    // A new week is ordinary publisher content, not a per-class adoption.
+    const content=section.contentStatus==="published"?readClassContent(section.curriculum):null;
+    // School and teacher additions are separate supplements and assignments.
     const teacherGuides=actor.role==="teacher"&&section.contentStatus==="published"
-      ?composeClassTeacherGuides(section.courseCode,readClassTeacherGuides(section.curriculum),availableUnits)
-      :null;
+      ?readClassTeacherGuides(section.curriculum):null;
     if(teacherGuides && (teacherGuides.courseCode!==section.courseCode ||
        teacherGuides.units.some(unit=>!content?.modules.some(module=>module.id===unit.unitId &&
          unit.lessons.every(lesson=>module.lessons.some(item=>item.id===lesson.lessonId))))))
@@ -162,9 +157,7 @@ export const setLessonCompletion = createServerFn({ method: "POST" })
       if (!studentProfileId || section.contentStatus !== "published" || section.versionId !== data.versionId) {
         throw new Error("This published course version is no longer available. Reload your class.");
       }
-      const base=readClassContent(section.curriculum);
-      const units=await readAdoptedClassUnits(section,tx);
-      const {content}=composeClassUnits(base,units);
+      const content=readClassContent(section.curriculum);
       if (!content?.modules.some(module => module.lessons.some(lesson => lesson.id === data.lessonId)))
         throw new Error("Lesson unavailable in this published section release.");
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"lesson:"+section.id+":"+studentProfileId+":"+data.lessonId}))`);
