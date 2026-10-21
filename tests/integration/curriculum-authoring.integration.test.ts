@@ -153,6 +153,50 @@ integration("governed curriculum authoring through classroom delivery",()=>{
      await expect(flow.getCurriculumStudio({data:{programId:program.id}})).rejects.toThrow();
     }
     state.actor=staff;
+    // Compose a pack through the same scoped publisher server functions as the UI.
+    const packApi=await import("@/modules/learning/publisher-pack-authoring.functions");
+    const packRequest={programId:program.id,slug:`sciences-${suffix}`,name:"Published Science Pack",
+     description:"Science course release available for institutional adoption.",
+     visibility:"public" as const,licenseCode:"CC-BY-4.0" as const,requestId:crypto.randomUUID()};
+    const authoredPack=await packApi.createAuthoredPublisherPack({data:packRequest});
+    expect((await packApi.createAuthoredPublisherPack({data:packRequest})).packId).toBe(authoredPack.packId);
+    const studioBefore=await packApi.getPublisherPackStudio({data:{programId:program.id}});
+    const draftPack=first(first(studioBefore.packs.filter(p=>p.id===authoredPack.packId)).releases);
+    expect(draftPack.status).toBe("draft");
+    await expect(packApi.publishAuthoredPublisherPack({data:{
+     programId:program.id,versionId:authoredPack.versionId,
+     expectedRevision:draftPack.revision,reason:"Publisher reviewed course selection.",confirmed:true,
+    }})).rejects.toThrow("Select between");
+    const savedPack=await packApi.saveAuthoredPublisherPack({data:{
+     programId:program.id,versionId:authoredPack.versionId,
+     expectedRevision:draftPack.revision,courseVersionIds:[versionId,next.versionId],
+    }}).catch(async error=>{
+     // Both versions refer to the SAME course and may never share a pack.
+     if(!(error instanceof Error)||!error.message.includes("one published release"))throw error;
+     return packApi.saveAuthoredPublisherPack({data:{
+      programId:program.id,versionId:authoredPack.versionId,
+      expectedRevision:draftPack.revision,courseVersionIds:[next.versionId],
+     }});
+    });
+    await expect(packApi.saveAuthoredPublisherPack({data:{
+     programId:program.id,versionId:authoredPack.versionId,
+     expectedRevision:draftPack.revision,courseVersionIds:[versionId],
+    }})).rejects.toThrow("draft changed");
+    await packApi.publishAuthoredPublisherPack({data:{
+     programId:program.id,versionId:authoredPack.versionId,
+     expectedRevision:savedPack.revision,reason:"Publisher approved this immutable pack release.",
+     confirmed:true,
+    }});
+    await expect(packApi.saveAuthoredPublisherPack({data:{
+     programId:program.id,versionId:authoredPack.versionId,
+     expectedRevision:savedPack.revision,courseVersionIds:[versionId],
+    }})).rejects.toThrow("immutable");
+    const nextPack=await packApi.startPublisherPackDraft({data:{
+     programId:program.id,packId:authoredPack.packId,requestId:crypto.randomUUID(),
+    }});
+    const secondPackDraft=first(first((await packApi.getPublisherPackStudio({data:{programId:program.id}})
+     ).packs.filter(p=>p.id===authoredPack.packId)).releases.filter(r=>r.id===nextPack.versionId));
+    expect(secondPackDraft.courseVersionIds).toEqual([next.versionId]);
     const foreign=first(await tx.insert(s.organizations).values({type:"christian_school",name:"Foreign owner",slug:`foreign-${suffix}`}).returning());
     const foreignCourse=first(await tx.insert(s.courseTemplates).values({owningOrganizationId:foreign.id,code:suffix,title:"Foreign curriculum",subject:"Science"}).returning());
     await expect(flow.startCurriculumDraft({data:{...request,courseId:foreignCourse.id,requestId:crypto.randomUUID()}})).rejects.toThrow("owning organization");
