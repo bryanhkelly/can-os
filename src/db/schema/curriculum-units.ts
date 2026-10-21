@@ -4,8 +4,9 @@ import { organizations } from "./organizations";
 import { courseTemplateVersions, sections } from "./academics";
 import { people } from "./identity";
 
-/** An instructional unit is versioned independently of the immutable base course
- * and of any marketplace pack version. A published release must not be edited. */
+/** LEGACY COMPATIBILITY ONLY (PR #140). No active API publishes per-class units.
+ * Publisher-owned weeks belong inside a versioned course release. Preserve this
+ * migrated table rather than dropping historical records or rewriting history. */
 export const curriculumUnitVersions = pgTable("curriculum_unit_versions", {
   id: id(),
   owningOrganizationId: uuid("owning_organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
@@ -27,8 +28,9 @@ export const curriculumUnitVersions = pgTable("curriculum_unit_versions", {
   index("curriculum_unit_status_idx").on(t.baseCourseVersionId, t.status),
 ]);
 
-/** A teacher-reviewed, school-approved release is *pinned* to one actual section.
- * Each unitKey has one active pin; do not silently upgrade it on republication. */
+/** LEGACY COMPATIBILITY ONLY. Section delivery no longer reads this table.
+ * Organization adoption selects a publisher course; teachers deliver it and
+ * attach separate classroom supplements and assignments. */
 export const sectionUnitAdoptions = pgTable("section_unit_adoptions", {
   id: id(),
   sectionId: uuid("section_id").notNull().references(() => sections.id, { onDelete: "restrict" }),
