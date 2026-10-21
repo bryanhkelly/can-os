@@ -1,0 +1,70 @@
+name: Curriculum Browser Acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: curriculum-browser-acceptance
+  cancel-in-progress: false
+
+jobs:
+  algebra1:
+    name: Isolated synthetic Algebra I student and teacher E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: integration-test
+    env:
+      APP_ENV: test
+      NODE_ENV: test
+      CAN_TEST_DB_WRITES_ENABLED: "true"
+      CAN_DEMO_WRITES_ENABLED: "true"
+      CAN_CURRICULUM_TEST_DATABASE_URL: ${{ secrets.CAN_CURRICULUM_TEST_DATABASE_URL }}
+      TEST_DATABASE_URL: ${{ secrets.CAN_CURRICULUM_TEST_DATABASE_URL }}
+      DATABASE_URL: ${{ secrets.CAN_CURRICULUM_TEST_DATABASE_URL }}
+      CAN_APPLICATION_DB_HOST: ${{ vars.CAN_APPLICATION_DB_HOST }}
+      PLAYWRIGHT_BASE_URL: http://localhost:3188
+      CAN_ACCESS_TOKEN_PEPPER: ${{ secrets.CAN_CURRICULUM_TEST_TOKEN_PEPPER }}
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify isolation and secrets before any SQL
+        shell: bash
+        run: |
+          if [ -z "$CAN_ACCESS_TOKEN_PEPPER" ] || [ "${#CAN_ACCESS_TOKEN_PEPPER}" -lt 32 ]; then
+            echo "::error::CAN_CURRICULUM_TEST_TOKEN_PEPPER must be a secret of at least 32 characters."
+            exit 1
+          fi
+          node scripts/preflight-curriculum-e2e.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Migrate isolated branch
+        run: npm run db:migrate
+      - name: Test real-session classroom workflow
+        run: npm run test:e2e:curriculum
+      - name: Publish acceptance summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## Algebra I browser acceptance" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
+          echo "- This runs with disposable synthetic sessions on a separate test branch; it is not a production login test." >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload failure traces
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: algebra1-browser-failure
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
