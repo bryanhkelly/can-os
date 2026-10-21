@@ -51,6 +51,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const [body, setBody] = useState("");
   const announcementId = useRef<string | null>(null);
   const search = { section: data.section.id, student: data.role === "guardian" ? data.studentPersonId ?? undefined : undefined };
+  const supplements = data.supplements ?? [];
   const lessons = data.content?.modules.flatMap(module => module.lessons) ?? [];
   const lesson = lessons.find(item => item.id === lessonId);
   const completed = new Set(data.progress.filter(item => item.completedAt).map(item => item.lessonId));
@@ -104,9 +105,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {lesson ? <WorkspacePanel title={lesson.title} actions={<Link to="/classes" search={{ ...search, tab: "lessons" }} className="text-sm underline">All lessons</Link>}>
         <div className="whitespace-pre-wrap text-sm leading-8">{lesson.body || "No lesson text provided."}</div>
         {lesson.resources.length > 0 && <div className="mt-5">{resources(lesson.resources)}</div>}
-        {data.supplements.some(item=>item.lessonId===lesson.id) && <div className="mt-5 space-y-2">
+        {supplements.some(item=>item.lessonId===lesson.id) && <div className="mt-5 space-y-2">
           <h3 className="font-semibold">School and classroom supplements</h3>
-          <ul className="space-y-2">{data.supplements.filter(item=>item.lessonId===lesson.id).map(item=>
+          <ul className="space-y-2">{supplements.filter(item=>item.lessonId===lesson.id).map(item=>
             <li key={item.id} className="rounded border p-3 text-sm">{item.url?
               <a href={item.url} rel="noopener noreferrer" target="_blank" className="underline">{item.title} ({item.kind})</a>
               :<span>{item.title} (school document)</span>}</li>)}</ul>
@@ -125,13 +126,13 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     </div>}
     {tab === "files" && <WorkspacePanel title="Class files and resources" description="Links and verified private documents from the published course version.">
       {data.content && resources(classResources(data.content))}
-      {data.supplements.length>0 && <section className="mt-5 space-y-2"><h3 className="font-semibold">School supplements</h3>
-        <ul className="space-y-2">{data.supplements.map(item=><li key={item.id} className="rounded border p-3 text-sm">
+      {supplements.length>0 && <section className="mt-5 space-y-2"><h3 className="font-semibold">School supplements</h3>
+        <ul className="space-y-2">{supplements.map(item=><li key={item.id} className="rounded border p-3 text-sm">
           {item.url?<a href={item.url} target="_blank" rel="noopener noreferrer" className="underline">{item.title} ({item.kind})</a>
            :<span>{item.title} (verified school document)</span>}
         </li>)}</ul>
       </section>}
-      {(!data.content || !classResources(data.content).length) && !data.supplements.length && <p className="text-sm text-muted-foreground">No resources have been published.</p>}
+      {(!data.content || !classResources(data.content).length) && !supplements.length && <p className="text-sm text-muted-foreground">No resources have been published.</p>}
     </WorkspacePanel>}
     {tab === "syllabus" && <WorkspacePanel title="Syllabus"><p className="whitespace-pre-wrap text-sm leading-8">{data.content?.syllabus || "No syllabus has been published."}</p></WorkspacePanel>}
     {tab === "people" && (data.role === "teacher" ? <WorkspacePanel title="Class roster" description="Only current section enrollments appear. Completion is student-reported, not mastery.">
