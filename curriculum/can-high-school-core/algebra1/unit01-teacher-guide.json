@@ -104,7 +104,7 @@
             },
             {
               "prompt": "Exit ticket: solve 3(x+4)=x-2.",
-              "answer": "3x+12=x-2; 2x=-14; x=-7. Check 3(5)=-7-2? This reveals a correction is needed: for x=-7, 3(-3)=-9 and -7-2=-9."
+              "answer": "Distribute: 3x+12=x-2. Subtract x, then subtract 12: 2x=-14, so x=-7. Check original: 3(-7+4)=3(-3)=-9 and -7-2=-9."
             }
           ],
           "misconceptions": [
