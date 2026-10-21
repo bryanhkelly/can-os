@@ -126,7 +126,7 @@ export async function createCurriculumDraft(actor: Actor, input: {
 
 export async function saveCurriculumDraft(actor: Actor, input: {
   programId: string; versionId: string; expectedRevision: string; content: ClassContent;
-  teacherGuides?: ClassTeacherGuides;
+  teacherGuides?: ClassTeacherGuides | null;
 }) {
   const content = curriculumDraftContent.parse(input.content);
   return db.transaction(async tx => {
@@ -136,12 +136,12 @@ export async function saveCurriculumDraft(actor: Actor, input: {
     const course = await ownedCourse(tx, lookup.courseTemplateId, program.organizationId);
     const [version] = await tx.select().from(courseTemplateVersions).where(eq(courseTemplateVersions.id, input.versionId)).for("update").limit(1);
     if (!version || version.status !== "draft") throw new Error("Published curriculum is immutable. Create a new draft.");
-    const teacherGuides = input.teacherGuides
-      ? assertTeacherGuidesMatchCourse(content, input.teacherGuides, course.code)
-      : readClassTeacherGuides(version.curriculum);
+    const teacherGuides = input.teacherGuides === undefined
+      ? readClassTeacherGuides(version.curriculum)
+      : input.teacherGuides === null ? null : assertTeacherGuidesMatchCourse(content, input.teacherGuides, course.code);
     if (teacherGuides) assertTeacherGuidesMatchCourse(content, teacherGuides, course.code);
     const curriculum = { ...version.curriculum, learning: content,
-      ...(teacherGuides ? {teacherGuides} : {}) };
+      teacherGuides: teacherGuides ?? undefined };
     if (revision(curriculum) === revision(version.curriculum)) return { revision: revision(curriculum) };
     if (revision(version.curriculum) !== input.expectedRevision) throw new Error("This draft changed. Reload before saving; your edits have not been applied.");
     await tx.update(courseTemplateVersions).set({ curriculum, updatedAt: new Date() }).where(eq(courseTemplateVersions.id, version.id));
