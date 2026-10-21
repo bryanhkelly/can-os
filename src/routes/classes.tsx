@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { z } from "zod";
 import { classResources, type ClassContent } from "@/domain/class-content";
 import { getClassDirectory, getClassWorkspace, getClassResourceDownload, getClassSupplementDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
+import { addClassSupplement } from "@/modules/learning/class-supplements.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
@@ -49,6 +50,10 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const [notice, setNotice] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [resourceTitle,setResourceTitle]=useState("");
+  const [resourceUrl,setResourceUrl]=useState("");
+  const [resourceKind,setResourceKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link");
+  const [resourceLesson,setResourceLesson]=useState("");
   const announcementId = useRef<string | null>(null);
   const search = { section: data.section.id, student: data.role === "guardian" ? data.studentPersonId ?? undefined : undefined };
   const supplements = data.supplements ?? [];
@@ -180,8 +185,41 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {data.content && !lessons.length && <p className="text-sm text-muted-foreground">No lessons have been published.</p>}
     </div>}
     {tab === "files" && <WorkspacePanel title="Class files and resources" description="Links and verified private documents from the published course version.">
+      {data.role==="teacher" && <form className="mb-5 grid gap-3 rounded-lg border p-4"
+        onSubmit={event=>{event.preventDefault();void run(async()=>{
+          await addClassSupplement({data:{
+            sectionId:data.section.id,title:resourceTitle.trim(),url:resourceUrl.trim(),
+            kind:resourceKind,...(resourceLesson?{lessonId:resourceLesson}:{})
+          }});
+          setResourceTitle("");setResourceUrl("");setResourceLesson("");
+        },"Class resource added without changing the publisher's curriculum.");}}>
+        <h3 className="text-sm font-semibold">Add a teacher supplement</h3>
+        <p className="text-xs text-muted-foreground">Share an HTTPS resource with this class, or connect it to a particular published lesson. Publisher content stays unchanged.</p>
+        <label className="text-sm">Title<input aria-label="Resource title" required minLength={3} maxLength={200} value={resourceTitle}
+          onChange={event=>setResourceTitle(event.target.value)} className="mt-1 w-full rounded border p-2"/></label>
+        <label className="text-sm">External HTTPS resource URL<input aria-label="Resource URL" required type="url" value={resourceUrl}
+          onChange={event=>setResourceUrl(event.target.value)} className="mt-1 w-full rounded border p-2"/></label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">Resource type
+            <select aria-label="Resource type" value={resourceKind}
+              onChange={event=>setResourceKind(event.target.value as typeof resourceKind)}
+              className="mt-1 w-full rounded border p-2">
+              {(["link","video","pdf","image","audio","document"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
+            </select>
+          </label>
+          <label className="text-sm">Publisher lesson (optional)
+            <select aria-label="Publisher lesson" value={resourceLesson}
+              onChange={event=>setResourceLesson(event.target.value)}
+              className="mt-1 w-full rounded border p-2">
+              <option value="">Classwide resource</option>
+              {lessons.map(lesson=><option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
+            </select>
+          </label>
+        </div>
+        <button type="submit" disabled={busy} className="justify-self-start rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50">Add resource</button>
+      </form>}
       {data.content && resources(classResources(data.content))}
-      {supplements.length>0 && <section className="mt-5 space-y-2"><h3 className="font-semibold">School supplements</h3>
+      {supplements.length>0 && <section className="mt-5 space-y-2"><h3 className="font-semibold">Publisher, school and teacher resources</h3>
         <ul className="space-y-2">{supplements.map(item=><li key={item.id} className="rounded border p-3 text-sm">
           {item.url?<a href={item.url} target="_blank" rel="noopener noreferrer" className="underline">{item.title} ({item.kind})</a>
            :item.kind==="pdf"?<button type="button" disabled={busy}
