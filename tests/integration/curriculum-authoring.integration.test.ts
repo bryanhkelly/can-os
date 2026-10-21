@@ -208,50 +208,196 @@ integration("governed curriculum authoring through classroom delivery",()=>{
     const secondPackDraft=first(first((await packApi.getPublisherPackStudio({data:{programId:program.id}})
      ).packs.filter(p=>p.id===authoredPack.packId)).releases.filter(r=>r.id===nextPack.versionId));
     expect(secondPackDraft.courseVersionIds).toEqual([next.versionId]);
-    const foreign=first(await tx.insert(s.organizations).values({type:"christian_school",name:"Foreign owner",slug:`foreign-${suffix}`}).returning());
-    const foreignCourse=first(await tx.insert(s.courseTemplates).values({owningOrganizationId:foreign.id,code:suffix,title:"Foreign curriculum",subject:"Science"}).returning());
-    await expect(flow.startCurriculumDraft({data:{...request,courseId:foreignCourse.id,requestId:crypto.randomUUID()}})).rejects.toThrow("owning organization");
-    // A third-party publisher is NOT the school's academic provider.
-    // A published pack, active entitlement, and program adoption must all exist.
-    const externalVersion=first(await tx.insert(s.courseTemplateVersions).values({
-      courseTemplateId:foreignCourse.id,version:1,status:"published",publishedAt:new Date(),
-      curriculum:{learning:content},
+
+    // Genuine cross-organization lifecycle: separate publisher authors a course,
+    // school installs a published pack and adopts it, assigned teacher creates
+    // work, enrolled student completes the lesson and submits a response.
+    const foreign=first(await tx.insert(s.organizations).values({
+      type:"christian_school",name:"Independent Curriculum Publisher",slug:`publisher-${suffix}`,
     }).returning());
+    const foreignSite=first(await tx.insert(s.sites).values({
+      organizationId:foreign.id,name:"Publisher Authoring Site",slug:`publisher-${suffix}`,
+    }).returning());
+    const foreignProgram=first(await tx.insert(s.programs).values({
+      organizationId:foreign.id,siteId:foreignSite.id,jurisdictionId:jurisdiction.id,
+      type:"full_school",status:"active",name:"Publisher Academic Program",slug:`publisher-${suffix}`,
+      gradeRange:{min:"9",max:"12"},deliveryModel:{onsite:true},
+      academicProviderOrganizationId:foreign.id,creditIssuingOrganizationId:foreign.id,
+    }).returning());
+    const foreignPerson=first(await tx.insert(s.people).values({
+      legalFirstName:"Independent",legalLastName:"Publisher",
+    }).returning());
+    await tx.insert(s.memberships).values({personId:foreignPerson.id,organizationId:foreign.id});
+    await tx.insert(s.roleAssignments).values({
+      personId:foreignPerson.id,organizationId:foreign.id,siteId:foreignSite.id,
+      programId:foreignProgram.id,roleKey:"curriculum_publisher",capabilities:["curriculum.publish"],
+    });
+    const publisherActor:AccessContext={...staff,actorPersonId:foreignPerson.id,
+      accountId:crypto.randomUUID(),sessionId:crypto.randomUUID(),grantId:crypto.randomUUID(),
+      scope:{organizationIds:[foreign.id],siteIds:[foreignSite.id],programIds:[foreignProgram.id]}};
+    state.actor=publisherActor;
+    const foreignScope={programId:foreignProgram.id};
+    const foreignCourse=await flow.createAuthoredCourse({data:{
+      ...foreignScope,code:`MATH-${suffix}`,title:"Third-Party Algebra I",subject:"Mathematics",
+      requestId:crypto.randomUUID(),
+    }});
+    state.actor=staff;
+    await expect(flow.startCurriculumDraft({data:{
+      ...request,courseId:foreignCourse.courseId,requestId:crypto.randomUUID(),
+    }})).rejects.toThrow("owning organization");
+    state.actor=publisherActor;
+    const foreignDraft=await flow.startCurriculumDraft({data:{
+      ...foreignScope,courseId:foreignCourse.courseId,requestId:crypto.randomUUID(),
+    }});
+    const foreignFirst=first(first((await flow.getCurriculumStudio({data:foreignScope}))
+      .courses.filter(c=>c.id===foreignCourse.courseId)).releases);
+    const thirdPartyContent:ClassContent={...content,syllabus:"Publisher-owned algebra curriculum for adopting schools.",
+      modules:[{id:"algebra1-u01",title:"Algebra I: Equations",lessons:[{
+        id:"algebra1-equations",title:"Solve Equations",body:"Solve equations and justify the inverse operations.",
+        resources:[],activities:[{id:"algebra1-equations-launch",kind:"guided_practice",
+          title:"Explain the solution",instructions:"Solve 3x + 5 = 20; check by substitution.",
+          evidence:"teacher_review",estimatedMinutes:20}],
+      }]}]};
+    const protectedGuide={version:1 as const,visibility:"teacher_only" as const,
+      courseCode:`MATH-${suffix}`,units:[{unitId:"algebra1-u01",
+        reviewStatus:"draft" as const,teacherOverview:"Check algebra reasoning during instruction.",
+        lessons:[{lessonId:"algebra1-equations",
+          preparation:"Prepare a balanced-scale example of solving equations.",
+          workedAnswers:[{prompt:"Solve 3x + 5 = 20.",answer:"Subtract five, divide by three, x=5. Check 3(5)+5=20."}],
+          misconceptions:["Students may divide before subtracting the constant."],
+          interventions:["Draw a balanced scale and undo addition before multiplication."],
+          extensions:["Change the right side and justify the effect on x."]}],
+        assessments:[]}]};
+    const foreignSaved=await flow.saveAuthoredCurriculum({data:{
+      ...foreignScope,versionId:foreignDraft.versionId,expectedRevision:foreignFirst.revision,
+      content:thirdPartyContent,teacherGuides:protectedGuide,
+    }});
+    await flow.publishAuthoredCurriculum({data:{
+      ...foreignScope,versionId:foreignDraft.versionId,expectedRevision:foreignSaved.revision,
+      reason:"Publisher confirms lesson and restricted teacher guide.",confirmed:true,
+    }});
+    const publisherPack=await packApi.createAuthoredPublisherPack({data:{
+      ...foreignScope,slug:`publisher-algebra-${suffix}`,name:"Publisher Algebra I",
+      description:"Licensed publisher Algebra I course with learning activities.",
+      visibility:"public",licenseCode:"CC-BY-4.0",requestId:crypto.randomUUID(),
+    }});
+    const draftComposition=first(first((await packApi.getPublisherPackStudio({data:foreignScope}))
+      .packs.filter(p=>p.id===publisherPack.packId)).releases);
+    const composed=await packApi.saveAuthoredPublisherPack({data:{
+      ...foreignScope,versionId:publisherPack.versionId,expectedRevision:draftComposition.revision,
+      courseVersionIds:[foreignDraft.versionId],
+    }});
+    await packApi.publishAuthoredPublisherPack({data:{
+      ...foreignScope,versionId:publisherPack.versionId,expectedRevision:composed.revision,
+      reason:"Publisher releases Algebra I pack for licensed schools.",confirmed:true,
+    }});
+
+    state.actor=staff;
+    const marketplace=await import("@/modules/learning/curriculum-marketplace.functions");
+    const market=await marketplace.getCurriculumMarketplace({data:scope});
+    expect(market.packs.some(p=>p.id===publisherPack.packId&&p.courses.some(
+      c=>c.courseVersionId===foreignDraft.versionId))).toBe(true);
     const programIdentity={id:program.id,organizationId:org.id,academicProviderOrganizationId:org.id};
     const {listLaunchEligibleCourses,assertLaunchEligibleCourse}=await import("@/modules/programs/launch-curriculum-eligibility.server");
-    await expect(assertLaunchEligibleCourse(programIdentity,externalVersion.id,tx)).rejects.toThrow("Choose a published course");
-    const pack=first(await tx.insert(s.curriculumPacks).values({
-      publisherOrganizationId:foreign.id,slug:`pack-${suffix}`,name:"Foreign Published Science",
-      description:"Third-party published curriculum",visibility:"public",licenseCode:"CC-BY-4.0",
-    }).returning());
-    const packVersion=first(await tx.insert(s.curriculumPackVersions).values({
-      packId:pack.id,version:1,status:"published",publishedAt:new Date(),
-    }).returning());
-    await tx.insert(s.curriculumPackItems).values({
-      packVersionId:packVersion.id,courseTemplateVersionId:externalVersion.id,position:1,
-    });
-    const entitlement=first(await tx.insert(s.curriculumEntitlements).values({
-      organizationId:org.id,packId:pack.id,termsAcceptedAt:new Date(),
-      acceptedByPersonId:publisher.id,
-    }).returning());
-    await expect(assertLaunchEligibleCourse(programIdentity,externalVersion.id,tx)).rejects.toThrow("Choose a published course");
-    const adoption=first(await tx.insert(s.curriculumAdoptions).values({
-      organizationId:org.id,programId:program.id,siteId:site.id,packId:pack.id,
-      packVersionId:packVersion.id,adoptedByPersonId:publisher.id,
-    }).returning());
-    expect((await listLaunchEligibleCourses(programIdentity,tx)).some(c=>c.versionId===externalVersion.id)).toBe(true);
-    const thirdParty=await provisionLaunchSection({data:{
-      ...provision,courseTemplateVersionId:externalVersion.id,code:`EXT-${suffix}`,title:"Licensed Science",
+    await expect(assertLaunchEligibleCourse(programIdentity,foreignDraft.versionId,tx))
+      .rejects.toThrow("Choose a published course");
+    const installed=await marketplace.installCurriculumPack({data:{
+      ...scope,packId:publisherPack.packId,termsAccepted:true,
     }});
-    expect(first(await tx.select().from(s.sections).where(eq(s.sections.id,thirdParty.sectionId))).courseTemplateVersionId).toBe(externalVersion.id);
-    await tx.update(s.curriculumEntitlements).set({status:"revoked"}).where(eq(s.curriculumEntitlements.id,entitlement.id));
-    await expect(provisionLaunchSection({data:{
-      ...provision,courseTemplateVersionId:externalVersion.id,code:`DENY-${suffix}`,title:"Denied Science",
-    }})).rejects.toThrow("Choose a published course");
-    await tx.update(s.curriculumEntitlements).set({status:"active"}).where(eq(s.curriculumEntitlements.id,entitlement.id));
-    await tx.update(s.curriculumAdoptions).set({status:"inactive"}).where(eq(s.curriculumAdoptions.id,adoption.id));
-    await expect(assertLaunchEligibleCourse(programIdentity,externalVersion.id,tx)).rejects.toThrow("Choose a published course");
+    expect(installed.installed).toBe(true);
+    await expect(assertLaunchEligibleCourse(programIdentity,foreignDraft.versionId,tx))
+      .rejects.toThrow("Choose a published course");
+    const adopted=await marketplace.adoptCurriculumPack({data:{
+      ...scope,packId:publisherPack.packId,versionId:publisherPack.versionId,
+    }});
+    expect(adopted.adopted).toBe(true);
+    const eligible=await listLaunchEligibleCourses(programIdentity,tx);
+    expect(eligible.some(c=>c.versionId===foreignDraft.versionId)).toBe(true);
+    const selected=await provisionLaunchSection({data:{
+      ...provision,courseTemplateVersionId:foreignDraft.versionId,code:`EXT-${suffix}`,
+      title:"Adopted Publisher Algebra I",
+    }});
+    expect(first(await tx.select().from(s.sections).where(eq(s.sections.id,selected.sectionId)))
+      .courseTemplateVersionId).toBe(foreignDraft.versionId);
+    await tx.insert(s.sectionTeachers).values({sectionId:selected.sectionId,personId:teacher.id});
+    await tx.insert(s.enrollments).values({
+      studentProfileId:student.id,kind:"section",status:"active",organizationId:org.id,
+      programId:program.id,schoolYearId:time.schoolYear.id,sectionId:selected.sectionId,
+    });
 
+    act("teacher",teacher.id);
+    const teacherWorkspace=await getClassWorkspace({data:{sectionId:selected.sectionId}});
+    expect(teacherWorkspace.content).toEqual(thirdPartyContent);
+    expect(teacherWorkspace.teacherGuides?.units[0]?.lessons[0]?.workedAnswers[0]?.answer)
+      .toContain("x=5");
+    const {addClassSupplement}=await import("@/modules/learning/class-supplements.functions");
+    const supplement=await addClassSupplement({data:{
+      sectionId:selected.sectionId,lessonId:"algebra1-equations",kind:"link",
+      title:"Teacher practice extension",url:"https://www.khanacademy.org/math/algebra",
+    }});
+    expect(supplement.supplementId).toBeTruthy();
+    const {createAssessment,gradeSubmission}=await import("@/modules/learning/gradebook.functions");
+    const task=await createAssessment({data:{
+      sectionId:selected.sectionId,title:"Publisher-aligned Algebra Practice",
+      instructions:"Solve 3x + 5 = 20, show and check each step.",pointsPossible:10,
+      assignmentKind:"homework",curriculumLessonId:"algebra1-equations",
+      rubricCriteria:[{id:"equation",label:"Reasoning",maxPoints:10,
+        description:"Equality-preserving steps and substitution"}],
+      dueAt:new Date(Date.now()+7*86400000).toISOString(),
+    }});
+    const [assigned]=await tx.select().from(s.submissions)
+      .where(eq(s.submissions.assessmentId,task.assessmentId)).limit(1);
+    expect(assigned?.studentProfileId).toBe(student.id);
+
+    act("student",learner.id);
+    const studentWorkspace=await getClassWorkspace({data:{sectionId:selected.sectionId}});
+    expect(studentWorkspace.content?.modules[0]?.lessons[0]?.id).toBe("algebra1-equations");
+    expect(studentWorkspace.teacherGuides).toBeNull();
+    expect(studentWorkspace.supplements.some(r=>r.title==="Teacher practice extension"&&
+      r.source==="teacher")).toBe(true);
+    const {getAssignments,saveAssignmentResponse}=await import("@/modules/student-experience/assignments.functions");
+    const assignments=await getAssignments();
+    expect(assignments.assignments.some(a=>a.assessmentId===task.assessmentId&&
+      a.metadata.curriculumLessonId==="algebra1-equations")).toBe(true);
+    await setLessonCompletion({data:{
+      sectionId:selected.sectionId,versionId:foreignDraft.versionId,lessonId:"algebra1-equations",completed:true,
+    }});
+    const response=await saveAssignmentResponse({data:{
+      assessmentId:task.assessmentId,text:"3x=15, x=5. Substituting 3(5)+5=20.",
+    }});
+    expect(response.submissionId).toBe(assigned.id);
+    await expect(createAssessment({data:{
+      sectionId:selected.sectionId,title:"Unauthorized",pointsPossible:10,
+    }})).rejects.toThrow();
+
+    act("teacher",teacher.id);
+    await gradeSubmission({data:{
+      submissionId:response.submissionId,
+      rubricScores:[{id:"equation",points:10}],
+      feedbackComment:"Correct inverse operations and substitution.",
+    }});
+    act("student",learner.id);
+    const feedback=(await getAssignments()).assignments.find(a=>a.assessmentId===task.assessmentId);
+    expect(feedback?.status).toBe("graded");
+    expect(Number(feedback?.score)).toBe(10);
+    expect(feedback?.feedbackText).toContain("Correct inverse operations");
+    expect((await getClassWorkspace({data:{sectionId:selected.sectionId}})).progress)
+      .toEqual([{lessonId:"algebra1-equations",completedAt:expect.any(String)}]);
+
+    state.actor=staff;
+    await tx.update(s.curriculumEntitlements).set({status:"revoked"})
+      .where(eq(s.curriculumEntitlements.id,installed.entitlementId));
+    await expect(provisionLaunchSection({data:{
+      ...provision,courseTemplateVersionId:foreignDraft.versionId,
+      code:`DENY-${suffix}`,title:"Revoked-license class",
+    }})).rejects.toThrow("Choose a published course");
+    // No already-running classroom version pointer was rewritten by revocation.
+    expect(first(await tx.select().from(s.sections).where(eq(s.sections.id,selected.sectionId)))
+      .courseTemplateVersionId).toBe(foreignDraft.versionId);
+    // Verify that unauthorized school users cannot publish the external publisher course.
+    await expect(flow.startCurriculumDraft({data:{
+      ...request,courseId:foreignCourse.courseId,requestId:crypto.randomUUID(),
+    }})).rejects.toThrow("owning organization");
     await tx.update(s.people).set({active:false}).where(eq(s.people.id,publisher.id));
     await expect(flow.getCurriculumStudio({data:scope})).rejects.toThrow("explicit curriculum publisher");
     await tx.update(s.people).set({active:true}).where(eq(s.people.id,publisher.id));
