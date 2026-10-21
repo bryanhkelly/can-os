@@ -331,6 +331,8 @@ export const createAssessment = createServerFn({ method: "POST" })
     metadata:{...(data.rubric?{rubric:data.rubric}:{}),
       assignmentKind:data.assignmentKind,
       publisherCourseVersionId:teachingSection.versionId,
+      ...(data.curriculumLessonId?{curriculumLessonTitle:publisherLessonChoices(
+        teachingSection.curriculum,teachingSection.status).find(lesson=>lesson.id===data.curriculumLessonId)?.title}:{}),
       ...(data.curriculumLessonId?{curriculumLessonId:data.curriculumLessonId}:{})},
     status,
     pointsPossible: String(data.pointsPossible),
