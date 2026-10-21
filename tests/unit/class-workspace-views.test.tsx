@@ -94,7 +94,7 @@ describe("published class workspace", () => {
     expect(teacher).toContain("Assessment answer guides");
     expect(teacher).toContain("Net revenue");
     expect(teacher).toContain("6=5");
-    expect(teacher).toContain("teacher-only");
+    expect(teacher).toContain("not student-facing");
     const student=renderToStaticMarkup(<ClassWorkspace data={{...teacherData,role:"student"}} tab="teacher-guide"/>);
     const guardian=renderToStaticMarkup(<ClassWorkspace data={{...teacherData,role:"guardian"}} tab="teacher-guide"/>);
     for(const html of [student,guardian]){
