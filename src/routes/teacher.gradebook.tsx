@@ -9,6 +9,7 @@ import {
  gradeSubmission,
 } from "@/modules/learning/gradebook.functions";
 import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
+import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
 import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -45,6 +46,8 @@ function TeacherGradebookPage() {
  const gridRef = useRef<HTMLDivElement | null>(null);
  const [title, setTitle] = useState("");
  const [instructions, setInstructions] = useState("");
+ const [newRubric, setNewRubric] = useState<Array<{id:string;label:string;maxPoints:string;description:string}>>([]);
+ const rubricSequence=useRef(0);
  const [points, setPoints] = useState("");
  const [due, setDue] = useState("");
  const [assignmentKind,setAssignmentKind]=useState<"homework"|"classwork"|"quiz"|"test"|"project"|"discussion">("classwork");
@@ -191,7 +194,15 @@ function TeacherGradebookPage() {
 
  const submitAssessment = async () => {
   const pointsValue = Number(points);
-  if (!title.trim() || !Number.isFinite(pointsValue)) { setNotice("Enter a title and a numeric point value."); return; }
+  if (!title.trim() || !Number.isFinite(pointsValue) || pointsValue < 1 || pointsValue > 1000) {
+   setNotice("Enter a title and a point value between 1 and 1000."); return;
+  }
+  const rubricCriteria = newRubric.map(row=>({
+   id:row.id,label:row.label.trim(),maxPoints:row.maxPoints.trim()?Number(row.maxPoints):NaN,
+   ...(row.description.trim()?{description:row.description.trim()}:{}),
+  }));
+  try { validateAssessmentRubric(rubricCriteria,pointsValue); }
+  catch(cause){setNotice(cause instanceof Error?cause.message:"Invalid scoring rubric.");return;}
   setBusy(true);
   setNotice("");
   try {
@@ -200,6 +211,7 @@ function TeacherGradebookPage() {
     title,
     instructions,
     pointsPossible: pointsValue,
+    rubricCriteria,
     assignmentKind,
     ...(curriculumLessonId?{curriculumLessonId}:{}),
     ...(due ? { dueAt: new Date(`${due}T23:59:00`).toISOString() } : {}),
@@ -207,6 +219,7 @@ function TeacherGradebookPage() {
    setNotice(result.status === "published" ? "Assessment published and assigned to enrolled students." : "Assessment saved as a draft.");
    setTitle("");
    setInstructions("");
+   setNewRubric([]);
    setPoints("");
    setDue("");
    setCurriculumLessonId("");
