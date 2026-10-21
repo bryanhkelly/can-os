@@ -7,6 +7,7 @@ import { getCurriculumPrograms } from "@/modules/learning/curriculum-authoring.f
 import { getCurriculumMarketplace, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
 import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploadAvailability } from "@/modules/learning/curriculum-resource-upload.functions";
 import { validateCommonCartridgeImport, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
+import { exportOneRosterBulkRoster } from "@/modules/learning/oneroster-export.functions";
 
 const searchSchema=z.object({programId:z.string().uuid().optional()});
 export const Route=createFileRoute("/operations/curriculum-marketplace")({
@@ -191,6 +192,29 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        {item.sourceName} · {item.format.replaceAll("_"," ")} · {item.status} · {item.resourceCount} resources · {item.noticeCount} notices
      </li>)}</ul>
      {!data.imports.length&&<p className="text-sm text-muted-foreground">No Common Cartridge imports have been staged for this organization.</p>}
+   </section>
+
+   <section className="space-y-3 rounded-xl border p-5">
+     <h2 className="font-serif text-2xl">OneRoster 1.2 school exchange</h2>
+     <p className="text-sm text-muted-foreground">
+       Export the active program's classes, students and teachers as a ZIP containing OneRoster 1.2 bulk roster CSVs.
+       This export contains identifiable student and teacher information and requires the school's separate registrar
+       enrollment-approval authority. Gradebook result exchange and roster import are not yet enabled.
+     </p>
+     <button type="button" disabled={busy} className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+      onClick={()=>void perform(async()=>{
+        const archive=await exportOneRosterBulkRoster({data:{programId:market.program.id}});
+        const binary=atob(archive.base64),bytes=new Uint8Array(binary.length);
+        for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+        const url=URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer],{type:"application/zip"}));
+        const a=document.createElement("a");a.href=url;a.download=archive.fileName;
+        document.body.appendChild(a);a.click();a.remove();
+        URL.revokeObjectURL(url);
+      },"OneRoster roster export generated and access logged.")}>Export OneRoster ZIP</button>
+     <p className="text-xs text-muted-foreground">
+       Only active, explicitly authorized sections and their enrolled students and assigned teachers are included.
+       This is a roster-profile implementation, not a claim of complete OneRoster or gradebook conformance.
+     </p>
    </section>
   </>}
  </main>;
