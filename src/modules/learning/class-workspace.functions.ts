@@ -93,6 +93,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       id:s.curriculumOverlays.id,title:s.curriculumOverlays.title,kind:s.curriculumOverlays.kind,
       url:s.curriculumOverlays.url,resourceId:s.curriculumOverlays.resourceId,siteId:s.curriculumOverlays.siteId,
       sectionId:s.curriculumOverlays.sectionId,lessonId:s.curriculumOverlays.lessonId,
+      metadata:s.curriculumOverlays.metadata,
     }).from(s.curriculumOverlays).where(and(
       eq(s.curriculumOverlays.programId,section.programId),
       eq(s.curriculumOverlays.courseTemplateVersionId,section.versionId),
@@ -106,7 +107,8 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       item.siteId ? item.siteId===section.siteId : true,
     ).map(item=>({id:item.id,title:item.title,kind:item.kind,
       url:item.resourceId?attached.find(resource=>resource.id===item.resourceId)?.url??null:item.url,
-      lessonId:item.lessonId}));
+      lessonId:item.lessonId,
+      source:item.metadata?.source==="teacher_supplement"?"teacher" as const:"organization" as const}));
     // Pack-level resources are only visible when the program has an active adoption
     // AND the owning organization has an active entitlement. Bindings are read-only.
     const publisherRows=await db.select({
@@ -126,7 +128,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
         eq(s.curriculumAdoptions.status,"active"),
         or(eq(s.curriculumResourceBindings.courseTemplateVersionId,section.versionId),
            isNull(s.curriculumResourceBindings.courseTemplateVersionId))));
-    const allSupplements=[...publisherRows.map(row=>({...row})),...supplements];
+    const allSupplements=[...publisherRows.map(row=>({...row,source:"publisher" as const})),...supplements];
     const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.map(lesson => lesson.id)) ?? []);
     return {
       role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,
