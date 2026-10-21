@@ -101,9 +101,9 @@ export async function getClassUnitDraft(actor:Actor,input:{programId:string;unit
  if(!program[0]||!await hasInstitutionalProgramCapability(actor,program[0],"curriculum.publish")||
    program[0].organizationId!==unit.owningOrganizationId)
    throw new AuthorizationError("institutional unit authoring");
+ const draft=unitDraftSchema.parse({unitKey:unit.unitKey,module:unit.module,teacherGuide:unit.teacherGuide??undefined});
  return {id:unit.id,status:unit.status,unitKey:unit.unitKey,version:unit.version,
-  draft: {unitKey:unit.unitKey,module:classModuleSchema.parse(unit.module),teacherGuide:unit.teacherGuide},
-  revision:revision({module:unit.module,teacherGuide:unit.teacherGuide})};
+  draft,revision:revision({module:unit.module,teacherGuide:unit.teacherGuide})};
 }
 /** A *real assigned teacher* performs curriculum review, separately from school approval. */
 export async function reviewClassUnitDraft(actor:Actor,input:{sectionId:string;unitVersionId:string}){
