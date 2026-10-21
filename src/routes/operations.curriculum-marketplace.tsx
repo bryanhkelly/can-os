@@ -5,6 +5,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getCurriculumPrograms } from "@/modules/learning/curriculum-authoring.functions";
 import { getCurriculumMarketplace, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
+import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploadAvailability } from "@/modules/learning/curriculum-resource-upload.functions";
 
 const searchSchema=z.object({programId:z.string().uuid().optional()});
 export const Route=createFileRoute("/operations/curriculum-marketplace")({
@@ -13,6 +14,7 @@ export const Route=createFileRoute("/operations/curriculum-marketplace")({
  loader:({deps})=>safeLoader(async()=>({
   programs:await getCurriculumPrograms(),
   marketplace:deps.programId?await getCurriculumMarketplace({data:{programId:deps.programId}}):null,
+  pdfUpload:await curriculumPdfUploadAvailability().catch(()=>({enabled:false})),
  }),{authMessage:"An authorized institutional curriculum publisher is required."})(),
  component:CurriculumMarketplacePage,
 });
@@ -22,13 +24,15 @@ function CurriculumMarketplacePage(){
  if(!outcome.ok)return <LoaderFailure title="Curriculum Marketplace" outcome={outcome}/>;
  return <MarketView key={outcome.data.marketplace?.program.id??"none"} data={outcome.data}/>;
 }
-function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumPrograms>>;marketplace:Market|null}}){
+function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumPrograms>>;marketplace:Market|null;pdfUpload:{enabled:boolean}}}){
  const router=useRouter();
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [accepted,setAccepted]=useState<Record<string,boolean>>({});
  const [courseVersionId,setCourseVersionId]=useState(""),[scope,setScope]=useState<"program"|"site"|"section">("site");
  const [sectionId,setSectionId]=useState(""),[lessonId,setLessonId]=useState("");
  const [title,setTitle]=useState(""),[kind,setKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link"),[url,setUrl]=useState("");
+ const [pdfFile,setPdfFile]=useState<File|null>(null),[rightsConfirmed,setRightsConfirmed]=useState(false);
+ const [pdfKey,setPdfKey]=useState(0);
  const market=data.marketplace;
  async function perform(task:()=>Promise<unknown>,success:string){
   setBusy(true);setError("");setNotice("");
@@ -108,6 +112,39 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      </select></label>
      <label className="text-sm sm:col-span-2">HTTPS resource URL<input required type="url" maxLength={2048} className="mt-1 block w-full rounded border bg-background p-2" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://..."/></label>
      <button disabled={busy||!courseVersionId||(scope==="section"&&!sectionId)} className="justify-self-start rounded bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">Add supplement</button>
+     <fieldset className="sm:col-span-2 space-y-3 rounded-lg border p-4">
+      <legend className="px-2 text-sm font-semibold">Upload a private PDF</legend>
+      <p className="text-xs text-muted-foreground">Upload a PDF directly to CAN's private storage. It is visible only in the selected program, site or class and downloadable by authorized class members.</p>
+      <input key={pdfKey} type="file" accept=".pdf,application/pdf" disabled={busy||!data.pdfUpload.enabled}
+        onChange={e=>setPdfFile(e.currentTarget.files?.[0]??null)} className="block w-full text-sm" aria-label="Supplemental PDF"/>
+      <label className="flex items-start gap-2 text-xs">
+       <input type="checkbox" checked={rightsConfirmed} disabled={busy||!data.pdfUpload.enabled}
+        onChange={e=>setRightsConfirmed(e.currentTarget.checked)}/>
+       <span>I have permission to share this material with authorized learners. Uploading does not authorize AI training or public redistribution.</span>
+      </label>
+      <button type="button" disabled={busy||!data.pdfUpload.enabled||!pdfFile||!rightsConfirmed||!courseVersionId||
+          !title.trim()||(scope==="section"&&!sectionId)}
+       className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+       onClick={()=>void perform(async()=>{
+         if(!pdfFile)throw new Error("Select a PDF.");
+         if(pdfFile.size<16||pdfFile.size>10*1024*1024)throw new Error("PDF must be between 16 bytes and 10 MB.");
+         const params={programId:market.program.id,courseVersionId,scope,title,
+           ...(scope==="section"?{sectionId}:{}),
+           ...(lessonId.trim()?{lessonId:lessonId.trim()}:{}),
+           fileName:pdfFile.name,size:pdfFile.size};
+         const signed=await beginCurriculumPdfUpload({data:params});
+         const uploaded=await fetch(signed.uploadUrl,{
+           method:"PUT",headers:{"Content-Type":"application/pdf","If-None-Match":"*"},
+           body:pdfFile,
+         });
+         if(!uploaded.ok)throw new Error("Private PDF upload failed. No curriculum resource was created.");
+         await finishCurriculumPdfUpload({data:{...params,
+           resourceId:signed.resourceId,key:signed.key,acknowledgedRights:true}});
+         setPdfFile(null);setPdfKey(v=>v+1);setRightsConfirmed(false);
+       },"Private PDF uploaded and attached to the selected curriculum scope.")}>Upload PDF</button>
+      {!data.pdfUpload.enabled&&<p className="text-xs text-muted-foreground" role="status">
+        Private PDF uploads require CAN_R2_CURRICULUM_UPLOADS_ENABLED=true and a configured private R2 bucket. External HTTPS PDF links remain available above.</p>}
+     </fieldset>
     </form>}
     <h3 className="font-semibold">Current supplements</h3>
     <ul className="space-y-2 text-sm">{market.overlays.map(item=><li className="rounded border p-3" key={item.id}>
