@@ -3,8 +3,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { getCurriculumPrograms } from "@/modules/learning/curriculum-authoring.functions";
-import { getCurriculumMarketplace, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
+import { getCurriculumMarketplace, getCurriculumAdopterPrograms, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
 import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploadAvailability } from "@/modules/learning/curriculum-resource-upload.functions";
 import { validateCommonCartridgeImport, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
 import { exportOneRosterBulkRoster } from "@/modules/learning/oneroster-export.functions";
@@ -13,12 +12,16 @@ const searchSchema=z.object({programId:z.string().uuid().optional()});
 export const Route=createFileRoute("/operations/curriculum-marketplace")({
  validateSearch:(search:Record<string,unknown>)=>searchSchema.parse(search),
  loaderDeps:({search})=>({programId:search.programId}),
- loader:({deps})=>safeLoader(async()=>({
-  programs:await getCurriculumPrograms(),
-  marketplace:deps.programId?await getCurriculumMarketplace({data:{programId:deps.programId}}):null,
-  pdfUpload:await curriculumPdfUploadAvailability().catch(()=>({enabled:false})),
-  imports:deps.programId?await listCommonCartridgeImports({data:{programId:deps.programId}}):[],
- }),{authMessage:"An authorized institutional curriculum publisher is required."})(),
+ loader:({deps})=>safeLoader(async()=>{
+  const programs=await getCurriculumAdopterPrograms();
+  const marketplace=deps.programId?await getCurriculumMarketplace({data:{programId:deps.programId}}):null;
+  return {
+   programs,marketplace,
+   pdfUpload:await curriculumPdfUploadAvailability().catch(()=>({enabled:false})),
+   imports:deps.programId&&marketplace?.canPublish
+    ?await listCommonCartridgeImports({data:{programId:deps.programId}}):[],
+  };
+ },{authMessage:"An authorized school curriculum adopter or publisher is required."})(),
  component:CurriculumMarketplacePage,
 });
 type Market=Awaited<ReturnType<typeof getCurriculumMarketplace>>;
@@ -27,7 +30,7 @@ function CurriculumMarketplacePage(){
  if(!outcome.ok)return <LoaderFailure title="Curriculum Marketplace" outcome={outcome}/>;
  return <MarketView key={outcome.data.marketplace?.program.id??"none"} data={outcome.data}/>;
 }
-function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumPrograms>>;marketplace:Market|null;pdfUpload:{enabled:boolean};imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
+function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumAdopterPrograms>>;marketplace:Market|null;pdfUpload:{enabled:boolean};imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
  const router=useRouter();
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [accepted,setAccepted]=useState<Record<string,boolean>>({});
@@ -56,7 +59,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
   <nav className="flex flex-wrap gap-3" aria-label="Curriculum program scope">
    {data.programs.map(program=><Link key={program.id} to="/operations/curriculum-marketplace" search={{programId:program.id}}
     aria-current={market?.program.id===program.id?"page":undefined} className="rounded-lg border px-3 py-2 text-sm">{program.name}</Link>)}
-   <Link to="/operations/curriculum" search={{programId:market?.program.id}} className="rounded-lg border px-3 py-2 text-sm underline">Curriculum Studio</Link>
+   {market?.canPublish&&<Link to="/operations/curriculum" search={{programId:market.program.id}} className="rounded-lg border px-3 py-2 text-sm underline">Curriculum Studio</Link>}
   </nav>
   {error&&<p role="alert" className="rounded-lg border border-red-500 p-4 text-sm">{error}</p>}
   {notice&&<p role="status" className="rounded-lg border p-4 text-sm">{notice}</p>}
@@ -161,7 +164,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
     {!market.overlays.length&&<p className="text-sm text-muted-foreground">No supplemental materials yet.</p>}
    </section>
 
-   <section className="space-y-3 rounded-xl border p-5">
+   {market.canPublish&&<section className="space-y-3 rounded-xl border p-5">
      <h2 className="font-serif text-2xl">Import Common Cartridge</h2>
      <p className="text-sm text-muted-foreground">Inspect a publisher-supplied 1EdTech Common Cartridge or Thin Common Cartridge (.imscc) without rebuilding it manually. The first stage validates the ZIP manifest, preserves publisher IDs and reports unsupported assessment or application resources. It does not yet publish a course or import embedded files.</p>
      <label className="block text-sm">Cartridge package (.imscc, 2 MB maximum)
@@ -194,7 +197,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        {item.sourceName} · {item.format.replaceAll("_"," ")} · {item.status} · {item.resourceCount} resources · {item.noticeCount} notices
      </li>)}</ul>
      {!data.imports.length&&<p className="text-sm text-muted-foreground">No Common Cartridge imports have been staged for this organization.</p>}
-   </section>
+   </section>}
 
    <section className="space-y-3 rounded-xl border p-5">
      <h2 className="font-serif text-2xl">OneRoster 1.2 school exchange</h2>
