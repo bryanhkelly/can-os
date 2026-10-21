@@ -12,7 +12,7 @@
 
 ## Week 2
 
-When a publisher includes Week 2 in the original release, it is already available in the course sequence. When a publisher adds Week 2 while developing a new course, it is part of the publisher's **next controlled course version**. The school can choose when to adopt that new version through the normal program/course selection and rollout process. There is no special per-week approval, class adoption, or teacher-reviewed unit publication requirement. Teacher controls for classroom pacing and assignment scheduling are separate.
+When a publisher includes Week 2 in the adopted release, it is part of the course sequence already. When building a future release, the publisher adds Week 2 to that draft and publishes a **controlled course version**; the organization selects the course release when appropriate, typically before a new academic term. Week-by-week adoption, teacher-reviewed unit publication, and automatic mid-semester switches are not normal classroom operations. Midyear upgrades and version-based progress migration are deferred edge cases. Teacher pacing, assignments, and supplements remain independent.
 
 The `curriculum_unit_versions` and `section_unit_adoptions` tables introduced in PR #140 are **retained in the migration history for backward compatibility but are not used by live class delivery or exposed through mutable APIs**. Their data is not deleted; any later publisher-internal incremental editing feature should be designed separately and must never change classroom adoption semantics.
 

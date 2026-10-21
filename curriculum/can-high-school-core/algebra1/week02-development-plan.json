@@ -3,7 +3,7 @@
   "creditStatus": "not_credit_ready",
   "releaseStatus": "not_published",
   "courseCode": "CAN-ALG1",
-  "baseCourseVersion": "pinned_existing_class_version_v2",
+  "baseCourseVersion": "publisher_owned_course_release",
   "unitKey": "algebra1-u01-w02",
   "week": 2,
   "unitId": "algebra1-u01",
@@ -114,7 +114,7 @@
     "Review accessibility and accommodations for fraction notation",
     "Provide protected scoring key and common misconceptions separately from student lessons",
     "Confirm pacing, assigned instructor, student evidence and noncredit-ready policy",
-    "Only after teacher review and school approval publish a distinct unit release and pin it to the existing Algebra I section"
+    "Publisher completes qualified content review and publishes the next controlled course version; the organization decides when to adopt that version through the normal course selection process"
   ],
-  "publicationPolicy": "No student-facing lessons, assessments, or teacher answer keys are published by this planning asset. The existing Algebra I section course version and all Week 1 progress remain unchanged."
+  "publicationPolicy": "Planning only. The publisher may incorporate authored Week 2 lessons in a controlled course version after qualified review. A school adopts the publisher's course release, not an individual week. Teacher pacing, supplements, assignments, and existing student records are independent; this plan changes no current class."
 }
