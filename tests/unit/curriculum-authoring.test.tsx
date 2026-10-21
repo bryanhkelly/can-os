@@ -109,6 +109,27 @@ describe("curriculum studio presentation",()=>{
   expect(html).toContain('required="" minLength="10" maxLength="2000"');
   expect(html).toMatch(/<button type="submit" disabled=""[^>]*>Publish curriculum release<\/button>/);
  });
+ it("renders structured lesson activities and authoring fields for real publisher drafts",()=>{
+  const structured:ClassContent={...content,modules:[{...content.modules[0]!,
+   lessons:[{...content.modules[0]!.lessons[0]!,
+    learningTargets:["Recognize and explain a complete equivalent transformation"],
+    standards:["A-REI.1"],estimatedMinutes:55,
+    activities:[{id:"guided",kind:"guided_practice",title:"Guided fraction practice",
+     instructions:"Show the same operation on both sides.",estimatedMinutes:12,evidence:"teacher_review"}],
+   }],
+  }]};
+  expect(()=>assertPublishableCurriculum(structured)).not.toThrow();
+  const html=renderToStaticMarkup(<CurriculumEditor programId={ids.programId}
+   release={{id:ids.versionId,revision:ids.expectedRevision,content:structured}} onSaved={async()=>{}}/>);
+  for(const text of ["Structured lesson activities","Add activity","Learning targets","Standards",
+   "Total lesson minutes","Activity type","Student instructions","Guided fraction practice",
+   "Move activity up","Remove activity"]){
+    if(text==="Move activity up")continue; // Only rendered with 2+ activities.
+    expect(html).toContain(text);
+  }
+  expect(html).toContain("teacher_review");
+  expect(html).toContain("Show the same operation on both sides.");
+ });
  it("renders empty publisher authority explicitly without exposing editing controls",()=>{
   state.data={ok:true,data:{programs:[],studio:null}};
   const Page=Route.options.component!;
