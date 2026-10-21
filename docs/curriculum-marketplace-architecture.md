@@ -48,3 +48,9 @@ No distinct account, organization or demo-only route is created. The existing Va
 - `src/modules/learning/curriculum-resource-upload.functions.ts` signs resource-scoped private PUTs, verifies actual PDF objects, records the resource/document/overlay atomically and audits the action. The classroom download command checks current enrollment/teacher/guardian relationships before signing a GET. Uploads fail closed without the explicit environment gate.
 - Neither the Common Cartridge validator nor the upload flow changes grades, enrollments, school records or published source course versions.
 - R2 e2e, large-cartridge resource ingestion, QTI question/answer-key mapping, LTI 1.3 registration/launch/AGS, and OneRoster class/grade exchange are still **required work**, not completed capabilities.
+
+## OneRoster 1.2 roster export profile
+
+The registrar-scoped school/program workspace now includes a **bulk roster CSV ZIP exporter**. It emits the official `manifest.csv` with an `oneroster.version` of `1.2`, and the academicSessions, orgs, courses, classes, users, roles, and enrollments files. It includes only active authorized classes and their students and teaching staff, requires `registrations:approve`, records audit/outbox evidence, and never exports passwords. The ZIP payload is returned only over a private, non-cacheable authenticated POST with a 4 MB direct-download bound.
+
+This is a **roster-only profile** and has not passed the 1EdTech certification validator. OneRoster REST 1.2, inbound CSV, grade/results/lineItem import/export, differential sync and external sourcedId reconciliation remain tracked in [issue #129](https://github.com/bryanhkelly/can-os/issues/129). Retain export permission checks when connecting OneRoster to outside vendors.
