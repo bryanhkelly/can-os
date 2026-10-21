@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "courseCode": "CAN-ALG1",
+  "visibility": "teacher_only",
+  "units": [
+    {
+      "unitId": "algebra1-u01",
+      "reviewStatus": "draft",
+      "teacherOverview": "Five 55-minute Algebra I lessons introducing equivalence, solving equations, classifying solution sets, inequalities and applied modeling. Review the student's work for written mathematical reasoning, not only final numerical answers. The unit and guide require qualified mathematics teacher review before school approval.",
+      "lessons": [
+        {
+          "lessonId": "u01-d01",
+          "preparation": "Diagnose arithmetic with negative integers and the distributive property. Prepare paired equivalent and non-equivalent expression examples. Model substitution carefully, including parentheses around negative inputs.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided: evaluate 2a+3b at a=-2, b=5.",
+              "answer": "Substitute 2(-2)+3(5)=-4+15=11. A student must show the substituted expression, not only the final value."
+            },
+            {
+              "prompt": "Independent: evaluate 3x²-2x at x=-2.",
+              "answer": "3(-2)²-2(-2)=3(4)+4=16. The square acts on the negative base in parentheses."
+            },
+            {
+              "prompt": "Independent: simplify 3(2p-5)+4p.",
+              "answer": "6p-15+4p=10p-15. Check by substitution at p=1: -5 on both sides."
+            },
+            {
+              "prompt": "Exit ticket: simplify 2(3k-4)+k.",
+              "answer": "6k-8+k=7k-8. An expression has no equality assertion; an equation asserts equality between two quantities."
+            }
+          ],
+          "misconceptions": [
+            "A learner may combine unlike terms such as 4x+4 into 8x; ask whether variable and constant quantities can be added as like terms.",
+            "A learner may distribute multiplication to the first term only. Represent 2(x+5) as two groups of x+5 and expand to 2x+10.",
+            "A learner may mis-evaluate a negative substitution. Require explicit parentheses around negative numbers before applying exponents."
+          ],
+          "interventions": [
+            "For difficulty combining terms, use algebra tiles or matched-colored variable/constant tokens, then write the corresponding symbolic statement.",
+            "Have students evaluate their claimed equivalents at two contrasting inputs and explain why numerical checks support but do not prove equivalence.",
+            "Provide a short sign-rule warm-up if the learner cannot substitute a negative input reliably."
+          ],
+          "extensions": [
+            "Create three distinct expressions equivalent to 4(x-2)+3x and justify the transformations without numerical substitutions."
+          ]
+        },
+        {
+          "lessonId": "u01-d02",
+          "preparation": "Prepare a physical or virtual balance scale model and emphasize operations applied symmetrically to both sides. Require substitution checks before accepting solutions.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided: solve x-9=-2.",
+              "answer": "Add 9 to both sides to obtain x=7. Check 7-9=-2."
+            },
+            {
+              "prompt": "Guided: solve 4y+6=-10.",
+              "answer": "Subtract 6, then divide by 4: 4y=-16, y=-4. Check 4(-4)+6=-10."
+            },
+            {
+              "prompt": "Independent: solve 7n-3=25.",
+              "answer": "Add 3, divide by 7: 7n=28, n=4. Substitute to verify."
+            },
+            {
+              "prompt": "Independent: solve -3m+4=19.",
+              "answer": "Subtract 4, divide by -3: -3m=15, m=-5. Check -3(-5)+4=19."
+            },
+            {
+              "prompt": "Exit ticket: solve -4x+7=23.",
+              "answer": "Subtract 7: -4x=16; divide by -4: x=-4; check -4(-4)+7=23."
+            }
+          ],
+          "misconceptions": [
+            "Some students multiply rather than divide to undo a coefficient. Ask which operation reverses multiplication and why.",
+            "Students may divide only one term on one side; use balance drawings to stress maintaining equality.",
+            "Students may produce x=4 for -4x=16; request an original-equation check."
+          ],
+          "interventions": [
+            "Use color-coded two-column equality transformations, recording an operation in both columns.",
+            "Assign paired problems with positive and negative coefficients; ask the learner to predict the sign before solving.",
+            "Allow a calculator only for arithmetic checking after an algebraic solution has been justified."
+          ],
+          "extensions": [
+            "Write two different equations with solution x=-6, each with at least two steps, and explain which solution strategy is more efficient."
+          ]
+        },
+        {
+          "lessonId": "u01-d03",
+          "preparation": "Prepare identity and contradiction examples in addition to unique-solution equations. Avoid teaching zero coefficient as implying x=0.",
+          "workedAnswers": [
+            {
+              "prompt": "Worked: solve 3(2x-1)=x+12.",
+              "answer": "Distribute: 6x-3=x+12. Subtract x and add 3: 5x=15. Divide by 5: x=3. Both original sides equal 15."
+            },
+            {
+              "prompt": "Guided: solve 4x+9=2x-3.",
+              "answer": "Subtract 2x and then 9: 2x=-12, so x=-6. Check -24+9=-15 and -12-3=-15."
+            },
+            {
+              "prompt": "Guided: solve 5(y-2)=2y+8.",
+              "answer": "5y-10=2y+8; subtract 2y and add 10 to get 3y=18; y=6."
+            },
+            {
+              "prompt": "Independent: classify 6(t+1)-2=6t+4.",
+              "answer": "Distribution yields 6t+4=6t+4, an identity true for every real t; infinitely many solutions."
+            },
+            {
+              "prompt": "Exit ticket: solve 3(x+4)=x-2.",
+              "answer": "3x+12=x-2; 2x=-14; x=-7. Check 3(5)=-7-2? This reveals a correction is needed: for x=-7, 3(-3)=-9 and -7-2=-9."
+            }
+          ],
+          "misconceptions": [
+            "Learners may interpret a statement 0=0 as x=0; emphasize it holds for any real variable value.",
+            "A false final statement such as 6=5 means no value solves the original equation, not that a step was necessarily performed incorrectly.",
+            "Learners may change signs while moving variable terms; write the same subtraction explicitly on both sides."
+          ],
+          "interventions": [
+            "Sort six equations into one, no, or infinitely many solutions based on their simplified final statements.",
+            "Use algebra tiles to pair and remove equal variable groups on both sides.",
+            "Have a learner test two distinct inputs for a proposed identity and then establish equivalence symbolically."
+          ],
+          "extensions": [
+            "Construct an identity and a contradiction by changing only the constant in a two-sided linear equation."
+          ]
+        },
+        {
+          "lessonId": "u01-d04",
+          "preparation": "Prepare a horizontal number line with labeled endpoints and a nonvisual verbal alternative. Demonstrate multiplication by negative one as reversing order.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided: solve 2x-1≥9.",
+              "answer": "Add 1, divide by 2: x≥5. A closed dot at 5 shaded right; x=5 is included."
+            },
+            {
+              "prompt": "Guided: solve -2y+3<11.",
+              "answer": "Subtract 3: -2y<8. Divide by -2 and reverse the sign: y>-4."
+            },
+            {
+              "prompt": "Independent: solve -4n≥16.",
+              "answer": "Divide by -4 and reverse the inequality: n≤-4. Check n=-5 satisfies -4(-5)≥16."
+            },
+            {
+              "prompt": "Exit ticket: solve -5x+2≥17.",
+              "answer": "Subtract 2 to get -5x≥15; divide by -5, reverse ≥ to ≤: x≤-3; -3 is included."
+            }
+          ],
+          "misconceptions": [
+            "Learners may forget that dividing by a negative reverses the comparison sign.",
+            "Learners may use an open boundary for ≤ or ≥; ask whether the boundary value itself satisfies the original inequality.",
+            "Learners may accept fractional or negative counts of people in a context; explicitly define the permissible domain."
+          ],
+          "interventions": [
+            "Use two test values around a boundary to check shading direction.",
+            "Provide paired inequalities 3x>9 and -3x>9 to compare operations and solutions.",
+            "Describe open and closed endpoints aloud for accessible practice."
+          ],
+          "extensions": [
+            "Construct two inequalities with the same solution set but different coefficients and prove they are equivalent."
+          ]
+        },
+        {
+          "lessonId": "u01-d05",
+          "preparation": "Model units and domain restrictions with a real classroom budget. Explain that lesson completion is not a score and direct students to their separate assessments.",
+          "workedAnswers": [
+            {
+              "prompt": "Launch: maximum number of $8 kits after a $30 fixed cost with $150 budget.",
+              "answer": "30+8k≤150 implies 8k≤120, k≤15; since k is a nonnegative integer, the maximum is 15 kits."
+            },
+            {
+              "prompt": "Guided: $42 total, $7 delivery, $5 notebooks.",
+              "answer": "7+5n≤42 yields n≤7 nonnegative whole notebooks; n=7 gives exactly $42."
+            },
+            {
+              "prompt": "Guided: $11 fee plus $3 per class totals $29.",
+              "answer": "11+3c=29; c=6 classes. Check 11+18=29."
+            },
+            {
+              "prompt": "Independent: at least 20 exercise minutes starting at 8 minutes and adding 6 per round.",
+              "answer": "8+6r≥20 gives r≥2. Two full rounds are needed."
+            }
+          ],
+          "misconceptions": [
+            "A learner may round contextual counts the wrong direction. Ask whether the task requires a minimum or maximum and verify the rounded integer.",
+            "A learner may confuse revenue with net proceeds. Have them label the original total and subtract startup costs explicitly.",
+            "A learner may express a feasible negative number of kits. Define units and a nonnegative integer domain before solving."
+          ],
+          "interventions": [
+            "Use a table of 0, 1, 2, ... units to compare the symbolic result with actual costs.",
+            "Require verbal definitions of every symbol and unit before any equation manipulation.",
+            "Use a quick substitution check at the chosen count and one count beyond the proposed feasible boundary."
+          ],
+          "extensions": [
+            "Compare two vendors with different fixed fees and per-student costs and determine when each becomes less expensive."
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "assessmentKey": "u01-formative",
+          "title": "Algebra I · Unit 1 Guided Problem Set",
+          "answerGuide": [
+            {
+              "item": "1",
+              "correctResponse": "4(2x-3)-(x+5)=8x-12-x-5=7x-17.",
+              "evidenceToLookFor": "Distribution over all terms and correct subtraction of the entire second parenthesis."
+            },
+            {
+              "item": "2",
+              "correctResponse": "3(2x-1)=x+12 gives 6x-3=x+12, then 5x=15, x=3; both sides equal 15.",
+              "evidenceToLookFor": "Same operations on both sides and substitution in the original equation."
+            },
+            {
+              "item": "3",
+              "correctResponse": "-2y+3<11 gives -2y<8, so y>-4 after reversing the inequality on division by -2.",
+              "evidenceToLookFor": "Explicit explanation of reversal of ordering by division by a negative."
+            },
+            {
+              "item": "4",
+              "correctResponse": "90+15s=285 gives 15s=195, s=13 students. The result is a nonnegative whole number, and 90+195=285.",
+              "evidenceToLookFor": "Variable definition, equation, solution, units, and validity check."
+            }
+          ],
+          "scoringNotes": "Apply the existing 20-point rubric, not points invented by this answer guide. Award evidence for variable definition (6 points), justified solution steps (8 points), and checking and interpretation (6 points); comment on individual inaccuracies and invite revisions."
+        },
+        {
+          "assessmentKey": "u01-checkpoint",
+          "title": "Algebra I · Unit 1 Mastery Checkpoint",
+          "answerGuide": [
+            {
+              "item": "1",
+              "correctResponse": "3(2a-5)+4a=6a-15+4a=10a-15. For a=2: 20-15=5. Original: 3(4-5)+8=5.",
+              "evidenceToLookFor": "Equivalent expression and evaluation of both original and simplified forms."
+            },
+            {
+              "item": "2",
+              "correctResponse": "5(2x-1)=3x+16 gives 10x-5=3x+16, hence 7x=21, x=3. Check 5(6-1)=25 and 9+16=25.",
+              "evidenceToLookFor": "Justified inverse operations and original-equation check."
+            },
+            {
+              "item": "3A",
+              "correctResponse": "4(y+2)=4y+8 is an identity. Every real y satisfies it.",
+              "evidenceToLookFor": "Explanation that simplifying yields the same expression on both sides."
+            },
+            {
+              "item": "3B",
+              "correctResponse": "3(z+2)=3z+5 simplifies to 3z+6=3z+5, then 6=5. There is no solution.",
+              "evidenceToLookFor": "Recognition of a contradiction, not a proposed value."
+            },
+            {
+              "item": "4",
+              "correctResponse": "-4t+7≥19 gives -4t≥12, then t≤-3 after reversing the inequality. The boundary -3 is included.",
+              "evidenceToLookFor": "Correct inequality reversal, boundary decision and explanation."
+            },
+            {
+              "item": "5",
+              "correctResponse": "Let n be nonnegative integer notebooks. Net revenue after fees is 7n-25. Solve 7n-25≥200, giving n≥225/7≈32.143, so the minimum integer count is n=33. Check 7·33-25=206≥200, while n=32 gives 199<200.",
+              "evidenceToLookFor": "Explicit net-versus-gross distinction, variable/domain, inequality, round up and checks at 32 and 33."
+            }
+          ],
+          "scoringNotes": "Use the existing 30-point rubric: expressions 5, equations 10, inequalities 10 and modeling/communication 5. Consider independent reasoning, use feedback on misconceptions, and permit a new supervised demonstration of mastery where school policy allows."
+        }
+      ]
+    }
+  ]
+}
