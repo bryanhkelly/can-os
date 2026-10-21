@@ -79,7 +79,7 @@ function StudioView({data}:{data:{
      }}>Create next draft{course.releases.length?" from latest release":""}</button>}
     {course.releases.map(release=><details key={release.id} open={release.status==="draft"} className="mt-4 border-t pt-3">
      <summary>Version {release.version} · {release.status}{release.publishedAt?" · "+new Date(release.publishedAt).toLocaleDateString():""}</summary>
-     {release.status==="draft"?<CurriculumEditor key={release.id} programId={studio.programId} release={release}
+     {release.status==="draft"?<CurriculumEditor key={release.id} programId={studio.programId} courseCode={course.code} release={release}
       onSaved={async()=>{await router.invalidate();}}/>:<div className="mt-3 text-sm">
        <p>Immutable published release. Existing sections remain pinned to their selected release.</p>
        <p>{release.content?.modules.length??0} modules · {release.content?.modules.reduce((count,module)=>count+module.lessons.length,0)??0} lessons</p>

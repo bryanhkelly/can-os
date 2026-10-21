@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { curriculumDraftContent } from "@/domain/curriculum-authoring";
+import { classTeacherGuidesSchema } from "@/domain/class-teacher-guides";
 import { requireActor } from "@/modules/identity/actors.server";
 import { createCurriculumCourse, createCurriculumDraft, publishCurriculumDraft,
   readCurriculumPrograms, readCurriculumStudio, saveCurriculumDraft } from "./curriculum-authoring.server";
@@ -31,7 +32,8 @@ export const startCurriculumDraft = createServerFn({ method: "POST" })
     requestId: z.string().uuid() }).strict().parse(value))
   .handler(async ({ data }) => createCurriculumDraft(await actor(), data));
 export const saveAuthoredCurriculum = createServerFn({ method: "POST" })
-  .validator((value: unknown) => version.extend({ content: curriculumDraftContent }).strict().parse(value))
+  .validator((value: unknown) => version.extend({ content: curriculumDraftContent,
+    teacherGuides: classTeacherGuidesSchema.nullable().optional() }).strict().parse(value))
   .handler(async ({ data }) => saveCurriculumDraft(await actor(), data));
 export const publishAuthoredCurriculum = createServerFn({ method: "POST" })
   .validator((value: unknown) => version.extend({ reason: z.string().trim().min(10).max(2000),
