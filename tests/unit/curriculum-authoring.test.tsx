@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClassContent } from "@/domain/class-content";
-import { assertPublishableCurriculum, curriculumDraftContent } from "@/domain/curriculum-authoring";
+import { assertPublishableCurriculum, curriculumDraftContent, assertTeacherGuidesMatchCourse } from "@/domain/curriculum-authoring";
 import { CurriculumEditor } from "@/components/learning/CurriculumEditor";
 import { Route } from "@/routes/operations.curriculum";
 import { createAuthoredCourse, publishAuthoredCurriculum, saveAuthoredCurriculum } from "@/modules/learning/curriculum-authoring.functions";
@@ -64,6 +64,30 @@ describe("curriculum release contract",()=>{
   expect(()=>curriculumDraftContent.parse({...content,resources:[{id:"private",title:"Private document",documentId:ids.versionId}]}))
    .toThrow("HTTPS resources only");
  });
+ it("keeps protected teacher solutions scoped to the exact course module and lesson",()=>{
+  const guide={version:1 as const,courseCode:"SCI",visibility:"teacher_only" as const,
+   units:[{unitId:"module",reviewStatus:"draft" as const,
+    teacherOverview:"Provide modeling supports and answer checks.",lessons:[{
+     lessonId:"lesson",preparation:"Review the observation materials before class.",
+     workedAnswers:[{prompt:"Explain a guided practice example.",answer:"Demonstrate the steps and verify the stated result."}],
+     misconceptions:["Students might jump to conclusions without evidence."],
+     interventions:["Ask students to describe one observation before inferring a cause."],
+     extensions:[],
+    }],assessments:[]}]};
+  expect(()=>assertTeacherGuidesMatchCourse(content,guide,"SCI")).not.toThrow();
+  expect(()=>assertTeacherGuidesMatchCourse(content,guide,"ALG1")).toThrow("course code");
+  expect(()=>assertTeacherGuidesMatchCourse(content,{...guide,units:[{...guide.units[0]!,unitId:"other"}]},"SCI")).toThrow("module");
+  expect(()=>assertTeacherGuidesMatchCourse(content,{...guide,units:[{...guide.units[0]!,
+   lessons:[{...guide.units[0]!.lessons[0]!,lessonId:"other"}]}]},"SCI")).toThrow("lesson");
+  const html=renderToStaticMarkup(<CurriculumEditor programId={ids.programId} courseCode="SCI"
+   release={{id:ids.versionId,revision:ids.expectedRevision,content,teacherGuides:guide}}
+   onSaved={async()=>{}}/>);
+  expect(html).toContain("Protected teacher guide");
+  expect(html).toContain("Protected worked solution");
+  expect(html).toContain("Likely misconceptions");
+  expect(html).toContain("Targeted interventions");
+  expect(html).toContain("Add worked answer");
+ });
  it("rejects duplicate stable lesson IDs across modules",()=>{
   expect(()=>curriculumDraftContent.parse({...content,modules:[...content.modules,{...content.modules[0]!,id:"another"}]}))
    .toThrow("Duplicate lesson ID");
@@ -105,7 +129,7 @@ describe("curriculum public command boundaries",()=>{
 });
 describe("curriculum studio presentation",()=>{
  it("offers a structured draft editor rather than a raw JSON store",()=>{
-  const html=renderToStaticMarkup(<CurriculumEditor programId={ids.programId}
+  const html=renderToStaticMarkup(<CurriculumEditor programId={ids.programId} courseCode="SCI"
    release={{id:ids.versionId,revision:ids.expectedRevision,content}} onSaved={async()=>{}}/>);
   for(const label of ["Syllabus","Module title","Lesson title","Lesson reading","Add module","Add lesson","Add resource link","Save draft"])
    expect(html).toContain(label);
@@ -123,7 +147,7 @@ describe("curriculum studio presentation",()=>{
    }],
   }]};
   expect(()=>assertPublishableCurriculum(structured)).not.toThrow();
-  const html=renderToStaticMarkup(<CurriculumEditor programId={ids.programId}
+  const html=renderToStaticMarkup(<CurriculumEditor programId={ids.programId} courseCode="SCI"
    release={{id:ids.versionId,revision:ids.expectedRevision,content:structured}} onSaved={async()=>{}}/>);
   for(const text of ["Structured lesson activities","Add activity","Learning targets","Standards",
    "Total lesson minutes","Activity type","Student instructions","Guided fraction practice",
