@@ -174,7 +174,7 @@ export async function savePublisherPackDraft(actor:Actor,input:{
     const previousIds=await courseIds(tx,version.id);
     const current=packCompositionRevision(version.id,previousIds);
     if(current!==input.expectedRevision)throw new Error("This publisher pack draft changed. Reload before saving.");
-    const permitted=await tx.select({id:courseTemplateVersions.id})
+    const permitted=await tx.select({id:courseTemplateVersions.id,courseId:courseTemplates.id})
       .from(courseTemplateVersions)
       .innerJoin(courseTemplates,eq(courseTemplates.id,courseTemplateVersions.courseTemplateId))
       .where(and(inArray(courseTemplateVersions.id,input.courseVersionIds),
@@ -182,6 +182,8 @@ export async function savePublisherPackDraft(actor:Actor,input:{
         eq(courseTemplateVersions.status,"published")));
     if(permitted.length!==input.courseVersionIds.length)
       throw new AuthorizationError("all pack courses must be published and owned by this publisher");
+    if(new Set(permitted.map(row=>row.courseId)).size!==permitted.length)
+      throw new Error("A pack may contain only one published release of each course.");
     if(JSON.stringify(previousIds)===JSON.stringify(input.courseVersionIds))return {revision:current,changed:false};
     await tx.delete(curriculumPackItems).where(eq(curriculumPackItems.packVersionId,version.id));
     await tx.insert(curriculumPackItems).values(input.courseVersionIds.map((id,i)=>({
@@ -209,13 +211,15 @@ export async function publishPublisherPack(actor:Actor,input:{
     validatePackCourseSelection(ids);
     if(input.expectedRevision!==packCompositionRevision(version.id,ids))
       throw new Error("This pack composition changed. Reload before publishing.");
-    const valid=await tx.select({id:courseTemplateVersions.id})
+    const valid=await tx.select({id:courseTemplateVersions.id,courseId:courseTemplates.id})
       .from(courseTemplateVersions)
       .innerJoin(courseTemplates,eq(courseTemplates.id,courseTemplateVersions.courseTemplateId))
       .where(and(inArray(courseTemplateVersions.id,ids),
         eq(courseTemplates.owningOrganizationId,program.organizationId),
         eq(courseTemplateVersions.status,"published")));
     if(valid.length!==ids.length)throw new Error("Some selected course versions are no longer eligible.");
+    if(new Set(valid.map(row=>row.courseId)).size!==valid.length)
+      throw new Error("A pack cannot publish two versions of the same course.");
     await tx.update(curriculumPackVersions).set({status:"published",publishedAt:new Date(),updatedAt:new Date()})
       .where(eq(curriculumPackVersions.id,version.id));
     await writeAudit(tx,actor,{action:"curriculum.pack.publish",entityType:"curriculum_pack_version",
