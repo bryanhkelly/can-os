@@ -1,35 +1,38 @@
-> **Superseded by the publisher → organization → teacher model.** The per-class independently adopted week described below was removed from live classroom delivery in PR #141. The underlying published course contains its weeks. The organization adopts that publisher release; the teacher adds supplements and assignments without altering it. The old database tables remain for nondestructive migration compatibility only. See [Current curriculum architecture](publisher-organization-classroom-architecture.md).
+# Algebra I Week 2: publisher-owned instructional foundation
 
-# Algebra I Week 2: Independent unit foundation
+**Status:** Planning only. Week 2 lessons, assessments, teacher keys, and rubrics have not been authored or released to students by this plan. This material does not establish academic credit or accreditation readiness.
 
-**Status:** Architecture and five-day planning foundation. Week 2 instruction is NOT published to students and does not confer academic credit.
+## Ownership and delivery
 
-## What changed
-- `curriculum_unit_versions`: one organization-owned draft/reviewed/published unit version per base course version and unit key. A published release retains its lesson/module content and teacher guide unchanged.
-- `section_unit_adoptions`: explicitly pins a published, school-approved unit to one existing section, optionally with a future `available_at`. It does **not** change `sections.course_template_version_id`, the marketplace pack or existing grades.
-- Server commands: institutional registrar creates/saves drafts and publishes after review; an *assigned class teacher* independently reviews instructional content and a complete teacher guide; registrar then explicitly pins the release to a same-program/site class.
-- Existing `/classes` renders only available, pinned unit lessons and only returns adopted-unit guide answers for an assigned teacher. Student lesson progress remains under the original pinned course-version identity; Week 1 records do not need copying.
-- Version collisions (lesson, module, activity IDs, duplicated teacher units), mismatched course ownership, wrong review status, stale revisions and attempts to silently repoint existing adopted units are rejected.
+- **Publisher** owns the course sequence, including units, weeks, lessons, and teacher guidance; drafts and publishes controlled whole-course versions.
+- **Organization** licenses, accepts, and selects an eligible publisher course release. It can add organization/site-scoped supplements without editing the publisher's content.
+- **Assigned teacher** determines class pacing and adds section/lesson-scoped supplemental resources, homework, classwork, quizzes, tests, projects, and graded discussion assignments.
+- **Student** sees published lessons from their section's pinned course version. Student submissions, progress, and grades belong to their actual class.
 
-## Week 2 learning sequence
-`curriculum/can-high-school-core/algebra1/week02-development-plan.json` plans:
-1. Multi-step equations with fractional coefficients
-2. Rearranging literal formulas and quantity units
-3. Variables on both sides and denominator clearing
-4. Applied multi-step equations with contextual constraints
-5. Transfer assessment, targeted feedback and reteaching
+A week is a curricular grouping, **not** a separately adopted or published release. No per-week school or teacher approval workflow is necessary. Midyear publisher-version switches are exceptional and explicitly outside this bite's scope.
 
-Five 55-minute teaching days are *planned*, not evidence of actual instructional hours. Formative problem set: planned 20 points. Checkpoint: planned 30 points. Answers, accessible student activities, teacher key and rubrics still require full authoring and qualified educator review. The yearlong roadmap remains **not credit-ready**.
+## Week 2 lesson plan
 
-## Release controls and verification
-- Canonical generated Drizzle migration: `drizzle/0027_big_lady_deathstrike.sql`; migration journal and snapshot committed. New tables were applied and tracked on **Neon test01**, not on production. Existing production data is unchanged by this PR.
-- Automated CI exercises build, TypeScript, Vitest and migration-drift parity; `tests/unit/class-unit-releases.test.ts` covers progress retention, unit review gate, schedule hiding, collisions and teacher-guide separation.
-- **Deployment requirement:** apply committed database migrations in the target environment *before* deploying code that queries `section_unit_adoptions`. The new class loader requires the table even when no units have been adopted. Deploying code first will break class loading.
-- Do not publish Week 2 merely from this planning file. Author it as a draft release through the existing authenticated unit commands, obtain assigned teacher review and explicit school approval, then adopt it to the class.
-- A complete browser and actor-session acceptance is not claimed; per user direction, browser acceptance is skipped.
+The planning artifact is [week02-development-plan.json](../../curriculum/can-high-school-core/algebra1/week02-development-plan.json), which outlines five intended 55-minute sessions:
 
-## Explicit boundaries
-- No changes to production section/course/pack pointers.
-- No synthetic student records or scores inserted here.
-- Review states reflect workflow controls, not accreditation, course credit, legal qualification or UC A-G approval.
-- Future bite: teacher-friendly Unit Studio form and publishing UI, rather than treating developer JSON or API commands as the primary authoring surface.
+1. Multi-step equations with fractional coefficients.
+2. Rearranging literal formulas and checking units.
+3. Variables on both sides and clearing denominators.
+4. Applied multi-step equations with contextual constraints.
+5. Formative checkpoint, feedback, and targeted reteaching.
+
+Two assessments are proposed: 20-point practice and a 30-point teacher-scored checkpoint. These are proposed tasks, not published or assigned assessments. Instructional hours must be verified in actual delivery; five planned periods are not attendance evidence.
+
+## Required before publishing
+
+1. Author student-facing worked explanations, guided and independent practice, self-checks, and accessible exit tickets for all five days.
+2. Provide separate teacher-facing answers, misconception notes, support/reteaching guidance, and rubrics.
+3. Have a qualified math educator review mathematics, standards mapping, accessibility, and scoring.
+4. Release under the publisher's normal **course version** mechanism; schools adopt that course release through existing entitlements/adoptions.
+5. Teachers assign work through the actual class/gradebook, optionally referencing published lessons.
+
+## Database / compatibility
+
+PR #140's `curriculum_unit_versions` and `section_unit_adoptions` tables remain in migration history for backward compatibility, but are **not used** in live classroom delivery or exposed through the old mutable APIs (PR #141). Do not run migrations or seed student/class records to publish this planning file. Do not change existing class pointers or Week 1 progress.
+
+The earlier per-week Unit Studio, teacher review gate, and section-unit adoption design was superseded by [the publisher/organization/teacher architecture](publisher-organization-classroom-architecture.md). Browser acceptance remains deferred at the user's direction.
