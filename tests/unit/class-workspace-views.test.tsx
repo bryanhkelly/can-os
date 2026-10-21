@@ -23,6 +23,7 @@ vi.mock("@/modules/learning/class-workspace.functions", () => ({
   getClassDirectory: vi.fn(), getClassWorkspace: vi.fn(), getClassResourceDownload: vi.fn(), setLessonCompletion: vi.fn(),
 }));
 vi.mock("@/modules/learning/class-communication.functions", () => ({ publishClassAnnouncement: vi.fn() }));
+vi.mock("@/modules/learning/class-supplements.functions", () => ({ addClassSupplement: vi.fn() }));
 vi.mock("@/modules/learning/discussion-teacher-query.functions", () => ({ getTeacherCourseDiscussions: vi.fn() }));
 vi.mock("@/modules/learning/discussion-teacher.functions", () => ({
   createCourseDiscussion: vi.fn(), setCourseDiscussionLock: vi.fn(), moderateDiscussionMessage: vi.fn(),
@@ -140,6 +141,18 @@ describe("published class workspace", () => {
     const syllabus = renderToStaticMarkup(<ClassWorkspace data={workspace} tab="syllabus"/>);
     expect(syllabus).toContain("&lt;script&gt;");
     expect(syllabus).not.toContain("<script>");
+  });
+  it("offers class/lesson supplemental resources only to the assigned teaching role",()=>{
+    const teacher=renderToStaticMarkup(<ClassWorkspace data={{...workspace,role:"teacher"}} tab="files"/>);
+    const student=renderToStaticMarkup(<ClassWorkspace data={workspace} tab="files"/>);
+    const guardian=renderToStaticMarkup(<ClassWorkspace data={{...workspace,role:"guardian"}} tab="files"/>);
+    expect(teacher).toContain("Add a teacher supplement");
+    expect(teacher).toContain("Resource URL");
+    expect(teacher).toContain('value="evidence"');
+    for(const html of [student,guardian]){
+      expect(html).not.toContain("Add a teacher supplement");
+      expect(html).not.toContain("Resource URL");
+    }
   });
   it("lets only teachers publish announcements while all authorized readers see the feed", () => {
     for (const role of ["student", "guardian", "teacher"]) {

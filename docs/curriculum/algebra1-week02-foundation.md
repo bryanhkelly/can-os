@@ -1,3 +1,5 @@
+> **Superseded by the publisher → organization → teacher model.** The per-class independently adopted week described below was removed from live classroom delivery in PR #141. The underlying published course contains its weeks. The organization adopts that publisher release; the teacher adds supplements and assignments without altering it. The old database tables remain for nondestructive migration compatibility only. See [Current curriculum architecture](publisher-organization-classroom-architecture.md).
+
 # Algebra I Week 2: Independent unit foundation
 
 **Status:** Architecture and five-day planning foundation. Week 2 instruction is NOT published to students and does not confer academic credit.

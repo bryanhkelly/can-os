@@ -3,6 +3,7 @@ import { EventTypes } from "@/domain/event-types";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
+import { assertPublisherLessonReference,publisherLessonChoices } from "@/domain/publisher-course-references";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
@@ -134,10 +135,13 @@ export const getGradebook = createServerFn({ method: "GET" })
  .validator((value: unknown) => z.object({ sectionId: z.string().min(1) }).parse(value))
  .handler(async ({ data }) => {
   const context = await teacherActor(data.sectionId);
-  if (!process.env.DATABASE_URL) return { connected: false as const, section: null, students: [], assessments: [], cells: [] };
+  if (!process.env.DATABASE_URL) return { connected: false as const, section: null, students: [], assessments: [], cells: [], curriculumLessons: [] as Array<{id:string;title:string}> };
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-  const [section] = await db.select({ id: s.sections.id, code: s.sections.code, title: s.sections.title })
+  const [section] = await db.select({ id:s.sections.id,code:s.sections.code,
+    title:s.sections.title,versionId:s.sections.courseTemplateVersionId,
+    curriculum:s.courseTemplateVersions.curriculum,status:s.courseTemplateVersions.status })
    .from(s.sections)
+   .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
    .where(and(eq(s.sections.id, data.sectionId), inArray(s.sections.siteId, context.scope.siteIds!), inArray(s.sections.programId,context.scope.programIds??[])))
    .limit(1);
   if (!section) throw new AuthorizationError("section");
@@ -199,7 +203,8 @@ export const getGradebook = createServerFn({ method: "GET" })
 
   return {
    connected: true as const,
-   section,
+   section:{id:section.id,code:section.code,title:section.title},
+   curriculumLessons:publisherLessonChoices(section.curriculum,section.status),
    students: studentRows.map(row => ({
     studentProfileId: row.studentProfileId,
     personId: row.personId,
@@ -212,6 +217,8 @@ export const getGradebook = createServerFn({ method: "GET" })
     dueAt: row.dueAt?.toISOString() ?? null,
     pointsPossible: row.pointsPossible,
     rubric: readRubric(row.metadata?.rubricCriteria),
+    kind:typeof row.metadata?.assignmentKind==="string"?row.metadata.assignmentKind:"classwork",
+    curriculumLessonId:typeof row.metadata?.curriculumLessonId==="string"?row.metadata.curriculumLessonId:null,
    })),
    cells: [...latest.values()].map(row => ({
     submissionId: row.id,
@@ -292,6 +299,8 @@ export const createAssessment = createServerFn({ method: "POST" })
   instructions: z.string().trim().max(20000).optional(),
   rubric: z.string().trim().max(10000).optional(),
   pointsPossible: z.number().finite().min(1).max(1000),
+  assignmentKind:z.enum(["homework","classwork","quiz","test","project","discussion"]).optional().default("classwork"),
+  curriculumLessonId:z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/).optional(),
   dueAt: z.string().refine(v => !Number.isNaN(new Date(v).getTime()), "dueAt must be an ISO date").optional(),
  }).parse(value))
  .handler(async ({ data }) => {
@@ -300,21 +309,31 @@ export const createAssessment = createServerFn({ method: "POST" })
   const dueAt = data.dueAt ? new Date(data.dueAt) : null;
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   return db.transaction(async tx => {
-   const [teachingSection]=await tx.select({id:s.sections.id})
+   const [teachingSection]=await tx.select({
+      id:s.sections.id,versionId:s.sections.courseTemplateVersionId,
+      curriculum:s.courseTemplateVersions.curriculum,status:s.courseTemplateVersions.status,
+     })
     .from(s.sectionTeachers)
     .innerJoin(s.sections,eq(s.sections.id,s.sectionTeachers.sectionId))
+    .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
     .where(and(eq(s.sectionTeachers.personId,context.actorPersonId!),
      eq(s.sections.id,data.sectionId),eq(s.sections.active,true),
      inArray(s.sections.siteId,context.scope.siteIds??[]),
      inArray(s.sections.programId,context.scope.programIds??[])))
     .limit(1);
    if(!teachingSection)throw new AuthorizationError("active teaching assignment in authorized school/program");
+   assertPublisherLessonReference(teachingSection.curriculum,teachingSection.status,data.curriculumLessonId);
    const status = dueAt ? "published" as const : "draft" as const;
    const [assessment] = await tx.insert(s.assessments).values({
     sectionId: data.sectionId,
     title: data.title,
     instructions: data.instructions ?? null,
-    metadata: data.rubric ? {rubric:data.rubric} : {},
+    metadata:{...(data.rubric?{rubric:data.rubric}:{}),
+      assignmentKind:data.assignmentKind,
+      publisherCourseVersionId:teachingSection.versionId,
+      ...(data.curriculumLessonId?{curriculumLessonTitle:publisherLessonChoices(
+        teachingSection.curriculum,teachingSection.status).find(lesson=>lesson.id===data.curriculumLessonId)?.title}:{}),
+      ...(data.curriculumLessonId?{curriculumLessonId:data.curriculumLessonId}:{})},
     status,
     pointsPossible: String(data.pointsPossible),
     dueAt,
