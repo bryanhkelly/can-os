@@ -11,6 +11,10 @@ const state=vi.hoisted(()=>({
  actor:{role:"registrar",actorPersonId:"publisher",capabilities:new Set(["curriculum.publish"]),scope:{}},
  save:vi.fn(),publish:vi.fn(),create:vi.fn(),draft:vi.fn(),
 }));
+vi.mock("@/modules/learning/publisher-pack-authoring.server",()=>({
+ readPublisherPackStudio:vi.fn(),createPublisherPack:vi.fn(),createPublisherPackDraft:vi.fn(),
+ savePublisherPackDraft:vi.fn(),publishPublisherPack:vi.fn(),
+}));
 vi.mock("@/modules/learning/curriculum-authoring.server",()=>({
  saveCurriculumDraft:state.save,publishCurriculumDraft:state.publish,createCurriculumCourse:state.create,
  createCurriculumDraft:state.draft,readCurriculumStudio:vi.fn(),readCurriculumPrograms:vi.fn(),
