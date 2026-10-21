@@ -31,6 +31,7 @@ function StudioView({data}:{data:{
  const studio=data.studio;
  return <main className="mx-auto max-w-5xl space-y-6 px-5 py-10">
   <h1 className="font-serif text-4xl">Curriculum Studio</h1>
+  <Link to="/operations/curriculum-marketplace" search={{programId:studio?.programId}} className="inline-block rounded border px-3 py-2 text-sm underline">Browse curriculum marketplace →</Link>
   <p>Author reusable courses and immutable curriculum releases. Only an explicit institutional publisher grant permits changes.
    Courses are shared within the owning organization; existing classes keep their pinned version.</p>
   <nav aria-label="Curriculum program scope" className="flex flex-wrap gap-3">{data.programs.map(program=>

@@ -15,8 +15,13 @@
   "routes": {
     "/actions/$actionId": {
       "persona": "registrar, teacher, specialist, counselor",
-      "seeds": ["staff-experiences-v1.sql"],
-      "recordCounts": {"actions": 1, "insights": 1},
+      "seeds": [
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "insights": 1
+      },
       "interactions": [
         "registrar opens an existing scoped operational Action by ID",
         "accept an authorized academic insight and open the created Action",
@@ -26,21 +31,52 @@
     },
     "/counselor": {
       "persona": "counselor",
-      "seeds": ["gf41-support-referrals.sql"],
-      "recordCounts": {"actions": 1, "support_referrals": 1},
-      "interactions": ["read scoped support caseload", "open exact student context", "log school-support outreach"],
-      "downstreamRecords": ["actions", "audit_events", "domain_events"]
+      "seeds": [
+        "gf41-support-referrals.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "support_referrals": 1
+      },
+      "interactions": [
+        "read scoped support caseload",
+        "open exact student context",
+        "log school-support outreach"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
     },
     "/support": {
       "persona": "specialist, counselor",
-      "seeds": ["gf41-support-referrals.sql"],
-      "recordCounts": {"actions": 1, "support_referrals": 1},
-      "interactions": ["triage referral", "save plan", "schedule and complete service", "review and close referral"],
-      "downstreamRecords": ["support_plans", "support_services", "support_referral_stage_events", "audit_events", "domain_events"]
+      "seeds": [
+        "gf41-support-referrals.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "support_referrals": 1
+      },
+      "interactions": [
+        "triage referral",
+        "save plan",
+        "schedule and complete service",
+        "review and close referral"
+      ],
+      "downstreamRecords": [
+        "support_plans",
+        "support_services",
+        "support_referral_stage_events",
+        "audit_events",
+        "domain_events"
+      ]
     },
     "/classes": {
       "persona": "student, guardian, teacher",
-      "seeds": ["class-participation.sql"],
+      "seeds": [
+        "class-participation.sql"
+      ],
       "recordCounts": {
         "sections": 1,
         "course_template_versions": 1,
@@ -52,7 +88,13 @@
         "publish and read a class announcement",
         "open section-scoped classwork and discussions"
       ],
-      "downstreamRecords": ["lesson_progress", "communication_threads", "communication_messages", "audit_events", "domain_events"]
+      "downstreamRecords": [
+        "lesson_progress",
+        "communication_threads",
+        "communication_messages",
+        "audit_events",
+        "domain_events"
+      ]
     },
     "/": {
       "fixtureRequired": false,
@@ -419,7 +461,11 @@
         "show initials without a verified photo",
         "upload own JPEG or PNG through private storage"
       ],
-      "downstreamRecords": ["documents", "audit_events", "domain_events"]
+      "downstreamRecords": [
+        "documents",
+        "audit_events",
+        "domain_events"
+      ]
     },
     "/readiness": {
       "persona": "registrar",
@@ -828,7 +874,10 @@
     },
     "/operations/curriculum": {
       "persona": "registrar",
-      "seeds": ["new-experiences-v1.sql", "curriculum-authoring.sql"],
+      "seeds": [
+        "new-experiences-v1.sql",
+        "curriculum-authoring.sql"
+      ],
       "recordCounts": {
         "memberships": 1,
         "role_assignments": 1,
@@ -842,7 +891,11 @@
         "provision a new section from the release without changing existing classes"
       ],
       "downstreamRecords": [
-        "course_templates", "course_template_versions", "sections", "audit_events", "domain_events"
+        "course_templates",
+        "course_template_versions",
+        "sections",
+        "audit_events",
+        "domain_events"
       ]
     },
     "/operations/school-years": {
@@ -1047,6 +1100,32 @@
       "downstreamRecords": [
         "field_trip_participants",
         "audit_events"
+      ]
+    },
+    "/operations/curriculum-marketplace": {
+      "persona": "registrar",
+      "seeds": [
+        "valor-curriculum-marketplace.sql"
+      ],
+      "recordCounts": {
+        "curriculum_packs": 1,
+        "curriculum_pack_versions": 1,
+        "curriculum_pack_items": 32,
+        "curriculum_entitlements": 1,
+        "curriculum_adoptions": 1
+      },
+      "interactions": [
+        "browse published pack releases in the verified organization",
+        "install the pack after accepting stated license",
+        "adopt the installed release for the authorized program",
+        "add an HTTPS resource to an adopted course scope"
+      ],
+      "downstreamRecords": [
+        "curriculum_entitlements",
+        "curriculum_adoptions",
+        "curriculum_overlays",
+        "audit_events",
+        "domain_events"
       ]
     }
   }
