@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const application = "postgres://synthetic:synthetic@application.example.invalid/disposable";
 const disposable = "postgres://synthetic:synthetic@test.example.invalid/disposable";
 function preflight(overrides: NodeJS.ProcessEnv = {}) {
-  return spawnSync(process.execPath, ["scripts\\run-admissions-e2e.mjs", "--preflight"], {
+  return spawnSync(process.execPath, ["scripts/run-admissions-e2e.mjs", "--preflight"], {
     encoding: "utf8",
     env: { ...process.env, NODE_ENV: "test", CAN_TEST_DB_WRITES_ENABLED: "true",
       DATABASE_URL: application, TEST_DATABASE_URL: disposable, CAN_APPLICATION_DB_HOST: "application.example.invalid",

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
 import { AuthorizationError } from "@/domain/command-context";
@@ -53,11 +53,51 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       threadId: s.communicationMessages.threadId, body: s.communicationMessages.body,
     }).from(s.communicationMessages).where(inArray(s.communicationMessages.threadId, announcements.map(row => row.id)))
       .orderBy(s.communicationMessages.sentAt) : [];
+    // Supplements are separately owned records, never edits to a published publisher release.
+    // The authorized section determines program, site and version; browser input cannot widen the scope.
+    const overlayRows = await db.select({
+      id:s.curriculumOverlays.id,title:s.curriculumOverlays.title,kind:s.curriculumOverlays.kind,
+      url:s.curriculumOverlays.url,resourceId:s.curriculumOverlays.resourceId,siteId:s.curriculumOverlays.siteId,
+      sectionId:s.curriculumOverlays.sectionId,lessonId:s.curriculumOverlays.lessonId,
+    }).from(s.curriculumOverlays).where(and(
+      eq(s.curriculumOverlays.programId,section.programId),
+      eq(s.curriculumOverlays.courseTemplateVersionId,section.versionId),
+      eq(s.curriculumOverlays.status,"active")));
+    const attachedResourceIds=overlayRows.map(item=>item.resourceId).filter((id):id is string=>!!id);
+    const attached=attachedResourceIds.length?await db.select({
+      id:s.curriculumResources.id,url:s.curriculumResources.url,
+    }).from(s.curriculumResources).where(inArray(s.curriculumResources.id,attachedResourceIds)):[];
+    const supplements=overlayRows.filter(item=>
+      item.sectionId ? item.sectionId===section.id :
+      item.siteId ? item.siteId===section.siteId : true,
+    ).map(item=>({id:item.id,title:item.title,kind:item.kind,
+      url:item.resourceId?attached.find(resource=>resource.id===item.resourceId)?.url??null:item.url,
+      lessonId:item.lessonId}));
+    // Pack-level resources are only visible when the program has an active adoption
+    // AND the owning organization has an active entitlement. Bindings are read-only.
+    const publisherRows=await db.select({
+      id:s.curriculumResources.id,title:s.curriculumResources.title,
+      kind:s.curriculumResources.kind,url:s.curriculumResources.url,
+      lessonId:s.curriculumResourceBindings.lessonId,
+    }).from(s.curriculumAdoptions)
+      .innerJoin(s.curriculumEntitlements,and(
+        eq(s.curriculumEntitlements.packId,s.curriculumAdoptions.packId),
+        eq(s.curriculumEntitlements.organizationId,s.curriculumAdoptions.organizationId),
+        eq(s.curriculumEntitlements.status,"active")))
+      .innerJoin(s.curriculumResourceBindings,
+        eq(s.curriculumResourceBindings.packVersionId,s.curriculumAdoptions.packVersionId))
+      .innerJoin(s.curriculumResources,
+        eq(s.curriculumResources.id,s.curriculumResourceBindings.resourceId))
+      .where(and(eq(s.curriculumAdoptions.programId,section.programId),
+        eq(s.curriculumAdoptions.status,"active"),
+        or(eq(s.curriculumResourceBindings.courseTemplateVersionId,section.versionId),
+           isNull(s.curriculumResourceBindings.courseTemplateVersionId))));
+    const allSupplements=[...publisherRows.map(row=>({...row})),...supplements];
     const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.map(lesson => lesson.id)) ?? []);
     return {
       role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,
         subject: section.subject, versionId: section.versionId, contentStatus: section.contentStatus },
-      studentPersonId, content,
+      studentPersonId, content, supplements:allSupplements,
       teachers: teachers.map(row => ({ personId: row.personId, name: `${row.preferredName ?? row.firstName} ${row.lastName}` })),
       progress: progress.filter(row => lessonIds.has(row.lessonId)).map(row => ({ lessonId: row.lessonId, completedAt: row.completedAt?.toISOString() ?? null })),
       roster: [...new Map(roster.map(row => [row.profileId, {
