@@ -9,6 +9,7 @@ import {
  gradeSubmission,
 } from "@/modules/learning/gradebook.functions";
 import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
+import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
 import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -45,6 +46,8 @@ function TeacherGradebookPage() {
  const gridRef = useRef<HTMLDivElement | null>(null);
  const [title, setTitle] = useState("");
  const [instructions, setInstructions] = useState("");
+ const [newRubric, setNewRubric] = useState<Array<{id:string;label:string;maxPoints:string;description:string}>>([]);
+ const rubricSequence=useRef(0);
  const [points, setPoints] = useState("");
  const [due, setDue] = useState("");
  const [assignmentKind,setAssignmentKind]=useState<"homework"|"classwork"|"quiz"|"test"|"project"|"discussion">("classwork");
@@ -191,7 +194,15 @@ function TeacherGradebookPage() {
 
  const submitAssessment = async () => {
   const pointsValue = Number(points);
-  if (!title.trim() || !Number.isFinite(pointsValue)) { setNotice("Enter a title and a numeric point value."); return; }
+  if (!title.trim() || !Number.isFinite(pointsValue) || pointsValue < 1 || pointsValue > 1000) {
+   setNotice("Enter a title and a point value between 1 and 1000."); return;
+  }
+  const rubricCriteria = newRubric.map(row=>({
+   id:row.id,label:row.label.trim(),maxPoints:row.maxPoints.trim()?Number(row.maxPoints):NaN,
+   ...(row.description.trim()?{description:row.description.trim()}:{}),
+  }));
+  try { validateAssessmentRubric(rubricCriteria,pointsValue); }
+  catch(cause){setNotice(cause instanceof Error?cause.message:"Invalid scoring rubric.");return;}
   setBusy(true);
   setNotice("");
   try {
@@ -200,6 +211,7 @@ function TeacherGradebookPage() {
     title,
     instructions,
     pointsPossible: pointsValue,
+    rubricCriteria,
     assignmentKind,
     ...(curriculumLessonId?{curriculumLessonId}:{}),
     ...(due ? { dueAt: new Date(`${due}T23:59:00`).toISOString() } : {}),
@@ -207,6 +219,7 @@ function TeacherGradebookPage() {
    setNotice(result.status === "published" ? "Assessment published and assigned to enrolled students." : "Assessment saved as a draft.");
    setTitle("");
    setInstructions("");
+   setNewRubric([]);
    setPoints("");
    setDue("");
    setCurriculumLessonId("");
@@ -355,6 +368,30 @@ function TeacherGradebookPage() {
       <textarea aria-label="Student assignment instructions" className="mt-2 w-full rounded-lg border bg-background p-3" rows={5} maxLength={20000}
        value={instructions} onChange={event=>setInstructions(event.target.value)} placeholder="Directions, deliverables, submission requirements and allowed resources." />
      </label>
+     <fieldset className="mt-4 rounded-lg border p-4">
+      <legend className="px-1 text-sm font-semibold">Scoring rubric (optional)</legend>
+      <p className="mb-3 text-xs text-muted-foreground">Add criteria for graded projects, tests, discussions or other work. Criterion points must sum to the assignment's points possible.</p>
+      {newRubric.map((criterion,index)=><div key={criterion.id} className="mb-3 grid gap-2 rounded-lg border p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
+       <label className="text-xs font-semibold">Criterion {index+1}
+        <input aria-label={"Criterion "+(index+1)+" name"} className="mt-1 w-full rounded border bg-background p-2"
+         value={criterion.label} maxLength={120} placeholder="e.g. Mathematical reasoning"
+         onChange={event=>setNewRubric(rows=>rows.map(row=>row.id===criterion.id?{...row,label:event.target.value}:row))}/>
+       </label>
+       <label className="text-xs font-semibold">Points
+        <input aria-label={"Criterion "+(index+1)+" points"} className="mt-1 w-full rounded border bg-background p-2"
+         type="number" min={0.01} step="0.01" max={1000} value={criterion.maxPoints}
+         onChange={event=>setNewRubric(rows=>rows.map(row=>row.id===criterion.id?{...row,maxPoints:event.target.value}:row))}/>
+       </label>
+       <button type="button" className="self-end rounded border px-3 py-2 text-xs" onClick={()=>setNewRubric(rows=>rows.filter(row=>row.id!==criterion.id))}>Remove</button>
+       <label className="text-xs font-semibold sm:col-span-3">Description (optional)
+        <textarea aria-label={"Criterion "+(index+1)+" description"} className="mt-1 w-full rounded border bg-background p-2"
+         rows={2} maxLength={1000} value={criterion.description}
+         onChange={event=>setNewRubric(rows=>rows.map(row=>row.id===criterion.id?{...row,description:event.target.value}:row))}/>
+       </label>
+      </div>)}
+      <button type="button" disabled={newRubric.length>=20} className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+       onClick={()=>setNewRubric(rows=>[...rows,{id:"criterion-"+(++rubricSequence.current),label:"",maxPoints:"",description:""}])}>Add rubric criterion</button>
+     </fieldset>
      <p className="mt-2 text-xs text-muted-foreground">The assignment belongs to this teacher's class. Linking to a publisher lesson preserves the original curriculum.</p>
      <p className="mt-3 text-xs text-muted-foreground">Assessments with a due date are published and assigned to enrolled students; without one they are saved as drafts.</p>
      <button disabled={busy} onClick={submitAssessment} className="mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Create assessment</button>

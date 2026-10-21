@@ -4,6 +4,7 @@ import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
 import { assertPublisherLessonReference,publisherLessonChoices } from "@/domain/publisher-course-references";
+import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
@@ -298,6 +299,9 @@ export const createAssessment = createServerFn({ method: "POST" })
   title: z.string().trim().min(3).max(200),
   instructions: z.string().trim().max(20000).optional(),
   rubric: z.string().trim().max(10000).optional(),
+  rubricCriteria: z.array(z.object({
+   id: z.string(), label: z.string(), maxPoints: z.number(), description: z.string().optional(),
+  }).strict()).max(20).optional(),
   pointsPossible: z.number().finite().min(1).max(1000),
   assignmentKind:z.enum(["homework","classwork","quiz","test","project","discussion"]).optional().default("classwork"),
   curriculumLessonId:z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/).optional(),
@@ -306,6 +310,7 @@ export const createAssessment = createServerFn({ method: "POST" })
  .handler(async ({ data }) => {
   const context = await teacherActor(data.sectionId);
   assertCapability(context, "assignments:create");
+  const rubricCriteria = validateAssessmentRubric(data.rubricCriteria ?? [], data.pointsPossible);
   const dueAt = data.dueAt ? new Date(data.dueAt) : null;
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   return db.transaction(async tx => {
@@ -329,6 +334,7 @@ export const createAssessment = createServerFn({ method: "POST" })
     title: data.title,
     instructions: data.instructions ?? null,
     metadata:{...(data.rubric?{rubric:data.rubric}:{}),
+      ...(rubricCriteria.length?{rubricCriteria,rubricVersion:1}:{}),
       assignmentKind:data.assignmentKind,
       publisherCourseVersionId:teachingSection.versionId,
       ...(data.curriculumLessonId?{curriculumLessonTitle:publisherLessonChoices(
