@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ClassWorkspace } from "@/routes/classes";
@@ -65,6 +66,25 @@ describe("published class workspace", () => {
       expect(renderToStaticMarkup(<ClassWorkspace data={{ ...workspace, role }} tab="lessons" lessonId="evidence"/>))
         .not.toContain("Mark lesson complete");
     }
+  });
+  it("renders the 36-week provisional blueprint and typed lesson activities in the real Classes workspace",()=>{
+    const blueprint=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/yearlong-blueprint.json",import.meta.url),"utf8"));
+    const unit=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/unit01-week01.json",import.meta.url),"utf8"));
+    const content=classContentSchema.parse({version:1,syllabus:"Unit 1 preview",blueprint,
+      modules:[{id:unit.unitId,title:unit.title,lessons:unit.lessons}],resources:[]});
+    const data={...workspace,content};
+    const overview=renderToStaticMarkup(<ClassWorkspace data={data}/>);
+    expect(overview).toContain("Yearlong course roadmap");
+    expect(overview).toContain("1 of 36 weeks authored");
+    expect(overview).toContain("not certified as credit-ready");
+    expect(overview).toContain("Planning only");
+    const day=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="u01-d01"/>);
+    expect(day).toContain("Learning targets");
+    expect(day).toContain("Estimated lesson time: ");
+    expect(day).toContain("Guided Practice");
+    expect(day).toContain("Independent Practice");
+    expect(day).toContain("Mark lesson complete");
+    expect(day).not.toContain("ALGEBRA I • UNIT 1 • DAY 1 OF 5");
   });
   it("retains the selected child in parent class and assignment links", () => {
     const html = renderToStaticMarkup(<ClassWorkspace data={{ ...workspace, role: "guardian", roster: [] }} tab="lessons"/>);
