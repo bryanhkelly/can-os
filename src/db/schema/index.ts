@@ -30,3 +30,5 @@ export * from "./notification-preferences";
 export * from "./educational-capacity";
 export * from "./section-planning";
 export * from "./learning-participation";
+
+export * from "./curriculum-marketplace";
