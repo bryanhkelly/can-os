@@ -55,3 +55,9 @@ No distinct account, organization or demo-only route is created. The existing Va
 - `src/modules/learning/oneroster-import.functions.ts` exposes an authorized registrar-only **validation and audit-staging** command. Reports are stored in `curriculum_import_jobs` with content SHA-256 and source ownership scope. It deliberately does **not** change `people`, `enrollments`, class memberships, gradebooks, assignment scores, or provider identifiers.
 - 1EdTech OneRoster 1.2 CSV/REST **conformance is not claimed**. Supported headers are a guarded subset; implement specification-level profiles, optional data, interoperability partner tests, exports, and authenticated delta/grade synchronization before marking this production-ready.
 - Keep this preview non-disruptive to existing ValorSchool accounts. Real school data must require source-system authorization, a reconciliation report, explicit record matching, consent/privacy review and a reversible staged apply workflow.
+
+## OneRoster 1.2 roster export profile
+
+The registrar-scoped school/program workspace now includes a **bulk roster CSV ZIP exporter**. It emits the official `manifest.csv` with an `oneroster.version` of `1.2`, and the academicSessions, orgs, courses, classes, users, roles, and enrollments files. It includes only active authorized classes and their students and teaching staff, requires `registrations:approve`, records audit/outbox evidence, and never exports passwords. The ZIP payload is returned only over a private, non-cacheable authenticated POST with a 4 MB direct-download bound.
+
+This is a **roster-only profile** and has not passed the 1EdTech certification validator. OneRoster REST 1.2, inbound CSV, grade/results/lineItem import/export, differential sync and external sourcedId reconciliation remain tracked in [issue #129](https://github.com/bryanhkelly/can-os/issues/129). Retain export permission checks when connecting OneRoster to outside vendors.
