@@ -292,9 +292,27 @@ integration("governed curriculum authoring through classroom delivery",()=>{
       reason:"Publisher releases Algebra I pack for licensed schools.",confirmed:true,
     }});
 
-    state.actor=staff;
+    // Buying school registrar receives ONLY curriculum.adopt, not the
+    // unrelated publisher's curriculum.publish authoring grant.
+    const adopterPerson=first(await tx.insert(s.people).values({
+      legalFirstName:"School",legalLastName:"Curriculum Adopter",
+    }).returning());
+    await tx.insert(s.memberships).values({personId:adopterPerson.id,organizationId:org.id});
+    await tx.insert(s.roleAssignments).values({
+      personId:adopterPerson.id,organizationId:org.id,siteId:site.id,
+      programId:program.id,roleKey:"curriculum_adopter",capabilities:["curriculum.adopt"],
+    });
+    const adopterActor:AccessContext={...staff,actorPersonId:adopterPerson.id,
+      accountId:crypto.randomUUID(),sessionId:crypto.randomUUID(),grantId:crypto.randomUUID(),
+      scope:{organizationIds:[org.id],siteIds:[site.id],programIds:[program.id]}};
+    state.actor=adopterActor;
+    await expect(flow.getCurriculumStudio({data:scope})).rejects.toThrow("publisher");
     const marketplace=await import("@/modules/learning/curriculum-marketplace.functions");
+    expect(await marketplace.getCurriculumAdopterPrograms()).toEqual([
+      {id:program.id,name:program.name},
+    ]);
     const market=await marketplace.getCurriculumMarketplace({data:scope});
+    expect(market.canPublish).toBe(false);
     expect(market.packs.some(p=>p.id===publisherPack.packId&&p.courses.some(
       c=>c.courseVersionId===foreignDraft.versionId))).toBe(true);
     const programIdentity={id:program.id,organizationId:org.id,academicProviderOrganizationId:org.id};
@@ -311,8 +329,16 @@ integration("governed curriculum authoring through classroom delivery",()=>{
       ...scope,packId:publisherPack.packId,versionId:publisherPack.versionId,
     }});
     expect(adopted.adopted).toBe(true);
+    const orgSupplement=await marketplace.addMarketplaceSupplement({data:{
+      ...scope,courseVersionId:foreignDraft.versionId,scope:"program",
+      title:"School supplemental equation reference",kind:"link",
+      url:"https://www.khanacademy.org/math/algebra",
+      lessonId:"algebra1-equations",
+    }});
+    expect(orgSupplement.supplementId).toBeTruthy();
     const eligible=await listLaunchEligibleCourses(programIdentity,tx);
     expect(eligible.some(c=>c.versionId===foreignDraft.versionId)).toBe(true);
+    state.actor=staff; // Launch still requires the school's separate program-launch grant.
     const selected=await provisionLaunchSection({data:{
       ...provision,courseTemplateVersionId:foreignDraft.versionId,code:`EXT-${suffix}`,
       title:"Adopted Publisher Algebra I",
@@ -355,6 +381,8 @@ integration("governed curriculum authoring through classroom delivery",()=>{
     expect(studentWorkspace.teacherGuides).toBeNull();
     expect(studentWorkspace.supplements.some(r=>r.title==="Teacher practice extension"&&
       r.source==="teacher")).toBe(true);
+    expect(studentWorkspace.supplements.some(r=>r.title==="School supplemental equation reference"&&
+      r.source==="organization")).toBe(true);
     const {getAssignments,saveAssignmentResponse}=await import("@/modules/student-experience/assignments.functions");
     const assignments=await getAssignments();
     expect(assignments.assignments.some(a=>a.assessmentId===task.assessmentId&&

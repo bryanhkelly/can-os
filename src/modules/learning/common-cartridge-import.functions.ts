@@ -8,6 +8,7 @@ import { curriculumImportJobs, programs } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { inspectCommonCartridgeZip } from "@/domain/common-cartridge";
 import { requireActor } from "@/modules/identity/actors.server";
+import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { readMarketplace } from "./curriculum-marketplace.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
@@ -20,10 +21,11 @@ const incoming=context.extend({
 async function authorize(programId:string){
  const actor=await requireActor(["registrar"],"curriculum.publish");
  await readMarketplace(actor,programId);
- const [program]=await db.select({organizationId:programs.organizationId,siteId:programs.siteId})
+ const [program]=await db.select({id:programs.id,organizationId:programs.organizationId,siteId:programs.siteId})
    .from(programs).where(eq(programs.id,programId)).limit(1);
- if(!program||!actor.scope.organizationIds?.includes(program.organizationId))
-   throw new AuthorizationError("publisher organization");
+ if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
+   !await hasInstitutionalProgramCapability(actor,program,"curriculum.publish"))
+   throw new AuthorizationError("explicit publisher authority for curriculum import");
  return {actor,program};
 }
 

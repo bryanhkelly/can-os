@@ -2,11 +2,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireActor } from "@/modules/identity/actors.server";
-import { readMarketplace, installPack, adoptPack, addCurriculumSupplement } from "./curriculum-marketplace.server";
+import { readMarketplace, readCurriculumAdopterPrograms, installPack, adoptPack, addCurriculumSupplement } from "./curriculum-marketplace.server";
 
 const uuid=z.string().uuid();
 const program=z.object({programId:uuid}).strict();
-const actor=()=>requireActor(["registrar"],"curriculum.publish");
+const actor=()=>requireActor(["registrar"]);
+export const getCurriculumAdopterPrograms=createServerFn({method:"GET"})
+ .handler(async()=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  return readCurriculumAdopterPrograms(await actor());
+ });
 export const getCurriculumMarketplace=createServerFn({method:"GET"})
  .validator((input:unknown)=>program.parse(input))
  .handler(async({data})=>{
