@@ -13,16 +13,39 @@ import { emitEvent, writeAudit } from "@/platform/mutation";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const publishCapability = "curriculum.publish";
+export const adoptionCapability = "curriculum.adopt";
 
 async function authorizedProgram(actor: Actor, programId: string, tx: Pick<Tx, "select"> = db) {
  const [program] = await tx.select().from(programs).where(eq(programs.id,programId)).limit(1);
- if (!program || !await hasInstitutionalProgramCapability(actor,program,publishCapability,tx))
-  throw new AuthorizationError("institutional curriculum publishing capability and program scope");
+ if (!program || !await hasInstitutionalProgramCapability(actor,program,adoptionCapability,tx) &&
+     !await hasInstitutionalProgramCapability(actor,program,publishCapability,tx))
+  throw new AuthorizationError("institutional curriculum adoption grant and program scope");
  return program;
+}
+
+/** A school may buy/adopt without holding a publisher's authoring grant. */
+export async function readCurriculumAdopterPrograms(actor:Actor){
+ if(actor.role!=="registrar"||
+   !actor.capabilities.has(adoptionCapability)&&!actor.capabilities.has(publishCapability))
+  throw new AuthorizationError("school curriculum program access");
+ const orgIds=actor.scope.organizationIds??[];
+ const programIds=actor.scope.programIds??[];
+ const siteIds=actor.scope.siteIds??[];
+ if(!orgIds.length||!programIds.length||!siteIds.length)return [];
+ const rows=await db.select({id:programs.id,name:programs.name,organizationId:programs.organizationId,
+  siteId:programs.siteId}).from(programs)
+  .where(and(inArray(programs.id,programIds),inArray(programs.organizationId,orgIds),
+    inArray(programs.siteId,siteIds))).orderBy(asc(programs.name));
+ const valid=await Promise.all(rows.map(async p=>({
+  p,granted:await hasInstitutionalProgramCapability(actor,p,adoptionCapability) ||
+    await hasInstitutionalProgramCapability(actor,p,publishCapability),
+ })));
+ return valid.filter(x=>x.granted).map(x=>({id:x.p.id,name:x.p.name}));
 }
 
 export async function readMarketplace(actor: Actor, programId: string) {
  const program = await authorizedProgram(actor,programId);
+ const canPublish=await hasInstitutionalProgramCapability(actor,program,publishCapability);
  const packs = await db.select({
   id: curriculumPacks.id, slug: curriculumPacks.slug, name: curriculumPacks.name,
   description: curriculumPacks.description, publisherOrganizationId: curriculumPacks.publisherOrganizationId,
@@ -66,7 +89,7 @@ export async function readMarketplace(actor: Actor, programId: string) {
  const classSections=await db.select({id:sections.id,title:sections.title,courseVersionId:sections.courseTemplateVersionId})
   .from(sections).where(eq(sections.programId,program.id)).orderBy(asc(sections.title));
  return {
-  program:{id:program.id,name:program.name,siteId:program.siteId},
+  program:{id:program.id,name:program.name,siteId:program.siteId},canPublish,
   packs:packs.map(pack=>({
    ...pack,courses:items.filter(item=>item.packVersionId===pack.versionId),
    entitlement:entitlements.find(e=>e.packId===pack.id)?.status??null,
