@@ -53,11 +53,25 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       threadId: s.communicationMessages.threadId, body: s.communicationMessages.body,
     }).from(s.communicationMessages).where(inArray(s.communicationMessages.threadId, announcements.map(row => row.id)))
       .orderBy(s.communicationMessages.sentAt) : [];
+    // Supplements are separately owned records, never edits to a published publisher release.
+    // The authorized section determines program, site and version; browser input cannot widen the scope.
+    const overlayRows = await db.select({
+      id:s.curriculumOverlays.id,title:s.curriculumOverlays.title,kind:s.curriculumOverlays.kind,
+      url:s.curriculumOverlays.url,siteId:s.curriculumOverlays.siteId,
+      sectionId:s.curriculumOverlays.sectionId,lessonId:s.curriculumOverlays.lessonId,
+    }).from(s.curriculumOverlays).where(and(
+      eq(s.curriculumOverlays.programId,section.programId),
+      eq(s.curriculumOverlays.courseTemplateVersionId,section.versionId),
+      eq(s.curriculumOverlays.status,"active")));
+    const supplements=overlayRows.filter(item=>
+      item.sectionId ? item.sectionId===section.id :
+      item.siteId ? item.siteId===section.siteId : true,
+    ).map(item=>({id:item.id,title:item.title,kind:item.kind,url:item.url,lessonId:item.lessonId}));
     const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.map(lesson => lesson.id)) ?? []);
     return {
       role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,
         subject: section.subject, versionId: section.versionId, contentStatus: section.contentStatus },
-      studentPersonId, content,
+      studentPersonId, content, supplements,
       teachers: teachers.map(row => ({ personId: row.personId, name: `${row.preferredName ?? row.firstName} ${row.lastName}` })),
       progress: progress.filter(row => lessonIds.has(row.lessonId)).map(row => ({ lessonId: row.lessonId, completedAt: row.completedAt?.toISOString() ?? null })),
       roster: [...new Map(roster.map(row => [row.profileId, {
