@@ -1,11 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
-import { db } from "@/db/client";
-import { activities, activitySeasons, programs } from "@/db/schema";
-import { requireActor } from "@/modules/identity/actors.server";
-import { createExtendedSeasonDraft } from "./extended-learning-service";
-
 const extendedTypes = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const draftInput = z.object({
@@ -20,6 +15,10 @@ const draftInput = z.object({
 
 /** Only Programs under the verified registrar's organization, site and program scopes. */
 export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).handler(async () => {
+  // Keep server-only DB and identity imports out of UI component/module evaluation.
+  const [{ db }, { activities, activitySeasons, programs }, { requireActor }] = await Promise.all([
+    import("@/db/client"), import("@/db/schema"), import("@/modules/identity/actors.server"),
+  ]);
   const actor = await requireActor(["registrar"], "program.read");
   const ids = actor.scope.programIds ?? [];
   const siteIds = actor.scope.siteIds ?? [];
@@ -52,6 +51,9 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
 export const createExtendedSeasonDraftFn = createServerFn({ method: "POST" })
   .validator((value: unknown) => draftInput.parse(value))
   .handler(async ({ data }) => {
+    const [{ requireActor }, { createExtendedSeasonDraft }] = await Promise.all([
+      import("@/modules/identity/actors.server"), import("./extended-learning-service"),
+    ]);
     const actor = await requireActor(["registrar"], "program.launch.start");
     return createExtendedSeasonDraft(actor, data);
   });
