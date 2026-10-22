@@ -25,7 +25,7 @@ export function StudentSuccessSupportPanel({
       <ul className="grid gap-3">
         {support.tasks.map(task => <li key={task.id} className="rounded-lg border p-3">
           <p className="text-xs text-muted-foreground">
-            {task.status.replaceAll("_", " ")}
+            {task.status === "resolved" ? "Teacher confirmed goal met" : task.status.replaceAll("_", " ")}
             {task.dueAt ? ` · Due ${new Date(task.dueAt).toLocaleDateString()}` : ""}
           </p>
           <p className="mt-1 font-semibold">
@@ -35,6 +35,12 @@ export function StudentSuccessSupportPanel({
               : <Link to="/student/experiences" search={{ action: task.destinationId }}
                   className="underline">{task.title}</Link>}
           </p>
+          {task.goalOutcome && <p className="mt-2 text-sm font-medium">
+            {task.goalOutcome === "met" ? "Goal met after teacher review" : "Teacher recommends more practice"}
+          </p>}
+          {task.studentFeedback && <p className="mt-1 text-sm">
+            Teacher feedback: {task.studentFeedback}
+          </p>}
         </li>)}
       </ul>
       {support.truncated && <p className="mt-3 text-xs text-muted-foreground">
