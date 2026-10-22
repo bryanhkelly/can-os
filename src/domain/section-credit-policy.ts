@@ -9,11 +9,22 @@ export function verifiedSectionCreditUnits(metadata: Record<string,unknown>): nu
   return value;
 }
 
-export function requireKnownTranscriptCredits(rows:readonly {
-  creditConfigured:boolean;
-  creditsAttempted:number|null;
-  creditsEarned:number|null;
-}[]):void {
-  if(rows.some(r=>!r.creditConfigured||r.creditsAttempted===null||r.creditsEarned===null))
-    throw new Error("Official transcript issuance requires explicitly configured credit units for every included course");
+/**
+ * A transcript reflects what the school has recorded; it does not certify
+ * graduation. Missing credits are disclosed, never imputed and never used as
+ * an issuance eligibility gate. This is informational evidence only.
+ *
+ * Diploma/graduation eligibility is a separate institution-approved decision,
+ * which must validate earned credits against explicit graduation requirements.
+ */
+export function countTranscriptRowsWithUnrecordedCredits(rows: readonly {
+  creditConfigured?: boolean;
+  creditsAttempted?: number | null;
+  creditsEarned?: number | null;
+}[]): number {
+  return rows.filter(row =>
+    row.creditConfigured === false ||
+    row.creditsAttempted == null ||
+    row.creditsEarned == null,
+  ).length;
 }
