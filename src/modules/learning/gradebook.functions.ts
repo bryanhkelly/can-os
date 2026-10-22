@@ -292,7 +292,7 @@ export const gradeSubmission = createServerFn({ method: "POST" })
   return { submissionId: data.submissionId };
  });
 
-/** Create an assessment for a section the teacher teaches; published when a due date is set. */
+/** Assignment visibility is explicit, never inferred from a due date. */
 export const createAssessment = createServerFn({ method: "POST" })
  .validator((value: unknown) => z.object({
   sectionId: z.string().min(1),
@@ -306,12 +306,14 @@ export const createAssessment = createServerFn({ method: "POST" })
   assignmentKind:z.enum(["homework","classwork","quiz","test","project","discussion"]).optional().default("classwork"),
   curriculumLessonId:z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/).optional(),
   dueAt: z.string().refine(v => !Number.isNaN(new Date(v).getTime()), "dueAt must be an ISO date").optional(),
- }).parse(value))
+  publishNow:z.boolean().optional().default(false),
+ }).strict().parse(value))
  .handler(async ({ data }) => {
   const context = await teacherActor(data.sectionId);
   assertCapability(context, "assignments:create");
   const rubricCriteria = validateAssessmentRubric(data.rubricCriteria ?? [], data.pointsPossible);
   const dueAt = data.dueAt ? new Date(data.dueAt) : null;
+  if(data.publishNow && !dueAt)throw new Error("A due date is required to publish and assign an assessment.");
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   return db.transaction(async tx => {
    const [teachingSection]=await tx.select({
@@ -328,7 +330,7 @@ export const createAssessment = createServerFn({ method: "POST" })
     .limit(1);
    if(!teachingSection)throw new AuthorizationError("active teaching assignment in authorized school/program");
    assertPublisherLessonReference(teachingSection.curriculum,teachingSection.status,data.curriculumLessonId);
-   const status = dueAt ? "published" as const : "draft" as const;
+   const status = data.publishNow ? "published" as const : "draft" as const;
    const [assessment] = await tx.insert(s.assessments).values({
     sectionId: data.sectionId,
     title: data.title,
@@ -343,7 +345,7 @@ export const createAssessment = createServerFn({ method: "POST" })
     status,
     pointsPossible: String(data.pointsPossible),
     dueAt,
-    availableAt: dueAt ? new Date() : null,
+    availableAt: data.publishNow ? new Date() : null,
     createdByPersonId: context.actorPersonId!,
    }).returning({ id: s.assessments.id });
    if (!assessment) throw new Error("Assessment could not be created");
