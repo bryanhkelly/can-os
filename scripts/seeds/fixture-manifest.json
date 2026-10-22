@@ -1142,6 +1142,22 @@
         "domainEvents:SiteCreated",
         "auditEvents:network.site.create"
       ]
+    },
+    "/network-steward": {
+      "persona": "can_network_steward",
+      "fixtureRequired": false,
+      "rationale": "Steward onboarding needs independently verified contract/authority documents and bootstrap grant; synthetic fixture and browser acceptance remain pending.",
+      "interactions": [
+        "review externally verified agreement evidence",
+        "record effective term",
+        "authorize HQ officer with independently verified email-specific authority"
+      ],
+      "downstreamRecords": [
+        "network_agreements",
+        "account_person_grants",
+        "audit_events",
+        "domain_events"
+      ]
     }
   }
 }
