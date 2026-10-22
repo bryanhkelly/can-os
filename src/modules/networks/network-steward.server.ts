@@ -134,6 +134,11 @@ export async function provisionHQOfficer(actor: AccessContext, input: {
     if (!account) {
       [account] = await tx.insert(accessAccounts).values({ emailNormalized: input.email })
         .returning({ id: accessAccounts.id, disabled: accessAccounts.disabled });
+      await writeAudit(tx, actor, {
+        action: "network.officer.account.create", entityType: "access_account",
+        entityId: account!.id, scope: { organizationId: denomination.id },
+        after: { accountId: account!.id },
+      });
     }
 
     const priorPeople = await tx.select({ personId: accountPersonGrants.personId })
@@ -147,6 +152,11 @@ export async function provisionHQOfficer(actor: AccessContext, input: {
         legalFirstName: input.firstName, legalLastName: input.lastName, email: input.email,
       }).returning({ id: people.id });
       personId = person!.id;
+      await writeAudit(tx, actor, {
+        action: "network.officer.person.create", entityType: "person",
+        entityId: personId, scope: { organizationId: denomination.id },
+        after: { personId },
+      });
     }
     const [existing] = await tx.select({ id: accountPersonGrants.id, active: accountPersonGrants.active })
       .from(accountPersonGrants).where(and(
