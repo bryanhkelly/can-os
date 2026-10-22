@@ -1,4 +1,4 @@
-import { getLiveOperationsCommandCenter } from "@/modules/operations/command-center.functions";
+import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
@@ -12,16 +12,17 @@ export const Route=createFileRoute("/operations")({
  loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
  loader:async({deps})=>{
  try{
-  return {operations:await getOperationsActions({data:deps}),health:await getReleaseHealth(),commandCenter:await getLiveOperationsCommandCenter({data:deps}).catch(()=>null),authError:""};
+  return {operations:await getOperationsActions({data:deps}),health:await getReleaseHealth(),commandCenter:await getLiveOperationsCommandCenter({data:deps}).catch(()=>null),dashboard:await getLiveFullFlowOperations({data:deps}).catch(()=>null),authError:""};
  }catch{
-  return {operations:null,health:null,commandCenter:null,authError:"Sign in with an authorized staff account to view school operations."};
+  return {operations:null,health:null,commandCenter:null,dashboard:null,authError:"Sign in with an authorized staff account to view school operations."};
  }
 },component:OperationsPage});
 function OperationsPage(){
- const {operations:data,health,commandCenter,authError}:{
+ const {operations:data,health,commandCenter,dashboard,authError}:{
   operations:Awaited<ReturnType<typeof getOperationsActions>>|null;
   health:Awaited<ReturnType<typeof getReleaseHealth>>|null;
   commandCenter:Awaited<ReturnType<typeof getLiveOperationsCommandCenter>>|null;
+  dashboard:Awaited<ReturnType<typeof getLiveFullFlowOperations>>|null;
   authError:string;
  }=Route.useLoaderData();
  const selected=Route.useSearch();
@@ -90,6 +91,44 @@ function OperationsPage(){
      {!commandCenter.issues.length&&<p className="text-sm">No staffing or capacity exceptions detected.</p>}
     </div>
    </section>}
+  <section className="mt-7 rounded-xl border bg-card p-5" aria-label="FullFlow operational record">
+   <h2 className="font-serif text-2xl">Connected school operational record</h2>
+   <p className="mt-2 text-sm text-muted-foreground">Live records from the same authorized school programs, curriculum releases, enrollments, classrooms, grades and guardian follow-ups. Numbers are not simulated readiness approvals.</p>
+   {!dashboard ? <p className="mt-4 text-sm" role="alert">The connected school record could not be loaded. Launch and grading status cannot be verified from this screen.</p> : <>
+    <p className="mt-2 text-xs text-muted-foreground">Refreshed {new Date(dashboard.asOf).toLocaleString()}</p>
+    <div className="mt-4 grid gap-3 sm:grid-cols-4">
+     {[["Active students",dashboard.totals.activeProgramStudents],
+       ["Class placements",dashboard.totals.placedStudents],
+       ["Graded submissions",dashboard.totals.gradedWork],
+       ["Guardian questions open",dashboard.totals.unresolvedGuardianResponses]]
+       .map(([label,value])=><div key={label} className="rounded-lg border p-3">
+        <p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{value}</p>
+       </div>)}
+    </div>
+    <div className="mt-5 space-y-4">
+     {dashboard.programs.map(program=><article key={program.id} className="rounded-xl border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+       <h3 className="font-semibold">{program.name} <span className="text-xs font-normal text-muted-foreground">· {program.status.replaceAll("_"," ")} · {program.type.replaceAll("_"," ")}</span></h3>
+       <Link className="text-sm underline" to="/operations/launch/$programId" params={{programId:program.id}} search={{siteId:undefined,programId:undefined}}>Review program →</Link>
+      </div>
+      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-3">
+       <div><dt className="text-xs text-muted-foreground">Curriculum &amp; teaching</dt>
+        <dd>{program.counts.adoptedCurriculumPacks} adopted packs · {program.counts.publishedSections} published sections · {program.counts.staffedSections}/{program.counts.sections} staffed sections</dd></div>
+       <div><dt className="text-xs text-muted-foreground">Admissions &amp; enrollment</dt>
+        <dd>{program.counts.applications} applications · {program.counts.acceptedApplications} accepted · {program.counts.activeProgramStudents} active students · {program.counts.placedStudents} class placements</dd></div>
+       <div><dt className="text-xs text-muted-foreground">Learning &amp; responses</dt>
+        <dd>{program.counts.publishedAssessments} assessments · {program.counts.submittedWork} awaiting grading · {program.counts.gradedWork} graded · {program.counts.unresolvedGuardianResponses} open family questions</dd></div>
+      </dl>
+      <details className="mt-3 text-xs text-muted-foreground"><summary className="cursor-pointer underline">Academic authority and stable record IDs</summary>
+       <p className="mt-2 break-all">Program: {program.id}</p>
+       <p className="break-all">Academic provider: {program.academicProviderOrganizationId}</p>
+       <p className="break-all">Credit issuer: {program.creditIssuingOrganizationId}</p>
+      </details>
+     </article>)}
+     {!dashboard.programs.length&&<p className="rounded-lg border p-4 text-sm">No programs match your current school and verified access scope.</p>}
+    </div>
+   </>}
+  </section>
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
   {[["Open items",data.summary.total],["Urgent",data.summary.urgent],["Needs response",data.summary.needsResponse]].map(([label,num])=><div key={label} className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 font-serif text-3xl">{num}</p></div>)}
   </div>
