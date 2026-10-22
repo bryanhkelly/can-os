@@ -3,8 +3,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "@/db/client";
-import * as s from "@/db/schema";
 import { classResources, readClassContent } from "@/domain/class-content";
 import { AuthorizationError } from "@/domain/command-context";
 import {
@@ -13,6 +11,11 @@ import {
 } from "@/domain/learning-activity-policy";
 import { recordAudit } from "@/modules/identity/actors.server";
 import { authorizeClass, classActor } from "./class-access.server";
+
+async function loadLearningStore() {
+  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+  return { db, s };
+}
 
 const sessionInput = z.object({ sectionId: z.string().uuid() }).strict();
 const eventInput = z.object({
@@ -30,6 +33,7 @@ export const startLearningActivitySession = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await classActor();
     if (actor.role !== "student") throw new AuthorizationError("student learning session");
+    const { db, s } = await loadLearningStore();
     return db.transaction(async tx => {
       const { section, studentProfileId } = await authorizeClass(actor, data.sectionId, undefined, tx);
       if (!studentProfileId || !section.siteId || section.contentStatus !== "published" ||
@@ -67,6 +71,7 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await classActor();
     if (actor.role !== "student") throw new AuthorizationError("student learning interaction");
+    const { db, s } = await loadLearningStore();
     return db.transaction(async tx => {
       const { section, studentProfileId } = await authorizeClass(actor, data.interaction.sectionId, undefined, tx);
       if (!studentProfileId || !section.siteId || section.contentStatus !== "published") {
@@ -150,6 +155,7 @@ export const getLearningActivityHistory = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await classActor();
+    const { db, s } = await loadLearningStore();
     const { section, studentProfileId } = await authorizeClass(actor, data.sectionId, data.studentPersonId);
     let profileId = studentProfileId;
     if (actor.role === "teacher") {
@@ -188,6 +194,7 @@ export const endLearningActivitySession = createServerFn({ method: "POST" })
     if (actor.role !== "student") throw new AuthorizationError("student learning session");
     const { section, studentProfileId } = await authorizeClass(actor, data.sectionId);
     if (!studentProfileId) throw new AuthorizationError("student enrollment");
+    const { db, s } = await loadLearningStore();
     return db.transaction(async tx => {
       const [closed] = await tx.update(s.learningActivitySessions).set({ endedAt: new Date() })
         .where(and(
