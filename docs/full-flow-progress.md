@@ -7,14 +7,14 @@ This checklist records evidence and blockers, not automatic production acceptanc
 
 1. **CAN** contracts with an independent denomination/network organization. An executed commercial agreement is **not** the same as a verified user grant.
 2. **Denomination HQ administrator** holds an explicit `network_admin` membership under their denomination organization. HQ may create **directly operated** Site records for that organization. This membership does **not** grant academic, guardian, medical, admissions, curriculum-publishing or student-operation authority.
-3. **Independently governed church/school** remains the owner of its own Organization and Sites. A site may request denomination affiliation without changing `sites.organization_id`.
+3. **Independently governed church/school** remains the owner of its own Organization and Sites. A site can request denomination affiliation without changing `sites.organization_id`.
 4. **Affiliation link** is a reviewed relationship between a denomination Organization and a pre-existing Site (with its owner Organization). It must have its own pending/approved/rejected/revoked state, evidence and independent permission checks. A pending request is **not** an approved network membership and approval is **not** a student-data grant.
 5. **Local school operator/registrar** still performs the separate school/program launch, academic setup, admissions, enrollment and classroom activities under its own grants.
 
 ### Two intentional HQ entry paths
 
 - **HQ-created location:** authorized denomination HQ administrator creates a `Site` with `organization_id` belonging to that denomination. No school program, admissions or student record is automatically created. Implemented in this bite.
-- **Site-requested affiliation:** an authorized local school/site administrator identifies the denomination, submits an affiliation request, HQ reviews and accepts/denies. Keep the original site owner and school grants intact. **Not yet implemented.** Do **not** use `organizations.parent_organization_id` to impersonate a reviewed multi-network affiliation or silently grant HQ academic access.
+- **Site-requested affiliation:** an authorized local school/site administrator identifies the denomination, submits an affiliation request, HQ reviews and accepts/denies. Keep the original site owner and school grants intact. **Implemented in code in bite 1C; isolated database and browser acceptance remain pending.** Do **not** use `organizations.parent_organization_id` to impersonate a reviewed multi-network affiliation or silently grant HQ academic access.
 
 ## Bite register
 
@@ -22,7 +22,7 @@ This checklist records evidence and blockers, not automatic production acceptanc
 | --- | --- | --- | --- |
 | 1A | Correct organization-wide vs site-limited school launch grant handling | In `FullFlow`, inherited from prior school-launch patch | Primary CI passed on prior isolated patch; signed-in acceptance pending |
 | 1B | HQ creates its own location with distinct non-academic `network_admin` grant | Server commands, domain policy, HQ workspace and unit tests added on `FullFlow` | CI and isolated database/browser tests pending; HQ grant must be deliberately provisioned |
-| 1C | Independent site requests link to denomination; HQ reviews it | **Next** — requires persisted affiliation request, approval/revocation, and negative-access tests | Not started |
+| 1C | Independent site requests link to denomination; HQ reviews it | New `site_affiliations` table, local request/withdraw, HQ approve/reject/revoke, UI and guarded integration fixture added on `FullFlow` | Primary CI and database/browser acceptance pending |
 | 2 | Independently governed school configures high-school extension | Existing GF3 flows, then closed-loop acceptance | Not accepted |
 | 3 | Curriculum adoption, teacher and class provisioning | Existing canonical publisher/school/classroom tools | Not accepted |
 | 4 | Family application, offer, activation and class assignment | Existing GF22/GF2 | Not accepted |
@@ -44,3 +44,19 @@ This checklist records evidence and blockers, not automatic production acceptanc
 - A legitimate HQ `network_admin` grant needs a separate authorized CAN onboarding/provisioning path; the existing school registrar staff invitation is not allowed to mint one.
 - The existing `sites.organization_id` is an ownership edge, not a network-membership edge. A new association model with clear permissions and independent approvals is necessary for site-requested links.
 - Do not assert a denomination-wide right to student data or treat a signed contract as automatic access.
+
+## Bite 1C implementation — affiliation request and HQ decisions
+
+- Independent local registrar can request one denomination affiliation for each owned/authorized Site; the request is scoped to the actual owner Organization and Site and includes a message.
+- Only denominations with a currently active, organization-wide `network_admin` grant appear as request targets. This is an operational routing condition, **not** proof of a commercial contract.
+- HQ can approve/reject a pending request and revoke an approved link; site owner can withdraw pending/approved links.
+- Conflicting duplicate requests are refused; identical pending retries are no-ops; rejected/revoked links can be requested again and emit new event/audit evidence.
+- Never edit `sites.organization_id`, user grants, enrollment, program, student or family records as a side effect.
+- The new schema migration is `drizzle/0028_site_affiliation_link.sql`. Generated schema parity must be independently checked by CI. Do not deploy migration without review.
+- `tests/integration/network-affiliations.integration.test.ts` uses a rollback-isolated synthetic site/denomination and the actual request/review commands, including cross-denomination denial and owner continuity; it is not counted as passed until a disposable-database run completes.
+
+### Remaining blockers
+
+1. Dedicated, authorized CAN-issued HQ membership provisioner tied to verified executed contract; current `network_admin` grants must be assigned out-of-band by an authorized steward.
+2. Explicit, versioned partnership agreement/entitlement evidence must gate production affiliation approval. A verified HQ grant is not sufficient contract proof.
+3. Browser acceptance with real authenticated sessions and an isolated database, including negative access to student/family endpoints, remains unverified.
