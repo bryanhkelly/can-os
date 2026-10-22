@@ -22,12 +22,13 @@ execution details.
 passed build/typecheck/unit and migration checks. This is not an integration
 or browser pass.
 
-** Disconnected GF1/GF2/GF3 or network
-tests do not satisfy this requirement. The top blocking condition is isolated
-Neon acceptance configuration; the second is a continuous cross-role fixture.
-Fix those before implementing more network-onboarding capabilities. Existing
-denomination HQ/site affiliation work below is retained but **P2, optional
-entry-path work**, not part of the core school end-to-end gate.
+Disconnected GF1/GF2/GF3 or network tests do not satisfy this
+requirement. The immediate blocker is **executing the connected fixture**
+against the prepared isolated Neon branch using a trusted Node runner.
+The next gate is real multi-persona browser acceptance, including persisted
+notification, intervention, school dashboard and reload. Existing denomination
+HQ/site affiliation work below is retained but **P2 optional entry-path work**,
+not part of the core school end-to-end gate.
 
 ---
 
