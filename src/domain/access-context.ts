@@ -29,6 +29,12 @@ export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Obj
  // Network partners govern affiliation and their own sites; never student or school operations.
  can_network_steward: ["network.agreements.verify", "network.admins.provision"],
  network_admin: ["network.sites.read", "network.sites.manage", "network.affiliations.read", "network.affiliations.review"],
+ // First-observer site personnel: report-only capability, NEVER incident.read,
+ // counseling access, enrollment editing or automatic emergency dispatch.
+ room_facilitator: ["safeguarding.concern.submit"],
+ site_staff: ["safeguarding.concern.submit"],
+ site_leader: ["safeguarding.concern.submit"],
+ paraeducator: ["safeguarding.concern.submit"],
  student: ["student:read","assignments:submit","study-groups:participate","notifications:manage","communication.send","calendar.event.create"],
  teacher: ["teacher:read","profiles.credentials.submit","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate","communication.send","attendance.write","attendance.excuse.review","action.create","action.resolve","program.read","calendar.event.create","calendar.event.manage","insights:read","capacity.read"],
  guardian: ["guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read","communication.send","attendance.excuse.submit","calendar.event.create","conference.book"],
