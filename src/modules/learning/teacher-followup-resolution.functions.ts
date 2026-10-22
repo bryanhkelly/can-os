@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { STUDENT_LEARNING_GOAL_TYPE } from "@/domain/teacher-student-goal";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import {
   teacherFollowUpResolutionInput,
@@ -71,6 +72,15 @@ export const getTeacherLearningFollowUps = createServerFn({ method: "GET" })
         inArray(s.sections.programId, actor.scope.programIds ?? []),
       ))
       .orderBy(asc(s.actions.dueAt), desc(s.actions.createdAt)).limit(101);
+    const parentIds = rows.map(row => row.id);
+    const goalRows = parentIds.length ? await db.select({
+      id: s.actions.id, parentActionId: s.actions.parentActionId,
+      status: s.actions.status,
+    }).from(s.actions).where(and(
+      eq(s.actions.type, STUDENT_LEARNING_GOAL_TYPE),
+      inArray(s.actions.parentActionId, parentIds),
+    )).limit(101) : [];
+    const goalByParent = new Map(goalRows.map(goal => [goal.parentActionId, goal]));
     return {
       items: rows.slice(0, 100).map(row => ({
         id: row.id, title: row.title, description: row.description,
@@ -80,6 +90,10 @@ export const getTeacherLearningFollowUps = createServerFn({ method: "GET" })
         sectionId: row.sectionId, sectionTitle: row.sectionTitle,
         studentProfileId: row.studentProfileId, studentPersonId: row.studentPersonId,
         studentName: `${row.firstName} ${row.lastName}`,
+        studentGoal: (() => {
+          const goal = goalByParent.get(row.id);
+          return goal ? { id: goal.id, status: goal.status } : null;
+        })(),
         approach: typeof row.metadata.approach === "string" ? row.metadata.approach : "check_in",
       })),
       truncated: rows.length > 100,
