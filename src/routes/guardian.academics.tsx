@@ -6,6 +6,7 @@ import { guardianAssignmentSummary } from "@/domain/guardian-academics";
 import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
+import { GuardianGradeResponse } from "@/components/learning/GuardianGradeResponse";
 
 export const Route = createFileRoute("/guardian/academics")({
  validateSearch:(search:Record<string,unknown>):{student?:string;section?:string;assessment?:string}=>({
@@ -96,6 +97,7 @@ function GuardianAcademicsPage() {
       {item.rubric?.length>0&&<WorkspacePanel title="Rubric" className="mt-5"><ul className="space-y-3">{item.rubric.map(criterion=><li key={criterion.id} className="text-sm"><p className="font-semibold">{criterion.label} · {criterion.maxPoints} points</p><p>{criterion.description}</p></li>)}</ul></WorkspacePanel>}
       {item.submissionId&&["graded","returned"].includes(item.status)&&<SubmissionAnnotations key={item.submissionId} submissionId={item.submissionId}/>}
       <AssignmentConversation key={`${selected}:${item.assessmentId}`} assessmentId={item.assessmentId} studentPersonId={selected}/>
+      {item.submissionId && item.status === "graded" && <GuardianGradeResponse key={item.submissionId} submissionId={item.submissionId}/>} 
      </>}
     </section>)}
    </div>}
