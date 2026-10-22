@@ -5,7 +5,7 @@ import requestPassThrough, {
 import verificationPassThrough, {
   config as verificationGuard,
 } from "../../netlify/edge-functions/access-verify-rate-limit";
-import { AUTH_ADMISSION_POLICY } from "@/modules/identity/anonymous-auth-admission.server";
+
 
 describe("trusted Netlify edge authentication protection", () => {
  it("limits only the two credential POST routes, before hitting the application", () => {
@@ -26,8 +26,8 @@ describe("trusted Netlify edge authentication protection", () => {
  it("has tighter per-IP budgets than the existing database-wide emergency ceilings", () => {
   expect(requestGuard.rateLimit.windowLimit).toBe(20);
   expect(verificationGuard.rateLimit.windowLimit).toBe(40);
-  expect(requestGuard.rateLimit.windowLimit).toBeLessThan(AUTH_ADMISSION_POLICY.request);
-  expect(verificationGuard.rateLimit.windowLimit).toBeLessThan(AUTH_ADMISSION_POLICY.verify);
+  expect(requestGuard.rateLimit.windowLimit).toBeLessThan(240); // DB request ceiling
+  expect(verificationGuard.rateLimit.windowLimit).toBeLessThan(600); // DB verification ceiling
  });
  it("does not consume or rewrite the request: all existing server auth gates remain in place", () => {
   expect(requestPassThrough()).toBeUndefined();
