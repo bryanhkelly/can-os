@@ -382,7 +382,7 @@ function LaunchWizardPage() {
                     </label>
                   ) : (
                     <p className="text-xs text-muted-foreground">Noncredit offering: no credit issuer required; it does not contribute to official transcripts.</p>
-                  )
+                  )}
                 </div>
               </fieldset>
 
