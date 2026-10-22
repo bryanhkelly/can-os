@@ -1,4 +1,4 @@
-import { isStudentSupportAction } from "@/modules/actions/student-action-policy";
+import { isStudentVisibleSupportAction } from "@/modules/actions/student-action-policy";
 
 /**
  * The authoritative source is getQuickWinActions(), which reads only the
@@ -38,7 +38,7 @@ export function deriveStudentSuccessSupportTasks(
 
   const distinct = new Map<string, StudentSuccessSupportTask>();
   for (const action of actions) {
-    if (!isStudentSupportAction(action.type) ||
+    if (!isStudentVisibleSupportAction(action.type) ||
         !allowedStatus.some(status => status === action.status) ||
         !action.id || distinct.has(action.id)) continue;
     const isAssignment = action.subjectType === "assessment" && Boolean(action.subjectId);
