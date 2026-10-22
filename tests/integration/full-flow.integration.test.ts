@@ -234,6 +234,61 @@ integration("FullFlow: one school, same high-school program through curriculum a
           .where(and(eq(s.domainEvents.aggregateId, section.id),
             eq(s.domainEvents.eventType, "SectionProvisioned")));
         expect(matching).toHaveLength(1);
+        // The school now provisions an actual instructor, not a placeholder
+        // section-teacher row. Eligibility is checked against a school-scoped
+        // qualification policy and independently reviewed claim.
+        const teacher = first(await tx.insert(s.people).values({
+          legalFirstName: "FullFlow", legalLastName: "Algebra Instructor",
+        }).returning());
+        await tx.insert(s.roleAssignments).values({
+          personId: teacher.id, organizationId: school.id, siteId: site.id,
+          programId, roleKey: "teacher",
+        });
+        await tx.insert(s.memberships).values({
+          personId: schoolOperator.id, organizationId: school.id,
+        });
+        await tx.insert(s.roleAssignments).values({
+          personId: schoolOperator.id, organizationId: school.id, siteId: site.id,
+          programId, roleKey: "staffing_policy_publisher",
+          capabilities: ["staffing.policy.publish"],
+        });
+        const qualification = first(await tx.insert(s.qualificationDefinitions).values({
+          key: `fullflow-instructor-${suffix}`, kind: "license",
+          title: "Synthetic full-flow Algebra instructor qualification",
+        }).returning());
+        await sections.publishLaunchTeacherPolicy({ data: {
+          programId, qualificationKeys: [qualification.key], confirmed: true,
+        } });
+        const claim = first(await tx.insert(s.qualificationClaims).values({
+          personId: teacher.id, definitionId: qualification.id,
+          issuedAt: new Date("2026-01-01"), expiresAt: new Date("2028-12-31"),
+        }).returning());
+        await tx.insert(s.qualificationVerificationEvents).values({
+          claimId: claim.id, sequence: 1, decision: "approve",
+          actorPersonId: schoolOperator.id,
+        });
+        await tx.insert(s.sectionRegistrationPolicies).values({
+          sectionId: section.id, enrollmentCapacity: 24,
+          addDropEndsOn: "2027-10-01", withdrawalEndsOn: "2027-12-01",
+        });
+        await tx.insert(s.deliveryArrangements).values({
+          sectionId: section.id, academicProviderOrganizationId: school.id,
+          facilitatorPersonId: schoolOperator.id,
+          modality: "onsite", status: "active",
+        });
+        const assigned = await sections.assignLaunchTeacher({ data: {
+          programId, sectionId: section.id, teacherPersonId: teacher.id,
+        } });
+        expect(assigned.created).toBe(true);
+        expect(await tx.select().from(s.sectionTeachers).where(and(
+          eq(s.sectionTeachers.sectionId, section.id),
+          eq(s.sectionTeachers.personId, teacher.id),
+        ))).toHaveLength(1);
+        expect(await tx.select().from(s.deliveryArrangements).where(and(
+          eq(s.deliveryArrangements.sectionId, section.id),
+          eq(s.deliveryArrangements.instructorPersonId, teacher.id),
+          eq(s.deliveryArrangements.status, "active"),
+        ))).toHaveLength(1);
         ids = {programId, siteId: site.id, sectionId: section.id, versionId: draft.versionId};
         completed = true;
         throw rollback;
