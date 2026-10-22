@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertSeasonRegistrationOpen, type RegistrationSeason } from "@/modules/activities/registration-policy";
+import { assertSeasonRegistrationOpen, assertLegacyActivityRegistrationAllowed, type RegistrationSeason } from "@/modules/activities/registration-policy";
 
 const current: RegistrationSeason = {
   seasonStatus: "registration",
@@ -23,5 +23,17 @@ describe("Extended Learning registration policy", () => {
   });
   it("supports enrollment without an explicitly configured registration window", () => {
     expect(() => assertSeasonRegistrationOpen({ ...current, registrationOpensAt: null, registrationClosesAt: null }, new Date("2026-05-01T00:00:00Z"))).not.toThrow();
+  });
+});
+
+describe("Legacy extended-program registration isolation", () => {
+  it("requires verified publishing instead of accepting a legacy-open season", () => {
+    for (const type of ["summer_enrichment", "summer_program", "after_school_enrichment"]) {
+      expect(() => assertLegacyActivityRegistrationAllowed(type)).toThrow(/verified season-opening safeguards/);
+    }
+  });
+  it("preserves existing school co-curricular and standalone activities", () => {
+    expect(() => assertLegacyActivityRegistrationAllowed("full_school")).not.toThrow();
+    expect(() => assertLegacyActivityRegistrationAllowed(null)).not.toThrow();
   });
 });
