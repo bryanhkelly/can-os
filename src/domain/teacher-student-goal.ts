@@ -55,3 +55,9 @@ export function isStudentGoalPublicReview(value: unknown): value is StudentGoalP
     typeof row.reviewedAt === "string" &&
     Number.isFinite(Date.parse(row.reviewedAt));
 }
+
+export function statusFromTeacherGoalReview(
+  outcome: StudentGoalReviewInput["outcome"],
+): "resolved" | "in_progress" {
+  return outcome === "met" ? "resolved" : "in_progress";
+}
