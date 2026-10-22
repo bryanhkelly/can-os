@@ -10,7 +10,7 @@ import { assertNetworkSiteAccess, assertIanaTimezone } from "@/domain/network-si
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
-export async function requireNetworkHQ(capability: "network.sites.read" | "network.sites.manage" | "network.affiliations.read" | "network.affiliations.review") {
+async function hq(capability: "network.sites.read" | "network.sites.manage" | "network.affiliations.read" | "network.affiliations.review") {
   const actor = await getCommandContext(getRequest());
   if (actor.role !== "network_admin" || actor.grantSiteId !== null)
     throw new AuthorizationError("denomination HQ administrator");
@@ -26,7 +26,7 @@ export async function requireNetworkHQ(capability: "network.sites.read" | "netwo
 
 /** Headquarters can see its own directly operated sites, not affiliates' private records. */
 export const getNetworkSites = createServerFn({ method: "GET" }).handler(async () => {
-  const { organization } = await requireNetworkHQ("network.sites.read");
+  const { organization } = await hq("network.sites.read");
   const locations = await db.select({
     id: sites.id, name: sites.name, slug: sites.slug, timezone: sites.timezone,
   }).from(sites).where(eq(sites.organizationId, organization.id))
@@ -48,7 +48,7 @@ const createSiteInput = z.object({
 export const createNetworkSite = createServerFn({ method: "POST" })
   .validator((input: unknown) => createSiteInput.parse(input))
   .handler(async ({ data }) => {
-    const { actor, organization } = await requireNetworkHQ("network.sites.manage");
+    const { actor, organization } = await hq("network.sites.manage");
     assertIanaTimezone(data.timezone);
     return db.transaction(async tx => {
       const [created] = await tx.insert(sites)
