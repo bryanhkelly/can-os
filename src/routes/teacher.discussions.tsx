@@ -8,20 +8,21 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
 
 export const Route = createFileRoute("/teacher/discussions")({
-  validateSearch: (search: Record<string, unknown>): { section?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { section?: string; lesson?: string } => ({
     section: typeof search.section === "string" ? search.section : undefined,
+    lesson: typeof search.lesson === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(search.lesson) ? search.lesson : undefined,
   }),
   loader: safeLoader(() => getTeacherCourseDiscussions(), { authMessage: "Sign in with an authorized teacher account to manage class discussions." }),
   component: TeacherDiscussions,
 });
 function TeacherDiscussions() {
   const outcome = Route.useLoaderData();
-  const {section}=Route.useSearch();
+  const {section,lesson}=Route.useSearch();
   if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Teacher" title="Class discussions" outcome={outcome}/>;
-  return <TeacherDiscussionsView key={section ?? "all"} data={outcome.data}/>;
+  return <TeacherDiscussionsView key={section+":"+(lesson??"all")} data={outcome.data}/>;
 }
 export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<typeof getTeacherCourseDiscussions>> }) {
-  const { section } = Route.useSearch();
+  const { section, lesson } = Route.useSearch();
   const router = useRouter();
   const sections = data.sections.filter(item => !section || item.id === section);
   const threads = data.threads.filter(item => !section || item.sectionId === section);
@@ -31,6 +32,7 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const selectedLesson = sections.find(item=>item.id===section)?.curriculumLessons.find(item=>item.id===lesson);
   async function run(command: () => Promise<unknown>) {
     setBusy(true); setError("");
     try { await command(); await router.invalidate(); }
@@ -42,23 +44,29 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
     breadcrumbs={<Link to="/classes" search={{ section }} className="underline">Back to classes</Link>}>
     {error && <p role="alert" className="mt-5 rounded-lg border p-3 text-sm">{error}</p>}
     {section && !sections.length && <p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This class is unavailable in your current teaching membership.</p>}
-    {sections.length > 0 && <details className="mt-6 rounded-xl border bg-card p-5">
+    {sections.length > 0 && <details className="mt-6 rounded-xl border bg-card p-5" open={lesson?true:undefined}>
       <summary className="cursor-pointer font-semibold">Start a class discussion</summary>
       <form className="mt-4 grid gap-3" onSubmit={event => {
         event.preventDefault();
-        void run(async () => { await createCourseDiscussion({ data: { sectionId, subject, prompt } }); setSubject(""); setPrompt(""); });
+        void run(async () => { await createCourseDiscussion({ data: { sectionId, subject, prompt,
+          ...(selectedLesson&&sectionId===section?{curriculumLessonId:selectedLesson.id}:{}) } }); setSubject(""); setPrompt(""); });
       }}>
+        {lesson&&<p className="text-sm">Publisher lesson: {selectedLesson?.title??"Unavailable in this class"}. Discussions belong to the teacher and do not change publisher content.</p>}
+        {lesson&&!selectedLesson&&<p role="alert" className="text-sm">Choose an available publisher lesson before linking this discussion.</p>}
         <label className="text-sm">Class<select value={sectionId} disabled={busy} onChange={event => setSectionId(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3">
           {sections.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
         </select></label>
         <label className="text-sm">Title<input value={subject} disabled={busy} maxLength={160} onChange={event => setSubject(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
         <label className="text-sm">Prompt<textarea value={prompt} disabled={busy} maxLength={5000} rows={4} onChange={event => setPrompt(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-        <button disabled={busy || !sectionId || subject.trim().length < 3 || prompt.trim().length < 3} className="justify-self-start rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">Post discussion</button>
+        <button disabled={busy || !sectionId || (Boolean(lesson)&&(!selectedLesson||sectionId!==section)) || subject.trim().length < 3 || prompt.trim().length < 3} className="justify-self-start rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">Post discussion</button>
       </form>
     </details>}
     <div className="mt-7 grid gap-5">{threads.map(thread => <WorkspacePanel key={thread.id} title={thread.subject}
       description={data.sections.find(item => item.id === thread.sectionId)?.title}
       actions={<StatusBadge tone={thread.locked ? "attention" : "neutral"}>{thread.locked ? "Locked" : "Open"}</StatusBadge>}>
+      {thread.curriculumLessonId&&<p className="mb-2 text-xs text-muted-foreground">
+        Publisher lesson: {data.sections.find(item=>item.id===thread.sectionId)?.curriculumLessons.find(item=>item.id===thread.curriculumLessonId)?.title??thread.curriculumLessonId}
+      </p>}
       <button type="button" disabled={busy} onClick={() => void run(() => setCourseDiscussionLock({ data: { threadId: thread.id, locked: !thread.locked } }))}
         className="text-sm underline disabled:opacity-50">{thread.locked ? "Unlock discussion" : "Lock discussion"}</button>
       <div className="mt-4 grid gap-3">{thread.messages.map(message => <article key={message.id} className={"rounded-lg border p-4 text-sm " + (message.parentMessageId ? "ml-4" : "")}>
