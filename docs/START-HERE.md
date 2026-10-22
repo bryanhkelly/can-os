@@ -14,6 +14,10 @@ This directory separates **current specifications** from **historical implementa
 
 New architecture specification: [Curriculum marketplace and portability](./curriculum-marketplace-architecture.md).
 
+## Active cumulative FullFlow development
+
+- [FullFlow progression, evidence, and explicit acceptance blockers](./full-flow-progress.md).
+
 ## Historical records
 
 Documents under [archive/2026-10](./archive/2026-10/) preserve early demo designs, phase handoffs, and development checklists. They may mention branches, flags, routes, identities or unimplemented capabilities that are now obsolete. **Do not implement from archived instructions.** Source code is the evidence for the current implementation; run tests and security review for acceptance.
