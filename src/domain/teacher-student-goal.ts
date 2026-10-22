@@ -10,6 +10,7 @@ export const teacherStudentGoalInput = z.object({
   title: z.string().trim().min(8).max(120),
   studentInstructions: z.string().trim().min(15).max(750),
   dueInDays: z.union([z.literal(3), z.literal(7), z.literal(14)]),
+  confirmedStudentSafe: z.literal(true),
 }).strict();
 
 export type TeacherStudentGoalInput = z.infer<typeof teacherStudentGoalInput>;
