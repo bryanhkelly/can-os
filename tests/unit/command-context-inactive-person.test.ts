@@ -47,7 +47,7 @@ describe("server session must enforce active-person memberships",()=>{
     const sessionPredicate=sql.sqlToQuery(state.filters[0]!);
     expect(sessionPredicate.sql).toContain("updated_at");
     const dates=sessionPredicate.params.map(value=>
-      typeof value==="string" && /^\\d{4}-\\d{2}-\\d{2}T/.test(value) ? new Date(value) :
+      typeof value==="string" && /^\d{4}-\d{2}-\d{2}T/.test(value) ? new Date(value) :
       value instanceof Date ? value : null,
     ).filter((value):value is Date=>value instanceof Date);
     expect(dates).toHaveLength(2); // absolute expiration and idle cutoff
