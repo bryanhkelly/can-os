@@ -2,8 +2,9 @@ export type ReportCardGrade = {
   sectionGradeId: string;
   sectionTitle: string;
   letterGrade: string | null;
-  creditsAttempted?:number;
-  creditsEarned?:number;
+  creditsAttempted?:number|null;
+  creditsEarned?:number|null;
+  creditConfigured?:boolean;
   percentage: string | null;
   score: string | null;
   gradingPeriodName: string;
@@ -103,6 +104,7 @@ export function TranscriptView({
                     <p className="text-sm font-semibold">
                       {row.letterGrade ?? "—"} <span className="ml-2 text-xs font-normal text-muted-foreground">{percentageLabel(row.percentage)}</span>
                       {typeof row.creditsEarned==="number" && <span className="ml-2 text-xs font-normal text-muted-foreground">{row.creditsEarned}/{row.creditsAttempted??0} credits earned</span>}
+                      {row.creditConfigured===false&&<span className="ml-2 text-xs font-normal text-muted-foreground" role="status">Credit units not configured; official issuance blocked</span>}
                     </p>
                   </li>
                 ))}
