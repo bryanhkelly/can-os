@@ -9,13 +9,14 @@ import {
   setGrantActive,
 } from "@/modules/identity/admin.functions";
 import { WorkspaceShell, QueryState } from "@/components/workspace";
+import { isOnsiteSafeguardingRole } from "@/domain/site-safeguarding-access";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, useZodForm } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/admin")({ component: AdminConsolePage });
 
-const roles = ["teacher", "registrar", "specialist", "counselor"] as const;
+const roles = ["teacher", "registrar", "specialist", "counselor", "room_facilitator", "site_staff", "site_leader", "paraeducator"] as const;
 
 const inviteSchema = z.object({
   email: z.string().trim().email(),
@@ -142,6 +143,7 @@ function AdminConsolePage() {
         <section className="mt-8 rounded-xl border bg-card p-5">
           <h2 className="text-lg font-semibold">Invite staff</h2>
           <p className="mt-1 text-sm text-muted-foreground">Create a person, access account, and grant in one step. This does not send email.</p>
+           <p className="mt-1 text-xs text-muted-foreground">Onsite safeguarding roles are site-bound and currently have report-only authorization groundwork, not a live reporting channel. Use existing approved external reporting and emergency procedures.</p>
           <Form {...form}>
             <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={form.handleSubmit(submitInvite)}>
               <FormField control={form.control} name="email" render={({ field }) => (
@@ -184,10 +186,10 @@ function AdminConsolePage() {
               )} />
               <FormField control={form.control} name="siteId" render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel className="text-sm font-semibold">Site {requireSiteSelection?"(required for your membership)":"(optional)"}</FormLabel>
+                  <FormLabel className="text-sm font-semibold">Site {requireSiteSelection||isOnsiteSafeguardingRole(form.watch("role"))?"(required)":"(optional)"}</FormLabel>
                   <FormControl>
                     <select className={fieldClass} {...field}>
-                      <option value="">{requireSiteSelection?"Select a permitted school":"Organization-wide"}</option>
+                      <option value="">{requireSiteSelection||isOnsiteSafeguardingRole(form.watch("role"))?"Select a permitted school":"Organization-wide"}</option>
                       {sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}
                     </select>
                   </FormControl>
@@ -195,7 +197,7 @@ function AdminConsolePage() {
                 </FormItem>
               )} />
               <div className="sm:col-span-2">
-                <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy||(requireSiteSelection&&!form.watch("siteId"))}>
+                <button className="rounded-lg border bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50" type="submit" disabled={busy||((requireSiteSelection||isOnsiteSafeguardingRole(form.watch("role")))&&!form.watch("siteId"))}>
                   {busy ? "Inviting…" : "Invite staff member"}
                 </button>
               </div>
