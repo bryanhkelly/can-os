@@ -2,7 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   courseTemplates, courseTemplateVersions, curriculumAdoptions,
-  curriculumEntitlements, curriculumPackItems, curriculumPackVersions,
+  curriculumEntitlements, curriculumPackItems, curriculumPackVersions, curriculumPacks, organizations,
 } from "@/db/schema";
 
 /**
@@ -39,6 +39,7 @@ export async function listLaunchEligibleCourses(program: {
     versionId: courseTemplateVersions.id, version: courseTemplateVersions.version,
     title: courseTemplates.title, code: courseTemplates.code,
     subject: courseTemplates.subject,
+    packName:curriculumPacks.name,publisherName:organizations.name,
   })
     .from(curriculumAdoptions)
     .innerJoin(curriculumEntitlements, and(
@@ -51,6 +52,8 @@ export async function listLaunchEligibleCourses(program: {
       eq(curriculumPackVersions.packId, curriculumAdoptions.packId),
       eq(curriculumPackVersions.status, "published"),
     ))
+    .innerJoin(curriculumPacks,eq(curriculumPacks.id,curriculumPackVersions.packId))
+    .innerJoin(organizations,eq(organizations.id,curriculumPacks.publisherOrganizationId))
     .innerJoin(curriculumPackItems, eq(curriculumPackItems.packVersionId, curriculumPackVersions.id))
     .innerJoin(courseTemplateVersions, and(
       eq(courseTemplateVersions.id, curriculumPackItems.courseTemplateVersionId),
@@ -65,8 +68,13 @@ export async function listLaunchEligibleCourses(program: {
 
   // A version may also be owned by the school or appear in more than one pack;
   // never show duplicate options in the class setup catalog.
-  const deduplicated = new Map(owned.map(course => [course.versionId, course]));
-  for (const course of adopted) deduplicated.set(course.versionId, course);
+  type CourseChoice = (typeof owned)[number] & {
+    origin:"institution_owned"|"adopted";packName:string|null;publisherName:string|null;
+  };
+  const deduplicated = new Map<string,CourseChoice>(owned.map(course => [
+    course.versionId,{...course,origin:"institution_owned" as const,packName:null,publisherName:null},
+  ]));
+  for (const course of adopted) deduplicated.set(course.versionId,{...course,origin:"adopted"});
   return [...deduplicated.values()].sort((a, b) =>
     a.title.localeCompare(b.title) || a.version - b.version || a.versionId.localeCompare(b.versionId));
 }
