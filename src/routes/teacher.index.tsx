@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
+import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
 import { WorkspaceShell, StatCard, EmptyState, QueryState } from "@/components/workspace";
 
 export const Route = createFileRoute("/teacher/")({ component: TeacherTodayPage });
 
 type Today = Awaited<ReturnType<typeof getTeacherToday>>;
+type Evidence = Awaited<ReturnType<typeof getTeacherLearningEvidence>>;
 
 function greeting() {
  const hour = new Date().getHours();
@@ -14,6 +16,8 @@ function greeting() {
 
 function TeacherTodayPage() {
  const [data, setData] = useState<Today | null>(null);
+ const [activity, setActivity] = useState<Evidence | null>(null);
+ const [activityError, setActivityError] = useState("");
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState("");
 
@@ -23,6 +27,11 @@ function TeacherTodayPage() {
    if (active) { setData(result); setLoading(false); }
   }).catch(() => {
    if (active) { setError("Sign in with an authorized teacher account to view your day."); setLoading(false); }
+  });
+  void getTeacherLearningEvidence().then(result => {
+   if (active) setActivity(result);
+  }).catch(() => {
+   if (active) setActivityError("Learning evidence is unavailable.");
   });
   return () => { active = false; };
  }, []);
@@ -69,6 +78,33 @@ function TeacherTodayPage() {
        <p className="mt-1 text-sm">{item.studentName}</p>
       </article>)}
      </div>
+    </section>
+
+    <section className="mt-10" aria-label="Observed learning participation">
+      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Learning participation</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Verified CAN OS interaction evidence from your assigned sections, not attendance, grades or a diagnosis of disengagement.
+        Uninstrumented and offline learning may not appear.
+      </p>
+      {activityError && <p role="status" className="mt-3 text-sm">{activityError}</p>}
+      {!activity && !activityError && <p role="status" className="mt-3 text-sm">Loading observed activity…</p>}
+      {activity && <>
+        <p className="mt-2 text-xs text-muted-foreground">{activity.note}</p>
+        {activity.truncated && <p className="mt-2 text-xs">Large roster: showing a limited evidence sample.</p>}
+        <div className="mt-4 grid gap-3">
+          {activity.students.filter(student => student.observedEvents7d > 0).slice(0, 12).map(student =>
+            <article key={student.sectionId + ":" + student.studentProfileId} className="rounded-xl border p-4">
+              <p className="text-xs text-muted-foreground">{student.sectionTitle}</p>
+              <Link to="/staff/students/$personId" params={{ personId: student.studentPersonId }} className="mt-1 block font-semibold underline">{student.studentName}</Link>
+              <p className="mt-1 text-xs text-muted-foreground">{student.observedEvents7d} recorded interactions in 7 days
+                · latest {student.latestObservedAt ? new Date(student.latestObservedAt).toLocaleString() : "not recorded"}
+                · up to {Math.round(student.estimatedActiveMs7d / 60_000)} min estimated active time</p>
+            </article>)}
+          {!activity.students.some(student => student.observedEvents7d > 0) &&
+            <p className="text-sm">No interaction evidence has been collected for these classes yet. This does not mean students have not been learning.</p>}
+        </div>
+        <p className="mt-3 text-sm">Use existing <Link to="/teacher/missing-work" className="underline">missing-work follow-up</Link> and authorized support referrals for human-reviewed interventions.</p>
+      </>}
     </section>
 
     <section className="mt-10">
