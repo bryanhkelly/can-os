@@ -49,7 +49,7 @@ export async function readCurriculumJourneyReadiness(actor:Actor,programId:strin
   const content=v?.status==="published"?readClassContent(v.curriculum):null;
   const ids=new Set(assessmentRows.filter(a=>a.sectionId===section.id).map(a=>a.id));
   return {
-   id:section.id,title:section.title,code:section.title,courseVersionId:section.courseVersionId,
+   id:section.id,title:section.title,code:section.code,courseVersionId:section.courseVersionId,
    publishedLessonCount:content?.modules.reduce((n,m)=>n+m.lessons.length,0)??0,
    teacherCount:new Set(teacherRows.filter(t=>t.sectionId===section.id).map(t=>t.personId)).size,
    studentCount:new Set(enrollmentRows.filter(e=>e.sectionId===section.id).map(e=>e.studentProfileId)).size,
