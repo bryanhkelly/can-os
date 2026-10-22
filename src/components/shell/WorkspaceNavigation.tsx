@@ -71,6 +71,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
    <p className="mt-1 text-xs text-muted-foreground">{authenticated?.sites.map(site=>site.name).join(", ")}</p></div>
   <SidebarLinks links={links} activePath={activePath}/>
   <div className="border-t p-4"><Link to="/profiles" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold"><Users className="size-4" aria-hidden="true"/>My profile</Link>
+   <Link to="/account/sessions" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm"><Settings className="size-4" aria-hidden="true"/>Account sessions</Link>
    {current.role==="student"&&<Link to="/student/settings" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm"><Settings className="size-4" aria-hidden="true"/>Preferences</Link>}</div>
  </aside>}
  <div className="min-w-0"><header aria-label="Workspace top bar" className="sticky top-0 z-30 border-b bg-card px-4 py-3 sm:px-6">
@@ -105,7 +106,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  </header>{children}</div></div>
  {current&&<><ContextTray title="Workspace navigation" open={menuOpen} onClose={()=>setMenuOpen(false)}>
   <p className="mb-3 text-sm font-semibold">{current.firstName} {current.lastName} · {current.role}</p>
-  <SidebarLinks links={links} activePath={activePath}/><Link to="/profiles" className="mt-3 block border-t p-3 text-sm underline">My profile</Link>
+  <SidebarLinks links={links} activePath={activePath}/><Link to="/profiles" className="mt-3 block border-t p-3 text-sm underline">My profile</Link><Link to="/account/sessions" className="block p-3 text-sm underline">Account sessions</Link>
  </ContextTray><ContextTray title="Notifications" open={tray==="notifications"} onClose={()=>setTray(null)}>
   <Suspense fallback={<p role="status">Loading notifications...</p>}><NotificationTray onNavigate={()=>setTray(null)}/></Suspense>
  </ContextTray>
