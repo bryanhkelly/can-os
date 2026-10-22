@@ -50,7 +50,9 @@ describe("shared workspace session read", () => {
     });
     const dialect = new PgDialect();
     const queries = state.filters.map(filter => dialect.sqlToQuery(filter));
-    expect(queries.map(query => query.params)).toEqual([["account", true], ["site"], ["program"]]);
+    expect(queries.map(query => query.params)).toEqual([["account", true, true], ["site"], ["program"]]);
+    expect(queries[0]?.sql).toContain("people");
+    expect(queries[0]?.sql).toContain("active");
     expect(result).not.toHaveProperty("sessionId");
     expect(result).not.toHaveProperty("secretHash");
   });
