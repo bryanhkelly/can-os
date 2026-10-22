@@ -1,4 +1,6 @@
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
+import { listLaunches } from "@/modules/programs/launch.functions";
+import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
@@ -12,17 +14,18 @@ export const Route=createFileRoute("/operations")({
  loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
  loader:async({deps})=>{
  try{
-  return {operations:await getOperationsActions({data:deps}),health:await getReleaseHealth(),commandCenter:await getLiveOperationsCommandCenter({data:deps}).catch(()=>null),dashboard:await getLiveFullFlowOperations({data:deps}).catch(()=>null),authError:""};
+  return {operations:await getOperationsActions({data:deps}),health:await getReleaseHealth(),commandCenter:await getLiveOperationsCommandCenter({data:deps}).catch(()=>null),dashboard:await getLiveFullFlowOperations({data:deps}).catch(()=>null),launches:await listLaunches().catch(()=>null),authError:""};
  }catch{
-  return {operations:null,health:null,commandCenter:null,dashboard:null,authError:"Sign in with an authorized staff account to view school operations."};
+  return {operations:null,health:null,commandCenter:null,dashboard:null,launches:null,authError:"Sign in with an authorized staff account to view school operations."};
  }
 },component:OperationsPage});
 function OperationsPage(){
- const {operations:data,health,commandCenter,dashboard,authError}:{
+ const {operations:data,health,commandCenter,dashboard,launches,authError}:{
   operations:Awaited<ReturnType<typeof getOperationsActions>>|null;
   health:Awaited<ReturnType<typeof getReleaseHealth>>|null;
   commandCenter:Awaited<ReturnType<typeof getLiveOperationsCommandCenter>>|null;
   dashboard:Awaited<ReturnType<typeof getLiveFullFlowOperations>>|null;
+  launches:Awaited<ReturnType<typeof listLaunches>>|null;
   authError:string;
  }=Route.useLoaderData();
  const selected=Route.useSearch();
@@ -91,6 +94,16 @@ function OperationsPage(){
      {!commandCenter.issues.length&&<p className="text-sm">No staffing or capacity exceptions detected.</p>}
     </div>
    </section>}
+  {dashboard&&dashboard.programs.length>0&&<section className="mt-7 space-y-4" aria-label="Guided school launch and operations">
+    <h2 className="font-serif text-2xl">Your next school operations steps</h2>
+    <p className="text-sm text-muted-foreground">Follow verified program evidence through launch, instruction, enrollment and daily school operations. Links open the actual owning workflow.</p>
+    {dashboard.programs.filter(p=>p.type==="high_school_extension"||Boolean(selected.programId))
+      .slice(0,selected.programId?1:4).map(program=>
+       <GuidedSchoolJourney key={program.id} program={program}
+        journey={launches?.launches.find(launch=>launch.id===program.id)??null}/>)}
+    {!dashboard.programs.some(p=>p.type==="high_school_extension"||Boolean(selected.programId))&&
+      <p className="rounded-lg border p-4 text-sm">Select an individual program to review its guided operating journey.</p>}
+  </section>}
   <section className="mt-7 rounded-xl border bg-card p-5" aria-label="FullFlow operational record">
    <h2 className="font-serif text-2xl">Connected school operational record</h2>
    <p className="mt-2 text-sm text-muted-foreground">Live records from the same authorized school programs, curriculum releases, enrollments, classrooms, grades and guardian follow-ups. Numbers are not simulated readiness approvals.</p>
