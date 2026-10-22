@@ -74,7 +74,9 @@ export function estimateActiveLearningMilliseconds(input: {
   currentForeground: boolean;
 }): number {
   if (!input.previousForeground || !input.currentForeground ||
-      !Number.isSafeInteger(input.reportedDurationMs) || input.reportedDurationMs <= 0) return 0;
+      !Number.isSafeInteger(input.reportedDurationMs) ||
+      input.reportedDurationMs <= 0 ||
+      input.reportedDurationMs > LEARNING_ACTIVITY_POLICY.maxActiveIntervalMs) return 0;
   const intervalMs = input.receivedAt.getTime() - (input.previousReceivedAt?.getTime() ?? NaN);
   if (!Number.isFinite(intervalMs) || intervalMs <= 0 ||
       intervalMs > LEARNING_ACTIVITY_POLICY.maxIntervalGapMs) return 0;
