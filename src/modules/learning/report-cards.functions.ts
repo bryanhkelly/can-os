@@ -8,7 +8,7 @@ type CommandContext,
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { gradeLabelForPercentage,isPassingGrade } from "@/domain/grade-scale-policy";
-import { verifiedSectionCreditUnits,requireKnownTranscriptCredits } from "@/domain/section-credit-policy";
+import { verifiedSectionCreditUnits,countTranscriptRowsWithUnrecordedCredits } from "@/domain/section-credit-policy";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -859,10 +859,12 @@ async function listIssuances(db: DbClient, s: Schema, studentProfileId: string, 
 }
 
 /**
- * Registrar issues an official transcript artifact. The issuer is the explicit
- * CreditIssuingOrganization of the most recent program on record — never CAN
- * by assumption. The snapshot preserves the payload at issuance so later
- * corrections never rewrite issuance history.
+ * Registrar issues an academic record of actual courses, grades and credits
+ * as recorded. Unknown credits remain null, never invented, and missing
+ * credits do not block issuance or imply diploma/graduation eligibility.
+ * Records from different issuing institutions cannot be combined here without
+ * a separate reviewed transfer-credit arrangement. Issued snapshots do not
+ * change when underlying academic records are later corrected.
  */
 export const issueTranscript = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1), purpose: z.string().optional() }).parse(value))
@@ -898,7 +900,7 @@ export const issueTranscript = createServerFn({ method: "POST" })
     if (!rows.length) {
       throw new Error("No finalized grades available to issue a transcript");
     }
-    requireKnownTranscriptCredits(rows);
+    const unrecordedCreditRows = countTranscriptRowsWithUnrecordedCredits(rows);
     const issuingOrganizationId = rows[0]!.creditIssuingOrganizationId;
     if(rows.some(row=>row.creditIssuingOrganizationId!==issuingOrganizationId))
       throw new AuthorizationError("A single official transcript cannot combine credits issued by separate organizations without a transfer-credit agreement");
@@ -918,6 +920,8 @@ export const issueTranscript = createServerFn({ method: "POST" })
             studentProfileId: profile.id,
             studentPersonId: data.studentPersonId,
             rows,
+            // Informational disclosure only, never an issuance or graduation gate.
+            unrecordedCreditRows,
           },
         })
         .returning({ id: s.transcriptIssuances.id });
@@ -932,6 +936,7 @@ export const issueTranscript = createServerFn({ method: "POST" })
           studentProfileId: profile.id,
           issuingOrganizationId,
           gradeCount: rows.length,
+          unrecordedCreditRows,
         },
       });
       await writeAudit(tx, {
