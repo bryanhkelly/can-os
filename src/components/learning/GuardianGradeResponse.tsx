@@ -47,6 +47,7 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
     {loading ? <p className="mt-3 text-sm" role="status">Checking school response…</p> :
       current ? <div className="mt-3 space-y-2 text-sm">
         <p><strong>School response status:</strong> {current.status.replaceAll("_"," ")}</p>
+        {current.requestMessage && <p className="whitespace-pre-wrap text-muted-foreground">Your question: {current.requestMessage}</p>}
         {current.resolutionNote && <p className="rounded-lg bg-muted p-3 whitespace-pre-wrap">School response: {current.resolutionNote}</p>}
       </div> : <form className="mt-3 space-y-3" onSubmit={request}>
         <label className="block text-sm font-medium">Your question
