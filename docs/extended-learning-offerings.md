@@ -34,3 +34,38 @@ The earlier generic `createActivitySeason` path could create `registration`-stat
 The launch planner now displays per-season registration-opening blockers: active Program, matching Site, draft status, valid positive capacity, approved safeguarding response, verified onsite staffing, approved emergency response, approved pickup/release procedures, and dated sessions with confirmed coverage. This list is computed server-side. Since durable approval/coverage evidence is **not yet implemented**, those safety proofs are always false: there is **no open-registration button or command** and no unsafe checkbox override. A pure all-true unit test establishes only the policy logic, not an actual school authorization.
 
 **Next work:** persist/verifiably source the safeguarding and staffing evidence (including local facilitators), document child-release controls and site-level emergency protocols, implement dated sessions and a narrowly authorized transactional `draft → registration` transition. Recheck proof at publish time and consider revocation/closure of registration if essential coverage is lost. Do not treat this partial slice as permission to operate a program for children.
+
+## Bite 4: accountable readiness evidence requests (not verified approvals)
+
+The registrar can now choose a **currently active, site-specific registrar/operator**
+and atomically create six canonical `actions` for a draft extended-learning
+season: named site operator, safeguarding response, screened/qualified onsite
+staffing, emergency response, pickup/authorized release, and dated sessions
+with staff coverage. Assignment checks the verified registrar's Organization,
+Site and Program scope; checks the Program↔Activity Site association; rejects
+credit-bearing or non-draft seasons; and resolves the recipient against active
+account-person site grants. A transaction locks the Season and makes retries
+idempotent. Each new Action carries an audit row and an outbox
+`ActionCreated` event. Conflicting owner changes require a separate audited
+transfer operation; a caller may not silently reassign tasks.
+
+The Launch planner lists these assignments separately from **registration
+readiness**. Tasks can be gathered/closed for workflow purposes, but *neither
+Actions, claimed evidence, nor task closure set any approved readiness flag*.
+All unimplemented verified approvals remain false; no publish button or
+registration entry point for minor participants has been introduced. Room
+facilitators/site staff must participate in collecting verified supervision
+evidence, but task ownership alone does not confer childcare authorization.
+Safeguarding-specific reports and protected case details must never be copied
+into these ordinary Actions.
+
+This increment reuses existing `actions`, `audit_events` and `domain_events`.
+It introduces **no new migration** beyond the still-unverified 0032–0033.
+End-to-end verification remains blocked until an isolated Neon database with
+the current migrations and authenticated cross-site regression testing are
+available.
+
+Next: accept restricted, properly scoped document references as submitted
+evidence; implement independently authorized approval/rejection,
+expiry/revocation and signed site staffing/child-release checks without
+conflating evidence submission or task closure with operational clearance.
