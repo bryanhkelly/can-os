@@ -150,7 +150,7 @@ function OperationsPage(){
   {selected.action&&<Link to="/operations" search={{siteId:selected.siteId,programId:selected.programId}} className="text-sm underline">View all actions</Link>}
   {selected.action&&!data.items.some(item=>item.id===selected.action)&&<p role="alert" className="rounded-xl border p-4 text-sm">This action is unavailable in the current operations queue.</p>}
   {data.items.filter(item=>!selected.action||item.id===selected.action).map(i=><article className="rounded-xl border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold"><Link to="/operations" search={{siteId:selected.siteId,programId:selected.programId,action:i.id}} className="hover:underline">{i.title}</Link></h3><span className="text-xs uppercase text-muted-foreground">{i.priority}</span></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p>
-  <p className="mt-2 text-xs text-muted-foreground">Status: {i.status.replaceAll("_"," ")}
+  <p className="mt-2 text-xs text-muted-foreground">Status: {i.status?.replaceAll("_"," ") ?? "open"}
    {i.dueAt&&<> · Due {new Date(i.dueAt).toLocaleDateString()}
     {new Date(i.dueAt).getTime()<Date.now()&&<strong className="ml-2 text-foreground">Overdue</strong>}</>}
    {!i.ownerPersonId&&" · Unassigned"}
