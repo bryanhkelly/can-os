@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gte, isNotNull } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -77,7 +77,13 @@ export const getStudentGoalGradedEvidence = createServerFn({ method: "GET" })
           eq(s.assessments.sectionId, goal.sectionId!),
           eq(s.submissions.status, "graded"),
           isNotNull(s.submissions.gradedAt), isNotNull(s.submissions.score),
-          gte(s.submissions.gradedAt, goal.createdAt)))
+          gte(s.submissions.gradedAt, goal.createdAt),
+          sql`NOT EXISTS (
+            SELECT 1 FROM submissions AS newer
+            WHERE newer.assessment_id = ${s.submissions.assessmentId}
+              AND newer.student_profile_id = ${s.submissions.studentProfileId}
+              AND newer.attempt_number > ${s.submissions.attemptNumber}
+          )`))
         .orderBy(desc(s.submissions.gradedAt)).limit(30);
       return { goalActionId: goal.id, status: goal.status,
         availableEvidence: rows.map(row => ({
