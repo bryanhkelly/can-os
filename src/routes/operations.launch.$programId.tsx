@@ -122,7 +122,7 @@ function Setup({data}:{data:Snapshot}){
      <input aria-label="Credit units for new section" type="number" min="0.01" max="10" step="0.01"
       value={courseCredits} onChange={e=>setCourseCredits(e.target.value)} placeholder="E.g. 0.50 or 1.00"
       className="mt-1 block w-full rounded border bg-background p-2"/>
-     <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units block official transcript issuance.</span>
+     <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units are shown as Not recorded on transcripts and must be resolved separately for graduation decisions.</span>
     </label>
     <button type="submit" disabled={busy||!termId||!versionId} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create section</button>
    </form>
