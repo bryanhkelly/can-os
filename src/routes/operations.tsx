@@ -1,5 +1,5 @@
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
-import { listLaunches } from "@/modules/programs/launch.functions";
+import type { listLaunches } from "@/modules/programs/launch.functions";
 import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
@@ -14,7 +14,7 @@ export const Route=createFileRoute("/operations")({
  loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
  loader:async({deps})=>{
  try{
-  return {operations:await getOperationsActions({data:deps}),health:await getReleaseHealth(),commandCenter:await getLiveOperationsCommandCenter({data:deps}).catch(()=>null),dashboard:await getLiveFullFlowOperations({data:deps}).catch(()=>null),launches:await listLaunches().catch(()=>null),authError:""};
+  return {operations:await getOperationsActions({data:deps}),health:await getReleaseHealth(),commandCenter:await getLiveOperationsCommandCenter({data:deps}).catch(()=>null),dashboard:await getLiveFullFlowOperations({data:deps}).catch(()=>null),launches:await import("@/modules/programs/launch.functions").then(module=>module.listLaunches()).catch(()=>null),authError:""};
  }catch{
   return {operations:null,health:null,commandCenter:null,dashboard:null,launches:null,authError:"Sign in with an authorized staff account to view school operations."};
  }
