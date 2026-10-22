@@ -602,10 +602,14 @@ integration("FullFlow: one school, same high-school program through curriculum a
           metadata:{source:"teacher_shared_learning_goal"},evidence:[],
         });
         expect(JSON.stringify(studentGoal)).not.toContain(supportRequest.observation);
-        expect(await tx.select().from(s.auditEvents).where(and(
+        const sharedAudit = await tx.select().from(s.auditEvents).where(and(
           eq(s.auditEvents.resourceId,sharedGoal.actionId),
           eq(s.auditEvents.action,"student.learning_goal.shared"),
-        ))).toHaveLength(1);
+        ));
+        expect(sharedAudit).toHaveLength(1);
+        expect(first(sharedAudit).after).toMatchObject({
+          confirmedStudentSafe: true, parentActionId: support.actionId,
+        });
         state.actor = {...teacherActor,actorPersonId:outsider.id};
         await expect(goalService.shareTeacherStudentGoal({data:{
           ...approvedGoal,teacherActionId:support.actionId,
