@@ -20,6 +20,8 @@ Required P1 student experience: [Comprehensive learning-activity tracking](./com
 
 Connected five-track implementation: [Learning activity → teacher intervention → student success → academic progression → hybrid site](./connected-learning-success-progression-hybrid.md).
 
+Required support-case collaboration: [Counselors, academic coaches, tutors, specialists and paraeducators](./multidisciplinary-student-support-cases.md) with named-case and restricted-service access.
+
 ## Active cumulative FullFlow development
 
 - [FullFlow progression, evidence, and explicit acceptance blockers](./full-flow-progress.md).
