@@ -4,7 +4,7 @@ import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
-import {getOperationsActions,updateOperationsAction,assignOperationsAction} from "@/modules/operations/action-workspace.functions";
+import {getOperationsActions,updateOperationsAction,assignOperationsAction,setOperationsActionDeadline} from "@/modules/operations/action-workspace.functions";
 export const Route=createFileRoute("/operations")({
  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;action?:string}=>({
   siteId:typeof search.siteId==="string"?search.siteId:undefined,
@@ -38,6 +38,7 @@ function OperationsPage(){
  const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null);
  const [error,setError]=useState("");
+ const [dueDrafts,setDueDrafts]=useState<Record<string,string>>({});
  if(authError||!data||!health)return <main className="mx-auto max-w-6xl px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Operations</p>
   <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
@@ -57,6 +58,24 @@ function OperationsPage(){
   finally{setBusy(null);}
  }
 
+ async function changeDeadline(id:string,value:string){
+   const reason=window.prompt("Reason for the deadline change (required)");
+   if(!reason?.trim()||reason.trim().length<5)return;
+   setBusy(id);setError("");
+   try{
+     await setOperationsActionDeadline({data:{
+       id,dueAt:value?new Date(value).toISOString():null,reason:reason.trim(),
+     }});
+     setDueDrafts(prev=>{const next={...prev};delete next[id];return next;});
+     await router.invalidate();
+   }catch(e){setError(e instanceof Error?e.message:"Unable to save deadline");}
+   finally{setBusy(null);}
+ }
+ function localDue(iso:string|null){
+   if(!iso)return "";
+   const date=new Date(iso);
+   return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ }
  return <main className="mx-auto max-w-6xl px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · School operations</p>
   <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
@@ -160,6 +179,16 @@ function OperationsPage(){
  <option value="">Unassigned</option>
  {data.assignees.filter(person=>person.siteId===i.siteId).map(person=><option key={person.id} value={person.id}>{person.firstName} {person.lastName} · {person.role}</option>)}
  </select></label>
+ <label className="flex flex-col gap-1 text-xs">Due date (your local time)
+  <input type="datetime-local" aria-label={"Deadline for "+i.title}
+   className="rounded border bg-background px-2 py-1"
+   disabled={busy!==null}
+   value={dueDrafts[i.id]??localDue(i.dueAt)}
+   onChange={event=>setDueDrafts(prev=>({...prev,[i.id]:event.target.value}))}/>
+ </label>
+ <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+   disabled={busy!==null||dueDrafts[i.id]===undefined}
+   onClick={()=>void changeDeadline(i.id,dueDrafts[i.id]??"")}>Save due date</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"in_progress")}>Start</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>
