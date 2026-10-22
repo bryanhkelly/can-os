@@ -69,6 +69,21 @@ describe("published class workspace", () => {
         .not.toContain("Mark lesson complete");
     }
   });
+  it("keeps publisher reading visible alongside activities and never interprets it as HTML",()=>{
+    const lesson={...workspace.content!.modules[0]!.lessons[0]!,
+      body:"<script>Reading belongs in the lesson</script>",
+      activities:[{id:"practice",kind:"guided_practice" as const,title:"Solve carefully",
+        instructions:"Explain how you solved the equation.",evidence:"teacher_review" as const}]};
+    const data={...workspace,content:{...workspace.content!,
+      modules:[{...workspace.content!.modules[0]!,lessons:[lesson]}]}};
+    const html=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="evidence"/>);
+    expect(html).toContain("Lesson reading");
+    expect(html).toContain("Learning activities");
+    expect(html).toContain("&lt;script&gt;Reading belongs in the lesson&lt;/script&gt;");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("Solve carefully");
+    expect(html).toContain("Explain how you solved the equation.");
+  });
   it("renders the 36-week provisional blueprint and typed lesson activities in the real Classes workspace",()=>{
     const blueprint=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/yearlong-blueprint.json",import.meta.url),"utf8"));
     const unit=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/unit01-week01.json",import.meta.url),"utf8"));
@@ -86,7 +101,7 @@ describe("published class workspace", () => {
     expect(day).toContain("Guided Practice");
     expect(day).toContain("Independent Practice");
     expect(day).toContain("Mark lesson complete");
-    expect(day).not.toContain("ALGEBRA I • UNIT 1 • DAY 1 OF 5");
+    expect(day).toContain("ALGEBRA I • UNIT 1 • DAY 1 OF 5");
   });
   it("shows validated answer keys only in the teacher-only classroom guide",()=>{
     const guide=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/unit01-teacher-guide.json",import.meta.url),"utf8"));
