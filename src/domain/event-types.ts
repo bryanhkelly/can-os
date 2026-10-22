@@ -50,6 +50,7 @@ export const EventTypes = {
   SiteAffiliationRevoked: "SiteAffiliationRevoked",
   AcademicCalendarChanged: "AcademicCalendarChanged",
   ScheduleTemplateChanged: "ScheduleTemplateChanged",
+  SectionCreditConfigured: "SectionCreditConfigured",
   ProgramLaunchStarted: "ProgramLaunchStarted",
   CalendarEventCreated: "CalendarEventCreated",
   CalendarEventUpdated: "CalendarEventUpdated",
