@@ -85,7 +85,7 @@ export const shareTeacherStudentGoal = createServerFn({ method: "POST" })
         scope: { organizationId: source.organizationId, siteId: source.siteId,
           programId: source.programId, sectionId: source.sectionId },
         after: { studentPersonId: student.personId, parentActionId: source.id,
-          dueAt: dueAt.toISOString() },
+          dueAt: dueAt.toISOString(), confirmedStudentSafe: data.confirmedStudentSafe },
       });
       return { actionId: goal.id, created: true };
     });
