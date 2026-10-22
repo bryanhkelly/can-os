@@ -9,6 +9,7 @@ export function TeacherStudentGoalForm({
   const [title, setTitle] = useState("");
   const [studentInstructions, setStudentInstructions] = useState("");
   const [dueInDays, setDueInDays] = useState<3 | 7 | 14>(7);
+  const [confirmedStudentSafe, setConfirmedStudentSafe] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState("");
   const [shared, setShared] = useState(false);
@@ -19,12 +20,13 @@ export function TeacherStudentGoalForm({
     {expanded && <form className="mt-3 grid gap-3 rounded-lg border p-3"
       onSubmit={async event => {
         event.preventDefault();
-        if (busy || shared) return;
+        if (busy || shared || !confirmedStudentSafe) return;
         setBusy(true);
         setResult("");
         try {
           const response = await shareTeacherStudentGoal({ data: {
             teacherActionId, title, studentInstructions, dueInDays,
+            confirmedStudentSafe: true as const,
           } });
           setShared(true);
           setResult(response.created
@@ -63,8 +65,14 @@ export function TeacherStudentGoalForm({
           <option value={14}>In 14 days</option>
         </select>
       </label>
+      <label className="flex items-start gap-2 text-xs">
+        <input type="checkbox" required checked={confirmedStudentSafe}
+          disabled={busy || shared} onChange={event => setConfirmedStudentSafe(event.target.checked)} />
+        I reviewed these words for student visibility. They contain no confidential
+        counseling, safeguarding, health or private staff-case information.
+      </label>
       {!shared && <div className="flex gap-3 text-sm">
-        <button type="submit" disabled={busy} className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
+        <button type="submit" disabled={busy || !confirmedStudentSafe} className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
           {busy ? "Sharing…" : "Share approved goal"}
         </button>
         <button type="button" disabled={busy} className="underline"
