@@ -86,7 +86,7 @@ export async function readMarketplace(actor: Actor, programId: string) {
  const overlays=overlayRows.map(row=>({
   ...row,url:row.resourceId?linkedResources.find(resource=>resource.id===row.resourceId)?.url??null:row.url,
  }));
- const classSections=await db.select({id:sections.id,title:sections.title,courseVersionId:sections.courseTemplateVersionId})
+ const classSections=await db.select({id:sections.id,title:sections.title,code:sections.code,courseVersionId:sections.courseTemplateVersionId})
   .from(sections).where(eq(sections.programId,program.id)).orderBy(asc(sections.title));
  return {
   program:{id:program.id,name:program.name,siteId:program.siteId},canPublish,
