@@ -1,7 +1,7 @@
 # CAN OS — comprehensive learning-activity tracking
 
-**Status:** Approved product requirement. First code-only validation policy committed; durable ingestion, sessions, database migration, instrumentation and UI **NOT IMPLEMENTED**.  
-**Priority:** P1 after the canonical FullFlow P0 connected school journey is proven; instrument the real student-learning path first, not a parallel demo workflow.  
+**Status:** Early implementation committed: validated events, bounded estimates, session/event tables, student lesson instrumentation, scoped timeline, and teacher evidence roster. Full browser/authenticated integration, comprehensive resource/media coverage, accessibility and retention/privacy acceptance **NOT YET VERIFIED**.  
+**Priority:** P1 feature development begun alongside P0 work; FullFlow six-stage end-to-end acceptance remains the required release gate. Never claim full readiness based on schema/unit CI.  
 **Branch / review:** `FullFlow` / draft PR #172. Do not merge into `main` without approval.
 
 ## Product outcome
@@ -35,7 +35,11 @@ Questions the system must eventually answer include:
 - `src/domain/learning-activity-policy.ts` defines strict, bounded client evidence types for `lesson_opened`, `lesson_resumed`, `resource_opened` and `engaged_interval`. It forbids unrecognized fields such as client-supplied identity, grades and attendance, and rejects out-of-window timestamps and inflated durations.
 - `estimateActiveLearningMilliseconds` limits a reported active interval to elapsed **server-observed** time, rejects idle gaps or nonforeground interactions, and caps estimates to 60 seconds. It is deliberately conservative and untrusted as actual engagement.
 - `tests/unit/learning-activity-policy.test.ts` covers malicious payloads, timestamp skew and interval constraints.
-- **No learning-activity events are yet persisted or sent.** There is no endpoint, integration, background listener, Student 360 telemetry view, curriculum version check, event idempotency ledger or observer consent/retention implementation. These require a separate server-only command and schema migration, validated against the isolated Neon branch.
+- `0031_learning_activity_tracking.sql` adds `learning_activity_sessions` and append-only `learning_activity_events`; applied only on the disposable `fullflow-e2e-20261022` Neon branch. Migration ledger count is 32. This is not a production deployment.
+- `learning-activity.functions.ts` provides session start/end, serialized event ingestion with idempotent client event IDs and digest mismatch rejection, published-lesson/content/enrollment authorization, conservative active-time accounting, and scoped activity history.
+- `LearningActivityTracker.tsx` now records student lesson openings and foreground trusted interactions, resets its estimator after hidden/unfocused browser periods, and allows an enrolled student to view recent interaction history. Resource, video, external provider, detailed assessment, and offline-activity instrumentation are not yet wired.
+- `teacher-learning-evidence.functions.ts` exposes bounded teacher-section-roster evidence, shown on Teacher Today; absence of telemetry is explicitly not treated as disengagement.
+- **Still missing / release-gated:** real authenticated browser and integration acceptance, resource/media coverage, retention/consent policies, central telemetry throttles, long-term scale/partition decisions, Student 360 consolidated event timeline, rich intervention outcome tracking. Do not treat a published event as official attendance, grade, credit or proof of mastery.
 
 ## Required coverage (incremental rollout)
 
