@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,publishLaunchTeacherPolicy} from "@/modules/programs/launch-academics.functions";
+import {getLaunchAcademicSetup,provisionLaunchSection,assignLaunchTeacher,publishLaunchTeacherPolicy,setLaunchSectionCredits} from "@/modules/programs/launch-academics.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
@@ -28,6 +28,7 @@ function Setup({data}:{data:Snapshot}){
  const selectedCourse=data.catalog.find(course=>course.versionId===versionId);
  const [code,setCode]=useState(""),[title,setTitle]=useState("");
  const [teacherId,setTeacherId]=useState("");
+ const [courseCredits,setCourseCredits]=useState("");
  const [qualificationKeys,setQualificationKeys]=useState<string[]>([]);
  const [policyConfirmed,setPolicyConfirmed]=useState(false);
  const [reviewTeacherId,setReviewTeacherId]=useState("");
@@ -92,7 +93,8 @@ function Setup({data}:{data:Snapshot}){
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
     e.preventDefault();void run(()=>provisionLaunchSection({data:{
      programId:data.program.id,termId,courseTemplateVersionId:versionId,
-     code,title,...(teacherId?{teacherPersonId:teacherId}:{})}}),"Class provisioned.");
+     code,title,...(teacherId?{teacherPersonId:teacherId}:{}),
+     ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}}),"Class provisioned.");
    }}>
     <label className="text-sm">Academic term<select required value={termId} onChange={e=>setTermId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
      <option value="">Choose term</option>{data.terms.map(t=><option key={t.id} value={t.id}>{data.years.find(y=>y.id===t.schoolYearId)?.name??"School year"} · {t.name} ({t.startsOn}–{t.endsOn})</option>)}
@@ -116,6 +118,12 @@ function Setup({data}:{data:Snapshot}){
     <label className="text-sm sm:col-span-2">Instructor (optional)<select value={teacherId} onChange={e=>setTeacherId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
      <option value="">Assign later</option>{data.teachingStaff.map(t=><option value={t.personId} key={t.personId}>{t.first} {t.last}</option>)}
     </select></label>
+    <label className="text-sm sm:col-span-2">Course credit units
+     <input aria-label="Credit units for new section" type="number" min="0.01" max="10" step="0.01"
+      value={courseCredits} onChange={e=>setCourseCredits(e.target.value)} placeholder="E.g. 0.50 or 1.00"
+      className="mt-1 block w-full rounded border bg-background p-2"/>
+     <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units block official transcript issuance.</span>
+    </label>
     <button type="submit" disabled={busy||!termId||!versionId} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create section</button>
    </form>
   </section>
@@ -126,8 +134,10 @@ function Setup({data}:{data:Snapshot}){
   </div>
   <section className="mt-8 space-y-3">
    <h2 className="font-serif text-2xl">Teaching assignments</h2>
-   {data.sections.map(section=><SectionRow key={section.id} section={section}
+   {data.sections.map(section=><SectionRow key={section.id+":"+String(section.creditUnits)} section={section}
     staff={data.teachingStaff} busy={busy}
+    saveCredits={(credits,reason)=>run(()=>setLaunchSectionCredits({data:{
+     programId:data.program.id,sectionId:section.id,credits,reason}}),"Academic credit units recorded.")}
     assign={(personId)=>run(()=>assignLaunchTeacher({data:{
      programId:data.program.id,sectionId:section.id,teacherPersonId:personId}}),"Instructor assigned.")}/>)}
    {!data.sections.length&&<p className="rounded-lg border p-4 text-sm text-muted-foreground">No sections have been provisioned for this program.</p>}
@@ -146,18 +156,38 @@ function Setup({data}:{data:Snapshot}){
   <SectionLifecycleWorkspace programId={data.program.id} staff={data.teachingStaff}/>
  </WorkspaceShell>;
 }
-function SectionRow({section,staff,busy,assign}:{
+function SectionRow({section,staff,busy,assign,saveCredits}:{
  section:Snapshot["sections"][number],staff:Snapshot["teachingStaff"],busy:boolean,
- assign:(personId:string)=>Promise<void>
+ assign:(personId:string)=>Promise<void>,
+ saveCredits:(credits:number,reason:string)=>Promise<void>
 }){
  const [personId,setPersonId]=useState("");
+ const [credits,setCredits]=useState(section.creditUnits?.toString()??"");
+ const [creditReason,setCreditReason]=useState("");
  const candidate=section.candidates.find(candidate=>candidate.personId===personId);
  return <article className="rounded-lg border bg-card p-4">
   <h3 className="font-semibold">{section.title} · {section.code}</h3>
   <p className="mt-2 text-xs text-muted-foreground">
    {section.teachers.length?section.teachers.map(t=>t.first+" "+t.last).join(", "):"Instructor not yet assigned"}
   </p>
-  <div className="mt-3 grid gap-2 sm:grid-cols-4">
+  <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto] sm:items-end" onSubmit={e=>{
+    e.preventDefault();void saveCredits(Number(credits),creditReason);
+   }}>
+    <label className="text-xs">Recorded credit units
+     <input type="number" min="0.01" max="10" step="0.01" required value={credits}
+      onChange={e=>setCredits(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/>
+    </label>
+    <label className="text-xs">Reason for academic credit decision
+     <input value={creditReason} minLength={5} maxLength={500} required
+      onChange={e=>setCreditReason(e.target.value)}
+      placeholder="Reviewed against this program's course credit requirements"
+      className="mt-1 w-full rounded border bg-background p-2"/>
+    </label>
+    <button type="submit" disabled={busy||!credits||creditReason.trim().length<5}
+      className="rounded border px-3 py-2 text-xs disabled:opacity-50">Record credits</button>
+   </form>
+   <p className="mt-2 text-xs text-muted-foreground">The school sets actual credit units. Changes are audited and locked after finalized grades.</p>
+   <div className="mt-3 grid gap-2 sm:grid-cols-4">
    <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Enrollment</span><br/>{section.readiness.metrics.activeEnrollment}/{section.readiness.metrics.enrollmentCapacity}</div>
    <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Forecast</span><br/>{section.readiness.metrics.expectedDemand??"Not set"}</div>
    <div className="rounded border p-2 text-xs"><span className="text-muted-foreground">Reserved seats</span><br/>{section.readiness.metrics.reservedInstructionalSeats}</div>
