@@ -42,11 +42,13 @@ async function main() {
     access_sessions: ["id", "account_id", "secret_hash", "active_grant_id", "expires_at", "revoked_at", "created_at", "updated_at"],
     lesson_progress: ["id", "section_id", "course_template_version_id", "student_profile_id", "lesson_id", "completed_at"],
     submissions: ["id", "assessment_id", "student_profile_id", "status", "attempt_number", "submitted_at", "graded_at", "score"],
+    learning_activity_sessions: ["id", "access_session_id", "student_profile_id", "site_id", "program_id", "section_id", "course_template_version_id", "started_at", "last_interaction_at", "estimated_active_ms"],
+    learning_activity_events: ["id", "learning_session_id", "student_profile_id", "section_id", "course_template_version_id", "lesson_id", "kind", "client_event_id", "received_at", "estimated_active_ms"],
   };
   const columns = await query`
     SELECT table_name, column_name FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name IN ('auth_request_rate_limits', 'access_sessions', 'lesson_progress', 'submissions')
+      AND table_name IN ('auth_request_rate_limits', 'access_sessions', 'lesson_progress', 'submissions', 'learning_activity_sessions', 'learning_activity_events')
   `;
   const present = new Set(columns.map(row => `${row.table_name}.${row.column_name}`));
   const missing = Object.entries(required).flatMap(([table, names]) =>
@@ -58,10 +60,11 @@ async function main() {
     "access_sessions_secret_uq",
     "lesson_progress_student_section_version_lesson_uq",
     "submission_attempt_uq",
+    "learning_activity_events_client_uq",
   ];
   const indexes = await query`
     SELECT indexname FROM pg_indexes WHERE schemaname = 'public'
-      AND tablename IN ('auth_request_rate_limits', 'access_sessions', 'lesson_progress', 'submissions')
+      AND tablename IN ('auth_request_rate_limits', 'access_sessions', 'lesson_progress', 'submissions', 'learning_activity_sessions', 'learning_activity_events')
   `;
   const foundIndexes = new Set(indexes.map(row => row.indexname));
   const missingIndexes = expectedIndexes.filter(name => !foundIndexes.has(name));
