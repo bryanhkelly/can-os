@@ -20,3 +20,32 @@ export const followUpApproachLabels: Record<TeacherLearningFollowUpInput["approa
   review_work: "Review learning work",
   offer_tutoring: "Offer tutoring support",
 };
+
+/** Outcome explicitly assessed by the human educator, never inferred from telemetry. */
+export const teacherFollowUpResolutionInput = z.object({
+  actionId: z.string().uuid(),
+  supportProvided: z.string().trim().min(15).max(1000),
+  outcome: z.enum(["improved", "still_needs_support", "no_observed_change", "not_yet_verified"]),
+  outcomeEvidence: z.string().trim().min(15).max(1000),
+}).strict();
+
+export type TeacherFollowUpResolutionInput = z.infer<typeof teacherFollowUpResolutionInput>;
+export const teacherFollowUpOutcomeLabels: Record<TeacherFollowUpResolutionInput["outcome"], string> = {
+  improved: "Progress observed",
+  still_needs_support: "Further support needed",
+  no_observed_change: "No observed change yet",
+  not_yet_verified: "Outcome not yet verified",
+};
+
+/** A single explicit resolution note for the canonical Actions lifecycle. */
+export function teacherFollowUpResolutionNote(
+  input: TeacherFollowUpResolutionInput,
+): string {
+  const normalized = teacherFollowUpResolutionInput.parse(input);
+  return [
+    `Support provided: ${normalized.supportProvided}`,
+    `Teacher-assessed outcome: ${teacherFollowUpOutcomeLabels[normalized.outcome]}`,
+    `Evidence / next step: ${normalized.outcomeEvidence}`,
+    "Teacher-reported follow-up only; learning telemetry does not establish mastery or attendance.",
+  ].join("\n");
+}
