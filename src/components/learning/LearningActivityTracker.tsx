@@ -19,12 +19,13 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
   useEffect(() => {
     let cancelled = false;
     let lastSent = Date.now();
+    let mustResume = false;
     sessionRef.current = null;
     setAvailable(false);
     setHistory(null);
     setMessage("");
 
-    async function record(sessionId: string, kind: "lesson_opened" | "engaged_interval", durationMs?: number) {
+    async function record(sessionId: string, kind: "lesson_opened" | "lesson_resumed" | "engaged_interval", durationMs?: number) {
       await recordLearningInteraction({ data: {
         learningSessionId: sessionId,
         interaction: kind === "engaged_interval" ? {
@@ -57,6 +58,13 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
       if (!sessionId || !event.isTrusted || document.visibilityState !== "visible" ||
           !document.hasFocus()) return;
       const now = Date.now();
+      if (mustResume) {
+        mustResume = false;
+        lastSent = now;
+        void record(sessionId, "lesson_resumed")
+          .catch(() => { if (!cancelled) setMessage("Some activity could not be recorded."); });
+        return;
+      }
       const elapsed = now - lastSent;
       if (elapsed < 30_000) return;
       lastSent = now;
@@ -65,10 +73,19 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
       void record(sessionId, "engaged_interval", Math.min(60_000, elapsed))
         .catch(() => { if (!cancelled) setMessage("Some activity could not be recorded."); });
     };
+    const onVisibilityChange = () => {
+      // Never count time spent in a hidden or unfocused page.
+      mustResume = true;
+      lastSent = Date.now();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("blur", onVisibilityChange);
     document.addEventListener("pointerdown", onInteraction, { passive: true });
     document.addEventListener("keydown", onInteraction);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("blur", onVisibilityChange);
       document.removeEventListener("pointerdown", onInteraction);
       document.removeEventListener("keydown", onInteraction);
       const activeSession = sessionRef.current;
