@@ -44,6 +44,11 @@ describe("server session must enforce active-person memberships",()=>{
     }))).rejects.toThrow("active membership");
     const sql=new PgDialect();
     expect(state.filters).toHaveLength(2);
+    const sessionPredicate=sql.sqlToQuery(state.filters[0]!);
+    expect(sessionPredicate.sql).toContain("updated_at");
+    const dates=sessionPredicate.params.filter((value):value is Date=>value instanceof Date);
+    expect(dates).toHaveLength(2); // absolute expiration and idle cutoff
+    expect(dates[0]!.getTime()-dates[1]!.getTime()).toBe(30*60*1000);
     const query=sql.sqlToQuery(state.filters[1]!);
     expect(query.params).toEqual(["regular-account",true,true]);
     expect(query.sql).toContain("people");
