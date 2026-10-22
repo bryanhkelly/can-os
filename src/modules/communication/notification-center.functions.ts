@@ -131,6 +131,66 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     inArray(s.sections.programId,context.scope.programIds??[]))):[];
  const referralRows=studentIds.length?await db.select({id:s.actions.id,metadata:s.actions.metadata})
   .from(s.actions).where(and(eq(s.actions.type,"support_referral"),eq(s.actions.subjectType,"student_profile"),inArray(s.actions.subjectId,studentIds),inArray(s.actions.siteId,context.scope.siteIds??[]),inArray(s.actions.programId,context.scope.programIds??[]))):[];
+ const relatedGuardianSubmissions=submissionIds.length&&context.role==="guardian"?
+  await db.select({
+    id:s.submissions.id, assessmentId:s.assessments.id,
+    sectionId:s.sections.id, studentPersonId:s.studentProfiles.personId,
+  }).from(s.submissions)
+   .innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
+   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.submissions.studentProfileId))
+   .innerJoin(s.guardianRelationships,and(
+     eq(s.guardianRelationships.studentPersonId,s.studentProfiles.personId),
+     eq(s.guardianRelationships.guardianPersonId,personId),
+     eq(s.guardianRelationships.canViewAcademics,true)))
+   .innerJoin(s.enrollments,and(
+     eq(s.enrollments.studentProfileId,s.studentProfiles.id),
+     eq(s.enrollments.sectionId,s.sections.id),
+     eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active")))
+   .where(and(inArray(s.submissions.id,submissionIds),
+     inArray(s.sections.siteId,context.scope.siteIds??[]),
+     inArray(s.sections.programId,context.scope.programIds??[]))) : [];
+ const guardianSubmissionById=new Map(relatedGuardianSubmissions.map(x=>[x.id,x]));
+ const gradeActionIds=rows.filter(n=>n.resourceType==="action"&&
+  n.resourceId&&["guardian_grade_follow_up_requested","guardian_grade_follow_up_resolved"].includes(n.type))
+  .map(n=>n.resourceId as string);
+ const gradeActions=gradeActionIds.length?await db.select({
+   id:s.actions.id,sectionId:s.actions.sectionId,siteId:s.actions.siteId,
+   programId:s.actions.programId,subjectId:s.actions.subjectId,metadata:s.actions.metadata,
+   studentPersonId:s.studentProfiles.personId,
+ }).from(s.actions).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.actions.subjectId))
+ .where(and(inArray(s.actions.id,gradeActionIds),
+   eq(s.actions.type,"guardian_grade_follow_up"),
+   eq(s.actions.subjectType,"student_profile"),
+   inArray(s.actions.siteId,context.scope.siteIds??[]),
+   inArray(s.actions.programId,context.scope.programIds??[]))) : [];
+ const gradeActionsById=new Map(gradeActions.map(a=>[a.id,a]));
+ const verifiedGradeActions = new Map<string,string>();
+ if(gradeActions.length){
+   if(context.role==="guardian"){
+     const relations=await db.select({studentPersonId:s.guardianRelationships.studentPersonId})
+       .from(s.guardianRelationships).where(and(
+         eq(s.guardianRelationships.guardianPersonId,personId),
+         eq(s.guardianRelationships.canViewAcademics,true),
+         inArray(s.guardianRelationships.studentPersonId,gradeActions.map(x=>x.studentPersonId))));
+     const permitted=new Set(relations.map(x=>x.studentPersonId));
+     for(const action of gradeActions)if(permitted.has(action.studentPersonId)&&
+       action.metadata.requestedByGuardianPersonId===personId)
+       verifiedGradeActions.set(action.id,
+         `/guardian/academics?student=${encodeURIComponent(action.studentPersonId)}`);
+   }else if(context.role==="registrar"){
+     for(const action of gradeActions)if((context.scope.organizationIds??[]).length)
+       verifiedGradeActions.set(action.id,`/operations?action=${encodeURIComponent(action.id)}`);
+   }else if(context.role==="teacher"){
+     const teacherSections=await db.select({sectionId:s.sectionTeachers.sectionId})
+       .from(s.sectionTeachers).where(and(
+         eq(s.sectionTeachers.personId,personId),
+         inArray(s.sectionTeachers.sectionId,gradeActions.map(a=>a.sectionId).filter((id):id is string=>!!id))));
+     const allowed=new Set(teacherSections.map(t=>t.sectionId));
+     for(const action of gradeActions)if(action.sectionId&&allowed.has(action.sectionId))
+       verifiedGradeActions.set(action.id,"/teacher/gradebook");
+   }
+ }
  const bySubmission=new Map(submissions.map(x=>[x.id,x.assessmentId]));
  const referralIds=new Set(referralRows.map(r=>r.id));
  const missingIds=rows.filter(n=>n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId as string);
@@ -157,8 +217,15 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  return rows.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
   date:n.createdAt.toISOString(),href:n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
-   n.resourceType==="submission"&&n.resourceId&&bySubmission.has(n.resourceId)?
-   (context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:null):
+   n.resourceType==="submission"&&n.resourceId&&
+    (bySubmission.has(n.resourceId)||guardianSubmissionById.has(n.resourceId))?
+   (context.role==="student"&&bySubmission.has(n.resourceId)?
+     `/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:
+     context.role==="guardian"&&guardianSubmissionById.has(n.resourceId)?
+     (()=>{const row=guardianSubmissionById.get(n.resourceId)!;
+       return `/guardian/academics?student=${encodeURIComponent(row.studentPersonId)}&section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.assessmentId)}`;})():null):
+   n.resourceType==="action"&&n.resourceId&&gradeActionsById.has(n.resourceId)&&
+    verifiedGradeActions.has(n.resourceId)?verifiedGradeActions.get(n.resourceId)!:
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    (context.role==="student"?`/student/support?referral=${encodeURIComponent(n.resourceId)}`:null):
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:null):
