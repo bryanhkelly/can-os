@@ -1,3 +1,4 @@
+import { createAssessmentStatus } from "@/domain/assessment-publication";
 import { assertCapability,assertProgramScope,assertSiteScope,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
@@ -313,7 +314,7 @@ export const createAssessment = createServerFn({ method: "POST" })
   assertCapability(context, "assignments:create");
   const rubricCriteria = validateAssessmentRubric(data.rubricCriteria ?? [], data.pointsPossible);
   const dueAt = data.dueAt ? new Date(data.dueAt) : null;
-  if(data.publishNow && !dueAt)throw new Error("A due date is required to publish and assign an assessment.");
+  const intendedStatus=createAssessmentStatus(data.publishNow,dueAt);
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   return db.transaction(async tx => {
    const [teachingSection]=await tx.select({
@@ -330,7 +331,7 @@ export const createAssessment = createServerFn({ method: "POST" })
     .limit(1);
    if(!teachingSection)throw new AuthorizationError("active teaching assignment in authorized school/program");
    assertPublisherLessonReference(teachingSection.curriculum,teachingSection.status,data.curriculumLessonId);
-   const status = data.publishNow ? "published" as const : "draft" as const;
+   const status=intendedStatus;
    const [assessment] = await tx.insert(s.assessments).values({
     sectionId: data.sectionId,
     title: data.title,
