@@ -51,12 +51,13 @@ function displayName(first: string, last: string, preferred: string | null): str
 async function visibleStudentProfileIds(
   db: Db,
   s: Schema,
-  context: { role: StaffRole; actorPersonId: string; siteIds: string[] },
+  context: { role: StaffRole; actorPersonId: string; siteIds: string[]; programIds: string[] },
 ): Promise<string[]> {
   const conditions = [
     eq(s.enrollments.kind, "section"),
     eq(s.enrollments.status, "active"),
     inArray(s.sections.siteId, context.siteIds),
+    inArray(s.sections.programId, context.programIds),
   ];
   if (context.role === "teacher") {
     const rows = await db
@@ -165,6 +166,7 @@ export const searchStudents = createServerFn({ method: "GET" })
       role: context.role,
       actorPersonId: context.actorPersonId!,
       siteIds: context.siteIds,
+      programIds: context.scope.programIds??[],
     });
     if (!profileIds.length) return { students: [] };
     const query = data.query?.trim();
@@ -256,14 +258,16 @@ export const getStudent360 = createServerFn({ method: "GET" })
           eq(s.enrollments.kind, "section"),
           eq(s.enrollments.status, "active"),
           inArray(s.sections.siteId, context.siteIds),
+          inArray(s.sections.programId,context.scope.programIds??[]),
         ),
       );
     let authorized = activeSections.length > 0;
+    let visibleSections = activeSections;
     if (context.role === "teacher") {
       const sectionIds = activeSections.map((row) => row.sectionId);
       const taught = sectionIds.length
         ? await db
-            .select({ id: s.sectionTeachers.id })
+            .select({ sectionId: s.sectionTeachers.sectionId })
             .from(s.sectionTeachers)
             .where(
               and(
@@ -274,10 +278,12 @@ export const getStudent360 = createServerFn({ method: "GET" })
             .limit(1)
         : [];
       authorized = taught.length > 0;
+      const assignedSections=new Set(taught.map(row=>row.sectionId));
+      visibleSections=activeSections.filter(row=>assignedSections.has(row.sectionId));
     }
     if (!authorized) throw new AuthorizationError("student staff relationship");
 
-    const sectionIds = activeSections.map((row) => row.sectionId);
+    const sectionIds = visibleSections.map((row) => row.sectionId);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const [guardianRows, teacherRows, gradeRows, attendanceRows, actionRows, insightRows, referralRows, missing] =
@@ -333,6 +339,9 @@ export const getStudent360 = createServerFn({ method: "GET" })
           .where(
             and(
               eq(s.attendanceEvents.studentProfileId, profile.id),
+              inArray(s.attendanceEvents.siteId,context.siteIds),
+              inArray(s.attendanceEvents.programId,context.scope.programIds??[]),
+              ...(context.role==="teacher"?[inArray(s.attendanceEvents.sectionId,sectionIds)]:[]),
               inArray(s.attendanceEvents.status, ["absent", "tardy"]),
               gte(s.attendanceEvents.expectedAt, thirtyDaysAgo),
             ),
@@ -352,6 +361,12 @@ export const getStudent360 = createServerFn({ method: "GET" })
             and(
               eq(s.actions.subjectType, "student_profile"),
               eq(s.actions.subjectId, profile.id),
+              inArray(s.actions.siteId,context.siteIds),
+              inArray(s.actions.programId,context.scope.programIds??[]),
+              ...(context.role==="teacher"?[
+                inArray(s.actions.sectionId,sectionIds),
+                inArray(s.actions.type,["academic_intervention","guardian_grade_follow_up"]),
+              ]:[]),
               inArray(s.actions.status, ["open", "in_progress", "waiting"]),
             ),
           )
@@ -369,11 +384,16 @@ export const getStudent360 = createServerFn({ method: "GET" })
             and(
               eq(s.insights.subjectType, "student_profile"),
               eq(s.insights.subjectId, profile.id),
+              inArray(s.insights.siteId,context.siteIds),
+              inArray(s.insights.programId,context.scope.programIds??[]),
+              ...(context.role==="teacher"?[inArray(s.insights.sectionId,sectionIds)]:[]),
             ),
           )
           .orderBy(desc(s.insights.createdAt))
           .limit(5),
-        db
+        context.role==="teacher"?Promise.resolve([] as Array<{
+          id:string;title:string;stage:string;category:string;createdAt:Date;
+        }>):db
           .select({
             id: s.actions.id,
             title: s.actions.title,
@@ -388,6 +408,8 @@ export const getStudent360 = createServerFn({ method: "GET" })
               eq(s.actions.type, "support_referral"),
               eq(s.actions.subjectType, "student_profile"),
               eq(s.actions.subjectId, profile.id),
+              inArray(s.actions.siteId,context.siteIds),
+              inArray(s.actions.programId,context.scope.programIds??[]),
             ),
           )
           .orderBy(desc(s.actions.createdAt))
@@ -417,13 +439,13 @@ export const getStudent360 = createServerFn({ method: "GET" })
         name: displayName(row.firstName, row.lastName, row.preferredName),
         relationshipLabel: row.relationshipLabel,
       })),
-      sections: activeSections.map((row) => ({
+      sections: visibleSections.map((row) => ({
         sectionId: row.sectionId,
         title: row.sectionTitle,
         teacherNames: teachersBySection.get(row.sectionId) ?? [],
       })),
       academics: {
-        sections: activeSections.map((row) => {
+        sections: visibleSections.map((row) => {
           const grade = latestGradeBySection.get(row.sectionId);
           return {
             sectionId: row.sectionId,
