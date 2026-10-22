@@ -12,10 +12,22 @@ not a second school platform. Changes remain on `FullFlow` / draft PR #172.
 | Guided launch | `guided-school-journey.ts` and `GuidedSchoolJourney.tsx` turn the scoped live Program record into six navigable steps. A step is recorded only from canonical DB evidence; school-wide operations is always marked Review, never an automatic acceptance pass. | Real staff navigation and reload with one linked Program |
 | Operational action engine | `operations-action-triage.ts`, staff work queue, and `setOperationsActionDeadline`: urgent/due/unassigned ordering, due-date counts, verified site/program guard, auditable due-date change, existing owner's in-app alert. | Disposable DB tests for owner changes and deadline state, multi-role browser |
 | Student 360 | Existing `/staff/students/$personId` gains an academic-activity timeline. Searches, active-section counts, missing-work counts, attendance, actions, insights, and referrals are constrained to permitted programs/sections/sites. A teacher cannot view the student's other, untaught classes or private referral history through this read model. | Different-program and shared-student teacher isolation tests on real DB |
-| Academic credit and transcripts | `section-credit-policy.ts` removes the silent 1-credit fallback, blocks official transcript issuance when credit units are not configured, and labels missing units in the report view. Registrar can set actual Section credits in `/operations/launch/$programId`, with an audit/event and a lock after final grades; section provisioning optionally records units initially. | DB integration and authorized registrar UI; issuance snapshot test |
+| Academic credit and transcripts | `section-credit-policy.ts` removes the silent 1-credit fallback but **does not block official transcript issuance** when credits have not been recorded. Unknown credits remain null and display **Not recorded**. Official transcript snapshots preserve the missing-credit disclosure, courses, grades and institution of record. Registrar may configure Section credits in `/operations/launch/$programId` with an audit/event and a lock after finalized grades; section provisioning can also supply units initially. **Graduation eligibility and diploma issuance are different workflows**, not implied by a transcript. | DB integration and authorized registrar UI; issuance snapshot test |
 | Hybrid starter | A deliberate Grade 9 extension preset pre-fills onsite two days plus asynchronous delivery in the existing launch form. It never creates regulatory compliance, signed curriculum, schedules, attendance expectations or staff grants. | Actual calendar and hybrid attendance acceptance, after core journey |
 | Finance | **Not implemented.** No canonical tuition/billing/payments ledger was found. Do not generate money movements, financial aid or host-share percentages without an approved commercial/finance domain model. | Separate finance design and real ledger/payment integration; only after core-school acceptance |
 | Network/denomination | Existing partner contract and affiliation code retained but **deferred**. | No expansion until continuous school acceptance |
+
+**Transcript ≠ Diploma (canonical product rule):** A transcript reports the
+academic record as it exists, including courses and finalized grades even if
+credit information is incomplete. Missing credits must be displayed as
+`Not recorded`, **not** silently set to zero or one and **not** treated as
+an issuance blocker. Diploma issuance is reserved for a future separate
+graduation-review workflow that checks the complete requirements for the
+applicable institution/cohort (required course categories, minimum credits,
+completion evidence, approved transfers, exceptions and authorized final
+approval). Issuing a transcript does not assert eligibility, award credits or
+issue a diploma. The transcript snapshot must remain unchanged when data is
+later corrected; a new issuance captures the corrected record.
 
 **Additional academic-authority gate:** the credit issuer is currently selected
 when launching a Program, but independent legal authority for an external
