@@ -17,6 +17,16 @@ describe("provider-independent authorization context",()=>{
   context.scope.siteIds=["site-1","site-2"];
   expect(context.grantSiteId).toBeNull();
  });
+ it("grants HQ site administration without any student or admissions privileges",()=>{
+  const context=resolveAccessContext({accountId:"account-1",sessionId:"session-1",activeGrantId:"grant-1"},
+   [{...grant,role:"network_admin",siteId:null}]);
+  expect(context.role).toBe("network_admin");
+  expect(context.grantSiteId).toBeNull();
+  expect(context.capabilities.has("network.sites.manage")).toBe(true);
+  for(const forbidden of ["admissions:read","enrollment.activate","assignments:grade","student:read","admin.manage","program.launch.start"]){
+   expect(context.capabilities.has(forbidden)).toBe(false);
+  }
+ });
  it("rejects an account trying to use another account's membership",()=>{
   expect(()=>resolveAccessContext({accountId:"account-2",sessionId:"session-2",activeGrantId:"grant-1"},[grant])).toThrow();
   expect(()=>assertGrantSelection("account-2","grant-1",[grant])).toThrow();
