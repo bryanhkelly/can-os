@@ -4,7 +4,7 @@ import {db} from "@/db/client";
 import {accountPersonGrants} from "@/db/schema";
 import {readWorkspaceSession} from "@/modules/identity/workspace-session.server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
-import {selectAccessGrant} from "@/modules/identity/passwordless-access.server";
+import {selectAccessGrant,recordMeaningfulSessionActivity} from "@/modules/identity/passwordless-access.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {assertGrantSelection} from "@/domain/access-context";
 import {listDemoFacilitatorGrants} from "@/modules/identity/demo-facilitator.server";
@@ -27,6 +27,14 @@ export const Route=createFileRoute("/access/session")({
    try{
     const context=await getCommandContext(request);
     const body:unknown=await request.json();
+    // Explicit interactive activity is not a grant switch and must not be
+    // inferred from this route's periodic GET requests.
+    if(body && typeof body==="object" && "kind" in body &&
+      (body as {kind:unknown}).kind==="activity" &&
+      Object.keys(body).length===1){
+      await recordMeaningfulSessionActivity(context.sessionId,context.accountId);
+      return new Response(null,{status:204,headers:{"Cache-Control":"no-store"}});
+    }
     const grantId=body&&typeof body==="object"&&"grantId" in body?(body as {grantId:unknown}).grantId:null;
     if(typeof grantId!=="string")return Response.json({error:"Invalid membership"},{status:400});
     const grants=context.demoFacilitator
