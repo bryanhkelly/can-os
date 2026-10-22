@@ -104,6 +104,17 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
             <li key={season.id} className="rounded-lg border p-3 text-sm">
               <strong>{season.offeringName}</strong> · {season.name} · {season.startsOn} to {season.endsOn}
               <span className="ml-2 text-xs text-muted-foreground">{season.status} · {season.capacity ?? "Uncapped"} seats</span>
+              {(() => {
+                const gate = planning.readiness.find(item => item.seasonId === season.id);
+                return gate ? (
+                  <div className="mt-2 text-xs">
+                    <p className="font-semibold">{gate.ready ? "Readiness checks satisfied" : "Registration opening blocked"}</p>
+                    {!gate.ready && <ul className="mt-1 list-disc pl-5">
+                      {gate.blockers.map(blocker => <li key={blocker}>{blocker}</li>)}
+                    </ul>}
+                  </div>
+                ) : null;
+              })()}
             </li>
           )}
           {!planning.seasons.some(season => programs.some(p => p.id === season.programId)) &&
