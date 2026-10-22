@@ -114,6 +114,10 @@ export const reviewStudentLearningGoal = createServerFn({ method: "POST" })
           prior.outcome === data.outcome && prior.studentFeedback === data.studentFeedback) {
         return { goalActionId: goal.id, outcome: data.outcome, duplicate: true };
       }
+      if (isStudentGoalPublicReview(prior) && typeof prior === "object" &&
+          (prior as Record<string, unknown>).submissionId === data.gradedSubmissionId) {
+        throw new AuthorizationError("same graded work already reviewed for goal");
+      }
       if (goal.status === "resolved" || goal.status === "cancelled")
         throw new AuthorizationError("closed learning goal cannot be reviewed again");
 
