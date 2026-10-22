@@ -8,6 +8,7 @@ import { publishClassAnnouncement } from "@/modules/learning/class-communication
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { LearningActivityTracker } from "@/components/learning/LearningActivityTracker";
 
 const tabs = ["overview", "lessons", "planning", "files", "syllabus", "announcements", "people", "teacher-guide"] as const;
 const searchSchema = z.object({
@@ -188,6 +189,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {!data.content && <p role="status" className="rounded-xl border p-5 text-sm">No published learning content is configured for this class.</p>}
       {lessonId && !lesson && <p role="alert" className="rounded-xl border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
       {lesson ? <WorkspacePanel title={lesson.title} actions={<Link to="/classes" search={{ ...search, tab: "lessons" }} className="text-sm underline">All lessons</Link>}>
+        {data.role === "student" && <LearningActivityTracker sectionId={data.section.id} lessonId={lesson.id} />}
         <nav aria-label="Course lesson navigation" className="mb-5 space-y-3 rounded-lg border p-3">
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
             <span>Lesson {lessonIndex+1} of {lessons.length}</span>
