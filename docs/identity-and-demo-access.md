@@ -101,6 +101,34 @@ redemption, abuse control, attempt counting, structured unauthenticated
 security telemetry and retention controls are distinct follow-on security tasks.
 Do not store raw credentials or student work in the audit log.
 
+## Failed-authentication evidence (FullFlow bite 5)
+
+The `POST /access/verify` rejection path records
+`identity.verification.rejected` in the append-only `audit_events` table
+through a best-effort writer. **No user or account has been authenticated
+at this point.** The record intentionally uses `actor_person_id = NULL`,
+a fixed anonymous authentication resource, `outcome = rejected`, and
+a coarse method (email link versus local demo code). It never includes
+email, challenge token/hash, password, request headers, IP or student data.
+The HTTP error is generic and independent of whether the audit insert works.
+
+To prevent unbounded anonymous audit writes, the writer obtains a **nonblocking
+transaction advisory lock per authentication method**, checks a rolling
+one-minute window using the existing resource index, and records at most 30
+events per method per minute. It skips audit writes when busy or capped;
+security dashboards must therefore interpret anonymous rejection counts
+as **sampled/capped observations, not a complete count of attempts**.
+
+**Important limit:** This caps **audit writes**, not incoming sign-in requests
+or database queries. No claim of bot protection, per-network throttling, or
+per-account verification-failure lockout is warranted. Real abuse controls
+must be enforced at a trusted ingress/edge with a verified source-identity
+policy before accepting production traffic. Never trust a caller-supplied
+`X-Forwarded-For` header as a security boundary.
+
+The existing per-account email-link issuance cooldown remains in place.
+Successful auth lifecycle events retain separate verified identity attribution.
+
 ## Passwordless flow
 
 - Enter email; endpoint always responds generically (avoid enumeration).
