@@ -77,12 +77,14 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
       const lesson = content.modules.flatMap(module => module.lessons)
         .find(candidate => candidate.id === data.interaction.lessonId);
       if (!lesson) throw new AuthorizationError("published lesson");
-      if (data.interaction.kind === "resource_opened" &&
-          ![...classResources(content)].some(resource =>
-            resource.id === data.interaction.resourceId &&
+      if (data.interaction.kind === "resource_opened") {
+        const resourceId = data.interaction.resourceId;
+        if (!classResources(content).some(resource =>
+            resource.id === resourceId &&
             (lesson.resources.some(item => item.id === resource.id) ||
              content.resources.some(item => item.id === resource.id)))) {
-        throw new AuthorizationError("published lesson resource");
+          throw new AuthorizationError("published lesson resource");
+        }
       }
       const [learningSession] = await tx.select().from(s.learningActivitySessions)
         .where(and(
