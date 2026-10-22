@@ -12,6 +12,7 @@ const valid = {
   title: "Practice fraction equations",
   studentInstructions: "Complete the next three fraction exercises and bring your work to class.",
   dueInDays: 7 as const,
+  confirmedStudentSafe: true as const,
 };
 
 describe("teacher-approved student goals", () => {
@@ -36,7 +37,8 @@ describe("teacher-approved student goals", () => {
     for (const bad of [
       { teacherActionId: "unverified" }, { title: "Help" },
       { studentInstructions: "Go study." }, { dueInDays: 0 },
-      { dueInDays: 365 }, { studentInstructions: "x".repeat(751) },
+      { dueInDays: 365 },
+      { confirmedStudentSafe: false }, { studentInstructions: "x".repeat(751) },
     ]) {
       expect(() => teacherStudentGoalInput.parse({ ...valid, ...bad })).toThrow();
     }
