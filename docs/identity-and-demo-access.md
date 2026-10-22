@@ -169,6 +169,42 @@ policy before accepting production traffic. Never trust a caller-supplied
 The existing per-account email-link issuance cooldown remains in place.
 Successful auth lifecycle events retain separate verified identity attribution.
 
+## Netlify per-client rate-limiting safeguards (FullFlow bite 7)
+
+Two Netlify Edge Functions in `netlify/edge-functions/` declare code-based,
+**Netlify-enforced client IP + domain** rate limits on the credential endpoints,
+limited to POST requests:
+
+| Route | Per-IP/domain limit | Global Postgres emergency ceiling |
+| --- | ---: | ---: |
+| `/access/request` | 20 per 60 seconds | 240 per 60 seconds |
+| `/access/verify` | 40 per 60 seconds | 600 per 60 seconds |
+
+This uses Netlify's own trusted edge request attribution; the application
+does **not** trust `X-Forwarded-For` or parse the submitted email/token as
+a source address. Each Edge Function returns without consuming the request body,
+allowing the existing same-origin, global Postgres budget, atomic challenge and
+audit gates to execute unchanged. Netlify's limits operate separately from
+the application-side global limit; both are required.
+
+**Verification required on deployment:** Netlify validates these rules during
+**deploy post-processing**, not the local Vite build. It may not fail a deploy
+for a broken rate-limit declaration. Review the Netlify deploy log and confirm
+two valid published code-based rate-limiting rules for the named POST paths,
+then run controlled over-limit requests in an isolated staging deployment.
+Built-in rate limiting can begin blocking up to approximately 10 seconds
+after a client crosses the threshold, so do not promise an instantaneous ban.
+Ensure the current Netlify plan supports at least two code-based rules; on
+plans with exactly two, these rules consume both slots.
+
+**Limitations:** Clients behind shared campus or household NAT can share an IP
+budget and experience temporary 429s. Determined attackers may distribute
+requests across IPs. Do not log client IPs in CAN OS application audit, infer
+student behavior from throttling, or claim that static CI proves Netlify's
+published edge rules. Preserve application-wide database admission as a
+backstop. Limits should be tuned using authorized, aggregated operational
+measurements before real-student deployment.
+
 ## Passwordless flow
 
 - Enter email; endpoint always responds generically (avoid enumeration).
