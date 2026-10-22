@@ -295,5 +295,68 @@ integration("GF36 co-curriculars and athletics", () => {
     const seasonCount = await db.select().from(schema.activitySeasons)
       .where(eq(schema.activitySeasons.activityId, activityId));
     expect(seasonCount).toHaveLength(1);
+
+    // Noncredit extended-learning planning requests must have an active,
+    // named site registrar and must never publish registration implicitly.
+    await db.update(schema.programs).set({ creditIssuingOrganizationId: null })
+      .where(eq(schema.programs.id, program.id));
+    await db.update(schema.activitySeasons).set({ status: "draft" })
+      .where(eq(schema.activitySeasons.id, seasonId));
+    const [readinessAccount] = await db.insert(schema.accessAccounts).values({
+      emailNormalized: `gf36-ready-${suffix}@example.test`,
+    }).returning();
+    const [readinessGrant] = await db.insert(schema.accountPersonGrants).values({
+      accountId: readinessAccount.id, personId: coach.id,
+      role: "registrar", organizationId: org.id, siteId: site.id,
+      active: true,
+    }).returning();
+    const readinessContext = {
+      role: "registrar",
+      accountId: readinessAccount.id,
+      sessionId: crypto.randomUUID(), grantId: readinessGrant.id,
+      grantSiteId: site.id,
+      actorPersonId: coach.id,
+      capabilities: new Set(["program.launch.start"]),
+      scope: { organizationIds: [org.id], siteIds: [site.id], programIds: [program.id] },
+      requestId: `gf36-readiness-${suffix}`,
+    };
+    const { ensureExtendedReadinessAssignments } = await import(
+      "@/modules/activities/extended-learning-readiness-service"
+    );
+    const assignmentInput = { seasonId, recipientPersonId: coach.id };
+    await expect(ensureExtendedReadinessAssignments({
+      ...readinessContext, scope: { ...readinessContext.scope,
+        siteIds: [crypto.randomUUID()] },
+    }, assignmentInput)).rejects.toThrow(/scope/);
+    await expect(ensureExtendedReadinessAssignments(readinessContext, {
+      seasonId, recipientPersonId: guardian.id,
+    })).rejects.toThrow(/verified active registrar/);
+    for (const writer of ["writeAudit", "emitEvent"] as const) {
+      await expectEvidenceFailure(db, writer, () =>
+        ensureExtendedReadinessAssignments(readinessContext, assignmentInput));
+      const rolledBack = await db.select().from(schema.actions)
+        .where(eq(schema.actions.subjectId, seasonId));
+      expect(rolledBack).toEqual([]);
+    }
+    const assigned = await ensureExtendedReadinessAssignments(readinessContext, assignmentInput);
+    expect(assigned.created).toBe(6);
+    const replay = await ensureExtendedReadinessAssignments(readinessContext, assignmentInput);
+    expect(replay.created).toBe(0);
+    const requests = await db.select().from(schema.actions)
+      .where(eq(schema.actions.subjectId, seasonId));
+    expect(requests).toHaveLength(6);
+    expect(requests.every(task => task.status === "open" &&
+      task.ownerPersonId === coach.id && task.metadata.reviewState === "evidence_requested")).toBe(true);
+    for (const task of requests) {
+      await expectMutationEvidence(db, {
+        resourceType: "action", resourceId: task.id,
+        action: "activity.season.readiness.request", eventType: "ActionCreated",
+        scope: { organizationId: org.id, siteId: site.id, programId: program.id },
+        actorPersonId: coach.id, requestId: readinessContext.requestId,
+      });
+    }
+    const [unopened] = await db.select({ status: schema.activitySeasons.status })
+      .from(schema.activitySeasons).where(eq(schema.activitySeasons.id, seasonId));
+    expect(unopened.status).toBe("draft");
   });
 });
