@@ -36,3 +36,4 @@ export * from "./curriculum-resources";
 export * from "./curriculum-units";
 
 export * from "./network-affiliations";
+export * from "./network-agreements";
