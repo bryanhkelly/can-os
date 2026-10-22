@@ -563,6 +563,51 @@ integration("FullFlow: one school, same high-school program through curriculum a
         await expect(teacherFollowUp.createTeacherLearningFollowUp({
           data:supportRequest,
         })).rejects.toThrow("assigned active section");
+        const followThrough = await import("@/modules/learning/teacher-followup-resolution.functions");
+        await expect(followThrough.getTeacherLearningFollowUps())
+          .rejects.toThrow("verified teacher required").catch(async () => {
+            // An impostor with a teacher role but no actual Section assignment
+            // is denied at the row-scope query even if the role is present.
+            expect((await followThrough.getTeacherLearningFollowUps()).items).toHaveLength(0);
+          });
+        state.actor = guardianActor;
+        await expect(followThrough.resolveTeacherLearningFollowUp({data:{
+          actionId:support.actionId,
+          supportProvided:"I checked the student's revision in class.",
+          outcome:"not_yet_verified",outcomeEvidence:"A new assignment will be reviewed next week.",
+        }})).rejects.toThrow("verified teacher required");
+        state.actor = teacherActor;
+        const teacherQueue = await followThrough.getTeacherLearningFollowUps();
+        expect(teacherQueue.items.some(x=>x.id===support.actionId&&
+          x.studentProfileId===profile.id&&x.sectionId===section.id)).toBe(true);
+        const resolution = {
+          actionId:support.actionId,
+          supportProvided:"Reviewed inverse operations with the student using a worked example.",
+          outcome:"not_yet_verified" as const,
+          outcomeEvidence:"Student will complete the assigned example before mastery can be assessed.",
+        };
+        const savedFollowUp = await followThrough.resolveTeacherLearningFollowUp({data:resolution});
+        expect(savedFollowUp).toEqual({saved:true,alreadyResolved:false});
+        expect(await followThrough.resolveTeacherLearningFollowUp({data:resolution}))
+          .toEqual({saved:true,alreadyResolved:true});
+        const [resolvedFollowUp] = await tx.select().from(s.actions)
+          .where(eq(s.actions.id,support.actionId));
+        expect(resolvedFollowUp.status).toBe("resolved");
+        expect(resolvedFollowUp.resolutionNote).toContain("Support provided: Reviewed inverse operations");
+        expect(resolvedFollowUp.metadata.followUpResult).toMatchObject({
+          outcome:"not_yet_verified",supportProvided:resolution.supportProvided,
+          outcomeEvidence:resolution.outcomeEvidence,
+        });
+        expect(await tx.select().from(s.domainEvents).where(and(
+          eq(s.domainEvents.aggregateId,support.actionId),
+          eq(s.domainEvents.eventType,"ActionResolved"),
+        ))).toHaveLength(1);
+        expect(await tx.select().from(s.auditEvents).where(and(
+          eq(s.auditEvents.resourceId,support.actionId),
+          eq(s.auditEvents.action,"action.resolve"),
+        ))).toHaveLength(1);
+        expect((await followThrough.getTeacherLearningFollowUps()).items
+          .find(x=>x.id===support.actionId)?.status).toBe("resolved");
 
         state.actor = guardianActor;
         expect((await activity.getLearningActivityHistory({data:{
