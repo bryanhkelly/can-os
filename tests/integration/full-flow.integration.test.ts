@@ -295,6 +295,28 @@ integration("FullFlow: one school, same high-school program through curriculum a
           eq(s.deliveryArrangements.instructorPersonId, teacher.id),
           eq(s.deliveryArrangements.status, "active"),
         ))).toHaveLength(1);
+        // A site-based launch requires an independently held, active, local
+        // receiving-operator grant even when the creator has org-wide access.
+        await tx.insert(s.accountPersonGrants).values({
+          accountId: schoolAccount.id, personId: schoolOperator.id,
+          role: "registrar", organizationId: school.id, siteId: site.id, active: true,
+        });
+        const {completeJourneyRequirement} = await import("@/modules/journeys/complete-requirement");
+        const readiness = await tx.select().from(s.journeyRequirements)
+          .where(eq(s.journeyRequirements.journeyId, programLaunch.journeyId));
+        for (const requirement of readiness) {
+          await completeJourneyRequirement(state.actor!, requirement.id,
+            [{fact: `fullflow-${requirement.key}-verified`}]);
+        }
+        await launch.activateLaunch({data: {
+          programId, recipientPersonId: schoolOperator.id,
+        }});
+        expect(first(await tx.select().from(s.programs).where(eq(s.programs.id, programId))).status)
+          .toBe("active");
+        expect(await tx.select().from(s.domainEvents).where(and(
+          eq(s.domainEvents.aggregateId, programId),
+          eq(s.domainEvents.eventType, "ProgramActivated"),
+        ))).toHaveLength(1);
         ids = {programId, siteId: site.id, sectionId: section.id, versionId: draft.versionId};
         completed = true;
         throw rollback;
