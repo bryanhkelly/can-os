@@ -2,6 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { StudentExperience } from "@/components/student/StudentExperience";
 import { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
+import { getQuickWinActions } from "@/modules/actions/student-actions.functions";
+import {
+  deriveStudentSuccessSupportTasks,
+  type StudentSuccessSupportSummary,
+} from "@/domain/student-success-support";
 import {
   deriveStudentSuccessPriorities, type StudentSuccessPriorities,
 } from "@/domain/student-success";
@@ -34,7 +39,17 @@ async function loadStudentToday() {
     // Do not turn a recoverable assignments outage into a broken school-day
     // screen, or represent unavailable records as "no work assigned".
   }
-  return { today, success };
+  let support: StudentSuccessSupportSummary | null = null;
+  try {
+    const ownedActions = await getQuickWinActions();
+    if (ownedActions.connected) {
+      support = deriveStudentSuccessSupportTasks(ownedActions.actions);
+    }
+  } catch {
+    // Degrade independently: an Action read failure cannot break classes and
+    // coursework, or be mistaken for an empty support caseload.
+  }
+  return { today, success, support };
 }
 
 export const Route = createFileRoute("/student/")({
@@ -46,5 +61,5 @@ export const Route = createFileRoute("/student/")({
 function StudentTodayPage() {
   const result = Route.useLoaderData();
   if (!result.ok) return <LoaderFailure eyebrow="CAN OS · Student" title="Your learning day" outcome={result} />;
-  return <StudentExperience liveData={result.data.today} success={result.data.success} />;
+  return <StudentExperience liveData={result.data.today} success={result.data.success} support={result.data.support} />;
 }
