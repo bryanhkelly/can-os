@@ -48,6 +48,9 @@ export const getOperationsActions=createServerFn({method:"GET"})
  const scopedItems=prioritizeSchoolActions(items.map(item=>{
   const record=records.find(record=>record.id===item.id);
   return {...item,siteId:record?.siteId??null,ownerPersonId:record?.ownerPersonId??null,
+   dueAt:record?.dueAt?.toISOString()??null,status:record?.status??"open",
+   priority:item.priority==="critical"?"critical" as const:
+     item.priority==="high"?"high" as const:"normal" as const,
    managedBySupport:record?.type==="support_referral",openingHandoff:record?.type===openingHandoffType};
  }));
  const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor"])));
