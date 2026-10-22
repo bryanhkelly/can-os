@@ -9,7 +9,7 @@ import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge } from "@
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 
-const tabs = ["overview", "lessons", "files", "syllabus", "announcements", "people", "teacher-guide"] as const;
+const tabs = ["overview", "lessons", "planning", "files", "syllabus", "announcements", "people", "teacher-guide"] as const;
 const searchSchema = z.object({
   section: z.string().uuid().optional(), student: z.string().uuid().optional(),
   tab: z.enum(tabs).optional(), lesson: z.string().max(100).optional(),
@@ -103,7 +103,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {data.role !== "guardian" && <Link to="/calendar" search={{ section: data.section.id }} className="underline">Class calendar</Link>}
       {data.role === "guardian" && <Link to="/guardian/report-cards" search={{ student: search.student }} className="underline">Published report cards</Link>}
     </nav></WorkspacePanel>}>
-    <DetailNavigation label="Class sections">{tabs.filter(value => (value !== "people" && value !== "teacher-guide") || data.role === "teacher").map(value =>
+    <DetailNavigation label="Class sections">{tabs.filter(value => !["people","teacher-guide","planning"].includes(value) || data.role === "teacher").map(value =>
       <Link key={value} to="/classes" search={{ ...search, tab: value }} aria-current={tab === value ? "page" : undefined} className="capitalize">{value === "people" ? "Roster" : value === "teacher-guide" ? "Teacher guide" : value}</Link>)}</DetailNavigation>
     {error && <p role="alert" className="mb-5 rounded-lg border p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mb-5 rounded-lg border p-3 text-sm">{notice}</p>}
@@ -220,6 +220,42 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       </WorkspacePanel>)}
       {data.content && !lessons.length && <p className="text-sm text-muted-foreground">No lessons have been published.</p>}
     </div>}
+    {tab === "planning" && (data.role === "teacher" ? <div className="space-y-5" aria-label="Teacher course implementation plan">
+      <WorkspacePanel title="Teacher course implementation plan"
+        description="Plan classroom work from the publisher's pinned course sequence. Class assignments and supplements are separate teacher-owned records; completion is self-reported, not mastery or credit.">
+        <p className="text-sm">{lessons.length} published lessons · {data.roster.length} enrolled learners · {assessmentEvidence.length} released assessments</p>
+        {data.content?.blueprint&&<p className="mt-2 text-xs text-muted-foreground">
+          Publisher's proposed {data.content.blueprint.targetInstructionalWeeks}-week sequence:
+          {data.content.blueprint.weeks.filter(week=>week.status!=="planned").length} weeks with authored planning status.
+          Planned weeks without published lessons are not assigned automatically.
+        </p>}
+      </WorkspacePanel>
+      {data.content?.modules.map(module=><WorkspacePanel key={module.id} title={module.title}>
+        {data.content?.blueprint&&<p className="mb-3 text-xs text-muted-foreground">
+          {data.content.blueprint.weeks.filter(week=>week.unitId===module.id).map(week=>`Week ${week.week}: ${week.title} (${week.status})`).join(" · ")||"No matching weeks in publisher roadmap"}
+        </p>}
+        <ol className="divide-y">{module.lessons.map(item=>{
+          const assigned=assessmentEvidence.filter(work=>work.curriculumLessonId===item.id);
+          const marked=data.lessonCompletionCounts.find(count=>count.lessonId===item.id)?.studentCount??0;
+          return <li key={item.id} className="space-y-2 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><p className="font-medium">{item.title}</p>
+                <p className="text-xs text-muted-foreground">{assigned.length} linked released assignments · {marked}/{data.roster.length} learners self-reported complete</p>
+              </div>
+              <div className="flex flex-wrap gap-3 text-sm">
+                <Link to="/classes" search={{...search,tab:"lessons",lesson:item.id}} className="underline">View lesson</Link>
+                <Link to="/teacher/gradebook" search={{section:data.section.id,lesson:item.id,kind:"classwork"}} className="underline">Create classwork</Link>
+              </div>
+            </div>
+            {assigned.length>0&&<div className="flex flex-wrap gap-2">{assigned.map(work=>
+              <Link key={work.id} to="/teacher/gradebook" search={{section:data.section.id,assessment:work.id}}
+               className="rounded border px-2 py-1 text-xs underline">{work.title}</Link>)}</div>}
+          </li>;
+        })}</ol>
+        {!module.lessons.length&&<p className="text-sm text-muted-foreground">No published lessons in this unit.</p>}
+      </WorkspacePanel>)}
+      {!data.content&&<p className="rounded border p-4 text-sm">No published curriculum is available to plan this class.</p>}
+    </div> : <p role="alert" className="rounded border p-4 text-sm">Teacher planning is available only to the assigned teaching team.</p>)}
     {tab === "files" && <WorkspacePanel title="Class files and resources" description="Links and verified private documents from the published course version.">
       {data.role==="teacher" && <form className="mb-5 grid gap-3 rounded-lg border p-4"
         onSubmit={event=>{event.preventDefault();void run(async()=>{

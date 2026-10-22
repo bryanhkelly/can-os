@@ -34,7 +34,7 @@ vi.mock("@/modules/learning/discussion-post.functions", () => ({ postDiscussionM
 const workspace: ComponentProps<typeof ClassWorkspace>["data"] = {
   role: "student", section: { id: "english", title: "English", code: "ENG", description: "Read and revise.",
     subject: "English", versionId: "published-version", contentStatus: "published" },
-  teacherGuides: null,
+  teacherGuides: null, lessonCompletionCounts:[],
   studentPersonId: "child", teachers: [{ personId: "teacher", name: "Taylor Teacher" }],
   content: classContentSchema.parse({
     version: 1, syllabus: "<script>unsafe()</script>",
@@ -125,6 +125,24 @@ describe("published class workspace", () => {
     expect(day).toContain("Independent Practice");
     expect(day).toContain("Mark lesson complete");
     expect(day).toContain("ALGEBRA I • UNIT 1 • DAY 1 OF 5");
+  });
+  it("shows an authorized teacher a published-course planning view without treating lesson marks as credit",()=>{
+    const student=renderToStaticMarkup(<ClassWorkspace data={workspace} tab="planning"/>);
+    expect(student).toContain("Teacher planning is available only");
+    expect(student).not.toContain("Teacher course implementation plan");
+    const teacher=renderToStaticMarkup(<ClassWorkspace data={{...workspace,
+      role:"teacher",lessonCompletionCounts:[{lessonId:"evidence",studentCount:1}],
+      assessmentEvidence:[{
+       id:"assessment-1",title:"Publisher lesson homework",curriculumLessonId:"evidence",
+       unitId:null,attemptNumber:null,status:"not_submitted",score:null,pointsPossible:10,
+      }],
+    }} tab="planning"/>);
+    expect(teacher).toContain("Teacher course implementation plan");
+    expect(teacher).toContain("Publisher lesson homework");
+    expect(teacher).toContain("1/1 learners self-reported complete");
+    expect(teacher).toContain('href="/teacher/gradebook?section=english&amp;lesson=evidence&amp;kind=classwork"');
+    expect(teacher).toContain("not mastery or credit");
+    expect(teacher).not.toContain("Edit publisher");
   });
   it("shows validated answer keys only in the teacher-only classroom guide",()=>{
     const guide=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/unit01-teacher-guide.json",import.meta.url),"utf8"));
