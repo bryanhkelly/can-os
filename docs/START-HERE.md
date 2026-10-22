@@ -16,6 +16,8 @@ FullFlow execution priority: [one connected six-stage acceptance contract](./ful
 
 New architecture specification: [Curriculum marketplace and portability](./curriculum-marketplace-architecture.md).
 
+Extended offerings: [Summer and after-school program definitions and workflow limits](./extended-learning-offerings.md).
+
 Required P1 student experience: [Comprehensive learning-activity tracking](./comprehensive-learning-activity-tracking.md) (distinct from authentication sessions, official attendance, or grading).
 
 Connected five-track implementation: [Learning activity → teacher intervention → student success → academic progression → hybrid site](./connected-learning-success-progression-hybrid.md).
