@@ -668,6 +668,24 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/access.sessions.ts",
+      "route": "/access/sessions",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "authenticated account holder lists and revokes own sessions; deny cross-account",
+      "readBoundary": "verified account owns all returned sessions; exclude secrets",
+      "writeBoundary": "same-origin and strict command; conditional account-owned revocation; audited"
+    },
+    {
+      "file": "src/routes/account.sessions.tsx",
+      "route": "/account/sessions",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "account holder reviews and revokes signed-in sessions",
+      "readBoundary": "verified account via /access/sessions API",
+      "writeBoundary": "delegated to account-owned authenticated session endpoint"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
