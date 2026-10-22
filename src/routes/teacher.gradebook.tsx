@@ -15,10 +15,12 @@ import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
 
 export const Route = createFileRoute("/teacher/gradebook")({
- validateSearch:(search:Record<string,unknown>):{section?:string;assessment?:string;student?:string}=>({
+ validateSearch:(search:Record<string,unknown>):{section?:string;assessment?:string;student?:string;lesson?:string;kind?:string}=>({
   section:typeof search.section==="string"?search.section:undefined,
   assessment:typeof search.assessment==="string"?search.assessment:undefined,
   student:typeof search.student==="string"?search.student:undefined,
+  lesson:typeof search.lesson==="string"&&/^[A-Za-z0-9_-]{1,100}$/.test(search.lesson)?search.lesson:undefined,
+  kind:typeof search.kind==="string"&&["homework","classwork","quiz","test","project","discussion"].includes(search.kind)?search.kind:undefined,
  }),
  component:()=> <TeacherGradebookPage key={JSON.stringify(Route.useSearch())}/>,
 });
@@ -50,8 +52,9 @@ function TeacherGradebookPage() {
  const rubricSequence=useRef(0);
  const [points, setPoints] = useState("");
  const [due, setDue] = useState("");
- const [assignmentKind,setAssignmentKind]=useState<"homework"|"classwork"|"quiz"|"test"|"project"|"discussion">("classwork");
- const [curriculumLessonId,setCurriculumLessonId]=useState("");
+ const [assignmentKind,setAssignmentKind]=useState<"homework"|"classwork"|"quiz"|"test"|"project"|"discussion">(
+  (search.kind as "homework"|"classwork"|"quiz"|"test"|"project"|"discussion"|undefined)??"classwork");
+ const [curriculumLessonId,setCurriculumLessonId]=useState(search.lesson??"");
  const [assessmentDueDates,setAssessmentDueDates]=useState<Record<string,string>>({});
  const reviewKey=gradingKey||detailKey;
  const reviewCell=gradebook?.cells.find(cell=>`${cell.studentProfileId}:${cell.assessmentId}`===reviewKey);
@@ -332,8 +335,11 @@ function TeacherGradebookPage() {
       </div>}
      </WorkspacePanel>
     </div>}
-    <details className="mt-8 rounded-xl border bg-card p-5">
+    <details className="mt-8 rounded-xl border bg-card p-5" open={search.lesson?true:undefined}>
      <summary className="cursor-pointer text-lg font-semibold">Create an assessment</summary>
+     {search.lesson&&<p className="mt-2 text-sm text-muted-foreground">Creating {assignmentKind} from the selected publisher lesson. This activity belongs to your class, not the publisher's immutable course.</p>}
+     {search.lesson&&!gradebook.curriculumLessons.some(lesson=>lesson.id===search.lesson)&&
+      <p role="alert" className="mt-2 text-sm">This publisher lesson is unavailable in this class. Choose a listed lesson before creating the assessment.</p>}
     <section className="mt-4" aria-label="New assessment">
      <h2 className="text-lg font-semibold">New assessment</h2>
      <div className="mt-4 grid gap-4 sm:grid-cols-3">

@@ -62,6 +62,8 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const assessmentSummary = data.assessmentEvidenceSummary;
   const lessons = data.content?.modules.flatMap(module => module.lessons) ?? [];
   const lesson = lessons.find(item => item.id === lessonId);
+  const relatedWork = lesson ? assessmentEvidence.filter(item => item.curriculumLessonId === lesson.id) : [];
+
   const completed = new Set(data.progress.filter(item => item.completedAt).map(item => item.lessonId));
   async function run(command: () => Promise<unknown>, success: string) {
     setBusy(true); setError(""); setNotice("");
@@ -180,6 +182,32 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
                 onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
                 {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>} <span className="text-xs text-muted-foreground">· {item.source}</span></li>)}</ul>
         </div>}
+        {relatedWork.length > 0 && <section className="mt-6 space-y-3 rounded-lg border p-4" aria-label="Assignments for this lesson">
+          <h3 className="text-sm font-semibold">Assignments for this lesson</h3>
+          <ul className="divide-y">{relatedWork.map(work => <li key={work.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div>
+              <p className="font-medium text-sm">{work.title}</p>
+              {data.role !== "teacher" && <p className="text-xs text-muted-foreground">
+                {work.status === "graded" && work.score !== null ? `Graded: ${work.score} / ${work.pointsPossible ?? "—"}` :
+                work.status === "submitted" ? "Submitted · awaiting teacher feedback" :
+                work.status === "returned" ? "Returned for revision" :
+                work.status === "draft" ? "Response in progress" : "Not submitted"}
+              </p>}
+            </div>
+            {data.role === "teacher" ?
+              <Link to="/teacher/gradebook" search={{section:data.section.id,assessment:work.id}} className="text-sm underline">Review in gradebook</Link> :
+              data.role === "student" ?
+              <Link to="/student/assignments" search={{section:data.section.id,assessment:work.id}} className="text-sm underline">Open assignment</Link> : null}
+          </li>)}</ul>
+        </section>}
+        {data.role === "teacher" && <section className="mt-6 rounded-lg border p-4" aria-label="Assign from this lesson">
+          <h3 className="text-sm font-semibold">Assign work from this lesson</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Create teacher-owned work linked to this published lesson. Publisher content remains unchanged.</p>
+          <div className="mt-3 flex flex-wrap gap-3">{(["homework","classwork","quiz","test","project","discussion"] as const).map(kind=>
+            <Link key={kind} to="/teacher/gradebook" search={{section:data.section.id,lesson:lesson.id,kind}}
+              className="rounded border px-3 py-2 text-sm capitalize">Create {kind}</Link>
+          )}</div>
+        </section>}
         {data.role === "student" && <button type="button" disabled={busy} onClick={() => void run(() => setLessonCompletion({ data: {
           sectionId: data.section.id, versionId: data.section.versionId, lessonId: lesson.id, completed: !completed.has(lesson.id),
         } }), completed.has(lesson.id) ? "Lesson marked incomplete." : "Lesson completion saved.")}

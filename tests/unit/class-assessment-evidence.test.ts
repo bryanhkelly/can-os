@@ -32,6 +32,19 @@ describe("class assessment evidence (not course credit or mastery)",()=>{
   ]);
   expect(evidence.map(row=>row.score)).toEqual([null,null]);
  });
+ it("links only safe published assessments to the exact publisher lesson",()=>{
+  const evidence=buildClassAssessmentEvidence([
+   {id:"hw",title:"Equation homework",status:"published",pointsPossible:"10",metadata:{
+    curriculumLessonId:"algebra1-equations",assignmentKind:"homework"}},
+   {id:"unsafe",title:"Unrelated",status:"published",pointsPossible:"20",metadata:{
+    curriculumLessonId:"../other-class"}},
+   {id:"draft",title:"Private draft",status:"draft",pointsPossible:"10",metadata:{
+    curriculumLessonId:"algebra1-equations"}},
+  ],[]);
+  expect(evidence).toHaveLength(2);
+  expect(evidence[0]).toMatchObject({id:"hw",curriculumLessonId:"algebra1-equations",status:"not_submitted"});
+  expect(evidence[1]).toMatchObject({id:"unsafe",curriculumLessonId:null});
+ });
  it("ignores unsafe metadata unit identifiers and invalid point values",()=>{
   const evidence=buildClassAssessmentEvidence([
     {id:"x",title:"x",status:"published",pointsPossible:"not-a-number",metadata:{unitId:"../other-school"}},

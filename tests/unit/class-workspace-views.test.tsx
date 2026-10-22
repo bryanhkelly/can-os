@@ -84,6 +84,29 @@ describe("published class workspace", () => {
     expect(html).toContain("Solve carefully");
     expect(html).toContain("Explain how you solved the equation.");
   });
+  it("student sees only published work for the selected lesson; teacher gets linked create actions",()=>{
+    const evidence=[
+      {id:"hw1",title:"Find evidence homework",unitId:null,curriculumLessonId:"evidence",
+       attemptNumber:1,status:"not_submitted" as const,score:null,pointsPossible:10},
+      {id:"other",title:"Unrelated course task",unitId:null,curriculumLessonId:"other-lesson",
+       attemptNumber:1,status:"submitted" as const,score:null,pointsPossible:10},
+    ];
+    const data={...workspace,assessmentEvidence:evidence};
+    const student=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="evidence"/>);
+    expect(student).toContain("Assignments for this lesson");
+    expect(student).toContain("Find evidence homework");
+    expect(student).toContain('href="/student/assignments?section=english&amp;assessment=hw1"');
+    expect(student).not.toContain("Unrelated course task");
+    expect(student).not.toContain("Create homework");
+    const teacher=renderToStaticMarkup(<ClassWorkspace data={{...data,role:"teacher"}} tab="lessons" lessonId="evidence"/>);
+    expect(teacher).toContain('href="/teacher/gradebook?section=english&amp;lesson=evidence&amp;kind=homework"');
+    expect(teacher).toContain("Create quiz");
+    expect(teacher).toContain("Create project");
+    expect(teacher).toContain('href="/teacher/gradebook?section=english&amp;assessment=hw1"');
+    const guardian=renderToStaticMarkup(<ClassWorkspace data={{...data,role:"guardian"}} tab="lessons" lessonId="evidence"/>);
+    expect(guardian).not.toContain("Create homework");
+    expect(guardian).not.toContain('href="/student/assignments?section=english&amp;assessment=hw1"');
+  });
   it("renders the 36-week provisional blueprint and typed lesson activities in the real Classes workspace",()=>{
     const blueprint=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/yearlong-blueprint.json",import.meta.url),"utf8"));
     const unit=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/unit01-week01.json",import.meta.url),"utf8"));

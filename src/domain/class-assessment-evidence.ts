@@ -10,7 +10,7 @@ export type AssessmentAttempt = {
  assessmentId:string; attemptNumber:number; status:string; score:string|null;
 };
 export type ClassAssessmentEvidence = {
- id:string; title:string; unitId:string|null; pointsPossible:number|null;
+ id:string; title:string; unitId:string|null; curriculumLessonId:string|null; pointsPossible:number|null;
  attemptNumber:number|null; status:"not_submitted"|"submitted"|"graded"|"returned"|"draft";
  score:number|null;
 };
@@ -38,9 +38,11 @@ export function buildClassAssessmentEvidence(
     attempt?.status==="assigned"?"draft":"not_submitted";
    const score=(status==="graded"||status==="returned")?safePoints(attempt?.score??null):null;
    const unit=assessment.metadata.unitId;
+   const lesson=assessment.metadata.curriculumLessonId;
    return {
     id:assessment.id,title:assessment.title,
     unitId:typeof unit==="string"&&unitIdPattern.test(unit)?unit:null,
+    curriculumLessonId:typeof lesson==="string"&&unitIdPattern.test(lesson)?lesson:null,
     pointsPossible:safePoints(assessment.pointsPossible),
     attemptNumber:attempt?.attemptNumber??null,
     status,score,
