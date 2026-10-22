@@ -18,6 +18,8 @@ export const programType = pgEnum("program_type", [
   "hybrid_program",
   "homeschool_cohort",
   "summer_enrichment",
+  "summer_program",
+  "after_school_enrichment",
 ]);
 
 export const programStatus = pgEnum("program_status", [

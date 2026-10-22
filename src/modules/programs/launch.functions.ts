@@ -6,18 +6,9 @@ import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { programTypes } from "@/domain/program-offerings";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
 import { listOpeningOperators } from "./opening-handoff.server";
-
-const programTypes = [
-  "church_hosted_academy",
-  "high_school_extension",
-  "full_school",
-  "microschool",
-  "hybrid_program",
-  "homeschool_cohort",
-  "summer_enrichment",
-] as const;
 
 const uuid = z.string().uuid();
 
@@ -46,7 +37,8 @@ const startLaunchInput = z.object({
   hostOrganizationId: uuid,
   jurisdictionId: uuid,
   academicProviderOrganizationId: uuid,
-  creditIssuingOrganizationId: uuid,
+  creditIssuingOrganizationId: uuid.optional(),
+  creditMode: z.enum(["credit_bearing", "non_credit"]).optional(),
   siteId: uuid.optional(),
 });
 

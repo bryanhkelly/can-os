@@ -1,4 +1,5 @@
 import { db } from "@/db/client";
+import { resolveProgramCreditMode, type ProgramType, type ProgramCreditMode } from "@/domain/program-offerings";
 import {
 journeys,
 organizations,
@@ -32,14 +33,7 @@ export async function startProgramLaunch(
     hostOrganizationId: string;
     siteId?: string;
     jurisdictionId: string;
-    type:
-      | "church_hosted_academy"
-      | "high_school_extension"
-      | "full_school"
-      | "microschool"
-      | "hybrid_program"
-      | "homeschool_cohort"
-      | "summer_enrichment";
+    type: ProgramType;
     name: string;
     slug: string;
     gradeRange: { min: string; max: string };
@@ -50,12 +44,14 @@ export async function startProgramLaunch(
       onsiteDaysPerWeek?: number;
     };
     academicProviderOrganizationId: string;
-    creditIssuingOrganizationId: string;
+    creditIssuingOrganizationId?: string;
+    creditMode?: ProgramCreditMode;
     accreditationAuthorityOrganizationId?: string;
     journeyDefinitionKey?: string;
   },
 ): Promise<{ programId: string; journeyId: string }> {
   assertCapability(context, "program.launch.start");
+  const creditMode = resolveProgramCreditMode(input);
 
   return db.transaction(async (tx) => {
     const [host] = await tx
@@ -95,7 +91,8 @@ export async function startProgramLaunch(
         deliveryModel: input.deliveryModel,
         hostOrganizationId: input.hostOrganizationId,
         academicProviderOrganizationId: input.academicProviderOrganizationId,
-        creditIssuingOrganizationId: input.creditIssuingOrganizationId,
+        creditIssuingOrganizationId: creditMode === "credit_bearing" ? input.creditIssuingOrganizationId : null,
+        metadata: { creditMode },
         accreditationAuthorityOrganizationId:
           input.accreditationAuthorityOrganizationId,
       })
@@ -125,6 +122,7 @@ export async function startProgramLaunch(
         hostOrganizationId: input.hostOrganizationId,
         siteId: input.siteId ?? null,
         programType: input.type,
+        creditMode,
         journeyId,
       },
     });
@@ -141,8 +139,9 @@ export async function startProgramLaunch(
       after: {
         status: "launching",
         type: input.type,
+        creditMode,
         academicProviderOrganizationId: input.academicProviderOrganizationId,
-        creditIssuingOrganizationId: input.creditIssuingOrganizationId,
+        creditIssuingOrganizationId: creditMode === "credit_bearing" ? input.creditIssuingOrganizationId : null,
       },
     });
 
