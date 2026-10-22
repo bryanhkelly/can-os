@@ -67,6 +67,13 @@ If safeguarding case work creates a need for tutoring, an agreed safety accommod
 - Current support referrals route to counselors/specialists by site; the system has not implemented case-level confidentiality or restricted disclosure for sensitive allegations.
 - No approved state/territory-specific reporting policy engine, 24/7 safeguarding roster, safety-centric onsite intake, agency-report confirmation, incident legal hold/retention or real multisite browser acceptance. Do not claim the current incident lifecycle completes any of these.
 
+## First code slice (contract only — not yet connected)
+
+- `src/domain/safeguarding-intake-policy.ts`: strict schema for onsite observation, uncertain/multiple concern categories, immediate-danger question and factual narrative. It rejects client-supplied staff roles, agency report confirmations, legal findings and automatic guardian-notification claims.
+- `safeguardingIntakeGuidance` returns **display-only** advice that favors real-world emergency help and direct external-reporting guidance where relevant. It **cannot** file a report, determine legal reporting thresholds, dispatch outside notifications, notify CAN leadership or close a concern.
+- `tests/unit/safeguarding-intake-policy.test.ts` covers suspected abuse/neglect, possible substance-related emergency, uncertain observation, duplicate categories and rejected unsafe self-certifications.
+- **No site staff UI, reporting endpoint, approval policy, external agency integration or signed-off jurisdiction rule has been added.** The generic existing `incidents` and ordinary support services are unchanged.
+
 ## P0 safeguards before wiring production functionality
 
 1. Obtain qualified legal/child-protection review for each launch state and program type, including mandated reporting, child welfare agencies, law enforcement, school operations, privacy/FERPA and any other applicable requirements; include training materials and process owner.
