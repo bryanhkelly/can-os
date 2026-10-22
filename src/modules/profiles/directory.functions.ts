@@ -4,6 +4,7 @@ import { and, desc, eq, gte, ilike, inArray, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { studentAcademicTimeline } from "@/domain/student-academic-timeline";
 
 /**
  * Staff directory authorization: teacher, registrar, specialist and counselor,
@@ -367,6 +368,7 @@ export const getStudent360 = createServerFn({ method: "GET" })
             status: s.actions.status,
             priority: s.actions.priority,
             dueAt: s.actions.dueAt,
+            createdAt: s.actions.createdAt,
           })
           .from(s.actions)
           .where(
@@ -447,6 +449,10 @@ export const getStudent360 = createServerFn({ method: "GET" })
         name: displayName(profile.legalFirstName, profile.legalLastName, profile.preferredName),
         gradeLevel: profile.gradeLevel,
       },
+      timeline: studentAcademicTimeline({
+        sections:visibleSections.map(row=>({sectionId:row.sectionId,title:row.sectionTitle})),
+        grades:gradeRows,attendance:attendanceRows,actions:actionRows,
+      }),
       guardians: guardianRows.map((row) => ({
         name: displayName(row.firstName, row.lastName, row.preferredName),
         relationshipLabel: row.relationshipLabel,
