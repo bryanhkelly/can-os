@@ -9,8 +9,6 @@ import {
   estimateActiveLearningMilliseconds, learnerInteractionInputSchema,
   parseLearnerInteraction,
 } from "@/domain/learning-activity-policy";
-import { recordAudit } from "@/modules/identity/actors.server";
-import { authorizeClass, classActor } from "./class-access.server";
 
 async function loadLearningStore() {
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
@@ -31,9 +29,11 @@ const historyInput = sessionInput.extend({ studentPersonId: z.string().uuid().op
 export const startLearningActivitySession = createServerFn({ method: "POST" })
   .validator((value: unknown) => sessionInput.parse(value))
   .handler(async ({ data }) => {
+    const { classActor, authorizeClass } = await import("./class-access.server");
     const actor = await classActor();
     if (actor.role !== "student") throw new AuthorizationError("student learning session");
     const { db, s } = await loadLearningStore();
+    const { recordAudit } = await import("@/modules/identity/actors.server");
     return db.transaction(async tx => {
       const { section, studentProfileId } = await authorizeClass(actor, data.sectionId, undefined, tx);
       if (!studentProfileId || !section.siteId || section.contentStatus !== "published" ||
@@ -69,6 +69,7 @@ export const startLearningActivitySession = createServerFn({ method: "POST" })
 export const recordLearningInteraction = createServerFn({ method: "POST" })
   .validator((value: unknown) => eventInput.parse(value))
   .handler(async ({ data }) => {
+    const { classActor, authorizeClass } = await import("./class-access.server");
     const actor = await classActor();
     if (actor.role !== "student") throw new AuthorizationError("student learning interaction");
     const { db, s } = await loadLearningStore();
@@ -154,6 +155,7 @@ export const getLearningActivityHistory = createServerFn({ method: "GET" })
   .validator((value: unknown) => historyInput.parse(value))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
+    const { classActor, authorizeClass } = await import("./class-access.server");
     const actor = await classActor();
     const { db, s } = await loadLearningStore();
     const { section, studentProfileId } = await authorizeClass(actor, data.sectionId, data.studentPersonId);
@@ -190,6 +192,7 @@ export const getLearningActivityHistory = createServerFn({ method: "GET" })
 export const endLearningActivitySession = createServerFn({ method: "POST" })
   .validator((value: unknown) => sessionInput.extend({ learningSessionId: z.string().uuid() }).parse(value))
   .handler(async ({ data }) => {
+    const { classActor, authorizeClass } = await import("./class-access.server");
     const actor = await classActor();
     if (actor.role !== "student") throw new AuthorizationError("student learning session");
     const { section, studentProfileId } = await authorizeClass(actor, data.sectionId);
