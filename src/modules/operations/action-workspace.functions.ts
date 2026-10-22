@@ -7,12 +7,13 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray,isNotNull,isNull,or } from "drizzle-orm";
+import { and,asc,desc,eq,inArray,isNotNull,isNull,or,sql } from "drizzle-orm";
 import { operationsSelectionSchema,resolveOperationsSelection } from "./operations-scope.server";
 import { resolveActionInTransaction } from "@/modules/actions/resolve-action";
 import { assertAcademicActionAuthority,assertAcademicActionStaff } from "@/modules/actions/academic-action-policy.server";
 import { openingHandoffType } from "@/modules/programs/opening-handoff.server";
 import { gradeResponseActionType } from "@/domain/grade-response-policy";
+import { prioritizeSchoolActions,schoolActionBacklog } from "@/domain/operations-action-triage";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 
 async function operator() {
@@ -32,27 +33,29 @@ export const getOperationsActions=createServerFn({method:"GET"})
  const records=await db.select({
   id:actions.id,title:actions.title,description:actions.description,type:actions.type,
   siteId:actions.siteId,ownerPersonId:actions.ownerPersonId,
-  status:actions.status,priority:actions.priority,createdAt:actions.createdAt
- }).from(actions).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(desc(actions.createdAt)).limit(100);
+  status:actions.status,priority:actions.priority,dueAt:actions.dueAt,createdAt:actions.createdAt
+ }).from(actions).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
+   asc(actions.dueAt),desc(actions.createdAt)).limit(250);
  const items=dedupeQueue(records.map(record=>({
   id:record.id,kind:"action" as const,title:record.title,siteId:record.siteId,ownerPersonId:record.ownerPersonId,
   detail:record.description??record.type.replaceAll("_"," "),
   priority:record.priority==="urgent"?"critical" as const:record.priority==="high"?"high" as const:"normal" as const,
   createdAt:record.createdAt.toISOString(),
+  dueAt:record.dueAt?.toISOString()??null, status:record.status,
   href:"/operations",
   needsResponse:record.status==="open",
  })));
- const scopedItems=items.map(item=>{
+ const scopedItems=prioritizeSchoolActions(items.map(item=>{
   const record=records.find(record=>record.id===item.id);
   return {...item,siteId:record?.siteId??null,ownerPersonId:record?.ownerPersonId??null,
    managedBySupport:record?.type==="support_referral",openingHandoff:record?.type===openingHandoffType};
- });
+ }));
  const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor"])));
  const [siteChoices,programChoices]=await Promise.all([
   db.select({id:sites.id,name:sites.name}).from(sites).where(inArray(sites.id,actor.scope.siteIds!)),
   actor.scope.programIds?.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,actor.scope.programIds),isNotNull(programs.siteId),...(data.siteId?[eq(programs.siteId,data.siteId)]:[]))) : Promise.resolve([]),
  ]);
- return {items:scopedItems,assignees,sites:siteChoices,programs:programChoices,selected:data,summary:notificationSummary(items)};
+ return {items:scopedItems,assignees,sites:siteChoices,programs:programChoices,selected:data,summary:{...notificationSummary(items),...schoolActionBacklog(scopedItems)}};
 });
 
 /** Generic Actions only: domain-owned referrals must use their own state machine. */
