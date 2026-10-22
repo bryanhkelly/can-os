@@ -74,6 +74,16 @@ If safeguarding case work creates a need for tutoring, an agreed safety accommod
 - `tests/unit/safeguarding-intake-policy.test.ts` covers suspected abuse/neglect, possible substance-related emergency, uncertain observation, duplicate categories and rejected unsafe self-certifications.
 - **No site staff UI, reporting endpoint, approval policy, external agency integration or signed-off jurisdiction rule has been added.** The generic existing `incidents` and ordinary support services are unchanged.
 
+## Next code bite: site-bound first observers and launch coverage
+
+Committed to `FullFlow`:
+
+- `room_facilitator`, `site_staff`, `site_leader` and `paraeducator` identities now have **only** `safeguarding.concern.submit`, without incident reading, case management, attendance, teacher, registrar or counseling powers. Their active verified session + original site-bound grant must pass `assertOnsiteSafeguardingSubmissionScope`. A grant projected onto other sites cannot broaden reporter access.
+- The registrar staff invite code accepts these roles **only with an explicit site**, and the admin UI labels the site as required and warns that **no safeguarding intake endpoint is live**. This does not authorize a person to perform regulated safeguarding work; training/background checks, approved delegation and reporting obligations remain separate.
+- `evaluateSafeguardingSiteCoverage` checks for *documented* primary and distinct backup site responders, named CAN school-of-record lead, approved local reporting procedure, direct external and emergency instructions, after-hours/offline fallback, case-restricted access and recently confirmed roster. This is a **pure structural validation foundation**; there is no durable roster, verified professional qualification, legally signed-off rule, dispatch, launch blocker UI or real response flow yet.
+- `site-safeguarding-access.test.ts` and `safeguarding-site-coverage.test.ts` cover improper privilege access, sibling sites, organization-wide observer grants, stale rosters and missing emergency escalation.
+- **Next implementation must** persist named active responders and approved procedure versions under tightly scoped school-site authorization, add case-level permissions and a safe restricted intake path with fallback. Do **not** wire `safeguarding.concern.submit` to generic `fileIncident` or imply the action performs statutory outside-agency reporting. Consult counsel and trained safeguarding personnel first.
+
 ## P0 safeguards before wiring production functionality
 
 1. Obtain qualified legal/child-protection review for each launch state and program type, including mandated reporting, child welfare agencies, law enforcement, school operations, privacy/FERPA and any other applicable requirements; include training materials and process owner.
