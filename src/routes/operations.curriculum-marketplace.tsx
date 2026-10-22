@@ -35,6 +35,8 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const router=useRouter();
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [accepted,setAccepted]=useState<Record<string,boolean>>({});
+ const [adoptionReview,setAdoptionReview]=useState<string|null>(null);
+ const [adoptionConfirmed,setAdoptionConfirmed]=useState<Record<string,boolean>>({});
  const [courseVersionId,setCourseVersionId]=useState(""),[scope,setScope]=useState<"program"|"site"|"section">("site");
  const [sectionId,setSectionId]=useState(""),[lessonId,setLessonId]=useState("");
  const [title,setTitle]=useState(""),[kind,setKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link"),[url,setUrl]=useState("");
@@ -132,8 +134,31 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
         <p className="text-sm font-medium">Release v{pack.version} adopted for {market.program.name}</p>:
         pack.adoption?.status==="active"?
         <p className="text-sm text-muted-foreground">Installed; a different release of this pack is already adopted. Upgrades must be reviewed to preserve class progress.</p>:
-        <button type="button" disabled={busy} className="rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
-         onClick={()=>perform(()=>adoptCurriculumPack({data:{programId:market.program.id,packId:pack.id,versionId:pack.versionId}}),"Published pack release adopted by this program.")}>Adopt for this program</button>}
+        <section className="space-y-3 rounded border p-3" aria-label={"Review adoption for "+pack.name}>
+         {adoptionReview!==pack.versionId?<button type="button" disabled={busy}
+           className="rounded border px-3 py-2 text-sm" onClick={()=>setAdoptionReview(pack.versionId)}>Review adoption</button>:<>
+          <h4 className="font-semibold text-sm">Confirm curriculum adoption</h4>
+          <dl className="grid gap-1 text-sm">
+           <div><dt className="inline text-muted-foreground">School program: </dt><dd className="inline font-medium">{market.program.name}</dd></div>
+           <div><dt className="inline text-muted-foreground">Publisher: </dt><dd className="inline font-medium">{pack.publisherName}</dd></div>
+           <div><dt className="inline text-muted-foreground">Pack: </dt><dd className="inline">{pack.name}, release v{pack.version}</dd></div>
+           <div><dt className="inline text-muted-foreground">License classification: </dt><dd className="inline">{pack.licenseCode}</dd></div>
+          </dl>
+          <p className="text-xs text-muted-foreground">Included publisher course releases: {pack.courses.map(c=>`${c.code} (${c.title})`).join(" · ")}.</p>
+          <p className="text-xs text-muted-foreground">This pins this publisher pack to the selected program. Existing class versions will not change. Academic-year-specific adoption is not yet available; license classification alone is not an executed commercial agreement.</p>
+          <label className="flex items-start gap-2 text-sm"><input type="checkbox"
+            checked={adoptionConfirmed[pack.versionId]??false}
+            onChange={e=>setAdoptionConfirmed(v=>({...v,[pack.versionId]:e.target.checked}))}/>
+            <span>I reviewed the publisher, exact release, included courses, program, and license conditions.</span>
+          </label>
+          <div className="flex flex-wrap gap-3">
+           <button type="button" disabled={busy||!adoptionConfirmed[pack.versionId]}
+            className="rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
+            onClick={()=>perform(()=>adoptCurriculumPack({data:{programId:market.program.id,packId:pack.id,versionId:pack.versionId}}),"Published pack release adopted by this program.")}>Adopt for this program</button>
+           <button type="button" className="rounded border px-3 py-2 text-sm" onClick={()=>{setAdoptionReview(null);setAdoptionConfirmed(v=>({...v,[pack.versionId]:false}));}}>Cancel</button>
+          </div>
+         </>}
+        </section>}
       </article>)}
     </div>
     {!market.packs.length&&<p className="rounded border p-4 text-sm">No published curriculum packs are available to this organization yet.</p>}

@@ -234,6 +234,9 @@ test("Algebra I: student lessons and submissions -> teacher guide and rubric gra
    await expect.poll(async()=>dbRows<{id:string}>(await sql.query(
     `SELECT id FROM curriculum_entitlements WHERE pack_id=$1 AND organization_id=$2 AND status='active'`,
     [a.packId,f.hostOrgId])).length).toBe(1);
+   await publisherPack.getByRole("button",{name:"Review adoption"}).click();
+   await expect(publisherPack.getByText("Confirm curriculum adoption")).toBeVisible();
+   await publisherPack.getByRole("checkbox",{name:/I reviewed the publisher/}).check();
    await publisherPack.getByRole("button",{name:"Adopt for this program"}).click();
    await expect(publisherPack.getByText(/Release v1 adopted/)).toBeVisible();
    await expect.poll(async()=>dbRows<{id:string}>(await sql.query(
