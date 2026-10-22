@@ -8,6 +8,7 @@ describe("official academic credit safeguards",()=>{
     expect(verifiedSectionCreditUnits({credits:1})).toBe(1);
     expect(verifiedSectionCreditUnits({credits:0.5})).toBe(0.5);
     expect(verifiedSectionCreditUnits({credits:0.25})).toBe(0.25);
+    expect(verifiedSectionCreditUnits({credits:0.29})).toBe(0.29);
     for(const x of [0,-1,Infinity,NaN,11,0.123]){
       expect(verifiedSectionCreditUnits({credits:x})).toBeNull();
     }
