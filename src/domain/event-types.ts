@@ -42,6 +42,8 @@ export const EventTypes = {
   SchoolYearCreated: "SchoolYearCreated",
   SchoolYearActivated: "SchoolYearActivated",
   SiteCreated: "SiteCreated",
+  NetworkAgreementVerified: "NetworkAgreementVerified",
+  NetworkAdministratorProvisioned: "NetworkAdministratorProvisioned",
   SiteAffiliationRequested: "SiteAffiliationRequested",
   SiteAffiliationApproved: "SiteAffiliationApproved",
   SiteAffiliationRejected: "SiteAffiliationRejected",
