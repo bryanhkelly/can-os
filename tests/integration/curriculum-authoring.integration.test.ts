@@ -373,7 +373,7 @@ integration("governed curriculum authoring through classroom delivery",()=>{
       assignmentKind:"homework",curriculumLessonId:"algebra1-equations",
       rubricCriteria:[{id:"equation",label:"Reasoning",maxPoints:10,
         description:"Equality-preserving steps and substitution"}],
-      dueAt:new Date(Date.now()+7*86400000).toISOString(),
+      dueAt:new Date(Date.now()+7*86400000).toISOString(),publishNow:true,
     }});
     const [assigned]=await tx.select().from(s.submissions)
       .where(eq(s.submissions.assessmentId,task.assessmentId)).limit(1);
