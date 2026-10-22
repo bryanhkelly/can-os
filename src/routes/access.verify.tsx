@@ -4,6 +4,16 @@ export const Route=createFileRoute("/access/verify")({
  server:{handlers:{
   POST:async({request})=>{
    if(new URL(request.url).origin!==request.headers.get("origin"))return Response.json({error:"Invalid request origin"},{status:403});
+   // Enforce the shared global admission ceiling before parsing credentials.
+   // Do not derive rate keys from untrusted forwarded headers, email or tokens.
+   try {
+    const gate=await import("@/modules/identity/anonymous-auth-admission.server");
+    const denial=gate.anonymousAuthAdmissionResponse(await gate.admitAnonymousAuthRequest("verify"));
+    if(denial)return denial;
+   }catch{
+    return Response.json({error:"Authentication temporarily unavailable."},
+     {status:503,headers:{"Cache-Control":"no-store","Retry-After":"30"}});
+   }
    let value:unknown;
    try{value=await request.json();}catch{return Response.json({error:"Invalid request"},{status:400});}
    const payload=value&&typeof value==="object"?value:null;
