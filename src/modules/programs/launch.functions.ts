@@ -67,7 +67,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
     if (!organizationIds.length) {
       return { organizations: [], sites: [], jurisdictions: [] };
     }
-    const [{ db }, s, { asc, inArray }] = await Promise.all([
+    const [{ db }, s, { and, asc, eq, inArray }] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
@@ -86,7 +86,8 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
           timezone: s.sites.timezone,
         })
         .from(s.sites)
-        .where(inArray(s.sites.organizationId, organizationIds))
+        .where(and(inArray(s.sites.organizationId, organizationIds),
+          ...(context.grantSiteId === null ? [] : [eq(s.sites.id, context.grantSiteId)])))
         .orderBy(asc(s.sites.name)),
       db
         .select({ id: s.jurisdictions.id, code: s.jurisdictions.code, name: s.jurisdictions.name })
@@ -109,7 +110,10 @@ export const startLaunch = createServerFn({ method: "POST" })
     if (!context.scope.organizationIds?.includes(data.hostOrganizationId)) {
       throw new AuthorizationError("host organization scope");
     }
-    const organizationWide = !context.scope.siteIds?.length;
+    const organizationWide = context.grantSiteId === null;
+    if (!organizationWide && !data.siteId) {
+      throw new AuthorizationError("site-scoped launch requires a site");
+    }
     if (data.siteId && !organizationWide && !context.scope.siteIds?.includes(data.siteId)) {
       throw new AuthorizationError("site scope");
     }
@@ -227,7 +231,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
  }).parse(v))
  .handler(async({data})=>{
   const actor=await registrarContext("program.launch.start");
-  if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.scope.siteIds?.length)
+  if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.grantSiteId!==null)
    throw new AuthorizationError("organization-wide site creation");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
