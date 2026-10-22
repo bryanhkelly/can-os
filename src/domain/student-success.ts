@@ -117,6 +117,7 @@ export function deriveStudentSuccessPriorities(
     revise: count("revision"),
     overdue: count("overdue"),
     dueSoon: count("due_soon"),
+    toDo: count("to_do"),
     awaitingFeedback: count("awaiting_feedback"),
     feedbackAvailable: count("review_feedback"),
     truncated: steps.length > limit,
