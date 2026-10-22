@@ -564,12 +564,8 @@ integration("FullFlow: one school, same high-school program through curriculum a
           data:supportRequest,
         })).rejects.toThrow("assigned active section");
         const followThrough = await import("@/modules/learning/teacher-followup-resolution.functions");
-        await expect(followThrough.getTeacherLearningFollowUps())
-          .rejects.toThrow("verified teacher required").catch(async () => {
-            // An impostor with a teacher role but no actual Section assignment
-            // is denied at the row-scope query even if the role is present.
-            expect((await followThrough.getTeacherLearningFollowUps()).items).toHaveLength(0);
-          });
+        // Teacher role alone cannot expose a class owned by another educator.
+        expect((await followThrough.getTeacherLearningFollowUps()).items).toHaveLength(0);
         state.actor = guardianActor;
         await expect(followThrough.resolveTeacherLearningFollowUp({data:{
           actionId:support.actionId,
