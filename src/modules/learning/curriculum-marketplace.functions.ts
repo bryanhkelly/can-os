@@ -3,6 +3,7 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireActor } from "@/modules/identity/actors.server";
 import { readMarketplace, readCurriculumAdopterPrograms, installPack, adoptPack, addCurriculumSupplement } from "./curriculum-marketplace.server";
+import { readCurriculumJourneyReadiness } from "./curriculum-journey-readiness.server";
 
 const uuid=z.string().uuid();
 const program=z.object({programId:uuid}).strict();
@@ -11,6 +12,12 @@ export const getCurriculumAdopterPrograms=createServerFn({method:"GET"})
  .handler(async()=>{
   setResponseHeader("Cache-Control","private, no-store");
   return readCurriculumAdopterPrograms(await actor());
+ });
+export const getCurriculumJourneyReadiness=createServerFn({method:"GET"})
+ .validator((input:unknown)=>program.parse(input))
+ .handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  return readCurriculumJourneyReadiness(await actor(),data.programId);
  });
 export const getCurriculumMarketplace=createServerFn({method:"GET"})
  .validator((input:unknown)=>program.parse(input))

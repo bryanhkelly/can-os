@@ -3,7 +3,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { getCurriculumMarketplace, getCurriculumAdopterPrograms, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
+import { getCurriculumMarketplace, getCurriculumAdopterPrograms, getCurriculumJourneyReadiness, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
 import { beginCurriculumPdfUpload, finishCurriculumPdfUpload, curriculumPdfUploadAvailability } from "@/modules/learning/curriculum-resource-upload.functions";
 import { validateCommonCartridgeImport, listCommonCartridgeImports } from "@/modules/learning/common-cartridge-import.functions";
 import { exportOneRosterBulkRoster } from "@/modules/learning/oneroster-export.functions";
@@ -17,6 +17,7 @@ export const Route=createFileRoute("/operations/curriculum-marketplace")({
   const marketplace=deps.programId?await getCurriculumMarketplace({data:{programId:deps.programId}}):null;
   return {
    programs,marketplace,
+   journey:deps.programId?await getCurriculumJourneyReadiness({data:{programId:deps.programId}}):null,
    pdfUpload:await curriculumPdfUploadAvailability().catch(()=>({enabled:false})),
    imports:deps.programId&&marketplace?.canPublish
     ?await listCommonCartridgeImports({data:{programId:deps.programId}}):[],
@@ -30,7 +31,7 @@ function CurriculumMarketplacePage(){
  if(!outcome.ok)return <LoaderFailure title="Curriculum Marketplace" outcome={outcome}/>;
  return <MarketView key={outcome.data.marketplace?.program.id??"none"} data={outcome.data}/>;
 }
-function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumAdopterPrograms>>;marketplace:Market|null;pdfUpload:{enabled:boolean};imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
+function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurriculumAdopterPrograms>>;marketplace:Market|null;journey:Awaited<ReturnType<typeof getCurriculumJourneyReadiness>>|null;pdfUpload:{enabled:boolean};imports:Awaited<ReturnType<typeof listCommonCartridgeImports>>}}){
  const router=useRouter();
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [accepted,setAccepted]=useState<Record<string,boolean>>({});
@@ -65,6 +66,38 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
   {notice&&<p role="status" className="rounded-lg border p-4 text-sm">{notice}</p>}
   {!market&&<p className="rounded-lg border p-4">Select a program to browse packs under its verified school membership.</p>}
   {market&&<>
+   {data.journey&&<section className="space-y-4 rounded-xl border bg-card p-5" aria-label="Curriculum operational evidence">
+    <div>
+     <h2 className="font-serif text-2xl">Curriculum journey: operational evidence</h2>
+     <p className="text-sm text-muted-foreground">Read-only counts from this program's real adopted curriculum, sections and assessed student work. These are not proof that signed-in end-to-end acceptance tests have passed.</p>
+    </div>
+    <div className="grid gap-3 sm:grid-cols-3">
+     {([
+      ["Installed packs",data.journey.totals.packsInstalled],
+      ["Adopted packs",data.journey.totals.packsAdopted],
+      ["Adopted course versions",data.journey.totals.courseVersionsAvailable],
+      ["Classes using adopted courses",data.journey.totals.classesUsingAdoptedCourses],
+      ["Classes with published lessons",data.journey.totals.classesWithLessons],
+      ["Classes with an assigned teacher",data.journey.totals.classesWithTeachers],
+      ["Classes with enrolled students",data.journey.totals.classesWithStudents],
+      ["Classes with published assignments",data.journey.totals.classesWithAssignments],
+      ["Submitted responses",data.journey.totals.studentSubmissions],
+      ["Graded responses",data.journey.totals.gradedSubmissions],
+     ] as [string,number][]).map(([label,value])=><div key={label} className="rounded border p-3">
+      <p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-semibold tabular-nums">{value}</p>
+     </div>)}
+    </div>
+    <Link to="/operations/launch/$programId" params={{programId:market.program.id}} className="inline-block text-sm underline">Provision and staff classes for this program →</Link>
+    <h3 className="text-sm font-semibold">Classes using adopted publisher courses</h3>
+    {data.journey.classes.map(klass=><div key={klass.id} className="rounded border p-3 text-sm">
+     <p className="font-semibold">{klass.code} · {klass.title}</p>
+     <p>{klass.publishedLessonCount} lessons · {klass.teacherCount} teachers · {klass.studentCount} students · {klass.assignedAssessmentCount} published assessments · {klass.submittedAttemptCount} submitted responses · {klass.gradedAttemptCount} graded</p>
+     <p className="mt-1 text-xs text-muted-foreground">For classroom verification, switch to an assigned teacher or enrolled student account before opening the class.</p>
+     <Link to="/classes" search={{section:klass.id}} className="text-sm underline">Open class as an authorized member →</Link>
+    </div>)}
+    {!data.journey.classes.length&&<p className="text-sm">No classes use currently adopted publisher course releases. Provision a class after adopting a pack.</p>}
+    <p className="text-xs text-muted-foreground">To certify the workflow, run the isolated database acceptance suite and signed-in browser tests. Nonzero counts establish operational records only.</p>
+   </section>}
    <section className="space-y-3">
     <h2 className="font-serif text-2xl">Available curriculum packs</h2>
     <div className="grid gap-4 md:grid-cols-2">
