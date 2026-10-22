@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { ClassContent } from "@/domain/class-content";
+import { curriculumReleaseReadiness } from "@/domain/curriculum-release-readiness";
 import type { ClassTeacherGuides } from "@/domain/class-teacher-guides";
 import { PublisherTeacherGuideEditor } from "./PublisherTeacherGuideEditor";
 import { saveAuthoredCurriculum, publishAuthoredCurriculum, saveAuthoredLesson } from "@/modules/learning/curriculum-authoring.functions";
@@ -18,6 +19,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
  const saved=useRef(JSON.stringify(release.content??{version:1,syllabus:"",modules:[],resources:[]}));
  const guidesSaved=useRef(JSON.stringify(release.teacherGuides??null));
  const dirty=JSON.stringify(content)!==saved.current||JSON.stringify(teacherGuides)!==guidesSaved.current;
+ const readiness=curriculumReleaseReadiness(content,teacherGuides,courseCode);
  const foundModuleIndex=content.modules.findIndex(module=>module.id===selectedModuleId);
  const activeModuleIndex=foundModuleIndex>=0?foundModuleIndex:0;
  const activeModule=content.modules[activeModuleIndex];
@@ -251,9 +253,30 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
   </fieldset>
   <fieldset disabled={busy}><PublisherTeacherGuideEditor courseCode={courseCode} content={content}
    guides={teacherGuides} onChange={setTeacherGuides}/></fieldset>
+  <section className="space-y-3 rounded border p-4" aria-label="Publisher release readiness">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h3 className="font-semibold">Publication readiness</h3>
+        <p className="text-sm text-muted-foreground">{readiness.unitCount} units · {readiness.lessonCount} lessons</p>
+      </div>
+      <span className="rounded border px-2 py-1 text-xs font-semibold" role="status">
+        {readiness.readyForPublisherPublication?"Content requirements met":"Requires attention"}
+      </span>
+    </div>
+    {readiness.blockers.length>0&&<div>
+      <h4 className="text-sm font-semibold">Resolve before publication</h4>
+      <ul className="mt-2 list-inside list-disc space-y-1 text-sm">{readiness.blockers.map((blocker,i)=><li key={i}>{blocker}</li>)}</ul>
+    </div>}
+    {readiness.warnings.length>0&&<div>
+      <h4 className="text-sm font-semibold">Advisory review</h4>
+      <ul className="mt-2 list-inside list-disc space-y-1 text-sm">{readiness.warnings.map((warning,i)=><li key={i}>{warning}</li>)}</ul>
+    </div>}
+    <p className="text-xs text-muted-foreground">Completeness does not indicate accreditation, academic-credit approval, standards alignment, classroom delivery or school acceptance. The server validates the saved release again at publication.</p>
+    {dirty&&<p className="text-sm font-medium">Save the draft before publishing; this readiness view reflects unsaved edits.</p>}
+  </section>
   <form className="space-y-3 rounded border p-4" onSubmit={async event=>{
    event.preventDefault();setError("");setNotice("");
-   if(dirty||!confirmed||reason.trim().length<10){setError("Save your draft, provide a reason and confirm publication first.");return;}
+   if(dirty||!readiness.readyForPublisherPublication||!confirmed||reason.trim().length<10){setError("Resolve publication blockers, save your draft, provide a reason and confirm publication first.");return;}
    setBusy(true);
    try{
     await publishAuthoredCurriculum({data:{programId,versionId:release.id,expectedRevision:revision,reason,confirmed:true}});
@@ -265,7 +288,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
     value={reason} onChange={event=>setReason(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2"/></label>
    <label className="flex gap-2 text-sm"><input type="checkbox" required checked={confirmed}
     onChange={event=>setConfirmed(event.target.checked)}/>I reviewed this release. Publication is immutable and does not upgrade existing classes.</label>
-   <button type="submit" disabled={busy||dirty||!confirmed||reason.trim().length<10}
+   <button type="submit" disabled={busy||dirty||!readiness.readyForPublisherPublication||!confirmed||reason.trim().length<10}
     className="rounded border px-4 py-2 text-sm disabled:opacity-50">Publish curriculum release</button>
   </form>
  </section>;
