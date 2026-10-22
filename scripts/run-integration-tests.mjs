@@ -54,7 +54,7 @@ if (process.env.CAN_APPLICATION_DB_HOST) {
 }
 
 if (process.argv.includes("--preflight")) {
-  if (mode !== "curriculum-journey" && mode !== "curriculum-authoring" && mode !== "attendance-handoff" && mode !== "admissions-offers" && mode !== "academic-intervention" && mode !== "class-participation" && mode !== "delivery-history" && mode !== "qualification-readiness" && mode !== "capacity-expiry" && mode !== "launch-staffing") {
+  if (mode !== "curriculum-journey" && mode !== "curriculum-authoring" && mode !== "attendance-handoff" && mode !== "admissions-offers" && mode !== "academic-intervention" && mode !== "class-participation" && mode !== "delivery-history" && mode !== "qualification-readiness" && mode !== "capacity-expiry" && mode !== "launch-staffing" && mode !== "network-onboarding") {
     fail("preflight is only supported for acceptance-test modes.");
   }
   console.log(`Disposable ${mode} database endpoint check passed.`);
