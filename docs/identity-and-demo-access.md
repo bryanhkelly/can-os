@@ -101,6 +101,46 @@ redemption, abuse control, attempt counting, structured unauthenticated
 security telemetry and retention controls are distinct follow-on security tasks.
 Do not store raw credentials or student work in the audit log.
 
+## Anonymous authentication admission ceiling (FullFlow bite 6)
+
+The two anonymous authentication endpoints have a database-enforced, **global**
+emergency request budget. This is intentionally separate from the capped
+failed-authentication *audit writer* described below:
+
+- `POST /access/request`: **240 requests per 60-second window**
+- `POST /access/verify`: **600 requests per 60-second window**
+
+A single PostgreSQL row per route in `auth_request_rate_limits` tracks
+`window_started_at` and `request_count`. An atomic
+`INSERT ... ON CONFLICT ... DO UPDATE` resets the window or increments a
+saturated counter so concurrent application instances share one cap. Both
+routes check admission **before parsing credentials or querying accounts**.
+Exceeding the cap returns `429` with `Retry-After` and `Cache-Control:
+no-store`. When quota storage is unavailable or migration 0030 has not been
+applied, these endpoints **fail closed with 503**, not with unlimited requests.
+
+**This is deliberately NOT per-client abuse protection.** No reliable,
+nonspoofable source IP, identity, or verified proxy signal is currently
+available at the application boundary, so the gate does not trust
+`X-Forwarded-For`, an arbitrary email, a browser cookie or a submitted token.
+The budgets are **shared by everyone**; a malicious party could use up the
+global budget and deny service to others. They must be tuned against real
+legitimate sign-in rates and backed by **trusted Netlify/ingress-level
+per-source rate controls** before deployment with real users. Limits protect
+database/email cost but do not by themselves prevent distributed abuse.
+
+**Deployment order:** Apply the committed
+`drizzle/0030_anonymous_auth_request_budget.sql` migration to the target
+environment **before** deploying the new endpoint code; otherwise legitimate
+login attempts will receive 503. The migration contains no student data and
+the counter table remains fixed in size (two rows under these handlers).
+
+**Acceptance:** Unit tests verify SQL/upsert design, 429 responses,
+fail-closed behavior, anti-enumeration and request/verify ordering.
+Exercise concurrent admission, expiry reset, cross-instance persistence and
+release migration ordering against an isolated database before calling the
+deployment ready. Those database/browser checks are not established by static CI.
+
 ## Failed-authentication evidence (FullFlow bite 5)
 
 The `POST /access/verify` rejection path records
