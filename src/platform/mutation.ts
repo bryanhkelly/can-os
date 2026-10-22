@@ -1,5 +1,6 @@
 import { auditEvents, domainEvents, notifications } from "@/db/schema";
 import type { CommandContext } from "@/domain/command-context";
+import type { AccessContext } from "@/domain/access-context";
 
 /**
  * Minimal structural view of a Drizzle transaction's write surface. The db
@@ -93,6 +94,17 @@ export async function writeAudit(
   }
   if (!entry) throw new Error("Audit change is required");
   const context = contextOrEntry;
+  // Identity fields are produced by the verified server-side session resolver.
+  // A generic CommandContext (e.g., system mutations) has no account/session
+  // and must not fabricate an identity or let contextExtras override one.
+  const session = context as CommandContext & Partial<Pick<AccessContext,
+    "accountId" | "sessionId" | "grantId" | "role">>;
+  const authenticatedAttribution = {
+    ...(session.accountId ? { accountId: session.accountId } : {}),
+    ...(session.sessionId ? { sessionId: session.sessionId } : {}),
+    ...(session.grantId ? { grantId: session.grantId } : {}),
+    ...(session.role ? { role: session.role } : {}),
+  };
   await tx.insert(auditEvents).values({
     actorPersonId: context.actorPersonId,
     action: entry.action,
@@ -102,9 +114,10 @@ export async function writeAudit(
     before: entry.before ?? null,
     after: entry.after ?? null,
     context: {
+      ...(entry.contextExtras ?? {}),
       requestId: context.requestId ?? null,
       ...(context.demoFacilitator ? { demoFacilitator: context.demoFacilitator } : {}),
-      ...(entry.contextExtras ?? {}),
+      ...authenticatedAttribution,
     },
   });
 }
