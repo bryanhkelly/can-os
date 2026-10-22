@@ -63,6 +63,35 @@ describe("Student Today summary navigation", () => {
     expect(html).toMatch(/<a href="\/student\/assignments\?filter=missing"[^>]*><p[^>]*>Missing work<\/p>/);
   });
 
+  it("shows student-owned support tasks exactly once in Student Today without staff case data", () => {
+    const html = renderToStaticMarkup(<StudentExperience
+      liveData={{
+        student: { studentProfileId: "student", personId: "person",
+          firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+        generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+        sections: [], coursework: [], events: [], recoveryCandidates: [],
+        openActions: [{
+          id: "support-task", title: "Meet your academic tutor",
+          description: "Your owned action", dueAt: null, priority: "normal",
+          subjectType: "student_profile", subjectId: "student",
+        }],
+      }}
+      support={{
+        tasks: [{
+          id: "support-task", title: "Meet your academic tutor",
+          type: "student_support", status: "open", dueAt: null,
+          destination: "action", destinationId: "support-task",
+        }],
+        total: 1, truncated: false,
+      }}
+    />);
+    expect(html.match(/Meet your academic tutor/g)).toHaveLength(1);
+    expect(html).toContain('href="/student/experiences?action=support-task"');
+    expect(html).toContain("No additional actions outside your learning support list.");
+    expect(html).not.toContain("Private counselor");
+    expect(html).not.toContain("safeguarding");
+  });
+
   it("opens assessment actions in the assignment and other actions individually", () => {
     const html = renderToStaticMarkup(<StudentExperience liveData={{
       student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
