@@ -26,3 +26,18 @@ export function assertSeasonRegistrationOpen(season: RegistrationSeason, now: Da
     throw new Error("Invalid activity season dates");
   }
 }
+
+/**
+ * The legacy activity path has no verified extended-learning launch evidence.
+ * A registration-status season alone is NOT authorization to enroll minors.
+ * Fail closed until an audited, evidence-backed opening command exists.
+ */
+export function assertLegacyActivityRegistrationAllowed(
+  programType: string | null,
+): void {
+  if (programType === "summer_program" ||
+      programType === "summer_enrichment" ||
+      programType === "after_school_enrichment") {
+    throw new Error("Extended-learning registration requires verified season-opening safeguards");
+  }
+}
