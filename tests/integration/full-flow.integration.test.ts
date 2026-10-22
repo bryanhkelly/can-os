@@ -317,6 +317,119 @@ integration("FullFlow: one school, same high-school program through curriculum a
           eq(s.domainEvents.aggregateId, programId),
           eq(s.domainEvents.eventType, "ProgramActivated"),
         ))).toHaveLength(1);
+        // The family enters the VERY SAME newly activated Program, not an
+        // unrelated pre-seeded admissions demo. Offer, consent and placement
+        // use the existing canonical school and guardian commands.
+        const admission = await import("@/modules/enrollment/enrollment-service");
+        const familyReadiness = await import("@/modules/enrollment/family-readiness.functions");
+        const familyForms = await import("@/modules/enrollment/enrollment-form.functions");
+        const familyChecklist = await import("@/modules/enrollment/guardian-enrollment-checklist.functions");
+        const offerCommands = await import("@/modules/enrollment/admissions-offer.functions");
+        const placements = await import("@/modules/enrollment/course-placement.functions");
+        const guardian = first(await tx.insert(s.people).values({
+          legalFirstName: "FullFlow", legalLastName: "Family Guardian",
+        }).returning());
+        const outsider = first(await tx.insert(s.people).values({
+          legalFirstName: "Unauthorized", legalLastName: "Guardian",
+        }).returning());
+        const guardianActor: AccessContext = {
+          ...context(guardian.id, school.id, [site.id], [programId]),
+          role: "guardian", capabilities: new Set(roleCapabilities.guardian),
+          accountId: crypto.randomUUID(), grantId: crypto.randomUUID(),
+        };
+        const unrelatedActor: AccessContext = {...guardianActor,actorPersonId: outsider.id};
+        const applicationDefinitionKey = `fullflow-enrollment-${suffix}`;
+        await tx.insert(s.journeyDefinitions).values({
+          key: applicationDefinitionKey, version: "1", audience: "family",
+          owningOrganizationId: school.id, title: "FullFlow enrollment agreement",
+          configuration: {requirements: [
+            {key: "school-review", title: "School enrollment review",
+              owner: "can", blocking: true},
+            {key: "school-consent", title: "School consent form",
+              owner: "family", blocking: true, enrollmentForm: {
+                version: "fullflow-synthetic-1",
+                instructions: "Synthetic consent for connected school acceptance only.",
+                consent: "I acknowledge this synthetic school enrollment statement.",
+                fields: [{key: "contact_plan",label: "Contact plan",
+                  type: "text",required: true}],
+              }},
+          ]},
+        });
+        const application = await admission.startFamilyApplication(guardianActor,{
+          programId, idempotencyKey: `fullflow-application-${suffix}`,
+          journeyDefinitionKey: applicationDefinitionKey,
+          student: {legalFirstName: "FullFlow",legalLastName: "Learner",
+            gradeLevel: "9"},
+        });
+        const applicationRow = first(await tx.select().from(s.applications)
+          .where(eq(s.applications.id,application.applicationId)));
+        expect(applicationRow.programId).toBe(programId);
+        const profile = first(await tx.select().from(s.studentProfiles)
+          .where(eq(s.studentProfiles.id,application.studentProfileId)));
+        expect(await tx.select().from(s.guardianRelationships).where(and(
+          eq(s.guardianRelationships.guardianPersonId,guardian.id),
+          eq(s.guardianRelationships.studentPersonId,profile.personId),
+        ))).toHaveLength(1);
+
+        const familyRequirements = await tx.select().from(s.journeyRequirements)
+          .where(eq(s.journeyRequirements.journeyId,application.journeyId));
+        const review = first(familyRequirements.filter(x=>x.key==="school-review"));
+        const form = first(familyRequirements.filter(x=>x.key==="school-consent"));
+        state.actor = context(schoolOperator.id, school.id, [site.id], [programId]);
+        await familyReadiness.setFamilyRequirement({data: {
+          applicationId: application.applicationId, requirementId: review.id, complete: true,
+        }});
+        state.actor = guardianActor;
+        const checklist = await familyChecklist.getGuardianEnrollmentChecklist({
+          data: {applicationId: application.applicationId},
+        });
+        const configured = first(checklist.requirements.filter(x=>x.id===form.id));
+        if (!configured.form) throw new Error("School consent form was not configured");
+        const signatureId = crypto.randomUUID();
+        const signatureInput = {
+          applicationId: application.applicationId, requirementId: form.id,
+          requestId: signatureId, formRevision: configured.form.revision,
+          answers: {contact_plan: "Email the family guardian after school."},
+          signerName: "FullFlow Family Guardian", confirmed: true as const,
+        };
+        state.actor = unrelatedActor;
+        await expect(familyForms.submitGuardianEnrollmentForm({data: signatureInput}))
+          .rejects.toThrow();
+        state.actor = guardianActor;
+        await familyForms.submitGuardianEnrollmentForm({data: signatureInput});
+        state.actor = context(schoolOperator.id, school.id, [site.id], [programId]);
+        await familyForms.decideEnrollmentForm({data: {
+          applicationId: application.applicationId, requirementId: form.id,
+          submissionId: signatureId, status: "accepted" as const,
+          reason: "Synthetic consent independently reviewed by the school.",
+          confirmed: true as const,
+        }});
+        await tx.insert(s.admissionSeatPools).values({
+          programId, schoolYearId: time.schoolYear.id, capacity: 24,
+        });
+        const offer = await offerCommands.issueAdmissionOffer({data: {
+          applicationId: application.applicationId,schoolYearId: time.schoolYear.id,
+        }});
+        state.actor = guardianActor;
+        await offerCommands.respondToAdmissionOffer({data: {
+          offerId: offer.offerId,decision: "accept",
+        }});
+        state.actor = context(schoolOperator.id, school.id, [site.id], [programId]);
+        const activated = await offerCommands.activateOfferedEnrollment({data: {
+          offerId: offer.offerId,
+        }});
+        const placement = await placements.placeEnrolledStudent({data: {
+          applicationId: application.applicationId, sectionId: section.id,
+        }});
+        expect(activated.enrollmentId).toBeTruthy();
+        expect(placement).toBeTruthy();
+        expect(await tx.select().from(s.enrollments).where(and(
+          eq(s.enrollments.studentProfileId,profile.id),
+          eq(s.enrollments.programId, programId),
+          eq(s.enrollments.kind,"section"),
+          eq(s.enrollments.sectionId,section.id),
+          eq(s.enrollments.status,"active"),
+        ))).toHaveLength(1);
         ids = {programId, siteId: site.id, sectionId: section.id, versionId: draft.versionId};
         completed = true;
         throw rollback;
