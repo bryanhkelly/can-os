@@ -22,7 +22,8 @@
     "test:integration:academic-intervention": "node scripts/run-integration-tests.mjs academic-intervention",
     "test:e2e:curriculum": "playwright test --config playwright.curriculum.config.ts",
     "test:integration:curriculum-journey": "node scripts/run-integration-tests.mjs curriculum-journey",
-    "test:integration:network-onboarding": "node scripts/run-integration-tests.mjs network-onboarding"
+    "test:integration:network-onboarding": "node scripts/run-integration-tests.mjs network-onboarding",
+    "test:integration:full-flow": "node scripts/run-integration-tests.mjs full-flow"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
