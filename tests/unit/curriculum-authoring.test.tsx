@@ -148,6 +148,37 @@ describe("curriculum studio presentation",()=>{
   expect(html).toContain('required="" minLength="10" maxLength="2000"');
   expect(html).toMatch(/<button type="submit" disabled=""[^>]*>Publish curriculum release<\/button>/);
  });
+ it("navigates the complete course through one selected unit without dropping other draft units",()=>{
+  const second={id:"second-unit",title:"Later unit",lessons:[
+   {id:"later-lesson",title:"Future lesson",body:"Do not render this unit's editable lesson until selected.",resources:[]},
+  ]};
+  const twoUnitContent:ClassContent={...content,modules:[...content.modules,second]};
+  const html=renderToStaticMarkup(<CurriculumEditor programId={ids.programId} courseCode="SCI"
+   release={{id:ids.versionId,revision:ids.expectedRevision,content:twoUnitContent}} onSaved={async()=>{}}/>);
+  expect(html).toContain("Full-course outline");
+  expect(html).toContain("Unit to edit");
+  expect(html).toContain("2 units");
+  expect(html).toContain("2 lessons");
+  expect(html).toContain("Previous unit");
+  expect(html).toContain("Next unit");
+  expect(html).toContain("Later unit");
+  expect(html).not.toContain("Do not render this unit&#x27;s editable lesson until selected.");
+  expect((html.match(/>Module title/g)??[])).toHaveLength(1);
+ });
+ it("renders a plain-text student-facing draft preview without claiming publication",()=>{
+  const updated:ClassContent={...content,modules:[{...content.modules[0]!,
+   lessons:[{...content.modules[0]!.lessons[0]!,body:"<script>alert('not HTML')</script>",
+    activities:[{id:"practice",kind:"guided_practice",title:"Guided practice",
+      instructions:"Practice with the published equation, not teacher keys."}]}],
+  }]};
+  const html=renderToStaticMarkup(<CurriculumEditor programId={ids.programId} courseCode="SCI"
+   release={{id:ids.versionId,revision:ids.expectedRevision,content:updated}} onSaved={async()=>{}}/>);
+  expect(html).toContain("Preview student-facing lesson (draft)");
+  expect(html).toContain("This is not a classroom assignment");
+  expect(html).toContain("Guided practice");
+  expect(html).not.toContain("<script>");
+  expect(html).toContain("&lt;script&gt;");
+ });
  it("renders structured lesson activities and authoring fields for real publisher drafts",()=>{
   const structured:ClassContent={...content,modules:[{...content.modules[0]!,
    lessons:[{...content.modules[0]!.lessons[0]!,
