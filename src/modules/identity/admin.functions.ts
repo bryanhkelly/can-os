@@ -3,7 +3,7 @@ import { and, eq, ilike, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { recordAudit, requireActor, type Actor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
-import { isOnsiteSafeguardingRole } from "@/domain/site-safeguarding-access";
+import { assertSafeguardingStaffInviteSite } from "@/domain/site-safeguarding-access";
 // The staff-invite flow must not grant student or guardian identities.
 const assignableRoles = ["teacher", "registrar", "specialist", "counselor", "room_facilitator", "site_staff", "site_leader", "paraeducator"] as const;
 
@@ -159,9 +159,7 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
   }).parse(value))
   .handler(async ({ data }) => {
     // A report-only onsite membership must never be organization-wide.
-    if (isOnsiteSafeguardingRole(data.role) && !data.siteId) {
-      throw new AuthorizationError("onsite role requires explicit site selection");
-    }
+    assertSafeguardingStaffInviteSite(data.role, data.siteId);
     const actor = await requireRegistrar();
     const { db } = await import("@/db/client");
     const { people, accessAccounts, accountPersonGrants, sites } = await import("@/db/schema");
