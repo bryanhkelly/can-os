@@ -8,6 +8,7 @@ type CommandContext,
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { gradeLabelForPercentage,isPassingGrade } from "@/domain/grade-scale-policy";
+import { verifiedSectionCreditUnits,requireKnownTranscriptCredits } from "@/domain/section-credit-policy";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -152,13 +153,14 @@ async function finalizedGradeRows(
     const configuration=gradeScaleId?scalesById.get(gradeScaleId):null;
     if(gradeScaleId&&!configuration)throw new Error("Finalized grade scale is unavailable");
     const passes=isPassingGrade(row.letterGrade,configuration);
+    const creditUnits=verifiedSectionCreditUnits(sectionMetadata);
+    const terminalPeriod=row.gradingPeriodSequence===lastPeriod.get(row.termId);
     return {
       ...rest,
       finalizedAt: row.finalizedAt?.toISOString() ?? null,
-      creditsAttempted:row.gradingPeriodSequence===lastPeriod.get(row.termId)?
-        (typeof sectionMetadata.credits==="number"?sectionMetadata.credits:1):0,
-      creditsEarned:row.gradingPeriodSequence===lastPeriod.get(row.termId)&&passes?
-        (typeof sectionMetadata.credits==="number"?sectionMetadata.credits:1):0,
+      creditConfigured:creditUnits!==null,
+      creditsAttempted:terminalPeriod?creditUnits:0,
+      creditsEarned:terminalPeriod?(creditUnits===null?null:passes?creditUnits:0):0,
     };
   });
 }
@@ -711,8 +713,9 @@ async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
   gradingPeriodName:"Withdrawal",termId:row.termId,termName:row.termName,
   schoolYearId:row.schoolYearId,schoolYearName:row.schoolYearName,
   letterGrade:"W",percentage:null,score:null,programName:row.programName,
-  creditsAttempted:typeof row.sectionMetadata.credits==="number"?row.sectionMetadata.credits:1,
-  creditsEarned:0,
+  creditsAttempted:verifiedSectionCreditUnits(row.sectionMetadata),
+  creditsEarned:verifiedSectionCreditUnits(row.sectionMetadata)===null?null:0,
+  creditConfigured:verifiedSectionCreditUnits(row.sectionMetadata)!==null,
   creditIssuingOrganizationId:row.creditIssuingOrganizationId,
   creditIssuingOrganization:row.creditIssuingOrganization,
   finalizedAt:row.endedAt?.toISOString()??null,
@@ -895,6 +898,7 @@ export const issueTranscript = createServerFn({ method: "POST" })
     if (!rows.length) {
       throw new Error("No finalized grades available to issue a transcript");
     }
+    requireKnownTranscriptCredits(rows);
     const issuingOrganizationId = rows[0]!.creditIssuingOrganizationId;
     if(rows.some(row=>row.creditIssuingOrganizationId!==issuingOrganizationId))
       throw new AuthorizationError("A single official transcript cannot combine credits issued by separate organizations without a transfer-credit agreement");
