@@ -67,9 +67,9 @@ are excluded; use synthetic users on a disposable, migrated Neon branch.
 
 | Priority | Blocking condition | Resolution and exit evidence |
 | --- | --- | --- |
-| P0 | Acceptance jobs cannot start without an isolated Neon test connection and application-host comparison. Current Admissions Neon job fails on missing GitHub environment secret/variable, before DB tests execute. | Configure the `integration-test` environment with `CAN_ADMISSIONS_TEST_DATABASE_URL` pointing **only** to a disposable Neon branch and `CAN_APPLICATION_DB_HOST` as a nonsecret hostname. Run guarded preflight, migrate isolated branch, then real DB suites. This is a runner configuration action, not a code regression. |
-| P0 | Existing GF3 launch, curriculum adoption, GF2 enrollment and GF1 classroom tests create independent fixtures. Their separate green results cannot prove the IDs connect. | Implement ONE orchestrated FullFlow integration/browser fixture and assertion chain using the same site/program/section/student. Find and fix the first broken handoff; rerun the whole chain after each repair. |
-| P0 | Application/browser evidence is not yet captured for this continuous journey. | Run real server-issued sessions for school registrar, publisher (if separate), teacher, guardian and student on one isolated instance; verify after reload and against SQL identity continuity. |
+| P0 | FullFlow's isolated Neon branch is migrated, but the real application test has not been executed. GitHub Actions secrets are no longer our chosen execution path. | Run the corrected `full-flow` selector with guarded `--preflight` and `TEST_DATABASE_URL` for the disposable Neon branch from a Node runner that can reach Neon, then run the actual six-stage integration test. **Fix the first failed assertion; no skipped tests count.** |
+| P0 | A single service-level `full-flow.integration.test.ts` now connects all six stages, but the run and its intermediate assertions are unverified. Its identities are mocked. | Execute it against the isolated branch and fix actual failures; then replace mock-actor acceptance with real server-issued sessions and a single browser story, retaining stable school/program/section/student IDs. |
+| P0 | The rollback-only fixture cannot prove persisted UI behavior after refresh, actual session grants, event delivery, or the unified operations view. | Build a persistent but disposable per-run scenario using existing Playwright authentication helpers, test registrar/publisher/teacher/guardian/student in distinct sessions, process the event outbox, verify notifications and operations from the app after reload, then revoke sessions and clean up. |
 | P1 | Data/authority mismatch may occur at each existing service boundary. | Diagnose from the first actual failing assertion: GF3 → curriculum → admission → student work → teacher/guardian → operations. Fix only the failing canonical command or projection and add a regression. |
 | P1 | Security and audit may be incomplete for some cross-role handoffs. | Require scoped denial and material domain events/audits for all consequential mutations in the same journey. |
 | P2 | Network contracts, denomination HQ creation and site-linking are distinct optional entry channels. | Maintain their existing work but do not expand this subsystem until this primary school journey reaches acceptance, unless an actual blocker in the journey depends on it. |
@@ -80,10 +80,11 @@ are excluded; use synthetic users on a disposable, migrated Neon branch.
 - **Primary CI:** existing `FullFlow` commits have passed build,
   typecheck, unit tests and migration-generation parity. These are static and
   isolated checks only. See [draft PR #172](https://github.com/bryanhkelly/can-os/pull/172).
-- **Disposable DB acceptance:** **TEST BRANCH MIGRATED, APP TEST NOT RUN**. On run
-  [39735575555](https://github.com/bryanhkelly/can-os/actions/runs/39735575555),
-  Admissions Neon Acceptance failed at the required isolated database secret
-  check. It is not evidence of failed admissions domain assertions.
+- **Disposable DB acceptance:** **TEST BRANCH MIGRATED, APP TEST NOT RUN**.
+  The earlier Admissions Neon Acceptance run failed at a GitHub secret check
+  before database tests. That Actions configuration is no longer the chosen
+  gate: we will use a guarded Node runner against the prepared disposable
+  branch, and record separate real integration results.
 - **Connected six-step FullFlow integration:** **WRITTEN / NOT EXECUTED**.
   The rollback-isolated `tests/integration/full-flow.integration.test.ts` now
   follows the same newly created Site/Program through publishing, adoption,
