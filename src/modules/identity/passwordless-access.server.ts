@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants } from "@/db/schema";
+import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,people } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader } from "@/domain/access-tokens";
 import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
@@ -29,7 +29,8 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false))).limit(1);
  if(!account || email.endsWith(".invalid"))return genericResult;
  const memberships=await db.select({role:accountPersonGrants.role}).from(accountPersonGrants)
-  .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)));
+  .innerJoin(people,eq(people.id,accountPersonGrants.personId))
+  .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),eq(people.active,true)));
  if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role)))return genericResult;
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
@@ -74,7 +75,8 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    .where(and(eq(accessAccounts.id,claimed.accountId),eq(accessAccounts.disabled,false))).limit(1);
   if(!account)throw new Error("Account unavailable");
   const grants=await tx.select({id:accountPersonGrants.id,role:accountPersonGrants.role}).from(accountPersonGrants)
-   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)));
+   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
+   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),eq(people.active,true)));
   const activeGrant=grants.find(g=>Object.hasOwn(roleCapabilities,g.role));
   if(!activeGrant)throw new Error("No supported CAN OS membership");
   const secret=issueOpaqueSecret();
@@ -115,7 +117,8 @@ export async function redeemLocalDemoAccess(
    role:accountPersonGrants.role,
    isSynthetic:accountPersonGrants.isSynthetic,
   }).from(accountPersonGrants)
-   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)));
+   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
+   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),eq(people.active,true)));
   const grant=account.id===LOCAL_DEMO_ADMIN.accountId
    ?(await listDemoFacilitatorGrants(tx)).find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
    :grants.find(candidate=>candidate.isSynthetic&&Object.hasOwn(roleCapabilities,candidate.role));
@@ -161,8 +164,8 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
   const delegated=accountId===LOCAL_DEMO_ADMIN.accountId?(await listDemoFacilitatorGrants(tx)).find(grant=>grant.id===grantId):undefined;
   if(accountId===LOCAL_DEMO_ADMIN.accountId&&!delegated)throw new Error("Demo user unavailable");
   const [grant]=delegated?[delegated]:await tx.select({id:accountPersonGrants.id,personId:accountPersonGrants.personId,role:accountPersonGrants.role})
-   .from(accountPersonGrants)
-   .where(and(eq(accountPersonGrants.id,grantId),eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true))).limit(1);
+   .from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId))
+   .where(and(eq(accountPersonGrants.id,grantId),eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true),eq(people.active,true))).limit(1);
   if(!grant || !Object.hasOwn(roleCapabilities,grant.role))throw new Error("Membership unavailable");
   const [changed]=await tx.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
