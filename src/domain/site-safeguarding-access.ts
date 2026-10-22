@@ -19,6 +19,13 @@ export function isOnsiteSafeguardingRole(role: string): role is OnsiteSafeguardi
   return (onsiteSafeguardingRoles as readonly string[]).includes(role);
 }
 
+/** Only named single-site grants may be provisioned for reporter-only roles. */
+export function assertSafeguardingStaffInviteSite(role: string, siteId: string | null | undefined): void {
+  if (isOnsiteSafeguardingRole(role) && !siteId) {
+    throw new AuthorizationError("onsite role requires explicit site selection");
+  }
+}
+
 /**
  * Require a VERIFIED session/grant (never request-body staff identity).
  * A room/site staff grant must be for one actual site, not organization-wide.
