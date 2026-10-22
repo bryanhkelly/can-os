@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { TeacherStudentGoalForm } from "./TeacherStudentGoalForm";
+import { TeacherStudentGoalReviewForm } from "./TeacherStudentGoalReviewForm";
 import {
   getTeacherLearningFollowUps,
   resolveTeacherLearningFollowUp,
@@ -107,7 +108,13 @@ export function TeacherLearningFollowUpsPanel() {
           <p className="mt-1 text-xs text-muted-foreground">
             Planned support: {followUpApproachLabels[item.approach as keyof typeof followUpApproachLabels] ?? "Teacher check-in"}
           </p>
-          {item.status !== "resolved" && <TeacherStudentGoalForm teacherActionId={item.id} />}
+          {!item.studentGoal && item.status !== "resolved" &&
+            <TeacherStudentGoalForm teacherActionId={item.id} />}
+          {item.studentGoal?.status === "resolved" &&
+            <p className="mt-2 text-sm">Shared student goal reviewed and marked met.</p>}
+          {item.studentGoal && item.studentGoal.status !== "resolved" &&
+            <TeacherStudentGoalReviewForm
+              goalActionId={item.studentGoal.id} onReviewed={load} />}
           <TeacherFollowUpResolution item={item} onSaved={load} />
         </article>)}
       </div>
