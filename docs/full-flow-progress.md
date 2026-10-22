@@ -16,7 +16,7 @@ draft PR #172.
 | Guided launch | `guided-school-journey.ts` and `GuidedSchoolJourney.tsx` turn the scoped live Program record into six navigable steps. A step is recorded only from canonical DB evidence; school-wide operations is always marked Review, never an automatic acceptance pass. | Real staff navigation and reload with one linked Program |
 | Operational action engine | `operations-action-triage.ts`, staff work queue, and `setOperationsActionDeadline`: urgent/due/unassigned ordering, due-date counts, verified site/program guard, auditable due-date change, existing owner's in-app alert. | Disposable DB tests for owner changes and deadline state, multi-role browser |
 | Student 360 | Existing `/staff/students/$personId` gains an academic-activity timeline. Searches, active-section counts, missing-work counts, attendance, actions, insights, and referrals are constrained to permitted programs/sections/sites. A teacher cannot view the student's other, untaught classes or private referral history through this read model. | Different-program and shared-student teacher isolation tests on real DB |
-| **Comprehensive learning-activity tracking (required P1)** | **Input validation/time-bounding policy committed, collection not implemented.** Existing `access_sessions`, `lesson_progress`, `submissions`, audit/events, and attendance represent distinct facts; none alone records comprehensive learning engagement. [Tracking contract](./comprehensive-learning-activity-tracking.md) specifies learner sessions, lesson/resource engagement, bounded estimated active time, retries/feedback, hybrid/offline attestation, scoped Student 360/teacher views, and privacy/abuse protections. | After P0 FullFlow, connect tested input policy to authenticated, section-enrollment-scoped event ingestion and persisted learning sessions; then verify same-student/section continuity, negative access, deduplication, idle/background handling and browser reload |
+| **Comprehensive learning-activity tracking (required P1)** | **Session/event persistence and student/teacher evidence surfaces committed; connected browser test pending.** Existing `access_sessions`, `lesson_progress`, `submissions`, audit/events, and attendance represent distinct facts; none alone records comprehensive learning engagement. [Tracking contract](./comprehensive-learning-activity-tracking.md) specifies learner sessions, lesson/resource engagement, bounded estimated active time, retries/feedback, hybrid/offline attestation, scoped Student 360/teacher views, and privacy/abuse protections. | Verify committed session/event ingestion with real authenticated student/guardian/teacher roles on isolated Neon; then add resource/media/submission event coverage, privacy/retention policy, deduplication stress tests, Student 360 timeline, and browser reload acceptance |
 | Academic credit and transcripts | `section-credit-policy.ts` removes the silent 1-credit fallback but **does not block official transcript issuance** when credits have not been recorded. Unknown credits remain null and display **Not recorded**. Official transcript snapshots preserve the missing-credit disclosure, courses, grades and institution of record. Registrar may configure Section credits in `/operations/launch/$programId` with an audit/event and a lock after finalized grades; section provisioning can also supply units initially. **Graduation eligibility and diploma issuance are different workflows**, not implied by a transcript. | DB integration and authorized registrar UI; issuance snapshot test |
 | Hybrid starter | A deliberate Grade 9 extension preset pre-fills onsite two days plus asynchronous delivery in the existing launch form. It never creates regulatory compliance, signed curriculum, schedules, attendance expectations or staff grants. | Actual calendar and hybrid attendance acceptance, after core journey |
 | Finance | **Not implemented.** No canonical tuition/billing/payments ledger was found. Do not generate money movements, financial aid or host-share percentages without an approved commercial/finance domain model. | Separate finance design and real ledger/payment integration; only after core-school acceptance |
@@ -56,6 +56,19 @@ static CI is green.
 
 
 
+## Connected learning and school-operations workstream
+
+User-approved order: **comprehensive learning activity → teacher intervention →
+student success → academic progression → hybrid-site operations**.
+See [Connected Learning / School Operations](./connected-learning-success-progression-hybrid.md)
+for canonical owners, committed source, deferred work and acceptance gates.
+Current source includes learner session/event tables and scoped ingestion, a
+student lesson tracker, assigned-teacher learning evidence, student course
+next steps, a **non-authoritative** credit-gap calculator, and a hybrid
+attendance/online-evidence separator. The last two are **pure domain
+foundations, not working registrar/site-leader workflows**. All feature
+acceptance remains separate from static CI and from P0 FullFlow proof.
+
 ## P0: canonical continuous six-stage journey
 
 **[The single FullFlow acceptance contract](./full-flow-acceptance-contract.md)
@@ -73,8 +86,8 @@ remains missing. The canonical acceptance contract lists exact environment and
 execution details.
 
 **Isolated Neon branch:** `fullflow-e2e-20261022`
-(`br-proud-pine-arfju8h2`), **31 migrations confirmed as of 22 October 2026**.
-Migration `0030_anonymous_auth_request_budget.sql` was applied transactionally to this isolated branch, including the matching Drizzle migration ledger hash. Read-only verification confirmed `auth_request_rate_limits` and its three columns. The existing `access_sessions`, `lesson_progress`, and `submissions` tables, required columns and unique indexes were also confirmed; no additional session or lesson-completion table is required for the current first bite. A dedicated *authentication* last-interaction column is optional, but the separately specified comprehensive learning-activity event history is required P1 work, not a P0 FullFlow fixture prerequisite.
+(`br-proud-pine-arfju8h2`), **32 migrations confirmed as of 22 October 2026**.
+Migrations `0030_anonymous_auth_request_budget.sql` and `0031_learning_activity_tracking.sql` were applied transactionally to this isolated branch, including matching Drizzle migration ledger entries. Read-only verification confirmed `auth_request_rate_limits` and its three columns. The existing `access_sessions`, `lesson_progress`, and `submissions` tables, required columns and unique indexes were also confirmed; no additional session or lesson-completion table is required for the current first bite. A dedicated *authentication* last-interaction column is optional, but the separately specified comprehensive learning-activity event history is required P1 work, not a P0 FullFlow fixture prerequisite.
 
 **Connected schema guard:** `scripts/verify-fullflow-schema.mjs` now fails the connected `full-flow` integration runner before fixtures when the isolated database's migration count/latest checksum or required auth/session/learning columns/indexes differ from the FullFlow source. It uses `TEST_DATABASE_URL` exclusively, after the existing test-database isolation checks; `--preflight` intentionally remains an offline URL-isolation check. **The Node schema guard has been committed but has not passed on a trusted connected runner**; live multi-persona tests and the full six-stage fixture remain unverified.
 **Latest full-flow code static CI:** [39740004930](https://github.com/bryanhkelly/can-os/actions/runs/39740004930)
