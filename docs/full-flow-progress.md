@@ -17,6 +17,20 @@ not a second school platform. Changes remain on `FullFlow` / draft PR #172.
 | Finance | **Not implemented.** No canonical tuition/billing/payments ledger was found. Do not generate money movements, financial aid or host-share percentages without an approved commercial/finance domain model. | Separate finance design and real ledger/payment integration; only after core-school acceptance |
 | Network/denomination | Existing partner contract and affiliation code retained but **deferred**. | No expansion until continuous school acceptance |
 
+**Additional academic-authority gate:** the credit issuer is currently selected
+when launching a Program, but independent legal authority for an external
+academic provider/credit issuer is **not proven by a verified academic
+partnership agreement**. Program metadata and school-staff choices are
+insufficient evidence. Do not treat a configured credit unit or selected issuer
+as legal accreditation/credit authorization. Separate verified contracting
+and graduation/issuance authorization are still needed before using this
+with real external credit issuers.
+
+**Outbox:** `SectionCreditConfigured` and `ActionDeadlineChanged` are
+registered as transactional fact/pass-through types with the existing worker,
+preventing them from sitting forever as unhandled events. No external
+email, payment movement or student credit award is made by these events.
+
 **Gating facts:** the six-stage `tests/integration/full-flow.integration.test.ts`
 continues to be **written but not executed** against the disposable Neon branch.
 The new functional unit/CI checks cannot substitute for a linked database and
