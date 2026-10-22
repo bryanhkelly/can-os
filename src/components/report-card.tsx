@@ -56,7 +56,7 @@ export function ReportCardView({ grades }: { grades: ReportCardGrade[] }) {
                     <h3 className="text-lg font-semibold">{grade.sectionTitle}</h3>
                     {grade.creditIssuingOrganization && (
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {grade.programName ? `${grade.programName} · ` : ""}Credit issued by {grade.creditIssuingOrganization}
+                        {grade.programName ? `${grade.programName} · ` : ""}Academic record issuer: {grade.creditIssuingOrganization}
                       </p>
                     )}
                   </div>
@@ -85,6 +85,7 @@ export function TranscriptView({
   return (
     <div className="mt-6">
       <h2 className="font-serif text-2xl">Transcript</h2>
+      <p className="mt-2 text-xs text-muted-foreground">Official academic history. Missing credits appear as Not recorded and do not prevent transcript issuance. A transcript does not certify graduation or confer a diploma.</p>
       {!rows.length && <p className="mt-4 text-sm">No finalized grades on record yet.</p>}
       {groupBy(rows, row => row.schoolYearName).map(([year, yearRows]) => (
         <section key={year} className="mt-6">
@@ -98,13 +99,13 @@ export function TranscriptView({
                     <div>
                       <p className="text-sm font-semibold">{row.sectionTitle}</p>
                       {row.creditIssuingOrganization && (
-                        <p className="text-xs text-muted-foreground">Credit issued by {row.creditIssuingOrganization}</p>
+                        <p className="text-xs text-muted-foreground">Academic record issuer: {row.creditIssuingOrganization}</p>
                       )}
                     </div>
                     <p className="text-sm font-semibold">
                       {row.letterGrade ?? "—"} <span className="ml-2 text-xs font-normal text-muted-foreground">{percentageLabel(row.percentage)}</span>
                       {typeof row.creditsEarned==="number" && <span className="ml-2 text-xs font-normal text-muted-foreground">{row.creditsEarned}/{row.creditsAttempted??0} credits earned</span>}
-                      {row.creditConfigured===false&&<span className="ml-2 text-xs font-normal text-muted-foreground" role="status">Credit units not configured; official issuance blocked</span>}
+                      {(row.creditConfigured===false || row.creditsEarned === null || row.creditsAttempted === null) && <span className="ml-2 text-xs font-normal text-muted-foreground" role="status">Credits: Not recorded</span>}
                     </p>
                   </li>
                 ))}
