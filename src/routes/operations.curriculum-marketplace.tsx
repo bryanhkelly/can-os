@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
+import { schoolCurriculumNextActions } from "@/domain/curriculum-next-actions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getCurriculumMarketplace, getCurriculumAdopterPrograms, getCurriculumJourneyReadiness, installCurriculumPack, adoptCurriculumPack, addMarketplaceSupplement } from "@/modules/learning/curriculum-marketplace.functions";
@@ -55,6 +56,12 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
  const adopted=installed.filter(pack=>pack.adoption?.status==="active" && pack.adoption.versionId===pack.versionId);
  const choices=adopted.flatMap(pack=>pack.courses.map(course=>({...course,pack:pack.name})));
  const chosenSections=market?.sections.filter(section=>section.courseVersionId===courseVersionId)??[];
+ const nextActions=data.journey?schoolCurriculumNextActions({
+  installedPacks:data.journey.totals.packsInstalled,
+  adoptedPacks:data.journey.totals.packsAdopted,
+  adoptedCourseVersions:data.journey.totals.courseVersionsAvailable,
+  classes:data.journey.classes,
+ }):[];
  return <main className="mx-auto max-w-6xl space-y-6 px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Academic operations</p>
   <h1 className="font-serif text-4xl">Curriculum Marketplace</h1>
@@ -68,6 +75,20 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
   {notice&&<p role="status" className="rounded-lg border p-4 text-sm">{notice}</p>}
   {!market&&<p className="rounded-lg border p-4">Select a program to browse packs under its verified school membership.</p>}
   {market&&<>
+   {data.journey&&<section className="space-y-4 rounded-xl border bg-card p-5" aria-label="School curriculum next actions">
+    <div>
+      <h2 className="font-serif text-2xl">School curriculum next actions</h2>
+      <p className="text-sm text-muted-foreground">Suggested next steps from current school records. They do not establish academic approval or end-to-end test completion.</p>
+    </div>
+    {nextActions.length?<ol className="space-y-2">{nextActions.map((action,index)=><li key={action.key} className="flex flex-wrap items-start justify-between gap-3 rounded border p-3">
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-sm">{index+1}. {action.title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{action.detail}</p>
+      </div>
+      {action.destination==="packs"?<a href="#curriculum-packs" className="text-sm underline">Browse curriculum packs</a>:
+       action.destination==="launch"?<Link to="/operations/launch/$programId" params={{programId:market.program.id}} className="text-sm underline">Open class setup</Link>:null}
+    </li>)}</ol>:<p className="text-sm">No immediate gaps detected in the tracked curriculum handoffs. Continue monitoring instruction and student evidence; this is not an acceptance-test result.</p>}
+   </section>}
    {data.journey&&<section className="space-y-4 rounded-xl border bg-card p-5" aria-label="Curriculum operational evidence">
     <div>
      <h2 className="font-serif text-2xl">Curriculum journey: operational evidence</h2>
@@ -100,7 +121,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
     {!data.journey.classes.length&&<p className="text-sm">No classes use currently adopted publisher course releases. Provision a class after adopting a pack.</p>}
     <p className="text-xs text-muted-foreground">To certify the workflow, run the isolated database acceptance suite and signed-in browser tests. Nonzero counts establish operational records only.</p>
    </section>}
-   <section className="space-y-3">
+   <section id="curriculum-packs" className="space-y-3">
     <h2 className="font-serif text-2xl">Available curriculum packs</h2>
     <div className="grid gap-4 md:grid-cols-2">
      {market.packs.map(pack=><article key={pack.versionId} className="space-y-3 rounded-xl border bg-card p-5">
