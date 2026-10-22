@@ -23,6 +23,8 @@ async function requireAffiliationHQ(capability: "network.affiliations.read" | "n
   }).from(organizations).where(eq(organizations.id, ids[0]!)).limit(1);
   if (!organization) throw new AuthorizationError("denomination organization");
   assertNetworkSiteAccess(actor, organization, capability);
+  const { requireCurrentNetworkAgreement } = await import("./network-agreement.server");
+  await requireCurrentNetworkAgreement(db, organization.id);
   return { actor, organization };
 }
 
@@ -62,7 +64,15 @@ export const listAffiliationNetworks = createServerFn({ method: "GET" }).handler
     ))
     .where(eq(organizations.type, "denomination"))
     .orderBy(asc(organizations.name));
-  return { networks };
+  const { requireCurrentNetworkAgreement } = await import("./network-agreement.server");
+  const allowed = await Promise.all(networks.map(async network => {
+    try { await requireCurrentNetworkAgreement(db, network.id); return network; }
+    catch (error) {
+      if (error instanceof AuthorizationError) return null;
+      throw error;
+    }
+  }));
+  return { networks: allowed.filter((n): n is typeof networks[number] => n !== null) };
 });
 
 export const listSiteAffiliations = createServerFn({ method: "GET" })
@@ -98,6 +108,8 @@ export const requestSiteAffiliation = createServerFn({ method: "POST" })
       )).where(and(eq(organizations.id, data.denominationOrganizationId),
         eq(organizations.type, "denomination"))).limit(1);
     if (!denomination) throw new AuthorizationError("registered denomination network");
+    const { requireCurrentNetworkAgreement } = await import("./network-agreement.server");
+    await requireCurrentNetworkAgreement(db, denomination.id);
 
     return db.transaction(async tx => {
       const [created] = await tx.insert(siteAffiliations).values({
