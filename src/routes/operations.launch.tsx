@@ -180,6 +180,14 @@ function LaunchWizardPage() {
     }
   }
 
+  function applyNinthGradeHybridPreset(){
+    // Explicit form proposal only. No accreditation, staffing, credit issuer,
+    // timetable, attendance or regulatory readiness is silently accepted.
+    setType("high_school_extension");
+    setGradeMin("9");setGradeMax("9");
+    setOnsite(true);setOnsiteDaysPerWeek("2");
+    setAsynchronous(true);setLiveOnline(false);
+  }
   const selectClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
   const inputClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
 
@@ -222,6 +230,11 @@ function LaunchWizardPage() {
                 <code>{created.journeyId}</code> is now in the checklist below.
               </p>
             )}
+            <div className="mt-4 rounded-lg border p-4">
+              <p className="font-semibold text-sm">Suggested school-in-a-box starting point</p>
+              <p className="mt-2 text-sm text-muted-foreground">Grade 9 hybrid extension: two on-site days and asynchronous instruction on the remaining days. This only pre-fills the proposal; your school must verify its staffing, calendar, academic provider and legal credit issuer before opening.</p>
+              <button type="button" className="mt-3 rounded-lg border px-3 py-2 text-sm" onClick={applyNinthGradeHybridPreset}>Use suggested Grade 9 hybrid settings</button>
+            </div>
             <form className="mt-4 space-y-5" onSubmit={submitLaunch}>
               <fieldset>
                 <legend className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
