@@ -45,6 +45,7 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
   const ids = [...new Set(selected.map(r => r.studentProfileId))];
   const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const evidence = ids.length ? await db.select({
+    id: s.learningActivityEvents.id,
     sectionId: s.learningActivityEvents.sectionId,
     studentProfileId: s.learningActivityEvents.studentProfileId,
     receivedAt: s.learningActivityEvents.receivedAt,
@@ -54,7 +55,7 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
       inArray(s.learningActivityEvents.studentProfileId, ids),
       gte(s.learningActivityEvents.receivedAt, from)))
     .orderBy(desc(s.learningActivityEvents.receivedAt)).limit(3001) : [];
-  const latest = new Map<string, { count: number; lastAt: Date; estimatedMs: number }>();
+  const latest = new Map<string, { count: number; lastAt: Date; latestEventId: string; estimatedMs: number }>();
   for (const row of evidence.slice(0, 3000)) {
     const key = row.sectionId + ":" + row.studentProfileId;
     const current = latest.get(key);
@@ -62,7 +63,7 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
       current.count++;
       current.estimatedMs += row.estimatedActiveMs;
     } else {
-      latest.set(key, { count: 1, lastAt: row.receivedAt, estimatedMs: row.estimatedActiveMs });
+      latest.set(key, { count: 1, lastAt: row.receivedAt, latestEventId: row.id, estimatedMs: row.estimatedActiveMs });
     }
   }
   const titles = new Map(assigned.map(row => [row.sectionId, row.sectionTitle]));
@@ -74,6 +75,7 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
       studentName: row.firstName + " " + row.lastName,
       observedEvents7d: activity?.count ?? 0,
       latestObservedAt: activity?.lastAt.toISOString() ?? null,
+      latestEventId: activity?.latestEventId ?? null,
       estimatedActiveMs7d: activity?.estimatedMs ?? 0,
     };
   });
