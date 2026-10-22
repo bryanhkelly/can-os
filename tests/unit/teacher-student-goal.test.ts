@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDENT_LEARNING_GOAL_TYPE, studentLearningGoalActionText, teacherStudentGoalInput,
   studentGoalReviewInput, studentGoalOutcomeLabels, isStudentGoalPublicReview,
+  statusFromTeacherGoalReview,
 } from "@/domain/teacher-student-goal";
 import {
   canCompleteStudentAction, isStudentSupportAction, isStudentVisibleSupportAction,
@@ -73,6 +74,8 @@ describe("graded-evidence teacher review of student goals", () => {
   it("requires a verified submission reference and human-selected outcome", () => {
     expect(studentGoalReviewInput.parse(review)).toEqual(review);
     expect(studentGoalOutcomeLabels.met).toContain("teacher reviewed");
+    expect(statusFromTeacherGoalReview("met")).toBe("resolved");
+    expect(statusFromTeacherGoalReview("needs_more_practice")).toBe("in_progress");
     expect(isStudentGoalPublicReview({
       outcome: "needs_more_practice", studentFeedback: review.studentFeedback,
       reviewedAt: "2026-10-22T23:00:00.000Z",
