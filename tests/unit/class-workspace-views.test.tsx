@@ -230,6 +230,30 @@ describe("published class workspace", () => {
       expect(html).not.toContain("Resource URL");
     }
   });
+  it("allows management only of a teacher's own supplement, never publisher or school material",()=>{
+    const resources=[
+     {id:"own",title:"My practice link",kind:"link",url:"https://example.org/own",
+      lessonId:"evidence",source:"teacher" as const,canManage:true},
+     {id:"school",title:"School packet",kind:"pdf",url:"https://example.org/school",
+      lessonId:"evidence",source:"organization" as const,canManage:false},
+     {id:"publisher",title:"Publisher reading",kind:"link",url:"https://example.org/publisher",
+      lessonId:"evidence",source:"publisher" as const,canManage:false},
+    ];
+    const teacher=renderToStaticMarkup(<ClassWorkspace data={{...workspace,role:"teacher",supplements:resources}}
+      tab="lessons" lessonId="evidence"/>);
+    expect(teacher).toContain("Add resource to this lesson");
+    expect(teacher).toContain("Manage My practice link");
+    expect(teacher).toContain("Replace resource");
+    expect(teacher).toContain("Retire resource");
+    expect(teacher).not.toContain("Manage School packet");
+    expect(teacher).not.toContain("Manage Publisher reading");
+    const student=renderToStaticMarkup(<ClassWorkspace data={{...workspace,supplements:resources}}
+      tab="lessons" lessonId="evidence"/>);
+    expect(student).toContain("My practice link");
+    expect(student).not.toContain("Replace resource");
+    expect(student).not.toContain("Retire resource");
+    expect(student).not.toContain("Add resource to this lesson");
+  });
   it("lets only teachers publish announcements while all authorized readers see the feed", () => {
     for (const role of ["student", "guardian", "teacher"]) {
       const html = renderToStaticMarkup(<ClassWorkspace data={{ ...workspace, role }} tab="announcements"/>);
