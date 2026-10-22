@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveClassNextSteps } from "@/domain/student-success";
+import { deriveClassNextSteps, deriveStudentSuccessPriorities, type StudentSuccessAssignment } from "@/domain/student-success";
 import { assessAcademicProgression } from "@/domain/academic-progression";
 import { summarizeHybridSiteDay } from "@/domain/hybrid-site-evidence";
 
@@ -21,6 +21,78 @@ describe("student success follows course evidence without inferred mastery", () 
     });
     expect(result.nextLessonId).toBeNull();
     expect(result.message).toMatch(/not a mastery or credit decision/i);
+  });
+});
+
+
+describe("cross-class Student Success assignment priorities", () => {
+  const now = new Date("2026-10-22T12:00:00.000Z");
+  const assignment = (overrides: Partial<StudentSuccessAssignment>): StudentSuccessAssignment => ({
+    assessmentId: "assessment-1", sectionId: "section-a",
+    title: "Practice problems", course: "Mathematics",
+    dueAt: "2026-10-24T12:00:00.000Z",
+    status: null, timeliness: null, assessmentStatus: "published",
+    ...overrides,
+  });
+
+  it("includes an enrolled student's published assignment before any submission exists", () => {
+    const plan = deriveStudentSuccessPriorities([
+      assignment({ assessmentId: "math", course: "Math" }),
+      assignment({ assessmentId: "english", sectionId: "section-b", course: "English" }),
+    ], now);
+    expect(plan.steps).toHaveLength(2);
+    expect(plan.dueSoon).toBe(2);
+    expect(plan.requiresAction).toBe(2);
+    expect(plan.steps.map(step => step.course).sort()).toEqual(["English","Math"]);
+  });
+
+  it("prioritizes revisions, overdue work and due-soon assignments ahead of waiting", () => {
+    const plan = deriveStudentSuccessPriorities([
+      assignment({assessmentId:"submitted",status:"submitted",timeliness:"late"}),
+      assignment({assessmentId:"graded",status:"graded",assessmentStatus:"closed"}),
+      assignment({assessmentId:"soon"}),
+      assignment({assessmentId:"late",dueAt:"2026-10-01T10:00:00Z"}),
+      assignment({assessmentId:"returned",status:"returned",dueAt:null}),
+      assignment({assessmentId:"ungraded",dueAt:null}),
+    ], now);
+    expect(plan.steps.map(step=>step.kind)).toEqual([
+      "revision","overdue","due_soon","to_do","review_feedback","awaiting_feedback",
+    ]);
+    expect(plan.overdue).toBe(1);
+    expect(plan.revise).toBe(1);
+    expect(plan.awaitingFeedback).toBe(1);
+    expect(plan.requiresAction).toBe(4);
+    expect(plan.notice).not.toMatch(/diagnos|risk score|attendance risk/i);
+  });
+
+  it("never calls late-submitted work missing and never suggests submitting closed assessments", () => {
+    const plan = deriveStudentSuccessPriorities([
+      assignment({assessmentId:"late-submitted",status:"submitted",timeliness:"missing"}),
+      assignment({assessmentId:"closed-no-submission",assessmentStatus:"closed"}),
+      assignment({assessmentId:"draft",assessmentStatus:"draft",status:"returned"}),
+    ], now);
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0]?.kind).toBe("awaiting_feedback");
+    expect(plan.overdue).toBe(0);
+    expect(plan.revise).toBe(0);
+  });
+
+  it("does not duplicate latest-attempt projections and uses deterministic bounded results", () => {
+    const plan = deriveStudentSuccessPriorities([
+      assignment({assessmentId:"A",dueAt:"2026-10-25T12:00:00Z"}),
+      assignment({assessmentId:"A",status:"submitted"}),
+      assignment({assessmentId:"B",dueAt:"2026-10-25T12:00:00Z"}),
+    ], now, 1);
+    expect(plan.steps).toHaveLength(1);
+    expect(plan.steps[0]?.assessmentId).toBe("A");
+    expect(plan.total).toBe(2);
+    expect(plan.truncated).toBe(true);
+  });
+
+  it("rejects invalid caller-provided review windows", () => {
+    expect(() => deriveStudentSuccessPriorities([], now, 0)).toThrow();
+    expect(() => deriveStudentSuccessPriorities([], new Date("invalid"))).toThrow();
+    expect(deriveStudentSuccessPriorities([], now).steps).toEqual([]);
   });
 });
 
