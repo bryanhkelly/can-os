@@ -19,7 +19,8 @@
 
 **Remaining (P0 for this feature):**
 - Run real user-session browser journeys and DB-backed tests against an isolated test branch, including teacher/guardian/wrong-school denial.
-- Add controlled resource-opening capture, document/media interaction, assignment started/submitted/feedback viewed, explicit activity session renewal/timeout, tamper/abuse tests, privacy/retention and aggregation.
+- **Small bite committed:** the student tracker now limits foreground interaction collection to published lesson reading/activities/resources and logs user-initiated clicks on existing published lesson resource links/download controls as `resource_opened`. This is an access attempt, not confirmed file delivery or evidence of reading. Guarded policy/SSR tests cover typed resource IDs and student-only instrumentation. **CI and connected browser behavior must still be verified.**
+- Next: test authenticated resource clicks and retry behavior against the isolated database, then add document/media interaction, assignment started/submitted/feedback viewed, explicit activity session renewal/timeout, tamper/abuse tests, privacy/retention and aggregation.
 - Validate telemetry when JavaScript is blocked, network is lost, different browser tabs exist, clients retry, and students work offline. Stale events must not silently count time. Never infer absence or academic success from partial telemetry.
 - Connect full evidence history into Student 360 with current per-section and per-student scope.
 
