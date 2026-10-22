@@ -211,6 +211,13 @@
       "when": 1792650000000,
       "tag": "0029_network_agreements",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792653600000,
+      "tag": "0030_anonymous_auth_request_budget",
+      "breakpoints": true
     }
   ]
 }
