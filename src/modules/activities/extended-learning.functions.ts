@@ -37,7 +37,7 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
 
   const rows = await db.select({
     id: programs.id, name: programs.name, type: programs.type,
-    status: programs.status, siteId: programs.siteId,
+    status: programs.status, siteId: programs.siteId, organizationId: programs.organizationId,
   }).from(programs).where(and(
     inArray(programs.id, ids), inArray(programs.siteId, siteIds),
     inArray(programs.organizationId, orgIds), inArray(programs.type, extendedTypes),
@@ -89,7 +89,7 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
   const operators = (await Promise.all(rows.map(async program => ({
     programId: program.id,
     people: await listOpeningOperators({
-      organizationId: orgIds[0]!, siteId: program.siteId,
+      organizationId: program.organizationId, siteId: program.siteId,
     }),
   })))).flatMap(item => item.people.map(person => ({ programId: item.programId, ...person })));
 
