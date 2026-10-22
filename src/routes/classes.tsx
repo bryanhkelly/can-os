@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { z } from "zod";
 import { classResources, type ClassContent } from "@/domain/class-content";
 import { getClassDirectory, getClassWorkspace, getClassResourceDownload, getClassSupplementDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
-import { addClassSupplement } from "@/modules/learning/class-supplements.functions";
+import { addClassSupplement, manageClassSupplement } from "@/modules/learning/class-supplements.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
@@ -54,6 +54,11 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const [resourceUrl,setResourceUrl]=useState("");
   const [resourceKind,setResourceKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link");
   const [resourceLesson,setResourceLesson]=useState("");
+  const [editingResource,setEditingResource]=useState<string|null>(null);
+  const [resourceEditTitle,setResourceEditTitle]=useState("");
+  const [resourceEditUrl,setResourceEditUrl]=useState("");
+  const [resourceEditKind,setResourceEditKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link");
+  const [retireCandidate,setRetireCandidate]=useState<string|null>(null);
   const announcementId = useRef<string | null>(null);
   const search = { section: data.section.id, student: data.role === "guardian" ? data.studentPersonId ?? undefined : undefined };
   const supplements = data.supplements ?? [];
@@ -93,6 +98,38 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {item.url ? <a href={item.url} target="_blank" rel="noopener noreferrer" className="underline">{item.title} (external)</a> :
         <button type="button" disabled={busy} onClick={() => void download(item.id)} className="underline disabled:opacity-50">{item.title}</button>}
     </li>)}</ul>;
+  }
+  function supplementActions(item:typeof supplements[number]){
+    if(data.role!=="teacher"||!item.canManage)return null;
+    return <div className="mt-3 space-y-2 border-t pt-3" aria-label={"Manage "+item.title}>
+      {editingResource===item.id?<form className="grid gap-2" onSubmit={event=>{event.preventDefault();void run(async()=>{
+        await manageClassSupplement({data:{action:"replace",sectionId:data.section.id,supplementId:item.id,
+          title:resourceEditTitle,kind:resourceEditKind,url:resourceEditUrl}});
+        setEditingResource(null);
+      },"Teacher resource replaced. Publisher content remains unchanged.");}}>
+        <label className="text-xs">Replacement title<input required minLength={3} maxLength={200} value={resourceEditTitle}
+          onChange={e=>setResourceEditTitle(e.target.value)} className="mt-1 block w-full rounded border p-2"/></label>
+        <label className="text-xs">Replacement HTTPS link<input required type="url" value={resourceEditUrl}
+          onChange={e=>setResourceEditUrl(e.target.value)} className="mt-1 block w-full rounded border p-2"/></label>
+        <label className="text-xs">Resource format<select value={resourceEditKind}
+          onChange={e=>setResourceEditKind(e.target.value as typeof resourceEditKind)} className="mt-1 block w-full rounded border p-2">
+          {(["link","video","pdf","image","audio","document"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
+        </select></label>
+        <div className="flex gap-3"><button type="submit" disabled={busy} className="text-xs underline">Save replacement</button>
+          <button type="button" onClick={()=>setEditingResource(null)} className="text-xs underline">Cancel</button></div>
+      </form>:<button type="button" disabled={busy} className="text-xs underline"
+        onClick={()=>{setEditingResource(item.id);setRetireCandidate(null);
+          setResourceEditTitle(item.title);setResourceEditUrl(item.url??"");
+          setResourceEditKind(item.kind as typeof resourceEditKind);}}>Replace resource</button>}
+      {retireCandidate===item.id?<div className="flex gap-3 text-xs">
+        <span>Retire this teacher resource from the class?</span>
+        <button type="button" disabled={busy} className="underline" onClick={()=>void run(async()=>{
+          await manageClassSupplement({data:{action:"retire",sectionId:data.section.id,supplementId:item.id}});
+          setRetireCandidate(null);
+        },"Teacher resource retired from this class.")}>Confirm retirement</button>
+        <button type="button" className="underline" onClick={()=>setRetireCandidate(null)}>Cancel</button>
+      </div>:<button type="button" disabled={busy} className="text-xs underline" onClick={()=>{setRetireCandidate(item.id);setEditingResource(null);}}>Retire resource</button>}
+    </div>;
   }
   const classwork = data.role === "teacher" ? <Link to="/teacher/gradebook" search={{ section: data.section.id }} className="underline">Gradebook and submission review</Link> :
     data.role === "guardian" ? <Link to="/guardian/academics" search={{ student: search.student, section: data.section.id }} className="underline">Assignments and released feedback</Link> :
@@ -196,8 +233,26 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
               <a href={item.url} rel="noopener noreferrer" target="_blank" className="underline">{item.title} ({item.kind})</a>
               :item.kind==="pdf"?<button type="button" disabled={busy}
                 onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
-                {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>} <span className="text-xs text-muted-foreground">· {item.source}</span></li>)}</ul>
+                {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>} <span className="text-xs text-muted-foreground">· {item.source}</span>{supplementActions(item)}</li>)}</ul>
         </div>}
+        {data.role==="teacher"&&<form className="mt-5 grid gap-3 rounded-lg border p-4" aria-label="Add resource to this lesson"
+          onSubmit={event=>{event.preventDefault();void run(async()=>{
+            await addClassSupplement({data:{sectionId:data.section.id,lessonId:lesson.id,
+              title:resourceTitle.trim(),url:resourceUrl.trim(),kind:resourceKind}});
+            setResourceTitle("");setResourceUrl("");
+          },"Teacher supplement attached to this lesson.");}}>
+          <h3 className="font-semibold text-sm">Add resource to this lesson</h3>
+          <label className="text-xs">Resource title<input required minLength={3} maxLength={200} value={resourceTitle}
+           onChange={e=>setResourceTitle(e.target.value)} className="mt-1 block w-full rounded border p-2"/></label>
+          <label className="text-xs">HTTPS resource link<input required type="url" value={resourceUrl}
+           onChange={e=>setResourceUrl(e.target.value)} className="mt-1 block w-full rounded border p-2"/></label>
+          <label className="text-xs">Resource format<select value={resourceKind}
+           onChange={e=>setResourceKind(e.target.value as typeof resourceKind)} className="mt-1 block w-full rounded border p-2">
+           {(["link","video","pdf","image","audio","document"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
+          </select></label>
+          <button disabled={busy} className="justify-self-start rounded border px-3 py-2 text-sm">Add lesson resource</button>
+          <p className="text-xs text-muted-foreground">Only teacher-owned supplementary resources can be replaced or retired here. Publisher content is immutable.</p>
+        </form>}
         {relatedWork.length > 0 && <section className="mt-6 space-y-3 rounded-lg border p-4" aria-label="Assignments for this lesson">
           <h3 className="text-sm font-semibold">Assignments for this lesson</h3>
           <ul className="divide-y">{relatedWork.map(work => <li key={work.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -316,7 +371,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
            :item.kind==="pdf"?<button type="button" disabled={busy}
               onClick={()=>void downloadSupplement(item.id)} className="underline disabled:opacity-50">
               {item.title} (private PDF)</button>:<span>{item.title} (unavailable document)</span>}
-          <span className="ml-2 text-xs text-muted-foreground">· {item.source}</span>
+          <span className="ml-2 text-xs text-muted-foreground">· {item.source}</span>{supplementActions(item)}
         </li>)}</ul>
       </section>}
       {(!data.content || !classResources(data.content).length) && !supplements.length && <p className="text-sm text-muted-foreground">No resources have been published.</p>}
