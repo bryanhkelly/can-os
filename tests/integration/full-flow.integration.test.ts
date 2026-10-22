@@ -549,6 +549,16 @@ integration("FullFlow: one school, same high-school program through curriculum a
           eq(s.notifications.resourceId,responseRequest.actionId),
         ));
         expect(parentNotice).toBeTruthy();
+        // Network retries must not send a second guardian resolution or create
+        // another action. A resolved record is immutable for this transition.
+        await schoolActions.updateOperationsAction({data:{
+          id:responseRequest.actionId,status:"resolved",resolutionNote,
+        }});
+        expect(await tx.select().from(s.notifications).where(and(
+          eq(s.notifications.recipientPersonId,guardian.id),
+          eq(s.notifications.type,"guardian_grade_follow_up_resolved"),
+          eq(s.notifications.resourceId,responseRequest.actionId),
+        ))).toHaveLength(1);
         const snapshotApi = await import("@/modules/operations/command-center.functions");
         const live = await snapshotApi.getLiveFullFlowOperations({data:{
           siteId:site.id,programId,
@@ -568,6 +578,13 @@ integration("FullFlow: one school, same high-school program through curriculum a
         expect(answer.response).toMatchObject({
           id:responseRequest.actionId,status:"resolved",resolutionNote,
         });
+        await tx.update(s.guardianRelationships).set({canViewAcademics:false})
+          .where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
+        await expect(gradeResponses.getGuardianGradeResponse({data:{
+          submissionId:submission.submissionId,
+        }})).rejects.toThrow();
+        await tx.update(s.guardianRelationships).set({canViewAcademics:true})
+          .where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
         const resolvedNotice=(await notices.getNotifications()).find(
           item=>item.type==="guardian_grade_follow_up_resolved"&&
             item.href?.includes("guardian/academics"));
