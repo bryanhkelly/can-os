@@ -3,7 +3,7 @@ import {db} from "@/db/client";
 import {accessAccounts,accessSessions,accountPersonGrants,people,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
-import {accessSessionCookie,hashAccessSecret} from "@/domain/access-tokens";
+import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
 import {LOCAL_DEMO_ADMIN} from "@/domain/local-demo-access";
 import {listDemoFacilitatorGrants} from "./demo-facilitator.server";
 
@@ -25,7 +25,7 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  }).from(accessSessions)
   .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
   .where(and(eq(accessSessions.secretHash,digest),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
-   eq(accessAccounts.disabled,false)))
+   gt(accessSessions.updatedAt,sessionIdleCutoff(now)),eq(accessAccounts.disabled,false)))
   .limit(1);
  if(!session) throw new AuthorizationError("authenticated session");
  const grants=session.accountId===LOCAL_DEMO_ADMIN.accountId?await listDemoFacilitatorGrants(db):await db.select({
