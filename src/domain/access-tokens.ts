@@ -23,6 +23,15 @@ export function accessChallengeIsUsable(input: {expiresAt:Date;consumedAt:Date|n
 export function accessSessionIsUsable(input: {expiresAt:Date;revokedAt:Date|null}, now=new Date()): boolean {
  return !input.revokedAt && input.expiresAt.getTime()>now.getTime();
 }
+/** Server authority for idle expiry. Authenticated GETs and workspace polling
+ * never move the idle deadline; only deliberate interactive activity may. */
+export const ACCESS_SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+export function sessionIdleCutoff(now = new Date()): Date {
+ return new Date(now.getTime() - ACCESS_SESSION_IDLE_TIMEOUT_MS);
+}
+export function accessSessionIsWithinIdleWindow(lastActivityAt: Date, now = new Date()): boolean {
+ return lastActivityAt.getTime() > sessionIdleCutoff(now).getTime() && lastActivityAt.getTime() <= now.getTime();
+}
 export const accessSessionCookie = "__Host-can_os_session";
 export function sessionCookieHeader(secret: string, maxAgeSeconds=60*60*12): string {
  if(!/^[A-Za-z0-9_-]{40,}$/.test(secret)) throw new Error("Invalid session token");
