@@ -6,6 +6,7 @@ const state=vi.hoisted(()=>({
  redeem:vi.fn(),
  demo:vi.fn(),
  rejected:vi.fn(),
+ admit:vi.fn(),
 }));
 vi.mock("@tanstack/react-router",()=>({
  createFileRoute:()=>(
@@ -18,6 +19,12 @@ vi.mock("@/modules/identity/passwordless-access.server",()=>({
 }));
 vi.mock("@/modules/identity/authentication-rejections.server",()=>({
  recordRejectedAuthentication:state.rejected,
+}));
+vi.mock("@/modules/identity/anonymous-auth-admission.server",()=>({
+ admitAnonymousAuthRequest:state.admit,
+ anonymousAuthAdmissionResponse:(result:{allowed:boolean;retryAfterSeconds:number})=>
+  result.allowed?null:Response.json({error:"Too many authentication requests. Try again later."},
+   {status:429,headers:{"Cache-Control":"no-store","Retry-After":String(result.retryAfterSeconds)}}),
 }));
 import "@/routes/access.verify";
 
@@ -32,6 +39,8 @@ beforeEach(()=>{
  state.demo.mockReset();
  state.rejected.mockReset();
  state.rejected.mockResolvedValue(true);
+ state.admit.mockReset();
+ state.admit.mockResolvedValue({allowed:true,retryAfterSeconds:0});
 });
 
 describe("unauthenticated verification failures",()=>{
@@ -71,6 +80,22 @@ describe("unauthenticated verification failures",()=>{
   const response=await state.post!({request:request({token:"valid"})});
   expect(response.status).toBe(200);
   expect(state.rejected).not.toHaveBeenCalled();
+ });
+ it("denies over-budget submissions without evaluating the supplied credential",async()=>{
+  state.admit.mockResolvedValue({allowed:false,retryAfterSeconds:12});
+  const response=await state.post!({request:request({token:"redacted-secret"})});
+  expect(response.status).toBe(429);
+  expect(response.headers.get("Retry-After")).toBe("12");
+  expect(state.redeem).not.toHaveBeenCalled();
+  expect(state.rejected).not.toHaveBeenCalled();
+  expect(state.admit).toHaveBeenCalledWith("verify");
+ });
+ it("fails closed if the shared admission store cannot be reached",async()=>{
+  state.admit.mockRejectedValue(new Error("private DB connection string"));
+  const response=await state.post!({request:request({token:"redacted-secret"})});
+  expect(response.status).toBe(503);
+  expect(JSON.stringify(await response.json())).not.toContain("connection string");
+  expect(state.redeem).not.toHaveBeenCalled();
  });
  it("rejects cross-origin verification before checking credentials",async()=>{
   const response=await state.post!({request:request({token:"invalid"},"http://evil.example")});
