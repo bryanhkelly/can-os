@@ -501,10 +501,60 @@ integration("FullFlow: one school, same high-school program through curriculum a
         expect(parentItem.status).toBe("graded");
         expect(Number(parentItem.score)).toBe(9);
         expect(parentItem.sectionId).toBe(section.id);
+        // Guardian can respond to the released grade; the school gets an
+        // actual operations Action, resolves it, and the related guardian can
+        // read the resolution while a different guardian cannot.
+        const gradeResponses = await import("@/modules/learning/guardian-grade-response.functions");
+        const question = {submissionId: submission.submissionId,
+          message: "Please explain how the written solution was assessed."};
+        const responseRequest = await gradeResponses.requestGuardianGradeResponse({data:question});
+        expect(responseRequest.created).toBe(true);
+        expect(await gradeResponses.requestGuardianGradeResponse({data:question}))
+          .toMatchObject({created:false,actionId:responseRequest.actionId});
+        expect((await gradeResponses.getGuardianGradeResponse({data:{
+          submissionId:submission.submissionId,
+        }})).response?.status).toBe("open");
         state.actor = unrelatedActor;
+        await expect(gradeResponses.getGuardianGradeResponse({data:{
+          submissionId:submission.submissionId,
+        }})).rejects.toThrow();
         await expect(guardianQueries.getGuardianAssignments({data:{
           studentPersonId: profile.personId,
         }})).rejects.toThrow("guardian academic relationship");
+        state.actor = context(schoolOperator.id, school.id, [site.id], [programId]);
+        const schoolActions = await import("@/modules/operations/action-workspace.functions");
+        const queue = await schoolActions.getOperationsActions({data:{siteId:site.id,programId}});
+        expect(queue.items.some(item=>item.id===responseRequest.actionId)).toBe(true);
+        const resolutionNote = "The solution was correct; one point was deducted for incomplete explanation.";
+        await schoolActions.updateOperationsAction({data:{
+          id:responseRequest.actionId,status:"resolved",resolutionNote,
+        }});
+        const [parentNotice] = await tx.select().from(s.notifications).where(and(
+          eq(s.notifications.recipientPersonId,guardian.id),
+          eq(s.notifications.type,"guardian_grade_follow_up_resolved"),
+          eq(s.notifications.resourceId,responseRequest.actionId),
+        ));
+        expect(parentNotice).toBeTruthy();
+        const snapshotApi = await import("@/modules/operations/command-center.functions");
+        const live = await snapshotApi.getLiveFullFlowOperations({data:{
+          siteId:site.id,programId,
+        }});
+        const programRow = first(live.programs);
+        expect(programRow.id).toBe(programId);
+        expect(programRow.counts).toMatchObject({
+          adoptedCurriculumPacks:1,sections:1,publishedSections:1,
+          staffedSections:1,applications:1,activeProgramStudents:1,
+          placedStudents:1,publishedAssessments:1,gradedWork:1,
+          unresolvedGuardianResponses:0,
+        });
+        state.actor = guardianActor;
+        const answer = await gradeResponses.getGuardianGradeResponse({data:{
+          submissionId:submission.submissionId,
+        }});
+        expect(answer.response).toMatchObject({
+          id:responseRequest.actionId,status:"resolved",resolutionNote,
+        });
+
 
         // One operational record means the actual newly created school
         // Program and its relational children are identical across domains.
