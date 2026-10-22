@@ -3,10 +3,11 @@ import { db } from "@/db/client";
 import {
  curriculumAdoptions, curriculumEntitlements, curriculumOverlays, curriculumPackItems,
  curriculumPacks, curriculumPackVersions, curriculumResources, courseTemplates, courseTemplateVersions,
- programs, sections,
+ organizations, programs, sections,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { readClassContent } from "@/domain/class-content";
+import { schoolCourseOutline } from "@/domain/school-course-outline";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import type { Actor } from "@/modules/identity/actors.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -49,9 +50,11 @@ export async function readMarketplace(actor: Actor, programId: string) {
  const packs = await db.select({
   id: curriculumPacks.id, slug: curriculumPacks.slug, name: curriculumPacks.name,
   description: curriculumPacks.description, publisherOrganizationId: curriculumPacks.publisherOrganizationId,
-  licenseCode: curriculumPacks.licenseCode, versionId: curriculumPackVersions.id,
+  licenseCode: curriculumPacks.licenseCode, publisherName: organizations.name,
+  versionId: curriculumPackVersions.id,
   version: curriculumPackVersions.version,
- }).from(curriculumPacks).innerJoin(curriculumPackVersions,eq(curriculumPackVersions.packId,curriculumPacks.id))
+ }).from(curriculumPacks).innerJoin(organizations,eq(organizations.id,curriculumPacks.publisherOrganizationId))
+  .innerJoin(curriculumPackVersions,eq(curriculumPackVersions.packId,curriculumPacks.id))
   .where(and(eq(curriculumPackVersions.status,"published"),
    or(eq(curriculumPacks.visibility,"public"),
       eq(curriculumPacks.publisherOrganizationId,program.organizationId))))
@@ -60,6 +63,7 @@ export async function readMarketplace(actor: Actor, programId: string) {
  const items = versionIds.length ? await db.select({
   packVersionId: curriculumPackItems.packVersionId, courseVersionId: courseTemplateVersions.id,
   code: courseTemplates.code, title: courseTemplates.title, subject: courseTemplates.subject,
+  curriculum: courseTemplateVersions.curriculum,
   position: curriculumPackItems.position,
  }).from(curriculumPackItems)
   .innerJoin(courseTemplateVersions,eq(courseTemplateVersions.id,curriculumPackItems.courseTemplateVersionId))
@@ -91,7 +95,9 @@ export async function readMarketplace(actor: Actor, programId: string) {
  return {
   program:{id:program.id,name:program.name,siteId:program.siteId},canPublish,
   packs:packs.map(pack=>({
-   ...pack,courses:items.filter(item=>item.packVersionId===pack.versionId),
+   ...pack,courses:items.filter(item=>item.packVersionId===pack.versionId).map(({curriculum,...course})=>({
+    ...course,preview:schoolCourseOutline(curriculum),
+   })),
    entitlement:entitlements.find(e=>e.packId===pack.id)?.status??null,
    adoption:adoptions.find(a=>a.packId===pack.id)
     ? {versionId:adoptions.find(a=>a.packId===pack.id)!.packVersionId,
