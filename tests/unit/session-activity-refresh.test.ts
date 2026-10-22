@@ -39,7 +39,7 @@ describe("explicit activity refreshes only a live authenticated session",()=>{
     expect(statement.params).toContain("session-1");
     expect(statement.params).toContain("account-1");
     const dates=statement.params.map(value=>
-      typeof value==="string" && /^\\d{4}-\\d{2}-\\d{2}T/.test(value) ? new Date(value) :
+      typeof value==="string" && /^\d{4}-\d{2}-\d{2}T/.test(value) ? new Date(value) :
       value instanceof Date ? value : null,
     ).filter((value):value is Date=>value instanceof Date);
     expect(dates).toHaveLength(2);
