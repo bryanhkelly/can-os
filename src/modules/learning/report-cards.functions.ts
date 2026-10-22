@@ -114,7 +114,7 @@ async function finalizedGradeRows(
       gradeScaleId: s.sectionGrades.gradeScaleId,
       finalizedAt: s.sectionGrades.finalizedAt,
       programName: s.programs.name,
-      creditIssuingOrganizationId: s.programs.creditIssuingOrganizationId,
+      creditIssuingOrganizationId: sql<string>`${s.programs.creditIssuingOrganizationId}`,
       creditIssuingOrganization: s.organizations.name,
     })
     .from(s.sectionGrades)
@@ -695,7 +695,7 @@ async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
   sectionMetadata:s.sections.metadata,
   termId:s.terms.id,termName:s.terms.name,schoolYearId:s.schoolYears.id,
   schoolYearName:s.schoolYears.name,programName:s.programs.name,
-  creditIssuingOrganizationId:s.programs.creditIssuingOrganizationId,
+  creditIssuingOrganizationId:sql<string>`${s.programs.creditIssuingOrganizationId}`,
   creditIssuingOrganization:s.organizations.name,metadata:s.enrollments.metadata,
   endedAt:s.enrollments.endedAt,
  }).from(s.enrollments)
@@ -758,7 +758,7 @@ export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" }
         studentPersonId: s.studentProfiles.personId,
         firstName: s.people.legalFirstName,
         lastName: s.people.legalLastName,
-        issuerId: s.programs.creditIssuingOrganizationId,
+        issuerId: sql<string>`${s.programs.creditIssuingOrganizationId}`,
         issuerName: s.organizations.name,
       }).from(s.sectionGrades)
         .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.sectionGrades.studentProfileId))
@@ -779,7 +779,7 @@ export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" }
         studentPersonId: s.studentProfiles.personId,
         firstName: s.people.legalFirstName,
         lastName: s.people.legalLastName,
-        issuerId: s.programs.creditIssuingOrganizationId,
+        issuerId: sql<string>`${s.programs.creditIssuingOrganizationId}`,
         issuerName: s.organizations.name,
       }).from(s.enrollments)
         .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))

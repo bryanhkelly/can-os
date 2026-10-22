@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
@@ -12,27 +13,7 @@ import {
   scheduleLaunchOrientation,
 } from "@/modules/programs/launch.functions";
 
-const programTypes = [
-  "church_hosted_academy",
-  "high_school_extension",
-  "full_school",
-  "microschool",
-  "hybrid_program",
-  "homeschool_cohort",
-  "summer_enrichment",
-] as const;
-
 const grades = ["TK", "K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
-
-const typeLabels: Record<string, string> = {
-  church_hosted_academy: "Church-hosted academy",
-  high_school_extension: "High school extension",
-  full_school: "Full school",
-  microschool: "Microschool",
-  hybrid_program: "Hybrid program",
-  homeschool_cohort: "Homeschool cohort",
-  summer_enrichment: "Summer enrichment",
-};
 
 const requirementStatusLabels: Record<string, string> = {
   needs_you: "Needs you",
@@ -71,7 +52,9 @@ function LaunchWizardPage() {
   const [openingRecipients,setOpeningRecipients]=useState<Record<string,string>>({});
   const [opened,setOpened]=useState<{siteId:string|null;name:string}|null>(null);
 
-  const [type, setType] = useState<string>("church_hosted_academy");
+  const [type, setType] = useState<(typeof programTypes)[number]>("church_hosted_academy");
+  const [summerCreditBearing, setSummerCreditBearing] = useState(false);
+  const creditMode = type === "summer_program" && summerCreditBearing ? "credit_bearing" : isExtendedLearningType(type) ? "non_credit" : "credit_bearing";
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [gradeMin, setGradeMin] = useState("K");
@@ -126,7 +109,7 @@ function LaunchWizardPage() {
         data: {
           name,
           slug,
-          type: type as (typeof programTypes)[number],
+          type,
           gradeRange: { min: gradeMin, max: gradeMax },
           deliveryModel: {
             onsite,
@@ -139,7 +122,8 @@ function LaunchWizardPage() {
           hostOrganizationId,
           jurisdictionId,
           academicProviderOrganizationId,
-          creditIssuingOrganizationId,
+          creditMode,
+          ...(creditMode === "credit_bearing" ? { creditIssuingOrganizationId } : {}),
           ...(siteId ? { siteId } : {}),
         },
       });
@@ -188,6 +172,13 @@ function LaunchWizardPage() {
     setOnsite(true);setOnsiteDaysPerWeek("2");
     setAsynchronous(true);setLiveOnline(false);
   }
+  function applyExtendedLearningPreset(offering: "summer_program" | "summer_enrichment" | "after_school_enrichment") {
+    setType(offering);
+    setSummerCreditBearing(false);
+    setGradeMin("K"); setGradeMax("12");
+    setOnsite(true); setAsynchronous(false); setLiveOnline(false);
+    setOnsiteDaysPerWeek(offering === "after_school_enrichment" ? "3" : "5");
+  }
   const selectClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
   const inputClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
 
@@ -233,7 +224,12 @@ function LaunchWizardPage() {
             <div className="mt-4 rounded-lg border p-4">
               <p className="font-semibold text-sm">Suggested school-in-a-box starting point</p>
               <p className="mt-2 text-sm text-muted-foreground">Grade 9 hybrid extension: two on-site days and asynchronous instruction on the remaining days. This only pre-fills the proposal; your school must verify its staffing, calendar, academic provider and legal credit issuer before opening.</p>
-              <button type="button" className="mt-3 rounded-lg border px-3 py-2 text-sm" onClick={applyNinthGradeHybridPreset}>Use suggested Grade 9 hybrid settings</button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={applyNinthGradeHybridPreset}>Grade 9 hybrid</button>
+                <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => applyExtendedLearningPreset("summer_program")}>Summer academic program</button>
+                <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => applyExtendedLearningPreset("summer_enrichment")}>Summer camp / enrichment</button>
+                <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => applyExtendedLearningPreset("after_school_enrichment")}>After-school enrichment</button>
+              </div>
             </div>
             <form className="mt-4 space-y-5" onSubmit={submitLaunch}>
               <fieldset>
@@ -243,12 +239,19 @@ function LaunchWizardPage() {
                 <div className="mt-2 space-y-3">
                   <label className="block text-xs">
                     Program type
-                    <select aria-label="Program type" className={selectClass} value={type} onChange={(e) => setType(e.target.value)}>
+                    <select aria-label="Program type" className={selectClass} value={type} onChange={(e) => setType(e.target.value as (typeof programTypes)[number])}>
                       {programTypes.map((value) => (
-                        <option key={value} value={value}>{typeLabels[value]}</option>
+                        <option key={value} value={value}>{programTypeLabels[value]}</option>
                       ))}
                     </select>
                   </label>
+                  {type === "summer_program" && (
+                    <label className="flex items-center gap-2 text-xs">
+                      <input type="checkbox" checked={summerCreditBearing} onChange={e => setSummerCreditBearing(e.target.checked)} />
+                      Offer credit-bearing summer coursework (requires an authorized credit issuer)
+                    </label>
+                  )}
+                  {isExtendedLearningType(type) && <p className="text-xs text-muted-foreground">Summer and after-school offerings share the Program record. Existing academic-year, section, staffing and opening gates still apply; short-course registration and recurring-session operations need further integration.</p>}
                   <label className="block text-xs">
                     Name
                     <input aria-label="Program name" className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} />
@@ -367,15 +370,19 @@ function LaunchWizardPage() {
                       ))}
                     </select>
                   </label>
-                  <label className="block text-xs">
-                    Credit-issuing organization
-                    <select aria-label="Credit issuing organization" className={selectClass} value={creditIssuingOrganizationId} onChange={(e) => setCreditIssuingOrganizationId(e.target.value)} required>
-                      <option value="">Select credit issuer…</option>
-                      {options.organizations.map((organization) => (
-                        <option key={organization.id} value={organization.id}>{organization.name}</option>
-                      ))}
-                    </select>
-                  </label>
+                  {creditMode === "credit_bearing" ? (
+                    <label className="block text-xs">
+                      Credit-issuing organization
+                      <select aria-label="Credit issuing organization" className={selectClass} value={creditIssuingOrganizationId} onChange={(e) => setCreditIssuingOrganizationId(e.target.value)} required>
+                        <option value="">Select credit issuer…</option>
+                        {options.organizations.map((organization) => (
+                          <option key={organization.id} value={organization.id}>{organization.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Noncredit offering: no credit issuer required; it does not contribute to official transcripts.</p>
+                  )
                 </div>
               </fieldset>
 
@@ -412,7 +419,7 @@ function LaunchWizardPage() {
                       search={{siteId:launch.siteId??undefined,programId:undefined}}
                       className="mt-2 inline-block text-xs font-semibold underline">Configure classes and instructors →</Link>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {typeLabels[launch.type] ?? launch.type}
+                      {programTypeLabels[launch.type] ?? launch.type}
                       {launch.journey ? ` · Journey: ${launch.journey.status}` : " · No launch journey"}
                     </p>
                     <ul className="mt-3 space-y-2">
