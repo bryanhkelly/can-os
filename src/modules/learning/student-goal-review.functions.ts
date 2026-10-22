@@ -7,7 +7,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import {
   isStudentGoalPublicReview, studentGoalReviewInput,
-  STUDENT_LEARNING_GOAL_TYPE,
+  statusFromTeacherGoalReview, STUDENT_LEARNING_GOAL_TYPE,
 } from "@/domain/teacher-student-goal";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { z } from "zod";
@@ -152,7 +152,7 @@ export const reviewStudentLearningGoal = createServerFn({ method: "POST" })
         throw new AuthorizationError("most recent graded assessment attempt");
 
       const now = new Date();
-      const nextStatus = data.outcome === "met" ? "resolved" : "in_progress";
+      const nextStatus = statusFromTeacherGoalReview(data.outcome);
       const review = {
         outcome: data.outcome, studentFeedback: data.studentFeedback,
         reviewedAt: now.toISOString(), submissionId: work.id,
