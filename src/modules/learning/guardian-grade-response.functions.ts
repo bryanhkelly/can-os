@@ -84,6 +84,7 @@ async function relatedResponse(actor: Awaited<ReturnType<typeof guardianActor>>,
     return null;
   return {
     id: found.id, status: found.status, resolutionNote: found.resolutionNote,
+    requestMessage: typeof found.metadata.requestMessage === "string" ? found.metadata.requestMessage : "",
     updatedAt: found.updatedAt.toISOString(),
   };
 }
