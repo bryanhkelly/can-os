@@ -6,6 +6,7 @@ import { dedupeQueue,notificationSummary } from "@/domain/notification-triage";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,asc,desc,eq,inArray,isNotNull,isNull,or,sql } from "drizzle-orm";
 import { operationsSelectionSchema,resolveOperationsSelection } from "./operations-scope.server";
@@ -137,4 +138,53 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    await writeAudit(tx,actor,{action:"action.assignment.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{ownerPersonId:record.ownerPersonId,priority:record.priority},after:{ownerPersonId:data.ownerPersonId,priority:data.priority}});
    return {saved:true};
   });
+ });
+
+/** Give a verified school Action a real due date. Domain-owned referrals and
+ * opening handoffs retain their own lifecycle. Changes are audited/events. */
+export const setOperationsActionDeadline=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({
+   id:z.string().uuid(),dueAt:z.string().datetime({offset:true}).nullable(),
+   reason:z.string().trim().min(5).max(500),
+ }).strict().parse(value))
+ .handler(async({data})=>{
+   const actor=await operator();
+   return db.transaction(async tx=>{
+     const [record]=await tx.select().from(actions)
+       .where(and(eq(actions.id,data.id),inArray(actions.siteId,actor.scope.siteIds??[])))
+       .for("update").limit(1);
+     if(!record||record.status==="resolved"||record.status==="cancelled")
+       throw new AuthorizationError("open action in authorized school");
+     if(record.organizationId&&!actor.scope.organizationIds?.includes(record.organizationId))
+       throw new AuthorizationError("action school ownership");
+     if(record.programId&&!actor.scope.programIds?.includes(record.programId))
+       throw new AuthorizationError("action program");
+     if(record.type==="support_referral"||record.type===openingHandoffType)
+       throw new Error("Use the Action's owning domain workflow");
+     if(record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId)
+       await assertAcademicActionAuthority(tx,actor,record);
+     const newDate=data.dueAt?new Date(data.dueAt):null;
+     if((record.dueAt?.getTime()??null)===(newDate?.getTime()??null))
+       return {changed:false as const};
+     await tx.update(actions).set({dueAt:newDate,updatedAt:new Date()})
+       .where(eq(actions.id,record.id));
+     await writeAudit(tx,actor,{
+       action:"action.deadline.change",entityType:"action",entityId:record.id,
+       scope:{organizationId:record.organizationId,siteId:record.siteId,programId:record.programId},
+       before:{dueAt:record.dueAt?.toISOString()??null},
+       after:{dueAt:newDate?.toISOString()??null,reason:data.reason},
+     });
+     await emitEvent(tx,{
+       eventType:EventTypes.ActionDeadlineChanged,aggregateType:"action",
+       aggregateId:record.id,actorPersonId:actor.actorPersonId,
+       organizationId:record.organizationId,siteId:record.siteId,programId:record.programId,
+       payload:{dueAt:newDate?.toISOString()??null},
+     });
+     if(record.ownerPersonId&&record.ownerPersonId!==actor.actorPersonId)
+       await notify(tx,{recipientPersonId:record.ownerPersonId,
+         type:"operations_action_deadline_changed",title:"Action deadline updated",
+         body:"Review the updated deadline in the school operations queue.",
+         resourceType:"action",resourceId:record.id});
+     return {changed:true as const};
+   });
  });
