@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
+import { TeacherLearningFollowUpForm } from "@/components/learning/TeacherLearningFollowUpForm";
 import { WorkspaceShell, StatCard, EmptyState, QueryState } from "@/components/workspace";
 
 export const Route = createFileRoute("/teacher/")({ component: TeacherTodayPage });
@@ -99,6 +100,9 @@ function TeacherTodayPage() {
               <p className="mt-1 text-xs text-muted-foreground">{student.observedEvents7d} recorded interactions in 7 days
                 · latest {student.latestObservedAt ? new Date(student.latestObservedAt).toLocaleString() : "not recorded"}
                 · up to {Math.round(student.estimatedActiveMs7d / 60_000)} min estimated active time</p>
+              {student.latestEventId && <TeacherLearningFollowUpForm
+                sectionId={student.sectionId} studentProfileId={student.studentProfileId}
+                learningEventId={student.latestEventId} />}
             </article>)}
           {!activity.students.some(student => student.observedEvents7d > 0) &&
             <p className="text-sm">No interaction evidence has been collected for these classes yet. This does not mean students have not been learning.</p>}
