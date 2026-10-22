@@ -1158,6 +1158,23 @@
         "audit_events",
         "domain_events"
       ]
+    },
+    "/account/sessions": {
+      "persona": "authenticated account holder",
+      "seeds": [],
+      "recordCounts": {
+        "access_sessions": 1
+      },
+      "interactions": [
+        "list usable sessions only for the authenticated account, without exposing credentials or fabricated devices",
+        "revoke one owned session while other account sessions remain usable",
+        "sign out everywhere and verify current cookie clearing and revocation on the next authenticated request",
+        "deny cross-account revocation and indistinguishable unknown IDs"
+      ],
+      "downstreamRecords": [
+        "access_sessions",
+        "audit_events"
+      ]
     }
   }
 }
