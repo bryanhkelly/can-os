@@ -65,7 +65,11 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
         {canCompleteStudentAction(action) &&
           <button disabled={busy||!connected} onClick={()=>finish(action.id)} className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">Mark complete</button>}
         {action.status==="open"&&!canCompleteStudentAction(action)&&
-          <p className="text-xs text-muted-foreground">Managed in its owning workflow.</p>}
+          <p className="text-xs text-muted-foreground">
+            {action.type==="student_learning_goal"
+              ? "Review this goal with your teacher; your teacher will confirm the outcome."
+              : "Managed in its owning workflow."}
+          </p>}
       </div>;})}
       {actionId && !visible.length ? <p role="alert" className="text-sm text-muted-foreground">This action is unavailable in your current student workspace.</p> :
         !actions.length && <p className="text-sm text-muted-foreground">You have no saved actions.</p>}
