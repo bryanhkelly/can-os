@@ -20581,7 +20581,7 @@
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": "false"
+          "default": false
         },
         "last_lesson_id": {
           "name": "last_lesson_id",
@@ -20600,7 +20600,7 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "0"
+          "default": 0
         },
         "created_at": {
           "name": "created_at",
@@ -20828,7 +20828,7 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "0"
+          "default": 0
         }
       },
       "indexes": {
