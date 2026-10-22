@@ -1,5 +1,23 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0: canonical continuous six-stage journey
+
+**[The single FullFlow acceptance contract](./full-flow-acceptance-contract.md)
+is the primary priority and release gate.** One independently operated K–8
+school must create a high-school extension, adopt course content, provision an
+actual teacher/section, admit and activate a family/student, submit and grade
+real work, notify/serve the guardian, and see the same persistent operational
+record. The same tenant/program/section/student IDs must survive all stages.
+
+**Current result: HOLD / NOT YET PROVEN.** Disconnected GF1/GF2/GF3 or network
+tests do not satisfy this requirement. The top blocking condition is isolated
+Neon acceptance configuration; the second is a continuous cross-role fixture.
+Fix those before implementing more network-onboarding capabilities. Existing
+denomination HQ/site affiliation work below is retained but **P2, optional
+entry-path work**, not part of the core school end-to-end gate.
+
+---
+
 **Working branch:** `FullFlow`. No changes to `main` without explicit approval.
 This checklist records evidence and blockers, not automatic production acceptance.
 
