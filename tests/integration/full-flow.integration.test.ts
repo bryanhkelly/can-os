@@ -539,6 +539,20 @@ integration("FullFlow: one school, same high-school program through curriculum a
         const schoolActions = await import("@/modules/operations/action-workspace.functions");
         const queue = await schoolActions.getOperationsActions({data:{siteId:site.id,programId}});
         expect(queue.items.some(item=>item.id===responseRequest.actionId)).toBe(true);
+        const deadline=new Date(Date.now()+86400000).toISOString();
+        await schoolActions.assignOperationsAction({data:{
+          id:responseRequest.actionId,ownerPersonId:schoolOperator.id,priority:"high",
+        }});
+        await schoolActions.setOperationsActionDeadline({data:{
+          id:responseRequest.actionId,dueAt:deadline,
+          reason:"School will review the guardian question within one day.",
+        }});
+        const [scheduledResponse]=await tx.select().from(s.actions)
+          .where(eq(s.actions.id,responseRequest.actionId));
+        expect(scheduledResponse.ownerPersonId).toBe(schoolOperator.id);
+        expect(scheduledResponse.dueAt?.toISOString()).toBe(deadline);
+        expect((await schoolActions.getOperationsActions({data:{siteId:site.id,programId}}))
+          .summary.overdue).toBe(0);
         const resolutionNote = "The solution was correct; one point was deducted for incomplete explanation.";
         await schoolActions.updateOperationsAction({data:{
           id:responseRequest.actionId,status:"resolved",resolutionNote,
