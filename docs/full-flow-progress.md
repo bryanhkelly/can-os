@@ -68,7 +68,10 @@ remains missing. The canonical acceptance contract lists exact environment and
 execution details.
 
 **Isolated Neon branch:** `fullflow-e2e-20261022`
-(`br-proud-pine-arfju8h2`), 30 migrations confirmed.
+(`br-proud-pine-arfju8h2`), **31 migrations confirmed as of 22 October 2026**.
+Migration `0030_anonymous_auth_request_budget.sql` was applied transactionally to this isolated branch, including the matching Drizzle migration ledger hash. Read-only verification confirmed `auth_request_rate_limits` and its three columns. The existing `access_sessions`, `lesson_progress`, and `submissions` tables, required columns and unique indexes were also confirmed; no additional session or lesson-completion table is required for the current first bite. A dedicated last-interaction column or event history remains optional future design, not a prerequisite for this FullFlow fixture.
+
+**Connected schema guard:** `scripts/verify-fullflow-schema.mjs` now fails the `full-flow` integration runner (including `--preflight`) before fixtures when the isolated database's migration count/latest checksum or required auth/session/learning columns/indexes differ from the FullFlow source. It uses `TEST_DATABASE_URL` exclusively, after the existing test-database isolation checks. **This new Node guard has been committed but not yet executed from a trusted runner**; live multi-persona tests and the full six-stage fixture remain unverified.
 **Latest full-flow code static CI:** [39740004930](https://github.com/bryanhkelly/can-os/actions/runs/39740004930)
 passed build/typecheck/unit and migration checks. This is not an integration
 or browser pass.
