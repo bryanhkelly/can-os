@@ -12,10 +12,10 @@ export function StudentExperience({ liveData, success }: {
 }) {
  const displayName=liveData.student.preferredName??liveData.student.firstName;
  const missing=liveData.coursework.filter(item=>item.timeliness==="missing");
+ const upcoming=liveData.coursework.filter(item=>item.status==="assigned"&&item.timeliness!=="missing");
  const overdueCount=success ? success.overdue : missing.length;
  const upcomingCount=success ? success.dueSoon + success.toDo : upcoming.length;
  const summaryUnavailable=success === null;
- const upcoming=liveData.coursework.filter(item=>item.status==="assigned"&&item.timeliness!=="missing");
  const format=(date:Date|string)=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short"}).format(new Date(date));
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title={`Today, ${displayName}`}
   subtitle="Your schedule, coursework and next steps, all from your school records."
