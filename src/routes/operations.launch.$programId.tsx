@@ -23,6 +23,9 @@ function Setup({data}:{data:Snapshot}){
  const router=useRouter();
  const [termId,setTermId]=useState(data.terms[0]?.id??"");
  const [versionId,setVersionId]=useState(data.catalog[0]?.versionId??"");
+ const selectedTerm=data.terms.find(t=>t.id===termId);
+ const selectedYear=data.years.find(y=>y.id===selectedTerm?.schoolYearId);
+ const selectedCourse=data.catalog.find(course=>course.versionId===versionId);
  const [code,setCode]=useState(""),[title,setTitle]=useState("");
  const [teacherId,setTeacherId]=useState("");
  const [qualificationKeys,setQualificationKeys]=useState<string[]>([]);
@@ -92,11 +95,22 @@ function Setup({data}:{data:Snapshot}){
      code,title,...(teacherId?{teacherPersonId:teacherId}:{})}}),"Class provisioned.");
    }}>
     <label className="text-sm">Academic term<select required value={termId} onChange={e=>setTermId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
-     <option value="">Choose term</option>{data.terms.map(t=><option key={t.id} value={t.id}>{t.name} ({t.startsOn}–{t.endsOn})</option>)}
+     <option value="">Choose term</option>{data.terms.map(t=><option key={t.id} value={t.id}>{data.years.find(y=>y.id===t.schoolYearId)?.name??"School year"} · {t.name} ({t.startsOn}–{t.endsOn})</option>)}
     </select></label>
     <label className="text-sm">Published curriculum<select required value={versionId} onChange={e=>setVersionId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
-     <option value="">Choose curriculum</option>{data.catalog.map(x=><option key={x.versionId} value={x.versionId}>{x.title} · v{x.version}</option>)}
+     <option value="">Choose curriculum</option>{data.catalog.map(x=><option key={x.versionId} value={x.versionId}>
+      {x.code} · {x.title} · v{x.version} · {x.origin==="adopted"?`Adopted from ${x.publisherName}`:"Institution-owned"}
+     </option>)}
     </select></label>
+    {selectedTerm&&<div className="sm:col-span-2 rounded border p-3 text-sm" role="status">
+      <p>Scheduling for <strong>{selectedYear?.name??"the selected school year"}</strong> · {selectedTerm.name}.</p>
+      {selectedCourse&&<p className="mt-1">
+        Course release: {selectedCourse.code} · v{selectedCourse.version} ·
+        {selectedCourse.origin==="adopted"?` Adopted publisher: ${selectedCourse.publisherName} · Pack: ${selectedCourse.packName}`:" Institution-owned curriculum"}.
+        Existing sections retain their pinned version.
+      </p>}
+      <p className="mt-1 text-xs text-muted-foreground">Adoption eligibility is currently program-scoped, not yet versioned by academic year. Annual adoption rollover is a separate release.</p>
+    </div>}
     <label className="text-sm">Class code<input value={code} required onChange={e=>setCode(e.target.value)} placeholder="BIO-101-A" className="mt-1 block w-full rounded border bg-background p-2"/></label>
     <label className="text-sm">Class title<input value={title} required onChange={e=>setTitle(e.target.value)} placeholder="Biology I" className="mt-1 block w-full rounded border bg-background p-2"/></label>
     <label className="text-sm sm:col-span-2">Instructor (optional)<select value={teacherId} onChange={e=>setTeacherId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
