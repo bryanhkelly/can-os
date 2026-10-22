@@ -130,7 +130,19 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
            isNull(s.curriculumResourceBindings.courseTemplateVersionId))));
     const allSupplements=[...publisherRows.map(row=>({...row,source:"publisher" as const})),...supplements];
     const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.map(lesson => lesson.id)) ?? []);
+    // Only the assigned teacher receives aggregate, student-reported completion counts.
+    // No student identities, grades or mastery in this planning view.
+    const completionGroups=new Map<string,Set<string>>();
+    if(actor.role==="teacher")for(const row of rosterProgress){
+      if(!lessonIds.has(row.lessonId))continue;
+      const students=completionGroups.get(row.lessonId)??new Set<string>();
+      students.add(row.profileId);
+      completionGroups.set(row.lessonId,students);
+    }
+    const lessonCompletionCounts=actor.role==="teacher"
+      ?[...completionGroups].map(([lessonId,students])=>({lessonId,studentCount:students.size})):[];
     return {
+      lessonCompletionCounts,
       role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,
         subject: section.subject, versionId: section.versionId, contentStatus: section.contentStatus },
       studentPersonId, content, teacherGuides, supplements:allSupplements,
