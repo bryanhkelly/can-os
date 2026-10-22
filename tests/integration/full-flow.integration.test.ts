@@ -38,7 +38,13 @@ function first<T>(list: T[]): T {
   if (!list.length) throw new Error("Expected persistent FullFlow record");
   return list[0]!;
 }
-const integration = process.env.DATABASE_URL ? describe : describe.skip;
+const databaseConfigured = Boolean(process.env.DATABASE_URL);
+if (databaseConfigured && (process.env.CAN_TEST_DB_WRITES_ENABLED !== "true" ||
+    process.env.APP_ENV !== "test" || !process.env.TEST_DATABASE_URL ||
+    process.env.DATABASE_URL !== process.env.TEST_DATABASE_URL)) {
+  throw new Error("FullFlow requires the guarded isolated-test database runner");
+}
+const integration = databaseConfigured ? describe : describe.skip;
 
 integration("FullFlow: one school, same high-school program through curriculum adoption", () => {
   it("creates its site/program, adopts a separately published course and provisions that exact program section", async () => {
