@@ -48,6 +48,33 @@ interaction can advance it. This is an incremental schema-free change: it is
   records, verify actual expiration and cross-tab behavior in a signed-in
   browser against an isolated test database.
 
+## Account session inventory and remote revocation (FullFlow bite 3)
+
+`/account/sessions` is a self-service, account-wide security view. It calls
+`GET /access/sessions` using the current verified session, lists at most 100
+**currently usable** sessions, identifies the present session and shows each
+sign-in time, last interaction and fixed expiration. It does not invent device
+names, browser identifiers or geographic locations, and does not return stored
+secret hashes, IP addresses or raw credentials.
+
+- `POST /access/sessions` is same-origin only and accepts strictly validated
+  `{ "kind":"one", "sessionId":"<uuid>" }` or `{ "kind":"all" }` commands.
+  The client cannot select an account/person/role or broaden the scope of revocation.
+- The server conditionally updates only matching
+  `access_sessions.account_id` rows. Foreign/unknown/already revoked IDs
+  produce a safe no-op without identifying another account's sessions.
+- Revocation commits an account-owned audit record in the same transaction.
+  Revoking the current session also clears its HttpOnly cookie. Other open
+  tabs/devices will lose authorization on their next server request.
+- Both student and administrator identities see their **own account sessions**,
+  even if their account has memberships in more than one school. An organization
+  operator cannot revoke another person's account sessions through this feature.
+- A later bite may add device metadata collected at sign-in and stricter
+  information-retention rules. Until then, the UI never claims device
+  attribution it cannot support.
+- Passing static tests are not a substitute for verifying multiple real
+  sessions and cross-account denial against a disposable Neon branch.
+
 ## Passwordless flow
 
 - Enter email; endpoint always responds generically (avoid enumeration).
