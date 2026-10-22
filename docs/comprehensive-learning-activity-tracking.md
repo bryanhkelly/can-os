@@ -1,7 +1,7 @@
 # CAN OS — comprehensive learning-activity tracking
 
-**Status:** Approved product requirement / implementation NOT STARTED.  
-**Priority:** P1 immediately after the canonical FullFlow P0 connected school journey is proven; instrument the real student-learning path first, not a parallel demo workflow.  
+**Status:** Approved product requirement. First code-only validation policy committed; durable ingestion, sessions, database migration, instrumentation and UI **NOT IMPLEMENTED**.  
+**Priority:** P1 after the canonical FullFlow P0 connected school journey is proven; instrument the real student-learning path first, not a parallel demo workflow.  
 **Branch / review:** `FullFlow` / draft PR #172. Do not merge into `main` without approval.
 
 ## Product outcome
@@ -29,6 +29,13 @@ Questions the system must eventually answer include:
 | Extracurricular/club activities | Existing `activities` service | Online or classroom learning engagement |
 
 **Do not** repurpose `access_sessions.updated_at` as learning time or rename the existing extracurricular `activities` table into a learning telemetry system. Recorded instructional attendance must follow the configured attendance policy and evidence requirements; it must not be inferred from clicks, a heartbeat, or completion flags.
+
+## First implementation bite: typed input policy (source only)
+
+- `src/domain/learning-activity-policy.ts` defines strict, bounded client evidence types for `lesson_opened`, `lesson_resumed`, `resource_opened` and `engaged_interval`. It forbids unrecognized fields such as client-supplied identity, grades and attendance, and rejects out-of-window timestamps and inflated durations.
+- `estimateActiveLearningMilliseconds` limits a reported active interval to elapsed **server-observed** time, rejects idle gaps or nonforeground interactions, and caps estimates to 60 seconds. It is deliberately conservative and untrusted as actual engagement.
+- `tests/unit/learning-activity-policy.test.ts` covers malicious payloads, timestamp skew and interval constraints.
+- **No learning-activity events are yet persisted or sent.** There is no endpoint, integration, background listener, Student 360 telemetry view, curriculum version check, event idempotency ledger or observer consent/retention implementation. These require a separate server-only command and schema migration, validated against the isolated Neon branch.
 
 ## Required coverage (incremental rollout)
 
