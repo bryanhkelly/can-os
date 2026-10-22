@@ -203,10 +203,13 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
         {data.role === "teacher" && <section className="mt-6 rounded-lg border p-4" aria-label="Assign from this lesson">
           <h3 className="text-sm font-semibold">Assign work from this lesson</h3>
           <p className="mt-1 text-xs text-muted-foreground">Create teacher-owned work linked to this published lesson. Publisher content remains unchanged.</p>
-          <div className="mt-3 flex flex-wrap gap-3">{(["homework","classwork","quiz","test","project","discussion"] as const).map(kind=>
+          <div className="mt-3 flex flex-wrap gap-3">{(["homework","classwork","quiz","test","project"] as const).map(kind=>
             <Link key={kind} to="/teacher/gradebook" search={{section:data.section.id,lesson:lesson.id,kind}}
               className="rounded border px-3 py-2 text-sm capitalize">Create {kind}</Link>
-          )}</div>
+          )}
+            <Link to="/teacher/discussions" search={{section:data.section.id,lesson:lesson.id}}
+              className="rounded border px-3 py-2 text-sm">Start discussion</Link>
+          </div>
         </section>}
         {data.role === "student" && <button type="button" disabled={busy} onClick={() => void run(() => setLessonCompletion({ data: {
           sectionId: data.section.id, versionId: data.section.versionId, lessonId: lesson.id, completed: !completed.has(lesson.id),
