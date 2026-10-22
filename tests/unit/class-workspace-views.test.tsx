@@ -59,6 +59,23 @@ describe("published class workspace", () => {
     expect(html).not.toContain("Roster");
     expect(html).not.toMatch(/Create class|Edit lesson|Live room|Recording/);
   });
+  it("supports first, middle, and final published lesson navigation without altering completion",()=>{
+    const data={...workspace,content:{...workspace.content!,modules:[{...workspace.content!.modules[0]!,
+     lessons:[...workspace.content!.modules[0]!.lessons,
+      {id:"middle",title:"Middle lesson",body:"Learn the next step.",resources:[]},
+      {id:"final",title:"Final lesson",body:"Course wrap-up.",resources:[]}]}]}};
+    const first=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="evidence"/>);
+    expect(first).toContain("Lesson 1 of 3");
+    expect(first).toContain("Beginning of course");
+    expect(first).toContain('href="/classes?section=english&amp;tab=lessons&amp;lesson=middle"');
+    const middle=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="middle"/>);
+    expect(middle).toContain("Lesson 2 of 3");
+    expect(middle).toContain('href="/classes?section=english&amp;tab=lessons&amp;lesson=evidence"');
+    expect(middle).toContain('href="/classes?section=english&amp;tab=lessons&amp;lesson=final"');
+    const last=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="final"/>);
+    expect(last).toContain("End of published course");
+    expect(last).toContain("Navigation never marks lessons complete");
+  });
   it("allows only students to mark a lesson and safely renders lesson text", () => {
     const student = renderToStaticMarkup(<ClassWorkspace data={workspace} tab="lessons" lessonId="evidence"/>);
     expect(student).toContain("Mark lesson complete");
