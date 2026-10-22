@@ -53,6 +53,16 @@ if (process.env.CAN_APPLICATION_DB_HOST) {
   }
 }
 
+if (process.argv.includes("--preflight")) {
+  if (mode !== "curriculum-journey" && mode !== "curriculum-authoring" && mode !== "attendance-handoff" && mode !== "admissions-offers" && mode !== "academic-intervention" && mode !== "class-participation" && mode !== "delivery-history" && mode !== "qualification-readiness" && mode !== "capacity-expiry" && mode !== "launch-staffing" && mode !== "network-onboarding" && mode !== "full-flow") {
+    fail("preflight is only supported for acceptance-test modes.");
+  }
+  console.log(`Disposable ${mode} database endpoint check passed.`);
+  process.exit(0);
+}
+
+// URL-only preflight remains an offline safety check. On actual FullFlow test
+// execution, additionally prove the isolated database matches committed schema.
 // A URL isolation preflight is necessary but not sufficient: connected FullFlow
 // fixtures must see the exact migration ledger and persisted session/learning schema.
 if (mode === "full-flow") {
@@ -62,14 +72,6 @@ if (mode === "full-flow") {
   });
   if (schema.error) throw schema.error;
   if (schema.status !== 0) fail("FullFlow isolated database schema check failed.");
-}
-
-if (process.argv.includes("--preflight")) {
-  if (mode !== "curriculum-journey" && mode !== "curriculum-authoring" && mode !== "attendance-handoff" && mode !== "admissions-offers" && mode !== "academic-intervention" && mode !== "class-participation" && mode !== "delivery-history" && mode !== "qualification-readiness" && mode !== "capacity-expiry" && mode !== "launch-staffing" && mode !== "network-onboarding" && mode !== "full-flow") {
-    fail("preflight is only supported for acceptance-test modes.");
-  }
-  console.log(`Disposable ${mode} database endpoint check passed.`);
-  process.exit(0);
 }
 
 const targeted = mode === "demo-registrar" || mode === "curriculum-journey" || mode === "curriculum-authoring" || mode === "attendance-handoff" || mode === "study-groups" || mode === "study-group-lifecycle" || mode === "admissions-offers" || mode === "academic-intervention" || mode === "class-participation" || mode === "delivery-history" || mode === "qualification-readiness" || mode === "capacity-expiry" || mode === "launch-staffing" || mode === "network-onboarding" || mode === "full-flow";
