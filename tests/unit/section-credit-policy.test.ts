@@ -1,8 +1,11 @@
 import {describe,expect,it} from "vitest";
-import {verifiedSectionCreditUnits,requireKnownTranscriptCredits} from "@/domain/section-credit-policy";
+import {
+  verifiedSectionCreditUnits,
+  countTranscriptRowsWithUnrecordedCredits,
+} from "@/domain/section-credit-policy";
 
-describe("official academic credit safeguards",()=>{
-  it("never fabricates a one-credit course when metadata is absent",()=>{
+describe("transcripts record academic facts without deciding graduation",()=>{
+  it("never invents one credit where course units have not been configured",()=>{
     expect(verifiedSectionCreditUnits({})).toBeNull();
     expect(verifiedSectionCreditUnits({credits:"1"})).toBeNull();
     expect(verifiedSectionCreditUnits({credits:1})).toBe(1);
@@ -13,11 +16,21 @@ describe("official academic credit safeguards",()=>{
       expect(verifiedSectionCreditUnits({credits:x})).toBeNull();
     }
   });
-  it("prevents issuing an official transcript without a configured credit decision",()=>{
-    const okay={creditConfigured:true,creditsAttempted:1,creditsEarned:1};
-    expect(()=>requireKnownTranscriptCredits([okay])).not.toThrow();
-    expect(()=>requireKnownTranscriptCredits([{...okay,creditConfigured:false}])).toThrow("explicitly configured");
-    expect(()=>requireKnownTranscriptCredits([{...okay,creditsAttempted:null}])).toThrow("explicitly configured");
-    expect(()=>requireKnownTranscriptCredits([{...okay,creditsEarned:null}])).toThrow("explicitly configured");
+  it("discloses unknown credits without rejecting valid academic transcript rows",()=>{
+    const known={creditConfigured:true,creditsAttempted:1,creditsEarned:1};
+    const missing={creditConfigured:false,creditsAttempted:null,creditsEarned:null};
+    const failed={creditConfigured:true,creditsAttempted:0.5,creditsEarned:0};
+    const nonTerminal={creditConfigured:true,creditsAttempted:0,creditsEarned:0};
+    expect(countTranscriptRowsWithUnrecordedCredits([known,missing,failed,nonTerminal])).toBe(1);
+    expect(countTranscriptRowsWithUnrecordedCredits([known,failed])).toBe(0);
+    expect(countTranscriptRowsWithUnrecordedCredits([missing,missing])).toBe(2);
+    expect(countTranscriptRowsWithUnrecordedCredits([])).toBe(0);
+  });
+  it("treats absent credit fields as unknown, not as proof of zero credits",()=>{
+    expect(countTranscriptRowsWithUnrecordedCredits([
+      {creditConfigured:true,creditsAttempted:null,creditsEarned:null},
+      {creditConfigured:true,creditsAttempted:0,creditsEarned:0},
+      {},
+    ])).toBe(2);
   });
 });
