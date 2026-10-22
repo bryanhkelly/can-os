@@ -25,7 +25,7 @@ Run **GitHub Actions → Curriculum Journey Acceptance → Run workflow** after 
 - Secret `CURRICULUM_TEST_DATABASE_URL`: PostgreSQL connection string for a **disposable Neon branch**, NOT the production/default branch.
 - Repository variable `CAN_APPLICATION_DB_HOST`: production Neon PostgreSQL hostname (no protocol, username or port), to guard against pointing the disposable test at production.
 
-The workflow refuses to run if either value is missing and enforces the branch host differs from production. It sets `APP_ENV=test`, `NODE_ENV=test` and `CAN_TEST_DB_WRITES_ENABLED=true` **only inside the isolated job**.
+The workflow refuses to run if either value is missing and enforces the branch host differs from production. It sets `APP_ENV=test`, `NODE_ENV=test` and `CAN_TEST_DB_WRITES_ENABLED=true` **only inside the isolated job**. After the rollback integration scenario, the SAME workflow installs Chromium and runs the signed-in school marketplace → student lessons → teacher grading Playwright suite. It uploads Playwright failure reports/traces when the browser stage fails. Browser-stage `DATABASE_URL` is set to the guarded test URL only for that step and the child dev server.
 
 For locally connected acceptance: `npm run test:integration:curriculum-journey`, with `TEST_DATABASE_URL`, `CAN_APPLICATION_DB_HOST` and `CAN_TEST_DB_WRITES_ENABLED=true` set explicitly. The runner refuses production URLs and ignores the application's `DATABASE_URL` as a fallback.
 
@@ -34,7 +34,7 @@ For locally connected acceptance: `npm run test:integration:curriculum-journey`,
 - Passing ordinary CI means source build, types and **unit** tests pass. The integration test is **not executed by regular CI**. The separate acceptance job must pass before claiming database-backed lifecycle acceptance.
 - This is server-function integration through authentic tables, transactions and audited operations using **scoped synthetic actors**. It does **not** validate real browser login, button clicks, email sending, media uploads, external vendor purchases, or deployment on Netlify.
 - `tests/e2e/algebra1-classroom.spec.ts` now starts by using a **real authenticated school registrar session** in the Curriculum Marketplace browser to install and adopt a foreign publisher's public CC-BY pack. It verifies installed entitlement, program adoption and school-only access boundaries, then continues through the existing student's and teacher's browser lesson, submission and grading checks. The published publisher pack is created as a synthetic fixture for this browser test; the separate database-backed scenario tests publisher course/pack authoring through the real server functions.
-- The Playwright acceptance runs via `npm run test:e2e:curriculum` only against a guarded disposable Neon connection. It is not part of ordinary primary CI and has not passed until its own run finishes successfully.
+- The Playwright acceptance runs via `npm run test:e2e:curriculum` only against a guarded disposable Neon connection. It is wired into the manual `Curriculum Journey Acceptance` workflow, not ordinary primary CI, and has not passed until that manual workflow completes successfully.
 - Commercial license verification and Common Cartridge conversion are explicitly deferred. The journey uses a legally distributable CC-BY test pack.
 - Academic-year adoption rollover is a **separate** follow-up. Do not switch an existing section's `course_template_version_id` when a school adopts a future release.
 
