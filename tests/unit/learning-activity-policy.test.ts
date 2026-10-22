@@ -42,6 +42,22 @@ describe("learning interaction evidence boundary", () => {
     expect(() => parseLearnerInteraction({ ...lessonEvent, resourceId }, now)).toThrow();
   });
 
+  it("accepts published resource keys but rejects free-form or hostile identifiers", () => {
+    expect(parseLearnerInteraction({
+      ...lessonEvent, kind: "resource_opened", resourceId: "lesson-reading_01",
+    }, now)).toMatchObject({ kind: "resource_opened", resourceId: "lesson-reading_01" });
+    for (const resourceId of ["", "../another-lesson", "http://unknown", "<script>", "a".repeat(101)]) {
+      expect(() => parseLearnerInteraction({
+        ...lessonEvent, kind: "resource_opened", resourceId,
+      }, now)).toThrow();
+    }
+    // Only resource_opened may carry the resource ID.
+    expect(() => parseLearnerInteraction({
+      ...lessonEvent, kind: "engaged_interval", resourceId: "lesson-reading_01",
+      durationMs: 5_000, pageVisible: true, windowFocused: true,
+    }, now)).toThrow();
+  });
+
   it("rejects replay outside the live telemetry window and future-timestamp inflation", () => {
     expect(() => parseLearnerInteraction({ ...lessonEvent, occurredAt: "2026-10-22T15:50:00Z" }, now)).toThrow();
     expect(() => parseLearnerInteraction({ ...lessonEvent, occurredAt: "2026-10-22T16:00:16Z" }, now)).toThrow();
