@@ -80,15 +80,45 @@ are excluded; use synthetic users on a disposable, migrated Neon branch.
 - **Primary CI:** existing `FullFlow` commits have passed build,
   typecheck, unit tests and migration-generation parity. These are static and
   isolated checks only. See [draft PR #172](https://github.com/bryanhkelly/can-os/pull/172).
-- **Disposable DB acceptance:** **BLOCKED / NOT RUN**. On run
+- **Disposable DB acceptance:** **TEST BRANCH MIGRATED, APP TEST NOT RUN**. On run
   [39735575555](https://github.com/bryanhkelly/can-os/actions/runs/39735575555),
   Admissions Neon Acceptance failed at the required isolated database secret
   check. It is not evidence of failed admissions domain assertions.
-- **Connected six-step FullFlow integration:** **NOT IMPLEMENTED / NOT RUN**;
-  existing GF-specific tests have independent fixtures.
-- **One connected authenticated browser journey:** **NOT RUN**.
+- **Connected six-step FullFlow integration:** **WRITTEN / NOT EXECUTED**.
+  The rollback-isolated `tests/integration/full-flow.integration.test.ts` now
+  follows the same newly created Site/Program through publishing, adoption,
+  verified teacher assignment, program activation, family application, signed
+  synthetic form, offer acceptance, enrollment/class placement, student lesson
+  completion, assignment submission, teacher grade, guardian visibility and a
+  relational operational-record cross-check. Its server context uses a test
+  actor adapter, **not real browser session authorization**; this is not
+  sufficient acceptance. The test and all dependent domain behavior remain
+  unverified until run against the isolated Neon database.
+- **One connected authenticated browser journey:** **NOT IMPLEMENTED / NOT RUN**.
+  The rollback integration fixture cannot replace persistent cross-session
+  browser verification. The notification/intervention loop and school
+  dashboard reload are not fully checked in this integration test.
 - **Production release:** **HOLD**. Merging to `main` requires separate user
   authorization.
+
+## Isolated Neon test branch verified
+
+- Neon project: `sweet-hall-62441909` (`can-os`).
+- Disposable branch: `fullflow-e2e-20261022`
+  (`br-proud-pine-arfju8h2`), branched from `test01`, **not** the
+  project's default production branch.
+- All **30** committed migrations were applied to this isolated branch and
+  checked against `drizzle.__drizzle_migrations` (including migrations 0028
+  and 0029). Core program rows were unchanged; the primary branch was untouched.
+- We are intentionally bypassing GitHub Actions for DB acceptance. The
+  repository CI may still run as a static check.
+- Execute `npm run test:integration:full-flow -- --preflight` and then
+  `npm run test:integration:full-flow` from a runner with Node dependencies,
+  an isolated `TEST_DATABASE_URL`, `CAN_APPLICATION_DB_HOST` set to
+  the main database host, `CAN_TEST_DB_WRITES_ENABLED=true`, and `APP_ENV=test`.
+  Do **not** use the main Neon branch, bypass the endpoint guard or mark
+  skipped/unexecuted tests as passes. The code runner is currently unavailable
+  in this chat's filesystem/network environment.
 
 ## Execution order once the test runner is available
 
