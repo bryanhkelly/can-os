@@ -238,7 +238,7 @@ export const setGrantActive = createServerFn({ method: "POST" })
         siteId:accountPersonGrants.siteId,
         active: accountPersonGrants.active, role: accountPersonGrants.role,
       }).from(accountPersonGrants).where(eq(accountPersonGrants.id, data.grantId)).limit(1);
-      if (!grant || !grant.organizationId || !actor.organizationIds.includes(grant.organizationId) ||
+      if (!grant || !assignableRoles.includes(grant.role as typeof assignableRoles[number]) || !grant.organizationId || !actor.organizationIds.includes(grant.organizationId) ||
           (actor.grantSiteId && grant.siteId!==actor.grantSiteId)) {
         throw new AuthorizationError("grant organization scope");
       }
