@@ -7,6 +7,7 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
 import { isStudentSupportAction } from "./student-action-policy";
+import { isStudentGoalPublicReview } from "@/domain/teacher-student-goal";
 
 const studentActor = () => requireActor(["student"]);
 
@@ -23,6 +24,7 @@ export const getQuickWinActions = createServerFn({ method: "GET" })
   const rows = await db.select({
     id: actions.id, title: actions.title, description: actions.description,
     status: actions.status, priority: actions.priority, dueAt: actions.dueAt,
+    resolvedAt: actions.resolvedAt,
     metadata: actions.metadata, type: actions.type,
     subjectType: actions.subjectType, subjectId: actions.subjectId,
   }).from(actions).where(and(
@@ -31,7 +33,16 @@ export const getQuickWinActions = createServerFn({ method: "GET" })
     inArray(actions.programId, actor.scope.programIds ?? []),
     data.actionId ? eq(actions.id, data.actionId) : undefined,
   )).orderBy(desc(actions.createdAt)).limit(data.actionId ? 1 : 100);
-  return { connected: true as const, actions: rows.map(row => ({ ...row, metadata: { source: typeof row.metadata.source === "string" ? row.metadata.source : row.type }, dueAt: row.dueAt?.toISOString() ?? null })) };
+  return { connected: true as const, actions: rows.map(row => ({
+    ...row,
+    // Only the explicitly student-safe teacher review can cross this boundary.
+    // No intervention observations, counselor notes or staff-case metadata.
+    metadata: { source: typeof row.metadata.source === "string" ? row.metadata.source : row.type },
+    review: row.type === "student_learning_goal" && isStudentGoalPublicReview(row.metadata.goalReview)
+      ? row.metadata.goalReview : null,
+    dueAt: row.dueAt?.toISOString() ?? null,
+    resolvedAt: row.resolvedAt?.toISOString() ?? null,
+  })) };
 });
 
 export const finishQuickWinAction = createServerFn({ method: "POST" })
