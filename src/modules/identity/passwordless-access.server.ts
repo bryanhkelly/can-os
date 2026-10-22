@@ -5,7 +5,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { listDemoFacilitatorGrants } from "./demo-facilitator.server";
-import { writeAudit } from "@/platform/mutation";
+import { recordSessionSecurityEvent } from "./session-security-audit.server";
 import { and,eq,gt,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
 
@@ -89,7 +89,11 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
   if(!member)throw new Error("Membership unavailable");
-  await writeAudit(tx, {actorPersonId:member.personId,action:"identity.session.started",resourceType:"account",resourceId:account.id,context:{method:"email_link",sessionId:session.id,grantId:activeGrant.id}});
+  await recordSessionSecurityEvent(tx,{
+   action:"identity.session.started",actorPersonId:member.personId,
+   accountId:account.id,sessionId:session.id,grantId:activeGrant.id,
+   role:activeGrant.role,method:"email_link",
+  });
   return {accountId:account.id,role:activeGrant.role,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
@@ -132,14 +136,10 @@ export async function redeemLocalDemoAccess(
    expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
   }).returning({id:accessSessions.id});
   if(!session)throw new Error("Unable to establish session");
-  await writeAudit(tx,{
-   actorPersonId:grant.personId,
-   action:"identity.session.started",
-   resourceType:"account",
-   resourceId:account.id,
-   context:{method:"local_demo_code",sessionId:session.id,grantId:grant.id,
-    ...(account.id===LOCAL_DEMO_ADMIN.accountId?{demoFacilitator:LOCAL_DEMO_ADMIN.personId}:{}),
-   },
+  await recordSessionSecurityEvent(tx,{
+   action:"identity.session.started",actorPersonId:grant.personId,
+   accountId:account.id,sessionId:session.id,grantId:grant.id,
+   role:grant.role,method:"local_demo_code",
   });
   return {
    accountId:account.id,
@@ -153,8 +153,13 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
   const [row]=await tx.update(accessSessions).set({revokedAt:new Date(),updatedAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),isNull(accessSessions.revokedAt))).returning({activeGrantId:accessSessions.activeGrantId});
   if(row?.activeGrantId){
-   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,row.activeGrantId)).limit(1);
-   if(member)await writeAudit(tx, {actorPersonId:member.personId,action:"identity.session.revoked",resourceType:"account",resourceId:accountId,context:{sessionId}});
+   const [member]=await tx.select({
+    personId:accountPersonGrants.personId,role:accountPersonGrants.role,
+   }).from(accountPersonGrants).where(eq(accountPersonGrants.id,row.activeGrantId)).limit(1);
+   await recordSessionSecurityEvent(tx,{
+    action:"identity.session.revoked",actorPersonId:member?.personId??null,
+    accountId,sessionId,grantId:row.activeGrantId,role:member?.role??null,
+   });
   }
  });
  return clearSessionCookieHeader();
@@ -173,10 +178,10 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
     isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date())))
    .returning({id:accessSessions.id});
   if(!changed)throw new Error("Session expired");
-  await writeAudit(tx, {actorPersonId:grant.personId,action:"identity.membership.selected",
-   resourceType:"account",resourceId:accountId,context:{sessionId,grantId,
-    ...(accountId===LOCAL_DEMO_ADMIN.accountId?{demoFacilitator:LOCAL_DEMO_ADMIN.personId}:{}),
-   }});
+  await recordSessionSecurityEvent(tx,{
+   action:"identity.membership.selected",actorPersonId:grant.personId,
+   accountId,sessionId,grantId,role:grant.role,
+  });
  });
 }
 
