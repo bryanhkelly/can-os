@@ -4,7 +4,7 @@
  */
 export type FullFlowRows = {
   programs: Array<{id:string;name:string;status:string;type:string;siteId:string|null;
-    academicProviderOrganizationId:string;creditIssuingOrganizationId:string}>;
+    academicProviderOrganizationId:string;creditIssuingOrganizationId:string|null}>;
   sections: Array<{id:string;programId:string;active:boolean;versionStatus:string}>;
   teacherAssignments: Array<{sectionId:string;personId:string}>;
   adoptions: Array<{programId:string;status:string}>;
