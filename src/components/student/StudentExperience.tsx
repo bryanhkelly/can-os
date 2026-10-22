@@ -4,11 +4,14 @@ import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import type { StudentSuccessPriorities } from "@/domain/student-success";
 import { StudentSuccessPriorityPanel } from "./StudentSuccessPriorityPanel";
+import { StudentSuccessSupportPanel } from "./StudentSuccessSupportPanel";
+import type { StudentSuccessSupportSummary } from "@/domain/student-success-support";
 
 /** Read-only, canonical Student Today projection. All mutations live in the owning workflow. */
-export function StudentExperience({ liveData, success }: {
+export function StudentExperience({ liveData, success, support }: {
   liveData: Awaited<ReturnType<typeof getMyStudentToday>>;
   success?: StudentSuccessPriorities | null;
+  support?: StudentSuccessSupportSummary | null;
 }) {
  const displayName=liveData.student.preferredName??liveData.student.firstName;
  const missing=liveData.coursework.filter(item=>item.timeliness==="missing");
@@ -34,6 +37,7 @@ export function StudentExperience({ liveData, success }: {
    <Link to="/calendar" className="rounded-lg border px-4 py-2">Calendar</Link>
   </nav>
   {success !== undefined && <StudentSuccessPriorityPanel plan={success} />}
+  {support !== undefined && <StudentSuccessSupportPanel support={support} />}
   {liveData.sections.length>0&&<WorkspacePanel title="My classes" description="Go directly to your enrolled class workspace." className="mt-7">
    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/student/courses" search={{section:section.sectionId}} className="rounded-lg border p-4 hover:bg-muted">
     <h3 className="font-semibold">{section.sectionTitle}</h3><span className="mt-3 inline-block text-sm underline">Open class</span>
@@ -58,7 +62,7 @@ export function StudentExperience({ liveData, success }: {
     </article>)}
     {!liveData.events.length&&<p className="rounded-xl border p-4 text-sm text-muted-foreground">No scheduled events today.</p>}</div>
     <h2 className="mt-8 font-serif text-3xl">Needs your attention</h2>
-    <div className="mt-4 space-y-3">{liveData.openActions.map(action=><article key={action.id} className="rounded-xl border bg-card p-4">
+    <div className="mt-4 space-y-3">{liveData.openActions.filter(action => !support?.tasks.some(task=>task.id===action.id)).map(action=><article key={action.id} className="rounded-xl border bg-card p-4">
       <h3 className="font-semibold">{action.subjectType==="assessment"?<Link to="/student/assignments" search={{assessment:action.subjectId}} className="hover:underline">{action.title}</Link>:<Link to="/student/experiences" search={{action:action.id}} className="hover:underline">{action.title}</Link>}</h3><p className="mt-1 text-sm text-muted-foreground">{action.description}</p>
       {action.subjectType==="assessment"?
        <Link to="/student/assignments" search={{assessment:action.subjectId}} className="mt-3 inline-block text-sm underline">Review assignment →</Link>:
