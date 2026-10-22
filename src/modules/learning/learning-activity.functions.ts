@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
@@ -91,7 +91,7 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
           eq(s.learningActivitySessions.studentProfileId, studentProfileId),
           eq(s.learningActivitySessions.sectionId, section.id),
           eq(s.learningActivitySessions.courseTemplateVersionId, section.versionId),
-        )).for("update").limit(1);
+        )).limit(1).for("update");
       if (!learningSession) throw new AuthorizationError("owned learning session");
       const digest = createHash("sha256").update(JSON.stringify(data.interaction)).digest("hex");
       const [previousEvent] = await tx.select({
@@ -194,6 +194,7 @@ export const endLearningActivitySession = createServerFn({ method: "POST" })
           eq(s.learningActivitySessions.studentProfileId, studentProfileId),
           eq(s.learningActivitySessions.sectionId, section.id),
           eq(s.learningActivitySessions.courseTemplateVersionId, section.versionId),
+          isNull(s.learningActivitySessions.endedAt),
         ))
         .returning({ id: s.learningActivitySessions.id });
       return { closed: Boolean(closed) };
