@@ -143,13 +143,17 @@ until both checks are green.**
 - Disposable branch: `fullflow-e2e-20261022`
   (`br-proud-pine-arfju8h2`), branched from `test01`, **not** the
   project's default production branch.
-- All **30** committed migrations were applied to this isolated branch and
-  checked against `drizzle.__drizzle_migrations` (including migrations 0028
-  and 0029). Core program rows were unchanged; the primary branch was untouched.
+- All **31** committed migrations were applied to this isolated branch and
+  checked against `drizzle.__drizzle_migrations` (including migrations 0028,
+  0029, and 0030). Migration 0030 restores the missing
+  `auth_request_rate_limits` table. Core program rows were unchanged; the
+  primary branch was untouched.
 - We are intentionally bypassing GitHub Actions for DB acceptance. The
   repository CI may still run as a static check.
-- Execute `npm run test:integration:full-flow -- --preflight` and then
-  `npm run test:integration:full-flow` from a runner with Node dependencies,
+- Execute `npm run test:integration:full-flow -- --preflight` (offline,
+  endpoint-isolation only), then `npm run test:integration:full-flow`
+  (connected schema validation and integration fixture) from a runner with
+  Node dependencies,
   an isolated `TEST_DATABASE_URL`, `CAN_APPLICATION_DB_HOST` set to
   the main database host, `CAN_TEST_DB_WRITES_ENABLED=true`, and `APP_ENV=test`.
   Do **not** use the main Neon branch, bypass the endpoint guard or mark
