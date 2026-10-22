@@ -583,10 +583,13 @@ integration("FullFlow: one school, same high-school program through curriculum a
           teacherActionId: support.actionId,
           title: "Practice solving two-step equations",
           studentInstructions: "Complete two assigned examples and bring the written steps to our next math class.",
-          dueInDays: 7 as const,
+          dueInDays: 7 as const, confirmedStudentSafe: true as const,
         };
         const sharedGoal = await goalService.shareTeacherStudentGoal({data:approvedGoal});
         expect(sharedGoal.created).toBe(true);
+        await expect(goalService.shareTeacherStudentGoal({data:{
+          ...approvedGoal, confirmedStudentSafe: false,
+        }})).rejects.toThrow();
         expect(await goalService.shareTeacherStudentGoal({data:approvedGoal}))
           .toEqual({actionId:sharedGoal.actionId,created:false});
         const [studentGoal] = await tx.select().from(s.actions)
