@@ -9,6 +9,7 @@ import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatusBadge } from "@
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { LearningActivityTracker } from "@/components/learning/LearningActivityTracker";
+import { deriveClassNextSteps } from "@/domain/student-success";
 
 const tabs = ["overview", "lessons", "planning", "files", "syllabus", "announcements", "people", "teacher-guide"] as const;
 const searchSchema = z.object({
@@ -74,6 +75,11 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const relatedWork = lesson ? assessmentEvidence.filter(item => item.curriculumLessonId === lesson.id) : [];
 
   const completed = new Set(data.progress.filter(item => item.completedAt).map(item => item.lessonId));
+  const nextSteps = deriveClassNextSteps({
+    lessonIds: lessons.map(item => item.id),
+    completedLessonIds: [...completed],
+    assessments: assessmentEvidence,
+  });
   async function run(command: () => Promise<unknown>, success: string) {
     setBusy(true); setError(""); setNotice("");
     try { await command(); await router.invalidate(); setNotice(success); }
@@ -149,6 +155,15 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     {error && <p role="alert" className="mb-5 rounded-lg border p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mb-5 rounded-lg border p-3 text-sm">{notice}</p>}
     {tab === "overview" && <div className="grid gap-5">
+      {data.role !== "teacher" && <WorkspacePanel title="Your next learning steps"
+        description="Recommendations come from published lessons and actual assessment status; they do not assign a grade or claim mastery.">
+        {nextSteps.nextLessonId ? <Link to="/classes" search={{ ...search, tab: "lessons", lesson: nextSteps.nextLessonId }} className="text-sm underline">Continue the next uncompleted lesson →</Link>
+          : <p className="text-sm">{nextSteps.message}</p>}
+        <p className="mt-2 text-sm text-muted-foreground">{nextSteps.selfReportedCompleted} of {nextSteps.totalPublishedLessons} published lessons marked complete
+          · {nextSteps.awaitingFeedback} assessment(s) awaiting feedback
+          · {nextSteps.revisionRequested} returned for revision</p>
+        <p className="mt-2 text-xs">If you need help, use your school's academic-support or teacher communication workflow.</p>
+      </WorkspacePanel>}
       <WorkspacePanel title="About this class"><p className="whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p></WorkspacePanel>
       <WorkspacePanel title="Learning progress" description="Student-reported lesson completion is not a grade, mastery score or attendance record.">
         <p className="text-sm">{data.role === "teacher" ? `${lessons.length} published lessons · ${data.roster.length} enrolled students` : `${completed.size} / ${lessons.length} published lessons marked complete`}</p>
