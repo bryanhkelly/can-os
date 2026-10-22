@@ -503,6 +503,10 @@ integration("FullFlow: one school, same high-school program through curriculum a
         expect(guardianGradeNotice).toHaveLength(1);
 
         state.actor = guardianActor;
+        const notices = await import("@/modules/communication/notification-center.functions");
+        const gradeNotice = (await notices.getNotifications()).find(
+          note=>note.type==="grade_posted"&&note.href?.includes("guardian/academics"));
+        expect(gradeNotice?.href).toContain(encodeURIComponent(assessment.assessmentId));
         const parentProgress = await guardianQueries.getGuardianAssignments({data:{
           studentPersonId: profile.personId,
         }});
@@ -564,6 +568,20 @@ integration("FullFlow: one school, same high-school program through curriculum a
         expect(answer.response).toMatchObject({
           id:responseRequest.actionId,status:"resolved",resolutionNote,
         });
+        const resolvedNotice=(await notices.getNotifications()).find(
+          item=>item.type==="guardian_grade_follow_up_resolved"&&
+            item.href?.includes("guardian/academics"));
+        expect(resolvedNotice?.href).toContain(encodeURIComponent(profile.personId));
+        state.actor = {...context(publisherPerson.id,publisherOrg.id,
+          [publisherSite.id],[publisherProgram.id])};
+        await expect(snapshotApi.getLiveFullFlowOperations({data:{
+          siteId: site.id, programId,
+        }})).rejects.toThrow();
+        state.actor = context(schoolOperator.id,school.id,[site.id],[programId]);
+        expect((await snapshotApi.getLiveFullFlowOperations({data:{
+          siteId:site.id,programId,
+        }})).programs.map(p=>p.id)).toEqual([programId]);
+
 
 
         // One operational record means the actual newly created school
