@@ -19,6 +19,7 @@ export function StudentExperience({ liveData, success, support }: {
  const overdueCount=success ? success.overdue : missing.length;
  const upcomingCount=success ? success.dueSoon + success.toDo : upcoming.length;
  const summaryUnavailable=success === null;
+ const otherOpenActions=liveData.openActions.filter(action => !support?.tasks.some(task=>task.id===action.id));
  const format=(date:Date|string)=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short"}).format(new Date(date));
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title={`Today, ${displayName}`}
   subtitle="Your schedule, coursework and next steps, all from your school records."
@@ -62,13 +63,13 @@ export function StudentExperience({ liveData, success, support }: {
     </article>)}
     {!liveData.events.length&&<p className="rounded-xl border p-4 text-sm text-muted-foreground">No scheduled events today.</p>}</div>
     <h2 className="mt-8 font-serif text-3xl">Needs your attention</h2>
-    <div className="mt-4 space-y-3">{liveData.openActions.filter(action => !support?.tasks.some(task=>task.id===action.id)).map(action=><article key={action.id} className="rounded-xl border bg-card p-4">
+    <div className="mt-4 space-y-3">{otherOpenActions.map(action=><article key={action.id} className="rounded-xl border bg-card p-4">
       <h3 className="font-semibold">{action.subjectType==="assessment"?<Link to="/student/assignments" search={{assessment:action.subjectId}} className="hover:underline">{action.title}</Link>:<Link to="/student/experiences" search={{action:action.id}} className="hover:underline">{action.title}</Link>}</h3><p className="mt-1 text-sm text-muted-foreground">{action.description}</p>
       {action.subjectType==="assessment"?
        <Link to="/student/assignments" search={{assessment:action.subjectId}} className="mt-3 inline-block text-sm underline">Review assignment →</Link>:
        <Link to="/student/experiences" search={{action:action.id}} className="mt-3 inline-block text-sm underline">Review action →</Link>}
     </article>)}
-    {!liveData.openActions.length&&<p className="rounded-xl border p-4 text-sm text-muted-foreground">Nothing needs your attention right now.</p>}</div>
+    {!otherOpenActions.length&&<p className="rounded-xl border p-4 text-sm text-muted-foreground">No additional actions outside your learning support list.</p>}</div>
    </section>
   </div>
  </WorkspaceShell>;
