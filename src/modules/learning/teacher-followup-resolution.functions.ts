@@ -16,7 +16,7 @@ async function teacherActor() {
   if (!actor.scope.organizationIds?.length ||
       !actor.scope.siteIds?.length || !actor.scope.programIds?.length)
     throw new AuthorizationError("authorized school/section scope");
-  return actor;
+  return { ...actor, actorPersonId: actor.actorPersonId };
 }
 
 /**
