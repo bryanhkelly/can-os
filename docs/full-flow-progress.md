@@ -23,7 +23,7 @@ This checklist records evidence and blockers, not automatic production acceptanc
 | 1A | Correct organization-wide vs site-limited school launch grant handling | In `FullFlow`, inherited from prior school-launch patch | Primary CI passed on prior isolated patch; signed-in acceptance pending |
 | 1B | HQ creates its own location with distinct non-academic `network_admin` grant | Server commands, domain policy, HQ workspace and unit tests added on `FullFlow` | Primary CI passed; isolated database/browser acceptance pending; HQ grant must be deliberately provisioned |
 | 1C | Independent site requests link to denomination; HQ reviews it | New `site_affiliations` table, local request/withdraw, HQ approve/reject/revoke, UI and guarded integration fixture added on `FullFlow` | Primary CI passed (run `39732006470`); database/browser acceptance pending |
-| 1D | Verify network contract and provision HQ officer | Agreement evidence + effective-term table, CAN steward authorization, officer authority checks, server-side contract gates and steward desk on `FullFlow` | Primary CI and database/browser acceptance pending |
+| 1D | Verify network contract and provision HQ officer | Agreement evidence + effective-term table, CAN steward authorization, officer authority checks, server-side contract gates and steward desk on `FullFlow` | Primary CI passed (run `39735575551`); isolated database/browser acceptance pending |
 | 2 | Independently governed school configures high-school extension | Existing GF3 flows, then closed-loop acceptance | Not accepted |
 | 3 | Curriculum adoption, teacher and class provisioning | Existing canonical publisher/school/classroom tools | Not accepted |
 | 4 | Family application, offer, activation and class assignment | Existing GF22/GF2 | Not accepted |
@@ -84,3 +84,5 @@ Authority and evidence are **distinct**:
 - Independent signed-contract and HQ officer-authority verification/upload pathways are not yet implemented in CAN OS. The steward desk accepts IDs of **already independently verified** Documents, not legal attestation by checkbox.
 - Contract term revocation and renewal workflows, explicit entitlements, independent verifier administration, account invitation delivery and dual-control review need subsequent focused bites before commercial production acceptance.
 - Isolated Neon integration and authenticated-browser validation must run before treating this as fully accepted. Missing isolated Neon CI configuration remains a blocker.
+
+**Last verified CI:** [run 39735575551](https://github.com/bryanhkelly/can-os/actions/runs/39735575551) passed on commit `194ef48758c36a41702934635c67ec4f810b9eec`. The separate Admissions Neon Acceptance job failed at **Require isolated test database secret** before running database-backed tests; it does not establish a failed product assertion. The focused mode `npm run test:integration:network-onboarding` is implemented but unexecuted.
