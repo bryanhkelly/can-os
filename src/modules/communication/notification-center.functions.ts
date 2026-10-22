@@ -156,14 +156,16 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   .map(n=>n.resourceId as string);
  const gradeActions=gradeActionIds.length?await db.select({
    id:s.actions.id,sectionId:s.actions.sectionId,siteId:s.actions.siteId,
-   programId:s.actions.programId,subjectId:s.actions.subjectId,metadata:s.actions.metadata,
+   programId:s.actions.programId,organizationId:s.actions.organizationId,
+   subjectId:s.actions.subjectId,metadata:s.actions.metadata,
    studentPersonId:s.studentProfiles.personId,
  }).from(s.actions).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.actions.subjectId))
  .where(and(inArray(s.actions.id,gradeActionIds),
    eq(s.actions.type,"guardian_grade_follow_up"),
    eq(s.actions.subjectType,"student_profile"),
    inArray(s.actions.siteId,context.scope.siteIds??[]),
-   inArray(s.actions.programId,context.scope.programIds??[]))) : [];
+   inArray(s.actions.programId,context.scope.programIds??[]),
+   inArray(s.actions.organizationId,context.scope.organizationIds??[]))) : [];
  const gradeActionsById=new Map(gradeActions.map(a=>[a.id,a]));
  const verifiedGradeActions = new Map<string,string>();
  if(gradeActions.length){
