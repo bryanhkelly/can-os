@@ -14,6 +14,7 @@ export function StudentExperience({ liveData, success }: {
  const missing=liveData.coursework.filter(item=>item.timeliness==="missing");
  const overdueCount=success ? success.overdue : missing.length;
  const upcomingCount=success ? success.dueSoon + success.toDo : upcoming.length;
+ const summaryUnavailable=success === null;
  const upcoming=liveData.coursework.filter(item=>item.status==="assigned"&&item.timeliness!=="missing");
  const format=(date:Date|string)=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short"}).format(new Date(date));
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title={`Today, ${displayName}`}
@@ -21,8 +22,8 @@ export function StudentExperience({ liveData, success }: {
   actions={<Link to="/student/courses" className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">Open my classes</Link>}>
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
    <Link to="/student/courses" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">Classes</p><p className="mt-2 text-3xl font-semibold">{liveData.sections.length}</p></Link>
-   <Link to="/student/assignments" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"To do / due soon":"Upcoming assignments"}</p><p className="mt-2 text-3xl font-semibold">{upcomingCount}</p></Link>
-   <Link to="/student/assignments" search={{filter:success?"todo":"missing"}} className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"Overdue / missing work":"Missing work"}</p><p className="mt-2 text-3xl font-semibold">{overdueCount}</p></Link>
+   <Link to="/student/assignments" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"To do / due soon":"Upcoming assignments"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":upcomingCount}</p></Link>
+   <Link to="/student/assignments" search={{filter:success?"todo":"missing"}} className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"Overdue / missing work":"Missing work"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":overdueCount}</p></Link>
   </div>
   <nav aria-label="Student workspace" className="mt-6 flex flex-wrap gap-2 text-sm">
    <Link to="/student/assignments" className="rounded-lg border px-4 py-2">Assignments</Link>
@@ -40,13 +41,13 @@ export function StudentExperience({ liveData, success }: {
   </WorkspacePanel>}
   <div className="mt-10 grid gap-8 lg:grid-cols-2">
    <section>
-    <h2 className="font-serif text-3xl">Coursework</h2>
+    <h2 className="font-serif text-3xl">Recent submitted coursework</h2>
     <div className="mt-4 space-y-3">{liveData.coursework.map(item=><article key={item.assessmentId} className="rounded-xl border bg-card p-4">
      <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold"><Link to="/student/assignments" search={{assessment:item.assessmentId}} className="hover:underline">{item.assessmentTitle}</Link></h3><p className="mt-1 text-sm text-muted-foreground">{item.instructions??"Review course instructions"}</p></div><StatusBadge tone={item.timeliness==="missing"?"attention":"neutral"}>{item.timeliness==="missing"?"Missing":item.status}</StatusBadge></div>
      <p className="mt-3 text-xs text-muted-foreground">{item.dueAt?"Due "+format(item.dueAt):"No due date"}</p>
      <Link to="/student/assignments" search={{assessment:item.assessmentId}} className="mt-3 inline-block text-sm font-semibold underline">Open assignment →</Link>
     </article>)}
-    {!liveData.coursework.length&&<p className="rounded-xl border p-4 text-sm text-muted-foreground">No assignments require attention today.</p>}</div>
+    {!liveData.coursework.length&&<p className="rounded-xl border p-4 text-sm text-muted-foreground">No recent submission updates. See Your next learning steps for published assignments that may still need attention.</p>}</div>
    </section>
    <section>
     <h2 className="font-serif text-3xl">Schedule</h2>
