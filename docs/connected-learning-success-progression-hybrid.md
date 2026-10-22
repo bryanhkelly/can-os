@@ -31,7 +31,9 @@
 
 **First new slice:** `getTeacherLearningEvidence` and Teacher Today display observed last-7-day interaction evidence only within live assigned Sections and enrolled students. It is descriptive, never an auto-generated risk diagnosis.
 
-**Next build:** One teacher-reviewed intervention action with evidence type, specific observation, owner, due date, teacher-selected support tactic, follow-up date, and outcome. Reuse `actions` and referrals lifecycle; only authorized teacher or school support staff may create/resolve. Deduplicate repeat issue creation. Preserve guardian visibility only for allowable academic support information; private counseling/referral details stay restricted.
+**First teacher-action bite committed:** Teacher Today now offers `TeacherLearningFollowUpForm` for a student with verified, recent recorded interactions. A teacher must enter an independent observation, choose check-in/work review/tutoring, and choose a 1/3/7-day deadline. `createTeacherLearningFollowUp` rechecks the assigned active section, current enrollment, student/section/version-matched event and organization/site/program scope in the transaction; the teacher becomes the Action owner. It stores the specific event as descriptive evidence, deduplicates open Actions for that event, emits the standard `ActionCreated` event and audit record, and does **not** automatically flag students as at risk or notify guardians. No new referral table or workflow was introduced.
+
+**Next build:** Close the response loop: show each teacher-owned Action with its deadline, teacher-selected follow-up approach and resolution outcome in Teacher Today, reusing the authorized academic Action lifecycle; add an explicit follow-up note and assess change against subsequent *academic work*, not telemetry alone. Preserve guardian visibility only for allowable academic information; counseling notes remain restricted.
 
 **Acceptance:** teacher sees verified evidence and missing work; initiates human-reviewed follow-up; student receives appropriate notification; ownership, response, and outcome persist; another teacher cannot see or act on untaught Sections.
 
