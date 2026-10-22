@@ -461,6 +461,100 @@ integration("FullFlow: one school, same high-school program through curriculum a
         const delivery = await classroom.getClassWorkspace({data: {sectionId: section.id}});
         expect(delivery.content?.modules.some(module=>
           module.lessons.some(lesson=>lesson.id==="solve-one"))).toBe(true);
+
+        // Connected learning evidence stays on the SAME student, section,
+        // publisher release and rollback-isolated Neon fixture. This directly
+        // exercises the server commands and real DB constraints with mocked
+        // actor selection. Real browser-cookie acceptance remains separate.
+        const activity = await import("@/modules/learning/learning-activity.functions");
+        const learningAccount = first(await tx.insert(s.accessAccounts).values({
+          emailNormalized: `fullflow-learner-${suffix}@example.test`,
+        }).returning());
+        const learningGrant = first(await tx.insert(s.accountPersonGrants).values({
+          accountId: learningAccount.id, personId: profile.personId,
+          role: "student", organizationId: school.id, siteId: site.id,
+          active: true,
+        }).returning());
+        const learningLogin = first(await tx.insert(s.accessSessions).values({
+          accountId: learningAccount.id, activeGrantId: learningGrant.id,
+          secretHash: `fullflow-learning-synthetic-${suffix}`,
+          expiresAt: new Date(Date.now() + 60 * 60_000),
+        }).returning());
+        const authenticatedStudent: AccessContext = {
+          ...studentActor,
+          accountId: learningAccount.id, sessionId: learningLogin.id,
+          grantId: learningGrant.id,
+        };
+        state.actor = authenticatedStudent;
+        const tracking = await activity.startLearningActivitySession({data:{
+          sectionId:section.id,
+        }});
+        expect(tracking.versionId).toBe(draft.versionId);
+        const opened = {
+          clientEventId:crypto.randomUUID(),sectionId:section.id,
+          lessonId:"solve-one",kind:"lesson_opened" as const,
+          occurredAt:new Date().toISOString(),
+        };
+        expect(await activity.recordLearningInteraction({data:{
+          learningSessionId:tracking.learningSessionId,interaction:opened,
+        }})).toMatchObject({recorded:true,duplicate:false,estimatedActiveMs:0});
+        expect(await activity.recordLearningInteraction({data:{
+          learningSessionId:tracking.learningSessionId,interaction:opened,
+        }})).toMatchObject({recorded:true,duplicate:true,estimatedActiveMs:0});
+        await expect(activity.recordLearningInteraction({data:{
+          learningSessionId:tracking.learningSessionId,
+          interaction:{...opened,kind:"lesson_resumed" as const},
+        }})).rejects.toThrow("Conflicting learning event retry");
+        await expect(activity.recordLearningInteraction({data:{
+          learningSessionId:tracking.learningSessionId,
+          interaction:{...opened,clientEventId:crypto.randomUUID(),
+            kind:"resource_opened" as const,resourceId:"not-a-published-resource"},
+        }})).rejects.toThrow("published lesson resource");
+        expect(await tx.select().from(s.learningActivityEvents).where(eq(
+          s.learningActivityEvents.learningSessionId,tracking.learningSessionId))).toHaveLength(1);
+        const ownLearning = await activity.getLearningActivityHistory({data:{sectionId:section.id}});
+        expect(ownLearning.evidence.map(e=>e.kind)).toEqual(["lesson_opened"]);
+        expect((await activity.getLearningActivityHistory({data:{sectionId:section.id}})).evidence)
+          .toEqual(ownLearning.evidence); // refresh/read after server-side persistence
+        state.actor = teacherActor;
+        expect((await activity.getLearningActivityHistory({data:{
+          sectionId:section.id,studentPersonId:profile.personId,
+        }})).evidence).toHaveLength(1);
+        state.actor = guardianActor;
+        expect((await activity.getLearningActivityHistory({data:{
+          sectionId:section.id,studentPersonId:profile.personId,
+        }})).evidence).toHaveLength(1);
+        state.actor = unrelatedActor;
+        await expect(activity.getLearningActivityHistory({data:{
+          sectionId:section.id,studentPersonId:profile.personId,
+        }})).rejects.toThrow("guardian academic relationship");
+        state.actor = {
+          ...teacherActor,actorPersonId:outsider.id,
+        };
+        await expect(activity.getLearningActivityHistory({data:{
+          sectionId:section.id,studentPersonId:profile.personId,
+        }})).rejects.toThrow("assigned teacher");
+        state.actor = {
+          ...authenticatedStudent,sessionId:crypto.randomUUID(),
+        };
+        await expect(activity.recordLearningInteraction({data:{
+          learningSessionId:tracking.learningSessionId,
+          interaction:{...opened,clientEventId:crypto.randomUUID()},
+        }})).rejects.toThrow("active learner login session");
+        await tx.update(s.accessSessions).set({revokedAt:new Date()})
+          .where(eq(s.accessSessions.id,learningLogin.id));
+        state.actor = authenticatedStudent;
+        await expect(activity.recordLearningInteraction({data:{
+          learningSessionId:tracking.learningSessionId,
+          interaction:{...opened,clientEventId:crypto.randomUUID()},
+        }})).rejects.toThrow("active learner login session");
+        await expect(activity.startLearningActivitySession({data:{
+          sectionId:section.id,
+        }})).rejects.toThrow("active learner login session");
+        expect(await tx.select().from(s.learningActivityEvents).where(eq(
+          s.learningActivityEvents.learningSessionId,tracking.learningSessionId))).toHaveLength(1);
+        state.actor = studentActor;
+
         await classroom.setLessonCompletion({data: {
           sectionId: section.id, versionId: draft.versionId,
           lessonId: "solve-one", completed: true,
