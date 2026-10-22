@@ -8,6 +8,7 @@ consentRecords,
 financialObligations,
 guardianRelationships,
 householdMemberships,
+programs,
 sites,
 studentProfiles
 } from "@/db/schema";
@@ -22,7 +23,7 @@ import { EventTypes } from "@/domain/event-types";
 import { publishProjection } from "@/platform/calendar/projection";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { and,count,eq,inArray } from "drizzle-orm";
-import { assertSeasonRegistrationOpen } from "./registration-policy";
+import { assertSeasonRegistrationOpen, assertLegacyActivityRegistrationAllowed } from "./registration-policy";
 
 export async function createActivity(
   context: CommandContext,
@@ -94,15 +95,18 @@ export async function createActivitySeason(
   }
 
   return db.transaction(async (tx) => {
-    const [activity] = await tx
-      .select()
+    const [linked] = await tx
+      .select({ activity: activities, programType: programs.type })
       .from(activities)
+      .leftJoin(programs, eq(programs.id, activities.programId))
       .where(eq(activities.id, input.activityId))
       .limit(1);
+    const activity = linked?.activity;
 
     if (!activity) throw new Error("Activity not found");
     assertSiteScope(context, activity.siteId);
     assertProgramScope(context, activity.programId);
+    assertLegacyActivityRegistrationAllowed(linked?.programType ?? null);
 
     const [season] = await tx
       .insert(activitySeasons)
@@ -170,14 +174,17 @@ export async function registerForActivity(
         activityName: activities.name,
         siteId: activities.siteId,
         programId: activities.programId,
+        programType: programs.type,
       })
       .from(activitySeasons)
       .innerJoin(activities, eq(activities.id, activitySeasons.activityId))
+      .leftJoin(programs, eq(programs.id, activities.programId))
       .where(eq(activitySeasons.id, input.activitySeasonId))
       .limit(1)
       .for("update", { of: activitySeasons });
 
     if (!record) throw new Error("Activity season not found");
+    assertLegacyActivityRegistrationAllowed(record.programType);
     assertSeasonRegistrationOpen(record, new Date());
 
     const [student] = await tx
