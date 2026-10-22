@@ -218,6 +218,13 @@
       "when": 1792653600000,
       "tag": "0030_anonymous_auth_request_budget",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792700000000,
+      "tag": "0031_learning_activity_tracking",
+      "breakpoints": true
     }
   ]
 }
