@@ -9,7 +9,20 @@ actual teacher/section, admit and activate a family/student, submit and grade
 real work, notify/serve the guardian, and see the same persistent operational
 record. The same tenant/program/section/student IDs must survive all stages.
 
-**Current result: HOLD / NOT YET PROVEN.** Disconnected GF1/GF2/GF3 or network
+**Current result: HOLD / NOT YET PROVEN.** A connected service-level
+acceptance test now exists at `tests/integration/full-flow.integration.test.ts`
+but has **not been executed** against the migrated isolated Neon branch. Browser
+acceptance with separate actual user sessions and notification/reload evidence
+remains missing. The canonical acceptance contract lists exact environment and
+execution details.
+
+**Isolated Neon branch:** `fullflow-e2e-20261022`
+(`br-proud-pine-arfju8h2`), 30 migrations confirmed.
+**Latest full-flow code static CI:** [39740004930](https://github.com/bryanhkelly/can-os/actions/runs/39740004930)
+passed build/typecheck/unit and migration checks. This is not an integration
+or browser pass.
+
+** Disconnected GF1/GF2/GF3 or network
 tests do not satisfy this requirement. The top blocking condition is isolated
 Neon acceptance configuration; the second is a continuous cross-role fixture.
 Fix those before implementing more network-onboarding capabilities. Existing
