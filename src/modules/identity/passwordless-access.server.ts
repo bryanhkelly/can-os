@@ -1,6 +1,7 @@
 import { db } from "@/db/client";
 import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,people } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
+import { AuthorizationError } from "@/domain/command-context";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { listDemoFacilitatorGrants } from "./demo-facilitator.server";
@@ -196,5 +197,5 @@ export async function recordMeaningfulSessionActivity(sessionId:string,accountId
     isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
     gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
   .returning({id:accessSessions.id});
- if(!updated)throw new Error("Session expired or revoked");
+ if(!updated)throw new AuthorizationError("Session expired or revoked");
 }
