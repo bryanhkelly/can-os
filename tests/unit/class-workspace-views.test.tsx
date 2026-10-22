@@ -102,6 +102,9 @@ describe("published class workspace", () => {
     expect(teacher).toContain('href="/teacher/gradebook?section=english&amp;lesson=evidence&amp;kind=homework"');
     expect(teacher).toContain("Create quiz");
     expect(teacher).toContain("Create project");
+    expect(teacher).toContain("Start discussion");
+    expect(teacher).toContain('href="/teacher/discussions?section=english&amp;lesson=evidence"');
+    expect(teacher).not.toContain('kind=discussion');
     expect(teacher).toContain('href="/teacher/gradebook?section=english&amp;assessment=hw1"');
     const guardian=renderToStaticMarkup(<ClassWorkspace data={{...data,role:"guardian"}} tab="lessons" lessonId="evidence"/>);
     expect(guardian).not.toContain("Create homework");
@@ -219,6 +222,19 @@ describe("published class workspace", () => {
   });
 });
 
+describe("lesson-linked teacher discussion",()=>{
+ it("opens the existing discussion composer from a publisher lesson, not the gradebook",()=>{
+  state.search={section:"english",lesson:"evidence"};
+  const html=renderToStaticMarkup(<TeacherDiscussionsView data={{
+   sections:[{id:"english",title:"English",curriculumLessons:[{id:"evidence",title:"Find evidence"}]}],
+   threads:[],
+  }}/>);
+  expect(html).toContain("Publisher lesson: Find evidence");
+  expect(html).toContain("Start a class discussion");
+  expect(html).toContain("Post discussion");
+  expect(html).not.toContain("Create an assessment");
+ });
+});
 describe("production discussion controls", () => {
   const messages = [
     { id: "prompt", body: "Read the passage", authorLabel: "Participant", createdAt: "2026-10-01T12:00:00Z",

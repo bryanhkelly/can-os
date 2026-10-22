@@ -1,5 +1,6 @@
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { assertPublisherLessonReference } from "@/domain/publisher-course-references";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -15,7 +16,8 @@ async function authorizedTeacher(){
 }
 /** Teacher-created section discussions using actual school records. */
 export const createCourseDiscussion=createServerFn({method:"POST"})
-.validator((input:unknown)=>z.object({sectionId:z.string().uuid(),subject:z.string(),prompt:z.string()}).parse(input))
+.validator((input:unknown)=>z.object({sectionId:z.string().uuid(),subject:z.string(),prompt:z.string(),
+ curriculumLessonId:z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).optional()}).strict().parse(input))
 .handler(async({data})=>{
  const actor=await authorizedTeacher();
  const subject=data.subject.trim(),prompt=data.prompt.trim();
@@ -24,9 +26,14 @@ export const createCourseDiscussion=createServerFn({method:"POST"})
  return db.transaction(async tx=>{
   const [assigned]=await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers).where(and(eq(s.sectionTeachers.sectionId,data.sectionId),eq(s.sectionTeachers.personId,actor.actorPersonId!))).limit(1);
   if(!assigned)throw new Error("Teacher is not assigned to this section");
-  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId}).from(s.sections).where(and(eq(s.sections.id,data.sectionId),eq(s.sections.active,true))).limit(1);
+  const [site]=await tx.select({siteId:s.sections.siteId,programId:s.sections.programId,
+  versionId:s.sections.courseTemplateVersionId,contentStatus:s.courseTemplateVersions.status,
+  curriculum:s.courseTemplateVersions.curriculum}).from(s.sections)
+  .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId)).where(and(eq(s.sections.id,data.sectionId),eq(s.sections.active,true))).limit(1);
   if(!site?.siteId||!actor.scope.siteIds?.includes(site.siteId)||!actor.scope.programIds?.includes(site.programId))throw new AuthorizationError("discussion section site");
-  const [thread]=await tx.insert(s.communicationThreads).values({subject,contextType:"section",contextId:data.sectionId,createdByPersonId:actor.actorPersonId!,metadata:{kind:"course_discussion",locked:false,graded:false}}).returning({id:s.communicationThreads.id});
+  assertPublisherLessonReference(site.curriculum,site.contentStatus,data.curriculumLessonId);
+  const [thread]=await tx.insert(s.communicationThreads).values({subject,contextType:"section",contextId:data.sectionId,createdByPersonId:actor.actorPersonId!,metadata:{kind:"course_discussion",locked:false,graded:false,
+   ...(data.curriculumLessonId?{curriculumLessonId:data.curriculumLessonId,publisherCourseVersionId:site.versionId}:{})}}).returning({id:s.communicationThreads.id});
   if(!thread)throw new Error("Unable to create discussion");
   await tx.insert(s.communicationMessages).values({threadId:thread.id,senderPersonId:actor.actorPersonId!,body:prompt,metadata:{kind:"prompt"}});
   await writeAudit(tx, {actorPersonId:actor.actorPersonId!,action:"discussion.create",resourceType:"communication_thread",resourceId:thread.id,after:{sectionId:data.sectionId,subject},context:{sessionId:actor.sessionId}});
