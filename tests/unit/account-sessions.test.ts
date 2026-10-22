@@ -43,7 +43,7 @@ vi.mock("@/db/client", () => {
    };
    return query;
   },
-  transaction: async (fn:(tx:typeof tx)=>Promise<unknown>) => fn(tx),
+  transaction: async (fn:(transaction:typeof tx)=>Promise<unknown>) => fn(tx),
  } };
 });
 
