@@ -19,6 +19,8 @@ export type AccessContext = CommandContext & {
  accountId: string;
  sessionId: string;
  grantId: string;
+ /** Original verified membership site (null means organization-wide), before effective site expansion. */
+ grantSiteId: string | null;
  role: string;
 };
 
@@ -40,6 +42,7 @@ export function resolveAccessContext(principal: SessionPrincipal, grants: readon
   accountId: principal.accountId,
   sessionId: principal.sessionId,
   grantId: grant.id,
+  grantSiteId: grant.siteId,
   actorPersonId: grant.personId,
   role: grant.role,
   capabilities: new Set(roleCapabilities[grant.role]),
