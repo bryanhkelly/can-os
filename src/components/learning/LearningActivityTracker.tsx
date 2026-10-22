@@ -25,18 +25,21 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
     setHistory(null);
     setMessage("");
 
-    async function record(sessionId: string, kind: "lesson_opened" | "lesson_resumed" | "engaged_interval", durationMs?: number) {
-      await recordLearningInteraction({ data: {
-        learningSessionId: sessionId,
-        interaction: kind === "engaged_interval" ? {
-          clientEventId: crypto.randomUUID(), sectionId, lessonId,
-          kind, occurredAt: new Date().toISOString(),
-          durationMs: durationMs ?? 1, pageVisible: true, windowFocused: true,
-        } : {
-          clientEventId: crypto.randomUUID(), sectionId, lessonId,
-          kind, occurredAt: new Date().toISOString(),
-        },
-      } });
+    async function record(
+      sessionId: string,
+      kind: "lesson_opened" | "lesson_resumed" | "engaged_interval" | "resource_opened",
+      options?: { durationMs?: number; resourceId?: string },
+    ) {
+      const base = {
+        clientEventId: crypto.randomUUID(), sectionId, lessonId,
+        occurredAt: new Date().toISOString(),
+      };
+      const interaction = kind === "engaged_interval"
+        ? { ...base, kind, durationMs: options?.durationMs ?? 1, pageVisible: true as const, windowFocused: true as const }
+        : kind === "resource_opened"
+          ? { ...base, kind, resourceId: options?.resourceId ?? "" }
+          : { ...base, kind };
+      await recordLearningInteraction({ data: { learningSessionId: sessionId, interaction } });
     }
 
     void startLearningActivitySession({ data: { sectionId } })
@@ -55,8 +58,12 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
 
     const onInteraction = (event: Event) => {
       const sessionId = sessionRef.current;
-      if (!sessionId || !event.isTrusted || document.visibilityState !== "visible" ||
-          !document.hasFocus()) return;
+      // Workspace navigation, menus and unrelated app controls never count as
+      // learning activity. Only interaction inside the selected lesson qualifies.
+      const target = event.target;
+      if (!sessionId || !event.isTrusted || !(target instanceof Element) ||
+          !target.closest("[data-learning-content]") ||
+          document.visibilityState !== "visible" || !document.hasFocus()) return;
       const now = Date.now();
       if (mustResume) {
         mustResume = false;
@@ -70,8 +77,21 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
       lastSent = now;
       // Only foreground interaction at both ends. This is an estimated upper
       // bound on engaged time, not attendance or verified study.
-      void record(sessionId, "engaged_interval", Math.min(60_000, elapsed))
+      void record(sessionId, "engaged_interval", { durationMs: Math.min(60_000, elapsed) })
         .catch(() => { if (!cancelled) setMessage("Some activity could not be recorded."); });
+    };
+    const onResourceClick = (event: MouseEvent) => {
+      const sessionId = sessionRef.current;
+      if (!sessionId || !event.isTrusted || !(event.target instanceof Element) ||
+          document.visibilityState !== "visible" || !document.hasFocus()) return;
+      const trigger = event.target.closest<HTMLElement>("[data-learning-resource-id]");
+      if (!trigger?.closest("[data-learning-content]")) return;
+      const resourceId = trigger.dataset.learningResourceId;
+      if (!resourceId) return;
+      // Records a user-initiated access attempt, NOT successful download,
+      // reading, watching, mastery, attendance, or earned course credit.
+      void record(sessionId, "resource_opened", { resourceId })
+        .catch(() => { if (!cancelled) setMessage("Some resource activity could not be recorded."); });
     };
     const onVisibilityChange = () => {
       // Never count time spent in a hidden or unfocused page.
@@ -80,12 +100,14 @@ export function LearningActivityTracker({ sectionId, lessonId }: { sectionId: st
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("blur", onVisibilityChange);
+    document.addEventListener("click", onResourceClick);
     document.addEventListener("pointerdown", onInteraction, { passive: true });
     document.addEventListener("keydown", onInteraction);
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("blur", onVisibilityChange);
+      document.removeEventListener("click", onResourceClick);
       document.removeEventListener("pointerdown", onInteraction);
       document.removeEventListener("keydown", onInteraction);
       const activeSession = sessionRef.current;
