@@ -9,7 +9,7 @@ import type { AccessContext } from "@/domain/access-context";
 export function assertNetworkSiteAccess(
   actor: AccessContext,
   organization: { id: string; type: string },
-  capability: "network.sites.read" | "network.sites.manage",
+  capability: "network.sites.read" | "network.sites.manage" | "network.affiliations.read" | "network.affiliations.review",
 ): void {
   if (actor.role !== "network_admin" || !actor.actorPersonId || actor.grantSiteId !== null)
     throw new AuthorizationError("denomination HQ administrator");
