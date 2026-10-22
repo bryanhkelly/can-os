@@ -11,6 +11,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
  const [content,setContent]=useState<ClassContent>(release.content??{version:1,syllabus:"",modules:[],resources:[]});
  const [revision,setRevision]=useState(release.revision);
  const [selectedModuleId,setSelectedModuleId]=useState(release.content?.modules[0]?.id??"");
+ const [previewLessonId,setPreviewLessonId]=useState(release.content?.modules[0]?.lessons[0]?.id??"");
  const [teacherGuides,setTeacherGuides]=useState<ClassTeacherGuides|null>(release.teacherGuides??null);
  const [reason,setReason]=useState(""),[confirmed,setConfirmed]=useState(false);
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
@@ -20,6 +21,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
  const foundModuleIndex=content.modules.findIndex(module=>module.id===selectedModuleId);
  const activeModuleIndex=foundModuleIndex>=0?foundModuleIndex:0;
  const activeModule=content.modules[activeModuleIndex];
+ const previewLesson=activeModule?.lessons.find(lesson=>lesson.id===previewLessonId)??activeModule?.lessons[0];
  const lessonTotal=content.modules.reduce((n,module)=>n+module.lessons.length,0);
  const lessonsWithContent=content.modules.reduce((n,module)=>n+module.lessons.filter(
   lesson=>Boolean(lesson.body.trim()||lesson.activities?.length)).length,0);
@@ -107,6 +109,24 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
        Week {week.week}: {week.title} · {week.status}
       </button>
      </li>)}</ol>
+    </details>}
+    {activeModule?.lessons.length&&<details className="rounded border p-3">
+      <summary className="cursor-pointer text-sm font-medium">Preview student-facing lesson (draft)</summary>
+      <p className="mt-2 text-xs text-muted-foreground">Read-only publisher draft preview. This is not a classroom assignment, student progress or published lesson. Restricted teacher solutions are not included.</p>
+      <label className="mt-3 block text-sm">Lesson to preview
+       <select aria-label="Lesson to preview" className="mt-1 block w-full rounded border bg-background p-2"
+        value={previewLesson?.id??""} onChange={e=>setPreviewLessonId(e.target.value)}>
+        {activeModule.lessons.map(lesson=><option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
+       </select>
+      </label>
+      {previewLesson&&<div className="mt-3 space-y-3 rounded border p-4">
+        <h4 className="font-semibold">{previewLesson.title}</h4>
+        {previewLesson.learningTargets?.length? <ul className="list-inside list-disc text-sm">{previewLesson.learningTargets.map(target=><li key={target}>{target}</li>)}</ul>:null}
+        {previewLesson.body.trim()&&<p className="whitespace-pre-wrap text-sm">{previewLesson.body}</p>}
+        {previewLesson.activities?.length? <ol className="list-inside list-decimal space-y-2 text-sm">{previewLesson.activities.map(activity=><li key={activity.id}>
+          <span className="font-medium">{activity.title}</span><p className="whitespace-pre-wrap">{activity.instructions}</p>
+        </li>)}</ol>:null}
+      </div>}
     </details>}
     {dirty&&<p className="text-xs font-medium">Unsaved changes stay in this draft while you navigate the course outline.</p>}
    </section>
