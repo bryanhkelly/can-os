@@ -1127,6 +1127,21 @@
         "audit_events",
         "domain_events"
       ]
+    },
+    "/network": {
+      "persona": "network_admin",
+      "fixtureRequired": false,
+      "rationale": "HQ network membership is not automatically seeded into the student demo; the authorized empty-state is supported, while a separate isolated network grant and end-to-end browser acceptance remain required.",
+      "interactions": [
+        "authorized denomination HQ administrator lists its directly owned locations",
+        "HQ creates a new location without student enrollment access",
+        "school registrar and unrelated HQ cannot create a denomination location"
+      ],
+      "downstreamRecords": [
+        "sites",
+        "domainEvents:SiteCreated",
+        "auditEvents:network.site.create"
+      ]
     }
   }
 }
