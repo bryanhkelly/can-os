@@ -279,5 +279,21 @@ integration("GF36 co-curriculars and athletics", () => {
     const registrationAudit = await db.select().from(schema.auditEvents)
       .where(eq(schema.auditEvents.resourceId, registrationId));
     expect(JSON.stringify(registrationAudit)).not.toContain(physical.id);
+
+    // Legacy activity seasons can predate the extended-program policy. Even if
+    // they remain in 'registration' status they must not enroll minors when
+    // linked to an extended-learning Program, nor create another open season.
+    await db.update(schema.programs).set({ type: "summer_enrichment" })
+      .where(eq(schema.programs.id, program.id));
+    await expect(activities.createActivitySeason(staffContext, {
+      ...seasonInput, name: "Unapproved Summer 2028",
+    })).rejects.toThrow(/verified season-opening safeguards/);
+    await expect(activities.registerForActivity(guardianContext, {
+      activitySeasonId: seasonId, studentProfileId: student.id,
+      householdId: household.id, consentVersion: "2028-unapproved",
+    })).rejects.toThrow(/verified season-opening safeguards/);
+    const seasonCount = await db.select().from(schema.activitySeasons)
+      .where(eq(schema.activitySeasons.activityId, activityId));
+    expect(seasonCount).toHaveLength(1);
   });
 });
