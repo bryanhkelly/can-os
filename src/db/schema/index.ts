@@ -34,3 +34,5 @@ export * from "./learning-participation";
 export * from "./curriculum-marketplace";
 export * from "./curriculum-resources";
 export * from "./curriculum-units";
+
+export * from "./network-affiliations";
