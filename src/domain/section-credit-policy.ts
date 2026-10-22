@@ -5,7 +5,7 @@
 export function verifiedSectionCreditUnits(metadata: Record<string,unknown>): number|null {
   const value=metadata.credits;
   if(typeof value!=="number"||!Number.isFinite(value)||
-    value<=0||value>10||Math.round(value*100)!==value*100) return null;
+    value<=0||value>10||Math.abs(Math.round(value*100)-value*100)>1e-8) return null;
   return value;
 }
 
