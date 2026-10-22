@@ -7,7 +7,9 @@
 import { readFileSync } from "node:fs";
 import { expect,test,type Browser,type BrowserContext,type Page } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
+import { hashAccessSecret } from "../../src/domain/access-tokens";
+import { TEST_ACCESS_TOKEN_PEPPER } from "./env";
 import { accessSessionCookie,createGf1Fixture,destroyGf1Fixture,type Gf1Fixture,type Sql } from "./fixture";
 import { DATABASE_URL } from "./env";
 
@@ -95,6 +97,83 @@ async function cleanupCurriculum(){
  if(extraAssessmentId)await sql.query(`DELETE FROM assessments WHERE id=$1`,[extraAssessmentId]);
 }
 
+
+type AdoptionBrowserFixture={
+ packId:string;packVersionId:string;adoptionId?:string;entitlementId?:string;
+ registrarPersonId:string;accountId:string;grantId:string;roleAssignmentId:string;
+ registrarSecret:string;packName:string;
+};
+let adoptionBrowser:AdoptionBrowserFixture|undefined;
+
+/** A real school account and a foreign publisher pack, in the disposable DB only. */
+async function prepareSchoolMarketplace(){
+ if(!fixture)throw new Error("Missing isolated acceptance fixture.");
+ const f=fixture, suffix=f.suffix;
+ const one=async(query:string,args:unknown[]):Promise<string>=>{
+  const result=dbRows<{id:string}>(await sql.query(query,args));
+  if(!result[0]?.id)throw new Error("Missing browser fixture id");
+  return result[0].id;
+ };
+ const packName=`Publisher Algebra I ${suffix}`;
+ const packId=await one(`INSERT INTO curriculum_packs
+  (publisher_organization_id,slug,name,description,visibility,license_code)
+  VALUES($1,$2,$3,'Third-party E2E publisher Algebra I','public','CC-BY-4.0') RETURNING id`,
+  [f.canOrgId,`algebra-e2e-${suffix}`,packName]);
+ const packVersionId=await one(`INSERT INTO curriculum_pack_versions
+  (pack_id,version,status,published_at) VALUES($1,1,'published',now()) RETURNING id`,[packId]);
+ await sql.query(`INSERT INTO curriculum_pack_items
+  (pack_version_id,course_template_version_id,position) VALUES($1,$2,1)`,
+  [packVersionId,f.courseTemplateVersionId]);
+ const registrarPersonId=await one(`INSERT INTO people
+  (legal_first_name,legal_last_name,email,metadata) VALUES
+  ('E2E School','Curriculum Adopter',$1,'{"synthetic":true}'::jsonb) RETURNING id`,
+  [`e2e-adopter-${suffix}@can-os.invalid`]);
+ await sql.query(`INSERT INTO memberships (person_id,organization_id) VALUES($1,$2)`,
+  [registrarPersonId,f.hostOrgId]);
+ const roleAssignmentId=await one(`INSERT INTO role_assignments
+  (person_id,organization_id,site_id,program_id,role_key,capabilities)
+  VALUES($1,$2,$3,$4,'curriculum_adopter','["curriculum.adopt"]'::jsonb)
+  RETURNING id`,[registrarPersonId,f.hostOrgId,f.siteId,f.programId]);
+ const accountId=await one(`INSERT INTO access_accounts
+  (email_normalized,email_verified_at) VALUES($1,now()) RETURNING id`,
+  [`e2e-adopter-${suffix}@can-os.invalid`]);
+ const grantId=await one(`INSERT INTO account_person_grants
+  (account_id,person_id,role,organization_id,site_id,active,is_synthetic)
+  VALUES($1,$2,'registrar',$3,$4,true,true) RETURNING id`,
+  [accountId,registrarPersonId,f.hostOrgId,f.siteId]);
+ const registrarSecret=randomBytes(32).toString("base64url");
+ await sql.query(`INSERT INTO access_sessions
+  (account_id,secret_hash,active_grant_id,expires_at)
+  VALUES($1,$2,$3,now()+interval '12 hours')`,
+  [accountId,hashAccessSecret(registrarSecret,TEST_ACCESS_TOKEN_PEPPER),grantId]);
+ adoptionBrowser={packId,packVersionId,registrarPersonId,accountId,grantId,
+  roleAssignmentId,registrarSecret,packName};
+}
+
+async function cleanupSchoolMarketplace(){
+ const a=adoptionBrowser;
+ if(!a)return;
+ const firstRows=dbRows<{id:string}>(await sql.query(`SELECT id FROM curriculum_adoptions
+  WHERE pack_id=$1`,[a.packId]));
+ const secondRows=dbRows<{id:string}>(await sql.query(`SELECT id FROM curriculum_entitlements
+  WHERE pack_id=$1`,[a.packId]));
+ const ids=[...firstRows.map(x=>x.id),...secondRows.map(x=>x.id),a.packId,a.packVersionId];
+ await sql.query(`DELETE FROM domain_events WHERE aggregate_id=ANY($1::uuid[])`,[ids]);
+ await sql.query(`DELETE FROM audit_events WHERE resource_id=ANY($1::uuid[])`,[ids]);
+ await sql.query(`DELETE FROM curriculum_adoptions WHERE pack_id=$1`,[a.packId]);
+ await sql.query(`DELETE FROM curriculum_entitlements WHERE pack_id=$1`,[a.packId]);
+ await sql.query(`DELETE FROM curriculum_pack_items WHERE pack_version_id=$1`,[a.packVersionId]);
+ await sql.query(`DELETE FROM curriculum_pack_versions WHERE id=$1`,[a.packVersionId]);
+ await sql.query(`DELETE FROM curriculum_packs WHERE id=$1`,[a.packId]);
+ await sql.query(`DELETE FROM access_sessions WHERE account_id=$1`,[a.accountId]);
+ await sql.query(`DELETE FROM account_person_grants WHERE id=$1`,[a.grantId]);
+ await sql.query(`DELETE FROM access_accounts WHERE id=$1`,[a.accountId]);
+ await sql.query(`DELETE FROM role_assignments WHERE id=$1`,[a.roleAssignmentId]);
+ await sql.query(`DELETE FROM memberships WHERE person_id=$1`,[a.registrarPersonId]);
+ await sql.query(`DELETE FROM people WHERE id=$1`,[a.registrarPersonId]);
+ adoptionBrowser=undefined;
+}
+
 async function latest(assessmentId:string){
  const rows=dbRows<{id:string;status:string;score:string|null;feedback:{comment?:string}}>(
   await sql.query(`SELECT id,status,score::text AS score,feedback FROM submissions
@@ -130,17 +209,44 @@ test.beforeAll(async()=>{
   throw new Error("Use the strict isolated Algebra I browser config, never a production URL.");
  sql=neon(DATABASE_URL);
  fixture=await createGf1Fixture(sql);
- try{await installCurriculum();}
- catch(error){await cleanupCurriculum().catch(()=>{});await destroyGf1Fixture(sql,fixture);fixture=undefined;throw error;}
+ try{await installCurriculum();await prepareSchoolMarketplace();}
+ catch(error){await cleanupSchoolMarketplace().catch(()=>{});
+  await cleanupCurriculum().catch(()=>{});await destroyGf1Fixture(sql,fixture);fixture=undefined;throw error;}
 });
 test.afterAll(async()=>{
  if(!fixture)return;
- try{await cleanupCurriculum();}
- finally{await destroyGf1Fixture(sql,fixture);}
+ try{await cleanupSchoolMarketplace();}
+ finally{try{await cleanupCurriculum();}finally{await destroyGf1Fixture(sql,fixture);}}
 });
 
 test("Algebra I: student lessons and submissions -> teacher guide and rubric grades -> student feedback",async({browser})=>{
  const f=fixture!;
+ const a=adoptionBrowser!;
+ const registrar=await signedIn(browser,a.registrarSecret);
+ try{
+  await test.step("school registrar installs and adopts a different publisher's public curriculum",async()=>{
+   await registrar.page.goto(`/operations/curriculum-marketplace?programId=${f.programId}`);
+   await expect(registrar.page.getByRole("heading",{name:"Curriculum Marketplace"})).toBeVisible();
+   const publisherPack=registrar.page.locator("article").filter({has:registrar.page.getByRole("heading",{name:a.packName})});
+   await expect(publisherPack.getByText("1 published course versions")).toBeVisible();
+   await publisherPack.getByRole("checkbox").check();
+   await publisherPack.getByRole("button",{name:"Add to library"}).click();
+   await expect.poll(async()=>dbRows<{id:string}>(await sql.query(
+    `SELECT id FROM curriculum_entitlements WHERE pack_id=$1 AND organization_id=$2 AND status='active'`,
+    [a.packId,f.hostOrgId])).length).toBe(1);
+   await publisherPack.getByRole("button",{name:"Adopt for this program"}).click();
+   await expect(publisherPack.getByText(/Release v1 adopted/)).toBeVisible();
+   await expect.poll(async()=>dbRows<{id:string}>(await sql.query(
+    `SELECT id FROM curriculum_adoptions WHERE program_id=$1 AND pack_id=$2
+      AND pack_version_id=$3 AND status='active'`,
+    [f.programId,a.packId,a.packVersionId])).length).toBe(1);
+   await expect(registrar.page.getByRole("region",{name:"Curriculum operational evidence"}))
+    .toContainText("Classes using adopted publisher courses");
+   // Adoption is permission to USE curriculum, not permission to author it.
+   await expect(registrar.page.getByRole("link",{name:"Curriculum Studio"})).toHaveCount(0);
+   await expect(registrar.page.getByRole("heading",{name:"Import Common Cartridge"})).toHaveCount(0);
+  });
+ }finally{await registrar.context.close();}
  const student=await signedIn(browser,f.studentSecret);
  try{
   await test.step("real enrolled student sees five published lessons and the 36-week planning boundary",async()=>{
