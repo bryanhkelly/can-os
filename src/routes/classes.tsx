@@ -62,6 +62,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const assessmentSummary = data.assessmentEvidenceSummary;
   const lessons = data.content?.modules.flatMap(module => module.lessons) ?? [];
   const lesson = lessons.find(item => item.id === lessonId);
+  const lessonIndex=lesson?lessons.findIndex(item=>item.id===lesson.id):-1;
+  const previousLesson=lessonIndex>0?lessons[lessonIndex-1]:null;
+  const nextLesson=lessonIndex>=0&&lessonIndex<lessons.length-1?lessons[lessonIndex+1]:null;
   const relatedWork = lesson ? assessmentEvidence.filter(item => item.curriculumLessonId === lesson.id) : [];
 
   const completed = new Set(data.progress.filter(item => item.completedAt).map(item => item.lessonId));
@@ -148,6 +151,19 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {!data.content && <p role="status" className="rounded-xl border p-5 text-sm">No published learning content is configured for this class.</p>}
       {lessonId && !lesson && <p role="alert" className="rounded-xl border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
       {lesson ? <WorkspacePanel title={lesson.title} actions={<Link to="/classes" search={{ ...search, tab: "lessons" }} className="text-sm underline">All lessons</Link>}>
+        <nav aria-label="Course lesson navigation" className="mb-5 space-y-3 rounded-lg border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span>Lesson {lessonIndex+1} of {lessons.length}</span>
+            {data.role==="student"&&<span>{completed.size} of {lessons.length} lessons self-reported complete</span>}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            {previousLesson?<Link to="/classes" search={{...search,tab:"lessons",lesson:previousLesson.id}} className="underline">← Previous: {previousLesson.title}</Link>:
+             <span className="text-muted-foreground">Beginning of course</span>}
+            {nextLesson?<Link to="/classes" search={{...search,tab:"lessons",lesson:nextLesson.id}} className="underline">Next: {nextLesson.title} →</Link>:
+             <span className="text-muted-foreground">End of published course</span>}
+          </div>
+          <p className="text-xs text-muted-foreground">Navigation never marks lessons complete or awards grades or academic credit.</p>
+        </nav>
         {lesson.estimatedMinutes && <p className="mb-3 text-xs text-muted-foreground">Estimated lesson time: {lesson.estimatedMinutes} minutes</p>}
         {lesson.learningTargets?.length ? <section className="mb-5 rounded-lg border p-4">
           <h3 className="text-sm font-semibold">Learning targets</h3>
