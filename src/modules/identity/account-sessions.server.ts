@@ -4,7 +4,7 @@ import { accessSessions } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { sessionIdleCutoff } from "@/domain/access-tokens";
-import { writeAudit } from "@/platform/mutation";
+import { recordSessionSecurityEvent } from "./session-security-audit.server";
 
 /**
  * Account-owned sessions, never school-owned sessions. No raw credential,
@@ -64,20 +64,16 @@ export async function revokeOwnedAccountSessions(
    updatedAt: now,
   }).where(and(...criteria)).returning({ id: accessSessions.id });
   if (changed.length) {
-   await writeAudit(tx, {
-    actorPersonId: actor.actorPersonId!,
+   await recordSessionSecurityEvent(tx, {
     action: selection.kind === "all"
      ? "identity.sessions.revoked_all" : "identity.session.revoked_remote",
-    resourceType: "account",
-    resourceId: actor.accountId,
-    context: {
-     accountId: actor.accountId,
-     sessionId: actor.sessionId,
-     grantId: actor.grantId,
-     revokedCount: changed.length,
-     ...(selection.kind === "one" ? { targetSessionId: selection.sessionId } : {}),
-     ...(actor.demoFacilitator ? { demoFacilitator: actor.demoFacilitator } : {}),
-    },
+    accountId: actor.accountId,
+    actorPersonId: actor.actorPersonId!,
+    sessionId: actor.sessionId,
+    grantId: actor.grantId,
+    role: actor.role,
+    revokedCount: changed.length,
+    ...(selection.kind === "one" ? { targetSessionId: selection.sessionId } : {}),
    });
   }
   return {
