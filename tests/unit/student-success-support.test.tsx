@@ -63,6 +63,40 @@ describe("Student Success support-task confidentiality", () => {
     expect(empty).toContain("No outstanding student-owned support actions");
   });
 
+  it("shows recently teacher-reviewed goals while keeping unreviewed resolutions hidden", () => {
+    const now = new Date("2026-10-22T19:00:00.000Z");
+    const feedback = "The submitted mathematics solution demonstrates all the practice steps.";
+    const result = deriveStudentSuccessSupportTasks([
+      ...actions,
+      { id: "verified-goal", type: "student_learning_goal", status: "resolved",
+        title: "Practice two-step equations", dueAt: null,
+        resolvedAt: "2026-10-22T18:00:00.000Z",
+        review: { outcome: "met", reviewedAt: "2026-10-22T18:00:00.000Z",
+          studentFeedback: feedback },
+        subjectType: "student_profile", subjectId: "student-1" },
+      { id: "unverified-goal", type: "student_learning_goal", status: "resolved",
+        title: "No grade reviewed", dueAt: null,
+        resolvedAt: "2026-10-22T18:00:00.000Z",
+        subjectType: "student_profile", subjectId: "student-1" },
+      { id: "old-goal", type: "student_learning_goal", status: "resolved",
+        title: "Old completed goal", dueAt: null,
+        resolvedAt: "2026-05-01T18:00:00.000Z",
+        review: { outcome: "met", reviewedAt: "2026-05-01T18:00:00.000Z",
+          studentFeedback: feedback },
+        subjectType: "student_profile", subjectId: "student-1" },
+    ], 10, now);
+    const item = result.tasks.find(task => task.id === "verified-goal");
+    expect(item).toMatchObject({
+      status: "resolved", goalOutcome: "met", studentFeedback: feedback,
+    });
+    expect(result.tasks.some(task=>task.id==="old-goal")).toBe(false);
+    expect(result.tasks.some(task=>task.id==="unverified-goal")).toBe(false);
+    const html = renderToStaticMarkup(<StudentSuccessSupportPanel support={result} />);
+    expect(html).toContain("Goal met after teacher review");
+    expect(html).toContain(feedback);
+    expect(html).not.toContain("No grade reviewed");
+  });
+
   it("bounds the queue, skips completed and duplicate actions, and never exposes metadata", () => {
     const many = [...actions, ...actions, ...Array.from({length: 8},(_,i)=>({
       ...actions[0]!, id: "more-"+i,
