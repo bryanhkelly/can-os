@@ -16,6 +16,8 @@ FullFlow execution priority: [one connected six-stage acceptance contract](./ful
 
 New architecture specification: [Curriculum marketplace and portability](./curriculum-marketplace-architecture.md).
 
+Required P1 student experience: [Comprehensive learning-activity tracking](./comprehensive-learning-activity-tracking.md) (distinct from authentication sessions, official attendance, or grading).
+
 ## Active cumulative FullFlow development
 
 - [FullFlow progression, evidence, and explicit acceptance blockers](./full-flow-progress.md).
