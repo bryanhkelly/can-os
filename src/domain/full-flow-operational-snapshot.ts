@@ -9,7 +9,7 @@ export type FullFlowRows = {
   teacherAssignments: Array<{sectionId:string;personId:string}>;
   adoptions: Array<{programId:string;status:string}>;
   applications: Array<{programId:string;stage:string}>;
-  enrollments: Array<{programId:string;kind:string;status:string;
+  enrollments: Array<{programId:string|null;kind:string;status:string;
     studentProfileId:string;sectionId:string|null}>;
   assessments: Array<{id:string;sectionId:string;status:string}>;
   submissions: Array<{assessmentId:string;status:string;studentProfileId:string}>;
