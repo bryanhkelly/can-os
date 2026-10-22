@@ -232,6 +232,13 @@
       "when": 1792704000000,
       "tag": "0032_extended_program_offerings",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792710000000,
+      "tag": "0033_extended_season_drafts",
+      "breakpoints": true
     }
   ]
 }

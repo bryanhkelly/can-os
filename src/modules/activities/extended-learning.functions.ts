@@ -1,0 +1,57 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { db } from "@/db/client";
+import { activities, activitySeasons, programs } from "@/db/schema";
+import { requireActor } from "@/modules/identity/actors.server";
+import { createExtendedSeasonDraft } from "./extended-learning-service";
+
+const extendedTypes = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const draftInput = z.object({
+  programId: z.string().uuid(),
+  offeringName: z.string().trim().min(2).max(160),
+  seasonName: z.string().trim().min(2).max(120),
+  activityType: z.enum(["athletics", "club", "arts", "service", "other"]),
+  startsOn: day,
+  endsOn: day,
+  capacity: z.number().int().min(1).max(10000),
+}).strict();
+
+/** Only Programs under the verified registrar's organization, site and program scopes. */
+export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).handler(async () => {
+  const actor = await requireActor(["registrar"], "program.read");
+  const ids = actor.scope.programIds ?? [];
+  const siteIds = actor.scope.siteIds ?? [];
+  const orgIds = actor.scope.organizationIds ?? [];
+  if (!ids.length || !siteIds.length || !orgIds.length)
+    return { programs: [], seasons: [] };
+
+  const rows = await db.select({
+    id: programs.id, name: programs.name, type: programs.type,
+    status: programs.status, siteId: programs.siteId,
+  }).from(programs).where(and(
+    inArray(programs.id, ids), inArray(programs.siteId, siteIds),
+    inArray(programs.organizationId, orgIds), inArray(programs.type, extendedTypes),
+    isNull(programs.creditIssuingOrganizationId),
+  )).orderBy(asc(programs.name)).limit(100);
+
+  if (!rows.length) return { programs: rows, seasons: [] };
+  const seasons = await db.select({
+    id: activitySeasons.id, activityId: activities.id, programId: activities.programId,
+    offeringName: activities.name, name: activitySeasons.name,
+    startsOn: activitySeasons.startsOn, endsOn: activitySeasons.endsOn,
+    capacity: activitySeasons.capacity, status: activitySeasons.status,
+  }).from(activitySeasons).innerJoin(activities, eq(activities.id, activitySeasons.activityId))
+    .where(and(inArray(activities.programId, rows.map(row => row.id)),
+      inArray(activities.siteId, siteIds)))
+    .orderBy(asc(activitySeasons.startsOn)).limit(300);
+  return { programs: rows, seasons };
+});
+
+export const createExtendedSeasonDraftFn = createServerFn({ method: "POST" })
+  .validator((value: unknown) => draftInput.parse(value))
+  .handler(async ({ data }) => {
+    const actor = await requireActor(["registrar"], "program.launch.start");
+    return createExtendedSeasonDraft(actor, data);
+  });

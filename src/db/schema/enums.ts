@@ -219,7 +219,7 @@ export const courseTemplateVersionStatus = pgEnum("course_template_version_statu
 
 export const activityStatus = pgEnum("activity_status", ["active"]);
 
-export const activitySeasonStatus = pgEnum("activity_season_status", ["registration"]);
+export const activitySeasonStatus = pgEnum("activity_season_status", ["registration", "draft"]);
 
 export const activityRegistrationStatus = pgEnum("activity_registration_status", [
   "pending",

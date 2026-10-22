@@ -20,3 +20,10 @@ Recommended next slices, after P0 FullFlow blockers:
 
 ## Migration dependency
 Migration `0032_extended_program_offerings.sql` follows `0031_learning_activity_tracking.sql`. The previous FullFlow test database was known to be behind GitHub migrations; **do not deploy until migrated and verified on isolated Neon**. This code change does not apply migration 0032 or touch production.
+
+## Bite 2: safe program-linked draft seasons
+The registrar Launch workspace can now plan an Activity and initial Season atomically for a **site-based, noncredit** summer or after-school Program, scoped to the registrar's verified organization/site/program grant. The Program, Site and Organization are validated server-side. Date ranges and positive bounded capacity are validated, and the event/audit outbox is part of the same transaction.
+
+The Season is stored as `draft`, **not** `registration`. The guardian registration policy already rejects every status except `registration`. No family-facing publication, session meeting recurrence, opening readiness waiver, fee collection, enrollment or childcare pickup authorization is introduced.
+
+Migration `0033_extended_season_drafts.sql` adds `draft` to the activity season status enum while preserving existing seasons. Apply only to the disposable test database once migrations through 0032 are present; production is untouched. Credit-bearing summer Programs continue to use official academic sections.

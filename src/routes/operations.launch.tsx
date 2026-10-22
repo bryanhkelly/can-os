@@ -3,6 +3,8 @@ import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domai
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
+import { ExtendedLearningSeasonPlanner } from "@/components/operations/ExtendedLearningSeasonPlanner";
+import { listExtendedSeasonPlanning } from "@/modules/activities/extended-learning.functions";
 import {
   activateLaunch,
   completeLaunchRequirement,
@@ -29,10 +31,12 @@ export const Route = createFileRoute("/operations/launch")({
       return {
         options: await listLaunchOptions(),
         launches: await listLaunches(),
+        // A pending migration for extended programs must not prevent core school launch.
+        extendedPlanning: await listExtendedSeasonPlanning().catch(() => null),
         authError: "",
       };
     } catch {
-      return { options: null, launches: null, authError: "Sign in with an authorized registrar account to manage program launches." };
+      return { options: null, launches: null, extendedPlanning: null, authError: "Sign in with an authorized registrar account to manage program launches." };
     }
   },
   component: LaunchWizardPage,
@@ -40,9 +44,10 @@ export const Route = createFileRoute("/operations/launch")({
 
 function LaunchWizardPage() {
   const selection=Route.useSearch();
-  const { options, launches, authError }: {
+  const { options, launches, extendedPlanning, authError }: {
     options: Awaited<ReturnType<typeof listLaunchOptions>> | null;
     launches: Awaited<ReturnType<typeof listLaunches>> | null;
+    extendedPlanning: Awaited<ReturnType<typeof listExtendedSeasonPlanning>> | null;
     authError: string;
   } = Route.useLoaderData();
   const router = useRouter();
@@ -213,6 +218,7 @@ function LaunchWizardPage() {
 
         <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         <div className="mt-8 grid gap-6">
+          {extendedPlanning ? <ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId} /> : <p role="status" className="rounded-lg border p-3 text-sm">Extended-learning planning is unavailable. Verify database migrations 0032–0033; school launches remain accessible.</p>}
           <details className="rounded-xl border bg-card p-5">
             <summary className="cursor-pointer text-lg font-semibold">Start a new program launch</summary>
             {created && (
