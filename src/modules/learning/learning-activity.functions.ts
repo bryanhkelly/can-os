@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
 import { AuthorizationError } from "@/domain/command-context";
+import { sessionIdleCutoff } from "@/domain/access-tokens";
 import {
   estimateActiveLearningMilliseconds, learnerInteractionInputSchema,
   parseLearnerInteraction,
@@ -35,6 +36,22 @@ export const startLearningActivitySession = createServerFn({ method: "POST" })
     const { db, s } = await loadLearningStore();
     const { recordAudit } = await import("@/modules/identity/actors.server");
     return db.transaction(async tx => {
+      // Defend the learner-session boundary even if a previously valid
+      // browser session or selected grant has since been revoked.
+      const now = new Date();
+      const [login] = await tx.select({ id: s.accessSessions.id })
+        .from(s.accessSessions)
+        .innerJoin(s.accessAccounts, eq(s.accessAccounts.id, s.accessSessions.accountId))
+        .where(and(
+          eq(s.accessSessions.id, actor.sessionId),
+          eq(s.accessSessions.accountId, actor.accountId),
+          eq(s.accessSessions.activeGrantId, actor.grantId),
+          isNull(s.accessSessions.revokedAt),
+          gt(s.accessSessions.expiresAt, now),
+          gt(s.accessSessions.updatedAt, sessionIdleCutoff(now)),
+          eq(s.accessAccounts.disabled, false),
+        )).limit(1);
+      if (!login) throw new AuthorizationError("active learner login session");
       const { section, studentProfileId } = await authorizeClass(actor, data.sectionId, undefined, tx);
       if (!studentProfileId || !section.siteId || section.contentStatus !== "published" ||
           !readClassContent(section.curriculum)) {
@@ -74,6 +91,20 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
     if (actor.role !== "student") throw new AuthorizationError("student learning interaction");
     const { db, s } = await loadLearningStore();
     return db.transaction(async tx => {
+      const now = new Date();
+      const [login] = await tx.select({ id: s.accessSessions.id })
+        .from(s.accessSessions)
+        .innerJoin(s.accessAccounts, eq(s.accessAccounts.id, s.accessSessions.accountId))
+        .where(and(
+          eq(s.accessSessions.id, actor.sessionId),
+          eq(s.accessSessions.accountId, actor.accountId),
+          eq(s.accessSessions.activeGrantId, actor.grantId),
+          isNull(s.accessSessions.revokedAt),
+          gt(s.accessSessions.expiresAt, now),
+          gt(s.accessSessions.updatedAt, sessionIdleCutoff(now)),
+          eq(s.accessAccounts.disabled, false),
+        )).limit(1);
+      if (!login) throw new AuthorizationError("active learner login session");
       const { section, studentProfileId } = await authorizeClass(actor, data.interaction.sectionId, undefined, tx);
       if (!studentProfileId || !section.siteId || section.contentStatus !== "published") {
         throw new AuthorizationError("published enrolled class");
@@ -114,7 +145,6 @@ export const recordLearningInteraction = createServerFn({ method: "POST" })
         return { recorded: true, duplicate: true, estimatedActiveMs: previousEvent.estimatedActiveMs };
       }
       if (learningSession.endedAt) throw new AuthorizationError("ended learning session");
-      const now = new Date();
       if (now.getTime() - learningSession.startedAt.getTime() > 12 * 60 * 60 * 1000 ||
           (learningSession.lastInteractionAt &&
            now.getTime() - learningSession.lastInteractionAt.getTime() > 30 * 60 * 1000)) {
