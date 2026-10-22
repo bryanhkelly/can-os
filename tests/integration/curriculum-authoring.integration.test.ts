@@ -373,11 +373,27 @@ integration("governed curriculum authoring through classroom delivery",()=>{
       assignmentKind:"homework",curriculumLessonId:"algebra1-equations",
       rubricCriteria:[{id:"equation",label:"Reasoning",maxPoints:10,
         description:"Equality-preserving steps and substitution"}],
-      dueAt:new Date(Date.now()+7*86400000).toISOString(),
+      dueAt:new Date(Date.now()+7*86400000).toISOString(),publishNow:true,
     }});
     const [assigned]=await tx.select().from(s.submissions)
       .where(eq(s.submissions.assessmentId,task.assessmentId)).limit(1);
     expect(assigned?.studentProfileId).toBe(student.id);
+    const draft=await createAssessment({data:{
+      sectionId:selected.sectionId,title:"Unpublished teacher practice",pointsPossible:10,
+      assignmentKind:"homework",curriculumLessonId:"algebra1-equations",
+      dueAt:new Date(Date.now()+9*86400000).toISOString(),publishNow:false,
+    }});
+    expect(draft.status).toBe("draft");
+    const [draftRecord]=await tx.select({status:s.assessments.status,dueAt:s.assessments.dueAt})
+      .from(s.assessments).where(eq(s.assessments.id,draft.assessmentId)).limit(1);
+    expect(draftRecord?.status).toBe("draft");
+    expect(draftRecord?.dueAt).not.toBeNull();
+    const draftAssignments=await tx.select().from(s.submissions)
+      .where(eq(s.submissions.assessmentId,draft.assessmentId));
+    expect(draftAssignments).toHaveLength(0);
+    await expect(createAssessment({data:{
+      sectionId:selected.sectionId,title:"Missing publishing deadline",pointsPossible:10,publishNow:true,
+    }})).rejects.toThrow(/due date/i);
 
     act("student",learner.id);
     const studentWorkspace=await getClassWorkspace({data:{sectionId:selected.sectionId}});

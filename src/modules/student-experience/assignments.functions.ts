@@ -192,7 +192,7 @@ export const createSyntheticAssignment=createServerFn({method:"POST"})
   if(!Number.isFinite(dueAt.getTime()))throw new Error("Invalid due date");
   return createAssessment({data:{
    sectionId:data.sectionId,title:data.title,instructions:data.instructions,
-   rubric:data.rubric,pointsPossible:data.pointsPossible,dueAt:dueAt.toISOString()
+   rubric:data.rubric,pointsPossible:data.pointsPossible,dueAt:dueAt.toISOString(),publishNow:true
   }});
  });
 

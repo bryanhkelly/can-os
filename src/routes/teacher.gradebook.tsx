@@ -52,6 +52,7 @@ function TeacherGradebookPage() {
  const rubricSequence=useRef(0);
  const [points, setPoints] = useState("");
  const [due, setDue] = useState("");
+ const [publishConfirmed,setPublishConfirmed]=useState(false);
  const [assignmentKind,setAssignmentKind]=useState<"homework"|"classwork"|"quiz"|"test"|"project"|"discussion">(
   (search.kind as "homework"|"classwork"|"quiz"|"test"|"project"|"discussion"|undefined)??"classwork");
  const [curriculumLessonId,setCurriculumLessonId]=useState(search.lesson??"");
@@ -195,7 +196,10 @@ function TeacherGradebookPage() {
    ?.focus();
  };
 
- const submitAssessment = async () => {
+ const submitAssessment = async (publishNow:boolean) => {
+  if(publishNow&&(!due||!publishConfirmed)){
+   setNotice("Select a due date and confirm before publishing to students.");return;
+  }
   const pointsValue = Number(points);
   if (!title.trim() || !Number.isFinite(pointsValue) || pointsValue < 1 || pointsValue > 1000) {
    setNotice("Enter a title and a point value between 1 and 1000."); return;
@@ -216,6 +220,7 @@ function TeacherGradebookPage() {
     pointsPossible: pointsValue,
     rubricCriteria,
     assignmentKind,
+    publishNow,
     ...(curriculumLessonId?{curriculumLessonId}:{}),
     ...(due ? { dueAt: new Date(`${due}T23:59:00`).toISOString() } : {}),
    } });
@@ -225,6 +230,7 @@ function TeacherGradebookPage() {
    setNewRubric([]);
    setPoints("");
    setDue("");
+   setPublishConfirmed(false);
    setCurriculumLessonId("");
    if (selected) await loadGradebook(selected);
   } catch (cause) {
@@ -399,8 +405,18 @@ function TeacherGradebookPage() {
        onClick={()=>setNewRubric(rows=>[...rows,{id:"criterion-"+(++rubricSequence.current),label:"",maxPoints:"",description:""}])}>Add rubric criterion</button>
      </fieldset>
      <p className="mt-2 text-xs text-muted-foreground">The assignment belongs to this teacher's class. Linking to a publisher lesson preserves the original curriculum.</p>
-     <p className="mt-3 text-xs text-muted-foreground">Assessments with a due date are published and assigned to enrolled students; without one they are saved as drafts.</p>
-     <button disabled={busy} onClick={submitAssessment} className="mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Create assessment</button>
+     <p className="mt-3 text-xs text-muted-foreground">Due dates are planning information until you explicitly publish. Saving a draft never assigns work, even if it has a due date.</p>
+     <label className="mt-3 flex items-start gap-2 text-sm">
+       <input type="checkbox" checked={publishConfirmed} onChange={event=>setPublishConfirmed(event.target.checked)}
+        disabled={busy}/>
+       <span>I reviewed this assignment and understand Publish & assign makes it available to enrolled students now.</span>
+     </label>
+     <div className="mt-4 flex flex-wrap gap-3">
+       <button type="button" disabled={busy} onClick={()=>void submitAssessment(false)}
+        className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Save draft</button>
+       <button type="button" disabled={busy||!due||!publishConfirmed} onClick={()=>void submitAssessment(true)}
+        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Publish & assign</button>
+     </div>
     </section></details>
 
     {gradebook.assessments.length === 0 && <p className="mt-8 text-sm">No assessments yet. Create one above to begin.</p>}
