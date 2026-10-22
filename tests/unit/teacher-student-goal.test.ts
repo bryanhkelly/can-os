@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   STUDENT_LEARNING_GOAL_TYPE, studentLearningGoalActionText, teacherStudentGoalInput,
+  studentGoalReviewInput, studentGoalOutcomeLabels, isStudentGoalPublicReview,
 } from "@/domain/teacher-student-goal";
 import {
   canCompleteStudentAction, isStudentSupportAction, isStudentVisibleSupportAction,
@@ -58,5 +59,41 @@ describe("teacher-approved student goals", () => {
     ]);
     expect(derived.tasks.map(t=>t.id)).toEqual(["goal-1"]);
     expect(JSON.stringify(derived)).not.toContain("Private:");
+  });
+});
+
+describe("graded-evidence teacher review of student goals", () => {
+  const review = {
+    goalActionId: valid.teacherActionId,
+    gradedSubmissionId: "22222222-2222-4222-8222-222222222222",
+    outcome: "needs_more_practice" as const,
+    studentFeedback: "The first three steps were correct. Revise the final solution and verify it by substitution.",
+    confirmedStudentSafe: true as const,
+  };
+  it("requires a verified submission reference and human-selected outcome", () => {
+    expect(studentGoalReviewInput.parse(review)).toEqual(review);
+    expect(studentGoalOutcomeLabels.met).toContain("teacher reviewed");
+    expect(isStudentGoalPublicReview({
+      outcome: "needs_more_practice", studentFeedback: review.studentFeedback,
+      reviewedAt: "2026-10-22T23:00:00.000Z",
+    })).toBe(true);
+  });
+  it("rejects invented grades, client authority, automatic mastery and unconfirmed disclosure", () => {
+    for (const invalid of [
+      { gradedSubmissionId: "not-verified" }, { outcome: "auto_certified" },
+      { studentFeedback: "Good job." }, { confirmedStudentSafe: false },
+      { studentProfileId: valid.teacherActionId }, { riskScore: 99 },
+      { score: 100 }, { teacherPersonId: valid.teacherActionId },
+      { counselingNote: "private" }, { attendance: "present" },
+    ]) expect(() => studentGoalReviewInput.parse({ ...review, ...invalid })).toThrow();
+  });
+  it("refuses private or malformed stored output instead of treating it as student-visible", () => {
+    expect(isStudentGoalPublicReview(null)).toBe(false);
+    expect(isStudentGoalPublicReview({
+      outcome: "met", studentFeedback: "private", reviewedAt: "2026-10-22T23:00:00Z",
+    })).toBe(false);
+    expect(isStudentGoalPublicReview({
+      outcome: "met", studentFeedback: review.studentFeedback, reviewedAt: "not a date",
+    })).toBe(false);
   });
 });
