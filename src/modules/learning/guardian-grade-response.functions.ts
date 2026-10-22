@@ -43,7 +43,7 @@ async function visibleGradedSubmission(actor: Awaited<ReturnType<typeof guardian
     .innerJoin(programs, eq(programs.id, sections.programId))
     .innerJoin(studentProfiles, eq(studentProfiles.id, submissions.studentProfileId))
     .innerJoin(guardianRelationships, guardianRelationshipPredicate({
-      guardianPersonId: actor.actorPersonId,
+      guardianPersonId: actor.actorPersonId!,
       studentPersonId: studentProfiles.personId,
       access: "academic",
     }))
