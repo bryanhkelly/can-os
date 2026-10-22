@@ -35,6 +35,7 @@ export const EventTypes = {
   ActionCreated: "ActionCreated",
   ActionDeadlineChanged: "ActionDeadlineChanged",
   ActionResolved: "ActionResolved",
+  StudentLearningGoalReviewed: "StudentLearningGoalReviewed",
   EnrollmentActivated: "EnrollmentActivated",
   EnrollmentDocumentSubmitted: "EnrollmentDocumentSubmitted",
   EnrollmentDocumentReviewed: "EnrollmentDocumentReviewed",
