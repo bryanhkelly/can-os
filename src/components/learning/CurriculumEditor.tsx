@@ -10,12 +10,19 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
 }){
  const [content,setContent]=useState<ClassContent>(release.content??{version:1,syllabus:"",modules:[],resources:[]});
  const [revision,setRevision]=useState(release.revision);
+ const [selectedModuleId,setSelectedModuleId]=useState(release.content?.modules[0]?.id??"");
  const [teacherGuides,setTeacherGuides]=useState<ClassTeacherGuides|null>(release.teacherGuides??null);
  const [reason,setReason]=useState(""),[confirmed,setConfirmed]=useState(false);
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const saved=useRef(JSON.stringify(release.content??{version:1,syllabus:"",modules:[],resources:[]}));
  const guidesSaved=useRef(JSON.stringify(release.teacherGuides??null));
  const dirty=JSON.stringify(content)!==saved.current||JSON.stringify(teacherGuides)!==guidesSaved.current;
+ const foundModuleIndex=content.modules.findIndex(module=>module.id===selectedModuleId);
+ const activeModuleIndex=foundModuleIndex>=0?foundModuleIndex:0;
+ const activeModule=content.modules[activeModuleIndex];
+ const lessonTotal=content.modules.reduce((n,module)=>n+module.lessons.length,0);
+ const lessonsWithContent=content.modules.reduce((n,module)=>n+module.lessons.filter(
+  lesson=>Boolean(lesson.body.trim()||lesson.activities?.length)).length,0);
  async function save(){
   setBusy(true);setError("");setNotice("");
   try{
@@ -71,12 +78,46 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
     <textarea value={content.syllabus} maxLength={100000} rows={5} className="mt-1 block w-full rounded border bg-background p-2"
      onChange={event=>setContent({...content,syllabus:event.target.value})}/>
    </label>
-   {content.modules.map((module,index)=><section key={module.id} className="space-y-3 rounded border p-4">
+   <section className="space-y-3 rounded border p-4" aria-label="Publisher course outline navigator">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+     <div><h3 className="font-semibold">Full-course outline</h3>
+      <p className="text-xs text-muted-foreground">{content.modules.length} units · {lessonTotal} lessons · {lessonsWithContent} lessons with authored content. These counts do not certify academic credit.</p></div>
+     <label className="text-sm">Unit to edit
+      <select aria-label="Unit to edit" value={activeModule?.id??""} onChange={e=>setSelectedModuleId(e.target.value)}
+       className="mt-1 block min-w-48 rounded border bg-background p-2">
+       {!activeModule&&<option value="">Add a unit to start</option>}
+       {content.modules.map((module,index)=><option value={module.id} key={module.id}>
+         Unit {index+1}: {module.title} ({module.lessons.length} lessons)</option>)}
+      </select>
+     </label>
+    </div>
+    {activeModule&&<div className="flex flex-wrap gap-3 text-sm">
+     <button type="button" className="rounded border px-3 py-2 disabled:opacity-40" disabled={activeModuleIndex===0}
+      onClick={()=>setSelectedModuleId(content.modules[activeModuleIndex-1]!.id)}>Previous unit</button>
+     <button type="button" className="rounded border px-3 py-2 disabled:opacity-40"
+      disabled={activeModuleIndex===content.modules.length-1}
+      onClick={()=>setSelectedModuleId(content.modules[activeModuleIndex+1]!.id)}>Next unit</button>
+    </div>}
+    {content.blueprint&&<details className="rounded border p-3">
+     <summary className="cursor-pointer text-sm font-medium">View {content.blueprint.targetInstructionalWeeks}-week course plan</summary>
+     <p className="mt-2 text-xs text-muted-foreground">Weeks are a planning sequence within this publisher's complete course, not separate releases or school adoptions. Planned units without authored lessons are not student content.</p>
+     <ol className="mt-3 grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">{content.blueprint.weeks.map(week=><li key={week.week}>
+      <button type="button" disabled={!content.modules.some(module=>module.id===week.unitId)}
+       onClick={()=>setSelectedModuleId(week.unitId)} className="w-full rounded border p-2 text-left text-xs disabled:opacity-50">
+       Week {week.week}: {week.title} · {week.status}
+      </button>
+     </li>)}</ol>
+    </details>}
+    {dirty&&<p className="text-xs font-medium">Unsaved changes stay in this draft while you navigate the course outline.</p>}
+   </section>
+   {content.modules.map((module,index)=>index===activeModuleIndex?<section key={module.id} className="space-y-3 rounded border p-4">
     <div className="flex flex-wrap items-center gap-3">
      <label className="flex-1 text-sm">Module title<input value={module.title} maxLength={200}
       onChange={event=>moduleChange(index,{title:event.target.value})} className="mt-1 block w-full rounded border bg-background p-2"/></label>
-     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={()=>setContent(current=>({
-      ...current,modules:current.modules.filter(item=>item.id!==module.id)}))}>Remove module</button>
+     <button type="button" className="rounded border px-3 py-2 text-sm" onClick={()=>{
+      setContent(current=>({...current,modules:current.modules.filter(item=>item.id!==module.id)}));
+      setSelectedModuleId(content.modules.find(item=>item.id!==module.id)?.id??"");
+     }}>Remove module</button>
      {index>0&&<button type="button" className="rounded border px-3 py-2 text-sm" onClick={()=>setContent(current=>{
       const modules=[...current.modules];[modules[index-1],modules[index]]=[modules[index]!,modules[index-1]!];
       return {...current,modules};
@@ -165,9 +206,13 @@ export function CurriculumEditor({programId,courseCode,release,onSaved}:{
     </div>)}
     <button type="button" disabled={module.lessons.length>=200} className="rounded border px-3 py-2 text-sm"
      onClick={()=>moduleChange(index,{lessons:[...module.lessons,{id:crypto.randomUUID(),title:"New lesson",body:"",resources:[]}]})}>Add lesson</button>
-   </section>)}
+   </section>:null)}
    <button type="button" disabled={content.modules.length>=100} className="rounded border px-3 py-2 text-sm"
-    onClick={()=>setContent({...content,modules:[...content.modules,{id:crypto.randomUUID(),title:"New module",lessons:[]}]})}>Add module</button>
+    onClick={()=>{
+      const id=crypto.randomUUID();
+      setContent(current=>({...current,modules:[...current.modules,{id,title:"New module",lessons:[]}]}));
+      setSelectedModuleId(id);
+    }}>Add module</button>
    <h3 className="font-semibold">Class resources (HTTPS links)</h3>
    {content.resources.map((resource,index)=><div key={resource.id} className="flex flex-wrap gap-3 rounded border p-3">
     <label className="flex-1 text-sm">Resource title<input value={resource.title} maxLength={200}
