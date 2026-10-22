@@ -91,6 +91,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     // The authorized section determines program, site and version; browser input cannot widen the scope.
     const overlayRows = await db.select({
       id:s.curriculumOverlays.id,title:s.curriculumOverlays.title,kind:s.curriculumOverlays.kind,
+      createdByPersonId:s.curriculumOverlays.createdByPersonId,
       url:s.curriculumOverlays.url,resourceId:s.curriculumOverlays.resourceId,siteId:s.curriculumOverlays.siteId,
       sectionId:s.curriculumOverlays.sectionId,lessonId:s.curriculumOverlays.lessonId,
       metadata:s.curriculumOverlays.metadata,
@@ -108,7 +109,9 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     ).map(item=>({id:item.id,title:item.title,kind:item.kind,
       url:item.resourceId?attached.find(resource=>resource.id===item.resourceId)?.url??null:item.url,
       lessonId:item.lessonId,
-      source:item.metadata?.source==="teacher_supplement"?"teacher" as const:"organization" as const}));
+      source:item.metadata?.source==="teacher_supplement"?"teacher" as const:"organization" as const,
+      canManage:actor.role==="teacher"&&item.metadata?.source==="teacher_supplement"&&
+        item.createdByPersonId===actor.actorPersonId}));
     // Pack-level resources are only visible when the program has an active adoption
     // AND the owning organization has an active entitlement. Bindings are read-only.
     const publisherRows=await db.select({
@@ -128,7 +131,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
         eq(s.curriculumAdoptions.status,"active"),
         or(eq(s.curriculumResourceBindings.courseTemplateVersionId,section.versionId),
            isNull(s.curriculumResourceBindings.courseTemplateVersionId))));
-    const allSupplements=[...publisherRows.map(row=>({...row,source:"publisher" as const})),...supplements];
+    const allSupplements=[...publisherRows.map(row=>({...row,source:"publisher" as const,canManage:false})),...supplements];
     const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.map(lesson => lesson.id)) ?? []);
     // Only the assigned teacher receives aggregate, student-reported completion counts.
     // No student identities, grades or mastery in this planning view.
