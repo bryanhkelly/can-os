@@ -25,6 +25,10 @@
 - Validate telemetry when JavaScript is blocked, network is lost, different browser tabs exist, clients retry, and students work offline. Stale events must not silently count time. Never infer absence or academic success from partial telemetry.
 - Connect full evidence history into Student 360 with current per-section and per-student scope.
 
+## Parallel safeguarding pathway — high priority before onsite launch
+
+Onsite room facilitators/site leaders are first observers of possible abuse/neglect, exploitation, serious bullying or violence, substance-related danger, threats and other welfare issues. These **cannot** be treated as routine academic intervention tickets. Implement [Site Safeguarding and Welfare](./site-student-safeguarding-and-welfare.md) as a distinct restricted incident workflow with urgent response, jurisdiction-specific outside reporting duties and separate school/site accountability. Authorized downstream support tasks may link to it without exposing confidential allegations. This is a **site-opening safety gate**, not optional P3 analytics and not fulfilled by the existing `incident-service` tables.
+
 ## 2. Teacher intervention
 
 **Existing canonical owners:** `teacher-today.functions.ts`, `teacher-missing-work.functions.ts`, `support-referrals.functions.ts`, `academic-intervention` actions, `insights`, `notifications`, and audit/event infrastructure. Do not create a competing referrals table or intervention engine.
