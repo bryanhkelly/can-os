@@ -338,6 +338,10 @@ integration("governed curriculum authoring through classroom delivery",()=>{
     expect(orgSupplement.supplementId).toBeTruthy();
     const eligible=await listLaunchEligibleCourses(programIdentity,tx);
     expect(eligible.some(c=>c.versionId===foreignDraft.versionId)).toBe(true);
+    expect(eligible.find(c=>c.versionId===foreignDraft.versionId)).toMatchObject({
+      origin:"adopted",publisherName:"Independent Curriculum Publisher",
+      packName:"Publisher Algebra I",
+    });
     state.actor=staff; // Launch still requires the school's separate program-launch grant.
     const selected=await provisionLaunchSection({data:{
       ...provision,courseTemplateVersionId:foreignDraft.versionId,code:`EXT-${suffix}`,
