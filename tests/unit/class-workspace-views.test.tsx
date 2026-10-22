@@ -101,7 +101,7 @@ describe("published class workspace", () => {
     expect(day).toContain("Guided Practice");
     expect(day).toContain("Independent Practice");
     expect(day).toContain("Mark lesson complete");
-    expect(day).not.toContain("ALGEBRA I • UNIT 1 • DAY 1 OF 5");
+    expect(day).toContain("ALGEBRA I • UNIT 1 • DAY 1 OF 5");
   });
   it("shows validated answer keys only in the teacher-only classroom guide",()=>{
     const guide=JSON.parse(readFileSync(new URL("../../curriculum/can-high-school-core/algebra1/unit01-teacher-guide.json",import.meta.url),"utf8"));
