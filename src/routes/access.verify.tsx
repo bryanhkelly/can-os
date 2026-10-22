@@ -16,7 +16,21 @@ export const Route=createFileRoute("/access/verify")({
       :null;
     if(!result)return Response.json({error:"Invalid request"},{status:400});
     return new Response(JSON.stringify({ok:true,role:result.role}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
-   }catch{return Response.json({error:"Invalid or expired access link"},{status:401});}
+   }catch{
+    // The credential was not accepted; no account/person may be inferred from
+    // an arbitrary token or demo-code attempt. Record only a bounded anonymous
+    // rejection, never email, token, IP or request data.
+    const method=payload&&"email" in payload&&"code" in payload
+     ?"local_demo_code":"email_link";
+    try {
+     const {recordRejectedAuthentication}=await import("@/modules/identity/authentication-rejections.server");
+     await recordRejectedAuthentication(method);
+    }catch{
+     // A failure to emit audit evidence never changes the generic denial.
+    }
+    return Response.json({error:"Invalid or expired access link"},
+     {status:401,headers:{"Cache-Control":"no-store"}});
+   }
   },
  }},
  component:VerifyAccess,
