@@ -8,10 +8,24 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
-import { requireNetworkHQ } from "./network-sites.functions";
+import { assertNetworkSiteAccess } from "@/domain/network-site-policy";
 
 const uuid = z.string().uuid();
 const siteQuery = z.object({ siteId: uuid }).strict();
+async function requireAffiliationHQ(capability: "network.affiliations.read" | "network.affiliations.review") {
+  const actor = await getCommandContext(getRequest());
+  if (actor.role !== "network_admin" || actor.grantSiteId !== null)
+    throw new AuthorizationError("denomination HQ administrator");
+  const ids = actor.scope.organizationIds ?? [];
+  if (ids.length !== 1) throw new AuthorizationError("denomination HQ scope");
+  const [organization] = await db.select({
+    id: organizations.id, name: organizations.name, type: organizations.type,
+  }).from(organizations).where(eq(organizations.id, ids[0]!)).limit(1);
+  if (!organization) throw new AuthorizationError("denomination organization");
+  assertNetworkSiteAccess(actor, organization, capability);
+  return { actor, organization };
+}
+
 const requestInput = z.object({
   siteId: uuid,
   denominationOrganizationId: uuid,
@@ -136,7 +150,7 @@ export const requestSiteAffiliation = createServerFn({ method: "POST" })
 
 /** HQ sees only member-site identity and affiliation lifecycle, never students. */
 export const listNetworkAffiliations = createServerFn({ method: "GET" }).handler(async () => {
-  const { organization } = await requireNetworkHQ("network.affiliations.read");
+  const { organization } = await requireAffiliationHQ("network.affiliations.read");
   const entries = await db.select({
     id: siteAffiliations.id, status: siteAffiliations.status,
     siteId: siteAffiliations.siteId, siteName: sites.name,
@@ -161,7 +175,7 @@ const reviewInput = z.object({
 export const reviewNetworkAffiliation = createServerFn({ method: "POST" })
   .validator((v: unknown) => reviewInput.parse(v))
   .handler(async ({ data }) => {
-    const { actor, organization } = await requireNetworkHQ("network.affiliations.review");
+    const { actor, organization } = await requireAffiliationHQ("network.affiliations.review");
     return db.transaction(async tx => {
       const [entry] = await tx.select({
         id: siteAffiliations.id, siteId: siteAffiliations.siteId,
