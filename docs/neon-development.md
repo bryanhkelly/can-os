@@ -13,6 +13,22 @@ Use separate Neon branches for:
 
 Never point integration tests at production.
 
+## Network onboarding acceptance mode
+
+Run `node scripts/run-integration-tests.mjs network-onboarding --preflight` to
+check the disposable database endpoint guard without writing. Then run
+`npm run test:integration:network-onboarding` against that same isolated,
+migrated database, using `TEST_DATABASE_URL`,
+`CAN_TEST_DB_WRITES_ENABLED=true`, and a distinct `CAN_APPLICATION_DB_HOST`.
+This mode runs both denomination-affiliation and CAN agreement/HQ-provision
+synthetic integration files. They use rollback transactions and must not be
+pointed at production. CI unit tests alone do not execute these fixtures.
+
+The synthetic signed-contract and HQ authorization evidence are fabricated
+records in the disposable transaction only. A passing test cannot certify a
+real contract, true signer authority, production email delivery, or deployed
+browser behavior.
+
 ## Golden Flow integration tests
 
 Golden Flow tests intentionally create realistic records across multiple domains. Prefer an isolated Neon branch over complicated fixture teardown.
