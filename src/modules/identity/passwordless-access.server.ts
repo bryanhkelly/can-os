@@ -1,7 +1,7 @@
 import { db } from "@/db/client";
 import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,people } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
-import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader } from "@/domain/access-tokens";
+import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { listDemoFacilitatorGrants } from "./demo-facilitator.server";
 import { writeAudit } from "@/platform/mutation";
@@ -177,4 +177,24 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
     ...(accountId===LOCAL_DEMO_ADMIN.accountId?{demoFacilitator:LOCAL_DEMO_ADMIN.personId}:{}),
    }});
  });
+}
+
+
+/**
+ * An explicit, same-origin user interaction refreshes ONLY the server's idle
+ * deadline, not the 12-hour absolute expiration. Never invoke on GET,
+ * background polling, focus or visibility events.
+ *
+ * Use the existing access_sessions.updated_at for this first incremental bite;
+ * login initializes it and membership selection is also a meaningful action.
+ * A dedicated session-activity timestamp can follow with device inventory.
+ */
+export async function recordMeaningfulSessionActivity(sessionId:string,accountId:string):Promise<void> {
+ const now=new Date();
+ const [updated]=await db.update(accessSessions).set({updatedAt:now})
+  .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
+    isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
+    gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
+  .returning({id:accessSessions.id});
+ if(!updated)throw new Error("Session expired or revoked");
 }
