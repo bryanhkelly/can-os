@@ -90,15 +90,17 @@ async function missingWorkCounts(
   db: Db,
   s: Schema,
   profileIds: string[],
+  permittedSectionIds: string[],
 ): Promise<Map<string, number>> {
   const counts = new Map<string, number>(profileIds.map((id) => [id, 0]));
-  if (!profileIds.length) return counts;
+  if (!profileIds.length || !permittedSectionIds.length) return counts;
   const roster = await db
     .select({ studentProfileId: s.enrollments.studentProfileId, sectionId: s.enrollments.sectionId })
     .from(s.enrollments)
     .where(
       and(
         inArray(s.enrollments.studentProfileId, profileIds),
+        inArray(s.enrollments.sectionId, permittedSectionIds),
         eq(s.enrollments.kind, "section"),
         eq(s.enrollments.status, "active"),
       ),
@@ -193,12 +195,23 @@ export const searchStudents = createServerFn({ method: "GET" })
       .limit(50);
     if (!rows.length) return { students: [] };
     const ids = rows.map((row) => row.profileId);
+    const permittedSections = context.role==="teacher"
+      ? await db.select({id:s.sections.id}).from(s.sections)
+        .innerJoin(s.sectionTeachers,eq(s.sectionTeachers.sectionId,s.sections.id))
+        .where(and(eq(s.sectionTeachers.personId,context.actorPersonId!),
+          inArray(s.sections.siteId,context.siteIds),
+          inArray(s.sections.programId,context.scope.programIds??[])))
+      : await db.select({id:s.sections.id}).from(s.sections)
+        .where(and(inArray(s.sections.siteId,context.siteIds),
+          inArray(s.sections.programId,context.scope.programIds??[])));
+    const permittedSectionIds=permittedSections.map(section=>section.id);
     const activeEnrollments = await db
       .select({ studentProfileId: s.enrollments.studentProfileId, sectionId: s.enrollments.sectionId })
       .from(s.enrollments)
       .where(
         and(
           inArray(s.enrollments.studentProfileId, ids),
+          inArray(s.enrollments.sectionId,permittedSectionIds),
           eq(s.enrollments.kind, "section"),
           eq(s.enrollments.status, "active"),
         ),
@@ -209,7 +222,7 @@ export const searchStudents = createServerFn({ method: "GET" })
       if (row.sectionId) set.add(row.sectionId);
       sectionCounts.set(row.studentProfileId, set);
     }
-    const missing = await missingWorkCounts(db, s, ids);
+    const missing = await missingWorkCounts(db, s, ids, permittedSectionIds);
     return {
       students: rows.map((row) => ({
         personId: row.personId,
@@ -275,7 +288,6 @@ export const getStudent360 = createServerFn({ method: "GET" })
                 eq(s.sectionTeachers.personId, context.actorPersonId!),
               ),
             )
-            .limit(1)
         : [];
       authorized = taught.length > 0;
       const assignedSections=new Set(taught.map(row=>row.sectionId));
@@ -414,7 +426,7 @@ export const getStudent360 = createServerFn({ method: "GET" })
           )
           .orderBy(desc(s.actions.createdAt))
           .limit(25),
-        missingWorkCounts(db, s, [profile.id]),
+        missingWorkCounts(db, s, [profile.id],sectionIds),
       ]);
 
     const latestGradeBySection = new Map<string, (typeof gradeRows)[number]>();
