@@ -158,6 +158,7 @@ integration("GF3 host / program launch", () => {
       const launchContext = {
         ...context,
         role: "registrar" as const,
+        grantSiteId: site.id,
         scope: { ...context.scope, programIds: [] as string[] },
       };
       launchState.context = launchContext;
@@ -333,14 +334,56 @@ integration("GF3 host / program launch", () => {
         eq(schema.auditEvents.action, "program.orientation.schedule"),
       ))).toHaveLength(1);
 
+      // A site-scoped membership cannot create another campus, even if its
+      // effective site list is empty. The verified grant remains authoritative.
       launchContext.scope.siteIds = [];
+      await expect(launchFunctions.createLaunchSite({ data: {
+        organizationId: host.id,
+        name: "Unauthorized Campus",
+        slug: `unauthorized-${suffix}-${index}`,
+        timezone: "America/Los_Angeles",
+      } })).rejects.toThrow("organization-wide site creation");
+      launchContext.scope.siteIds = [site.id];
+
+      // Organization-wide grant with expanded effective site IDs is still
+      // organization-wide; this is how production session resolution behaves.
+      const [wideGrant] = await db.insert(schema.accountPersonGrants).values({
+        accountId: operatorAccount.id, personId: operator.id, role: "registrar",
+        organizationId: host.id, siteId: null, active: true,
+      }).returning({id:schema.accountPersonGrants.id});
+      const wideContext = {
+        ...launchContext,
+        grantId: wideGrant.id,
+        grantSiteId: null,
+        scope: { ...launchContext.scope, siteIds: [site.id] },
+      };
+      launchState.context = wideContext;
       const extraSite = await launchFunctions.createLaunchSite({ data: {
         organizationId: host.id,
         name: "Additional Campus",
         slug: `additional-${suffix}-${index}`,
         timezone: "America/Los_Angeles",
       } });
-      launchContext.scope.siteIds = [site.id];
+      // Exercise the actual registrar handler for the expansion's program.
+      const extension = await launchFunctions.startLaunch({ data: {
+        hostOrganizationId: host.id,
+        siteId: extraSite.siteId,
+        jurisdictionId: jurisdiction.id,
+        type: "high_school_extension",
+        name: "Second Campus High School Extension",
+        slug: `extension-${suffix}-${index}`,
+        gradeRange: { min: "9", max: "12" },
+        deliveryModel: { onsite: true, asynchronous: true, onsiteDaysPerWeek: 2 },
+        academicProviderOrganizationId: canOrg.id,
+        creditIssuingOrganizationId: canOrg.id,
+      } });
+      const [extensionProgram] = await db.select().from(schema.programs)
+        .where(eq(schema.programs.id, extension.programId));
+      expect(extensionProgram.siteId).toBe(extraSite.siteId);
+      expect(extensionProgram.type).toBe("high_school_extension");
+      expect(extensionProgram.status).toBe("launching");
+      expect(extension.journeyId).toBeTruthy();
+      launchState.context = launchContext;
       expect(await db.select().from(schema.domainEvents).where(and(
         eq(schema.domainEvents.aggregateId, extraSite.siteId),
         eq(schema.domainEvents.eventType, "SiteCreated"),
