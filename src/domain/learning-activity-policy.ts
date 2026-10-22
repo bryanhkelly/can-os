@@ -21,7 +21,7 @@ export const learnerInteractionInputSchema = z.discriminatedUnion("kind", [
   z.object({
     ...common,
     kind: z.literal("resource_opened"),
-    resourceId: z.string().uuid(),
+    resourceId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
   }).strict(),
   z.object({
     ...common,
