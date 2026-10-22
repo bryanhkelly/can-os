@@ -1,5 +1,30 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## Product priorities — cumulative implementation, 22 October 2026
+
+The agreed order is **guided launch → action ownership/deadlines → Student 360 →
+academics/credits → finance → deeper hybrid scheduling → optional denomination
+features**. These are improvements to existing canonical commands/read models,
+not a second school platform. Changes remain on `FullFlow` / draft PR #172.
+
+| Priority | Committed implementation | Remaining acceptance |
+| --- | --- | --- |
+| Guided launch | `guided-school-journey.ts` and `GuidedSchoolJourney.tsx` turn the scoped live Program record into six navigable steps. A step is recorded only from canonical DB evidence; school-wide operations is always marked Review, never an automatic acceptance pass. | Real staff navigation and reload with one linked Program |
+| Operational action engine | `operations-action-triage.ts`, staff work queue, and `setOperationsActionDeadline`: urgent/due/unassigned ordering, due-date counts, verified site/program guard, auditable due-date change, existing owner's in-app alert. | Disposable DB tests for owner changes and deadline state, multi-role browser |
+| Student 360 | Existing `/staff/students/$personId` gains an academic-activity timeline. Searches, active-section counts, missing-work counts, attendance, actions, insights, and referrals are constrained to permitted programs/sections/sites. A teacher cannot view the student's other, untaught classes or private referral history through this read model. | Different-program and shared-student teacher isolation tests on real DB |
+| Academic credit and transcripts | `section-credit-policy.ts` removes the silent 1-credit fallback, blocks official transcript issuance when credit units are not configured, and labels missing units in the report view. Registrar can set actual Section credits in `/operations/launch/$programId`, with an audit/event and a lock after final grades; section provisioning optionally records units initially. | DB integration and authorized registrar UI; issuance snapshot test |
+| Hybrid starter | A deliberate Grade 9 extension preset pre-fills onsite two days plus asynchronous delivery in the existing launch form. It never creates regulatory compliance, signed curriculum, schedules, attendance expectations or staff grants. | Actual calendar and hybrid attendance acceptance, after core journey |
+| Finance | **Not implemented.** No canonical tuition/billing/payments ledger was found. Do not generate money movements, financial aid or host-share percentages without an approved commercial/finance domain model. | Separate finance design and real ledger/payment integration; only after core-school acceptance |
+| Network/denomination | Existing partner contract and affiliation code retained but **deferred**. | No expansion until continuous school acceptance |
+
+**Gating facts:** the six-stage `tests/integration/full-flow.integration.test.ts`
+continues to be **written but not executed** against the disposable Neon branch.
+The new functional unit/CI checks cannot substitute for a linked database and
+authenticated-browser run. Do not claim an overall FullFlow pass, even when
+static CI is green.
+
+
+
 ## P0: canonical continuous six-stage journey
 
 **[The single FullFlow acceptance contract](./full-flow-acceptance-contract.md)
