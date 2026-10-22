@@ -720,6 +720,65 @@ integration("FullFlow: one school, same high-school program through curriculum a
           .where(eq(s.submissions.id,submission.submissionId)));
         expect(graded.status).toBe("graded");
         expect(Number(graded.score)).toBe(9);
+
+        // Teacher reviews the separately student-visible goal against the
+        // actual SAME student/section/AFTER-goal graded assessment, even if
+        // the private teacher intervention has already been resolved.
+        const goalReview = await import("@/modules/learning/student-goal-review.functions");
+        const eligibleGoalWork = await goalReview.getStudentGoalGradedEvidence({data:{
+          goalActionId:sharedGoal.actionId,
+        }});
+        expect(eligibleGoalWork.availableEvidence.map(row=>row.submissionId))
+          .toContain(submission.submissionId);
+        const approvedReview = {
+          goalActionId:sharedGoal.actionId,
+          gradedSubmissionId:submission.submissionId,
+          outcome:"met" as const,
+          studentFeedback:"Your explanation of inverse operations and written verification meets the assigned practice goal.",
+          confirmedStudentSafe:true as const,
+        };
+        state.actor = guardianActor;
+        await expect(goalReview.reviewStudentLearningGoal({data:approvedReview}))
+          .rejects.toThrow("assigned teacher");
+        state.actor = {...teacherActor, actorPersonId:outsider.id};
+        await expect(goalReview.getStudentGoalGradedEvidence({data:{
+          goalActionId:sharedGoal.actionId,
+        }})).rejects.toThrow("current teacher-owned goal relationship");
+        state.actor = teacherActor;
+        await expect(goalReview.reviewStudentLearningGoal({data:{
+          ...approvedReview, gradedSubmissionId:crypto.randomUUID(),
+        }})).rejects.toThrow("newly graded work");
+        const reviewed = await goalReview.reviewStudentLearningGoal({data:approvedReview});
+        expect(reviewed).toEqual({
+          goalActionId:sharedGoal.actionId,outcome:"met",duplicate:false,
+        });
+        expect(await goalReview.reviewStudentLearningGoal({data:approvedReview}))
+          .toEqual({goalActionId:sharedGoal.actionId,outcome:"met",duplicate:true});
+        const [completedGoal] = await tx.select().from(s.actions)
+          .where(eq(s.actions.id,sharedGoal.actionId));
+        expect(completedGoal.status).toBe("resolved");
+        expect(completedGoal.resolutionNote).toBe(approvedReview.studentFeedback);
+        expect(completedGoal.metadata.goalReview).toMatchObject({
+          submissionId:submission.submissionId,outcome:"met",
+          studentFeedback:approvedReview.studentFeedback,
+        });
+        expect(await tx.select().from(s.domainEvents).where(and(
+          eq(s.domainEvents.aggregateId,sharedGoal.actionId),
+          eq(s.domainEvents.eventType,"ActionResolved"),
+        ))).toHaveLength(1);
+        expect(await tx.select().from(s.auditEvents).where(and(
+          eq(s.auditEvents.resourceId,sharedGoal.actionId),
+          eq(s.auditEvents.action,"student.learning_goal.reviewed"),
+        ))).toHaveLength(1);
+        state.actor = studentActor;
+        const reviewedStudentAction = first((await studentActions.getQuickWinActions()).actions
+          .filter(action=>action.id===sharedGoal.actionId));
+        expect(reviewedStudentAction.status).toBe("resolved");
+        expect(reviewedStudentAction.review).toMatchObject({
+          outcome:"met",studentFeedback:approvedReview.studentFeedback,
+        });
+        expect(JSON.stringify(reviewedStudentAction)).not.toContain(supportRequest.observation);
+        state.actor = teacherActor;
         const [postedEvent] = await tx.select().from(s.domainEvents).where(and(
           eq(s.domainEvents.aggregateId,submission.submissionId),
           eq(s.domainEvents.eventType,"GradePosted"),
