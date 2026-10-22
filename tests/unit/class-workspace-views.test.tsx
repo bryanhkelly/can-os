@@ -59,6 +59,29 @@ describe("published class workspace", () => {
     expect(html).not.toContain("Roster");
     expect(html).not.toMatch(/Create class|Edit lesson|Live room|Recording/);
   });
+  it("instruments only the real published lesson and resource controls for student telemetry", () => {
+    const source = { id: "source-1", title: "Evidence source", url: "https://www.loc.gov/" };
+    const lesson = {
+      ...workspace.content!.modules[0]!.lessons[0]!,
+      body: "Read the source and take notes.",
+      resources: [source],
+      activities: [{ id: "self-check", title: "Check your reasoning",
+        kind: "self_check" as const, instructions: "Write down two supporting examples." }],
+    };
+    const data = { ...workspace, content: { ...workspace.content!,
+      modules: [{ ...workspace.content!.modules[0]!, lessons: [lesson] }],
+    }};
+    const student = renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="evidence" />);
+    expect(student).toContain("Learning activity");
+    expect(student).toContain('data-learning-content="true"');
+    expect(student).toContain('data-learning-resource-id="source-1"');
+    expect(student).toContain("Evidence source");
+    const guardian = renderToStaticMarkup(<ClassWorkspace data={{ ...data, role: "guardian" }} tab="lessons" lessonId="evidence" />);
+    expect(guardian).not.toContain('aria-label="Learning activity"');
+    expect(guardian).toContain("Evidence source");
+    const overview = renderToStaticMarkup(<ClassWorkspace data={data} tab="overview" />);
+    expect(overview).not.toContain('aria-label="Learning activity"');
+  });
   it("supports first, middle, and final published lesson navigation without altering completion",()=>{
     const data={...workspace,content:{...workspace.content!,modules:[{...workspace.content!.modules[0]!,
      lessons:[...workspace.content!.modules[0]!.lessons,
