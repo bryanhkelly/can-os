@@ -487,10 +487,20 @@ integration("FullFlow: one school, same high-school program through curriculum a
           .where(eq(s.submissions.id,submission.submissionId)));
         expect(graded.status).toBe("graded");
         expect(Number(graded.score)).toBe(9);
-        expect(await tx.select().from(s.domainEvents).where(and(
+        const [postedEvent] = await tx.select().from(s.domainEvents).where(and(
           eq(s.domainEvents.aggregateId,submission.submissionId),
           eq(s.domainEvents.eventType,"GradePosted"),
-        ))).toHaveLength(1);
+        ));
+        expect(postedEvent).toBeTruthy();
+        // Exercise the real outbox handler (not just the GradePosted event row).
+        const events = await import("@/modules/learning/academic-event-handler");
+        await events.handleGradePostedEvent(postedEvent!.id);
+        const guardianGradeNotice = await tx.select().from(s.notifications).where(and(
+          eq(s.notifications.recipientPersonId,guardian.id),
+          eq(s.notifications.resourceId,submission.submissionId),
+          eq(s.notifications.type,"grade_posted"),
+        ));
+        expect(guardianGradeNotice).toHaveLength(1);
 
         state.actor = guardianActor;
         const parentProgress = await guardianQueries.getGuardianAssignments({data:{
