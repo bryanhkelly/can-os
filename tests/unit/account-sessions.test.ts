@@ -4,7 +4,7 @@ import type { SQL } from "drizzle-orm";
 import type { AccessContext } from "@/domain/access-context";
 
 const state = vi.hoisted(() => ({
- reads: [] as Array<{id:string;createdAt:Date;updatedAt:Date;expiresAt:Date}>,
+ reads: [] as Array<{id:string;createdAt:Date;lastActivityAt:Date;expiresAt:Date}>,
  changed: [] as Array<{id:string}>,
  conditions: [] as SQL[],
  changes: [] as Array<Record<string,unknown>>,
@@ -69,8 +69,8 @@ describe("owned security sessions", () => {
  it("lists only server-filtered live sessions and flags current without leaking token hashes", async () => {
   const time=new Date();
   state.reads=[
-   {id:"session-2",createdAt:time,updatedAt:time,expiresAt:new Date(time.getTime()+60_000)},
-   {id:"session-1",createdAt:time,updatedAt:time,expiresAt:new Date(time.getTime()+60_000)},
+   {id:"session-2",createdAt:time,lastActivityAt:time,expiresAt:new Date(time.getTime()+60_000)},
+   {id:"session-1",createdAt:time,lastActivityAt:time,expiresAt:new Date(time.getTime()+60_000)},
   ];
   const result=await listAccountSessions(actor);
   expect(result).toHaveLength(2);
