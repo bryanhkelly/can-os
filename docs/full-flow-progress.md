@@ -23,6 +23,7 @@ This checklist records evidence and blockers, not automatic production acceptanc
 | 1A | Correct organization-wide vs site-limited school launch grant handling | In `FullFlow`, inherited from prior school-launch patch | Primary CI passed on prior isolated patch; signed-in acceptance pending |
 | 1B | HQ creates its own location with distinct non-academic `network_admin` grant | Server commands, domain policy, HQ workspace and unit tests added on `FullFlow` | Primary CI passed; isolated database/browser acceptance pending; HQ grant must be deliberately provisioned |
 | 1C | Independent site requests link to denomination; HQ reviews it | New `site_affiliations` table, local request/withdraw, HQ approve/reject/revoke, UI and guarded integration fixture added on `FullFlow` | Primary CI passed (run `39732006470`); database/browser acceptance pending |
+| 1D | Verify network contract and provision HQ officer | Agreement evidence + effective-term table, CAN steward authorization, officer authority checks, server-side contract gates and steward desk on `FullFlow` | Primary CI and database/browser acceptance pending |
 | 2 | Independently governed school configures high-school extension | Existing GF3 flows, then closed-loop acceptance | Not accepted |
 | 3 | Curriculum adoption, teacher and class provisioning | Existing canonical publisher/school/classroom tools | Not accepted |
 | 4 | Family application, offer, activation and class assignment | Existing GF22/GF2 | Not accepted |
@@ -60,3 +61,26 @@ This checklist records evidence and blockers, not automatic production acceptanc
 1. Dedicated, authorized CAN-issued HQ membership provisioner tied to verified executed contract; current `network_admin` grants must be assigned out-of-band by an authorized steward.
 2. Explicit, versioned partnership agreement/entitlement evidence must gate production affiliation approval. A verified HQ grant is not sufficient contract proof.
 3. Browser acceptance with real authenticated sessions and an isolated database, including negative access to student/family endpoints, remains unverified.
+
+## Bite 1D — verified partner agreement and HQ officer provisioning
+
+A verified HQ login is **not** sufficient to operate a network. A verified **current agreement** is now required by the HQ site workspace, site creation, affiliation request target discovery, and HQ affiliation review. Once the agreement expires, HQ management operations fail closed; local school ownership and affiliation history remain unchanged.
+
+A separate `can_network_steward` role, granted only under a verified CAN-network Organization with no Site restriction, can:
+1. Record the existence of an externally signed agreement. It must reference an existing `documents` row with `subject_type='organization'`, denomination subject ID, `category='network_agreement'`, valid independent `verified_at` and `verified_by_person_id`, and no expired evidence. The steward recording the contract cannot be the same Person who verified that document.
+2. Create an organization-wide `network_admin` grant only while a contract is current, with a second independently verified `network_hq_authority` Document whose `metadata.authorizedEmailNormalized` **exactly matches** the invited officer's normalized email. A locally existing account/person is reused; otherwise an account/person is created. This records a real membership but does **not** bypass email verification or send a mail message.
+3. Review contract terms and the recorded agreement reference in `/network-steward`. This interface is a post-verification record, **not** an upload, e-signature, independent verification or contract-negotiation system.
+
+Authority and evidence are **distinct**:
+- CAN steward may not enroll students, open programs, modify schools' registrar grants or review student records.
+- Denomination HQ grant may not manage student data or grant itself stronger roles.
+- School registrar may not mint `network_admin` or `can_network_steward`, including by toggling existing grants' active status.
+- All agreement and HQ-provisioning mutations write transactional audit and domain events. Identical contract reference retries reuse existing details; changed reference details reject; active officer membership retries reuse existing grant.
+- New schema is `drizzle/0029_network_agreements.sql`, reviewed in GitHub CI only; **not migrated to production**.
+
+### Remaining acceptance blockers
+
+- The very first CAN-steward membership must be bootstrapped by a separately authorized operator; no browser self-registration or school registrar escalation exists.
+- Independent signed-contract and HQ officer-authority verification/upload pathways are not yet implemented in CAN OS. The steward desk accepts IDs of **already independently verified** Documents, not legal attestation by checkbox.
+- Contract term revocation and renewal workflows, explicit entitlements, independent verifier administration, account invitation delivery and dual-control review need subsequent focused bites before commercial production acceptance.
+- Isolated Neon integration and authenticated-browser validation must run before treating this as fully accepted. Missing isolated Neon CI configuration remains a blocker.
