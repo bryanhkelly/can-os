@@ -39,7 +39,9 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
     .where(and(inArray(s.enrollments.sectionId, sectionIds),
       eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active")))
     .limit(501);
-  const selected = roster.slice(0, 500);
+  const selected = roster.filter(
+    (row): row is typeof row & { sectionId: string } => row.sectionId !== null,
+  ).slice(0, 500);
   const ids = [...new Set(selected.map(r => r.studentProfileId))];
   const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const evidence = ids.length ? await db.select({
