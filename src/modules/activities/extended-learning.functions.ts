@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { extendedRegistrationOpeningReadiness } from "./registration-policy";
 const extendedTypes = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const draftInput = z.object({
@@ -24,7 +25,7 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
   const siteIds = actor.scope.siteIds ?? [];
   const orgIds = actor.scope.organizationIds ?? [];
   if (!ids.length || !siteIds.length || !orgIds.length)
-    return { programs: [], seasons: [] };
+    return { programs: [], seasons: [], readiness: [] };
 
   const rows = await db.select({
     id: programs.id, name: programs.name, type: programs.type,
@@ -35,9 +36,10 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
     isNull(programs.creditIssuingOrganizationId),
   )).orderBy(asc(programs.name)).limit(100);
 
-  if (!rows.length) return { programs: rows, seasons: [] };
+  if (!rows.length) return { programs: rows, seasons: [], readiness: [] };
   const seasons = await db.select({
     id: activitySeasons.id, activityId: activities.id, programId: activities.programId,
+    siteId: activities.siteId,
     offeringName: activities.name, name: activitySeasons.name,
     startsOn: activitySeasons.startsOn, endsOn: activitySeasons.endsOn,
     capacity: activitySeasons.capacity, status: activitySeasons.status,
@@ -45,7 +47,27 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
     .where(and(inArray(activities.programId, rows.map(row => row.id)),
       inArray(activities.siteId, siteIds)))
     .orderBy(asc(activitySeasons.startsOn)).limit(300);
-  return { programs: rows, seasons };
+  // The immutable facts are read server-side. Unimplemented safeguarding,
+  // staffing, emergency, and child-release approval sources FAIL CLOSED.
+  // No user checkbox or metadata value can currently open registration.
+  const readiness = seasons.map(season => {
+    const program = rows.find(p => p.id === season.programId);
+    return {
+      seasonId: season.id,
+      ...extendedRegistrationOpeningReadiness({
+        programStatus: program?.status ?? null,
+        seasonStatus: season.status,
+        siteMatchesProgram: !!program?.siteId && program.siteId === season.siteId,
+        capacity: season.capacity,
+        approvedSafeguardingCoverage: false,
+        verifiedOnsiteStaffing: false,
+        emergencyResponsePlanApproved: false,
+        pickupAndReleasePolicyApproved: false,
+        datedSessionsAndCoverageVerified: false,
+      }),
+    };
+  });
+  return { programs: rows, seasons, readiness };
 });
 
 export const createExtendedSeasonDraftFn = createServerFn({ method: "POST" })
