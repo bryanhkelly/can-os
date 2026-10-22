@@ -65,14 +65,14 @@ integration("FullFlow: one school, same high-school program through curriculum a
           slug: `fullflow-school-${suffix}`,
         }).returning());
         const publisherOrg = first(await tx.insert(s.organizations).values({
-          type: "other_partner", name: "FullFlow Curriculum Publisher",
+          type: "christian_school", name: "FullFlow Curriculum Publisher",
           slug: `fullflow-publisher-${suffix}`,
         }).returning());
         const jurisdiction = first(await tx.insert(s.jurisdictions).values({
           code: `fullflow-${suffix}`, name: "Synthetic school jurisdiction",
         }).returning());
         await tx.insert(s.journeyDefinitions).values({
-          key: `fullflow-launch-${suffix}`, version: "1",
+          key: "program-launch", version: `fullflow-${suffix}`,
           owningOrganizationId: school.id, audience: "partner",
           title: "FullFlow high-school extension launch",
           configuration: { requirements: [
