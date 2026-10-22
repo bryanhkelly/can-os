@@ -1,6 +1,6 @@
 import {and,eq,gt,isNull,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,accountPersonGrants,programs,sites as schoolSites} from "@/db/schema";
+import {accessAccounts,accessSessions,accountPersonGrants,people,programs,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret} from "@/domain/access-tokens";
@@ -32,7 +32,9 @@ export async function getCommandContext(request: Request): Promise<AccessContext
   id:accountPersonGrants.id,accountId:accountPersonGrants.accountId,personId:accountPersonGrants.personId,
   role:accountPersonGrants.role,organizationId:accountPersonGrants.organizationId,
   siteId:accountPersonGrants.siteId,active:accountPersonGrants.active,
- }).from(accountPersonGrants).where(and(eq(accountPersonGrants.accountId,session.accountId),eq(accountPersonGrants.active,true)));
+ }).from(accountPersonGrants)
+  .innerJoin(people,eq(people.id,accountPersonGrants.personId))
+  .where(and(eq(accountPersonGrants.accountId,session.accountId),eq(accountPersonGrants.active,true),eq(people.active,true)));
  const selected=grants.find(grant=>grant.id===session.activeGrantId);
  const context=resolveAccessContext({
   accountId:session.accountId===LOCAL_DEMO_ADMIN.accountId&&selected?selected.accountId:session.accountId,
