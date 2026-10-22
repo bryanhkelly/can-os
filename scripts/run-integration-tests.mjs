@@ -53,6 +53,17 @@ if (process.env.CAN_APPLICATION_DB_HOST) {
   }
 }
 
+// A URL isolation preflight is necessary but not sufficient: connected FullFlow
+// fixtures must see the exact migration ledger and persisted session/learning schema.
+if (mode === "full-flow") {
+  const schema = spawnSync(process.execPath, ["scripts/verify-fullflow-schema.mjs"], {
+    stdio: "inherit",
+    env: process.env,
+  });
+  if (schema.error) throw schema.error;
+  if (schema.status !== 0) fail("FullFlow isolated database schema check failed.");
+}
+
 if (process.argv.includes("--preflight")) {
   if (mode !== "curriculum-journey" && mode !== "curriculum-authoring" && mode !== "attendance-handoff" && mode !== "admissions-offers" && mode !== "academic-intervention" && mode !== "class-participation" && mode !== "delivery-history" && mode !== "qualification-readiness" && mode !== "capacity-expiry" && mode !== "launch-staffing" && mode !== "network-onboarding" && mode !== "full-flow") {
     fail("preflight is only supported for acceptance-test modes.");
