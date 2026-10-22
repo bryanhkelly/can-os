@@ -26,6 +26,8 @@ export type AccessContext = CommandContext & {
 
 /** Capability mapping is centralized; domain-specific relationship checks are still required. */
 export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Object.freeze({
+ // Network partners govern affiliation and their own sites; never student or school operations.
+ network_admin: ["network.sites.read", "network.sites.manage"],
  student: ["student:read","assignments:submit","study-groups:participate","notifications:manage","communication.send","calendar.event.create"],
  teacher: ["teacher:read","profiles.credentials.submit","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate","communication.send","attendance.write","attendance.excuse.review","action.create","action.resolve","program.read","calendar.event.create","calendar.event.manage","insights:read","capacity.read"],
  guardian: ["guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read","communication.send","attendance.excuse.submit","calendar.event.create","conference.book"],
