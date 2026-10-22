@@ -18,7 +18,7 @@ export async function readWorkspaceSession(request: Request) {
     firstName: people.legalFirstName, lastName: people.legalLastName,
     organizationId: accountPersonGrants.organizationId, siteId: accountPersonGrants.siteId,
   }).from(accountPersonGrants).innerJoin(people, eq(people.id, accountPersonGrants.personId))
-    .where(and(eq(accountPersonGrants.accountId, context.accountId), eq(accountPersonGrants.active, true)));
+    .where(and(eq(accountPersonGrants.accountId, context.accountId), eq(accountPersonGrants.active, true),eq(people.active,true)));
   const siteIds = context.scope.siteIds ?? [];
   const programIds = context.scope.programIds ?? [];
   const [siteChoices, programChoices] = await Promise.all([
