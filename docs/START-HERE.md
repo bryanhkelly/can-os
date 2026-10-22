@@ -12,6 +12,8 @@ This directory separates **current specifications** from **historical implementa
 - **Focused current implementation note:** [admissions offers](./admissions-offers.md). Historic labels: [feature tracks](./FEATURE-TRACKS.md).
 - **Release evidence:** [synthetic pilot gate](./synthetic-pilot-release-gate.md). A `HOLD` snapshot is not production authorization and requires up-to-date verification.
 
+FullFlow execution priority: [one connected six-stage acceptance contract](./full-flow-acceptance-contract.md). Golden Flow-specific tests and network onboarding must not substitute for that primary end-to-end school journey.
+
 New architecture specification: [Curriculum marketplace and portability](./curriculum-marketplace-architecture.md).
 
 ## Active cumulative FullFlow development
