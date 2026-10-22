@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
 import { TeacherLearningFollowUpForm } from "@/components/learning/TeacherLearningFollowUpForm";
+import { TeacherLearningFollowUpsPanel } from "@/components/learning/TeacherLearningFollowUpsPanel";
 import { WorkspaceShell, StatCard, EmptyState, QueryState } from "@/components/workspace";
 
 export const Route = createFileRoute("/teacher/")({ component: TeacherTodayPage });
@@ -110,6 +111,8 @@ function TeacherTodayPage() {
         <p className="mt-3 text-sm">Use existing <Link to="/teacher/missing-work" className="underline">missing-work follow-up</Link> and authorized support referrals for human-reviewed interventions.</p>
       </>}
     </section>
+
+    <TeacherLearningFollowUpsPanel />
 
     <section className="mt-10">
      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Missing work</p>
