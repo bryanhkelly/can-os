@@ -102,12 +102,24 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
     <h2 className="font-serif text-2xl">Available curriculum packs</h2>
     <div className="grid gap-4 md:grid-cols-2">
      {market.packs.map(pack=><article key={pack.versionId} className="space-y-3 rounded-xl border bg-card p-5">
-       <p className="text-xs uppercase tracking-wide text-muted-foreground">Version {pack.version} · {pack.licenseCode}</p>
+       <p className="text-xs uppercase tracking-wide text-muted-foreground">Version {pack.version} · {pack.licenseCode} · Published by {pack.publisherName}</p>
        <h3 className="font-serif text-2xl">{pack.name}</h3>
        <p className="text-sm text-muted-foreground">{pack.description}</p>
        <p className="text-sm">{pack.courses.length} published course versions</p>
-       <details className="text-sm"><summary className="cursor-pointer underline">View included courses</summary>
-        <ul className="mt-3 max-h-56 space-y-1 overflow-y-auto">{pack.courses.map(c=><li key={c.courseVersionId}>{c.code}: {c.title}</li>)}</ul>
+       <details className="text-sm"><summary className="cursor-pointer underline">Review included courses and outlines</summary>
+        <p className="mt-2 text-xs text-muted-foreground">Discovery previews show publisher-provided course structure, not lesson text, restricted teacher guides, or a guarantee of academic credit.</p>
+        <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto">{pack.courses.map(c=><li key={c.courseVersionId} className="rounded border p-3">
+          <p className="font-medium">{c.code}: {c.title} · {c.subject}</p>
+          {c.preview ? <details className="mt-2">
+            <summary className="cursor-pointer underline">{c.preview.moduleCount} units · {c.preview.lessonCount} lessons{c.preview.weeksPlanned ? ` · ${c.preview.weeksPlanned} planned instructional weeks` : ""}</summary>
+            {c.preview.syllabusSummary&&<p className="mt-2 whitespace-pre-wrap text-xs">{c.preview.syllabusSummary}{c.preview.syllabusSummary.length===240?"…":""}</p>}
+            <ol className="mt-2 list-inside list-decimal space-y-2">{c.preview.modules.map(module=><li key={module.id}>
+              <span className="font-medium">{module.title} · {module.lessonCount} lessons</span>
+              {module.lessonTitles.length>0&&<p className="ml-5 text-xs text-muted-foreground">{module.lessonTitles.join(" · ")}{module.lessonCount>module.lessonTitles.length?" …":""}</p>}
+            </li>)}</ol>
+            {c.preview.outlineTruncated&&<p className="mt-2 text-xs text-muted-foreground">Additional units omitted from this preview.</p>}
+          </details>:<p className="mt-2 text-xs text-muted-foreground">Publisher course outline not yet available for review.</p>}
+        </li>)}</ul>
        </details>
        {pack.entitlement!=="active"?<>
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={accepted[pack.id]??false}
