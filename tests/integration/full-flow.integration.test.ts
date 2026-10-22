@@ -576,6 +576,53 @@ integration("FullFlow: one school, same high-school program through curriculum a
         const teacherQueue = await followThrough.getTeacherLearningFollowUps();
         expect(teacherQueue.items.some(x=>x.id===support.actionId&&
           x.studentProfileId===profile.id&&x.sectionId===section.id)).toBe(true);
+        // Student Success handoff: deliberately NEW student-facing text, not
+        // the teacher's original intervention notes or learning telemetry.
+        const goalService = await import("@/modules/learning/teacher-student-goal.functions");
+        const approvedGoal = {
+          teacherActionId: support.actionId,
+          title: "Practice solving two-step equations",
+          studentInstructions: "Complete two assigned examples and bring the written steps to our next math class.",
+          dueInDays: 7 as const,
+        };
+        const sharedGoal = await goalService.shareTeacherStudentGoal({data:approvedGoal});
+        expect(sharedGoal.created).toBe(true);
+        expect(await goalService.shareTeacherStudentGoal({data:approvedGoal}))
+          .toEqual({actionId:sharedGoal.actionId,created:false});
+        const [studentGoal] = await tx.select().from(s.actions)
+          .where(eq(s.actions.id,sharedGoal.actionId));
+        expect(studentGoal).toMatchObject({
+          type:"student_learning_goal",status:"open",ownerPersonId:profile.personId,
+          parentActionId:support.actionId,subjectType:"student_profile",subjectId:profile.id,
+          sectionId:section.id,programId,siteId:site.id,
+          title:approvedGoal.title,description:approvedGoal.studentInstructions,
+          metadata:{source:"teacher_shared_learning_goal"},evidence:[],
+        });
+        expect(JSON.stringify(studentGoal)).not.toContain(supportRequest.observation);
+        expect(await tx.select().from(s.auditEvents).where(and(
+          eq(s.auditEvents.resourceId,sharedGoal.actionId),
+          eq(s.auditEvents.action,"student.learning_goal.shared"),
+        ))).toHaveLength(1);
+        state.actor = {...teacherActor,actorPersonId:outsider.id};
+        await expect(goalService.shareTeacherStudentGoal({data:{
+          ...approvedGoal,teacherActionId:support.actionId,
+        }})).rejects.toThrow("active teacher-owned academic follow-up");
+        state.actor = guardianActor;
+        await expect(goalService.shareTeacherStudentGoal({data:approvedGoal}))
+          .rejects.toThrow("verified assigned teacher");
+        state.actor = studentActor;
+        const studentActions = await import("@/modules/actions/student-actions.functions");
+        const visibleActions = await studentActions.getQuickWinActions();
+        expect(visibleActions.actions.find(x=>x.id===sharedGoal.actionId)).toMatchObject({
+          title:approvedGoal.title, description:approvedGoal.studentInstructions,
+          type:"student_learning_goal",subjectId:profile.id,
+        });
+        expect(JSON.stringify(visibleActions.actions.find(x=>x.id===sharedGoal.actionId)))
+          .not.toContain(supportRequest.observation);
+        await expect(studentActions.finishQuickWinAction({data:{
+          actionId:sharedGoal.actionId,
+        }})).rejects.toThrow("owning workflow");
+        state.actor = teacherActor;
         const resolution = {
           actionId:support.actionId,
           supportProvided:"Reviewed inverse operations with the student using a worked example.",
