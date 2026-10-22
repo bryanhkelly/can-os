@@ -1,4 +1,4 @@
-import { curriculumDraftContent } from "./curriculum-authoring";
+import { assertTeacherGuidesMatchCourse, curriculumDraftContent } from "./curriculum-authoring";
 import type { ClassContent } from "./class-content";
 import type { ClassTeacherGuides } from "./class-teacher-guides";
 
@@ -7,7 +7,7 @@ import type { ClassTeacherGuides } from "./class-teacher-guides";
  * "Blockers" mirror the mandatory content requirements checked again by the
  * authorized publication command. Warnings are advice, never new policy.
  */
-export function curriculumReleaseReadiness(content: ClassContent, guides: ClassTeacherGuides|null) {
+export function curriculumReleaseReadiness(content: ClassContent, guides: ClassTeacherGuides|null, courseCode:string) {
  const blockers:string[]=[];
  const warnings:string[]=[];
  const validation=curriculumDraftContent.safeParse(content);
@@ -28,6 +28,8 @@ export function curriculumReleaseReadiness(content: ClassContent, guides: ClassT
  if(missingStandards)warnings.push(`${missingStandards} lesson(s) have no standards references.`);
  if(!guides)warnings.push("No protected teacher guide is configured for this course.");
  else {
+  try{assertTeacherGuidesMatchCourse(content,guides,courseCode);}
+  catch{blockers.push("Fix protected teacher guide references or its course code before publishing.");}
   const covered=new Set(guides.units.flatMap(unit=>unit.lessons.map(lesson=>lesson.lessonId)));
   const missing=lessons.filter(lesson=>lesson.activities?.some(activity=>activity.evidence==="teacher_review")&&!covered.has(lesson.id)).length;
   if(missing)warnings.push(`${missing} lesson(s) request teacher-reviewed evidence without a protected lesson guide.`);
