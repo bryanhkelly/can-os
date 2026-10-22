@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import { TeacherStudentGoalForm } from "./TeacherStudentGoalForm";
 import {
   getTeacherLearningFollowUps,
   resolveTeacherLearningFollowUp,
@@ -106,6 +107,7 @@ export function TeacherLearningFollowUpsPanel() {
           <p className="mt-1 text-xs text-muted-foreground">
             Planned support: {followUpApproachLabels[item.approach as keyof typeof followUpApproachLabels] ?? "Teacher check-in"}
           </p>
+          {item.status !== "resolved" && <TeacherStudentGoalForm teacherActionId={item.id} />}
           <TeacherFollowUpResolution item={item} onSaved={load} />
         </article>)}
       </div>
