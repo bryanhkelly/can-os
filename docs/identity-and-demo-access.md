@@ -75,6 +75,32 @@ secret hashes, IP addresses or raw credentials.
 - Passing static tests are not a substitute for verifying multiple real
   sessions and cross-account denial against a disposable Neon branch.
 
+## Security event attribution (FullFlow bite 4)
+
+Authentication and session lifecycle successes now use a **typed, shared writer**
+that persists records into the existing append-only `audit_events` table.
+Covered events: `identity.session.started`, `identity.session.revoked`,
+`identity.session.revoked_remote`, `identity.sessions.revoked_all` and
+`identity.membership.selected`. Every recorded success includes its verified
+account, person (or explicit null where unavailable), session, grant, effective
+role and outcome. Login method is limited to known enum values. The audit
+writer intentionally ignores arbitrary email, token, password, IP, browser
+details and raw request payloads.
+
+The generic `writeAudit(tx, commandContext, change)` path additionally includes
+authenticated account/session/grant/role data **when available from the
+server-verified command context**. Explicit user-supplied audit extras cannot
+override verified attribution or the server request ID. Operations without a
+verified user context continue to record their existing system-level evidence;
+we do not invent an identity.
+
+**Current limit:** This bite does **not** claim comprehensive failed-login
+monitoring. Unassociated unknown-token attempts cannot be responsibly
+attributed to a real account using the current audit schema. Failed passwordless
+redemption, abuse control, attempt counting, structured unauthenticated
+security telemetry and retention controls are distinct follow-on security tasks.
+Do not store raw credentials or student work in the audit log.
+
 ## Passwordless flow
 
 - Enter email; endpoint always responds generically (avoid enumeration).
