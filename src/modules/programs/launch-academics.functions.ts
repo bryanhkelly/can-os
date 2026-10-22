@@ -5,11 +5,14 @@ people,
 programs,roleAssignments,schoolYears,
 qualificationDefinitions,
 sections,
+sectionGrades,
 sectionTeachers,
 terms
 } from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { EventTypes } from "@/domain/event-types";
+import { verifiedSectionCreditUnits } from "@/domain/section-credit-policy";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { and,asc,eq,inArray,isNull,or } from "drizzle-orm";
@@ -76,7 +79,7 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
   const teachingStaff=[...new Map(personnel.map(p=>[p.personId,p])).values()];
   const sectionRows=await db.select({
    id:sections.id,title:sections.title,code:sections.code,termId:sections.termId,
-   active:sections.active,
+   active:sections.active,metadata:sections.metadata,
   }).from(sections).where(eq(sections.programId,program.id)).orderBy(asc(sections.title));
   const assignments=sectionRows.length?await db.select({
    sectionId:sectionTeachers.sectionId,personId:sectionTeachers.personId,
@@ -90,7 +93,8 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
     return {personId:teacher.personId,eligible:eligibility.eligible,reasons:eligibility.reasons,
      from:eligibility.window.from.toISOString(),through:eligibility.window.through.toISOString()};
    }));
-   return {...row,teachers:assignments.filter(a=>a.sectionId===row.id),
+   const {metadata,...publicRow}=row;
+   return {...publicRow,creditUnits:verifiedSectionCreditUnits(metadata),teachers:assignments.filter(a=>a.sectionId===row.id),
     candidates,
     readiness:{...readiness,items:readiness.items.map(({evidence,...item})=>item)}};
   }));
@@ -103,6 +107,7 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
   programId:uuid,termId:uuid,courseTemplateVersionId:uuid,
   code:z.string().trim().min(2).max(32),title:z.string().trim().min(2).max(160),
   teacherPersonId:uuid.optional(),
+  credits:z.number().positive().max(10).refine(v=>verifiedSectionCreditUnits({credits:v})!==null).optional(),
  }).parse(v))
  .handler(async({data})=>{
   const {actor,program}=await setupContext(data.programId);
@@ -122,13 +127,16 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
     programId:program.id,siteId:program.siteId,termId:data.termId,
     courseTemplateVersionId:data.courseTemplateVersionId,
     code:data.code,title:data.title,active:true,
-   }).onConflictDoNothing().returning({id:sections.id,versionId:sections.courseTemplateVersionId,title:sections.title});
-   const [existing]=created?[created]:await tx.select({id:sections.id,versionId:sections.courseTemplateVersionId,title:sections.title}).from(sections)
+    metadata:data.credits!==undefined?{credits:data.credits}:{},
+   }).onConflictDoNothing().returning({id:sections.id,versionId:sections.courseTemplateVersionId,title:sections.title,metadata:sections.metadata});
+   const [existing]=created?[created]:await tx.select({id:sections.id,versionId:sections.courseTemplateVersionId,title:sections.title,metadata:sections.metadata}).from(sections)
     .where(and(eq(sections.programId,program.id),eq(sections.termId,data.termId),
      eq(sections.code,data.code))).limit(1);
    if(!existing)throw new Error("Section code collision");
    if(existing.versionId!==data.courseTemplateVersionId||existing.title!==data.title)
     throw new Error("Section code is already used by a different class or curriculum version");
+   if(data.credits!==undefined&&verifiedSectionCreditUnits(existing.metadata)!==data.credits)
+    throw new Error("Existing section code has different academic credit units");
    if(data.teacherPersonId){
     await assignLaunchInstructor(tx,actor,{programId:program.id,sectionId:existing.id,
      teacherPersonId:data.teacherPersonId});
@@ -142,7 +150,7 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
      action:"launch.section.provision",entityType:"section",entityId:existing.id,
      scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
      after:{code:data.code,title:data.title,termId:data.termId,
-      teacherPersonId:data.teacherPersonId??null}});
+      teacherPersonId:data.teacherPersonId??null,credits:data.credits??null}});
    }
    return {sectionId:existing.id,created:Boolean(created)};
   });
@@ -197,4 +205,41 @@ export const publishLaunchTeacherPolicy=createServerFn({method:"POST"})
     after:{qualificationKeys:keys,version:"1",confirmed:true}});
    return {versionId:version.id};
   });
+ });
+
+/** Registrar explicitly sets course credits before finalized grades exist. */
+export const setLaunchSectionCredits=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({
+   programId:uuid,sectionId:uuid,
+   credits:z.number().positive().max(10)
+     .refine(units=>verifiedSectionCreditUnits({credits:units})!==null,"Use at most two decimal places"),
+   reason:z.string().trim().min(5).max(500),
+ }).strict().parse(value))
+ .handler(async({data})=>{
+   const {actor,program}=await setupContext(data.programId);
+   if(!program.siteId)throw new AuthorizationError("school site required");
+   return db.transaction(async tx=>{
+     const [section]=await tx.select({id:sections.id,programId:sections.programId,
+       siteId:sections.siteId,metadata:sections.metadata})
+       .from(sections).where(eq(sections.id,data.sectionId)).for("update").limit(1);
+     if(!section||section.programId!==program.id||section.siteId!==program.siteId)
+       throw new AuthorizationError("authorized school section");
+     const current=verifiedSectionCreditUnits(section.metadata);
+     if(current===data.credits)return {changed:false as const,credits:current};
+     const [finalGrade]=await tx.select({id:sectionGrades.id}).from(sectionGrades)
+       .where(and(eq(sectionGrades.sectionId,section.id),eq(sectionGrades.status,"finalized")))
+       .limit(1);
+     if(finalGrade)throw new Error("Course credits are locked after finalized grades");
+     await tx.update(sections).set({metadata:{...section.metadata,credits:data.credits},updatedAt:new Date()})
+       .where(eq(sections.id,section.id));
+     await emitEvent(tx,{eventType:EventTypes.SectionCreditConfigured,
+       aggregateType:"section",aggregateId:section.id,actorPersonId:actor.actorPersonId,
+       organizationId:program.organizationId,siteId:program.siteId,programId:program.id,
+       payload:{before:current,after:data.credits}});
+     await writeAudit(tx,actor,{action:"academic.section_credits.configure",
+       entityType:"section",entityId:section.id,
+       scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
+       before:{credits:current},after:{credits:data.credits,reason:data.reason}});
+     return {changed:true as const,credits:data.credits};
+   });
  });
