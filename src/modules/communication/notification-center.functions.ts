@@ -208,7 +208,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const permittedConsents=new Set(consentActions.filter(action=>
   !action.programId||(context.scope.programIds??[]).includes(action.programId)
  ).map(action=>action.id));
- const assignedActionIds=rows.filter(n=>n.resourceType==="action"&&n.resourceId&&n.type==="operations_action_assigned").map(n=>n.resourceId as string);
+ const assignedActionIds=rows.filter(n=>n.resourceType==="action"&&n.resourceId&&["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)).map(n=>n.resourceId as string);
  const ownedActions=assignedActionIds.length?await db.select({id:s.actions.id,siteId:s.actions.siteId,programId:s.actions.programId})
    .from(s.actions).where(and(inArray(s.actions.id,assignedActionIds),eq(s.actions.ownerPersonId,personId),
      inArray(s.actions.siteId,context.scope.siteIds??[]))):[];
@@ -238,7 +238,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)||
     n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${encodeURIComponent(n.resourceId!)}`:"/guardian/group-permissions"):
    n.type==="program_opening_handoff"&&n.resourceId&&handoffSites.get(n.resourceId)?`/sites/${encodeURIComponent(handoffSites.get(n.resourceId)!)}`:
-   n.type==="operations_action_assigned"&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&context.role==="registrar"?`/operations?action=${encodeURIComponent(n.resourceId)}`:
+   ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&context.role==="registrar"?`/operations?action=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"?`/groups?group=${encodeURIComponent(n.resourceId)}`:context.role==="student"?`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`:null):
    context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
 });
