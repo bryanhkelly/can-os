@@ -20,8 +20,11 @@ export function normalizeAccessEmail(value: string): string {
 export function accessChallengeIsUsable(input: {expiresAt:Date;consumedAt:Date|null;attempts:number}, now=new Date()): boolean {
  return !input.consumedAt && input.expiresAt.getTime()>now.getTime() && input.attempts<5;
 }
-export function accessSessionIsUsable(input: {expiresAt:Date;revokedAt:Date|null}, now=new Date()): boolean {
- return !input.revokedAt && input.expiresAt.getTime()>now.getTime();
+export function accessSessionIsUsable(input: {
+ expiresAt:Date;revokedAt:Date|null;updatedAt:Date;
+}, now=new Date()): boolean {
+ return !input.revokedAt && input.expiresAt.getTime()>now.getTime() &&
+  accessSessionIsWithinIdleWindow(input.updatedAt,now);
 }
 /** Server authority for idle expiry. Authenticated GETs and workspace polling
  * never move the idle deadline; only deliberate interactive activity may. */
