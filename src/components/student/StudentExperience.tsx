@@ -12,6 +12,8 @@ export function StudentExperience({ liveData, success }: {
 }) {
  const displayName=liveData.student.preferredName??liveData.student.firstName;
  const missing=liveData.coursework.filter(item=>item.timeliness==="missing");
+ const overdueCount=success ? success.overdue : missing.length;
+ const upcomingCount=success ? success.dueSoon + success.toDo : upcoming.length;
  const upcoming=liveData.coursework.filter(item=>item.status==="assigned"&&item.timeliness!=="missing");
  const format=(date:Date|string)=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short"}).format(new Date(date));
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title={`Today, ${displayName}`}
@@ -19,8 +21,8 @@ export function StudentExperience({ liveData, success }: {
   actions={<Link to="/student/courses" className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">Open my classes</Link>}>
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
    <Link to="/student/courses" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">Classes</p><p className="mt-2 text-3xl font-semibold">{liveData.sections.length}</p></Link>
-   <Link to="/student/assignments" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">Upcoming assignments</p><p className="mt-2 text-3xl font-semibold">{upcoming.length}</p></Link>
-   <Link to="/student/assignments" search={{filter:"missing"}} className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">Missing work</p><p className="mt-2 text-3xl font-semibold">{missing.length}</p></Link>
+   <Link to="/student/assignments" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"To do / due soon":"Upcoming assignments"}</p><p className="mt-2 text-3xl font-semibold">{upcomingCount}</p></Link>
+   <Link to="/student/assignments" search={{filter:success?"todo":"missing"}} className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"Overdue / missing work":"Missing work"}</p><p className="mt-2 text-3xl font-semibold">{overdueCount}</p></Link>
   </div>
   <nav aria-label="Student workspace" className="mt-6 flex flex-wrap gap-2 text-sm">
    <Link to="/student/assignments" className="rounded-lg border px-4 py-2">Assignments</Link>
