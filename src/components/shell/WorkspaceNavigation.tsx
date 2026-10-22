@@ -8,9 +8,10 @@ import {useWorkspaceSession} from "./WorkspaceSession";
 const NotificationTray=lazy(()=>import("./NotificationTray").then(module=>({default:module.NotificationTray})));
 const AskCanConversation=lazy(()=>import("@/components/conversation/AskCanConversation").then(module=>({default:module.AskCanConversation})));
 
-export const workspaceHome:Record<string,string>={student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor",network_admin:"/network"};
+export const workspaceHome:Record<string,string>={student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor",network_admin:"/network",can_network_steward:"/network/steward"};
 export const workspaceLinks:Record<string,{title:string;path:string}[]>={
  network_admin:[{title:"Network locations",path:"/network"}],
+ can_network_steward:[{title:"Network contracts",path:"/network/steward"}],
  student:[{title:"Today",path:"/student"},{title:"Assignments",path:"/student/assignments"},{title:"My classes",path:"/student/courses"},{title:"Study groups",path:"/student/study-groups"},{title:"Support",path:"/student/support"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
  guardian:[{title:"Family",path:"/guardian"},{title:"Classes",path:"/classes"},{title:"Academics",path:"/guardian/academics"},{title:"Attendance",path:"/guardian/attendance"},{title:"Offers",path:"/guardian/admission-offers"},{title:"Messages",path:"/messages"}],
  teacher:[{title:"Today",path:"/teacher"},{title:"Classes",path:"/classes"},{title:"Gradebook",path:"/teacher/gradebook"},{title:"Students",path:"/staff/students"},{title:"Teachers",path:"/staff/teachers"},{title:"Study groups",path:"/teacher/study-groups"},{title:"Referrals",path:"/student/support"},{title:"Missing work",path:"/teacher/missing-work"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
