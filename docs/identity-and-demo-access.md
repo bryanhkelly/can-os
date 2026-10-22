@@ -18,6 +18,36 @@ CAN OS is a real multi-user application with a shared Neon-backed synthetic demo
 10. **Demo kill switch**: `CAN_DEMO_WRITES_ENABLED` must be explicitly true for synthetic mutations; restrict writes to an allowlisted synthetic dataset/tenant and provide facilitator-only reset with an audit record.
 11. **Future authentication**: interface `verifyIdentityCredential(request): Promise<{ accountId: string } | null>` is replaceable by a future auth provider. Services depend on account/person/context, never on Resend or provider-specific claims.
 
+## Session-management hardening: initial inactivity limit (FullFlow)
+
+The first session-management bite reuses `access_sessions.updated_at` as the
+last **meaningful** session interaction timestamp. Session creation initializes
+it, an approved role selection also updates it, and an explicit signed-in
+interaction can advance it. This is an incremental schema-free change: it is
+**not** a complete activity journal, device record or learning-session metric.
+
+- **Server-enforced:** all calls to `getCommandContext` require an unrevoked,
+  enabled-account session with absolute expiry in the future and
+  `updated_at` strictly later than **30 minutes ago**. An idle expired
+  session must sign in again; it cannot be revived by an activity POST.
+- **No passive extension:** GET `/access/session`, the 60-second workspace
+  polling, focus, navigation load and visibility alone must **never** change
+  the idle timestamp.
+- **Active use:** the signed-in workspace sends `POST /access/session` with
+  `{ "kind": "activity" }` only after a trusted visible-document pointer or
+  keyboard interaction (throttled to at most once/minute on the client).
+  The existing same-origin POST check applies; server reauthorizes account,
+  current grant, expiry and current idle state, then conditionally updates
+  the server timestamp. This doesn't extend the fixed 12-hour absolute expiry.
+- **Privacy/meaning:** a browser interaction is adequate as an inactivity
+  *signal*, but is not evidence of student attendance, engaged learning or
+  actual human identity, and is not copied into the academic event log.
+- **Next focused bites:** a distinct `last_activity_at` column plus device
+  inventory, remote session revocation, user-visible timeout warning and
+  preservation of unfinished drafts. Before using this with real student
+  records, verify actual expiration and cross-tab behavior in a signed-in
+  browser against an isolated test database.
+
 ## Passwordless flow
 
 - Enter email; endpoint always responds generically (avoid enumeration).
