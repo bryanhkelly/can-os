@@ -520,6 +520,50 @@ integration("FullFlow: one school, same high-school program through curriculum a
         expect((await activity.getLearningActivityHistory({data:{
           sectionId:section.id,studentPersonId:profile.personId,
         }})).evidence).toHaveLength(1);
+
+        // Teacher-reviewed intervention: evidence is a referenced fact, not an
+        // automated disengagement diagnosis. The ordinary Actions lifecycle
+        // owns assignment, follow-up deadline, audit and resolution.
+        const teacherFollowUp = await import("@/modules/learning/teacher-learning-followup.functions");
+        const supportRequest = {
+          sectionId: section.id, studentProfileId: profile.id,
+          learningEventId: first(ownLearning.evidence).id,
+          observation: "I will review this lesson with the learner and verify their next steps.",
+          approach: "review_work" as const, dueInDays: 3 as const,
+        };
+        const support = await teacherFollowUp.createTeacherLearningFollowUp({
+          data: supportRequest,
+        });
+        expect(support.created).toBe(true);
+        expect(await teacherFollowUp.createTeacherLearningFollowUp({data:supportRequest}))
+          .toEqual({actionId:support.actionId,created:false});
+        const [supportAction] = await tx.select().from(s.actions)
+          .where(eq(s.actions.id,support.actionId));
+        expect(supportAction).toMatchObject({
+          type:"academic_intervention",status:"open",
+          ownerPersonId:teacher.id,sectionId:section.id,
+          programId,subjectType:"student_profile",subjectId:profile.id,
+          metadata:{source:"teacher_learning_follow_up",
+            learningEventId:supportRequest.learningEventId,approach:"review_work",
+            createdByTeacherId:teacher.id},
+        });
+        expect(supportAction.evidence).toHaveLength(1);
+        expect(await tx.select().from(s.auditEvents).where(and(
+          eq(s.auditEvents.resourceId,support.actionId),
+          eq(s.auditEvents.action,"teacher.learning_follow_up.created"),
+        ))).toHaveLength(1);
+        expect(await tx.select().from(s.domainEvents).where(and(
+          eq(s.domainEvents.aggregateId,support.actionId),
+          eq(s.domainEvents.eventType,"ActionCreated"),
+        ))).toHaveLength(1);
+        await expect(teacherFollowUp.createTeacherLearningFollowUp({data:{
+          ...supportRequest,studentProfileId:crypto.randomUUID(),
+        }})).rejects.toThrow("currently enrolled student");
+        state.actor = {...teacherActor,actorPersonId:outsider.id};
+        await expect(teacherFollowUp.createTeacherLearningFollowUp({
+          data:supportRequest,
+        })).rejects.toThrow("assigned active section");
+
         state.actor = guardianActor;
         expect((await activity.getLearningActivityHistory({data:{
           sectionId:section.id,studentPersonId:profile.personId,
