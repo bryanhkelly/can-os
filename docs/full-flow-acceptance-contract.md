@@ -75,6 +75,41 @@ are excluded; use synthetic users on a disposable, migrated Neon branch.
 | P2 | Network contracts, denomination HQ creation and site-linking are distinct optional entry channels. | Maintain their existing work but do not expand this subsystem until this primary school journey reaches acceptance, unless an actual blocker in the journey depends on it. |
 | P3 | Styling, extra features, advanced AI, new portal design and contract/product polish. | Defer until the connected journey works end to end. |
 
+## Implementation bite: response loop and connected operations
+
+- **Guardian academic view:** a related guardian can read a graded attempt and
+  submit exactly one school follow-up question per submission. Its Action is
+  scoped to the same School/Program/Section/Student, with an audit and durable
+  domain event. Identical retries return the prior Action; conflicting retries
+  are rejected. A revoked academic relationship prevents reading or creating
+  new requests. The grade itself is not changed.
+- **School operations:** school registrars see and can triage/resolve that
+  Action through `/operations` with an explicit resolution note. The teacher
+  and active school registrars receive in-app notification on request; on
+  resolution, the guardian receives a notification only if their academic
+  relationship still exists. Guardian academics renders the original question,
+  current status and school resolution. Notification links enforce current
+  site/program/organization and guardian relationship membership.
+- **Operational record:** the `/operations` dashboard now reads canonical
+  Programs, published course releases and program adoptions, Section teacher
+  assignments, Applications, active Program enrollments and Section placements,
+  Assessments, graded/submitted work, and outstanding guardian responses.
+  It presents aggregate per-program counts with academic provider and credit
+  issuer references. It is a read model, not a new data store, and never
+  presents synthetic readiness approval flags or student identifiers.
+- **Regression coverage:** pure unit tests enforce guardian question ownership,
+  nonduplicate summary counts, program isolation, and no fabricated readiness
+  indicators. The six-stage rollback fixture additionally attempts grade
+  notifications, guardian questions, school response, duplicate closure,
+  cross-tenant dashboard denial and guardian relationship revocation.
+  This database-backed test **still has not been executed**; static CI alone
+  cannot verify its runtime assertions.
+
+**Remaining P0 acceptance:** execute this complete integration test against the
+isolated Neon branch; connect real verified sessions in a multi-user browser
+run with persisted state and reload. **Do not label this bite end-to-end passed
+until both checks are green.**
+
 ## Current evidence, not assumptions
 
 - **Primary CI:** existing `FullFlow` commits have passed build,
