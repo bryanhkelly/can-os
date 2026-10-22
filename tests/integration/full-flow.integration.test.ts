@@ -227,7 +227,7 @@ integration("FullFlow: one school, same high-school program through curriculum a
         state.actor = context(schoolOperator.id, school.id, [site.id], [programId]);
         const provisioned = await sections.provisionLaunchSection({data: {
           programId, termId: time.term.id, courseTemplateVersionId: draft.versionId,
-          code: `FF-ALG-${suffix}`, title: "Algebra I",
+          code: `FF-ALG-${suffix}`, title: "Algebra I", credits: 1,
         }});
         const section = first(await tx.select().from(s.sections)
           .where(eq(s.sections.id, provisioned.sectionId)));
