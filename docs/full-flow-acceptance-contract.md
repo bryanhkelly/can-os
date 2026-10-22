@@ -143,10 +143,10 @@ until both checks are green.**
 - Disposable branch: `fullflow-e2e-20261022`
   (`br-proud-pine-arfju8h2`), branched from `test01`, **not** the
   project's default production branch.
-- All **31** committed migrations were applied to this isolated branch and
+- All **32** committed migrations were applied to this isolated branch and
   checked against `drizzle.__drizzle_migrations` (including migrations 0028,
-  0029, and 0030). Migration 0030 restores the missing
-  `auth_request_rate_limits` table. Core program rows were unchanged; the
+  0029, 0030, and 0031). Migration 0030 restores the missing
+  `auth_request_rate_limits` table; migration 0031 adds isolated learning-session and event evidence tables. Core program rows were unchanged; the
   primary branch was untouched.
 - We are intentionally bypassing GitHub Actions for DB acceptance. The
   repository CI may still run as a static check.
