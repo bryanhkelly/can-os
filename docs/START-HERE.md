@@ -24,6 +24,8 @@ Connected five-track implementation: [Learning activity → teacher intervention
 
 Required support-case collaboration: [Counselors, academic coaches, tutors, specialists and paraeducators](./multidisciplinary-student-support-cases.md) with named-case and restricted-service access.
 
+Pre-onsite child safety: [Site Student Safeguarding and Welfare](./site-student-safeguarding-and-welfare.md) (onsite staff reporting, mandatory external reporting, urgent safety response, confidentiality and CAN/site roles).
+
 ## Active cumulative FullFlow development
 
 - [FullFlow progression, evidence, and explicit acceptance blockers](./full-flow-progress.md).
