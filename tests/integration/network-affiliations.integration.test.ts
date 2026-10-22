@@ -68,6 +68,20 @@ integration("denomination HQ affiliation — actual server handlers", () => {
           organizationId: outsider.id, siteId: null, active: true,
         }).returning())[0]!;
 
+        const [agreementEvidence] = await tx.insert(schema.documents).values({
+          subjectType: "organization", subjectId: denom.id,
+          category: "network_agreement", fileName: "synthetic-network-agreement.pdf",
+          storageProvider: "synthetic-test", storageKey: "isolated-network-agreement",
+          verifiedAt: new Date(Date.now() - 3600000),
+          verifiedByPersonId: registrar.id, uploadedByPersonId: registrar.id,
+        }).returning();
+        await tx.insert(schema.networkAgreements).values({
+          denominationOrganizationId: denom.id, agreementReference: "synthetic-" + suffix,
+          evidenceDocumentId: agreementEvidence.id,
+          validFrom: new Date(Date.now() - 86400000),
+          validThrough: new Date(Date.now() + 86400000),
+          verifiedByPersonId: registrar.id,
+        });
         const principal = (accountId: string, activeGrantId: string) =>
           ({ accountId, activeGrantId, sessionId: "integration-session" });
         const registrarContext = resolveAccessContext(
@@ -93,7 +107,7 @@ integration("denomination HQ affiliation — actual server handlers", () => {
           .toBe("pending");
 
         state.context = unrelatedContext;
-        expect((await endpoints.listNetworkAffiliations()).entries).toHaveLength(0);
+        await expect(endpoints.listNetworkAffiliations()).rejects.toThrow();
         await expect(endpoints.reviewNetworkAffiliation({ data: {
           affiliationId, decision: "approve", reason: "Looks appropriate",
         } })).rejects.toThrow();
