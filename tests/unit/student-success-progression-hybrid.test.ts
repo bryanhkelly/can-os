@@ -62,7 +62,8 @@ describe("cross-class Student Success assignment priorities", () => {
     expect(plan.revise).toBe(1);
     expect(plan.awaitingFeedback).toBe(1);
     expect(plan.requiresAction).toBe(4);
-    expect(plan.notice).not.toMatch(/diagnos|risk score|attendance risk/i);
+    expect(plan.notice).toMatch(/not a risk score/i);
+    expect(plan.notice).toMatch(/not a .*credit decision/i);
   });
 
   it("never calls late-submitted work missing and never suggests submitting closed assessments", () => {
