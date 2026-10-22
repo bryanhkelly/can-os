@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import {
   createExtendedSeasonDraftFn,
+  createExtendedReadinessAssignmentsFn,
   type listExtendedSeasonPlanning,
 } from "@/modules/activities/extended-learning.functions";
 import { programTypeLabels } from "@/domain/program-offerings";
+import { extendedLearningReadinessTasks } from "@/domain/extended-learning-readiness-tasks";
 
 type Planning = Awaited<ReturnType<typeof listExtendedSeasonPlanning>>;
 
@@ -24,6 +26,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [readinessOwners, setReadinessOwners] = useState<Record<string,string>>({});
   const programs = planning.programs.filter(p => !siteId || p.siteId === siteId);
   const selectable = programs.filter(p => p.status !== "paused" && p.status !== "closed");
   const selected = selectable.find(p => p.id === programId);
@@ -43,6 +46,27 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       await router.invalidate();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save draft season");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function assignReadiness(seasonId: string, programId: string) {
+    setBusy(true); setError(""); setSuccess("");
+    try {
+      const existing = planning.assignments.find(a => a.seasonId === seasonId);
+      const recipientPersonId = readinessOwners[seasonId] ?? existing?.ownerPersonId ?? "";
+      if (!recipientPersonId || !planning.operators.some(
+        op => op.programId === programId && op.personId === recipientPersonId
+      )) throw new Error("Select an eligible site operator");
+      const result = await createExtendedReadinessAssignmentsFn({
+        data: { seasonId, recipientPersonId },
+      });
+      setSuccess(result.created ? `Created ${result.created} readiness evidence requests. These are not approvals.`
+        : "All evidence requests already exist; registration remains blocked.");
+      await router.invalidate();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to assign evidence requests");
     } finally {
       setBusy(false);
     }
@@ -114,6 +138,52 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                     </ul>}
                   </div>
                 ) : null;
+              })()}
+              {(() => {
+                const tasks = planning.assignments.filter(a => a.seasonId === season.id);
+                const available = planning.operators.filter(p => p.programId === season.programId);
+                const existingOwner = tasks[0]?.ownerPersonId ?? "";
+                const operatorId = readinessOwners[season.id] ?? existingOwner;
+                return (
+                  <div className="mt-3 rounded-lg border p-3">
+                    <p className="text-xs font-semibold">
+                      Evidence requests: {tasks.length}/{extendedLearningReadinessTasks.length} recorded
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      These are evidence-gathering assignments only. A completed task does not
+                      demonstrate approval or allow children to register.
+                    </p>
+                    {!!tasks.length && <ul className="mt-2 list-disc pl-5 text-xs">
+                      {tasks.map(task => <li key={task.id}>
+                        {extendedLearningReadinessTasks.find(t => t.key === task.requirementKey)?.title ??
+                          "Unrecognized requirement"} — {task.status === "resolved"
+                            ? "task closed, verification pending" : "evidence requested"}
+                      </li>)}
+                    </ul>}
+                    {season.status === "draft" && <div className="mt-2 flex flex-wrap items-end gap-2">
+                      <label className="min-w-44 flex-1 text-xs">Receiving site operator
+                        <select className={inputClass} value={operatorId}
+                          disabled={busy || tasks.length > 0}
+                          onChange={e => setReadinessOwners(current => ({
+                            ...current, [season.id]: e.target.value,
+                          }))}>
+                          <option value="">Choose active site registrar</option>
+                          {available.map(person => <option key={person.personId} value={person.personId}>
+                            {person.firstName} {person.lastName}
+                          </option>)}
+                        </select>
+                      </label>
+                      <button type="button" className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                        disabled={busy || !operatorId || tasks.length === extendedLearningReadinessTasks.length}
+                        onClick={() => assignReadiness(season.id, season.programId ?? "")}>
+                        {tasks.length ? "Complete missing requests" : "Assign readiness requests"}
+                      </button>
+                    </div>}
+                    {!available.length && <p className="mt-2 text-xs text-muted-foreground">
+                      No active site registrar/operator is currently eligible for these tasks.
+                    </p>}
+                  </div>
+                );
               })()}
             </li>
           )}
