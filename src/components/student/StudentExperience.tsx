@@ -2,9 +2,14 @@ import { Link } from "@tanstack/react-router";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import type { StudentSuccessPriorities } from "@/domain/student-success";
+import { StudentSuccessPriorityPanel } from "./StudentSuccessPriorityPanel";
 
 /** Read-only, canonical Student Today projection. All mutations live in the owning workflow. */
-export function StudentExperience({ liveData }: { liveData: Awaited<ReturnType<typeof getMyStudentToday>> }) {
+export function StudentExperience({ liveData, success }: {
+  liveData: Awaited<ReturnType<typeof getMyStudentToday>>;
+  success?: StudentSuccessPriorities | null;
+}) {
  const displayName=liveData.student.preferredName??liveData.student.firstName;
  const missing=liveData.coursework.filter(item=>item.timeliness==="missing");
  const upcoming=liveData.coursework.filter(item=>item.status==="assigned"&&item.timeliness!=="missing");
@@ -25,6 +30,7 @@ export function StudentExperience({ liveData }: { liveData: Awaited<ReturnType<t
    <Link to="/student/report-card" className="rounded-lg border px-4 py-2">Report card</Link>
    <Link to="/calendar" className="rounded-lg border px-4 py-2">Calendar</Link>
   </nav>
+  {success !== undefined && <StudentSuccessPriorityPanel plan={success} />}
   {liveData.sections.length>0&&<WorkspacePanel title="My classes" description="Go directly to your enrolled class workspace." className="mt-7">
    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{liveData.sections.map(section=><Link key={section.sectionId} to="/student/courses" search={{section:section.sectionId}} className="rounded-lg border p-4 hover:bg-muted">
     <h3 className="font-semibold">{section.sectionTitle}</h3><span className="mt-3 inline-block text-sm underline">Open class</span>
