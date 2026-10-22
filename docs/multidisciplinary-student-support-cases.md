@@ -3,6 +3,12 @@
 **Status:** Required product scope for the user-approved Teacher Intervention → Student Success workstreams. **Design and integration backlog; not yet fully implemented.**  
 **Branch:** `FullFlow`, draft PR #172. Do not merge to main or migrate production without authorization.
 
+## Separate, mandatory safeguarding path
+
+**Critical distinction:** Room facilitators, site leaders, site administrators and other onsite adults may see suspected abuse, neglect, exploitation, bullying, unsafe substance use, violence, self-harm or other welfare/safety concerns before any academic staff sees them. These concerns **must not** be forced through the ordinary teacher referral/counselor queue or treated as clinical or criminal determinations. See [Site Student Safeguarding and Welfare](./site-student-safeguarding-and-welfare.md) for urgent-response, external reporting, implicated-guardian, school/site responsibility, and case-confidentiality requirements.
+
+The safeguarding/incident and ordinary student support pathways may link **only through permissioned, minimum-necessary tasks**, never by copying allegation narratives or privileged notes into standard Academic Actions or family notifications. A reporting adult's outside legal obligations cannot be delayed by internal triage or software workflow.
+
 ## Product requirement
 
 A teacher's concern may require academic coaching, tutoring, counseling, accessibility-related instructional support, special education services, or local supervision. CAN OS must support **one coordinated, auditable student support case** spanning the right professionals, with clearly separated responsibilities and sensitive case information.
