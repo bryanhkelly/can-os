@@ -21,6 +21,8 @@ async function hq(capability: "network.sites.read" | "network.sites.manage" | "n
   }).from(organizations).where(eq(organizations.id, organizationIds[0]!)).limit(1);
   if (!organization) throw new AuthorizationError("denomination organization");
   assertNetworkSiteAccess(actor, organization, capability);
+  const { requireCurrentNetworkAgreement } = await import("./network-agreement.server");
+  await requireCurrentNetworkAgreement(db, organization.id);
   return { actor, organization };
 }
 
