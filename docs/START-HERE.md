@@ -18,6 +18,8 @@ New architecture specification: [Curriculum marketplace and portability](./curri
 
 Required P1 student experience: [Comprehensive learning-activity tracking](./comprehensive-learning-activity-tracking.md) (distinct from authentication sessions, official attendance, or grading).
 
+Connected five-track implementation: [Learning activity → teacher intervention → student success → academic progression → hybrid site](./connected-learning-success-progression-hybrid.md).
+
 ## Active cumulative FullFlow development
 
 - [FullFlow progression, evidence, and explicit acceptance blockers](./full-flow-progress.md).
