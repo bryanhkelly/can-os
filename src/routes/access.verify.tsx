@@ -56,6 +56,8 @@ function VerifyAccess(){
   try{
    if(!token){setStatus("Access link is missing.");return;}
    const res=await fetch("/access/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token})});
+   if(res.status===429){setStatus("Sign-in requests are temporarily limited. Please try again shortly.");return;}
+   if(res.status===503){setStatus("Sign-in is temporarily unavailable. Please try again shortly.");return;}
    if(!res.ok){setStatus("This access link is invalid or expired.");return;}
    setToken(null);
    const body=await res.json() as {role?:string};
