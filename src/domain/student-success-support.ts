@@ -26,8 +26,8 @@ export type StudentSuccessSupportTask = {
   type: string;
   status: "open" | "in_progress" | "waiting" | "resolved";
   dueAt: string | null;
-  studentFeedback: string | null;
-  goalOutcome: StudentGoalPublicReview["outcome"] | null;
+  studentFeedback?: string | null;
+  goalOutcome?: StudentGoalPublicReview["outcome"] | null;
   destination: "assignment" | "action";
   destinationId: string;
 };
