@@ -430,6 +430,113 @@ integration("FullFlow: one school, same high-school program through curriculum a
           eq(s.enrollments.sectionId,section.id),
           eq(s.enrollments.status,"active"),
         ))).toHaveLength(1);
+        // Real Section instruction: the assigned teacher publishes work for the
+        // student enrolled through the *same* admission offer above.
+        const gradebook = await import("@/modules/learning/gradebook.functions");
+        const assignmentCommands = await import("@/modules/student-experience/assignments.functions");
+        const classroom = await import("@/modules/learning/class-workspace.functions");
+        const guardianQueries = await import("@/modules/learning/guardian-academic-queries.functions");
+        const teacherActor: AccessContext = {
+          ...context(teacher.id, school.id, [site.id], [programId]),
+          role: "teacher", capabilities: new Set(roleCapabilities.teacher),
+          accountId: crypto.randomUUID(), grantId: crypto.randomUUID(),
+        };
+        const studentActor: AccessContext = {
+          ...context(profile.personId, school.id, [site.id], [programId]),
+          role: "student", capabilities: new Set(roleCapabilities.student),
+          accountId: crypto.randomUUID(), grantId: crypto.randomUUID(),
+        };
+        state.actor = teacherActor;
+        const assessment = await gradebook.createAssessment({data: {
+          sectionId: section.id,
+          title: "FullFlow Algebra: Explain your solution",
+          instructions: "Solve 3x + 5 = 20 and justify the inverse operations.",
+          assignmentKind: "classwork" as const, curriculumLessonId: "solve-one",
+          pointsPossible: 10,
+          dueAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+          publishNow: true,
+        }});
+        expect(assessment.status).toBe("published");
+        state.actor = studentActor;
+        const delivery = await classroom.getClassWorkspace({data: {sectionId: section.id}});
+        expect(delivery.content?.modules.some(module=>
+          module.lessons.some(lesson=>lesson.id==="solve-one"))).toBe(true);
+        await classroom.setLessonCompletion({data: {
+          sectionId: section.id, versionId: draft.versionId,
+          lessonId: "solve-one", completed: true,
+        }});
+        const assignedWork = await assignmentCommands.getAssignments();
+        expect(assignedWork.assignments.some(x=>
+          x.assessmentId===assessment.assessmentId)).toBe(true);
+        const submission = await assignmentCommands.saveAssignmentResponse({data: {
+          assessmentId: assessment.assessmentId,
+          text: "Subtract five: 3x = 15. Divide by three: x = 5; 3(5)+5=20.",
+        }});
+        const submitted = first(await tx.select().from(s.submissions)
+          .where(eq(s.submissions.id,submission.submissionId)));
+        expect(submitted).toMatchObject({
+          assessmentId: assessment.assessmentId,
+          studentProfileId: profile.id, status: "submitted",
+        });
+        state.actor = teacherActor;
+        await gradebook.gradeSubmission({data: {
+          submissionId: submission.submissionId, score: 9,
+          feedbackComment: "Correct inverse operations and a verified substitution.",
+        }});
+        const graded = first(await tx.select().from(s.submissions)
+          .where(eq(s.submissions.id,submission.submissionId)));
+        expect(graded.status).toBe("graded");
+        expect(Number(graded.score)).toBe(9);
+        expect(await tx.select().from(s.domainEvents).where(and(
+          eq(s.domainEvents.aggregateId,submission.submissionId),
+          eq(s.domainEvents.eventType,"GradePosted"),
+        ))).toHaveLength(1);
+
+        state.actor = guardianActor;
+        const parentProgress = await guardianQueries.getGuardianAssignments({data:{
+          studentPersonId: profile.personId,
+        }});
+        const parentItem = first(parentProgress.assignments.filter(x=>
+          x.assessmentId===assessment.assessmentId));
+        expect(parentItem.status).toBe("graded");
+        expect(Number(parentItem.score)).toBe(9);
+        expect(parentItem.sectionId).toBe(section.id);
+        state.actor = unrelatedActor;
+        await expect(guardianQueries.getGuardianAssignments({data:{
+          studentPersonId: profile.personId,
+        }})).rejects.toThrow("guardian academic relationship");
+
+        // One operational record means the actual newly created school
+        // Program and its relational children are identical across domains.
+        state.actor = context(schoolOperator.id, school.id, [site.id], [programId]);
+        const operational = await sections.getLaunchAcademicSetup({data:{programId}});
+        expect(operational.program.id).toBe(programId);
+        expect(operational.sections.some(x=>x.id===section.id)).toBe(true);
+        const admissions = await (await import(
+          "@/modules/enrollment/admissions-dashboard.functions")).getAdmissionsDashboard({
+          data: {programId,siteId:site.id},
+        });
+        expect(admissions).toBeTruthy();
+        const relation = first(await tx.select({
+          programId: s.programs.id, sectionId: s.sections.id,
+          studentProfileId: s.enrollments.studentProfileId,
+          assessmentId: s.assessments.id, submissionId: s.submissions.id,
+        }).from(s.programs)
+          .innerJoin(s.sections,eq(s.sections.programId,s.programs.id))
+          .innerJoin(s.enrollments,and(
+            eq(s.enrollments.sectionId,s.sections.id),
+            eq(s.enrollments.kind,"section")))
+          .innerJoin(s.assessments,eq(s.assessments.sectionId,s.sections.id))
+          .innerJoin(s.submissions,and(
+            eq(s.submissions.assessmentId,s.assessments.id),
+            eq(s.submissions.studentProfileId,s.enrollments.studentProfileId)))
+          .where(and(eq(s.programs.id,programId),
+            eq(s.sections.id,section.id),eq(s.enrollments.studentProfileId,profile.id),
+            eq(s.submissions.id,submission.submissionId))));
+        expect(relation).toEqual({
+          programId, sectionId: section.id, studentProfileId:profile.id,
+          assessmentId:assessment.assessmentId, submissionId:submission.submissionId,
+        });
         ids = {programId, siteId: site.id, sectionId: section.id, versionId: draft.versionId};
         completed = true;
         throw rollback;
