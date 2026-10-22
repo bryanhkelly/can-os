@@ -225,6 +225,13 @@
       "when": 1792700000000,
       "tag": "0031_learning_activity_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792704000000,
+      "tag": "0032_extended_program_offerings",
+      "breakpoints": true
     }
   ]
 }
