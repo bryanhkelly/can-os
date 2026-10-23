@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
-import { extendedRegistrationOpeningReadiness } from "./registration-policy";
+import { extendedRegistrationOpeningReadiness, unavailableExtendedSeasonApprovals } from "./registration-policy";
 const extendedTypes = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const publishInput = z.object({
@@ -94,11 +94,7 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
         seasonStatus: season.status,
         siteMatchesProgram: !!program?.siteId && program.siteId === season.siteId,
         capacity: season.capacity,
-        approvedSafeguardingCoverage: false,
-        verifiedOnsiteStaffing: false,
-        emergencyResponsePlanApproved: false,
-        pickupAndReleasePolicyApproved: false,
-        datedSessionsAndCoverageVerified: false,
+        ...unavailableExtendedSeasonApprovals,
       }),
     };
   });

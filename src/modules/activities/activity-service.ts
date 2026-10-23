@@ -24,7 +24,10 @@ import { EventTypes } from "@/domain/event-types";
 import { publishProjection } from "@/platform/calendar/projection";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { and,count,eq,inArray } from "drizzle-orm";
-import { assertSeasonRegistrationOpen, assertLegacyActivityRegistrationAllowed } from "./registration-policy";
+import {
+  assertSeasonRegistrationOpen, assertLegacyActivityRegistrationAllowed,
+  assertVerifiedExtendedSeasonOpening, unavailableExtendedSeasonApprovals,
+} from "./registration-policy";
 import { assertEnrichmentRegistrationPublished } from "@/domain/enrichment-publication";
 import { isExtendedLearningType } from "@/domain/program-offerings";
 import { readEnrichmentPackages, selectEnrichmentPackages,
@@ -198,6 +201,18 @@ export async function registerForActivity(
       .for("update", { of: activitySeasons });
 
     if (!record) throw new Error("Activity season not found");
+    // A historical "registration" status and a signed guardian permission
+    // statement do not prove current screening, safety or release readiness.
+    // Guard before any identity, consent, seat or financial-obligation writes.
+    if (record.programType && isExtendedLearningType(record.programType)) {
+      assertVerifiedExtendedSeasonOpening({
+        programStatus: record.programStatus,
+        seasonStatus: record.seasonStatus,
+        siteMatchesProgram: record.programSiteId === record.siteId,
+        capacity: record.capacity,
+        ...unavailableExtendedSeasonApprovals,
+      }, "register");
+    }
     const publication = record.programType && isExtendedLearningType(record.programType)
       ? assertEnrichmentRegistrationPublished({
         programType: record.programType, programStatus: record.programStatus,

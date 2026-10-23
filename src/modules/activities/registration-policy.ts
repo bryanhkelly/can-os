@@ -55,6 +55,18 @@ export type ExtendedSeasonOpeningEvidence = {
   datedSessionsAndCoverageVerified: boolean;
 };
 
+/** Until independently reviewed approvals have durable server-side sources, they are unavailable.
+ * Never derive child-safety clearance from an operator attestation, an Action,
+ * a login grant, calendar metadata, or a previously published Season.
+ */
+export const unavailableExtendedSeasonApprovals = Object.freeze({
+  approvedSafeguardingCoverage: false,
+  verifiedOnsiteStaffing: false,
+  emergencyResponsePlanApproved: false,
+  pickupAndReleasePolicyApproved: false,
+  datedSessionsAndCoverageVerified: false,
+});
+
 export function extendedRegistrationOpeningReadiness(e: ExtendedSeasonOpeningEvidence) {
   const blockers: string[] = [];
   if (e.programStatus !== "active") blockers.push("Program must be operationally active");
@@ -68,4 +80,26 @@ export function extendedRegistrationOpeningReadiness(e: ExtendedSeasonOpeningEvi
   if (!e.pickupAndReleasePolicyApproved) blockers.push("Authorized child pickup and release policy approved");
   if (!e.datedSessionsAndCoverageVerified) blockers.push("Dated sessions with verified staff coverage");
   return { ready: blockers.length === 0, blockers };
+}
+
+/**
+ * The SAME prerequisites protect initial publication, published-season retries
+ * and child registration. Only trusted server-read evidence may supply approvals.
+ * A published Season is not grandfathered merely because it has a permission
+ * statement in metadata.
+ */
+export function assertVerifiedExtendedSeasonOpening(
+  evidence: ExtendedSeasonOpeningEvidence,
+  action: "publish" | "register",
+): void {
+  if (action === "publish" && evidence.seasonStatus !== "draft")
+    throw new Error("Only a draft extended-learning Season may open registration");
+  if (action === "register" && evidence.seasonStatus !== "registration")
+    throw new Error("Extended-learning registration is not open");
+  const checked = extendedRegistrationOpeningReadiness({
+    ...evidence,
+    seasonStatus: "draft", // Status is independently checked above for each operation.
+  });
+  if (!checked.ready)
+    throw new Error("Extended-learning registration is blocked: " + checked.blockers.join("; "));
 }

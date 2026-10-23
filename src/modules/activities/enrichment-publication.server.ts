@@ -10,6 +10,7 @@ import { isExtendedLearningType } from "@/domain/program-offerings";
 import { enrichmentPublicationSchema, readEnrichmentPublication } from "@/domain/enrichment-publication";
 import { verifyEnrichmentPackages, readEnrichmentPackages, type EnrichmentPackage } from "@/domain/enrichment-packages";
 import { listExtendedSessionStaff } from "./extended-learning-sessions.server";
+import { assertVerifiedExtendedSeasonOpening, unavailableExtendedSeasonApprovals } from "./registration-policy";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
 /**
@@ -67,6 +68,16 @@ export async function publishExtendedSeason(
       .from(sites).where(eq(sites.id, season.programSiteId)).limit(1);
     if (!site || site.organizationId !== season.organizationId)
       throw new AuthorizationError("verified hosting site");
+    // The UI's readiness warning is not authorization. Fail closed in the
+    // mutation itself, including an otherwise idempotent published-season retry.
+    // These five approvals currently have no authoritative server-side source.
+    assertVerifiedExtendedSeasonOpening({
+      programStatus: season.programStatus,
+      seasonStatus: season.status,
+      siteMatchesProgram: season.programSiteId === season.activitySiteId,
+      capacity: season.capacity,
+      ...unavailableExtendedSeasonApprovals,
+    }, season.status === "registration" ? "register" : "publish");
     if (season.status === "registration") {
       const existing = readEnrichmentPublication(season.seasonMetadata) ??
         readEnrichmentPublication(season.activityMetadata);

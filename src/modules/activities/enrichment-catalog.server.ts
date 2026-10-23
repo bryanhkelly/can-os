@@ -4,6 +4,7 @@ import * as s from "@/db/schema";
 import { readEnrichmentPublication } from "@/domain/enrichment-publication";
 import { readEnrichmentPackages, sessionOccupancy } from "@/domain/enrichment-packages";
 import { isExtendedLearningType } from "@/domain/program-offerings";
+import { extendedRegistrationOpeningReadiness, unavailableExtendedSeasonApprovals } from "./registration-policy";
 
 const extended = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
 
@@ -52,6 +53,16 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
   const published = rows.flatMap(row => {
     const permission = readEnrichmentPublication(row.seasonMetadata) ??
       readEnrichmentPublication(row.activityMetadata);
+    // The catalog must not advertise registration on historically published
+    // Seasons without independently verified CURRENT opening evidence.
+    // Authoritative approval sources are not yet implemented, so fail closed.
+    if (!extendedRegistrationOpeningReadiness({
+      programStatus: row.programStatus,
+      seasonStatus: "draft",
+      siteMatchesProgram: row.programSiteId === row.siteId,
+      capacity: row.capacity,
+      ...unavailableExtendedSeasonApprovals,
+    }).ready) return [];
     if (!permission || !isExtendedLearningType(row.programType) ||
       row.creditIssuerId !== null || row.programSiteId !== row.siteId ||
       permission.seasonId !== row.seasonId ||

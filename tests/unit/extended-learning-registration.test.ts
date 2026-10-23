@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertSeasonRegistrationOpen, assertLegacyActivityRegistrationAllowed, extendedRegistrationOpeningReadiness, type ExtendedSeasonOpeningEvidence, type RegistrationSeason } from "@/modules/activities/registration-policy";
+import { assertSeasonRegistrationOpen, assertLegacyActivityRegistrationAllowed, extendedRegistrationOpeningReadiness, assertVerifiedExtendedSeasonOpening, unavailableExtendedSeasonApprovals, type ExtendedSeasonOpeningEvidence, type RegistrationSeason } from "@/modules/activities/registration-policy";
 
 const current: RegistrationSeason = {
   seasonStatus: "registration",
@@ -74,5 +74,37 @@ describe("Extended-learning registration readiness", () => {
     }).ready).toBe(false);
     // A pure fixture is not a verified server approval or an executable publisher.
     expect(extendedRegistrationOpeningReadiness(verified).ready).toBe(true);
+  });
+});
+
+describe("Server opening gate protects both publishing and guardian registration", () => {
+  const base: ExtendedSeasonOpeningEvidence = {
+    programStatus: "active", seasonStatus: "draft",
+    siteMatchesProgram: true, capacity: 25,
+    approvedSafeguardingCoverage: true, verifiedOnsiteStaffing: true,
+    emergencyResponsePlanApproved: true, pickupAndReleasePolicyApproved: true,
+    datedSessionsAndCoverageVerified: true,
+  };
+  it("blocks publication when any independently verified approval is absent", () => {
+    for (const key of Object.keys(unavailableExtendedSeasonApprovals) as Array<keyof typeof unavailableExtendedSeasonApprovals>) {
+      expect(() => assertVerifiedExtendedSeasonOpening({ ...base, [key]: false }, "publish"))
+        .toThrow(/registration is blocked/);
+    }
+    expect(() => assertVerifiedExtendedSeasonOpening({
+      ...base, ...unavailableExtendedSeasonApprovals,
+    }, "publish")).toThrow(/safeguarding/);
+  });
+  it("does not grandfather already-published offers or allow malformed status transitions", () => {
+    expect(() => assertVerifiedExtendedSeasonOpening({
+      ...base, seasonStatus: "registration", ...unavailableExtendedSeasonApprovals,
+    }, "register")).toThrow(/registration is blocked/);
+    expect(() => assertVerifiedExtendedSeasonOpening({ ...base, seasonStatus: "closed" }, "register"))
+      .toThrow(/not open/);
+    expect(() => assertVerifiedExtendedSeasonOpening({ ...base, seasonStatus: "registration" }, "publish"))
+      .toThrow(/draft/);
+  });
+  it("keeps an all-approved fixture logically valid without treating it as real clearance", () => {
+    expect(() => assertVerifiedExtendedSeasonOpening(base, "publish")).not.toThrow();
+    expect(() => assertVerifiedExtendedSeasonOpening({ ...base, seasonStatus: "registration" }, "register")).not.toThrow();
   });
 });
