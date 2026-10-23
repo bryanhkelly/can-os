@@ -43,6 +43,19 @@ describe("planned hybrid onsite section supervision",()=>{
     });
     expect(result.note).toMatch(/no authoritative room assignment.*onsite presence/i);
   });
+  it("does not treat a recurring timetable as an instructional duty on a closed or unconfigured day",()=>{
+    for(const confirmed of [false]){
+      const result=summarizeOnsiteSupervision([
+        period({instructionalDayConfirmed:confirmed}),
+      ]);
+      expect(result.plannedAssignments).toBe(0);
+      expect(result.unassignedOrConflicting).toBe(1);
+      expect(result.blocks[0]?.gaps).toContain("calendar_unverified");
+      expect(result.blocks[0]?.assignedPlan).toBe(false);
+      expect(result.hasConfirmedPhysicalCoverage).toBe(false);
+    }
+  });
+
   it("reports missing schedules, facilitators and active site authorizations",()=>{
     const result=summarizeOnsiteSupervision([
       period({sectionId:"section-a",periodId:null,
