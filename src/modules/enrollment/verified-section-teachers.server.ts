@@ -10,10 +10,11 @@ import {
  * preview and the transactional enrollment command. A Section assignment
  * alone does not mean a teacher can sign in and teach that class.
  *
- * For a church-hosted CAN school, the external academic provider's teacher
- * must hold their ORIGINAL, organization-wide institution grant (site NULL).
- * A school teacher can instead hold an exact host Site grant. No provider
- * grant is treated as a church-wide Site grant.
+ * When academics are provided by a different Organization, ONLY an original
+ * academic-provider-wide teacher grant may satisfy instructor staffing.
+ * Church-local roles do not become CAN academic instruction assignments.
+ * When the host is also the academic provider, its site-scoped teacher
+ * grant remains valid. No provider grant becomes church-wide Site access.
  *
  * Academic service-agreement and curriculum checks are intentionally
  * separate: placement and readiness projections apply those as well.
@@ -47,6 +48,10 @@ export async function verifiedTeacherSectionIds(
       isNotNull(accessAccounts.emailVerifiedAt),
       or(
         and(
+          // Where the host does NOT operate academics, a host teacher grant
+          // cannot satisfy "CAN instructor staffed" for a church-hosted
+          // classroom. The original academic provider owns teaching authority.
+          eq(programs.academicProviderOrganizationId, programs.organizationId),
           eq(accountPersonGrants.organizationId, programs.organizationId),
           or(isNull(accountPersonGrants.siteId),
             eq(accountPersonGrants.siteId, sections.siteId)),
