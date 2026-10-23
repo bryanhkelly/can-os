@@ -44,7 +44,7 @@ export function TeacherStudentGoalReviewForm({
         try {
           await reviewStudentLearningGoal({ data: {
             goalActionId, gradedSubmissionId: selected, outcome,
-            studentFeedback, confirmedStudentSafe: true,
+            studentFeedback, confirmedStudentSafe: true as const,
           } });
           setMessage("Teacher review saved to the student's learning goal.");
           setOpen(false);
