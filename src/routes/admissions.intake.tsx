@@ -118,11 +118,11 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
        search:{siteId:convertibleInterest.siteId,programId,
         application:created.applicationId,interest:undefined}});
      setRequestId(crypto.randomUUID());setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);},"Inquiry created; continue the normal admissions and enrollment checklist.");}}>
-    <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);}}>
+    <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required disabled={!!convertibleInterest} value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);}}>
      <option value="">Choose program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
     </select></label>
     <label className="text-sm sm:col-span-2">Student identity
-     <select className="mt-1 block w-full rounded border bg-background p-2" value={existingStudentKey}
+     <select className="mt-1 block w-full rounded border bg-background p-2" disabled={!!convertibleInterest} value={existingStudentKey}
       onChange={e=>{setExistingStudentKey(e.target.value);setExistingApplicationId("");setCreateHouseholdConfirmed(false);}}>
       <option value="">Create a new student</option>
       {existingStudents.map(student=><option key={studentKey(student)} value={studentKey(student)}>
@@ -141,7 +141,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     {!existingStudent&&<>
     <label className="text-sm sm:col-span-2">Existing household (optional, for siblings)
       <select className="mt-1 block w-full rounded border bg-background p-2"
-        value={existingApplicationId} onChange={e=>setExistingApplicationId(e.target.value)}>
+        disabled={!!convertibleInterest} value={existingApplicationId} onChange={e=>setExistingApplicationId(e.target.value)}>
         <option value="">Create new household</option>
         {data.records.filter(r=>r.programId===programId).map(r=>
           <option value={r.id} key={r.id}>{r.studentFirst} {r.studentLast} — same guardian</option>)}
@@ -157,9 +157,9 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     <label className="text-sm">Guardian email<input required type="email" value={guardianEmail} onChange={e=>setGuardianEmail(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
     <label className="text-sm">Entering grade<input value={gradeLevel} onChange={e=>setGradeLevel(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/></label>
     </>}
-    <label className="text-sm">Inquiry source<select value={source} onChange={e=>setSource(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"><option value="school_direct">School inquiry</option><option value="church_referral">Church referral</option><option value="family_referral">Family referral</option><option value="event">Event</option><option value="other">Other</option></select></label>
+    <label className="text-sm">Inquiry source<select value={source} disabled={!!convertibleInterest} onChange={e=>setSource(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"><option value="school_direct">School inquiry</option><option value="published_site">Published Site</option><option value="church_referral">Church referral</option><option value="family_referral">Family referral</option><option value="event">Event</option><option value="other">Other</option></select></label>
     <label className="text-sm sm:col-span-2">Notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} className="mt-1 w-full rounded border bg-background p-2" rows={2}/></label>
-    <button type="submit" disabled={busy||!programId} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create inquiry</button>
+    <button type="submit" disabled={busy||!programId||(!!convertibleInterest&&!contactReviewed)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create inquiry</button>
    </form>
   </section>
   <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3">
