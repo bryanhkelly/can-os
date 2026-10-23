@@ -444,14 +444,14 @@ integration("cross-persona admissions through active classes",()=>{
     await tx.update(s.accessAccounts).set({disabled:true})
       .where(eq(s.accessAccounts.id,teacherAccount.id));
     expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
-      .toEqual(expect.arrayContaining([expect.objectContaining({id:section.id,staffed:false})]));
+      .toEqual(expect.arrayContaining([expect.objectContaining({id:section.id,staffed:false,readyForPlacement:false})]));
     await expect(placeEnrolledStudent({data:{applicationId,sectionId:section.id}}))
       .rejects.toThrow("Assign an active teacher");
     await tx.update(s.accessAccounts).set({disabled:false})
       .where(eq(s.accessAccounts.id,teacherAccount.id));
     expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
       .toEqual(expect.arrayContaining([expect.objectContaining({
-        id:section.id,staffed:true,curriculumReady:true,
+        id:section.id,staffed:true,curriculumReady:true,readyForPlacement:true,
       })]));
     await placeEnrolledStudent({data:{applicationId,sectionId:section.id}});
     expect(await placeEnrolledStudent({data:{applicationId,sectionId:section.id}})).toMatchObject({created:false});
