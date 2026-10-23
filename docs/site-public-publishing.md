@@ -433,3 +433,32 @@ before enabling these new reads/writes. No production migrations or
 public-host activation are authorized by this document. Typecheck,
 cross-site mutation integration, anti-abuse and browser acceptance are
 still unverified.
+
+## Program-launch integration: reuse a draft for pre-existing Sites
+
+The canonical `startProgramLaunch` now calls
+`ensureExistingSitePublicationDraftForLaunch` for the selected Site **inside
+its existing Program/Journey/audit transaction**. Existing church/school
+Sites created before the website feature receive a safe draft reservation
+on first Program launch. If the Site already has a reserved or published
+address, the original row is reused and its publication status is left
+untouched. Collision handling uses the existing globally unique slug
+suggestions and database uniqueness, not another website identity table.
+
+The verified Program launch actor must still hold the
+`program.launch.start` capability, the host Organization scope and any
+site-specific restriction. This command **does not** grant publishing rights
+or institutional approval, publish a Program, accept an application or
+enable DNS/TLS. Site editor/publisher roles remain independently assigned.
+A Site-less Program creates no website, by design.
+
+The wizard displays the reservation from the command result and the scoped
+Launch Portfolio re-reads it from the canonical `site_publications` record
+on refresh, with a link to the existing private Site publishing workflow.
+The initial `createLaunchSite` draft-provisioning path is unchanged in
+behavior; both operations reuse the same transaction-bound reservation
+implementation.
+
+**Source committed; runtime unverified.** Program launch at an existing
+Site now depends on migration `0035` being present in that environment.
+Do not interpret the draft host as public or ready for family traffic.
