@@ -80,7 +80,8 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
     const verifiedStudentIds=verifiedRelations.map(row=>row.studentPersonId);
     const existing=await db.select({
       applicationId:applications.id,programId:applications.programId,
-      programName:programs.name,studentFirstName:people.legalFirstName,
+      programName:programs.name,studentPersonId:studentProfiles.personId,
+      studentFirstName:people.legalFirstName,
       studentLastName:people.legalLastName,stage:applications.stage,
       updatedAt:applications.updatedAt,
     }).from(applications)
@@ -98,8 +99,11 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
       .innerJoin(households,eq(households.id,householdMemberships.householdId))
       .where(eq(householdMemberships.personId,actor.actorPersonId))
       .orderBy(households.displayName).limit(100);
+    const verifiedIds=new Set(verifiedStudentIds);
     return {programs:activePrograms, applications:existing.map(row=>({
-      ...row,updatedAt:row.updatedAt.toISOString(),
+      ...row,
+      guardianVerified:verifiedIds.has(row.studentPersonId),
+      updatedAt:row.updatedAt.toISOString(),
     })),households:families};
   });
 
