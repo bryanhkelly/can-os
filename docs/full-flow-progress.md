@@ -72,9 +72,13 @@ lesson and submission → teacher grade and guardian view → onsite-day reconci
   false), without rewriting existing rows. Registered in Drizzle journal.
   **Applied and inspected on isolated Neon `fullflow-e2e-20261022` only**;
   production unchanged. Ledger timestamp `1792738800000`.
-- Offer acceptance/activation use the same independently verified guardian
-  policy. Unit regressions cover family scope, parent/staff identity
-  separation and pending guardian relationships.
+- Offer acceptance/activation and admission-offer notification recipients
+  use the same independently verified guardian policy. The shared SQL
+  relationship predicate now additionally denies unverified academic,
+  enrollment and attendance-excuse reads/writes across dependent modules;
+  existing unverified records were not mutated to appear verified. Unit
+  regressions cover family scope, parent/staff identity separation,
+  pending relationships, and the SQL verification predicate.
 - The authenticated parent path now serializes submissions for an existing
   Household and rejects duplicate open applications for the same full name
   and Program. It never merges child identities on a name match; admissions
