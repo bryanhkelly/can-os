@@ -119,10 +119,10 @@ export const guardianRelationships = pgTable(
       .notNull()
       .references(() => people.id, { onDelete: "restrict" }),
     relationshipLabel: text("relationship_label").notNull(),
-    canViewAcademics: boolean("can_view_academics").default(true).notNull(),
-    canManageEnrollment: boolean("can_manage_enrollment").default(true).notNull(),
+    canViewAcademics: boolean("can_view_academics").default(false).notNull(),
+    canManageEnrollment: boolean("can_manage_enrollment").default(false).notNull(),
     canSubmitAttendanceExcuse: boolean("can_submit_attendance_excuse")
-      .default(true)
+      .default(false)
       .notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: createdAt(),
