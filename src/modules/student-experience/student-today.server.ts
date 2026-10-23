@@ -3,7 +3,7 @@
  * Server-side composition only; not exported through a public route or called
  * from the demo UI until a real student session exists.
  */
-import { and, asc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   actions, assessments, calendarEvents, enrollments, people, sections,
@@ -79,6 +79,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
     .where(and(
       inArray(scheduledOccurrences.siteId, siteIds),
       ...(scope?[or(isNull(scheduledOccurrences.programId),inArray(scheduledOccurrences.programId,scope.programIds))]:[]),
+      ne(calendarEvents.type, "extended_learning_session"), // keep draft camp plans out of Student Today
       gte(scheduledOccurrences.startsAt, startOfDay),
       lt(scheduledOccurrences.startsAt, endOfDay),
       or(
