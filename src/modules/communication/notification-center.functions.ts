@@ -5,6 +5,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability } from "@/domain/command-context";
 import {z} from "zod";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 async function notificationActor(){
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId)throw new Error("Authenticated person required");
@@ -31,8 +32,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   id:s.attendanceEvents.id,studentPersonId:s.studentProfiles.personId,
  }).from(s.attendanceEvents)
   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.attendanceEvents.studentProfileId))
-  .innerJoin(s.guardianRelationships,and(eq(s.guardianRelationships.studentPersonId,s.studentProfiles.personId),
-   eq(s.guardianRelationships.guardianPersonId,personId),eq(s.guardianRelationships.canViewAcademics,true)))
+  .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+    guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"academic",
+  }))
   .where(and(inArray(s.attendanceEvents.id,attendanceIds),
    inArray(s.attendanceEvents.siteId,context.scope.siteIds??[]),
    inArray(s.attendanceEvents.programId,context.scope.programIds??[]))):[];
@@ -43,8 +45,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
   await db.select({id:s.applications.id,studentPersonId:s.studentProfiles.personId}).from(s.applications)
    .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
    .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.applications.studentProfileId))
-   .innerJoin(s.guardianRelationships,and(eq(s.guardianRelationships.studentPersonId,s.studentProfiles.personId),
-    eq(s.guardianRelationships.guardianPersonId,personId),eq(s.guardianRelationships.canManageEnrollment,true)))
+   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+     guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"enrollment",
+   }))
    .where(and(inArray(s.applications.id,enrollmentApplicationIds),
     inArray(s.applications.programId,context.scope.programIds??[]),
     inArray(s.programs.siteId,context.scope.siteIds??[]),
@@ -109,7 +112,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const relatedStudentPeople=admissionOffers.length?await db.select({id:s.studentProfiles.id,personId:s.studentProfiles.personId})
   .from(s.studentProfiles).where(inArray(s.studentProfiles.id,admissionOffers.map(o=>o.studentProfileId))):[];
  const guardianLinks=relatedStudentPeople.length?await db.select({guardianPersonId:s.guardianRelationships.guardianPersonId,studentPersonId:s.guardianRelationships.studentPersonId})
-  .from(s.guardianRelationships).where(and(eq(s.guardianRelationships.guardianPersonId,personId),eq(s.guardianRelationships.canManageEnrollment,true))):[];
+  .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+    guardianPersonId:personId,access:"enrollment",
+  })):[];
  const manageableStudents=new Set(guardianLinks.map(g=>g.studentPersonId));
  const personByProfile=new Map(relatedStudentPeople.map(p=>[p.id,p.personId]));
  const permittedGuardianOffers=new Set(admissionOffers.filter(o=>manageableStudents.has(personByProfile.get(o.studentProfileId)??"")&&(context.scope.programIds??[]).includes(o.programId)).map(o=>o.id));
@@ -139,10 +144,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    .innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.submissions.studentProfileId))
-   .innerJoin(s.guardianRelationships,and(
-     eq(s.guardianRelationships.studentPersonId,s.studentProfiles.personId),
-     eq(s.guardianRelationships.guardianPersonId,personId),
-     eq(s.guardianRelationships.canViewAcademics,true)))
+   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+     guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"academic",
+   }))
    .innerJoin(s.enrollments,and(
      eq(s.enrollments.studentProfileId,s.studentProfiles.id),
      eq(s.enrollments.sectionId,s.sections.id),
@@ -172,8 +176,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    if(context.role==="guardian"){
      const relations=await db.select({studentPersonId:s.guardianRelationships.studentPersonId})
        .from(s.guardianRelationships).where(and(
-         eq(s.guardianRelationships.guardianPersonId,personId),
-         eq(s.guardianRelationships.canViewAcademics,true),
+         guardianRelationshipPredicate({guardianPersonId:personId,access:"academic"}),
          inArray(s.guardianRelationships.studentPersonId,gradeActions.map(x=>x.studentPersonId))));
      const permitted=new Set(relations.map(x=>x.studentPersonId));
      for(const action of gradeActions)if(permitted.has(action.studentPersonId)&&
