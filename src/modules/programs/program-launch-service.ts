@@ -279,21 +279,24 @@ export async function activateProgram(
       .limit(1);
 
     if (!program) throw new Error("Program not found");
-    // The church's host grant and a selected CAN provider do not prove
-    // institutional authority; retain planning but deny unsupported operation.
-    // A future resolver must verify an independently approved agreement,
-    // effective dates and exact Site/Program before replacing null.
+    // Resolve the caller's verified program/organization/site scope BEFORE any
+    // institutional-policy result, so unrelated actors cannot discover whether
+    // another organization's school has been approved to open.
+    assertProgramScope(context, programId);
+    if (!context.scope.organizationIds?.includes(program.organizationId))
+      throw new Error("Program activation requires the verified organization grant");
+    if (program.siteId) assertSiteScope(context, program.siteId);
+    // Provider selection is a planning fact, not CAN institutional authority.
+    // Until a separate approved Program-Site agreement resolver exists, deny
+    // independent church/CAN operation before changing the program or locking
+    // its site attendance configuration.
     assertChurchHostedActivationAuthorization({
       programType: program.type,
       hostOrganizationId: program.hostOrganizationId ?? program.organizationId,
       academicProviderOrganizationId: program.academicProviderOrganizationId,
       verifiedProgramSiteAuthorizationId: null,
     });
-    assertProgramScope(context, programId);
-    if (!context.scope.organizationIds?.includes(program.organizationId))
-      throw new Error("Program activation requires the verified organization grant");
     if (program.siteId) {
-      assertSiteScope(context, program.siteId);
       await lockAttendanceConfigurationAtSite(tx, program.siteId);
     }
     const [current] = await tx.select({ status: programs.status })
