@@ -14,6 +14,8 @@ This directory separates **current specifications** from **historical implementa
 
 FullFlow execution priority: [one connected six-stage acceptance contract](./full-flow-acceptance-contract.md). Golden Flow-specific tests and network onboarding must not substitute for that primary end-to-end school journey.
 
+Integration stabilization: [cross-domain convergence audit, blockers and ordered acceptance bites](./integration-convergence-audit.md). Connect and test existing services before adding more screens or workflows.
+
 New architecture specification: [Curriculum marketplace and portability](./curriculum-marketplace-architecture.md).
 
 Extended offerings: [Summer and after-school program definitions and workflow limits](./extended-learning-offerings.md).
