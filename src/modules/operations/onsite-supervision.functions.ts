@@ -185,6 +185,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
       // instruction plan. Never accept a browser-supplied facilitator ID.
       canRespond:!projectionTruncated && data.date===today &&
         assignedPersonId===actor.actorPersonId && block.verifiedSiteStaffGrant &&
+        block.instructionalDayConfirmed===true &&
         block.periodId!==null && block.startsAtLocal!==null && block.endsAtLocal!==null,
       canAccept:!projectionTruncated && data.date===today &&
         assignedPersonId===actor.actorPersonId && block.assignedPlan,
