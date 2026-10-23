@@ -33,6 +33,26 @@ describe("CAN OS partner hostname router", () => {
       expect(classify(`https://${host}/`)).toEqual({ kind: "deny" });
     }
   });
+  it("permits only the tenant inquiry POST and never application or private POSTs", () => {
+    expect(classify("https://vineyard.can-os.com/inquiry", "POST")).toEqual({
+      kind: "site", slug: "vineyard", rewrite: true,
+    });
+    expect(classify("https://vineyard.can-os.com/published-site/inquiry", "POST")).toEqual({
+      kind: "site", slug: "vineyard", rewrite: false,
+    });
+    for (const path of ["/inquiry/other", "/access/request", "/admissions/intake",
+      "/published-site", "/_serverFn"]) {
+      expect(classify("https://vineyard.can-os.com" + path, "POST"))
+        .toEqual({ kind: "deny" });
+    }
+    expect(classify("https://vineyard.can-os.com/inquiry", "GET"))
+      .toEqual({ kind: "deny" });
+    expect(classify("https://vineyard.can-os.com/inquiry", "POST", false))
+      .toEqual({ kind: "deny" });
+    expect(slugForPublicSiteOrigin(new Request(
+      "https://vineyard.can-os.com/published-site/inquiry", { method: "POST" }), true))
+      .toBe("vineyard");
+  });
   it("validates origin hostname independently, ignoring proxy-provided host claims", () => {
     expect(slugForPublicSiteOrigin(new Request("https://vineyard.can-os.com/published-site"), true))
       .toBe("vineyard");
