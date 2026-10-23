@@ -1,4 +1,5 @@
 import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createdAt, id, updatedAt } from "./common";
 import { documents } from "./documents";
 import { people } from "./identity";
@@ -32,6 +33,9 @@ export const programSiteAuthorizations = pgTable("program_site_authorizations", 
   updatedAt: updatedAt(),
 }, table => [
   uniqueIndex("program_site_authorization_version_uq").on(table.programId,table.version),
+  // Match the SQL migration's one-request-or-approval-per-Program uniqueness.
+  uniqueIndex("program_site_authorization_current_uq").on(table.programId)
+    .where(sql`${table.status} IN ('requested','approved')`),
   index("program_site_authorization_site_idx").on(table.siteId,table.status),
   index("program_site_authorization_institution_idx").on(table.institutionOrganizationId,table.status),
 ]);
