@@ -227,6 +227,8 @@ export async function requireCurrentSiteLocalDelegate(
       eq(roleAssignments.roleKey, localResponsibilityRoles[responsibility]),
       lte(programResponsibilityAssignments.effectiveFrom, now),
       gt(programResponsibilityAssignments.effectiveThrough, now),
+      eq(accountPersonGrants.id, actor.grantId),
+      eq(accountPersonGrants.accountId, actor.accountId),
       eq(accountPersonGrants.active, true), eq(people.active, true),
       eq(accessAccounts.disabled, false),
       sql`${accessAccounts.emailVerifiedAt} is not null`,
