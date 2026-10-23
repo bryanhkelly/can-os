@@ -688,6 +688,15 @@
       "writeBoundary": "delegated to account-owned authenticated session endpoint"
     },
     {
+      "file": "src/routes/site-website.tsx",
+      "route": "/site-website",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "Site-specific partner previews private website only; denies registrar and unrelated Site roles",
+      "readBoundary": "verified active Site grant + matching organization membership and explicit site website editor role assignment; approved public-safe catalog only",
+      "writeBoundary": "read-only; no publisher, admissions, student or public website mutation"
+    },
+    {
       "file": "src/routes/sites.$siteId.publish.tsx",
       "route": "/sites/$siteId/publish",
       "owner": "operations",
