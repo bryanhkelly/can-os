@@ -45,11 +45,11 @@ export async function changeAcademicProgramPublication(
       eq(programs.siteId, site.id),
       eq(programs.organizationId, site.organizationId),
     )).limit(1);
-    if (!program || !publishableAcademicProgram({
+    if (!program || (input.action === "publish" && !publishableAcademicProgram({
       type: program.type, status: program.status,
       siteId: program.siteId, organizationId: program.organizationId,
       publicationSiteId: site.id, siteOrganizationId: site.organizationId,
-    })) throw new Error("Only current academic Programs belonging to this Site can be marketed");
+    }))) throw new Error("Only current academic Programs belonging to this Site can be marketed");
 
     const [current] = await tx.select({
       status: programPublications.status,
