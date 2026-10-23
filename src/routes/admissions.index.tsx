@@ -187,6 +187,20 @@ function CoursePlacement({ applicationId }: { applicationId: string }) {
   const [chosen, setChosen] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // An activated student's eligible classes should be visible immediately.
+  // Reload on application change, and never reuse another child's prior choices.
+  useEffect(() => {
+    let current = true;
+    setSections([]);
+    setChosen("");
+    setLoaded(false);
+    listEnrollmentPlacements({ data: { applicationId } }).then(result => {
+      if (current) { setSections(result.sections); setLoaded(true); }
+    }).catch(cause => {
+      if (current) { setError(cause instanceof Error ? cause.message : "Cannot load course placements"); setLoaded(true); }
+    });
+    return () => { current = false; };
+  }, [applicationId]);
   async function refresh() {
     const result = await listEnrollmentPlacements({ data: { applicationId } });
     setSections(result.sections);
@@ -214,10 +228,11 @@ function CoursePlacement({ applicationId }: { applicationId: string }) {
       <h3 className="text-sm font-semibold">Course placement</h3>
       <button type="button" disabled={busy} onClick={open}
         className="rounded-md border px-3 py-1.5 text-xs disabled:opacity-50">
-        {loaded ? "Refresh sections" : "Choose courses"}
+        Refresh eligible classes
       </button>
     </div>
     {error && <p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+    {!loaded && !error && <p role="status" className="mt-3 text-xs text-muted-foreground">Loading eligible classes…</p>}
     {loaded && <div className="mt-3 space-y-3">
       <div className="flex flex-wrap gap-2">
         {sections.filter(s => s.enrolled).map(s =>
