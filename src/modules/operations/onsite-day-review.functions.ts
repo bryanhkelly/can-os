@@ -11,6 +11,7 @@ import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { listExpectedOnsiteRoster } from "@/modules/attendance/onsite-attendance-workflow.functions";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { writeAudit } from "@/platform/mutation";
 
 /**
@@ -112,6 +113,19 @@ export const attestOnsiteDayReview = createServerFn({method:"POST"})
     if (!summary.readyForAttendanceReview)
       throw new Error("Unmarked attendance or schedule gaps prevent daily attendance attestation");
     return db.transaction(async tx=>{
+      // The preflight roster is not authority: recheck all currently active
+      // onsite Programs and independently contracted CAN supervision inside
+      // the same transaction that records the local school's review.
+      const currentPrograms=await tx.select({
+        id:programs.id,deliveryModel:programs.deliveryModel,
+      }).from(programs).where(and(eq(programs.siteId,site.id),
+        eq(programs.organizationId,site.organizationId),eq(programs.status,"active")));
+      const onsiteIds=currentPrograms.filter(row=>row.deliveryModel.onsite===true)
+        .map(row=>row.id);
+      if(!onsiteIds.length||!onsiteIds.every(id=>actor.scope.programIds?.includes(id)))
+        throw new AuthorizationError("current complete onsite school-program grant");
+      for(const programId of onsiteIds)
+        await requireChurchHostedOperatingServices(tx,programId,["onsite_supervision"]);
       // Prevent two concurrent review requests from recording duplicate Actions.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"site-review:"+site.id+":"+data.date}))`);
       const [prior] = await tx.select({
