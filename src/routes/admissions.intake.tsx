@@ -5,13 +5,13 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox";
-import { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
+import { listPublicAdmissionsInterests,listPublicInterestFollowUpAssignees } from "@/modules/enrollment/public-admissions-interest.functions";
 const load=async()=>{
- const [records,programs,existingStudents,publicInterests]=await Promise.all([
+ const [records,programs,existingStudents,publicInterests,followUpAssignees]=await Promise.all([
   listAdmissionsIntake(),listAdmissionsIntakePrograms(),listAdmissionsExistingStudents(),
-  listPublicAdmissionsInterests(),
+  listPublicAdmissionsInterests(),listPublicInterestFollowUpAssignees(),
  ]);
- return {records,programs,existingStudents,publicInterests};
+ return {records,programs,existingStudents,publicInterests,followUpAssignees};
 };
 export const Route=createFileRoute("/admissions/intake")({
  validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string;interest?:string}=>({
@@ -68,7 +68,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
-  <PublicInterestInbox items={data.publicInterests.filter(row =>
+  <PublicInterestInbox assignees={data.followUpAssignees} items={data.publicInterests.filter(row =>
     (!selected.siteId || row.siteId === selected.siteId) &&
     (!selected.programId || row.programId === selected.programId))}/>
   <section className="mt-8 rounded-xl border bg-card p-5">
