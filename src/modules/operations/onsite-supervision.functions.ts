@@ -142,6 +142,12 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     }
     const result:SupervisionBlockInput[]=[];
     for(const section of onsiteSections){
+      // Classroom staff only see the Sections they are named for on an
+      // actual delivery arrangement. Retain visibility for an assigned adult
+      // reporting inability to cover after their separate delegation expires.
+      if (actor.role === "room_facilitator" &&
+          !candidates.some(row => row.sectionId === section.id &&
+            row.facilitatorPersonId === actor.actorPersonId)) continue;
       const templates=periodRows.filter(row=>
         row.templateId===section.scheduleTemplateId &&
         row.yearId===section.schoolYearId &&
