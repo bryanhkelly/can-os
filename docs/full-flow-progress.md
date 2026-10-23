@@ -28,6 +28,28 @@ lesson and submission → teacher grade and guardian view → onsite-day reconci
 - Unit regressions for school-type guidance, first-family routing, unplaced
   students and orphan Section placement were added; **no test run is claimed**.
 
+**Additional 23 October source patches (unverified):**
+- Registrar-created inquiries, including converted public interests, now
+  navigate directly to their exact Application so staff can immediately
+  verify guardianship, provision sign-in, invite the parent, and continue
+  eligibility/offer review instead of hunting through the inbox.
+- Guardian offer reads exclude pending/unverified or revoked enrollment
+  relationships despite legacy boolean defaults; class counts require the
+  Section to belong to the same Program. Enrolled families with assigned
+  classes now have an explicit contextual `/classes` link. This is not
+  anonymous online application signup.
+- Guardian verification and invitation recheck registrar Program, owner
+  Organization and Site scope. Unit policy tests cover unverified,
+  pending, duplicate and revoked relationships.
+- The church operating-authorization proposal previously defaulted to
+  only four services and omitted **admissions** and **academic_records**,
+  both required downstream. It now recommends the complete class/admissions/
+  records entitlement set and removes `credit_issuance` for Programs without
+  a credit issuer. CAN independent review, verified evidence, effective
+  periods, individual staff grants and opening/safeguarding checks are
+  unchanged requirements; no agreement is automatically approved.
+- These are source changes with tests added, **not** recorded passing runs.
+
 **Still P0 / not implemented or accepted:** the parent's independent self-service
 application and safe verified account-start experience; CAN staff's effective
 cross-organization academic permissions and local delegated responsibility;
