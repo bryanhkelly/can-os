@@ -48,7 +48,7 @@ export function planSitePublicationTransition(input: {
   }
   if (action === "publish" &&
       (!input.contentReviewed || input.eligibleOfferingCount < 1)) {
-    throw new Error("Review the public content and include at least one eligible published enrichment offering");
+    throw new Error("Review the public content and include at least one eligible published academic or enrichment listing");
   }
   if (!Number.isFinite(now.getTime())) throw new Error("Invalid publication clock");
   // Updated revision must change even if two commands happen in the same ms.
