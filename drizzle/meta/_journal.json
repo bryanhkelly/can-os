@@ -274,6 +274,13 @@
       "when": 1792728000000,
       "tag": "0038_public_interest_conversion",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792731600000,
+      "tag": "0039_program_site_authorizations",
+      "breakpoints": true
     }
   ]
 }

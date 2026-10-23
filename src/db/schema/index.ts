@@ -41,3 +41,4 @@ export * from "./network-agreements";
 export * from "./site-publications";
 export * from "./program-publications";
 export * from "./public-admissions-interests";
+export * from "./program-site-authorizations";
