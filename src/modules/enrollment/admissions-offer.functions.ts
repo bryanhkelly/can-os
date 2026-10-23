@@ -72,11 +72,11 @@ export const respondToAdmissionOffer=createServerFn({method:"POST"})
  return {offerId:await respondToSyntheticAdmissionOffer(actor,offer.id,data.decision)};
 });
 export const activateOfferedEnrollment=createServerFn({method:"POST"})
-.validator((data:unknown)=>z.object({offerId:z.string().uuid()}).strict().parse(data)).handler(async({data})=>{
+.validator((data:unknown)=>z.object({offerId:z.string().uuid(),sectionId:z.string().uuid().optional()}).strict().parse(data)).handler(async({data})=>{
  const {offer,app}=await loadOffer(data.offerId);
  const actor=await authorizedActor("registrar","enrollment.activate",app.programId);
  assertRecordWriteAllowed(app.metadata,"registrar");
- return {enrollmentId:await activateSyntheticOfferedEnrollment(actor,offer.id)};
+ return {enrollmentId:await activateSyntheticOfferedEnrollment(actor,offer.id,data.sectionId)};
 });
 
 export const withdrawIssuedAdmissionOffer=createServerFn({method:"POST"})
