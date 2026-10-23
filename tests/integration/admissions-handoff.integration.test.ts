@@ -106,6 +106,14 @@ integration("cross-persona admissions through active classes",()=>{
      student:{legalFirstName:"Accepted",legalLastName:"Learner",gradeLevel:"9"}});
     applicationId=app.applicationId;profileId=app.studentProfileId;
     const student=first(await tx.select().from(s.studentProfiles).where(eq(s.studentProfiles.id,profileId)));
+    // An unverified application never automatically establishes child-record
+    // access. This test explicitly simulates a separate authorized registrar
+    // identity check before proceeding to the guardian's enrollment forms.
+    await tx.update(s.guardianRelationships).set({
+      canViewAcademics:true,canManageEnrollment:true,canSubmitAttendanceExcuse:true,
+      metadata:{verification:"verified",source:"synthetic_independent_review"},
+    }).where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),
+      eq(s.guardianRelationships.studentPersonId,student.personId)));
     const requirement=first(await tx.select().from(s.journeyRequirements).where(and(
      eq(s.journeyRequirements.journeyId,app.journeyId),eq(s.journeyRequirements.key,"review"))));
     const formRequirement=first(await tx.select().from(s.journeyRequirements).where(and(
