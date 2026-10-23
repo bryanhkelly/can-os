@@ -96,8 +96,40 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           disabled={saving || !candidate} type="submit">{saving ? "Reserving…" : "Reserve address"}</button>
       </form>}
     </section>
+    <section aria-labelledby="website-preview" className="mt-6 rounded-xl border bg-card p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="website-preview" className="text-xl font-semibold">Website draft preview</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            This private, read-only preview uses the same website template and approved
+            public-safe academic and enrichment listings as the eventual public site.
+            Unapproved internal Programs are not displayed here. No inquiry forms,
+            family applications or registrations are enabled.
+          </p>
+        </div>
+        <span className="rounded-full border px-3 py-1 text-xs font-semibold">
+          {data.address?.status === "published" ? "Site approved · hosting disabled" : "Private draft"}
+        </span>
+      </div>
+      {data.previewHtml ? <>
+        <p className="mt-4 text-xs text-muted-foreground">
+          Reserved address: <span className="font-mono">{data.address?.host}</span>.
+          The address is not an active public website.
+        </p>
+        <iframe title={`${data.site.name} private website draft preview`}
+          srcDoc={data.previewHtml} sandbox="" referrerPolicy="no-referrer"
+          loading="lazy" className="mt-3 h-[680px] w-full rounded-lg border bg-white"
+        />
+        <p className="mt-2 text-xs text-muted-foreground">
+          The iframe is origin-isolated, and all form submission and scripts are disabled.
+          Content approval and public hosting are separate operations.
+        </p>
+      </> : <p role="status" className="mt-4 rounded-lg border p-4 text-sm">
+        Reserve a public address above to see the website draft. No content is public.
+      </p>}
+    </section>
     <section className="mt-6 rounded-xl border bg-card p-5">
-      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Private editor preview · authenticated only</p>
+      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Internal program and catalog review · authenticated only</p>
       <div className="mt-5 border-b pb-5">
         <p className="font-serif text-3xl">{data.site.name}</p>
         <p className="mt-1 text-sm text-muted-foreground">{data.site.organizationName}</p>
