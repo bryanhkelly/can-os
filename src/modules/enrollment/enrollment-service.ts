@@ -14,6 +14,7 @@ schoolYears,
 studentProfiles
 } from "@/db/schema";
 import { assertApplicationAcceptance,assertApplicationRetryOwnership } from "@/domain/admissions-transitions";
+import { assertGuardianApplicationOpening } from "@/domain/guardian-application-opening";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {
 assertCapability,
@@ -73,10 +74,7 @@ export async function startFamilyApplication(
     if (input.parentSelfService) {
       const [opening] = await tx.select({status:programs.status,organizationId:programs.organizationId,
         siteId:programs.siteId}).from(programs).where(eq(programs.id,input.programId)).for("share").limit(1);
-      if (!opening || opening.status !== "active" || !opening.siteId ||
-          !context.scope.organizationIds?.includes(opening.organizationId) ||
-          !context.scope.siteIds?.includes(opening.siteId))
-        throw new AuthorizationError("active school and authorized family application scope");
+      assertGuardianApplicationOpening(opening,context.scope);
       await requireChurchHostedOperatingServices(tx,input.programId,["admissions","school_of_record"]);
     }
     const [existing] = await tx
