@@ -14,10 +14,11 @@ const load=async()=>{
  return {records,programs,existingStudents,publicInterests};
 };
 export const Route=createFileRoute("/admissions/intake")({
- validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string}=>({
+ validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string;interest?:string}=>({
   application:typeof search.application==="string"?search.application:undefined,
   siteId:typeof search.siteId==="string"?search.siteId:undefined,
   programId:typeof search.programId==="string"?search.programId:undefined,
+  interest:typeof search.interest==="string"?search.interest:undefined,
  }),
  loader:safeLoader(load,{authMessage:"Sign in as a registrar to manage admissions."}),
  component:IntakePage
@@ -26,7 +27,7 @@ function IntakePage(){
  const outcome=Route.useLoaderData();
  const selected=Route.useSearch();
  if(!outcome.ok)return <LoaderFailure eyebrow="CAN OS · Admissions" title="Inquiry and decision pipeline" outcome={outcome}/>;
- return <Intake key={`${selected.siteId??""}:${selected.programId??""}`} data={outcome.data}/>;
+ return <Intake key={`${selected.siteId??""}:${selected.programId??""}:${selected.interest??""}`} data={outcome.data}/>;
 }
 function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const router=useRouter();
@@ -36,7 +37,12 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const scopedRecords=data.records.filter(row=>(!selected.siteId||row.siteId===selected.siteId)&&
   (!selected.programId||row.programId===selected.programId));
  const records=scopedRecords.filter(row=>!selected.application||row.id===selected.application);
- const [programId,setProgramId]=useState(programs[0]?.id??"");
+ const selectedInterest=data.publicInterests.find(row=>row.id===selected.interest &&
+  (!selected.siteId||row.siteId===selected.siteId) &&
+  (!selected.programId||row.programId===selected.programId));
+ const convertibleInterest=selectedInterest&&["new","contacted"].includes(selectedInterest.status)?
+  selectedInterest:null;
+ const [programId,setProgramId]=useState(convertibleInterest?.programId??programs[0]?.id??"");
  const [requestId,setRequestId]=useState(()=>crypto.randomUUID());
  const [existingApplicationId,setExistingApplicationId]=useState("");
  const [existingStudentKey,setExistingStudentKey]=useState("");
@@ -46,9 +52,9 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
   `${student.studentProfileId}:${student.guardianPersonId}:${student.householdId??"new"}`;
  const existingStudent=existingStudents.find(student=>studentKey(student)===existingStudentKey);
  const [studentFirstName,setStudentFirstName]=useState(""),[studentLastName,setStudentLastName]=useState("");
- const [guardianFirstName,setGuardianFirstName]=useState(""),[guardianLastName,setGuardianLastName]=useState("");
- const [guardianEmail,setGuardianEmail]=useState(""),[gradeLevel,setGradeLevel]=useState("9"),[source,setSource]=useState("school_direct");
- const [notes,setNotes]=useState(""),[saving,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [guardianFirstName,setGuardianFirstName]=useState(convertibleInterest?.firstName??""),[guardianLastName,setGuardianLastName]=useState(convertibleInterest?.lastName??"");
+ const [guardianEmail,setGuardianEmail]=useState(convertibleInterest?.email??""),[gradeLevel,setGradeLevel]=useState(convertibleInterest?"":"9"),[source,setSource]=useState(convertibleInterest?"published_site":"school_direct");
+ const [notes,setNotes]=useState(convertibleInterest?.message??""),[contactReviewed,setContactReviewed]=useState(false),[saving,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [interactive,setInteractive]=useState(false);
  useEffect(()=>setInteractive(true),[]);
  const busy=saving||!interactive;
