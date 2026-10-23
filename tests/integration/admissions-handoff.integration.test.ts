@@ -473,6 +473,22 @@ integration("cross-persona admissions through active classes",()=>{
     state.actor=learner;
     const studentClass=await getClassWorkspace({data:{sectionId:section.id}});
     expect(studentClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
+    // A withdrawn Program must remove learning access even when a stale
+    // active Section enrollment was left behind. Restore fixture state after
+    // proving the deny so remaining enrollment/guardian assertions can run.
+    const [activeProgram]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
+      .where(and(eq(s.enrollments.studentProfileId,profileId),
+        eq(s.enrollments.programId,program.id),
+        eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
+    if(!activeProgram)throw new Error("Expected current Program enrollment");
+    await tx.update(s.enrollments).set({status:"withdrawn"})
+      .where(eq(s.enrollments.id,activeProgram.id));
+    await expect(authorizeClass(learner,section.id)).rejects.toThrow("active class enrollment");
+    expect((await accessibleClasses(learner)).map(row=>row.id)).not.toContain(section.id);
+    await expect(getMyStudentToday()).rejects.toThrow("active student membership");
+    await tx.update(s.enrollments).set({status:"active"})
+      .where(eq(s.enrollments.id,activeProgram.id));
+    expect((await getMyStudentToday()).sections.map(row=>row.sectionId)).toContain(section.id);
     const unrelated=act("guardian",outsider.id);
     await expect(authorizeClass(unrelated,section.id,student.personId)).rejects.toThrow();
     state.actor=family;
