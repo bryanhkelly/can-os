@@ -106,3 +106,65 @@ authorized replacement, not a new checklist engine.
 This slice requires previously committed 0032/0033 migrations for its
 Program/Season model; it does not add a new schema migration. Database and
 browser acceptance remain release gates.
+
+
+## Bite 6: family discovery and enrollment using the existing Activity system
+
+**Core user journey:** An authorized registrar plans a noncredit offering and its
+dated, site-local sessions, assigns currently active onsite facilitators, and
+activates the Program through the existing Program Launch Journey. Noncredit
+extended Programs no longer require a school year, academic Section, teacher
+Section staffing or transcript credit just to become active. The existing
+staffing/facility launch requirements and verified receiving site operator
+remain in place; the academic launch task is labeled for enrichment sessions.
+
+The registrar then explicitly publishes a **versioned guardian participation
+permission statement**, an activity fee, and a responsible-operator
+attestation. This command checks the Program's active status, site ownership,
+draft Season, seat limit, real calendar sessions, and currently valid hosting
+site staff grants. The publication is recorded on the existing Activity
+metadata, changes the Season to `registration`, releases previously
+creator-private draft calendar events, and writes audit/outbox evidence
+transactionally. The attestation is a **human accountability record**, not
+automatic safety qualification, medical clearance, regulatory authorization,
+or proof of a completed mandated report. Actual onsite safety checks remain
+the operator's and school's responsibilities.
+
+`/enrichment` offers a **public browse-only catalog** of specifically
+published, active, noncredit summer and after-school Seasons, prices, locations,
+date ranges, availability and waitlist information; it never exposes internal
+draft activities, student identities or staff case data.
+
+`/guardian/enrichment` lets a verified guardian:
+- Browse the same published catalog; choose an existing manageable child
+  even when that child does not have any active CAN academic enrollment.
+- Add a new enrichment-only child profile linked to their own Household and
+  GuardianRelationship, without creating a school-year/program Enrollment,
+  class assignment, transcript entry or duplicate student-management system.
+- Read and explicitly acknowledge the published **current-version** guardian
+  permission; submit to the existing locked `registerForActivity` transaction.
+  Server code rechecks publication identity, status, site match, current
+  version, `canManageEnrollment` relationship, household access and season
+  registration window. Capacity, waitlisting, signed ConsentRecord and
+  FinancialObligation are handled by the preexisting Activity service.
+  Repeating a successful submission returns the existing registration,
+  without duplicate consent or fees; withdrawn registrations require a
+  separate staff-managed reapplication.
+
+This work replaces the **blanket** earlier extended-program registration
+denial with a stricter per-season published-offer check. The generic
+`createActivitySeason` auto-open path remains prohibited for enrichment;
+only the explicitly audited publishing command may open an extended Season.
+Publication snapshot evidence is never treated as proof of licensure.
+Existing credit-bearing summer academic Sections are unchanged.
+
+**Remaining release gates:** authenticated guardian account invitation or
+signup for completely new families is still separate from the enrichment
+catalog; no unauthenticated child identity is silently created. Actual
+payment processing/settlement, refund rules, guardian pickup authorization,
+session attendance/check-in, age/grade eligibility policy configuration,
+documented legally applicable permission language, and cross-role browser
+acceptance remain unfinished. Do not claim production-ready childcare or
+payment services from this slice. The CI and isolated-Neon acceptance results
+must be green before deployment; this slice introduces no schema migration
+beyond 0032/0033.
