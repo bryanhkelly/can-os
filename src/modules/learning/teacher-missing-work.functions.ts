@@ -7,6 +7,7 @@ import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,eq,inArray,lt } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 async function verifiedTeacher(){
  const context=await getCommandContext(getRequest());
@@ -31,10 +32,21 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
   .where(and(inArray(s.assessments.sectionId,sectionIds),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,now)));
  if(!due.length)return {connected:true,items:[]};
+ const activeProgram=alias(s.enrollments,"missing_work_program_membership");
  const roster=await db.select({sectionId:s.enrollments.sectionId,studentId:s.studentProfiles.id,studentName:s.people.legalFirstName,studentLastName:s.people.legalLastName}).from(s.enrollments)
+  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(activeProgram,and(
+    eq(activeProgram.studentProfileId,s.enrollments.studentProfileId),
+    eq(activeProgram.programId,s.sections.programId),
+    eq(activeProgram.schoolYearId,s.terms.schoolYearId),
+    eq(activeProgram.kind,"program"),eq(activeProgram.status,"active"),
+  ))
   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
   .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
-  .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),inArray(s.enrollments.sectionId,sectionIds)));
+  .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+    eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+    inArray(s.enrollments.sectionId,sectionIds)));
  const eligible=roster;
  const submissions=await db.select({assessmentId:s.submissions.assessmentId,studentId:s.submissions.studentProfileId,status:s.submissions.status,attempt:s.submissions.attemptNumber}).from(s.submissions).where(inArray(s.submissions.assessmentId,due.map(x=>x.id)));
  const latest=new Map<string,(typeof submissions)[number]>();
@@ -69,6 +81,15 @@ export const createMissingWorkFollowUp=createServerFn({method:"POST"})
     .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
     .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.studentProfiles.id,data.studentProfileId))).limit(1);
    if(!student)throw new Error("Student not actively enrolled in this section");
+   const [programMembership]=await tx.select({id:s.enrollments.id})
+     .from(s.enrollments).innerJoin(s.terms,
+       eq(s.terms.schoolYearId,s.enrollments.schoolYearId))
+     .innerJoin(s.sections,and(eq(s.sections.termId,s.terms.id),
+       eq(s.sections.id,assessment.sectionId)))
+     .where(and(eq(s.enrollments.studentProfileId,student.id),
+       eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+       eq(s.enrollments.programId,assessment.programId))).limit(1);
+   if(!programMembership)throw new AuthorizationError("current active student school-year enrollment");
    const attempts=await tx.select({status:s.submissions.status}).from(s.submissions)
     .where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,student.id)));
    if(attempts.some(a=>a.status!=="assigned"))throw new Error("Work has already been submitted");
