@@ -168,3 +168,60 @@ acceptance remain unfinished. Do not claim production-ready childcare or
 payment services from this slice. The CI and isolated-Neon acceptance results
 must be green before deployment; this slice introduces no schema migration
 beyond 0032/0033.
+
+
+## Bite 7: selectable weeks and weekdays against real session capacity
+
+Flexible enrollment **extends** the existing Season, Registration, Consent and
+FinancialObligation records; it does not introduce another admissions workflow.
+
+Schema migration `0034_enrichment_packages.sql` adds JSON metadata to
+`activity_seasons` and `activity_registrations`. Before release, registrars
+can build up to 30 named, priced **week/day/weekday packages**, each containing
+IDs of dated sessions that already exist in the canonical calendar. Package
+builders filter sessions by site-local dates and weekdays. Alternatively,
+leaving packages empty preserves the original full-season offer. Publication
+validates all selected session identities, coverage of every day, named onsite
+facilitators and original scoped registrar requirements; it freezes the
+packages and permission statement on the **Season**, so another Season under
+the same Activity cannot overwrite either. Older Activity-stored published
+permission versions remain readable for compatibility.
+
+A guardian may select one package or several nonoverlapping options for one
+child, allowing multiple camp weeks or separate weekday combinations in one
+registration. The original per-(Season, StudentProfile) registration uniqueness
+is intentionally retained. The server resolves exact session IDs and sums the
+**published prices**, not client-provided totals. The selected package IDs,
+sessions and fee are copied to Registration metadata, guardian ConsentRecord
+signature evidence and the existing household FinancialObligation. Later
+changes to a catalog cannot silently change a prior purchase. Replays of the
+same purchase return the same registration; trying to change the chosen
+packages on a replay fails explicitly.
+
+**Capacity is checked separately for each dated session.** The transaction
+locks the Season and computes occupied seats from other active registrations'
+selection snapshots. Week 1 and Week 2 can therefore each take 20 children
+without treating the Season as full after its first 20 distinct participants.
+If any requested date is full, the *whole requested selection* goes on the
+existing waitlist (no partial seat allocation, no fee obligation at that point);
+there is no automatic waitlist promotion or payment collection yet. Existing
+whole-season registrants without a selection snapshot conservatively occupy
+all scheduled dates.
+
+The catalog returns options, each price and session-specific remaining seats;
+the guardian page shows multi-option quoted totals and blocks overlapping
+selection. The registrar's season planner also has an authenticated
+**per-session read-only roster** derived from those registration snapshots,
+with only currently allocated participants (pending/eligible/conditional);
+draft meetings and cross-site student records fail closed. **A registration
+roster is not attendance/check-in, proof of eligibility, authorized pickup,
+or a staff background/qualification clearance.**
+
+*This is a focused package purchase slice*, not a complete daily-care or
+payment settlement system. Further work: one child buying additional weeks
+in a later purchase (currently rejected for immutable registration
+idempotency), attendance/check-out and guardian-authorized release,
+payments/deposits/refunds/discounts, cancellation/makeup dates, and safe
+first-time family account onboarding. Database migrations, CI and authenticated
+browser acceptance are required before deployment; they have not been
+claimed as passing.
