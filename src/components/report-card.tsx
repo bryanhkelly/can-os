@@ -1,4 +1,11 @@
+import { summarizeRecordedTranscriptCredits } from "@/domain/recorded-credit-summary";
+
 export type ReportCardGrade = {
+  sectionId?: string;
+  termId?: string;
+  creditIssuingOrganizationId?: string;
+  subject?: string | null;
+  terminalPeriod?: boolean;
   sectionGradeId: string;
   sectionTitle: string;
   letterGrade: string | null;
@@ -85,6 +92,7 @@ export function TranscriptView({
   return (
     <div className="mt-6">
       <h2 className="font-serif text-2xl">Transcript</h2>
+      <RecordedCreditInventory rows={rows} />
       <p className="mt-2 text-xs text-muted-foreground">Official academic history. Missing credits appear as Not recorded and do not prevent transcript issuance. A transcript does not certify graduation or confer a diploma.</p>
       {!rows.length && <p className="mt-4 text-sm">No finalized grades on record yet.</p>}
       {groupBy(rows, row => row.schoolYearName).map(([year, yearRows]) => (
@@ -132,4 +140,65 @@ export function TranscriptView({
       )}
     </div>
   );
+}
+
+
+/**
+ * Informational inventory only. Requirements, transfer equivalencies,
+ * diplomas and graduation authority live outside the transcript reader.
+ */
+export function RecordedCreditInventory({ rows }: { rows: ReportCardGrade[] }) {
+  if (!rows.length) return null;
+  if (rows.some(row => !row.sectionId || !row.termId || !row.creditIssuingOrganizationId)) {
+    return <section className="mt-5 rounded-lg border p-4" aria-label="Recorded credit inventory">
+      <h3 className="font-semibold">Recorded credits by subject</h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        This transcript record lacks the provenance needed to calculate a reliable credit summary.
+        The original course and grade entries remain available below.
+      </p>
+    </section>;
+  }
+  const inventory = summarizeRecordedTranscriptCredits(rows.map(row => ({
+    sectionGradeId: row.sectionGradeId,
+    sectionId: row.sectionId!,
+    termId: row.termId!,
+    creditIssuingOrganizationId: row.creditIssuingOrganizationId!,
+    creditIssuingOrganization: row.creditIssuingOrganization ?? "Unknown issuing organization",
+    subject: row.subject,
+    letterGrade: row.letterGrade,
+    terminalPeriod: row.terminalPeriod,
+    creditConfigured: row.creditConfigured,
+    creditsAttempted: row.creditsAttempted,
+    creditsEarned: row.creditsEarned,
+  })));
+  return <section className="mt-5 rounded-lg border p-4" aria-label="Recorded credit inventory">
+    <h3 className="font-semibold">Recorded credits by subject</h3>
+    <p className="mt-1 text-xs text-muted-foreground">
+      Informational summary of finalized academic records, kept separate by issuing institution.
+      It is not an official graduation audit and does not establish diploma eligibility.
+    </p>
+    {!inventory.byIssuer.length &&
+      <p className="mt-3 text-sm">No terminal grading-period credit entries are recorded yet.</p>}
+    {inventory.byIssuer.map(issuer => <div key={issuer.issuerId} className="mt-4">
+      <h4 className="font-semibold">{issuer.issuerName}</h4>
+      <p className="mt-1 text-sm">Recorded earned: {issuer.earnedUnits} units · attempted: {issuer.attemptedUnits} units</p>
+      <ul className="mt-2 divide-y">
+        {issuer.subjects.map(item => <li className="flex flex-wrap justify-between gap-3 py-2 text-sm"
+          key={item.subject}>
+          <span>{item.subject}</span>
+          <span>{item.earnedUnits} earned / {item.attemptedUnits} attempted
+            {item.incompleteEntries ? ` · ${item.incompleteEntries} to review` : ""}
+            {item.withdrawals ? ` · ${item.withdrawals} W` : ""}
+          </span>
+        </li>)}
+      </ul>
+      {issuer.conflictingEntries > 0 && <p role="status" className="mt-2 text-sm">
+        {issuer.conflictingEntries} conflicting course/term records require academic review.
+      </p>}
+    </div>)}
+    {inventory.incompleteEntries > 0 && <p className="mt-3 text-sm" role="status">
+      {inventory.incompleteEntries} credit entries require review. Unknown credits are never assumed earned.
+    </p>}
+    <p className="mt-3 text-xs text-muted-foreground">{inventory.note}</p>
+  </section>;
 }
