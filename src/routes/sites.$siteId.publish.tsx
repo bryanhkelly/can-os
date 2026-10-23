@@ -113,9 +113,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
     <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">Enrichment catalog preview</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Existing published summer and after-school Seasons at this site. The Site's
-        public website is still private. Preview does not open registration or
-        publish any Program.
+        Existing independently published summer and after-school Seasons at this Site.
+        Site approval controls catalog visibility only. It never changes
+        registration availability or Program status.
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {data.catalogPreview.map(item => <article key={item.seasonId} className="rounded-lg border p-4">
@@ -139,6 +139,49 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           No eligible published enrichment Seasons for this site.
         </p>}
       </div>
+    </section>
+    <section className="mt-6 rounded-xl border bg-card p-5">
+      <h2 className="text-xl font-semibold">Site publication decision</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Approving this Site controls its public-safe enrichment catalog.
+        It does not publish academic Programs or open registration.
+        Deploying the public hostname remains a separate step.
+      </p>
+      {!data.address ? <p className="mt-4 text-sm">
+        Reserve the Site address before approving its public catalog.
+      </p> : <div className="mt-4 space-y-4">
+        <p className="text-sm">Current state: <strong>{data.address.status}</strong></p>
+        {data.address.status === "draft" && data.catalogPreview.length === 0 &&
+          <p role="status" className="rounded-lg border p-3 text-sm">
+            Publishing blocked: first approve at least one summer or after-school
+            offering through the existing CAN OS enrichment workflow.
+          </p>}
+        <label className="block text-sm">
+          Publication decision reason (10–500 characters; no student information)
+          <textarea aria-label="Publication decision reason"
+            className="mt-1 block w-full rounded-lg border bg-background p-2"
+            value={reason} onChange={event => setReason(event.target.value)}
+            minLength={10} maxLength={500} rows={3}
+            placeholder={data.address.status === "published"
+              ? "Reason for withdrawing this site catalog"
+              : "What content was reviewed and approved?"}/>
+        </label>
+        {data.address.status === "draft" && <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" checked={contentReviewed}
+            onChange={event => setContentReviewed(event.target.checked)}/>
+          <span>I reviewed this Site's identity and eligible enrichment offerings,
+            including program titles, dates, pricing, and disclosures.</span>
+        </label>}
+        <button type="button"
+          onClick={() => void updatePublication(data.address!.status === "published" ? "unpublish" : "publish")}
+          disabled={saving || reason.trim().length < 10 ||
+            (data.address.status === "draft" &&
+              (!contentReviewed || data.catalogPreview.length === 0))}
+          className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+          {saving ? "Saving…" : data.address.status === "published"
+            ? "Unpublish public catalog" : "Approve public catalog"}
+        </button>
+      </div>}
     </section>
   </WorkspaceShell>;
 }
