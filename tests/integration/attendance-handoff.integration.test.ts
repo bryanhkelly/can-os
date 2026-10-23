@@ -79,6 +79,7 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
     const teacher=first(await tx.insert(s.people).values({legalFirstName:"Attendance",legalLastName:"Teacher"}).returning());
     const registrar=first(await tx.insert(s.people).values({legalFirstName:"Attendance",legalLastName:"Registrar"}).returning());
     const facilitator=first(await tx.insert(s.people).values({legalFirstName:"Onsite",legalLastName:"Facilitator"}).returning());
+    const siteLeader=first(await tx.insert(s.people).values({legalFirstName:"Site",legalLastName:"Leader"}).returning());
     const outsider=first(await tx.insert(s.people).values({legalFirstName:"Other",legalLastName:"Guardian"}).returning());
     const student=first(await tx.insert(s.studentProfiles).values({personId:learner.id,gradeLevel:"9"}).returning());
     studentId=student.id;
@@ -93,12 +94,20 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
      {studentProfileId:student.id,kind:"program",status:"active",organizationId:org.id,programId:program.id,schoolYearId:schoolYear.id},
      {studentProfileId:student.id,kind:"section",status:"active",organizationId:org.id,programId:program.id,schoolYearId:schoolYear.id,sectionId:section.id},
     ]);
-    function act(role:"registrar"|"teacher"|"guardian"|"room_facilitator",personId:string):Actor{
+    function act(role:"registrar"|"teacher"|"guardian"|"room_facilitator"|"site_leader",personId:string):Actor{
      const actor:Actor={actorPersonId:personId,role,accountId:crypto.randomUUID(),sessionId:crypto.randomUUID(),
       grantId:crypto.randomUUID(),grantSiteId:site.id,capabilities:new Set(roleCapabilities[role]),
       scope:{organizationIds:[org.id],siteIds:[site.id],programIds:[program.id]}};
      state.actor=actor;return actor;
     }
+    const leadAccount=first(await tx.insert(s.accessAccounts).values({
+      emailNormalized:`site-lead-${suffix}@example.test`,
+    }).returning());
+    await tx.insert(s.accountPersonGrants).values({
+      accountId:leadAccount.id,personId:siteLeader.id,
+      role:"site_leader",siteId:site.id,organizationId:org.id,
+      active:true,isSynthetic:false,
+    });
     const staff=act("registrar",registrar.id);
 
     // Hybrid planning reads the already-configured instructional schedule,
@@ -140,11 +149,44 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
       .rejects.toThrow("site-bound");
     state.actor=staff;
     expect(first((await flow.listExpectedOnsiteRoster({data:{date}})).students).status).toBe("unmarked");
+    const onsiteReview=await import("@/modules/operations/onsite-day-review.functions");
+    const lead=act("site_leader",siteLeader.id);
+    expect((await onsiteReview.getOnsiteDayReview({data:{date}}))
+      .readyForAttendanceReview).toBe(false);
+    await expect(onsiteReview.attestOnsiteDayReview({data:{
+      date,confirmedRecordsReviewed:true,
+    }})).rejects.toThrow("Unmarked attendance");
+    state.actor=staff;
     const taught=act("teacher",teacher.id);
     const absent={date,studentProfileId:student.id,programId:program.id,status:"absent" as const,
      mutationId:crypto.randomUUID(),expectedPreviousEventId:null};
     const original=await flow.markExpectedOnsiteAttendance({data:absent});originalId=original.attendanceEventId;
     expect(await flow.markExpectedOnsiteAttendance({data:absent})).toEqual(original);
+    state.actor=lead;
+    expect(await onsiteReview.getOnsiteDayReview({data:{date}})).toMatchObject({
+      status:"not_reviewed",canAttest:true,readyForAttendanceReview:true,
+      unresolvedIssues:0,
+    });
+    const dayReviewed=await onsiteReview.attestOnsiteDayReview({data:{
+      date,confirmedRecordsReviewed:true,
+    }});
+    expect(dayReviewed.created).toBe(true);
+    expect(await onsiteReview.attestOnsiteDayReview({data:{
+      date,confirmedRecordsReviewed:true,
+    }})).toMatchObject({reviewId:dayReviewed.reviewId,created:false});
+    expect((await onsiteReview.getOnsiteDayReview({data:{date}})).status)
+      .toBe("reviewed_snapshot");
+    state.actor=taught;
+    await expect(onsiteReview.attestOnsiteDayReview({data:{
+      date,confirmedRecordsReviewed:true,
+    }})).rejects.toThrow();
+    state.actor=staff;
+    const reviewAction=first(await tx.select().from(s.actions)
+      .where(eq(s.actions.id,dayReviewed.reviewId)));
+    expect(reviewAction.metadata).toMatchObject({
+      date,expectedEntries:1,markedEntries:1,scope:"attendance_snapshot_only",
+    });
+
 
     // The facilitator is physically assigned to this site, not a registrar.
     // Their attendance event goes through the same authoritative ledger.
@@ -207,6 +249,10 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
     await expect(flow.markExpectedOnsiteAttendance({data:correction})).rejects.toThrow("No authorized scheduled");
     await replaceStudioSchedulePeriods({data:{scheduleTemplateId:schedule.id,periods:[period]}});
     const present=await flow.markExpectedOnsiteAttendance({data:correction});
+    state.actor=lead;
+    expect((await onsiteReview.getOnsiteDayReview({data:{date}})).status)
+      .toBe("stale_after_changes");
+    state.actor=staff;
     await expect(flow.markExpectedOnsiteAttendance({data:{...absent,mutationId:crypto.randomUUID()}})).rejects.toThrow("Attendance conflict");
     await expect(flow.reviewCurrentAttendanceExcuse({data:{excuseId,decision:"approved"}})).rejects.toThrow("Attendance changed");
     const pending=first((await flow.listExpectedPendingExcuses()).excuses);
