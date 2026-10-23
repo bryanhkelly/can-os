@@ -137,7 +137,10 @@ export const attestOnsiteDayReview = createServerFn({method:"POST"})
         .map(row=>row.id);
       if(!onsiteIds.length||!onsiteIds.every(id=>actor.scope.programIds?.includes(id)))
         throw new AuthorizationError("current complete onsite school-program grant");
-      for (const programId of onsiteIds) {
+      // Lock all Programs in stable order; delegation changes use the same
+      // lock. Revocation cannot race an already-authorized affirmative review.
+      for (const programId of [...onsiteIds].sort()) {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:" + programId}))`);
         await requireCurrentSiteLocalDelegate(tx, actor, programId, "site_director");
         await requireChurchHostedOperatingServices(tx, programId, ["onsite_supervision"]);
       }
