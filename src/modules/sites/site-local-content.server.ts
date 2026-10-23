@@ -7,6 +7,7 @@ import {
 } from "@/domain/site-local-content";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
+import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 
 type Reader = Pick<typeof db, "select">;
 
@@ -43,7 +44,7 @@ export async function publishPartnerLocalContent(actor: AccessContext, input: {
 }) {
   return db.transaction(async tx => {
     // Relationship authorization runs inside the write transaction.
-    const site = await requirePartnerWebsiteEditor(actor, tx);
+    const site = await requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability);
     const [sitePublication] = await tx.select({
       siteId: sitePublications.siteId,
     }).from(sitePublications)
