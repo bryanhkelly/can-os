@@ -134,6 +134,8 @@ integration("academic intervention", () => {
       guardianPersonId: guardian.id,
       studentPersonId: studentPerson.id,
       relationshipLabel: "parent",
+      canViewAcademics:true,canManageEnrollment:true,
+      metadata:{verification:"verified",source:"independent_test_review"},
     });
 
     const [template] = await db
@@ -181,6 +183,11 @@ integration("academic intervention", () => {
       personId: teacher.id,
     });
 
+    await db.insert(schema.enrollments).values({
+      studentProfileId: student.id,kind:"program",status:"active",
+      organizationId:hostOrg.id,programId:program.id,
+      schoolYearId:academicTime.schoolYear.id,
+    });
     await db.insert(schema.enrollments).values({
       studentProfileId: student.id,
       kind: "section",
