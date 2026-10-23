@@ -12,6 +12,7 @@ import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { listExpectedOnsiteRoster } from "@/modules/attendance/onsite-attendance-workflow.functions";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
 import { writeAudit } from "@/platform/mutation";
 
 /**
@@ -47,7 +48,7 @@ async function reviewContext(date: string) {
     onsiteIds.every(id=>actor.scope.programIds?.includes(id));
   if (date > today || date < earliest)
     throw new AuthorizationError("recent valid school-local review date");
-  return { actor, site, coversAllPrograms };
+  return { actor, site, coversAllPrograms, onsiteIds };
 }
 
 async function currentSnapshot(date: string) {
@@ -81,11 +82,23 @@ async function lastReview(siteId: string, date: string) {
 export const getOnsiteDayReview = createServerFn({method:"GET"})
   .validator((value:unknown)=>input.parse(value))
   .handler(async ({data})=>{
-    const {actor,site,coversAllPrograms}=await reviewContext(data.date);
+    const {actor,site,coversAllPrograms,onsiteIds}=await reviewContext(data.date);
+    let canAttest = actor.role === "site_leader" && coversAllPrograms;
+    if (canAttest) {
+      for (const programId of onsiteIds) {
+        try {
+          await requireCurrentSiteLocalDelegate(db, actor, programId, "site_director");
+        } catch (error) {
+          if (!(error instanceof AuthorizationError)) throw error;
+          canAttest = false;
+          break;
+        }
+      }
+    }
     const {summary,fingerprint}=await currentSnapshot(data.date);
     const review=await lastReview(site.id,data.date);
     return {
-      date:data.date,canAttest:actor.role==="site_leader" && coversAllPrograms,
+      date:data.date,canAttest,
       coversAllPrograms,
       status:!review?"not_reviewed" as const:
         coversAllPrograms && summary.readyForAttendanceReview &&
@@ -124,8 +137,10 @@ export const attestOnsiteDayReview = createServerFn({method:"POST"})
         .map(row=>row.id);
       if(!onsiteIds.length||!onsiteIds.every(id=>actor.scope.programIds?.includes(id)))
         throw new AuthorizationError("current complete onsite school-program grant");
-      for(const programId of onsiteIds)
-        await requireChurchHostedOperatingServices(tx,programId,["onsite_supervision"]);
+      for (const programId of onsiteIds) {
+        await requireCurrentSiteLocalDelegate(tx, actor, programId, "site_director");
+        await requireChurchHostedOperatingServices(tx, programId, ["onsite_supervision"]);
+      }
       // Prevent two concurrent review requests from recording duplicate Actions.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"site-review:"+site.id+":"+data.date}))`);
       const [prior] = await tx.select({
