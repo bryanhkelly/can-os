@@ -155,3 +155,85 @@ Existing `sites.organization_id` and `programs.organization_id` remain with the 
   persistence. Unit/build/CI success does not equal multi-role runtime acceptance.
 - **Release status remains HOLD** until contract/authority security, safeguarding, actual
   onsite operations and connected authenticated browser tests succeed on the same source.
+
+## Increment 3 — current service entitlement on operational writes (2026-10-23)
+
+**Source committed to `FullFlow`; runtime unverified; release HOLD.** This
+is a narrow server-side fail-closed integration, not a declaration that Golden
+Flow B runs end to end.
+
+- The common Program lookup resolves the **persisted host Organization type**,
+  Program and academic provider. Same-organization and non-church flows retain
+  their existing behavior. A church/CAN cross-organization Program cannot use
+  a chosen provider or church-owned Site grant as an agreement.
+- The independent CAN **institutional academic** check requires the actor's
+  verified CAN Organization membership **and** the current, evidence-verified,
+  non-expired, non-revoked Program–Site contract. A previously assigned teacher
+  cannot finalize/correct grades without `academic_instruction` and
+  `academic_records`. New official transcript issuance requires
+  `school_of_record`, `academic_records` and `credit_issuance`, confirms
+  the current Section/Program credit issuer inside the issuance transaction,
+  and keeps previously issued snapshots unchanged. Issuance discovery excludes
+  issuers outside the registrar's original Organization grant.
+- The host **admissions/enrollment** check separately requires live
+  `admissions` and `school_of_record` service entitlements for offer-ready
+  decisions, application acceptance, new offer issuance, and both program
+  enrollment-activation paths. Inquiry, planning and guardian enrollment
+  documentation remain accessible through their normal, separate identity gates.
+  An agreement **does not grant** a host registrar CAN academic credentials.
+- The host **onsite supervision** check requires `onsite_supervision` inside
+  transactions recording a new staff duty response or daily attendance
+  review. It preserves the original local employee, site and duty checks.
+  These are availability/attendance attestations, **not** clearance, proof of
+  continuous physical supervision, custody reconciliation, legal school-day
+  completion or safeguarding certification.
+- Rollback-only Program-Site integration expectations cover pending, approved,
+  missing-service, host-versus-CAN actor, and revoked authorizations for both
+  academic and onsite actions. This is source/test code, **not an executed
+  integration or browser result**.
+
+### Remaining P0 gaps before calling Golden Flow B complete
+
+1. **Apply migrations only in the disposable environment:** review `0039`
+   authorization and `0040` local-site-content source/ledger, apply through the
+   guarded test-only path and record actual DB acceptance. Last confirmed
+   dedicated FullFlow Neon state had migrations through `0038`.
+2. **Separate, minimally scoped CAN staff grants:** the current authenticated
+   `getCommandContext` projects Programs from `programs.organization_id`,
+   which is **the host church**. A CAN academic provider/issuer cannot gain
+   access to a church Program just from agreement approval. Implement explicit,
+   independently authorized, revocable, *Program- and Section-limited* CAN
+   staff entitlements with only the approved capability set, without globally
+   inserting the host Site into every CAN staff member's access scope. Test
+   teacher/registrar positive access and wrong-church denials.
+3. **Local delegation:** use named `program_responsibility_assignments`,
+   service contract and verified local staff grants for a time-bounded site
+   director/facilitator chain. No local leader grade-finalization, counseling
+   detail, official credit-issuer or network administration by implication.
+4. **All canonical operations, not only today's guarded writes:** audit and
+   enforce boundaries in Section provisioning, curriculum adoption/publication,
+   attendance marking/corrections, admissions identity/consent/packets, public
+   inquiry handoff, teacher assignments, roster/records queries, and official
+   academic year/credit workflows. Deny after contract expiry/revocation; retain
+   historical data and necessary child-safety reporting.
+5. **Opening safety evidence:** independently approved site safeguards,
+   screened/trained coverage and qualified backups, schedule/custody/arrival/
+   departure plan, safe pickup, emergency and external mandatory-report
+   escalation, health and incident case isolation, and an effective local day
+   roster. Neither role assignment nor the existing coverage display verifies
+   screening or physical presence. Do not open a real supervised campus until
+   these are independently reviewed.
+6. **Actual continuous journey:** real authorized church initiator, CAN
+   approver, CAN registrar/teacher, local director, facilitator, guardian and
+   student sessions must complete one same-ID Program→Year/Section→Application/
+   Offer→Enrollment→Onsite day→Assignment/Grade→Family/site/CAN reconciliation.
+   Run denial, revocation, idempotency, outbox, audit and browser-reload tests.
+7. **Runtime environment:** CI workflow jobs for this slice have failed to
+   acquire runners (`runner_id=0`, no steps); no typecheck, integration or
+   browser pass may be claimed. Resolve runner provisioning, then record actual
+   executable results for the precise tested commit.
+
+**Safety principle:** An expired academic operating agreement may halt new
+school/academic authorizations but must not erase prior attendance evidence or
+suppress a person's ability to record or externally report an urgent child
+safety concern. Preserve emergency reporting and independent agency pathways.
