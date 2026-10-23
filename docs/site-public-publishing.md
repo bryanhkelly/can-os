@@ -93,3 +93,37 @@ records; it must not become a separate SIS, admissions system, or CMS database.
 **Next:** First establish an independently controlled publication decision
 and public-safe offering projection. Only expose `[site].can-os.com` once
 host resolution, edge configuration and negative cross-site tests are complete.
+
+## Bite 3 committed: published enrichment catalog projection (no public site yet)
+
+- The existing CAN-wide `/enrichment` list now calls
+  `readEnrichmentCatalog(siteId?)`. All prior activity/season publication,
+  active status, same-site and same-organization association, noncredit mode,
+  permission version, dated session, package, and available-seat logic are
+  shared. The optional Site restriction is performed in SQL **before**
+  `LIMIT 200`, not by filtering the first page of unrelated sites.
+- `/sites/$siteId/publish` shows a **private** catalog preview of eligible,
+  independently published enrichment Seasons at the requested Site, in
+  addition to the existing internal program summaries. The preview requires
+  the Bite 2 institutionally granted site publisher authorization.
+- `readPublishedSiteCatalog(slug)` is a read-only public-safe projection
+  bounded to one canonical Site. It returns `null` for missing/invalid,
+  reserved or draft Sites, and requires both `published` status **and**
+  `publishedAt`. Only then does it read that Site's eligible enrichment
+  Seasons. No current publishing command can set those fields yet.
+- The outward-facing DTO explicitly selects public title, site identity,
+  season/date/price/availability, time and package summaries. It does not
+  spread raw Season metadata, guardian permission text/version, calendar
+  session IDs, staff details, student profiles or internal program records.
+- Added focused tests for draft/missing publication, reserved host labels,
+  cross-site read isolation (selected Site ID only) and explicit DTO field
+  whitelisting. These tests are committed but **not yet executed**.
+- An unauthenticated server-side catalog read is prepared, but no
+  tenant hostname router, published-site page, wildcard DNS, site publish
+  transition, guardian application flow or payment system has been enabled.
+  This does not make `[site].can-os.com` live.
+
+**Next bite:** Add an explicit, audited and reversible **Site publish/unpublish**
+decision after reviewing public content and readiness; validate host-routing
+and tests on an isolated database before exposing public website traffic.
+Program marketing visibility must remain independent of opening registration.
