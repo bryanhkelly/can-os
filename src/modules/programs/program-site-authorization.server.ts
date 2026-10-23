@@ -282,6 +282,28 @@ export async function requireCurrentProgramSiteAuthorization(
   throw new AuthorizationError("current independently verified CAN-church operating authority");
 }
 
+/** The host's onsite staff retains original Site/Program grants, but an
+ * approved service contract can never be silently assumed on local writes.
+ * This helper is NOT a replacement for local role, Site or duty checks.
+ */
+export async function requireChurchHostedOperatingServices(
+  tx: Reader, programId: string, requiredServices: readonly OperatingService[],
+): Promise<string | null> {
+  const [program] = await tx.select({
+    organizationId: programs.organizationId,
+    hostOrganizationId: programs.hostOrganizationId,
+    institutionOrganizationId: programs.academicProviderOrganizationId,
+  }).from(programs).where(eq(programs.id, programId)).limit(1);
+  if (!program) throw new AuthorizationError("existing school Program");
+  const hostId = program.hostOrganizationId ?? program.organizationId;
+  const [host] = await tx.select({type: organizations.type})
+    .from(organizations).where(eq(organizations.id, hostId)).limit(1);
+  if (!host) throw new AuthorizationError("existing school host");
+  if (host.type === "church" && program.institutionOrganizationId !== hostId)
+    return requireCurrentProgramSiteAuthorization(tx,programId,requiredServices);
+  return null;
+}
+
 /** Institutional academic writes are not authorized merely because a church
  * Program names CAN as its provider. This check is intentionally separate from
  * the actor's verified role / Program / Section relationship checks.
