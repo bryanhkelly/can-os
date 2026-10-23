@@ -6,6 +6,7 @@ import {and,eq,inArray,desc} from "drizzle-orm";
 import {z} from "zod";
 import {admissionOfferProgress} from "@/domain/admission-offer-progress";
 import {verifiedEnrollmentStudentIds} from "@/domain/guardian-offer-visibility";
+import {staffedPublishedSectionIds} from "./instructional-section-readiness.server";
 
 /** Only offers for students whose enrollment this session's guardian can manage. */
 export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
@@ -51,10 +52,16 @@ export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
   .from(s.journeyRequirements).where(and(inArray(s.journeyRequirements.journeyId,journeys.map(journey=>journey.id)),
    eq(s.journeyRequirements.blocking,true))):[];
  const enrollments=await db.select({studentProfileId:s.enrollments.studentProfileId,programId:s.enrollments.programId,
-  schoolYearId:s.enrollments.schoolYearId,kind:s.enrollments.kind,sectionActive:s.sections.active,sectionProgramId:s.sections.programId})
-  .from(s.enrollments).leftJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  schoolYearId:s.enrollments.schoolYearId,kind:s.enrollments.kind,
+  sectionId:s.enrollments.sectionId,sectionYearId:s.terms.schoolYearId,
+  sectionActive:s.sections.active,sectionProgramId:s.sections.programId})
+  .from(s.enrollments)
+  .leftJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .leftJoin(s.terms,eq(s.terms.id,s.sections.termId))
   .where(and(inArray(s.enrollments.studentProfileId,profiles.map(profile=>profile.id)),
    inArray(s.enrollments.programId,permitted.map(app=>app.programId)),eq(s.enrollments.status,"active")));
+ const instructionalIds=await staffedPublishedSectionIds(enrollments
+  .map(row=>row.sectionId).filter((id):id is string=>!!id),db);
  const years=offers.length?await db.select({id:s.schoolYears.id,name:s.schoolYears.name}).from(s.schoolYears)
   .where(inArray(s.schoolYears.id,offers.map(offer=>offer.schoolYearId))):[];
  return permitted.map(app=>{
@@ -67,7 +74,9 @@ export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
    blockers,offers:offers.filter(o=>o.applicationId===app.id).map(o=>{
     const active=enrollments.filter(row=>row.studentProfileId===app.studentProfileId&&row.programId===app.programId&&row.schoolYearId===o.schoolYearId);
     const enrollmentActive=active.some(row=>row.kind==="program");
-    const sectionCount=active.filter(row=>row.kind==="section"&&row.sectionActive===true&&row.sectionProgramId===app.programId).length;
+    const sectionCount=active.filter(row=>row.kind==="section"&&row.sectionActive===true&&
+     row.sectionProgramId===app.programId&&row.sectionYearId===o.schoolYearId&&
+     !!row.sectionId&&instructionalIds.has(row.sectionId)).length;
     return {id:o.id,status:o.status,expiresAt:o.expiresAt?.toISOString()??null,schoolYearId:o.schoolYearId,
      schoolYearName:years.find(year=>year.id===o.schoolYearId)?.name??o.schoolYearId,
      enrollmentActive,sectionCount,progress:admissionOfferProgress({status:o.status,expiresAt:o.expiresAt?.toISOString()??null,
