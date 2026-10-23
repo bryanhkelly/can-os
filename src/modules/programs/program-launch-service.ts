@@ -286,13 +286,17 @@ export async function activateProgram(
     if (!context.scope.organizationIds?.includes(program.organizationId))
       throw new Error("Program activation requires the verified organization grant");
     if (program.siteId) assertSiteScope(context, program.siteId);
-    // Provider selection is a planning fact, not CAN institutional authority.
-    // Until a separate approved Program-Site agreement resolver exists, deny
-    // independent church/CAN operation before changing the program or locking
-    // its site attendance configuration.
+    // Resolve host identity from the database, not user-submitted program type
+    // or metadata. Church-owned sites cannot switch program type to evade the
+    // independently approved CAN institutional services agreement.
+    const hostOrganizationId = program.hostOrganizationId ?? program.organizationId;
+    const [hostOrganization] = await tx.select({ type: organizations.type })
+      .from(organizations).where(eq(organizations.id, hostOrganizationId)).limit(1);
+    if (!hostOrganization) throw new Error("Program host organization not found");
     assertChurchHostedActivationAuthorization({
       programType: program.type,
-      hostOrganizationId: program.hostOrganizationId ?? program.organizationId,
+      hostOrganizationId,
+      hostOrganizationType: hostOrganization.type,
       academicProviderOrganizationId: program.academicProviderOrganizationId,
       verifiedProgramSiteAuthorizationId: null,
     });
