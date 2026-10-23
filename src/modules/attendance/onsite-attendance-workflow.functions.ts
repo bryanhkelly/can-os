@@ -160,6 +160,25 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
   return { roster: [...byKey.values()], coverage, programsAtSite };
 }
 
+/** Localized date and verified site identity for room facilitators. */
+export const getOnsiteStaffDayContext = createServerFn({ method: "GET" })
+  .handler(async () => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    const actor = await getCommandContext(getRequest());
+    assertOnsiteAttendanceScope(actor);
+    const [site] = await db.select({
+      id: sites.id, name: sites.name, timezone: sites.timezone,
+      organizationId: sites.organizationId,
+    }).from(sites).where(eq(sites.id, actor.grantSiteId!)).limit(1);
+    if (!site || !actor.scope.organizationIds?.includes(site.organizationId))
+      throw new AuthorizationError("site day organization and site match");
+    return {
+      siteId: site.id, siteName: site.name, timeZone: site.timezone,
+      date: siteDate(new Date(), site.timezone),
+      note: "Staff-recorded onsite attendance. Online activity does not establish physical presence or departure.",
+    };
+  });
+
 export const listExpectedOnsiteRoster = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({
     date: dateField, programId: uuid.optional(),
@@ -243,6 +262,10 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
 
     if (isOnsiteAttendanceRole(actor.role)) {
       assertOnsiteAttendanceScope(actor, program.siteId);
+      if (data.expectedPreviousEventId === undefined)
+        throw new AuthorizationError("onsite correction requires prior-record acknowledgement");
+      if (data.expectedPreviousEventId && (data.note?.trim().length ?? 0) < 10)
+        throw new Error("Explain any onsite attendance correction (10 characters minimum)");
     }
     const { roster } = await resolveExpectedRoster(actor, data.date, data.programId,
       data.studentProfileId);
