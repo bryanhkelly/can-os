@@ -18,7 +18,7 @@ New architecture specification: [Curriculum marketplace and portability](./curri
 
 Extended offerings: [Summer and after-school program definitions and workflow limits](./extended-learning-offerings.md).
 
-Public site addresses: [Site public addresses and publishing](./site-public-publishing.md) (academic/enrichment publishing, default-off public site and inquiry intake into GF22; rollout unverified).
+Public site addresses: [Site public addresses and publishing](./site-public-publishing.md) (academic/enrichment publishing, default-off public site, public-interest inbox and reviewed conversion into GF22 inquiry; rollout unverified).
 
 Church-Hosted School flow: [Institutional authorization, supervised-day and multi-role acceptance](./church-hosted-school-acceptance.md). This is not yet accepted.
 
