@@ -48,7 +48,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Migrate isolated branch
-        run: npm run db:migrate:fullflow
+        run: npm run db:migrate
       - name: Test real-session classroom workflow
         run: npm run test:e2e:curriculum
       - name: Publish acceptance summary
