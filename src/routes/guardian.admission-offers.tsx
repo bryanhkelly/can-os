@@ -80,7 +80,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
         complete any requested forms or corrections. An application is not an active
         enrollment or class assignment.</p>
       {app.blockers.length>0&&<p className="mt-2">
-        {app.blockers.length} required ${app.blockers.length===1?"item needs":"items need"} review.
+        {app.blockers.length} required {app.blockers.length===1?"item needs":"items need"} review.
       </p>}
       <button type="button" className="mt-3 rounded border px-3 py-2 font-semibold"
         onClick={()=>setChecklist(app.applicationId)}>Review enrollment checklist →</button>
