@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertChurchCANOperatingIdentity, normalizeOperatingServices,
   assertOperatingAgreementEvidence, assertCurrentOperatingAuthorization,
+  recommendedChurchOperatingServices,
 } from "@/domain/program-site-operating-policy";
 const now = new Date("2026-10-23T16:00:00Z");
 const identity = {
@@ -30,6 +31,17 @@ const document = {
     authorizedServices: ["academic_instruction", "onsite_supervision"] },
 };
 describe("Church-CAN Program-Site authorization policy", () => {
+  it("recommends the end-to-end services needed for admissions and classes",()=>{
+    const credit=recommendedChurchOperatingServices(true);
+    expect(credit).toEqual(expect.arrayContaining([
+      "academic_instruction","curriculum","admissions",
+      "school_of_record","academic_records","onsite_supervision","credit_issuance",
+    ]));
+    const noncredit=recommendedChurchOperatingServices(false);
+    expect(noncredit).toContain("admissions");
+    expect(noncredit).toContain("academic_records");
+    expect(noncredit).not.toContain("credit_issuance");
+  });
   it("requires different legal institutions and correct church site ownership", () => {
     expect(() => assertChurchCANOperatingIdentity(identity)).not.toThrow();
     expect(() => assertChurchCANOperatingIdentity({ ...identity, siteOrganizationId: "other-church" })).toThrow();
