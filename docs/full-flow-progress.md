@@ -1,5 +1,35 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## Current P0 focus — put an admitted student in a usable class (23 October 2026)
+
+**Critical path:** first public parent → email-verified canonical Application →
+CAN admissions decision and accepted offer → active Program enrollment plus
+real Section placement → student can open a first lesson and the assigned
+teacher can teach. Church/Site ownership and CAN academic authority remain
+separately verified.
+
+**This bite (source committed; execution unverified):** A shared
+`verifiedTeacherSectionIds` query now drives **both** the registrar's
+placement candidate/readiness projection and the atomic Section enrollment
+command. An assigned `section_teachers` row is not enough: the adult must
+have an active Person, active nonsynthetic teacher account-person grant,
+non-disabled **email-verified account**, and appropriate original Site
+membership or an **organization-wide CAN academic-provider** membership.
+The Section must belong to its canonical Program Site. The original
+course-publication, first-lesson, agreement, enrollment, capacity, schedule,
+prerequisite, audit and outbox checks remain independently enforced.
+Regression fixtures now exercise disabled/unverified/synthetic denial and
+candidate/transaction agreement on disabled staff.
+
+**Do not divert P0** into more partner site styling, lead CRM,
+network expansion, or additional local staffing framework until the
+same-ID multi-role acceptance is executed. Next priority is running the
+isolated database plus browser family → Section → first-lesson journey
+and fixing any failed assertions. GitHub Actions runner allocation still
+requires investigation; a committed test is not a passing test.
+
+---
+
 ## Incremental application, classroom and student-access corrections (23 October 2026)
 
 - Serialize a first-time parent+Program application before Household creation,
