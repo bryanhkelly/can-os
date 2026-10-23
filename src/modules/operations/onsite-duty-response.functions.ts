@@ -116,10 +116,13 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
     },plan.blocks);
     const key=[site.id,data.date,data.sectionId,data.periodId,block.planToken].join(":");
     return db.transaction(async tx=>{
-      // Staff availability cannot be newly recorded as part of CAN's onsite
-      // school service after the independently approved agreement is revoked.
-      // The exact duty and original Site grant were checked above.
-      await requireChurchHostedOperatingServices(tx,block.programId,["onsite_supervision"]);
+      // An affirmative new CAN onsite duty needs a current service agreement.
+      // Preserve an assigned adult's ability to report *cannot cover* even
+      // after expiry/revocation: suppressing a safety-relevant exception is
+      // worse than retaining an accurate operational warning. Neither result
+      // certifies child custody or physical presence.
+      if(data.response==="accepted")
+        await requireChurchHostedOperatingServices(tx,block.programId,["onsite_supervision"]);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-duty:"+key}))`);
       const [prior]=await tx.select({id:actions.id,metadata:actions.metadata})
         .from(actions).where(and(eq(actions.type,dutyType),eq(actions.siteId,site.id),
