@@ -3,6 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import {
   createExtendedSeasonDraftFn,
   createExtendedReadinessAssignmentsFn,
+  scheduleExtendedSessionsFn,
   type listExtendedSeasonPlanning,
 } from "@/modules/activities/extended-learning.functions";
 import { programTypeLabels } from "@/domain/program-offerings";
@@ -27,6 +28,14 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [readinessOwners, setReadinessOwners] = useState<Record<string,string>>({});
+  const [scheduleSeasonId, setScheduleSeasonId] = useState("");
+  const [scheduleFrom, setScheduleFrom] = useState("");
+  const [scheduleThrough, setScheduleThrough] = useState("");
+  const [scheduleDays, setScheduleDays] = useState<number[]>([1,2,3,4,5]);
+  const [scheduleStart, setScheduleStart] = useState("09:00");
+  const [scheduleEnd, setScheduleEnd] = useState("15:00");
+  const [scheduleLocation, setScheduleLocation] = useState("");
+  const [scheduleStaffId, setScheduleStaffId] = useState("");
   const programs = planning.programs.filter(p => !siteId || p.siteId === siteId);
   const selectable = programs.filter(p => p.status !== "paused" && p.status !== "closed");
   const selected = selectable.find(p => p.id === programId);
@@ -67,6 +76,30 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       await router.invalidate();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to assign evidence requests");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSessions(event: React.FormEvent) {
+    event.preventDefault(); setBusy(true); setError(""); setSuccess("");
+    try {
+      if (!scheduleSeasonId) throw new Error("Choose a season");
+      const result = await scheduleExtendedSessionsFn({ data: {
+        seasonId: scheduleSeasonId,
+        fromDate: scheduleFrom,
+        throughDate: scheduleThrough,
+        weekdays: scheduleDays,
+        startTime: scheduleStart,
+        endTime: scheduleEnd,
+        location: scheduleLocation,
+        ...(scheduleStaffId ? { facilitatorPersonId: scheduleStaffId } : {}),
+      } });
+      setSuccess(`Planned ${result.created} new sessions out of ${result.total} matching dates. Registration remains closed.`);
+      setScheduleSeasonId("");
+      await router.invalidate();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to schedule sessions");
     } finally {
       setBusy(false);
     }
@@ -128,6 +161,87 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
             <li key={season.id} className="rounded-lg border p-3 text-sm">
               <strong>{season.offeringName}</strong> · {season.name} · {season.startsOn} to {season.endsOn}
               <span className="ml-2 text-xs text-muted-foreground">{season.status} · {season.capacity ?? "Uncapped"} seats</span>
+              {(() => {
+                const meetings = planning.sessions.filter(item => item.seasonId === season.id);
+                const staff = planning.staff.filter(person => person.programId === season.programId);
+                const active = scheduleSeasonId === season.id;
+                return (
+                  <div className="mt-3 rounded-lg border p-3">
+                    <p className="text-sm font-semibold">Sessions · {meetings.length} scheduled</p>
+                    {!!meetings.length && <div className="mt-1 text-xs text-muted-foreground">
+                      First: {new Intl.DateTimeFormat("en-US", {dateStyle:"medium",timeStyle:"short",
+                        timeZone:meetings[0]!.timezone}).format(new Date(meetings[0]!.startsAt))}
+                      {" · "}Last: {new Intl.DateTimeFormat("en-US",{dateStyle:"medium",
+                        timeZone:meetings.at(-1)!.timezone}).format(new Date(meetings.at(-1)!.startsAt))}
+                      {" · "}{meetings[0]!.location}
+                    </div>}
+                    {season.status === "draft" && <button type="button"
+                      className="mt-2 rounded-lg border px-3 py-2 text-xs font-semibold"
+                      onClick={() => {
+                        setScheduleSeasonId(active ? "" : season.id);
+                        setScheduleFrom(season.startsOn);
+                        setScheduleThrough(season.endsOn);
+                        setScheduleStaffId("");
+                        setScheduleLocation("");
+                      }}>{active ? "Close session editor" : "Plan recurring sessions"}</button>}
+                    {active && <form onSubmit={saveSessions} className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs">From
+                        <input type="date" required className={inputClass} min={season.startsOn} max={season.endsOn}
+                          value={scheduleFrom} onChange={e => setScheduleFrom(e.target.value)} />
+                      </label>
+                      <label className="text-xs">Through
+                        <input type="date" required className={inputClass} min={scheduleFrom||season.startsOn}
+                          max={season.endsOn} value={scheduleThrough}
+                          onChange={e => setScheduleThrough(e.target.value)} />
+                      </label>
+                      <fieldset className="sm:col-span-2">
+                        <legend className="text-xs">Days of week (site local time)</legend>
+                        <div className="mt-1 flex flex-wrap gap-3 text-xs">
+                          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((label, day) =>
+                            <label key={label} className="flex items-center gap-1">
+                              <input type="checkbox" checked={scheduleDays.includes(day)} onChange={e =>
+                                setScheduleDays(days => e.target.checked
+                                  ? [...days, day].sort((a,b) => a-b) : days.filter(d => d!==day))} />
+                              {label}
+                            </label>)}
+                        </div>
+                      </fieldset>
+                      <label className="text-xs">Start time
+                        <input type="time" required className={inputClass} value={scheduleStart}
+                          onChange={e => setScheduleStart(e.target.value)} />
+                      </label>
+                      <label className="text-xs">End time
+                        <input type="time" required className={inputClass} value={scheduleEnd}
+                          min={scheduleStart} onChange={e => setScheduleEnd(e.target.value)} />
+                      </label>
+                      <label className="text-xs">Room or location
+                        <input required className={inputClass} value={scheduleLocation}
+                          minLength={2} maxLength={120} placeholder="Classroom 2 / Fellowship Hall"
+                          onChange={e => setScheduleLocation(e.target.value)} />
+                      </label>
+                      <label className="text-xs">Instructor / facilitator (optional)
+                        <select className={inputClass} value={scheduleStaffId}
+                          onChange={e => setScheduleStaffId(e.target.value)}>
+                          <option value="">Assign later</option>
+                          {staff.map(person => <option key={person.personId} value={person.personId}>
+                            {person.firstName} {person.lastName}
+                          </option>)}
+                        </select>
+                      </label>
+                      <div className="sm:col-span-2">
+                        <button type="submit" disabled={busy || scheduleDays.length===0}
+                          className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                          {busy ? "Scheduling…" : "Save draft sessions"}
+                        </button>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Up to 180 sessions per request; dates must be within this season.
+                          Assigning an instructor does not certify qualifications or open registration.
+                        </p>
+                      </div>
+                    </form>}
+                  </div>
+                );
+              })()}
               {(() => {
                 const gate = planning.readiness.find(item => item.seasonId === season.id);
                 return gate ? (
