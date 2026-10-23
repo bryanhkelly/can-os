@@ -34,5 +34,8 @@ describe("FullFlow Neon branch isolation", () => {
     expect(wrapper).toContain("verifyFullFlowNeonBranch(testUrl)");
     expect(wrapper.indexOf("verifyFullFlowNeonBranch(testUrl)"))
       .toBeLessThan(wrapper.indexOf('["run", "db:migrate"]'));
+    expect(wrapper).toContain('["scripts/review-fullflow-migrations.mjs"]');
+    expect(wrapper.indexOf('["scripts/review-fullflow-migrations.mjs"]'))
+      .toBeLessThan(wrapper.indexOf('["run", "db:migrate"]'));
   });
 });
