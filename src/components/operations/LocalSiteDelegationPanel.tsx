@@ -71,10 +71,12 @@ export function LocalSiteDelegationPanel({ programId }: { programId: string }) {
     {error && <p role="alert" className="mt-3 rounded border p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-3 rounded border p-3 text-sm">{notice}</p>}
     {!data ? <p className="mt-4 text-sm">Loading Site staff assignments…</p> :
-      !data.hasConfiguration ? <p role="status" className="mt-4 rounded border p-4 text-sm">
-        Configure this Program's school operating model before making named
-        local responsibility appointments. No Site authority was granted.
-      </p> : <div className="mt-5 grid gap-4 lg:grid-cols-2">
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        {!data.hasConfiguration && <p role="status" className="rounded border p-4 text-sm lg:col-span-2">
+          No local school operating configuration exists yet. The first authorized
+          appointment will create a <strong>draft planning configuration</strong>,
+          not an approved opening or safeguarding certification.
+        </p>}
         {assignments.map(item => {
           const current = data.responsibilities.find(row => row.key === item.key);
           const effective = !!current?.effectiveFrom && !!current.effectiveThrough &&
