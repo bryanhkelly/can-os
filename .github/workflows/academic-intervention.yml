@@ -47,7 +47,7 @@ jobs:
       - name: Verify disposable database endpoint before any writes
         run: npm run test:integration:academic-intervention -- --preflight
       - name: Apply committed schema migrations to disposable Neon branch
-        run: npm run db:migrate
+        run: npm run db:migrate:fullflow
       - name: Run GF1 integration acceptance
         run: npm run test:integration:academic-intervention
       - name: Install Playwright Chromium
