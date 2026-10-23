@@ -59,7 +59,7 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   .where(and(eq(s.sectionTeachers.sectionId,sectionId),eq(s.people.active,true)))
   .limit(1);
  if(!staffed)throw new Error("Assign an active teacher with verified school access before placing a student in this class");
- await requireChurchHostedOperatingServices(tx,section.programId,["academic_instruction","school_of_record"]);
+ await requireChurchHostedOperatingServices(tx,section.programId,["academic_instruction","curriculum","school_of_record"]);
  if(!actor.scope.programIds?.includes(section.programId)||
   !actor.scope.organizationIds?.includes(section.organizationId)||
   (actor.scope.siteIds?.length&&(!section.siteId||!actor.scope.siteIds.includes(section.siteId))))
