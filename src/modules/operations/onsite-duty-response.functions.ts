@@ -123,10 +123,13 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
       // worse than retaining an accurate operational warning. Neither result
       // certifies child custody or physical presence.
       if (data.response === "accepted") {
+        // Serialize a current affirmative duty response against revocation.
+        if (actor.role === "room_facilitator") {
+          await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:" + block.programId}))`);
+          await requireCurrentSiteLocalDelegate(tx, actor, block.programId, "room_facilitator");
+        }
         // A Site role and an instructional plan do not themselves delegate
         // authority to accept onsite coverage for a church/CAN Program.
-        if (actor.role === "room_facilitator")
-          await requireCurrentSiteLocalDelegate(tx, actor, block.programId, "room_facilitator");
         await requireChurchHostedOperatingServices(tx, block.programId, ["onsite_supervision"]);
       }
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-duty:"+key}))`);
