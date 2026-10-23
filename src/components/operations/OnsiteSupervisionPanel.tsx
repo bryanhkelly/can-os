@@ -120,7 +120,9 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
           </ul>}
           {duty&&<p className="mt-2 text-xs font-semibold" role="status">
             Duty response: {duty.status==="accepted"?"Assigned adult reports availability":
-              duty.status==="cannot_cover"?"Coverage gap reported":"Awaiting assigned adult's response"}
+              duty.status==="cannot_cover"?"Coverage gap reported":
+              duty.status==="stale_after_delegation"?"Previous acceptance is stale: named delegation or operating agreement is no longer effective":
+              "Awaiting assigned adult's response"}
           </p>}
           {duty?.canRespond&&duty.status==="not_reported"&&block.periodId&&<>
             <div className="mt-3 flex flex-wrap gap-2">
