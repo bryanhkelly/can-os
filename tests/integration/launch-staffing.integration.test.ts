@@ -210,6 +210,14 @@ integration("registrar staffing to launch handoff", () => {
         state.actor = { ...registrarActor, capabilities: new Set(["program.launch.start"]) };
         await expect(launch.publishLaunchTeacherPolicy({ data: policy })).rejects.toThrow("staffing.policy.publish");
         state.actor = registrarActor;
+        expect((await launch.getLaunchAcademicSetup({data:{programId:program.id}})).canPublishTeacherPolicy).toBe(false);
+        await expect(launch.publishLaunchTeacherPolicy({data:policy}))
+          .rejects.toThrow("explicit staffing policy publisher");
+        expect(await tx.select().from(s.complianceFrameworks)
+          .where(eq(s.complianceFrameworks.key,"launch-teacher:"+program.id))).toHaveLength(0);
+        await tx.update(s.roleAssignments).set({capabilities:["profiles.credentials.verify","staffing.policy.publish"]})
+          .where(eq(s.roleAssignments.id,stewardRole.id));
+        expect((await launch.getLaunchAcademicSetup({data:{programId:program.id}})).canPublishTeacherPolicy).toBe(true);
         await expect(launch.publishLaunchTeacherPolicy({ data: { ...policy, qualificationKeys: ["unknown"] } })).rejects.toThrow("catalog");
         const published = await launch.publishLaunchTeacherPolicy({ data: policy });
         await expect(launch.publishLaunchTeacherPolicy({ data: policy })).rejects.toThrow("already has");
