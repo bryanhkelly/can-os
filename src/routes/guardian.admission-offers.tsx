@@ -5,6 +5,7 @@ import {respondToAdmissionOffer} from "@/modules/enrollment/admissions-offer.fun
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {GuardianEnrollmentChecklist} from "@/components/enrollment/GuardianEnrollmentChecklist";
+import {StudentLearningAccessHandoff} from "@/components/enrollment/StudentLearningAccessHandoff";
 
 const loadGuardianOffers=(studentPersonId?:string)=>getGuardianAdmissionOffers({data:{studentPersonId}});
 export const Route=createFileRoute("/guardian/admission-offers")({
@@ -67,6 +68,8 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
        <p className="text-sm">{o.sectionCount
         ? `${o.sectionCount} assigned ${o.sectionCount===1?"class":"classes"} — your child can start learning.`
         : "Enrollment is active; the school has not assigned a class yet."}</p>
+       {o.sectionCount>0&&<StudentLearningAccessHandoff
+         applicationId={app.applicationId} role="guardian"/>}
        <div className="flex flex-wrap gap-3 text-sm">
         {o.sectionCount>0&&<Link to="/classes" search={{student:app.studentPersonId}}
           className="rounded-lg border px-3 py-2 font-semibold">Open your child's classes →</Link>}
