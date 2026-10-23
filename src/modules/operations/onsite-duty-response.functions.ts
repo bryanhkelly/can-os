@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import { actions, sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
+import { selectAuthorizedOnsiteDuty, resolveOnsiteDutyRetry } from "@/domain/onsite-duty-policy";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { getOnsiteSupervisionPlan } from "./onsite-supervision.functions";
@@ -102,12 +103,11 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
       throw new Error("An accepted duty cannot have an unavailable reason");
 
     const plan=await getOnsiteSupervisionPlan({data:{date:data.date}});
-    const block=plan.blocks.find(row=>row.sectionId===data.sectionId&&row.periodId===data.periodId);
-    if(plan.siteId!==site.id||plan.projectionTruncated||!block||
-      !block.canRespond||(data.response==="accepted"&&!block.canAccept))
-      throw new AuthorizationError("currently assigned, unconflicted onsite instructional duty");
-    if(!actor.scope.programIds?.includes(block.programId))
-      throw new AuthorizationError("current program assignment");
+    const block=selectAuthorizedOnsiteDuty({
+      siteMatches:plan.siteId===site.id,projectionTruncated:plan.projectionTruncated,
+      scopedProgramIds:actor.scope.programIds??[],
+      sectionId:data.sectionId,periodId:data.periodId,response:data.response,
+    },plan.blocks);
     const key=[site.id,data.date,data.sectionId,data.periodId,block.planToken].join(":");
     return db.transaction(async tx=>{
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-duty:"+key}))`);
@@ -119,11 +119,10 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
           sql`${actions.metadata}->>'periodId' = ${data.periodId}`,
           sql`${actions.metadata}->>'planToken' = ${block.planToken}`))
         .orderBy(desc(actions.createdAt),desc(actions.id)).limit(1);
-      if(prior){
-        if(prior.metadata.response===data.response)
-          return {responseId:prior.id,created:false,response:data.response};
-        throw new AuthorizationError("duty already answered; ask site lead to amend assignment");
-      }
+      const retry=resolveOnsiteDutyRetry(prior?{
+        id:prior.id,response:prior.metadata.response,reason:prior.metadata.reason,
+      }:null,{response:data.response,reason:data.reason});
+      if(retry)return retry;
       const [record]=await tx.insert(actions).values({
         type:dutyType,status:"resolved",
         priority:data.response==="cannot_cover"?"high":"normal",
