@@ -572,10 +572,17 @@ export async function recordAttendanceRevision(
   const siteActor = context as AccessContext;
   if (onsite && (siteActor.role === "site_leader" || siteActor.role === "room_facilitator")) {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:" + input.programId}))`);
-    const { requireCurrentSiteLocalDelegate } = await import(
+    const { requireCurrentSiteLocalDelegate,
+      requiresIndependentChurchLocalDelegation } = await import(
       "@/modules/operations/site-local-delegation.server");
-    await requireCurrentSiteLocalDelegate(tx, siteActor, input.programId,
-      siteActor.role === "site_leader" ? "site_director" : "room_facilitator");
+    if (siteActor.role === "site_leader") {
+      await requireCurrentSiteLocalDelegate(tx, siteActor, input.programId, "site_director");
+    } else if (await requiresIndependentChurchLocalDelegation(tx, input.programId)) {
+      if (!input.sectionId) throw new AuthorizationError("named Section for facilitator attendance");
+      const { requireCurrentSectionFacilitator } = await import(
+        "@/modules/operations/site-section-facilitators.server");
+      await requireCurrentSectionFacilitator(tx, siteActor, input.programId, input.sectionId);
+    }
   }
   const sourceKey="manual-revision:"+input.mutationId;
   const [repeat]=await tx.select({
