@@ -86,10 +86,10 @@ export async function verifiedScheduledSectionFacilitators(
       eq(people.active, true),
     ));
 
-  const expected = new Map(candidates.map(candidate => [
+  const expected = new Map<string, ScheduledSectionAdult>(candidates.map(candidate => [
     candidate.programId + ":" + sectionFacilitatorKey(candidate.sectionId, candidate.personId),
     candidate,
-  ]));
+  ] as const));
   const verified = new Map<string, { id: string; effectiveFrom: Date; effectiveThrough: Date }>();
   for (const row of rows) {
     if (!row.programId || !row.effectiveFrom || !row.effectiveThrough) continue;
