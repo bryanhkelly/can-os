@@ -13,7 +13,7 @@ import { enrollmentJourneyDefinitionKey } from "@/domain/enrollment-form";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray,isNull,or } from "drizzle-orm";
+import { and,desc,eq,inArray,isNull,or,sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 const uuid=z.string().uuid();
@@ -215,6 +215,20 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
         hasExistingApplication:false,
       },
     });
+    // Do not create another unverified Person/Household when this school
+    // already has an application for this adult contact. A sibling must use
+    // the explicit existing-household path and its relationship checks.
+    const [priorHousehold] = await tx.select({ id:households.id }).from(households)
+      .innerJoin(applications,eq(applications.householdId,households.id))
+      .innerJoin(programs,eq(programs.id,applications.programId))
+      .where(and(
+        inArray(programs.id,actor.scope.programIds??[]),
+        eq(programs.organizationId,program.organizationId),
+        sql`lower(trim(${households.primaryEmail})) = ${normalizeAccessEmail(data.guardianEmail)}`,
+      )).limit(1);
+    if(priorHousehold)throw new Error(
+      "An existing school household uses this contact email. Use verified existing-household intake."
+    );
     interestToConvert = { id:interest.id, priorStatus:interest.status };
    }
    let guardianPersonId:string;
