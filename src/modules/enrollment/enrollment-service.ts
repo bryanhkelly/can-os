@@ -212,6 +212,10 @@ export async function startFamilyApplication(
         idempotencyKey: input.idempotencyKey,
         submittedByPersonId: actorPersonId,
         submittedAt: new Date(),
+        ...(input.parentSelfService ? {metadata:{
+          origin:"authenticated_guardian_application",
+          guardianVerification:"pending",
+        }} : {}),
       })
       .returning({ id: applications.id });
 
