@@ -182,8 +182,11 @@ Flow B runs end to end.
   documentation remain accessible through their normal, separate identity gates.
   An agreement **does not grant** a host registrar CAN academic credentials.
 - The host **onsite supervision** check requires `onsite_supervision` inside
-  transactions recording a new staff duty response or daily attendance
-  review. It preserves the original local employee, site and duty checks.
+  transactions recording an affirmative staff duty acceptance or daily
+  attendance review. A verified assigned adult may still report
+  `cannot_cover` after contract expiry/revocation so a safety-relevant
+  coverage exception is not suppressed. All writes retain the original
+  local employee, Site and duty checks.
   These are availability/attendance attestations, **not** clearance, proof of
   continuous physical supervision, custody reconciliation, legal school-day
   completion or safeguarding certification.
