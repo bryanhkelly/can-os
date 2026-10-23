@@ -1,6 +1,8 @@
 import { index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
 import { programs, sites } from "./organizations";
+import { applications } from "./admissions";
+import { people } from "./identity";
 
 /**
  * An anonymous expression of interest, NOT an Application/Student/Household
@@ -20,10 +22,15 @@ export const publicAdmissionsInterests = pgTable("public_admissions_interests", 
   message: text("message").notNull(),
   status: text("status").notNull().default("new"),
   contactedAt: timestamp("contacted_at", { withTimezone: true }),
+  /** Set only by the existing registrar createAdmissionsInquiry command. */
+  applicationId: uuid("application_id").references(() => applications.id, { onDelete: "restrict" }),
+  convertedAt: timestamp("converted_at", { withTimezone: true }),
+  convertedByPersonId: uuid("converted_by_person_id").references(() => people.id, { onDelete: "restrict" }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, table => [
   uniqueIndex("public_admissions_interests_request_uq").on(table.requestId),
+  uniqueIndex("public_admissions_interests_application_uq").on(table.applicationId),
   index("public_admissions_interests_program_idx").on(table.programId, table.createdAt),
   index("public_admissions_interests_contact_idx").on(table.programId, table.emailDigest, table.createdAt),
 ]);
