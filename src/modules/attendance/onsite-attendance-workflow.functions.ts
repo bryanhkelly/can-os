@@ -8,6 +8,7 @@ import {
   people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -24,10 +25,19 @@ const occurrence = (date: string) => date + ":site-day";
 async function staff(capability: string) {
   setResponseHeader("Cache-Control", "private, no-store");
   const actor = await getCommandContext(getRequest());
-  assertCapability(actor, capability);
-  if (!actor.actorPersonId || !["registrar", "teacher"].includes(actor.role) ||
-      !actor.scope.programIds?.length || !actor.scope.siteIds?.length ||
-      !actor.scope.organizationIds?.length)
+  if (isOnsiteAttendanceRole(actor.role)) {
+    // Onsite staff may ONLY read expected rosters and record attendance;
+    // guardian excuse review and academic/registrar actions remain barred.
+    if (capability !== "attendance.write")
+      throw new AuthorizationError("onsite staff cannot review attendance excuses");
+    assertOnsiteAttendanceScope(actor);
+  } else {
+    assertCapability(actor, capability);
+    if (!["registrar", "teacher"].includes(actor.role))
+      throw new AuthorizationError("verified attendance staff role");
+  }
+  if (!actor.actorPersonId || !actor.scope.programIds?.length ||
+      !actor.scope.siteIds?.length || !actor.scope.organizationIds?.length)
     throw new AuthorizationError("verified attendance staff grant");
   return actor;
 }
@@ -90,7 +100,7 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
   const permittedIds = activePrograms.map(p => p.id);
   if (!permittedIds.length) return { roster: [], coverage, programsAtSite };
 
-  const programRoster = actor.role === "registrar" ? await db.select({
+  const programRoster = (actor.role === "registrar" || isOnsiteAttendanceRole(actor.role)) ? await db.select({
     studentProfileId: enrollments.studentProfileId, programId: enrollments.programId,
     preferredName: people.preferredName, firstName: people.legalFirstName,
     lastName: people.legalLastName,
@@ -112,7 +122,7 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
     .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
     .innerJoin(studentProfiles, eq(studentProfiles.id, enrollments.studentProfileId))
     .innerJoin(people, eq(people.id, studentProfiles.personId))
-    .innerJoin(sectionTeachers, eq(sectionTeachers.sectionId, sections.id))
+    .leftJoin(sectionTeachers, eq(sectionTeachers.sectionId, sections.id))
     .where(and(eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
       eq(sections.active, true), eq(schoolYears.status, "active"),
       lte(schoolYears.startsOn, date), gte(schoolYears.endsOn, date),
@@ -218,6 +228,8 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
         replay.programId !== data.programId || replay.occurrenceKey !== occurrence(data.date) ||
         replay.status !== data.status)
         throw new Error("Attendance mutation ID was already used for different input");
+      if (isOnsiteAttendanceRole(actor.role))
+        assertOnsiteAttendanceScope(actor, program.siteId);
       if (actor.role === "teacher") {
         if (!replay.sectionId) throw new AuthorizationError("teacher attendance replay section");
         const [assignment] = await db.select({ id: sectionTeachers.id })
@@ -229,6 +241,9 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
       return { attendanceEventId: replay.id };
     }
 
+    if (isOnsiteAttendanceRole(actor.role)) {
+      assertOnsiteAttendanceScope(actor, program.siteId);
+    }
     const { roster } = await resolveExpectedRoster(actor, data.date, data.programId,
       data.studentProfileId);
     const eligible = roster.find(r => r.programId === data.programId &&
