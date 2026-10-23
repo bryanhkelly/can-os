@@ -29,7 +29,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
         const {
           requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
           revokeProgramSiteAuthorization, requireCurrentProgramSiteAuthorization,
-          requireInstitutionalAcademicProgramAuthority,
+          requireInstitutionalAcademicProgramAuthority,requireChurchHostedOperatingServices,
           getHostProgramSiteAuthorization, listCANOperatingAuthorizationDesk,
         } = await import("@/modules/programs/program-site-authorization.server");
         const suffix = crypto.randomUUID().slice(0,8);
@@ -103,6 +103,8 @@ integration("Church-owned Site with independently authorized CAN academic servic
         await expect(requireCurrentProgramSiteAuthorization(tx,launch.programId,[
           "academic_instruction","onsite_supervision",
         ])).rejects.toThrow();
+        await expect(requireChurchHostedOperatingServices(tx,launch.programId,
+          ["onsite_supervision"])).rejects.toThrow();
         const canDesk=await listCANOperatingAuthorizationDesk(steward);
         expect(canDesk.authorizations.some(x=>x.id===authorizationId)).toBe(true);
 
@@ -153,6 +155,8 @@ integration("Church-owned Site with independently authorized CAN academic servic
           "academic_instruction","academic_records","onsite_supervision",
           "school_of_record","credit_issuance",
         ])).toBe(authorizationId);
+        expect(await requireChurchHostedOperatingServices(tx,launch.programId,
+          ["onsite_supervision"])).toBe(authorizationId);
         // Contracting authority is not a host registrar's CAN membership.
         await expect(requireInstitutionalAcademicProgramAuthority(tx,host,
           launch.programId,["academic_instruction","academic_records"]))
@@ -183,6 +187,8 @@ integration("Church-owned Site with independently authorized CAN academic servic
         await expect(requireInstitutionalAcademicProgramAuthority(tx,steward,
           launch.programId,["school_of_record","academic_records","credit_issuance"]))
           .rejects.toThrow();
+        await expect(requireChurchHostedOperatingServices(tx,launch.programId,
+          ["onsite_supervision"])).rejects.toThrow();
         const [revoked] = await tx.select({
           status:s.programSiteAuthorizations.status,
           reviewReason:s.programSiteAuthorizations.reviewReason,
