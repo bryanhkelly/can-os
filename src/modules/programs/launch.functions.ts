@@ -57,14 +57,14 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
     const context = await registrarContext("program.read");
     const organizationIds = context.scope.organizationIds ?? [];
     if (!organizationIds.length) {
-      return { organizations: [], sites: [], jurisdictions: [] };
+      return { organizations: [], academicProviderOrganizations: [], creditIssuingOrganizations: [], sites: [], jurisdictions: [] };
     }
     const [{ db }, s, { and, asc, eq, inArray }] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
     ]);
-    const [organizationRows, siteRows, jurisdictionRows] = await Promise.all([
+    const [organizationRows, siteRows, jurisdictionRows, canProviderRows] = await Promise.all([
       db
         .select({ id: s.organizations.id, name: s.organizations.name, type: s.organizations.type })
         .from(s.organizations)
@@ -85,9 +85,21 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
         .select({ id: s.jurisdictions.id, code: s.jurisdictions.code, name: s.jurisdictions.name })
         .from(s.jurisdictions)
         .orderBy(asc(s.jurisdictions.name)),
+      // CAN provider choices are distinct from the host's organization grants.
+      // This is public organization identity, not a grant or verified service agreement.
+      db.select({ id: s.organizations.id, name: s.organizations.name, type: s.organizations.type })
+        .from(s.organizations).where(eq(s.organizations.type, "can_network"))
+        .orderBy(asc(s.organizations.name)),
     ]);
+    const knownIds = new Set(organizationRows.map(organization => organization.id));
+    const academicProviderOrganizations = [
+      ...organizationRows,
+      ...canProviderRows.filter(provider => !knownIds.has(provider.id)),
+    ];
     return {
-      organizations: organizationRows,
+      organizations: organizationRows, // The host selector remains scoped to the local registrar.
+      academicProviderOrganizations,
+      creditIssuingOrganizations: academicProviderOrganizations,
       sites: siteRows,
       jurisdictions: jurisdictionRows,
     };
