@@ -41,7 +41,7 @@ export type CreditIssuerSummary = {
 
 function validUnits(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value) &&
-    value >= 0 && value <= 10 && Math.round(value * 100) === value * 100;
+    value >= 0 && value <= 10 && Math.abs(Math.round(value * 100) - value * 100) < 1e-8;
 }
 
 /**
