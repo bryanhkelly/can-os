@@ -43,6 +43,13 @@ async function loadHostProgram(tx: Reader, programId: string) {
   };
 }
 
+/** Other school models retain their established site-staff grant semantics. */
+export async function requiresIndependentChurchLocalDelegation(
+  tx: Reader, programId: string,
+): Promise<boolean> {
+  return (await loadHostProgram(tx, programId)).requiresDelegation;
+}
+
 async function currentConfiguration(tx: Reader, programId: string) {
   const [configuration] = await tx.select({
     id: schoolConfigurationVersions.id, version: schoolConfigurationVersions.version,
