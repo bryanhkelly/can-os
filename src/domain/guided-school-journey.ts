@@ -40,6 +40,7 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
   const staffed=c.sections>0&&c.publishedSections===c.sections&&c.staffedSections===c.sections;
   const enrolled=c.activeProgramStudents>0&&c.placedStudents>0;
   const hasWork=c.publishedAssessments>0&&(c.submittedWork+c.gradedWork)>0;
+  const awaitingClasses=Math.max(0,c.activeProgramStudents-c.placedStudents);
   const hasApplicants=c.applications>0;
   const enrollmentAction=hasApplicants
     ? `/admissions?programId=${encoded}`
@@ -58,7 +59,7 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
       href:academic,suggestedRole:"Curriculum publisher / school registrar"},
     {key:"enrollment",title:"Admit, enroll and place families",
       state:enrolled?"recorded":"needs_attention",
-      evidence:`${c.applications} applications · ${c.activeProgramStudents} active program students · ${c.placedStudents} students placed`,
+      evidence:`${c.applications} applications · ${c.activeProgramStudents} active program students · ${c.placedStudents} students placed${awaitingClasses?` · ${awaitingClasses} awaiting classes`:""}`,
       nextAction:enrolled?"Review admitted families and placements":
         hasApplicants?"Process applications, offers and class placement":
         "Start your first family intake",
