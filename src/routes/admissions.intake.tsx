@@ -114,9 +114,11 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
      }:{requestId,programId,...(existingApplicationId?{existingApplicationId}:{}),studentFirstName,studentLastName,
       guardianFirstName,guardianLastName,guardianEmail,gradeLevel,source,notes,
       ...(convertibleInterest?{publicInterestId:convertibleInterest.id,contactReviewed:true as const}:{})}});
-     if(convertibleInterest)await router.navigate({to:"/admissions/intake",
-       search:{siteId:convertibleInterest.siteId,programId,
-        application:created.applicationId,interest:undefined}});
+     const selectedProgram=data.programs.find(program=>program.id===programId);
+     await router.navigate({to:"/admissions/intake",search:{
+       siteId:convertibleInterest?.siteId??selectedProgram?.siteId??undefined,
+       programId,application:created.applicationId,interest:undefined,
+     }});
      setRequestId(crypto.randomUUID());setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);},"Inquiry created; continue the normal admissions and enrollment checklist.");}}>
     <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required disabled={!!convertibleInterest} value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);}}>
      <option value="">Choose program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
