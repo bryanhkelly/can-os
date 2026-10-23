@@ -5,6 +5,8 @@ import type { CommandContext } from "@/domain/command-context";
 import { isPassingGrade } from "@/domain/grade-scale-policy";
 import { requireAccessibleFirstLesson } from "@/domain/first-class-lesson";
 import { verifiedTeacherSectionIds } from "./verified-section-teachers.server";
+import { canAddStudentToSection } from "@/domain/section-registration-window";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { findSectionScheduleConflicts } from "@/modules/academic-time/section-schedule-service";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { getSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
@@ -33,10 +35,13 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   termId:s.sections.termId,startsOn:s.terms.startsOn,endsOn:s.terms.endsOn,
   programId:s.sections.programId,siteId:s.sections.siteId,
   organizationId:s.programs.organizationId,schoolYearId:s.terms.schoolYearId,
+  siteTimezone:s.sites.timezone,schoolYearTimezone:s.schoolYears.timezone,
   curriculumStatus:s.courseTemplateVersions.status,
   curriculum:s.courseTemplateVersions.curriculum})
   .from(s.sections).innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
   .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+  .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.terms.schoolYearId))
+  .leftJoin(s.sites,eq(s.sites.id,s.sections.siteId))
   .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
   .where(and(eq(s.sections.id,sectionId),eq(s.sections.active,true)))
   .limit(1).for("update");
@@ -68,13 +73,19 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
    eq(s.enrollments.status,"active"))).limit(1);
  if(already)return {enrollmentId:already.id,created:false};
  const policy=await getSectionRegistrationPolicy(sectionId,tx);
- const today=new Date().toISOString().slice(0,10);
+ const now=new Date();
+ const timezone=section.siteTimezone??section.schoolYearTimezone;
+ const today=dateKeyInTimezone(now.toISOString(),timezone);
  if(today>policy.addDropEndsOn)throw new Error("Add/drop deadline has passed");
  const [rosterCount]=await tx.select({total:sql<number>`count(*)::int`}).from(s.enrollments)
   .where(and(eq(s.enrollments.sectionId,sectionId),eq(s.enrollments.kind,"section"),
    eq(s.enrollments.status,"active")));
  const total=rosterCount?.total??0;
- if(total>=policy.enrollmentCapacity)throw new Error("Section is full");
+ if(!canAddStudentToSection({
+  addDropEndsOn:policy.addDropEndsOn,
+  enrollmentCapacity:policy.enrollmentCapacity,
+  occupiedSeats:total,timezone,now,
+ }))throw new Error("Section is full");
  const current=await tx.select({id:s.enrollments.id,termId:s.sections.termId,
   code:s.sections.code,metadata:s.sections.metadata,template:s.sections.courseTemplateVersionId,
   sectionId:s.sections.id})
