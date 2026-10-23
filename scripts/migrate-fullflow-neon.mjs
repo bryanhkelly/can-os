@@ -24,7 +24,7 @@ const host = new URL(testUrl).hostname.replace(/-pooler(?=\.)/, "").toLowerCase(
 if (host === process.env.CAN_APPLICATION_DB_HOST.trim().replace(/-pooler(?=\.)/, "").toLowerCase()) {
   throw new Error("Refusing migrations against the application database endpoint.");
 }
-if (process.env.DATABASE_URL) {
+if (process.env.DATABASE_URL && process.env.DATABASE_URL !== testUrl) {
   const appHost = new URL(process.env.DATABASE_URL).hostname.replace(/-pooler(?=\.)/, "").toLowerCase();
   if (host === appHost) throw new Error("Refusing migrations against the application DATABASE_URL endpoint.");
 }
