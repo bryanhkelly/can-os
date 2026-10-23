@@ -61,3 +61,35 @@ records; it must not become a separate SIS, admissions system, or CMS database.
   family inquiry/registration, cross-tenant denial and unpublish.
 - Provision wildcard DNS and certificate at the hosting platform separately.
   Do not treat migrations, docs or source commits as a deployment.
+
+## Bite 2 committed: authenticated draft address setup and private preview
+
+- `/sites/$siteId/publish` provides a registrar-only Site address
+  reservation form and a **private** preview of the canonical Site and
+  in-scope Programs. Site Today links to it.
+- A signed-in registrar requires BOTH its session capability
+  `site.publication.manage` and a matching explicitly provisioned
+  institutional `role_assignments.capabilities` entry. The assignment must
+  belong to the actor's active Person and Site's Organization, be backed by
+  that Organization's Membership, have `program_id IS NULL` and cover
+  the actual Site (or be Organization-wide). There is **no automatic grant**.
+  An affiliated denomination cannot take over another organization's Site.
+- The authenticated Organization and Site grant are validated in addition
+  to the explicit institutional assignment. Restricted Site memberships
+  cannot access sibling Sites even under a broad institutional assignment.
+- The server returns only Site metadata, reserved-address state and
+  authorized Program names, types, grades and internal statuses. It does
+  not expose household, student, staff-sensitive or admissions records.
+  Its response is marked `private, no-store`.
+- Reservation preserves transactionally linked audit and domain events
+  and concurrent-claim uniqueness. The preview does not serve an external
+  hostname, publish program content, open admissions, or accept registration.
+- Added scope-denial unit tests and a pending route contract. Test execution
+  and isolated-Neon migration/browser verification remain outstanding.
+  Migration `0035` must be applied and verified in a disposable environment
+  before running the feature. A separate administrator provisioning flow
+  for publisher grants is not part of this bite.
+
+**Next:** First establish an independently controlled publication decision
+and public-safe offering projection. Only expose `[site].can-os.com` once
+host resolution, edge configuration and negative cross-site tests are complete.
