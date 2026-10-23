@@ -55,3 +55,21 @@ export const revokeProgramSiteAuthorizationFn = createServerFn({ method:"POST" }
     ]);
     return revokeProgramSiteAuthorization(await getCommandContext(getRequest()), data);
   });
+
+export const getHostProgramSiteAuthorizationFn = createServerFn({ method:"GET" })
+  .validator((value: unknown) => z.object({programId: uuid}).strict().parse(value))
+  .handler(async ({data}) => {
+    const [{getCommandContext}, {getHostProgramSiteAuthorization}] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./program-site-authorization.server"),
+    ]);
+    return getHostProgramSiteAuthorization(await getCommandContext(getRequest()),data.programId);
+  });
+export const listCANOperatingAuthorizationDeskFn = createServerFn({ method:"GET" })
+  .handler(async () => {
+    const [{getCommandContext}, {listCANOperatingAuthorizationDesk}] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./program-site-authorization.server"),
+    ]);
+    return listCANOperatingAuthorizationDesk(await getCommandContext(getRequest()));
+  });

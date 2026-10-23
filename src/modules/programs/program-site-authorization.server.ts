@@ -277,3 +277,62 @@ export async function requireCurrentProgramSiteAuthorization(
   }
   throw new AuthorizationError("current independently verified CAN-church operating authority");
 }
+
+/** Authenticated, minimal host workspace projection. Never returns other
+ * churches' agreement evidence or CAN administrative lists.
+ */
+export async function getHostProgramSiteAuthorization(
+  actor: AccessContext, programId: string,
+) {
+  const identity = await loadOperatingIdentity(db, programId);
+  assertHostRequester(actor, identity);
+  const [record] = await db.select({
+    id: programSiteAuthorizations.id, version: programSiteAuthorizations.version,
+    status: programSiteAuthorizations.status,
+    services: programSiteAuthorizations.services,
+    effectiveFrom: programSiteAuthorizations.effectiveFrom,
+    effectiveThrough: programSiteAuthorizations.effectiveThrough,
+    revokedAt: programSiteAuthorizations.revokedAt,
+    reviewReason: programSiteAuthorizations.reviewReason,
+  }).from(programSiteAuthorizations)
+    .where(eq(programSiteAuthorizations.programId, programId))
+    .orderBy(desc(programSiteAuthorizations.version)).limit(1);
+  return {
+    programId, siteId: identity.siteId,
+    institutionOrganizationId: identity.institutionOrganizationId,
+    authorization: record ?? null,
+  };
+}
+
+/** Steward-only approval queue, limited to the CAN Organization of the
+ * authenticated steward. Never expose the signed agreement's private bytes.
+ */
+export async function listCANOperatingAuthorizationDesk(actor: AccessContext) {
+  if (actor.demoFacilitator || actor.grantSiteId !== null || !actor.actorPersonId ||
+      actor.role !== "can_network_steward" ||
+      !actor.capabilities.has("network.agreements.verify") ||
+      (actor.scope.organizationIds?.length ?? 0) !== 1)
+    throw new AuthorizationError("CAN operating authorization reviewer");
+  const orgId = actor.scope.organizationIds![0]!;
+  const [institution] = await db.select({ type: organizations.type })
+    .from(organizations).where(eq(organizations.id, orgId)).limit(1);
+  if (institution?.type !== "can_network")
+    throw new AuthorizationError("CAN institutional reviewer");
+  const requests = await db.select({
+    id: programSiteAuthorizations.id, programId: programSiteAuthorizations.programId,
+    siteId: programSiteAuthorizations.siteId,
+    hostOrganizationId: programSiteAuthorizations.hostOrganizationId,
+    institutionOrganizationId: programSiteAuthorizations.institutionOrganizationId,
+    programName: programs.name, hostName: organizations.name,
+    status: programSiteAuthorizations.status, services: programSiteAuthorizations.services,
+    version: programSiteAuthorizations.version, requestedAt: programSiteAuthorizations.requestedAt,
+    reviewedAt: programSiteAuthorizations.reviewedAt,
+    effectiveFrom: programSiteAuthorizations.effectiveFrom,
+    effectiveThrough: programSiteAuthorizations.effectiveThrough,
+  }).from(programSiteAuthorizations)
+    .innerJoin(programs, eq(programSiteAuthorizations.programId, programs.id))
+    .innerJoin(organizations, eq(programSiteAuthorizations.hostOrganizationId, organizations.id))
+    .where(eq(programSiteAuthorizations.institutionOrganizationId, orgId))
+    .orderBy(desc(programSiteAuthorizations.requestedAt)).limit(100);
+  return { authorizations: requests };
+}
