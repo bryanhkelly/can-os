@@ -5,6 +5,7 @@ import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {and,eq,inArray,desc} from "drizzle-orm";
 import {z} from "zod";
 import {admissionOfferProgress} from "@/domain/admission-offer-progress";
+import {verifiedEnrollmentStudentIds} from "@/domain/guardian-offer-visibility";
 
 /** Only offers for students whose enrollment this session's guardian can manage. */
 export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
@@ -17,14 +18,14 @@ export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const relations=await db.select({
   studentPersonId:s.guardianRelationships.studentPersonId,
+  canManageEnrollment:s.guardianRelationships.canManageEnrollment,
   metadata:s.guardianRelationships.metadata,
  }).from(s.guardianRelationships)
   .where(and(eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(s.guardianRelationships.canManageEnrollment,true),...(data.studentPersonId?[eq(s.guardianRelationships.studentPersonId,data.studentPersonId)]:[])));
  // A legacy or self-asserted relationship may have canManageEnrollment=true
  // without independent verification. Never expose a child's admissions record
  // or offers until the school has verified that precise relationship.
- const verifiedStudents=relations.filter(r=>r.metadata.verification==="verified")
-  .map(r=>r.studentPersonId);
+ const verifiedStudents=verifiedEnrollmentStudentIds(relations);
  if(!verifiedStudents.length)return [];
  const profiles=await db.select({id:s.studentProfiles.id,personId:s.studentProfiles.personId}).from(s.studentProfiles)
   .where(inArray(s.studentProfiles.personId,verifiedStudents));
