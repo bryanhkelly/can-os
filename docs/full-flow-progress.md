@@ -1,5 +1,30 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## Incremental application, classroom and student-access corrections (23 October 2026)
+
+- Serialize a first-time parent+Program application before Household creation,
+  and reject duplicate open Applications by that adult across Households.
+  No name-only Person merging is permitted.
+- Let authenticated adults resume registrar-created applications only when
+  the exact guardian–student relationship is independently verified.
+  Display pending/verified guardian review status on the family page.
+- Reuse the original Person for single-identity multi-role access accounts,
+  and reject ambiguous People, inactive People and revoked matching family
+  memberships. An email link cannot silently reactivate a suspended grant.
+- School placement now requires an independently authorized active Teacher,
+  a published instructional course and live curriculum agreement. CAN teacher
+  delegation requires an original organization-wide CAN grant, a named
+  Section assignment and current independently verified school agreement.
+- The legacy enrollment-only command is closed for church-hosted CAN
+  programs: activation requires an accepted-offer+staffed-Section
+  transaction. The Operations first-class metric additionally requires the
+  same school year on active Program and Section enrollments.
+- A **rollback-only Neon acceptance test** now exercises published Site,
+  email proof, one-use link, guardian account grant, canonical application,
+  replay/idempotency and pending child access. The existing enrollment
+  test requires staffing before placement, then checks student and assigned
+  teacher class access. These are source tests, not evidence of passing CI.
+
 ## P0 implementation slices — first public family and staffed class (23 October 2026)
 
 **Source committed on FullFlow, not released or browser accepted.**
