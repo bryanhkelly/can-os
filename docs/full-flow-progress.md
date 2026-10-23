@@ -1,5 +1,42 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 enrollment-to-student-login and return-family usability (23 October 2026)
+
+**Code committed; runtime acceptance not yet executed. GitHub Actions is known
+unavailable and is not the next work target.**
+
+- Student-learning-account eligibility now insists that the active Section
+  row's **actual Program and Site** match the admitted Application and the
+  student's active Program membership, and that the Section enrollment
+  itself belongs to that same canonical school year. A mis-keyed/stale
+  Section row cannot authorize a child's separate email login.
+- The existing rollback-only same-child admissions fixture now extends
+  beyond the teacher's first lesson: a real verified adult account
+  consents to a separate student email, a registrar independently approves,
+  the existing student Person gains the exact Site-bound student grant,
+  and one sign-in email request is made (delivery mocked to prevent
+  external email). The fixture rejects a mismatched-year Section before
+  consent and restores the actual Section before approved provisioning.
+- Admissions Section selection and the atomic Section placement command
+  now use **one school-local date and seat-window predicate** rather
+  than UTC midnight. Site timezone takes precedence; site-less online
+  classes use the SchoolYear timezone. Impossible dates and full classes
+  fail closed; rollover and capacity regression cases were added.
+- The signed-in family application workspace now offers a direct
+  **Resume this student's enrollment checklist** link for independently
+  verified guardians, scoped to the exact saved Application ID. Pending
+  unverified relationships still cannot access the child's records.
+
+**Next product gaps on this path:** preserve a visible next step if the
+family is pending guardian verification; verify the student can actually
+redeem a real passwordless link (not only receive the invitation request);
+match placement preview to schedule/prerequisite failures; execute the
+connected multi-persona acceptance in an available environment when
+practical. No deployment, merge, live student creation, email or production
+migration was performed.
+
+---
+
 ## P0 registrar seat and add/drop preview (23 October 2026)
 
 **Source committed, test execution pending.** Extended the same real
