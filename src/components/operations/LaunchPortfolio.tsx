@@ -20,6 +20,15 @@ export function LaunchPortfolio({ launches, sites, siteId, programId }: {
             <th scope="row" className="p-3 font-semibold"><Link to="/operations/launch/$programId" params={{ programId: launch.id }}
               search={{ siteId: launch.siteId ?? undefined }} className="underline">{launch.name}</Link>
               <span className="mt-1 block font-normal text-muted-foreground">{sites.find(site => site.id === launch.siteId)?.name ?? "No site assigned"}</span>
+              {launch.siteId && launch.publicSite && <span className="mt-2 block font-normal">
+                <span className="block text-xs text-muted-foreground">
+                  Website {launch.publicSite.status}: {launch.publicSite.host}
+                </span>
+                <Link to="/sites/$siteId/publish" params={{siteId:launch.siteId}}
+                  className="mt-1 inline-block text-xs underline">
+                  Review website (publisher permission required)
+                </Link>
+              </span>}
             </th>
             <td className="p-3"><StatusBadge tone={readiness.blockers.length ? "attention" : "neutral"}>{launch.status}</StatusBadge></td>
             <td className="p-3">{readiness.percentage === null ? "Not configured" : <>
