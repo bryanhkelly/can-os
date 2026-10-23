@@ -14,13 +14,13 @@ describe("Summer and after-school recurring sessions", () => {
     expect(x.at(-1)?.date).toBe("2027-06-18");
   });
   it("resolves each occurrence using its date's daylight-saving offset", () => {
-    const season={startsOn:"2027-03-05",endsOn:"2027-03-16"};
+    const season={startsOn:"2027-03-12",endsOn:"2027-03-24"};
     const x=planExtendedSessions({
       fromDate:season.startsOn,throughDate:season.endsOn,weekdays:[5],
       startTime:"15:00",endTime:"17:00",
     },season,"America/New_York");
     expect(x.map(v=>v.startsAt.toISOString())).toEqual([
-      "2027-03-05T20:00:00.000Z","2027-03-12T19:00:00.000Z",
+      "2027-03-12T20:00:00.000Z","2027-03-19T19:00:00.000Z",
     ]);
   });
   it("rejects reversed, out-of-season, invalid, and zero-match patterns",()=>{
