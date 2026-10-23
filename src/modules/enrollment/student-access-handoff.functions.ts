@@ -26,14 +26,15 @@ const statement="I am this student's independently verified parent or legal guar
 async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.transaction>[0]>[0],applicationId:string){
  const [app]=await tx.select({
   id:applications.id,programId:applications.programId,
-  studentProfileId:applications.studentProfileId,
+  studentProfileId:applications.studentProfileId,stage:applications.stage,
   studentPersonId:studentProfiles.personId,
   siteId:programs.siteId,organizationId:programs.organizationId,
  }).from(applications)
   .innerJoin(programs,eq(programs.id,applications.programId))
   .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
   .where(eq(applications.id,applicationId)).limit(1);
- if(!app?.siteId)throw new AuthorizationError("valid school application");
+ if(!app?.siteId||app.stage!=="accepted")
+  throw new AuthorizationError("accepted school application and active host Site");
  const active=await tx.select({schoolYearId:enrollments.schoolYearId})
   .from(enrollments).where(and(
    eq(enrollments.studentProfileId,app.studentProfileId),
@@ -53,6 +54,9 @@ async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.tran
   .where(and(
    eq(enrollments.studentProfileId,app.studentProfileId),
    eq(enrollments.programId,app.programId),
+   eq(enrollments.schoolYearId,terms.schoolYearId),
+   eq(sections.programId,app.programId),
+   eq(sections.siteId,app.siteId),
    eq(enrollments.kind,"section"),eq(enrollments.status,"active"),
    eq(sections.active,true),
   ));
