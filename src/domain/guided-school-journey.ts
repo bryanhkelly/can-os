@@ -6,6 +6,16 @@ export type LaunchJourneyRecord = {
   requirements: {status:string;blocking:boolean;title:string}[];
 } | null;
 
+/** School-launch guidance is for academic Programs, including independent church hosts.
+ * Enrichment has a separate readiness, registration and safeguarding workflow.
+ */
+export function isGuidedAcademicSchool(type: string): boolean {
+  return [
+    "church_hosted_academy", "high_school_extension", "full_school",
+    "microschool", "hybrid_program", "homeschool_cohort",
+  ].includes(type);
+}
+
 export type GuidedStep = {
   key: "launch"|"instruction"|"enrollment"|"learning"|"response"|"operations";
   title: string;
@@ -30,6 +40,10 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
   const staffed=c.sections>0&&c.publishedSections===c.sections&&c.staffedSections===c.sections;
   const enrolled=c.activeProgramStudents>0&&c.placedStudents>0;
   const hasWork=c.publishedAssessments>0&&(c.submittedWork+c.gradedWork)>0;
+  const hasApplicants=c.applications>0;
+  const enrollmentAction=hasApplicants
+    ? `/admissions?programId=${encoded}`
+    : `/admissions/intake?programId=${encoded}${site?`&siteId=${site}`:""}`;
 
   return [
     {key:"launch",title:"Configure and open the high school",
@@ -45,8 +59,10 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
     {key:"enrollment",title:"Admit, enroll and place families",
       state:enrolled?"recorded":"needs_attention",
       evidence:`${c.applications} applications · ${c.activeProgramStudents} active program students · ${c.placedStudents} students placed`,
-      nextAction:enrolled?"Review admissions":"Complete actual offers, consent and section placement",
-      href:`/admissions?programId=${encoded}`,suggestedRole:"Registrar / guardian"},
+      nextAction:enrolled?"Review admitted families and placements":
+        hasApplicants?"Process applications, offers and class placement":
+        "Start your first family application",
+      href:enrollmentAction,suggestedRole:"Registrar / guardian"},
     {key:"learning",title:"Deliver instruction and receive student work",
       state:hasWork?"recorded":"needs_attention",
       evidence:`${c.publishedAssessments} published assignments · ${c.submittedWork} awaiting grading · ${c.gradedWork} graded`,
