@@ -260,9 +260,11 @@ export async function withdrawAdmissionOffer(context:AccessContext,input:{offerI
   const [student]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles)
    .where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
   if(!student)throw new Error("Student profile missing");
-  const guardians=await tx.select({personId:guardianRelationships.guardianPersonId}).from(guardianRelationships)
+  const guardians=await tx.select({personId:guardianRelationships.guardianPersonId,
+   canManageEnrollment:guardianRelationships.canManageEnrollment,
+   metadata:guardianRelationships.metadata}).from(guardianRelationships)
    .where(and(eq(guardianRelationships.studentPersonId,student.personId),eq(guardianRelationships.canManageEnrollment,true)));
-  await notifyMany(tx,[...new Set(guardians.map(guardian=>guardian.personId))].map(recipientPersonId=>({
+  await notifyMany(tx,[...new Set(guardians.filter(isVerifiedEnrollmentGuardian).map(guardian=>guardian.personId))].map(recipientPersonId=>({
    recipientPersonId,type:"admission_offer_withdrawn",title:"Enrollment offer withdrawn",
    body:"Admissions withdrew an unaccepted offer. Contact admissions for next steps.",
    resourceType:"admission_offer",resourceId:offer.id,
