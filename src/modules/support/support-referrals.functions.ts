@@ -58,11 +58,22 @@ async function loadReferral(tx: any, s: any, referralId: string, actor: Actor) {
   return record;
 }
 
-/** Specialists are routed site-wide until area-level routing attributes exist on grants. */
+/** One currently active site-scoped coordinator is assigned to each new case.
+ * This is routing, not proof of clinical qualification or site-wide case access.
+ */
 async function firstSpecialistAtSites(tx: any, s: any, sites: string[], area: string): Promise<string | null> {
-  const [owner] = await tx.select({ personId: s.accountPersonGrants.personId }).from(s.accountPersonGrants)
-    .where(and(eq(s.accountPersonGrants.role, area === "counselor" ? "counselor" : "specialist"), inArray(s.accountPersonGrants.siteId, sites), eq(s.accountPersonGrants.active, true)))
-    .orderBy(s.accountPersonGrants.createdAt).limit(1);
+  const [owner] = await tx.select({ personId: s.accountPersonGrants.personId })
+    .from(s.accountPersonGrants)
+    .innerJoin(s.accessAccounts,eq(s.accessAccounts.id,s.accountPersonGrants.accountId))
+    .innerJoin(s.people,eq(s.people.id,s.accountPersonGrants.personId))
+    .where(and(
+      eq(s.accountPersonGrants.role, area === "counselor" ? "counselor" : "specialist"),
+      inArray(s.accountPersonGrants.siteId, sites),
+      eq(s.accountPersonGrants.active, true),
+      eq(s.accountPersonGrants.isSynthetic, false),
+      eq(s.accessAccounts.disabled, false),
+      eq(s.people.active, true),
+    )).orderBy(s.accountPersonGrants.createdAt).limit(1);
   return owner?.personId ?? null;
 }
 
@@ -183,11 +194,14 @@ export const createSupportReferral = createServerFn({ method: "POST" })
          inArray(s.sections.programId,actor.scope.programIds??[])))
        .limit(1);
       if(!placement)throw new AuthorizationError("student enrollment in a taught section");
+       const coordinatorPersonId = await firstSpecialistAtSites(
+         tx, s, [placement.siteId], destination[data.category],
+       );
       const [action] = await tx.insert(s.actions).values({
         type: "support_referral", status: "open", priority: data.priority,
         title: `Student support · ${data.category}`, description: observations,
-        ownerPersonId: null,
-        organizationId: placement.organizationId,
+        ownerPersonId: coordinatorPersonId,
+         organizationId: placement.organizationId,
         siteId: placement.siteId,
         programId: placement.programId,
         subjectType: "student_profile", subjectId,
@@ -201,7 +215,7 @@ export const createSupportReferral = createServerFn({ method: "POST" })
       }).returning({ id: s.supportReferrals.id });
       await tx.insert(s.supportReferralStageEvents).values({ referralId: referral!.id, stage: "submitted", actorPersonId: actor.actorPersonId });
       await emitEvent(tx, {eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,actorPersonId:actor.actorPersonId,payload:{subjectType:"student_profile",subjectId,referralId:referral!.id}});
-      await recordAudit(tx, actor, { action: "support_referral.create", resourceType: "action", resourceId: action.id, after: { category: data.category, subjectId, stage: "submitted" }, scope: { siteId: placement.siteId,programId:placement.programId } });
+      await recordAudit(tx, actor, { action: "support_referral.create", resourceType: "action", resourceId: action.id, after: { category: data.category, subjectId, stage: "submitted", coordinatorPersonId }, scope: { siteId: placement.siteId,programId:placement.programId } });
       return action;
     });
     return { referralId: created.id };
