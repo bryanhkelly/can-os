@@ -31,7 +31,9 @@ export const createTeacherLearningFollowUp = createServerFn({ method: "POST" })
         programId: s.sections.programId, title: s.sections.title,
         versionId: s.sections.courseTemplateVersionId,
         organizationId: s.programs.organizationId,
+        schoolYearId:s.terms.schoolYearId,
       }).from(s.sections).innerJoin(s.programs, eq(s.programs.id, s.sections.programId))
+        .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
         .innerJoin(s.sectionTeachers, and(
           eq(s.sectionTeachers.sectionId, s.sections.id),
           eq(s.sectionTeachers.personId, actor.actorPersonId!),
@@ -55,9 +57,7 @@ export const createTeacherLearningFollowUp = createServerFn({ method: "POST" })
       if (!student) throw new AuthorizationError("currently enrolled student");
       const [currentProgramEnrollment]=await tx.select({id:s.enrollments.id})
         .from(s.enrollments)
-        .innerJoin(s.terms,eq(s.terms.schoolYearId,s.enrollments.schoolYearId))
-        .where(and(eq(s.terms.id,(await tx.select({termId:s.sections.termId})
-          .from(s.sections).where(eq(s.sections.id,section.id)).limit(1))[0]!.termId),
+        .where(and(eq(s.enrollments.schoolYearId,section.schoolYearId),
           eq(s.enrollments.studentProfileId,student.id),
           eq(s.enrollments.programId,section.programId),
           eq(s.enrollments.kind,"program"),
