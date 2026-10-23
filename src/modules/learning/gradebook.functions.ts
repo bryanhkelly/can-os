@@ -1,5 +1,7 @@
 import { createAssessmentStatus } from "@/domain/assessment-publication";
-import { assertCapability,assertProgramScope,assertSiteScope,AuthorizationError } from "@/domain/command-context";
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { authorizeClass,accessibleClasses } from "./class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 import { EventTypes } from "@/domain/event-types";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -21,27 +23,16 @@ function readRubricScores(value: unknown): Array<{ id: string; points: number }>
   typeof v.points === "number" && Number.isFinite(v.points));
 }
 
-/**
- * Teacher gradebook server functions. Authorization mirrors the assignments
- * module: the actor must hold a verified teacher grant with site membership,
- * and section access requires a section_teachers row for the actor.
- * Never accept a browser-selected actor or role.
+/** The gradebook uses the same exact-Section authority as the class workspace.
+ * CAN academic teachers keep their original institution grant and NEVER receive
+ * a host church-wide Site or Program grant through this path.
  */
 async function teacherActor(sectionId?: string) {
  const context = await getCommandContext(getRequest());
  if (context.role !== "teacher" || !context.actorPersonId) throw new AuthorizationError("teacher gradebook access");
- if (!context.scope.siteIds?.length) throw new AuthorizationError("teacher site membership");
- const [{ db }, schema] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
- if (sectionId) {
-  const [section] = await db.select({ siteId: schema.sections.siteId, programId: schema.sections.programId })
-   .from(schema.sectionTeachers)
-   .innerJoin(schema.sections, eq(schema.sections.id, schema.sectionTeachers.sectionId))
-   .where(and(eq(schema.sectionTeachers.personId, context.actorPersonId), eq(schema.sectionTeachers.sectionId, sectionId)))
-   .limit(1);
-  if (!section) throw new AuthorizationError("assigned teacher");
-  assertSiteScope(context, section.siteId);
-  assertProgramScope(context, section.programId);
- }
+ if (!context.scope.siteIds?.length && !context.scope.sectionIds?.length)
+  throw new AuthorizationError("named teacher Section or Site scope");
+ if (sectionId) await authorizeClass(context as Actor, sectionId);
  return context;
 }
 
@@ -119,16 +110,10 @@ export const getGradebookSections = createServerFn({ method: "GET" }).handler(as
  const context = await teacherActor();
  if (!process.env.DATABASE_URL) return { connected: false, sections: [] as { id: string; code: string; title: string }[] };
  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
- const sections = await db.select({ id: s.sections.id, code: s.sections.code, title: s.sections.title })
-  .from(s.sectionTeachers)
-  .innerJoin(s.sections, eq(s.sections.id, s.sectionTeachers.sectionId))
-  .where(and(
-   eq(s.sectionTeachers.personId, context.actorPersonId!),
-   inArray(s.sections.siteId, context.scope.siteIds!),
-   inArray(s.sections.programId, context.scope.programIds??[]),
-   eq(s.sections.active, true),
-  ))
-  .orderBy(asc(s.sections.title));
+ // An institution's teacher appears only for the Sections authorized in
+ // their live class directory. Never project the church's whole Site.
+ const sections=(await accessibleClasses(context as Actor))
+  .map(({id,title,code})=>({id,title,code}));
  return { connected: true, sections };
 });
 
@@ -144,7 +129,7 @@ export const getGradebook = createServerFn({ method: "GET" })
     curriculum:s.courseTemplateVersions.curriculum,status:s.courseTemplateVersions.status })
    .from(s.sections)
    .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
-   .where(and(eq(s.sections.id, data.sectionId), inArray(s.sections.siteId, context.scope.siteIds!), inArray(s.sections.programId,context.scope.programIds??[])))
+   .where(eq(s.sections.id, data.sectionId))
    .limit(1);
   if (!section) throw new AuthorizationError("section");
 
@@ -317,6 +302,9 @@ export const createAssessment = createServerFn({ method: "POST" })
   const intendedStatus=createAssessmentStatus(data.publishNow,dueAt);
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   return db.transaction(async tx => {
+   // Recheck independent school agreement and teacher–Section relationship
+   // inside the same transaction that creates the assessment.
+   await authorizeClass(context as Actor,data.sectionId,undefined,tx);
    const [teachingSection]=await tx.select({
       id:s.sections.id,versionId:s.sections.courseTemplateVersionId,
       curriculum:s.courseTemplateVersions.curriculum,status:s.courseTemplateVersions.status,
@@ -325,9 +313,7 @@ export const createAssessment = createServerFn({ method: "POST" })
     .innerJoin(s.sections,eq(s.sections.id,s.sectionTeachers.sectionId))
     .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
     .where(and(eq(s.sectionTeachers.personId,context.actorPersonId!),
-     eq(s.sections.id,data.sectionId),eq(s.sections.active,true),
-     inArray(s.sections.siteId,context.scope.siteIds??[]),
-     inArray(s.sections.programId,context.scope.programIds??[])))
+     eq(s.sections.id,data.sectionId),eq(s.sections.active,true)))
     .limit(1);
    if(!teachingSection)throw new AuthorizationError("active teaching assignment in authorized school/program");
    assertPublisherLessonReference(teachingSection.curriculum,teachingSection.status,data.curriculumLessonId);
@@ -413,11 +399,10 @@ export const manageAssessment = createServerFn({method:"POST"})
     .innerJoin(s.sectionTeachers,and(
      eq(s.sectionTeachers.sectionId,s.sections.id),
      eq(s.sectionTeachers.personId,context.actorPersonId!)))
-    .where(and(eq(s.assessments.id,data.assessmentId),
-     inArray(s.sections.siteId,context.scope.siteIds??[]),
-     inArray(s.sections.programId,context.scope.programIds??[])))
+    .where(eq(s.assessments.id,data.assessmentId))
     .for("update").limit(1);
    if(!assessment)throw new AuthorizationError("assigned assessment in authorized program");
+   await authorizeClass(context as Actor,assessment.sectionId,undefined,tx);
    const transitions:Record<typeof data.action,readonly string[]>={
     publish:["draft"],close:["published"],reopen:["closed"],
     reschedule:["published","closed"],
@@ -498,11 +483,10 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
     .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
     .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),
      eq(s.sectionTeachers.personId,context.actorPersonId!)))
-    .where(and(eq(s.submissions.id,data.submissionId),
-     inArray(s.sections.siteId,context.scope.siteIds??[]),
-     inArray(s.sections.programId,context.scope.programIds??[])))
+    .where(eq(s.submissions.id,data.submissionId))
     .for("update").limit(1);
    if(!record)throw new AuthorizationError("graded submission in assigned section");
+   await authorizeClass(context as Actor,record.sectionId,undefined,tx);
    if(record.status!=="graded")throw new Error("Only graded work can be returned for revision");
    const [latest]=await tx.select({id:s.submissions.id})
     .from(s.submissions).where(and(eq(s.submissions.assessmentId,record.assessmentId),
