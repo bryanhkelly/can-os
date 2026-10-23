@@ -33,6 +33,34 @@ describe("transcript rendering",()=>{
     expect(html).not.toContain("official issuance blocked");
     expect(html).toContain("does not certify graduation");
   });
+  it("shows issuer-separated subject credit inventory and missing credit review without awarding a diploma",()=>{
+    const html=renderToStaticMarkup(<TranscriptView rows={[
+      row({ sectionId:"algebra",termId:"fall",creditIssuingOrganizationId:"can",
+        subject:"Mathematics",terminalPeriod:true }),
+      row({sectionGradeId:"biology",sectionId:"biology",termId:"fall",
+        creditIssuingOrganizationId:"can",subject:"Science",
+        terminalPeriod:true,sectionTitle:"Biology I",
+        creditsAttempted:null,creditsEarned:null,creditConfigured:false}),
+      row({sectionGradeId:"other",sectionId:"other",termId:"fall",
+        creditIssuingOrganizationId:"other",creditIssuingOrganization:"Outside School",
+        subject:"Mathematics",terminalPeriod:true,
+        creditsAttempted:0.5,creditsEarned:0.5}),
+    ]} issuances={[]}/>);
+    expect(html).toContain("Recorded credits by subject");
+    expect(html).toContain("Mathematics");
+    expect(html).toContain("Science");
+    expect(html).toContain("Outside School");
+    expect(html).toContain("credit entries require review");
+    expect(html).toContain("not an official graduation audit");
+    expect(html).toContain("does not establish diploma eligibility");
+    expect(html).toContain("Credits: Not recorded");
+  });
+  it("does not invent credits when historical rows lack source/term provenance",()=>{
+    const html=renderToStaticMarkup(<TranscriptView rows={[row()]} issuances={[]}/>);
+    expect(html).toContain("lacks the provenance");
+    expect(html).toContain("Algebra I");
+    expect(html).not.toContain("1 earned / 1 attempted");
+  });
   it("shows explicitly recorded earned credits without inventing others",()=>{
     const html=renderToStaticMarkup(<TranscriptView rows={[row()]} issuances={[]}/>);
     expect(html).toContain("1/1 credits earned");
