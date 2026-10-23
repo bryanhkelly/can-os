@@ -4,7 +4,7 @@ import { and, eq, gte, inArray, lte, or, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  accountPersonGrants, deliveryArrangements, people, programs, scheduleTemplatePeriods,
+  accessAccounts, accountPersonGrants, deliveryArrangements, people, programs, scheduleTemplatePeriods,
   scheduleTemplates, schoolYears, sections, sites, terms,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
@@ -36,7 +36,8 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
 
     const sectionsAtSite=await db.select({
       id:sections.id,title:sections.title,programId:sections.programId,
-      programName:programs.name,scheduleTemplateId:sections.scheduleTemplateId,
+      programName:programs.name,deliveryModel:programs.deliveryModel,
+      scheduleTemplateId:sections.scheduleTemplateId,
       schoolYearId:schoolYears.id,
     }).from(sections)
       .innerJoin(programs,eq(programs.id,sections.programId))
@@ -46,15 +47,17 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         eq(programs.organizationId,site.organizationId),
         eq(schoolYears.siteId,site.id),eq(schoolYears.organizationId,site.organizationId),
         eq(schoolYears.status,"active"),eq(sections.active,true),
+        eq(programs.status,"active"),
         lte(schoolYears.startsOn,data.date),gte(schoolYears.endsOn,data.date),
         lte(terms.startsOn,data.date),gte(terms.endsOn,data.date),
         inArray(sections.programId,actor.scope.programIds??[])))
       .limit(250);
-    if(!sectionsAtSite.length){
+    const onsiteSections=sectionsAtSite.filter(row=>row.deliveryModel.onsite===true);
+    if(!onsiteSections.length){
       return {date:data.date,siteId:site.id,...summarizeOnsiteSupervision([])};
     }
-    const ids=sectionsAtSite.map(row=>row.id);
-    const templateIds=[...new Set(sectionsAtSite.map(r=>r.scheduleTemplateId)
+    const ids=onsiteSections.map(row=>row.id);
+    const templateIds=[...new Set(onsiteSections.map(r=>r.scheduleTemplateId)
       .filter((id):id is string=>!!id))];
     const day=new Date(data.date+"T12:00:00Z").getUTCDay();
     const [periodRows,arrangements]=await Promise.all([
@@ -101,7 +104,9 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         .from(people).where(inArray(people.id,peopleIds)):Promise.resolve([]),
       peopleIds.length?db.select({personId:accountPersonGrants.personId,
         role:accountPersonGrants.role})
-        .from(accountPersonGrants).where(and(
+        .from(accountPersonGrants)
+        .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+        .where(and(eq(accessAccounts.disabled,false),eq(accountPersonGrants.isSynthetic,false),
           inArray(accountPersonGrants.personId,peopleIds),
           eq(accountPersonGrants.siteId,site.id),
           eq(accountPersonGrants.organizationId,site.organizationId),
@@ -115,7 +120,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
       bySection.set(entry.sectionId,items);
     }
     const result:SupervisionBlockInput[]=[];
-    for(const section of sectionsAtSite){
+    for(const section of onsiteSections){
       const templates=periodRows.filter(row=>
         row.templateId===section.scheduleTemplateId &&
         row.yearId===section.schoolYearId &&
