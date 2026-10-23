@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  summarizeOnsiteSupervision,
+  coversLocalSupervisionBlock, summarizeOnsiteSupervision,
   type SupervisionBlockInput,
 } from "@/domain/onsite-supervision-coverage";
 
@@ -14,6 +14,25 @@ const period=(patch:Partial<SupervisionBlockInput>={}):SupervisionBlockInput=>({
 });
 
 describe("planned hybrid onsite section supervision",()=>{
+  it("respects site-local shift effective times, not UTC day estimates",()=>{
+    const interval={
+      date:"2026-10-22",timeZone:"America/Los_Angeles",
+      startsAtLocal:"09:00:00",endsAtLocal:"10:00:00",
+      effectiveFrom:new Date("2026-10-22T16:00:00Z"),
+      effectiveThrough:new Date("2026-10-22T17:00:00Z"),
+    };
+    expect(coversLocalSupervisionBlock(interval)).toBe(true);
+    expect(coversLocalSupervisionBlock({
+      ...interval,effectiveFrom:new Date("2026-10-22T16:15:00Z"),
+    })).toBe(false);
+    expect(coversLocalSupervisionBlock({
+      ...interval,effectiveThrough:new Date("2026-10-22T16:45:00Z"),
+    })).toBe(false);
+    expect(coversLocalSupervisionBlock({
+      ...interval,startsAtLocal:"17:00",endsAtLocal:"16:00",
+    })).toBe(false);
+  });
+
   it("labels assigned staff as PLANNED, never physically confirmed or room assigned",()=>{
     const result=summarizeOnsiteSupervision([period()]);
     expect(result.plannedAssignments).toBe(1);
