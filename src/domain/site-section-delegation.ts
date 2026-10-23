@@ -4,7 +4,7 @@ import { AuthorizationError } from "./command-context";
 export function sectionFacilitatorKey(sectionId: string, personId: string) {
   if (!/^[0-9a-f-]{36}$/i.test(sectionId) || !/^[0-9a-f-]{36}$/i.test(personId))
     throw new AuthorizationError("canonical Section and Person IDs");
-  return `room_facilitator:${sectionId}:${personId}`;
+  return `room_facilitator:${sectionId.toLowerCase()}:${personId.toLowerCase()}`;
 }
 
 export function isEffectiveSectionFacilitator(input: {
