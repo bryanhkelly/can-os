@@ -84,5 +84,35 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         {!data.programs.length && <p className="text-sm text-muted-foreground">No programs are currently available for this private preview.</p>}
       </div>
     </section>
+    <section className="mt-6 rounded-xl border bg-card p-5">
+      <h2 className="text-xl font-semibold">Enrichment catalog preview</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Existing published summer and after-school Seasons at this site. The Site's
+        public website is still private. Preview does not open registration or
+        publish any Program.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {data.catalogPreview.map(item => <article key={item.seasonId} className="rounded-lg border p-4">
+          <h3 className="font-semibold">{item.title}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {item.season} · {item.startsOn} to {item.endsOn}
+          </p>
+          <p className="mt-2 text-sm">
+            {new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(
+              (item.packages.length ? Math.min(...item.packages.map(pkg=>pkg.priceCents)) :
+                item.feeAmountCents) / 100)}
+            {item.packages.length ? " starting price" : ""}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {item.registrationOpen ? "CAN enrichment registration currently open" :
+              "CAN enrichment registration window not open"}
+            {" · "}Site website unpublished
+          </p>
+        </article>)}
+        {!data.catalogPreview.length && <p className="text-sm text-muted-foreground">
+          No eligible published enrichment Seasons for this site.
+        </p>}
+      </div>
+    </section>
   </WorkspaceShell>;
 }
