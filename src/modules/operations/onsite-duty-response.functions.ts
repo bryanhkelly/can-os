@@ -10,6 +10,7 @@ import { selectAuthorizedOnsiteDuty, resolveOnsiteDutyRetry } from "@/domain/ons
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { getOnsiteSupervisionPlan } from "./onsite-supervision.functions";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { writeAudit } from "@/platform/mutation";
 
 const dutyType = "onsite_instruction_duty_response";
@@ -115,6 +116,10 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
     },plan.blocks);
     const key=[site.id,data.date,data.sectionId,data.periodId,block.planToken].join(":");
     return db.transaction(async tx=>{
+      // Staff availability cannot be newly recorded as part of CAN's onsite
+      // school service after the independently approved agreement is revoked.
+      // The exact duty and original Site grant were checked above.
+      await requireChurchHostedOperatingServices(tx,block.programId,["onsite_supervision"]);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-duty:"+key}))`);
       const [prior]=await tx.select({id:actions.id,metadata:actions.metadata})
         .from(actions).where(and(eq(actions.type,dutyType),eq(actions.siteId,site.id),
