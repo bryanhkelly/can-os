@@ -7,6 +7,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { programTypes } from "@/domain/program-offerings";
+import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
 import { listOpeningOperators } from "./opening-handoff.server";
 
@@ -149,9 +150,12 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
         status: s.programs.status,
         organizationId: s.programs.organizationId,
         siteId: s.programs.siteId,
+        publicSiteSlug: s.sitePublications.slug,
+        publicSiteStatus: s.sitePublications.status,
         createdAt: s.programs.createdAt,
       })
       .from(s.programs)
+      .leftJoin(s.sitePublications, eq(s.sitePublications.siteId, s.programs.siteId))
       .where(
         and(
           inArray(s.programs.organizationId, organizationIds),
@@ -189,6 +193,11 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
         return {
           ...program,
           createdAt: program.createdAt.toISOString(),
+          // Re-read canonical Site publication state on every launch reload.
+          publicSite: program.publicSiteSlug && isPublicSiteSlug(program.publicSiteSlug)
+            ? { host: publicSiteHost(program.publicSiteSlug),
+                status: program.publicSiteStatus === "published" ? "published" as const : "draft" as const }
+            : null,
           journey: journey ?? null,
           requirements,
           openingOperators:await listOpeningOperators(program),
