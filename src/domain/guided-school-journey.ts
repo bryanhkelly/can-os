@@ -38,7 +38,9 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
   const blocking=journey?.requirements.filter(r=>r.blocking&&r.status!=="complete")??[];
   const schoolOpen=program.status==="active";
   const staffed=c.sections>0&&c.publishedSections===c.sections&&c.staffedSections===c.sections;
-  const enrolled=c.activeProgramStudents>0&&c.placedStudents>0;
+  // Do not mark enrollment-to-classroom complete while any active student
+  // still lacks a valid class placement in this Program.
+  const enrolled=c.activeProgramStudents>0&&c.placedStudents>=c.activeProgramStudents;
   const hasWork=c.publishedAssessments>0&&(c.submittedWork+c.gradedWork)>0;
   const awaitingClasses=Math.max(0,c.activeProgramStudents-c.placedStudents);
   const hasApplicants=c.applications>0;
