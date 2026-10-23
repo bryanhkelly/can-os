@@ -61,7 +61,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         inArray(publicAdmissionsInterests.siteId, actor.scope.siteIds ?? []),
         eq(publicAdmissionsInterests.siteId, programs.siteId),
       )).orderBy(
-        sql`CASE WHEN ${publicAdmissionsInterests.status} IN ('closed', 'converted') THEN 2
+        sql`CASE WHEN ${publicAdmissionsInterests.status} IN ('closed', 'converted') OR ${actions.status} IN ('resolved', 'cancelled') THEN 2
                  WHEN ${actions.dueAt} < now() THEN 0 ELSE 1 END`,
         asc(actions.dueAt), desc(publicAdmissionsInterests.createdAt),
       ).limit(200);
