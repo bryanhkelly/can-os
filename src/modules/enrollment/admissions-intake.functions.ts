@@ -10,6 +10,7 @@ import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { enrollmentJourneyDefinitionKey } from "@/domain/enrollment-form";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
@@ -416,6 +417,11 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
       insertErrorLabel:"Family enrollment"});
     }
     if(data.decision==="accept"){
+     // Offer-ready is an academic institution admissions decision, not
+     // permission inferred from a host-owned school Site.
+     await requireChurchHostedOperatingServices(tx,app.programId,[
+      "admissions","school_of_record",
+     ]);
      if(!journey)throw new Error("Application has no enrollment journey");
      const blockers=await tx.select({id:journeyRequirements.id}).from(journeyRequirements)
       .where(and(eq(journeyRequirements.journeyId,journey.id),eq(journeyRequirements.blocking,true)));
