@@ -98,8 +98,21 @@ export const getEnrichmentFamily = createServerFn({ method: "GET" }).handler(asy
     seasonId: s.activityRegistrations.activitySeasonId,
     studentProfileId: s.activityRegistrations.studentProfileId,
     status: s.activityRegistrations.status,
+    offeringName: s.activities.name,
+    seasonName: s.activitySeasons.name,
+    startsOn: s.activitySeasons.startsOn, endsOn: s.activitySeasons.endsOn,
+    amountCents: s.financialObligations.amountCents,
+    paymentStatus: s.financialObligations.status,
   }).from(s.activityRegistrations)
-    .where(inArray(s.activityRegistrations.studentProfileId, children.map(c => c.studentProfileId))) : [];
+    .innerJoin(s.activitySeasons, eq(s.activitySeasons.id, s.activityRegistrations.activitySeasonId))
+    .innerJoin(s.activities, eq(s.activities.id, s.activitySeasons.activityId))
+    .innerJoin(s.programs, eq(s.programs.id, s.activities.programId))
+    .leftJoin(s.financialObligations,
+      eq(s.financialObligations.id, s.activityRegistrations.financialObligationId))
+    .where(and(
+      inArray(s.activityRegistrations.studentProfileId, children.map(c => c.studentProfileId)),
+      inArray(s.programs.type, extended),
+    )) : [];
   return { children, households, registrations };
 });
 
