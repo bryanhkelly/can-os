@@ -245,15 +245,16 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
         {sections.filter(s => s.enrolled).map(s =>
           <span key={s.id} className="rounded-full border px-2 py-1 text-xs">Assigned: {s.title}</span>)}
       </div>
-      {sections.some(s => !s.enrolled && !s.staffed) && <p role="status" className="text-xs text-amber-700">
-        Some classes are not available for placement: assign an active, school-authorized teacher first.
+      {sections.some(s => !s.enrolled && (!s.staffed||!s.curriculumReady)) && <p role="status" className="text-xs text-amber-700">
+        Some classes cannot accept students yet: assign an active, school-authorized teacher
+        and publish their instructional course version.
       </p>}
-      {sections.some(s => !s.enrolled && s.staffed) ? <div className="flex flex-wrap items-end gap-2">
+      {sections.some(s => !s.enrolled && s.staffed && s.curriculumReady) ? <div className="flex flex-wrap items-end gap-2">
         <label className="min-w-48 flex-1 text-xs">Available section
           <select value={chosen} onChange={e => setChosen(e.target.value)}
             className="mt-1 block w-full rounded-md border bg-background p-2">
             <option value="">Select a section</option>
-            {sections.filter(s => !s.enrolled && s.staffed).map(s =>
+            {sections.filter(s => !s.enrolled && s.staffed && s.curriculumReady).map(s =>
               <option key={s.id} value={s.id}>{s.title} ({s.code})</option>)}
           </select>
         </label>
@@ -264,7 +265,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
       </div> : <p className="text-xs text-muted-foreground">
         {sections.length
           ? sections.every(s => s.enrolled) ? "All currently available sections are assigned."
-            : "There are no staffed, available classes yet. Assign a teacher in school launch before placing this student."
+            : "No available instructional class is both staffed and curriculum-ready. Assign a teacher and publish the course before activation."
           : "No eligible sections are configured for this student's active school year."}
       </p>}
     </div>}
