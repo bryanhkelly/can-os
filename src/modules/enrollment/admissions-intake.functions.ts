@@ -18,6 +18,13 @@ import { and,desc,eq,inArray,isNull,or,sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 const uuid=z.string().uuid();
+/** Self-submitted applications reference their verified-account adult, while
+ * registrar-created inquiries must use their explicit prospective contact.
+ */
+export function applicationGuardianContact(metadata:Record<string,unknown>, submittedByPersonId:string):string {
+ return metadata.origin==="authenticated_guardian_application"
+  ?submittedByPersonId:String(metadata.contactPersonId??"");
+}
 const existingStudentSchema=z.object({
  studentProfileId:uuid,guardianPersonId:uuid,householdId:uuid.optional(),createHousehold:z.literal(true).optional(),
 }).strict().refine(student=>Boolean(student.householdId)!==Boolean(student.createHousehold),
@@ -84,6 +91,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
  const actor=await registrar();
  const rows=await db.select({id:applications.id,stage:applications.stage,metadata:applications.metadata,
   createdAt:applications.createdAt,updatedAt:applications.updatedAt,programId:applications.programId,
+  submittedByPersonId:applications.submittedByPersonId,
   organizationId:programs.organizationId,siteId:programs.siteId,
   studentPersonId:studentProfiles.personId,
   programName:programs.name,studentFirst:people.legalFirstName,studentLast:people.legalLastName})
@@ -94,7 +102,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
   .where(inArray(applications.programId,actor.scope.programIds!))
   .orderBy(desc(applications.updatedAt)).limit(300);
  const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
- const contactIds=[...new Set(rows.map(r=>String(r.metadata.contactPersonId??""))
+ const contactIds=[...new Set(rows.map(r=>applicationGuardianContact(r.metadata,r.submittedByPersonId))
   .filter(id=>uuidPattern.test(id)))];
  const relations=rows.length?await db.select({
   guardianPersonId:guardianRelationships.guardianPersonId,
@@ -111,7 +119,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
   eq(accountPersonGrants.active,true))):[];
  return rows.map(r=>{
   const {metadata,...rest}=r;
-  const contactId=String(metadata.contactPersonId??"");
+  const contactId=applicationGuardianContact(metadata,r.submittedByPersonId);
   const verified=relations.some(rel=>rel.guardianPersonId===contactId&&
    rel.studentPersonId===r.studentPersonId&&rel.metadata.verification==="verified"&&
    rel.canManageEnrollment);
@@ -456,6 +464,7 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [app]=await tx.select({
     id:applications.id,programId:applications.programId,studentProfileId:applications.studentProfileId,metadata:applications.metadata,
+    submittedByPersonId:applications.submittedByPersonId,
    }).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
    if(!app||!actor.scope.programIds?.includes(app.programId))
     throw new AuthorizationError("admissions guardian provisioning");
@@ -465,7 +474,7 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
     (actor.scope.siteIds?.length&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))
     throw new AuthorizationError("guardian membership scope");
    assertRecordWriteAllowed(app.metadata,"registrar");
-   const contactId=String(app.metadata.contactPersonId??"");
+   const contactId=applicationGuardianContact(app.metadata,app.submittedByPersonId);
    const [contact]=await tx.select({id:people.id,email:people.email})
     .from(people).where(eq(people.id,contactId)).limit(1);
    if(!contact?.email)throw new Error("Guardian contact email missing");
@@ -530,14 +539,14 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
   const [application]=await db.select({programId:applications.programId,
    studentProfileId:applications.studentProfileId,
    organizationId:programs.organizationId,siteId:programs.siteId,
-   metadata:applications.metadata}).from(applications)
+   metadata:applications.metadata,submittedByPersonId:applications.submittedByPersonId}).from(applications)
    .innerJoin(programs,eq(programs.id,applications.programId))
    .where(eq(applications.id,data.applicationId)).limit(1);
   if(!application||!actor.scope.programIds?.includes(application.programId)||
     !actor.scope.organizationIds?.includes(application.organizationId)||
     (application.siteId!==null&&!actor.scope.siteIds?.includes(application.siteId)))
    throw new AuthorizationError("admissions invitation Program, school and site scope");
-  const contactId=String(application.metadata.contactPersonId??"");
+  const contactId=applicationGuardianContact(application.metadata,application.submittedByPersonId);
   const [contact]=await db.select({email:people.email})
    .from(people).where(eq(people.id,contactId)).limit(1);
   if(!contact?.email)throw new Error("Guardian email is missing");
@@ -584,6 +593,7 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
    const [app]=await tx.select({
     id:applications.id,programId:applications.programId,
     studentProfileId:applications.studentProfileId,metadata:applications.metadata,
+    submittedByPersonId:applications.submittedByPersonId,
     organizationId:programs.organizationId,siteId:programs.siteId,
    }).from(applications).innerJoin(programs,eq(programs.id,applications.programId))
      .where(eq(applications.id,data.applicationId)).limit(1);
@@ -592,7 +602,7 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
       (app.siteId!==null&&!actor.scope.siteIds?.includes(app.siteId)))
     throw new AuthorizationError("guardian relationship verification Program, school and site scope");
    assertRecordWriteAllowed(app.metadata,"registrar");
-   const contactId=String(app.metadata.contactPersonId??"");
+   const contactId=applicationGuardianContact(app.metadata,app.submittedByPersonId);
    const [learner]=await tx.select({personId:studentProfiles.personId})
     .from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
    if(!learner)throw new Error("Student not found");
