@@ -1,6 +1,7 @@
 import { and, eq, or, isNull } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
-import { accountPersonGrants, enrollments, programs, sections, sectionTeachers } from "@/db/schema";
+import { accountPersonGrants, enrollments, programs, sections, sectionTeachers, terms } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { authorizeClass } from "@/modules/learning/class-access.server";
 import type { Actor } from "@/modules/identity/actors.server";
@@ -35,9 +36,17 @@ export async function assertAcademicActionAuthority(
         !context.scope.sectionIds.includes(resource.sectionId))){
     throw new AuthorizationError("academic Action scope");
   }
+  const activeProgram=alias(enrollments,"action_active_program_enrollment");
   const [section] = await tx.select({ id: sections.id }).from(sections)
     .innerJoin(programs, eq(programs.id, sections.programId))
+    .innerJoin(terms,eq(terms.id,sections.termId))
     .innerJoin(enrollments, eq(enrollments.sectionId, sections.id))
+    .innerJoin(activeProgram,and(
+      eq(activeProgram.studentProfileId,enrollments.studentProfileId),
+      eq(activeProgram.kind,"program"),eq(activeProgram.status,"active"),
+      eq(activeProgram.programId,sections.programId),
+      eq(activeProgram.schoolYearId,terms.schoolYearId),
+    ))
     .where(and(
       eq(sections.id, resource.sectionId), eq(sections.active, true),
       eq(sections.programId, resource.programId),
@@ -46,6 +55,7 @@ export async function assertAcademicActionAuthority(
       eq(enrollments.studentProfileId, resource.subjectId),
       eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
       eq(enrollments.programId, resource.programId),
+      eq(enrollments.schoolYearId,terms.schoolYearId),
     )).limit(1);
   if (!section) throw new AuthorizationError("current academic Action student/section relationship");
   await assertAcademicActionStaff(tx, context.actorPersonId, resource);
