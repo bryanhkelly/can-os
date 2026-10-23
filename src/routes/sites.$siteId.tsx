@@ -24,7 +24,12 @@ function SiteTodayPage() {
   }).format(new Date(date));
   return <WorkspaceShell eyebrow="CAN OS · Site Operations" title={data.site.name}
     subtitle={data.site.organizationName + " · " + data.localDate + " · " + data.site.timezone}
-    actions={<Link className="rounded-lg border px-3 py-2 text-sm" to="/operations" search={{siteId:undefined,programId:undefined}}>All operations →</Link>}>
+    actions={<div className="flex flex-wrap gap-2">
+      <Link className="rounded-lg border px-3 py-2 text-sm" to="/sites/$siteId/publish"
+        params={{siteId:data.site.id}}>Public site setup →</Link>
+      <Link className="rounded-lg border px-3 py-2 text-sm" to="/operations"
+        search={{siteId:undefined,programId:undefined}}>All operations →</Link>
+    </div>}>
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([
         ["Operations", "/operations"], ["Launch", "/operations/launch"],
