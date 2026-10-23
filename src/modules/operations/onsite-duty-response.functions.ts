@@ -50,6 +50,20 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
     const plan=await getOnsiteSupervisionPlan({data:{date:data.date}});
     if(plan.siteId!==site.id)
       throw new AuthorizationError("site duty scope");
+    // Keep safety-relevant "cannot cover" available; show affirmative
+    // acceptance only with a current named local facilitator delegation.
+    const canAcceptPrograms = new Map<string, boolean>();
+    if (actor.role === "room_facilitator") {
+      for (const programId of new Set(plan.blocks.map(block => block.programId))) {
+        try {
+          await requireCurrentSiteLocalDelegate(db, actor, programId, "room_facilitator");
+          canAcceptPrograms.set(programId, true);
+        } catch (error) {
+          if (!(error instanceof AuthorizationError)) throw error;
+          canAcceptPrograms.set(programId, false);
+        }
+      }
+    }
     // Never describe capped or incomplete coverage as fully acknowledged.
     const rows=await db.select({id:actions.id,sectionId:actions.sectionId,
       ownerPersonId:actions.ownerPersonId,metadata:actions.metadata,
@@ -70,7 +84,8 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
       return {
         sectionId:block.sectionId,periodId:block.periodId,
         canRespond:block.canRespond&&!truncated,
-        canAccept:block.canAccept&&!truncated,
+        canAccept:block.canAccept&&!truncated &&
+          (actor.role !== "room_facilitator" || canAcceptPrograms.get(block.programId) === true),
         status:record?.metadata.response==="accepted"?"accepted" as const:
           record?.metadata.response==="cannot_cover"?"cannot_cover" as const:
           "not_reported" as const,
