@@ -216,9 +216,18 @@ integration("GF3 host / program launch", () => {
       expect(launchingProgram.hostOrganizationId).toBe(host.id);
       expect(launchingProgram.academicProviderOrganizationId).toBe(canOrg.id);
 
-      await expect(
-        programsModule.activateProgram(context, launch.programId),
-      ).rejects.toThrow("ready");
+      if (scenario.programType === "church_hosted_academy") {
+        // Planning a church-owned campus with a CAN academic provider is
+        // allowed; without an independently approved institution/site
+        // agreement the Program must NOT be activated, even from draft.
+        await expect(
+          programsModule.activateProgram(context, launch.programId),
+        ).rejects.toThrow("independently verified Program-Site institutional authorization");
+      } else {
+        await expect(
+          programsModule.activateProgram(context, launch.programId),
+        ).rejects.toThrow("ready");
+      }
 
       const requirements = await db
         .select()
@@ -453,29 +462,37 @@ integration("GF3 host / program launch", () => {
       ));
       expect(siteEvent.status).toBe("processed");
 
-      await programsModule.activateProgram(context, launch.programId,{recipientPersonId:operator.id});
       const {listOpeningHandoffs,acknowledgeOpeningHandoff}=await import("@/modules/programs/opening-handoff.server");
-      const handoffs=await listOpeningHandoffs([launch.programId]);
-      expect(handoffs).toHaveLength(1);
-      expect(handoffs[0]?.ownerPersonId).toBe(operator.id);
-      await acknowledgeOpeningHandoff(launchContext,{
-        actionId:handoffs[0]!.id,note:"As the opening and receiving operator, I reviewed and received daily operations.",
-      });
-      expect((await listOpeningHandoffs([launch.programId]))[0]?.status).toBe("resolved");
-
-      const [activeProgram] = await db
-        .select()
-        .from(schema.programs)
-        .where(eq(schema.programs.id, launch.programId));
-
-      expect(activeProgram.status).toBe("active");
-
-      const [journey] = await db
-        .select()
-        .from(schema.journeys)
-        .where(eq(schema.journeys.id, launch.journeyId));
-
-      expect(journey.status).toBe("active");
+      if (scenario.programType === "church_hosted_academy") {
+        // All local course/staffing and launch checklist work is complete,
+        // yet that evidence cannot silently substitute for CAN authorization.
+        await expect(
+          programsModule.activateProgram(context, launch.programId, {recipientPersonId:operator.id}),
+        ).rejects.toThrow("independently verified Program-Site institutional authorization");
+        expect(await listOpeningHandoffs([launch.programId])).toHaveLength(0);
+        const [blockedProgram] = await db.select().from(schema.programs)
+          .where(eq(schema.programs.id, launch.programId));
+        expect(blockedProgram.status).toBe("launching");
+        expect(await db.select().from(schema.domainEvents).where(and(
+          eq(schema.domainEvents.aggregateId, launch.programId),
+          eq(schema.domainEvents.eventType, "ProgramActivated"),
+        ))).toHaveLength(0);
+      } else {
+        await programsModule.activateProgram(context, launch.programId,{recipientPersonId:operator.id});
+        const handoffs=await listOpeningHandoffs([launch.programId]);
+        expect(handoffs).toHaveLength(1);
+        expect(handoffs[0]?.ownerPersonId).toBe(operator.id);
+        await acknowledgeOpeningHandoff(launchContext,{
+          actionId:handoffs[0]!.id,note:"As the opening and receiving operator, I reviewed and received daily operations.",
+        });
+        expect((await listOpeningHandoffs([launch.programId]))[0]?.status).toBe("resolved");
+        const [activeProgram] = await db.select().from(schema.programs)
+          .where(eq(schema.programs.id, launch.programId));
+        expect(activeProgram.status).toBe("active");
+        const [journey] = await db.select().from(schema.journeys)
+          .where(eq(schema.journeys.id, launch.journeyId));
+        expect(journey.status).toBe("active");
+      }
 
       const orientationRows = await db
         .select()
