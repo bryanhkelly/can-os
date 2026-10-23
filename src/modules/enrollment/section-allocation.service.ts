@@ -4,6 +4,7 @@ import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configura
 import type { CommandContext } from "@/domain/command-context";
 import { isPassingGrade } from "@/domain/grade-scale-policy";
 import { findSectionScheduleConflicts } from "@/modules/academic-time/section-schedule-service";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { getSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray,sql } from "drizzle-orm";
@@ -35,6 +36,26 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   .where(and(eq(s.sections.id,sectionId),eq(s.sections.active,true)))
   .limit(1).for("update");
  if(!section)throw new Error("Section not active");
+ // Active roster membership must land in a real, staffed instructional class,
+ // not a Section shell whose assigned teacher has no current school access.
+ const [staffed]=await tx.select({id:s.sectionTeachers.id})
+  .from(s.sectionTeachers)
+  .innerJoin(s.people,eq(s.people.id,s.sectionTeachers.personId))
+  .innerJoin(s.accountPersonGrants,and(
+    eq(s.accountPersonGrants.personId,s.sectionTeachers.personId),
+    eq(s.accountPersonGrants.role,"teacher"),
+    eq(s.accountPersonGrants.active,true),
+    sql`(${s.accountPersonGrants.organizationId} = ${section.organizationId}
+      OR ${s.accountPersonGrants.organizationId} = (
+        SELECT academic_provider_organization_id FROM programs WHERE id = ${section.programId}
+      ))`,
+    ...(section.siteId?[sql`(${s.accountPersonGrants.siteId} IS NULL
+      OR ${s.accountPersonGrants.siteId} = ${section.siteId})`]:[]),
+  ))
+  .where(and(eq(s.sectionTeachers.sectionId,sectionId),eq(s.people.active,true)))
+  .limit(1);
+ if(!staffed)throw new Error("Assign an active teacher with verified school access before placing a student in this class");
+ await requireChurchHostedOperatingServices(tx,section.programId,["academic_instruction","school_of_record"]);
  if(!actor.scope.programIds?.includes(section.programId)||
   !actor.scope.organizationIds?.includes(section.organizationId)||
   (actor.scope.siteIds?.length&&(!section.siteId||!actor.scope.siteIds.includes(section.siteId))))
@@ -116,7 +137,8 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   const guardian=await tx.select({personId:s.guardianRelationships.guardianPersonId})
    .from(s.guardianRelationships).where(and(
     eq(s.guardianRelationships.studentPersonId,student.personId),
-    eq(s.guardianRelationships.canViewAcademics,true)));
+    eq(s.guardianRelationships.canViewAcademics,true),
+    sql`${s.guardianRelationships.metadata}->>'verification' = 'verified'`));
   const recipients=[...new Set([student.personId,...guardian.map(g=>g.personId)])];
   if(recipients.length)await notifyMany(tx, recipients.map(recipientPersonId=>({
    recipientPersonId,type:"course_placement",status:"unread" as const,
