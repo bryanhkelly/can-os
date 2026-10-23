@@ -23,6 +23,40 @@ const pendingTags = [
 export function assessFullFlowMigrationReadiness(input) {
   const { project, branch, applied, lastTimestamp, journal, types, columns, tables } = input;
   const issues = [];
+  // A previously reviewed 0032-0038 sequence is already applied on the
+  // dedicated branch. Before applying 0039, verify that exact committed base
+  // and that the new operating-authorization table is not partially present.
+  if (journal.entries.length === 40 &&
+      journal.entries[39]?.tag === "0039_program_site_authorizations") {
+    const found = new Set(tables.map(row => row.table_name));
+    const enumValues = new Set(types.map(row => row.typname + "." + row.enumlabel));
+    const cols = new Map(columns.map(row => [row.table_name + "." + row.column_name, row]));
+    const priorTables = ["site_publications", "program_publications", "public_admissions_interests"];
+    const priorEnums = ["program_type.summer_program",
+      "program_type.after_school_enrichment", "activity_season_status.draft"];
+    if (project !== "sweet-hall-62441909" || branch !== "br-proud-pine-arfju8h2")
+      issues.push("Wrong Neon project or branch");
+    if (!priorTables.every(name => found.has(name)) ||
+        !priorEnums.every(name => enumValues.has(name)) ||
+        cols.get("programs.credit_issuing_organization_id")?.is_nullable !== "YES" ||
+        !["activity_seasons.metadata", "activity_registrations.metadata"].every(name => cols.has(name)))
+      issues.push("0032-0038 database prerequisites do not match the reviewed FullFlow state");
+    const pre0039 = applied === 39 &&
+      String(lastTimestamp) === String(journal.entries[38].when) &&
+      !found.has("program_site_authorizations");
+    const post0039 = applied === 40 &&
+      String(lastTimestamp) === String(journal.entries[39].when) &&
+      found.has("program_site_authorizations");
+    if (!pre0039 && !post0039)
+      issues.push("0039 migration ledger/table state is inconsistent or unexpected");
+    return {
+      ready: issues.length === 0, issues, appliedMigrations: applied,
+      pendingMigrations: post0039 ? [] : ["0039_program_site_authorizations"],
+      target: "fullflow-e2e-20261022",
+      status: issues.length ? "HOLD_REVIEW_DRIFT" :
+        post0039 ? "UP_TO_DATE" : "PRECONDITIONS_MATCH_NOT_APPLIED",
+    };
+  }
   if (project !== "sweet-hall-62441909" || branch !== "br-proud-pine-arfju8h2")
     issues.push("Wrong Neon project or branch");
   const expected = journal.entries.slice(32).map(entry => entry.tag);
@@ -54,7 +88,8 @@ async function main() {
   const url = process.env.TEST_DATABASE_URL;
   await verifyFullFlowNeonBranch(url);
   const journal = JSON.parse(readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url),"utf8"));
-  if (journal.entries.length !== 39) throw new Error("Unexpected migration journal length; re-review the pending migration set");
+  if (![39,40].includes(journal.entries.length))
+    throw new Error("Unexpected migration journal length; re-review the pending migration set");
   const query = neon(url);
   const [[identity],[ledger],types,columns,tables] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
@@ -69,7 +104,7 @@ async function main() {
             (table_name IN ('activity_seasons','activity_registrations') AND column_name='metadata'))`,
     query`SELECT table_name FROM information_schema.tables
           WHERE table_schema='public' AND
-          table_name IN ('site_publications','program_publications','public_admissions_interests')`,
+          table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations')`,
   ]);
   const review = assessFullFlowMigrationReadiness({ ...identity, ...ledger, journal, types, columns, tables });
   process.stdout.write(JSON.stringify(review,null,2)+"\n");
