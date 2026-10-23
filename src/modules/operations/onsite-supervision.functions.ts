@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, gte, inArray, lte, or, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, or, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -48,12 +48,13 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         eq(schoolYears.siteId,site.id),eq(schoolYears.organizationId,site.organizationId),
         eq(schoolYears.status,"active"),eq(sections.active,true),
         eq(programs.status,"active"),
+        sql`${programs.deliveryModel} ->> 'onsite' = 'true'`,
         lte(schoolYears.startsOn,data.date),gte(schoolYears.endsOn,data.date),
         lte(terms.startsOn,data.date),gte(terms.endsOn,data.date),
         inArray(sections.programId,actor.scope.programIds??[])))
       .limit(251);
     const projectionTruncated=sectionsAtSite.length>250;
-    const onsiteSections=sectionsAtSite.slice(0,250).filter(row=>row.deliveryModel.onsite===true);
+    const onsiteSections=sectionsAtSite.slice(0,250);
     if(!onsiteSections.length){
       return {date:data.date,siteId:site.id,projectionTruncated,
         ...summarizeOnsiteSupervision([])};
