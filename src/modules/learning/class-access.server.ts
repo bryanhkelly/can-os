@@ -6,6 +6,29 @@ import { requireActor, assertSiteGranted, assertProgramGranted, type Actor } fro
 import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
 export type ClassTransaction = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
+/** Church owns its Site, CAN owns academics. A church staff grant must
+ * never stand in for CAN teacher authority on a separate academic provider.
+ */
+async function isIndependentChurchAcademicProgram(
+  query: Pick<typeof import("@/db/client").db,"select">,
+  programId: string,
+):Promise<boolean>{
+  const s=await import("@/db/schema");
+  const [program]=await query.select({
+    hostId:s.programs.hostOrganizationId,
+    ownerId:s.programs.organizationId,
+    academicProviderId:s.programs.academicProviderOrganizationId,
+  }).from(s.programs).where(eq(s.programs.id,programId)).limit(1);
+  if(!program)throw new AuthorizationError("existing class academic Program");
+  const hostId=program.hostId??program.ownerId;
+  if(hostId===program.academicProviderId)return false;
+  const [host]=await query.select({type:s.organizations.type}).from(s.organizations)
+    .where(eq(s.organizations.id,hostId)).limit(1);
+  if(!host)throw new AuthorizationError("existing church Site host");
+  return host.type==="church";
+}
+
+
 export async function classActor() {
   const actor = await requireActor(["student", "guardian", "teacher"]);
   assertCapability(actor, actor.role === "student" ? "student:read" : actor.role === "guardian" ? "student:related-read" : "teacher:read");
@@ -34,9 +57,18 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
   // host Organization or its unrelated Programs and Sites.
   const institutionalSection=actor.role==="teacher" &&
     actor.scope.sectionIds?.includes(section.id)===true;
-  if(institutionalSection){
-    // Recheck authoritative evidence on this request (and within the current
-    // mutation transaction when supplied), not only when the session loaded.
+  const churchCANProgram=actor.role==="teacher" &&
+    await isIndependentChurchAcademicProgram(query,section.programId);
+  if(churchCANProgram){
+    // Church staff may supervise children, but must NOT grade or teach
+    // institution-owned CAN classes on a host-local grant. The teacher must
+    // have a provider-wide original CAN grant and exact delegated Section.
+    if(!institutionalSection || actor.grantSiteId!==null)
+      throw new AuthorizationError("CAN academic provider teacher assigned to exact Section");
+    await requireInstitutionalAcademicProgramAuthority(query,actor,section.programId,[
+      "academic_instruction","curriculum",
+    ]);
+  }else if(institutionalSection){
     await requireInstitutionalAcademicProgramAuthority(query,actor,section.programId,[
       "academic_instruction","curriculum",
     ]);
@@ -107,15 +139,26 @@ export async function accessibleClasses(actor: Actor) {
           or(scope,inArray(s.sections.id,delegated))
         ) : scope)).orderBy(s.sections.title);
     const available=[];
+    const independentByProgram=new Map<string,boolean>();
     // A previously signed-in CAN teacher must not retain a stale church
     // class directory entry after the underlying academic agreement expires
     // or is withdrawn. A Section assignment alone is never a contract.
     for(const row of rows){
+      let independent=independentByProgram.get(row.programId);
+      if(independent===undefined){
+        independent=await isIndependentChurchAcademicProgram(db,row.programId);
+        independentByProgram.set(row.programId,independent);
+      }
       const hostLocal=!!row.siteId &&
         (actor.scope.siteIds??[]).includes(row.siteId) &&
         (actor.scope.programIds??[]).includes(row.programId);
-      if(!hostLocal){
-        if(!delegated.includes(row.id))continue;
+      if(independent){
+        if(actor.grantSiteId!==null || !delegated.includes(row.id))continue;
+      }else if(hostLocal){
+        // Ordinary school teacher: original local Site authorization remains
+        // sufficient, never a cross-school grant.
+      }else if(!delegated.includes(row.id))continue;
+      if(independent || !hostLocal){
         try{
           await requireInstitutionalAcademicProgramAuthority(db,actor,row.programId,[
             "academic_instruction","curriculum",
