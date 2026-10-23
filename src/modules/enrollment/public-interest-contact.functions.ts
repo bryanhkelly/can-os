@@ -33,6 +33,7 @@ export const recordPublicInterestContact = createServerFn({ method: "POST" })
         !actor.scope.programIds?.length)
       throw new AuthorizationError("admissions registrar");
     assertCapability(actor, "enrollment.decide");
+    const actorPersonId = actor.actorPersonId;
 
     return db.transaction(async tx => {
       // This lock also serializes assignment, close and reviewed conversion.
@@ -48,9 +49,9 @@ export const recordPublicInterestContact = createServerFn({ method: "POST" })
         .where(and(
           eq(publicAdmissionsInterests.id, data.interestId),
           eq(publicAdmissionsInterests.siteId, programs.siteId),
-          inArray(publicAdmissionsInterests.siteId, actor.scope.siteIds),
-          inArray(publicAdmissionsInterests.programId, actor.scope.programIds),
-          inArray(programs.organizationId, actor.scope.organizationIds),
+          inArray(publicAdmissionsInterests.siteId, actor.scope.siteIds ?? []),
+          inArray(publicAdmissionsInterests.programId, actor.scope.programIds ?? []),
+          inArray(programs.organizationId, actor.scope.organizationIds ?? []),
         )).for("update", { of: publicAdmissionsInterests }).limit(1);
       if (!interest) throw new AuthorizationError("public interest contact scope");
 
@@ -75,7 +76,7 @@ export const recordPublicInterestContact = createServerFn({ method: "POST" })
       const nextFollowUpAt = data.nextFollowUpAt ? new Date(data.nextFollowUpAt) : null;
       const appended = appendPublicInterestContact(followUp.evidence, {
         kind: "public_interest_contact", requestId: data.requestId,
-        outcome: data.outcome, actorPersonId: actor.actorPersonId,
+        outcome: data.outcome, actorPersonId,
         recordedAt: now.toISOString(), note: data.note,
         nextFollowUpAt: nextFollowUpAt?.toISOString() ?? null,
       });
