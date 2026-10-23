@@ -45,7 +45,9 @@ export async function createOpeningHandoff(tx: Transaction, context: CommandCont
   const { program } = input;
   const [created] = await tx.insert(actions).values({
     type: openingHandoffType, title: program.name + " - opening handoff",
-    description: "Review the opening record, school-year setup, classes and daily operations, then acknowledge receipt. This acknowledgment is not regulatory approval.",
+    description: input.sectionIds.length
+      ? "Review the opening record, school-year setup, classes and daily operations, then acknowledge receipt. This acknowledgment is not regulatory approval."
+      : "Review the opening record, program schedule, onsite facilitators and daily operations, then acknowledge receipt. This acknowledgment is not regulatory approval.",
     organizationId: program.organizationId, siteId: program.siteId, programId: program.id,
     subjectType: "program", subjectId: program.id, ownerPersonId: input.recipientPersonId,
     priority: "high",
