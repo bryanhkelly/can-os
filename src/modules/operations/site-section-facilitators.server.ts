@@ -9,6 +9,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { assertLocalDelegationIssuer, delegationExpiration } from "@/domain/site-local-delegation-policy";
 import { sectionFacilitatorKey } from "@/domain/site-section-delegation";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { requiresIndependentChurchLocalDelegation } from "./site-local-delegation.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 type Reader = Pick<typeof db, "select">;
@@ -214,6 +215,9 @@ export async function requireCurrentSectionFacilitator(
       actor.grantSiteId !== section.siteId ||
       !actor.scope.organizationIds?.includes(section.organizationId))
     throw new AuthorizationError("assigned Section and original host Site scope");
+  // Preserve pre-existing ordinary school staffing paths: section-scoped
+  // delegation is a new requirement only for independently church-hosted CAN.
+  if (!await requiresIndependentChurchLocalDelegation(tx, programId)) return;
   const ids = await activeFacilitatorSectionIds(tx, actor, programId);
   if (!ids.includes(sectionId))
     throw new AuthorizationError("current exact-Section named facilitator assignment");
