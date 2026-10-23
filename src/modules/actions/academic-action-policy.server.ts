@@ -24,7 +24,7 @@ export async function assertAcademicActionAuthority(
   if (!context.actorPersonId || resource.subjectType !== "student_profile" ||
       !resource.sectionId || !resource.programId || !resource.organizationId)
     throw new AuthorizationError("academic Action scope");
-  if(context.role==="teacher"){
+  if("role" in context && context.role==="teacher"){
     // A CAN instructor holds the institution-wide original membership and
     // an exact delegated Section, not the host church organization or Site.
     // Recheck contract and assignment under this Action's transaction.
