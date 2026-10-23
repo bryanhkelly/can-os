@@ -160,7 +160,7 @@ tests or release gates have passed.
 - **Depends on:** Canonical launch/Site workflow and PUB-13; `0035` schema.
 
 **PUB-13 — Site profile, editorial copy and true preview.** `Partial`
-- **Implement:** Versioned, approved public fields for hero, school
+- **Implement:** Versioned public fields with ownership-specific approval, not blanket review. for hero, school
   description, grades, delivery schedule, location/contact method, FAQ,
   program details and clear "host / education provider / school of record"
   descriptions. Make an authenticated preview use the **same public HTML
@@ -217,37 +217,71 @@ tests or release gates have passed.
   Every identity change is durable, reviewed and auditable.
 - **Depends on:** GF22/GF2 identity contract; PUB-11.
 
-**PUB-18 — Host partner drafts, CAN institutional approval.** `Partial`
-- **Implement:** Distinct partner site-editor, reviewer and institutional
-  publisher permissions. Partners propose copy, schedules, contact data
-  and imagery; CAN/institution approves accreditation, issuer, academic
-  status, tuition and legal/operator claims. Reuse audited workflow
-  Actions/Journeys; never make every site editor a registrar.
-- **DoD:** Scoped host may edit **only its draft**; it cannot self-approve
-  protected academic claims, change unrelated Sites, or read student
-  applications without a separate relationship-specific grant.
-- **First committed permission bite on `FullFlow` (unverified):**
-  `site_website_editor` is a separate role with only
-  `site.website.draft.read`. Its verified active account grant **must**
-  specify the host Organization AND exact Site; the read service also
-  demands an explicit same-Person Site role assignment with that
-  capability and host Organization Membership. Org-wide grants, network
-  affiliation, revoked role assignments, foreign Sites and registrar
-  impersonation cannot satisfy this read boundary. `/site-website`
-  displays ONLY the approved public-safe website projection in a sandboxed
-  iframe (no unpublished Site/Program notes, family data or live forms).
-  Site-publication and academic-marketing commands remain registrar-only.
-  This is **read-only preparation**, not partner editorial write access.
-  Existing installations need an authorized separate process to provision
-  this verified Site grant and RoleAssignment; none are auto-created.
-  Added unit/service tests and a pending route contract but no passing
-  execution evidence.
-- **Next small bite:** Design an auditable, restricted partner draft-copy
-  proposal and review boundary using canonical Site records; do **not**
-  let partner notes overwrite approved claims. Before institution-approved
-  academic publication, establish real provider/issuer authorization
-  independent from the host's current `programs.organizationId` ownership.
-- **Depends on:** Explicit host/institution contracts, PUB-13.
+**PUB-18 — Church-owned website content and risk-based publishing.** `Partial / source-committed, unverified`
+- **Governing principle:** **Centralize institutional accountability; decentralize
+  local operations and expression.** A church does **not** request CAN approval
+  for routine local, denominational or theological content changes.
+- **Ownership lanes:**
+  1. **Church-owned, self-published:** welcome, local mission, church history,
+     denomination/affiliation, statement of faith, prayer, worship, discipleship,
+     religious calendar, locally owned events and recruitment messaging. Local
+     publishers must have a verified scoped grant, appropriate content rights
+     and safety controls. Updates do not wait in a CAN editorial queue.
+  2. **CAN institutional, centrally sourced:** academic curriculum and official
+     Program status, academic provider, school of record, accreditation,
+     diploma/credit/transcripts, tuition/fees, enrollment availability,
+     regulatory and admissions policies. These are **not local website fields**;
+     derive them from CAN OS authoritative services and reviewed snapshots.
+  3. **Shared / regulated claims:** if free text asserts an institutional,
+     financial, accreditation or denomination-endorsement promise, **hold only
+     that submitted copy** for qualified review. Keep the last published
+     church copy live, not a broken or unpublished website.
+  4. **Unsafe or privacy-sensitive copy:** block rather than auto-publish.
+     Content/media child privacy, discrimination and misleading representation
+     require continuing policy and enforcement work. No reliance solely on AI.
+- **Source-committed bite on `FullFlow`:**
+  - Structured plain-text local fields: welcome, local community description,
+    denomination, statement of faith, spiritual formation. No images, rich
+    HTML, testimonials, student data or embedded third-party media in this bite.
+  - The existing `site_website_editor` has separate
+    `site.website.draft.read` and `site.website.local.publish` capabilities.
+    A verified exact-Site membership and explicit Site RoleAssignment carrying
+    the publish capability are required inside the write transaction; no
+    institutional registrar permission is granted.
+  - Migration `0040_site_local_content` adds append-only, per-Site revision
+    snapshots with `published` vs `review_required` status, attributable
+    author, revision number and optional restored-from revision. Mutations are
+    serialized by the existing Site publication row and reject stale expected
+    revisions. Rollbacks **append** another safe-screened revision.
+  - Structured-field and deterministic text screening publishes ordinary
+    church/denominational/theological copy immediately. Protected-claim wording
+    creates an auditable held revision and a canonical, scoped CAN `Action`
+    without changing the most recent `published` copy. Obvious unsafe
+    markup/sensitive terms are rejected. The screen is deliberately
+    conservative and **not a complete content moderation guarantee**.
+  - Partner workspace exposes self-publishing fields, editor status, history
+    and restore actions. Both private previews and the public Site catalog
+    render only the latest `published` church copy through the escaped,
+    shared HTML template, clearly labelled as local religious/community copy.
+    The CAN institutional Program/enrichment projections remain read-only.
+    Source-level unit cases cover ordinary faith/denomination copy,
+    protected claims, unsafe inputs and escaping.
+- **Important existing gate:** Site-level institutional publication and
+  currently default-off public host/DNS still govern whether an address can be
+  reached. Church copy requires **no routine CAN approval once the Site is
+  publicly live**, but saving content alone does not activate a public hostname
+  or override an intentional Site takedown.
+- **Unfinished acceptance / product:** Source changes and migration 0040 have
+  **not passed typecheck, disposable-Neon migrations, integration, child-safety,
+  accessibility or browser testing**. No live traffic enabled. Explicit grant
+  provisioning, qualified exception-review/approval commands, robust abuse
+  detection, takedown/rollback operations, media consent, local events,
+  campaign pages, social integrations and branded themes remain future bites.
+  Denominational network content/branding must remain **optional and explicitly
+  delegated**, never inferred from an affiliation. Formal CAN policies and
+  separate authorization are still required for provider/issuer claims.
+- **Depends on:** Host/institution separation, Site publishing, PUB-13 and
+  verified authorizations. No generic editorial approval queue for church copy.
 
 **PUB-19 — Publication lifecycle and change management.** `Partial`
 - **Implement:** Edit/resubmit/approve workflow for published Program
