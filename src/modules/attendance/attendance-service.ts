@@ -14,9 +14,12 @@ import {
   assertCapability,
   assertProgramScope,
   assertSiteScope,
+  AuthorizationError,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
+import type { AccessContext } from "@/domain/access-context";
 import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 import {
   emailNotificationRecipients,
@@ -545,7 +548,17 @@ export async function recordAttendanceRevision(
   /** Validated inside the same locked transaction as the canonical revision. */
   requireExpectedOnsiteDate?:string;
  }):Promise<string>{
- assertCapability(context,"attendance.write");
+ // Staff observers receive ONLY a scheduled site-day write path, scoped to
+ // their verified single-site membership even inside the shared data layer.
+ const onsite=isOnsiteAttendanceRole((context as AccessContext).role??"");
+ if(onsite){
+  assertOnsiteAttendanceScope(context as AccessContext,input.siteId);
+  if(!input.requireExpectedOnsiteDate ||
+     input.occurrenceKey!==input.requireExpectedOnsiteDate+":site-day")
+   throw new AuthorizationError("onsite staff may only record scheduled site-day attendance");
+ }else{
+  assertCapability(context,"attendance.write");
+ }
  assertProgramScope(context,input.programId);
  assertSiteScope(context,input.siteId);
  if(!context.actorPersonId)throw new Error("Attendance actor required");
