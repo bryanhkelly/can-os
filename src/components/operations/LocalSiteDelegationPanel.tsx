@@ -6,8 +6,6 @@ type Snapshot = Awaited<ReturnType<typeof getLocalSiteDelegations>>;
 const assignments = [
   { key: "site_director", title: "Local Site director",
     explanation: "A named Site leader responsible for reviewing onsite attendance snapshots—not custody release, regulatory clearance or academic credits." },
-  { key: "room_facilitator", title: "Local room facilitator",
-    explanation: "A named adult responsible for a supervised onsite assignment. Scheduled block duty still requires the separate verified staffing plan." },
 ] as const;
 
 export function LocalSiteDelegationPanel({ programId }: { programId: string }) {
@@ -63,9 +61,10 @@ export function LocalSiteDelegationPanel({ programId }: { programId: string }) {
   return <section aria-label="Local school responsibilities" className="mt-7 rounded-xl border bg-card p-5">
     <h2 className="font-serif text-2xl">Delegate local Site responsibilities</h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      The church retains local leadership. Named, verified Site staff receive
-      time-limited responsibilities for this Program only; appointment cannot
-      grant access to CAN academic records, official credits, counseling or other churches.
+      The church retains local leadership. Appoint its named Site director here.
+      Assign multiple classroom facilitators to their individual Sections below.
+      Neither appointment grants CAN academic records, credits, counseling,
+      or authority over other churches.
       An approved CAN onsite-supervision service agreement is required where applicable.
     </p>
     {error && <p role="alert" className="mt-3 rounded border p-3 text-sm">{error}</p>}
