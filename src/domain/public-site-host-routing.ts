@@ -31,18 +31,20 @@ export function classifyPublicSiteRequest(
     return { kind: "platform" };
   }
   const slug = slugFromPublicSiteHost(host);
-  if (!slug || !enabled || url.protocol !== "https:" || method !== "GET") {
+  if (!slug || !enabled || url.protocol !== "https:" || url.search || url.hash) {
     return { kind: "deny" };
   }
-  if (url.pathname === "/" && !url.search && !url.hash) {
+  // The ONLY tenant write is a restricted anonymous admissions-interest intake.
+  // All other POST, RPC, session, dashboard and asset paths are denied.
+  if (method === "POST" && url.pathname === "/inquiry")
     return { kind: "site", slug, rewrite: true };
-  }
-  // Netlify can re-run matching edge functions when a URL rewrite occurs.
-  // This path is not public functionality: it only returns escaped HTML after
-  // the server independently validates the Host and publication state.
-  if (url.pathname === "/published-site" && !url.search && !url.hash) {
+  if (method === "POST" && url.pathname === "/published-site/inquiry")
     return { kind: "site", slug, rewrite: false };
-  }
+  if (method === "GET" && url.pathname === "/")
+    return { kind: "site", slug, rewrite: true };
+  // Netlify may re-run edge middleware on the internal rewrite.
+  if (method === "GET" && url.pathname === "/published-site")
+    return { kind: "site", slug, rewrite: false };
   return { kind: "deny" };
 }
 
@@ -52,10 +54,13 @@ export function slugForPublicSiteOrigin(
   request: Request,
   enabled: boolean,
 ): string | null {
-  if (!enabled || request.method !== "GET") return null;
+  if (!enabled) return null;
   const url = new URL(request.url);
-  if (url.protocol !== "https:" || url.pathname !== "/published-site" ||
-      url.search || url.hash) return null;
+  const routeAllowed =
+    (request.method === "GET" && url.pathname === "/published-site") ||
+    (request.method === "POST" && url.pathname === "/published-site/inquiry");
+  if (!routeAllowed || url.protocol !== "https:" || url.search || url.hash)
+    return null;
   const hostHeader = request.headers.get("host");
   if (hostHeader && hostHeader.toLowerCase().replace(/\.$/, "") !== url.host.toLowerCase()) {
     return null;
