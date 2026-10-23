@@ -3,12 +3,15 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { accessibleClasses } from "./class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 
 async function assertTeacher() {
  const context = await getCommandContext(getRequest());
  if (context.role !== "teacher" || !context.actorPersonId) throw new AuthorizationError("teacher identity");
  assertCapability(context, "assignments:grade");
- if (!context.scope.siteIds?.length) throw new AuthorizationError("teacher site membership");
+ if (!context.scope.siteIds?.length && !context.scope.sectionIds?.length)
+  throw new AuthorizationError("named teaching assignment scope");
  return context;
 }
 
@@ -34,13 +37,11 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
  const [teacher] = await db.select({ firstName: s.people.legalFirstName })
   .from(s.people).where(eq(s.people.id, context.actorPersonId!)).limit(1);
 
- const assigned = await db.select({ sectionId: s.sections.id, title: s.sections.title })
-  .from(s.sectionTeachers)
-  .innerJoin(s.sections, and(
-   eq(s.sections.id, s.sectionTeachers.sectionId),
-   inArray(s.sections.siteId, context.scope.siteIds!),
-  ))
-  .where(eq(s.sectionTeachers.personId, context.actorPersonId!));
+ // Use exactly the teaching scope accepted by the actual classroom.
+ // Institution-owned CAN teachers need their delegated Section even when
+ // they do not possess a church Site or Program-wide grant.
+ const classDirectory=await accessibleClasses(context as Actor);
+ const assigned=classDirectory.map(row=>({sectionId:row.id,title:row.title}));
  const sectionIds = [...new Set(assigned.map(row => row.sectionId))];
  if (!sectionIds.length) {
   return { ...EMPTY_TODAY, connected: true, teacher: { firstName: teacher?.firstName ?? "" } };
