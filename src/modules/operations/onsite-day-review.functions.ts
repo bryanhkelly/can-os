@@ -87,6 +87,7 @@ export const getOnsiteDayReview = createServerFn({method:"GET"})
       date:data.date,canAttest:actor.role==="site_leader" && coversAllPrograms,
       coversAllPrograms,
       status:!review?"not_reviewed" as const:
+        coversAllPrograms && summary.readyForAttendanceReview &&
         review.metadata.fingerprint===fingerprint?"reviewed_snapshot" as const:
           "stale_after_changes" as const,
       reviewedAt:review?.createdAt.toISOString()??null,
