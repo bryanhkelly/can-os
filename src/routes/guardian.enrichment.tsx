@@ -164,6 +164,10 @@ function EnrichmentFamilyView({ data }: {
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{offer.siteName} · {offer.programName}</p>
           <h3 className="mt-1 text-xl font-semibold">{offer.name}</h3>
           <p className="mt-1 text-sm">{offer.seasonName} · {offer.startsOn} to {offer.endsOn}</p>
+          {offer.firstMeeting && offer.meetingTimezone && <p className="mt-1 text-sm text-muted-foreground">
+            First session: {new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",
+              timeZone:offer.meetingTimezone}).format(new Date(offer.firstMeeting))}
+          </p>}
           <div className="mt-3 flex flex-wrap gap-4 text-sm">
             <span>{usd(offer.feeAmountCents)}</span>
             <span>{offer.seatsRemaining === 0 ? "Waitlist available" :
