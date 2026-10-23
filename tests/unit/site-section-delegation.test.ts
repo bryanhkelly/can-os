@@ -23,6 +23,8 @@ describe("GF-B: Section-limited multiple local facilitators", () => {
       .toBe(`room_facilitator:${section}:${person}`);
     expect(sectionFacilitatorKey(section, other))
       .not.toBe(sectionFacilitatorKey(section, person));
+    expect(sectionFacilitatorKey(section.toUpperCase(), person.toUpperCase()))
+      .toBe(sectionFacilitatorKey(section, person));
     expect(sectionFacilitatorKey(other, person))
       .not.toBe(sectionFacilitatorKey(section, person));
     expect(() => sectionFacilitatorKey("spoof", person)).toThrow();
