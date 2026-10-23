@@ -740,6 +740,9 @@ integration("FullFlow: one school, same high-school program through curriculum a
         state.actor = guardianActor;
         await expect(goalReview.reviewStudentLearningGoal({data:approvedReview}))
           .rejects.toThrow("assigned teacher");
+        state.actor = studentActor;
+        await expect(goalReview.reviewStudentLearningGoal({data:approvedReview}))
+          .rejects.toThrow("assigned teacher");
         state.actor = {...teacherActor, actorPersonId:outsider.id};
         await expect(goalReview.getStudentGoalGradedEvidence({data:{
           goalActionId:sharedGoal.actionId,
@@ -754,6 +757,9 @@ integration("FullFlow: one school, same high-school program through curriculum a
         });
         expect(await goalReview.reviewStudentLearningGoal({data:approvedReview}))
           .toEqual({goalActionId:sharedGoal.actionId,outcome:"met",duplicate:true});
+        await expect(goalReview.reviewStudentLearningGoal({data:{
+          ...approvedReview,outcome:"needs_more_practice",
+        }})).rejects.toThrow("same graded work already reviewed");
         const [completedGoal] = await tx.select().from(s.actions)
           .where(eq(s.actions.id,sharedGoal.actionId));
         expect(completedGoal.status).toBe("resolved");
