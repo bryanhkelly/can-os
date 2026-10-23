@@ -109,7 +109,6 @@ export const getTeacherSubmissionAttachment=createServerFn({method:"POST"})
 export const getGradebookSections = createServerFn({ method: "GET" }).handler(async () => {
  const context = await teacherActor();
  if (!process.env.DATABASE_URL) return { connected: false, sections: [] as { id: string; code: string; title: string }[] };
- const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
  // An institution's teacher appears only for the Sections authorized in
  // their live class directory. Never project the church's whole Site.
  const sections=(await accessibleClasses(context as Actor))
@@ -121,7 +120,7 @@ export const getGradebookSections = createServerFn({ method: "GET" }).handler(as
 export const getGradebook = createServerFn({ method: "GET" })
  .validator((value: unknown) => z.object({ sectionId: z.string().min(1) }).parse(value))
  .handler(async ({ data }) => {
-  const context = await teacherActor(data.sectionId);
+  await teacherActor(data.sectionId);
   if (!process.env.DATABASE_URL) return { connected: false as const, section: null, students: [], assessments: [], cells: [], curriculumLessons: [] as Array<{id:string;title:string}> };
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const [section] = await db.select({ id:s.sections.id,code:s.sections.code,
