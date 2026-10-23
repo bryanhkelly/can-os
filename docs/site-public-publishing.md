@@ -381,3 +381,55 @@ and no production data or `main` branch was modified.
 existing CAN OS Action/communication ownership: assigned follow-up owner,
 due-date and contact outcome, without granting partner staff unrestricted
 admissions powers or auto-sending family messages.
+
+
+## PUB-18: Autonomous church-owned content (migration 0040 pending verification)
+
+A church partner now has two separately grantable `site_website_editor`
+capabilities, `site.website.draft.read` and
+`site.website.local.publish`. Both require an active Site-specific verified
+identity and the matching same-person, same-Site RoleAssignment. This is
+**not** general registrar or academic publishing authority.
+
+For this narrow bite, Site-level church fields are structured plain text:
+welcome message, local community description, denomination, statement of
+faith and spiritual formation. Denominational beliefs, church traditions,
+worship and theology are self-publishable; they do not require routine CAN
+approval. No blanket copy review is implemented. HTML/media, children’s
+photographs, testimonials and outbound social integrations remain out of
+scope until their own safeguards exist.
+
+`site_local_content_versions` is an append-only ledger in migration
+`0040_site_local_content`. An authorized church editor writes a new
+revision in one transaction with the existing Site publication row locked,
+a verified author, audit and domain-event record. The latest revision
+with `status='published'` is rendered by the same escaped public site HTML
+renderer used for private previews. Rollback appends a new version after
+the **current** deterministic screen and preserves previous versions.
+
+The deterministic screen blocks obvious malicious markup and sensitive
+student-information text. It holds certain academic/accreditation, fee,
+admissions, credit/issuer and unverified endorsement promises as
+`review_required` and creates a scoped canonical Action. **A held
+submission does not supersede the last published church revision.** The
+review-action creation is implemented; authorization and a distinct
+institutional accept/reject workflow for those exception cases are still
+required before held content can ever be released. This initial
+deterministic screen is not comprehensive harmful-content moderation.
+
+CAN-owned curriculum, school-of-record, admissions eligibility, tuition,
+official operating status and accreditation facts remain in authoritative
+CAN Program and publication projections. Denominational content never
+changes CAN school policy or implies CAN theological endorsement.
+Denominational network templating/delegation remains optional and future
+work; mere affiliation does not create a publishing grant.
+
+**Important boundary:** Locally published text can update without CAN
+editorial review once a Site is live, but it does **not** override the
+existing Site-level institutional publication/takedown gate or activate
+the currently disabled tenant hosting/DNS. Migration `0040` is source
+only and must be verified/applied on a disposable dedicated Neon branch
+before enabling these new reads/writes. No production migrations or
+public-host activation are authorized by this document. Typecheck,
+cross-site mutation integration, anti-abuse and browser acceptance are
+still unverified.
