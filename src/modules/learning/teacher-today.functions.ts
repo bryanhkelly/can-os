@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { accessibleClasses } from "./class-access.server";
@@ -47,15 +48,27 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   return { ...EMPTY_TODAY, connected: true, teacher: { firstName: teacher?.firstName ?? "" } };
  }
 
+ const activeProgram=alias(s.enrollments,"teacher_today_active_program");
+ const liveSectionMembership=and(
+   eq(s.enrollments.kind,"section"),
+   eq(s.enrollments.status,"active"),
+   eq(s.enrollments.programId,s.sections.programId),
+   eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+   inArray(s.enrollments.sectionId,sectionIds),
+ );
  const counts = await db.select({
   sectionId: s.enrollments.sectionId,
-  studentCount: sql<number>`count(*)::int`,
+  studentCount: sql<number>`count(distinct ${s.enrollments.studentProfileId})::int`,
  }).from(s.enrollments)
-  .where(and(
-   eq(s.enrollments.kind, "section"),
-   eq(s.enrollments.status, "active"),
-   inArray(s.enrollments.sectionId, sectionIds),
+  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(activeProgram,and(
+    eq(activeProgram.studentProfileId,s.enrollments.studentProfileId),
+    eq(activeProgram.programId,s.sections.programId),
+    eq(activeProgram.schoolYearId,s.terms.schoolYearId),
+    eq(activeProgram.kind,"program"),eq(activeProgram.status,"active"),
   ))
+  .where(liveSectionMembership)
   .groupBy(s.enrollments.sectionId);
  const countBySection = new Map(counts.map(row => [row.sectionId, Number(row.studentCount)]));
  const sections = assigned.map(row => ({
@@ -121,13 +134,17 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   firstName: s.people.legalFirstName,
   lastName: s.people.legalLastName,
  }).from(s.enrollments)
+  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(activeProgram,and(
+    eq(activeProgram.studentProfileId,s.enrollments.studentProfileId),
+    eq(activeProgram.programId,s.sections.programId),
+    eq(activeProgram.schoolYearId,s.terms.schoolYearId),
+    eq(activeProgram.kind,"program"),eq(activeProgram.status,"active"),
+  ))
   .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
   .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
-  .where(and(
-   eq(s.enrollments.kind, "section"),
-   eq(s.enrollments.status, "active"),
-   inArray(s.enrollments.sectionId, sectionIds),
-  )) : [];
+  .where(liveSectionMembership) : [];
 
  const attempts = due.length ? await db.select({
   assessmentId: s.submissions.assessmentId,
