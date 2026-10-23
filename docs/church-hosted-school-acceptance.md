@@ -41,6 +41,34 @@ employee directory or private records merely because a Program names the other a
 This increment is **selection and intent validation only**. It is not service entitlement,
 actual authorization to operate, or automatic accreditation.
 
+## FullFlow GF3 integration correction — launch intent versus opening authority (2026-10-23)
+
+The existing GF3 fixture previously expected a church-owned Program with CAN as
+a separate academic provider to activate merely after completing local readiness.
+That contradicts the approved service contract. The canonical activation service
+now verifies actor Program, Organization and Site scope **before** returning a
+church-specific authorization decision, and refuses an unverified independent
+CAN–church activation before locking attendance or writing opening handoffs.
+Changing the same church/CAN service arrangement's Program type to
+`high_school_extension` also does not bypass the authorization gate: host
+Organization type is resolved from persisted database identity.
+
+The updated GF3 integration assertions require:
+
+- church/CAN campus can be **created, planned and staffed**;
+- an unrelated Organization is denied before agreement status can be exposed;
+- two attempts to open the church-hosted Program—before and after completed
+  local readiness—are denied while verified Program-Site authority is absent;
+- denied opening leaves the Program in `launching`, with **no**
+  `ProgramActivated` event and no receiving-operator handoff;
+- an independently owned K–8 high-school extension still reaches `active`
+  with its normal Journey, staffing and receiving-operator handoff.
+
+**Status:** Code and assertions committed on `FullFlow`, but the DB-backed
+GF3 fixture has **not been executed** by an authenticated Node test runner.
+A real agreement-approval/expiry/revocation service is still required before
+a separate church/CAN institution can lawfully activate.
+
 ## Required connected acceptance (each stage preserves IDs and audit history)
 
 1. **Church requests local CAN site authorization.** Verified church registrar initiates
