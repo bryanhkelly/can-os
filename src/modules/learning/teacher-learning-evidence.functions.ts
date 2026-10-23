@@ -3,6 +3,8 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { accessibleClasses } from "./class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 
 /**
  * Staff-facing evidence slice: only active students in sections currently
@@ -15,18 +17,15 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
   if (actor.role !== "teacher" || !actor.actorPersonId)
     throw new AuthorizationError("verified assigned teacher");
   assertCapability(actor, "teacher:read");
-  if (!actor.scope.siteIds?.length || !actor.scope.programIds?.length)
-    throw new AuthorizationError("section grant scope");
+  if (!(actor.scope.siteIds?.length && actor.scope.programIds?.length) &&
+      !actor.scope.sectionIds?.length)
+    throw new AuthorizationError("named class teaching scope");
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-  const assigned = await db.select({ sectionId: s.sections.id, sectionTitle: s.sections.title })
-    .from(s.sections)
-    .innerJoin(s.sectionTeachers, and(
-      eq(s.sectionTeachers.sectionId, s.sections.id),
-      eq(s.sectionTeachers.personId, actor.actorPersonId),
-    ))
-    .where(and(inArray(s.sections.siteId, actor.scope.siteIds),
-      inArray(s.sections.programId, actor.scope.programIds), eq(s.sections.active, true)))
-    .limit(100);
+  // The same named Section authorization drives Teacher Today, class
+  // workspaces and learning evidence; CAN institutional teachers never
+  // receive the church's unrelated programs or student rosters.
+  const assigned=(await accessibleClasses(actor as Actor)).slice(0,100)
+    .map(row=>({sectionId:row.id,sectionTitle:row.title}));
   const sectionIds = assigned.map(row => row.sectionId);
   if (!sectionIds.length) return { students: [], truncated: false, note: "No currently assigned sections." };
   const roster = await db.select({
