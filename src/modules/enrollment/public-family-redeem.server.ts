@@ -77,12 +77,19 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
   // The account row is now serialized against concurrent family links.
   const grants=await tx.select({
     id:accountPersonGrants.id,personId:accountPersonGrants.personId,
-    role:accountPersonGrants.role,
+    role:accountPersonGrants.role,active:accountPersonGrants.active,
+    personActive:people.active,
     organizationId:accountPersonGrants.organizationId,siteId:accountPersonGrants.siteId,
   }).from(accountPersonGrants)
     .innerJoin(people,eq(people.id,accountPersonGrants.personId))
-    .where(and(eq(accountPersonGrants.accountId,account.id),
-      eq(accountPersonGrants.active,true),eq(people.active,true)));
+    .where(eq(accountPersonGrants.accountId,account.id));
+  // Do not let a fresh email verification silently resurrect a revoked
+  // guardian membership or replace a disabled person's identity. Staff must
+  // independently resolve such account/identity restrictions.
+  if(grants.some(grant=>!grant.personActive ||
+    (grant.role==="guardian" && grant.organizationId===school.organizationId &&
+      (grant.siteId===null||grant.siteId===school.siteId) && !grant.active)))
+    throw new AuthorizationError("school family membership requires manual identity review");
   // A staff/teacher account with the same verified email can also be a
   // parent. Reuse the SAME known Person, but never infer one if this account
   // has grants for more than one existing Person.
@@ -95,7 +102,7 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
     if(!person)throw new Error("Unable to create prospective family identity");
     personId=person.id;
   }
-  const matchingGrant=grants.find(g=>g.role==="guardian" && g.personId===personId &&
+  const matchingGrant=grants.find(g=>g.active && g.role==="guardian" && g.personId===personId &&
     g.organizationId===school.organizationId &&
     (g.siteId===null||g.siteId===school.siteId));
   const [createdGrant]=matchingGrant?[matchingGrant]:await tx.insert(accountPersonGrants).values({
