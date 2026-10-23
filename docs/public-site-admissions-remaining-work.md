@@ -84,8 +84,8 @@ tests or release gates have passed.
   notifications, and resolve with an auditable note. The intake screen shows
   owner, due date and overdue state. Interest closure and reviewed GF22
   conversion resolve the same Action; generic Operations mutations redirect
-  this domain-owned type to Admissions. For preexisting interests, the first
-  authorized mutation creates the Action under a row lock.
+  this domain-owned type to Admissions. For preexisting interests, an authorized follow-up assignment or
+  resolution creates the Action under an interest-row lock.
 - **Open acceptance:** Tests/typecheck, application database migrations,
   cross-site and disabled/revoked-grant denial, concurrent retry/legacy-row
   behavior, audit/outbox rollback, notification visibility and browser
