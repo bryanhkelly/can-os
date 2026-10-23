@@ -84,7 +84,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
         host.scope.programIds=[launch.programId];
         const services=[
           "academic_instruction","academic_records","onsite_supervision",
-          "school_of_record","credit_issuance",
+          "school_of_record","credit_issuance","admissions",
         ];
         await expect(requestProgramSiteAuthorization(unrelated,{
           programId:launch.programId,services,
@@ -157,6 +157,8 @@ integration("Church-owned Site with independently authorized CAN academic servic
         ])).toBe(authorizationId);
         expect(await requireChurchHostedOperatingServices(tx,launch.programId,
           ["onsite_supervision"])).toBe(authorizationId);
+        expect(await requireChurchHostedOperatingServices(tx,launch.programId,
+          ["admissions","school_of_record"])).toBe(authorizationId);
         // Contracting authority is not a host registrar's CAN membership.
         await expect(requireInstitutionalAcademicProgramAuthority(tx,host,
           launch.programId,["academic_instruction","academic_records"]))
@@ -167,8 +169,10 @@ integration("Church-owned Site with independently authorized CAN academic servic
           launch.programId,["academic_instruction","academic_records"]))
           .toBe(authorizationId);
         await expect(requireCurrentProgramSiteAuthorization(tx,launch.programId,[
-          "admissions",
+          "curriculum",
         ])).rejects.toThrow();
+        await expect(requireChurchHostedOperatingServices(tx,launch.programId,
+          ["curriculum"])).rejects.toThrow();
         const [original] = await tx.select({
           organizationId:s.programs.organizationId,
           status:s.programs.status,
