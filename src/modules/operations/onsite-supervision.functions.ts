@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { createHash } from "node:crypto";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, gte, inArray, lte, or, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -146,6 +147,13 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     // Person IDs are needed for overlap detection, not for the client.
     const blocks=projection.blocks.map(({facilitatorPersonId:assignedPersonId,...block})=>({
       ...block,
+      // An acknowledgment is valid only for this exact assignment/time
+      // fingerprint. Changes to the scheduled duty invalidate older records.
+      planToken:createHash("sha256").update(JSON.stringify([
+        site.id,data.date,block.sectionId,block.periodId,block.startsAtLocal,
+        block.endsAtLocal,assignedPersonId,block.verifiedSiteStaffGrant,
+        block.assignedPlan,
+      ])).digest("hex"),
       // Derived ONLY from the verified, original site grant and current active
       // instruction plan. Never accept a browser-supplied facilitator ID.
       canRespond:!projectionTruncated && data.date===today &&
