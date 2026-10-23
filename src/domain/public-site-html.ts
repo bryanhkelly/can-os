@@ -44,7 +44,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ${localItems.map(([label, value]) => `<div class="local-field">
       <h3>${escapePublicHtml(label)}</h3>
       <p>${escapePublicHtml(value)}</p>
-    </div>`).join("\\n")}
+    </div>`).join("\n")}
     <p class="availability">Local religious and community information reflects the church partner.
     Academic, enrollment and institutional statements are managed separately by CAN.</p>
   </section>` : "";
