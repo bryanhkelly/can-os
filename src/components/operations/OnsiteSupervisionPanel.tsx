@@ -20,6 +20,7 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
   useEffect(()=>{
     if (!date) return;
     let active=true;
+    setLoading(true);setPlan(null);setError("");
     void getOnsiteSupervisionPlan({data:{date}}).then(result=>{
       if (!active) return;
       setPlan(result);setError("");setLoading(false);
