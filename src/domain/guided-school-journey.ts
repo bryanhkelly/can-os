@@ -61,7 +61,7 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
       evidence:`${c.applications} applications · ${c.activeProgramStudents} active program students · ${c.placedStudents} students placed`,
       nextAction:enrolled?"Review admitted families and placements":
         hasApplicants?"Process applications, offers and class placement":
-        "Start your first family application",
+        "Start your first family intake",
       href:enrollmentAction,suggestedRole:"Registrar / guardian"},
     {key:"learning",title:"Deliver instruction and receive student work",
       state:hasWork?"recorded":"needs_attention",
