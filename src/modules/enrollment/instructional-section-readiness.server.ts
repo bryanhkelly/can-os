@@ -1,9 +1,7 @@
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import {
-  accountPersonGrants, courseTemplateVersions, people, programs,
-  sections, sectionTeachers,
-} from "@/db/schema";
+import { courseTemplateVersions, programs, sections } from "@/db/schema";
+import { verifiedTeacherSectionIds } from "./verified-section-teachers.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { hasAccessibleFirstLesson } from "@/domain/first-class-lesson";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
@@ -19,25 +17,16 @@ export async function staffedPublishedSectionIds(
   executor:Pick<typeof db,"select">=db,
 ):Promise<Set<string>> {
   if(!ids.length)return new Set();
+  const teacherSections=await verifiedTeacherSectionIds(ids,executor);
+  if(!teacherSections.size)return new Set();
   const rows=await executor.select({id:sections.id,programId:sections.programId,
     curriculum:courseTemplateVersions.curriculum}).from(sections)
     .innerJoin(programs,eq(programs.id,sections.programId))
     .innerJoin(courseTemplateVersions,eq(courseTemplateVersions.id,sections.courseTemplateVersionId))
-    .innerJoin(sectionTeachers,eq(sectionTeachers.sectionId,sections.id))
-    .innerJoin(people,eq(people.id,sectionTeachers.personId))
-    .innerJoin(accountPersonGrants,and(
-      eq(accountPersonGrants.personId,sectionTeachers.personId),
-      eq(accountPersonGrants.active,true),
-      eq(accountPersonGrants.role,"teacher"),
-      or(eq(accountPersonGrants.organizationId,programs.organizationId),
-        eq(accountPersonGrants.organizationId,programs.academicProviderOrganizationId)),
-      or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,sections.siteId)),
-    ))
     .where(and(
-      inArray(sections.id,[...new Set(ids)]),
+      inArray(sections.id,[...teacherSections]),
       eq(sections.active,true),
       eq(courseTemplateVersions.status,"published"),
-      eq(people.active,true),
     ));
   const permitted=new Set<string>();
   for(const programId of new Set(rows.map(row=>row.programId))){
