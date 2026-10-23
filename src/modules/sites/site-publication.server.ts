@@ -1,11 +1,13 @@
 import { db } from "@/db/client";
-import { memberships, organizations, people, programs, roleAssignments, sitePublications, sites } from "@/db/schema";
+import { memberships, organizations, people, programs, programPublications, roleAssignments, sitePublications, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { publicSiteHost, requirePublicSiteSlug } from "@/domain/public-site-address";
 import { assertSitePublicationScope, sitePublicationManageCapability } from "@/domain/site-publication-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
+import { isAcademicMarketingType } from "@/domain/academic-program-publication";
+import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
@@ -17,7 +19,7 @@ type Reader = Pick<typeof db, "select">;
  * publication capability are required. A network affiliation cannot confer
  * ownership or publication rights. Site-level grants never cover siblings.
  */
-async function requireSitePublisher(actor: AccessContext, siteId: string, executor: Reader = db) {
+export async function requireSitePublisher(actor: AccessContext, siteId: string, executor: Reader = db) {
   const [site] = await executor.select({
     id: sites.id, name: sites.name, slug: sites.slug,
     organizationId: sites.organizationId, organizationName: organizations.name,
@@ -57,7 +59,16 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     db.select({
       id: programs.id, name: programs.name, type: programs.type,
       status: programs.status, gradeRange: programs.gradeRange,
-    }).from(programs).where(and(
+      deliveryModel: programs.deliveryModel,
+      marketingStatus: programPublications.status,
+      marketingTitle: programPublications.title,
+      marketingSummary: programPublications.summary,
+      marketingUpdatedAt: programPublications.updatedAt,
+    }).from(programs)
+      .leftJoin(programPublications, and(
+        eq(programPublications.programId, programs.id),
+        eq(programPublications.siteId, site.id),
+      )).where(and(
       eq(programs.siteId, site.id),
       eq(programs.organizationId, site.organizationId),
       inArray(programs.id, actor.scope.programIds ?? []),
@@ -76,6 +87,16 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       publishedAt: address[0].publishedAt?.toISOString() ?? null,
     } : null,
     programs: sitePrograms,
+    academicPrograms: sitePrograms.filter(program => isAcademicMarketingType(program.type)).map(program => ({
+      id: program.id, name: program.name, type: program.type,
+      status: program.status, gradeRange: program.gradeRange,
+      deliveryModel: program.deliveryModel,
+      marketing: program.marketingStatus ? {
+        status: program.marketingStatus, title: program.marketingTitle,
+        summary: program.marketingSummary,
+        updatedAt: program.marketingUpdatedAt?.toISOString() ?? null,
+      } : null,
+    })),
     catalogPreview: publishedOfferings.map(toPublicSiteEnrichment),
   };
 }
@@ -151,12 +172,17 @@ export async function changeSitePublication(
     // Only a changed-to-published state requires content readiness.
     // This queries the canonical published Seasons inside the same transaction.
     // Unpublishing is never prevented by empty or expired offerings.
-    const eligible = input.action === "publish" && current.status === "draft"
-      ? await readEnrichmentCatalog(site.id, tx) : [];
+    const [enrichmentListings, academicListings] =
+      input.action === "publish" && current.status === "draft"
+        ? await Promise.all([
+          readEnrichmentCatalog(site.id, tx),
+          readAcademicProgramCatalog(site.id, tx),
+        ]) : [[], []];
+    const eligibleCount = enrichmentListings.length + academicListings.length;
     const decision = planSitePublicationTransition({
       current, action: input.action, expectedRevision: input.expectedRevision,
       reason: input.reason, contentReviewed: input.contentReviewed,
-      eligibleOfferingCount: eligible.length, now: new Date(),
+      eligibleOfferingCount: eligibleCount, now: new Date(),
     });
     if (!decision.changed) {
       return { siteId: site.id, status: decision.status,
@@ -180,7 +206,7 @@ export async function changeSitePublication(
       after: { status: decision.status, publishedAt: decision.publishedAt?.toISOString() ?? null,
         updatedAt: decision.updatedAt.toISOString(), reason: input.reason.trim(),
         contentReviewed: input.action === "publish" && input.contentReviewed,
-        eligibleOfferingCount: input.action === "publish" ? eligible.length : null },
+        eligibleOfferingCount: input.action === "publish" ? eligibleCount : null },
     });
     await emitEvent(tx, {
       eventType: input.action === "publish" ? "SitePublished" : "SiteUnpublished",
