@@ -13,6 +13,7 @@ import { and,eq,inArray } from "drizzle-orm";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { isVerifiedEnrollmentGuardian } from "@/domain/guardian-offer-visibility";
 
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
 const guarded=(context:AccessContext,role:"registrar"|"guardian")=>{
@@ -45,8 +46,8 @@ async function assertGuardian(tx:Transaction,actorId:string|null,studentProfileI
  if(!actorId)throw new Error("Guardian identity required");
  const [profile]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,studentProfileId)).limit(1);
  if(!profile)throw new Error("Student not found");
- const [relationship]=await tx.select({id:guardianRelationships.id}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.guardianPersonId,actorId),eq(guardianRelationships.canManageEnrollment,true))).for("share").limit(1);
- if(!relationship)throw new Error("Guardian is not authorized for enrollment");
+ const [relationship]=await tx.select({id:guardianRelationships.id,canManageEnrollment:guardianRelationships.canManageEnrollment,metadata:guardianRelationships.metadata}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.guardianPersonId,actorId),eq(guardianRelationships.canManageEnrollment,true))).for("share").limit(1);
+ if(!isVerifiedEnrollmentGuardian(relationship))throw new AuthorizationError("Independently verified guardian authority is required for enrollment offers");
 }
 async function ready(tx:Transaction,applicationId:string){
  const [journey]=await tx.select({id:journeys.id,status:journeys.status}).from(journeys).where(and(eq(journeys.participantType,"application"),eq(journeys.participantId,applicationId))).for("update").limit(1);
