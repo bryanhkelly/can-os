@@ -690,7 +690,7 @@
     {
       "file": "src/routes/sites.$siteId.publish.tsx",
       "route": "/sites/$siteId/publish",
-      "owner": "sites",
+      "owner": "operations",
       "verification": "pending",
       "roleJourney": "pending",
       "readBoundary": "pending",
