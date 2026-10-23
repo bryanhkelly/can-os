@@ -77,6 +77,16 @@ function GuardianApplyWorkspace({data}:{
               : "Independent guardian verification pending. Admissions must verify your relationship before forms or offers are available."}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Last updated {new Date(app.updatedAt).toLocaleDateString()}</p>
+          {app.guardianVerified&&<Link to="/guardian/admission-offers"
+            search={{application:app.applicationId}}
+            className="mt-3 inline-block rounded border px-3 py-2 text-sm font-semibold">
+            Resume this student's enrollment checklist →
+          </Link>}
+          {!app.guardianVerified&&<p className="mt-2 text-xs text-muted-foreground">
+            Your application is saved. The school must independently verify
+            your guardian relationship before enrollment forms and child
+            academic records become available.
+          </p>}
         </article>)}
       </div>:<p className="mt-3 text-sm">No applications submitted from this family account yet.</p>}
       <Link to="/guardian/admission-offers" className="mt-4 inline-block text-sm underline">
