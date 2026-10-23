@@ -6,6 +6,8 @@ import {
   sectionTeachers, sites, terms,
 } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
+import type { AccessContext } from "@/domain/access-context";
 import { siteDate, summarizeExpectedOnsiteAttendance } from "@/domain/expected-attendance";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 
@@ -37,9 +39,11 @@ export async function assertExpectedOnsiteMarkInTransaction(
   // CommandContext is the shared capability interface; the verified session
   // carries the active persona as an additional field.
   const role = (context as CommandContext & { role?: string }).role;
+  const onsite = isOnsiteAttendanceRole(role ?? "");
+  if (onsite) assertOnsiteAttendanceScope(context as AccessContext, input.siteId);
   if (input.occurrenceKey !== input.date + ":site-day" ||
       !input.siteId || !context.actorPersonId ||
-      !["registrar", "teacher"].includes(role ?? "") ||
+      !(onsite || ["registrar", "teacher"].includes(role ?? "")) ||
       !context.scope.programIds?.includes(input.programId) ||
       !context.scope.siteIds?.includes(input.siteId))
     throw new AuthorizationError("attendance occurrence, staff and site scope");
