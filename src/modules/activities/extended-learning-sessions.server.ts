@@ -133,8 +133,15 @@ export async function scheduleExtendedSessions(
         const [existing] = await tx.select({
           type: calendarEvents.type, metadata: calendarEvents.metadata,
         }).from(calendarEvents).where(eq(calendarEvents.id, projection.id)).limit(1);
+        const recorded = existing?.metadata.extendedLearningSession;
+        const fields = typeof recorded === "object" && recorded !== null
+          ? recorded as Record<string, unknown> : {};
         if (existing?.type !== "extended_learning_session" ||
-            JSON.stringify(existing.metadata.extendedLearningSession) !== JSON.stringify(specification))
+            fields.date !== specification.date ||
+            fields.startsAt !== specification.startsAt ||
+            fields.endsAt !== specification.endsAt ||
+            fields.location !== specification.location ||
+            fields.facilitatorPersonId !== specification.facilitatorPersonId)
           throw new Error(`Session already exists with different details on ${occurrence.date}. Edit or cancel it before rescheduling.`);
         continue;
       }
