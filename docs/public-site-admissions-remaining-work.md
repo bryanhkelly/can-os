@@ -126,10 +126,22 @@ tests or release gates have passed.
   newly reserved address and links to the existing separately authorized
   private publishing workspace. No Program, institution, application,
   DNS or public approval is fabricated. Source tests cover slug choices.
+- **Second source-committed bite on `FullFlow`:** The existing
+  registrar + explicitly authorized Site-publisher read now generates
+  `previewHtml` from `renderPublicSiteHtml`, the **exact same** escaped
+  standalone template as the public host. The content projection only
+  includes reviewed, published Program marketing snapshots and authorized
+  enrichment catalog items; raw internal Programs remain separately listed
+  for editor review. The Site publishing workspace shows the HTML in a
+  sandboxed, origin-isolated iframe with scripts, forms and navigation
+  blocked. The preview intentionally omits working inquiry request IDs,
+  cannot open admissions and does not enable public hostname routing.
+  An empty provisioned Site still shows the branded site shell.
+  Unit coverage for template parity without active forms is source-committed.
 - **Still outstanding:** Additional real partner/network onboarding entry
-  points, full professional website template and reviewed profile fields,
-  access for independent church partner editors, multi-organization
-  institution/host approval boundaries, a matching public HTML preview,
+  points, editable and reviewed Site profile fields, independent church
+  partner editor permissions, host/institution role-separated approval
+  boundaries, true editorial draft versus approved snapshot management,
   and verified disposable-Neon/route/browser acceptance. The new Site
   command requires migration `0035` to exist on its isolated target DB;
   do not deploy it to an unmigrated environment. Site creation is a
