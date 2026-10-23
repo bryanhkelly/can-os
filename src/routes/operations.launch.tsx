@@ -74,6 +74,7 @@ function LaunchWizardPage() {
   const [creditIssuingOrganizationId, setCreditIssuingOrganizationId] = useState("");
   const [siteId, setSiteId] = useState(selection.siteId??"");
   const [newSiteName,setNewSiteName]=useState("");
+  const [createdSiteDraft,setCreatedSiteDraft]=useState<{siteId:string;host:string}|null>(null);
   const [newSiteSlug,setNewSiteSlug]=useState("");
   const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
   const [orientationFor,setOrientationFor]=useState("");
@@ -95,8 +96,10 @@ function LaunchWizardPage() {
     if(!hostOrganizationId)return;
     setBusy(true);setError("");
     try{
-      await createLaunchSite({data:{organizationId:hostOrganizationId,name:newSiteName,
+      const result=await createLaunchSite({data:{organizationId:hostOrganizationId,name:newSiteName,
         slug:newSiteSlug,timezone:newSiteTimezone}});
+      setCreatedSiteDraft({siteId:result.siteId,host:result.publicSiteDraft.host});
+      setSiteId(result.siteId);
       await router.invalidate();setNewSiteName("");setNewSiteSlug("");
     }catch(e){setError(e instanceof Error?e.message:"Unable to create site");}
     finally{setBusy(false);}
@@ -331,6 +334,7 @@ function LaunchWizardPage() {
                       onChange={(e) => {
                         setHostOrganizationId(e.target.value);
                         setSiteId("");
+                        setCreatedSiteDraft(null);
                       }}
                       required
                     >
@@ -357,6 +361,17 @@ function LaunchWizardPage() {
                       <input aria-label="New site timezone" placeholder="Timezone" className={inputClass} value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}/>
                     </div>
                     <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Create site</button>
+                    {createdSiteDraft && <div role="status" className="mt-3 rounded-lg border p-3 text-sm">
+                      <p className="font-semibold">Your website draft is prepared</p>
+                      <p className="mt-1 font-mono">{createdSiteDraft.host}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Private draft only. The address is reserved, but no public site, admissions,
+                        or registration is open. An explicitly authorized Site publisher must
+                        review and approve marketing before publication.
+                      </p>
+                      <Link to="/sites/$siteId/publish" params={{siteId:createdSiteDraft.siteId}}
+                        className="mt-2 inline-block underline">Open private website setup (publisher access required) →</Link>
+                    </div>}
                   </div>
                   <label className="block text-xs">
                     Jurisdiction
