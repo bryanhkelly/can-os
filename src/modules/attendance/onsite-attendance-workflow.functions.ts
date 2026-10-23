@@ -9,7 +9,8 @@ import {
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
-import { requireCurrentSiteLocalDelegate } from "@/modules/operations/site-local-delegation.server";
+import { requireCurrentSiteLocalDelegate, requiresIndependentChurchLocalDelegation } from "@/modules/operations/site-local-delegation.server";
+import { activeFacilitatorSectionIds, requireCurrentSectionFacilitator } from "@/modules/operations/site-section-facilitators.server";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -93,8 +94,12 @@ async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, se
   const delegated = [];
   for (const program of onsite) {
     try {
-      await requireCurrentSiteLocalDelegate(db, actor, program.id,
-        actor.role === "site_leader" ? "site_director" : "room_facilitator");
+      if (actor.role === "site_leader") {
+        await requireCurrentSiteLocalDelegate(db, actor, program.id, "site_director");
+      } else if (await requiresIndependentChurchLocalDelegation(db, program.id)) {
+        const sections = await activeFacilitatorSectionIds(db, actor, program.id);
+        if (!sections.length) continue;
+      }
       delegated.push(program);
     } catch (error) {
       if (!(error instanceof AuthorizationError)) throw error;
@@ -117,7 +122,25 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
   const permittedIds = activePrograms.map(p => p.id);
   if (!permittedIds.length) return { roster: [], coverage, programsAtSite };
 
-  const programRoster = (actor.role === "registrar" || isOnsiteAttendanceRole(actor.role)) ? await db.select({
+  // A facilitator may read ONLY children currently assigned to a Section
+  // with an effective named appointment—not the entire Program roster.
+  const sectionFilter = new Set<string>();
+  if (actor.role === "room_facilitator") {
+    for (const program of activePrograms) {
+      if (await requiresIndependentChurchLocalDelegation(db, program.id)) {
+        for (const id of await activeFacilitatorSectionIds(db, actor, program.id))
+          sectionFilter.add(id);
+      } else {
+        // Existing non-independent sites continue using established staff grants.
+        const rows = await db.select({ id: sections.id }).from(sections)
+          .where(and(eq(sections.programId, program.id),
+            eq(sections.siteId, program.siteId), eq(sections.active, true)));
+        for (const row of rows) sectionFilter.add(row.id);
+      }
+    }
+  }
+  const programRoster = (actor.role === "registrar" ||
+    actor.role === "site_leader" || actor.role === "site_staff") ? await db.select({
     studentProfileId: enrollments.studentProfileId, programId: enrollments.programId,
     preferredName: people.preferredName, firstName: people.legalFirstName,
     lastName: people.legalLastName,
@@ -145,6 +168,7 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
       lte(schoolYears.startsOn, date), gte(schoolYears.endsOn, date),
       inArray(sections.programId, permittedIds),
       inArray(sections.siteId, actor.scope.siteIds!),
+      ...(actor.role === "room_facilitator" ? [inArray(sections.id, [...sectionFilter])] : []),
       ...(actor.role === "teacher" ? [eq(sectionTeachers.personId, actor.actorPersonId!)] :
         []),
       ...(studentId ? [eq(enrollments.studentProfileId, studentId)] : [])));
@@ -264,8 +288,14 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
         replay.programId !== data.programId || replay.occurrenceKey !== occurrence(data.date) ||
         replay.status !== data.status)
         throw new Error("Attendance mutation ID was already used for different input");
-      if (isOnsiteAttendanceRole(actor.role))
+      if (isOnsiteAttendanceRole(actor.role)) {
         assertOnsiteAttendanceScope(actor, program.siteId);
+        if (actor.role === "room_facilitator" &&
+            await requiresIndependentChurchLocalDelegation(db, program.id)) {
+          if (!replay.sectionId) throw new AuthorizationError("replay requires a named Section");
+          await requireCurrentSectionFacilitator(db, actor, program.id, replay.sectionId);
+        }
+      }
       if (actor.role === "teacher") {
         if (!replay.sectionId) throw new AuthorizationError("teacher attendance replay section");
         const [assignment] = await db.select({ id: sectionTeachers.id })
