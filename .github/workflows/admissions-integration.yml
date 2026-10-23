@@ -52,7 +52,7 @@ jobs:
       - name: Apply committed schema migrations to disposable Neon branch
         env:
           DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
-        run: npm run db:migrate
+        run: npm run db:migrate:fullflow
       - name: Run isolated admissions acceptance
         run: npm run test:integration:admissions
       - name: Publish release acceptance result
