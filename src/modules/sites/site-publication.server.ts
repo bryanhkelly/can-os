@@ -13,7 +13,7 @@ import { eq } from "drizzle-orm";
 export async function reserveSitePublicAddress(
   actor: CommandContext,
   input: { siteId: string; slug: string },
-): Promise<{ siteId: string; host: string; status: "draft" }> {
+): Promise<{ siteId: string; host: string; status: "draft" | "published" }> {
   assertCapability(actor, "program.launch.start");
   if (!actor.actorPersonId) throw new AuthorizationError("authenticated site publisher");
   const slug = requirePublicSiteSlug(input.slug);
@@ -26,16 +26,23 @@ export async function reserveSitePublicAddress(
       throw new AuthorizationError("site publication scope");
     }
 
-    const [existing] = await tx.select({ slug: sitePublications.slug, status: sitePublications.status })
-      .from(sitePublications).where(eq(sitePublications.siteId, site.id)).limit(1);
-    if (existing) {
-      if (existing.slug !== slug) throw new Error("Site public address is already reserved; renaming requires a separate reviewed operation.");
-      return { siteId: site.id, host: publicSiteHost(slug), status: "draft" as const };
+    // Concurrent claims are decided by the unique DB constraints, not by a
+    // preliminary read. Exactly one successful insertion emits evidence.
+    const [created] = await tx.insert(sitePublications)
+      .values({ siteId: site.id, slug, status: "draft" })
+      .onConflictDoNothing()
+      .returning({ siteId: sitePublications.siteId });
+    if (!created) {
+      const [existing] = await tx.select({ slug: sitePublications.slug, status: sitePublications.status })
+        .from(sitePublications).where(eq(sitePublications.siteId, site.id)).limit(1);
+      if (!existing) throw new Error("Public site address is already reserved by another site.");
+      if (existing.slug !== slug) {
+        throw new Error("Site public address is already reserved; renaming requires a separate reviewed operation.");
+      }
+      return { siteId: site.id, host: publicSiteHost(slug),
+        status: existing.status === "published" ? "published" as const : "draft" as const };
     }
 
-    // Database uniqueness arbitrates concurrent claims from different organizations.
-    // Conflicts roll back both reservation and mutation evidence.
-    await tx.insert(sitePublications).values({ siteId: site.id, slug, status: "draft" });
     await writeAudit(tx, actor, {
       action: "site.public_address.reserve", entityType: "site", entityId: site.id,
       scope: { organizationId: site.organizationId, siteId: site.id },
