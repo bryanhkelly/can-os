@@ -79,7 +79,12 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
     return {
       siteId:site.id,date:data.date,
       statuses,
-      unacknowledged:statuses.filter(row=>row.status==="not_reported").length,
+      // Do not count a closed/unconfigured school day as a missed staffing
+      // acknowledgment. Those blocks remain visible as schedule warnings.
+      unacknowledged:statuses.filter((row,index)=>
+        row.status==="not_reported" &&
+        plan.blocks[index]?.instructionalDayConfirmed===true &&
+        plan.blocks[index]?.assignedPlan===true).length,
       coverageExceptions:statuses.filter(row=>row.status==="cannot_cover").length,
       truncated:truncated||plan.projectionTruncated,
       note:"An acknowledgment records one assigned adult's stated availability for a scheduled block, not verified physical presence, room supervision, child custody, or an accepted handoff. Contact the site lead directly for coverage gaps.",
