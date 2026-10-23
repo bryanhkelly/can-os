@@ -75,13 +75,18 @@ lesson and submission → teacher grade and guardian view → onsite-day reconci
 - Offer acceptance/activation use the same independently verified guardian
   policy. Unit regressions cover family scope, parent/staff identity
   separation and pending guardian relationships.
+- The authenticated parent path now serializes submissions for an existing
+  Household and rejects duplicate open applications for the same full name
+  and Program. It never merges child identities on a name match; admissions
+  must resolve any genuine identity conflict. New-household collisions and
+  cross-school deduplication still need dedicated policy and acceptance.
 - **Still absent:** uninvited public parent signup, editable application
-  drafts, safe student identity deduplication, general school account
+  drafts, full identity deduplication and general school account
   self-provisioning, and connected browser/multi-role acceptance. Source
   committed is not release readiness.
 
-**Still P0 / not implemented or accepted:** the parent's independent self-service
-application and safe verified account-start experience; CAN staff's effective
+**Still P0 / not implemented or accepted:** uninvited parent account startup
+and a public first-contact-to-application journey; CAN staff's effective
 cross-organization academic permissions and local delegated responsibility;
 legal/evidence-backed school-of-record agreement, opening/safeguarding and
 day-supervision approval; executed disposable-Neon test and separate-session
