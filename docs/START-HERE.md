@@ -22,6 +22,8 @@ Extended offerings: [Summer and after-school program definitions and workflow li
 
 Public site addresses: [Site public addresses and publishing](./site-public-publishing.md) (academic/enrichment publishing, default-off public site, public-interest inbox and reviewed conversion into GF22 inquiry; rollout unverified).
 
+**Public-site product backlog:** [Remaining public-site, admissions and partner website work](./public-site-admissions-remaining-work.md) — ordered P1 delivery bites, P0 release/privacy gates, evidence gaps and canonical dependencies.
+
 Church-Hosted School flow: [Institutional authorization, supervised-day and multi-role acceptance](./church-hosted-school-acceptance.md). This is not yet accepted.
 
 Required P1 student experience: [Comprehensive learning-activity tracking](./comprehensive-learning-activity-tracking.md) (distinct from authentication sessions, official attendance, or grading).
