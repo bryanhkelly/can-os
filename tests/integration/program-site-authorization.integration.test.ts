@@ -29,6 +29,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
         const {
           requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
           revokeProgramSiteAuthorization, requireCurrentProgramSiteAuthorization,
+          requireInstitutionalAcademicProgramAuthority,
           getHostProgramSiteAuthorization, listCANOperatingAuthorizationDesk,
         } = await import("@/modules/programs/program-site-authorization.server");
         const suffix = crypto.randomUUID().slice(0,8);
@@ -82,7 +83,8 @@ integration("Church-owned Site with independently authorized CAN academic servic
         });
         host.scope.programIds=[launch.programId];
         const services=[
-          "academic_instruction","onsite_supervision","school_of_record","credit_issuance",
+          "academic_instruction","academic_records","onsite_supervision",
+          "school_of_record","credit_issuance",
         ];
         await expect(requestProgramSiteAuthorization(unrelated,{
           programId:launch.programId,services,
@@ -148,8 +150,18 @@ integration("Church-owned Site with independently authorized CAN academic servic
           evidenceDocumentId:approvedDocument.id,effectiveFrom:from,effectiveThrough:through,
         });
         expect(await requireCurrentProgramSiteAuthorization(tx,launch.programId,[
-          "academic_instruction","onsite_supervision","school_of_record","credit_issuance",
+          "academic_instruction","academic_records","onsite_supervision",
+          "school_of_record","credit_issuance",
         ])).toBe(authorizationId);
+        // Contracting authority is not a host registrar's CAN membership.
+        await expect(requireInstitutionalAcademicProgramAuthority(tx,host,
+          launch.programId,["academic_instruction","academic_records"]))
+          .rejects.toThrow();
+        // This helper proves entitlement only; the steward still has neither
+        // a teacher grant nor an academic registrar grant to perform writes.
+        expect(await requireInstitutionalAcademicProgramAuthority(tx,steward,
+          launch.programId,["academic_instruction","academic_records"]))
+          .toBe(authorizationId);
         await expect(requireCurrentProgramSiteAuthorization(tx,launch.programId,[
           "admissions",
         ])).rejects.toThrow();
@@ -168,6 +180,9 @@ integration("Church-owned Site with independently authorized CAN academic servic
         await expect(requireCurrentProgramSiteAuthorization(tx,launch.programId,[
           "academic_instruction",
         ])).rejects.toThrow();
+        await expect(requireInstitutionalAcademicProgramAuthority(tx,steward,
+          launch.programId,["school_of_record","academic_records","credit_issuance"]))
+          .rejects.toThrow();
         const [revoked] = await tx.select({
           status:s.programSiteAuthorizations.status,
           reviewReason:s.programSiteAuthorizations.reviewReason,
