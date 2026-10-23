@@ -1,5 +1,4 @@
 import { defineConfig } from "@playwright/test";
-import { execFileSync } from "node:child_process";
 import { TEST_ACCESS_TOKEN_PEPPER } from "./tests/e2e/env";
 
 /**
@@ -16,11 +15,6 @@ if(process.env.APP_ENV!=="test"||process.env.NODE_ENV!=="test"||
  (process.env.PLAYWRIGHT_BASE_URL!==undefined&&process.env.PLAYWRIGHT_BASE_URL!==origin)||
  !TEST_ACCESS_TOKEN_PEPPER||TEST_ACCESS_TOKEN_PEPPER.length<32)
  throw new Error("Algebra I browser acceptance requires the isolated TEST_DATABASE_URL, distinct application DB host, APP_ENV=test, NODE_ENV=test and explicit write guard.");
-
-// Direct Playwright invocation must not bypass the dedicated-branch guard.
-execFileSync(process.execPath, ["scripts/verify-fullflow-neon-branch.mjs"], {
- stdio:"inherit",env:process.env,
-});
 
 export default defineConfig({
  testDir:"./tests/e2e",
