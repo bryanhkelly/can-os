@@ -41,7 +41,12 @@ async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.tran
    eq(enrollments.kind,"program"),eq(enrollments.status,"active"),
   ));
  if(!active.length)throw new AuthorizationError("active accepted student enrollment");
- const sectionRows=await tx.select({id:sections.id,yearId:terms.schoolYearId})
+ const sectionRows=await tx.select({
+  id:sections.id,
+  sectionProgramId:sections.programId,sectionSiteId:sections.siteId,
+  sectionYearId:terms.schoolYearId,
+  enrollmentYearId:enrollments.schoolYearId,
+ })
   .from(enrollments)
   .innerJoin(sections,eq(sections.id,enrollments.sectionId))
   .innerJoin(terms,eq(terms.id,sections.termId))
@@ -51,7 +56,14 @@ async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.tran
    eq(enrollments.kind,"section"),eq(enrollments.status,"active"),
    eq(sections.active,true),
   ));
- const validIds=sectionRows.filter(row=>active.some(a=>a.schoolYearId===row.yearId))
+ // Both enrollment records must refer to the SAME Section's Program,
+ // same published host Site, and same school year. A stale or mis-keyed
+ // Section membership must not provision a fresh student's login.
+ const validIds=sectionRows.filter(row=>
+  row.sectionProgramId===app.programId &&
+  row.sectionSiteId===app.siteId &&
+  row.enrollmentYearId===row.sectionYearId &&
+  active.some(a=>a.schoolYearId===row.sectionYearId))
   .map(row=>row.id);
  const ready=await staffedPublishedSectionIds(validIds,tx);
  if(!ready.size)throw new AuthorizationError("actual ready classroom placement");
