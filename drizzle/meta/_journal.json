@@ -267,6 +267,13 @@
       "when": 1792724400000,
       "tag": "0037_public_admissions_interests",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792728000000,
+      "tag": "0038_public_interest_conversion",
+      "breakpoints": true
     }
   ]
 }
