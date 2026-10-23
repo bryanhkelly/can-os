@@ -67,6 +67,18 @@ Prepare and review migrations **only on a guarded disposable branch**, confirm
 hash/ledger/index parity, then execute the integration suite. Never migrate
 production as part of acceptance repair.
 
+**Branch enforcement improvement (2026-10-23):** The code now checks
+Postgres-reported `neon.project_id` and `neon.branch_id` against the approved
+FullFlow IDs before executing any integration fixture. The guarded
+`db:migrate:fullflow` command performs the same online branch verification
+before invoking the existing Drizzle migrator; admissions, academic-intervention,
+and curriculum-browser GitHub workflows now call this wrapper rather than
+running `db:migrate` directly. The admissions browser runner and all three
+Playwright entry configurations also require branch identity verification.
+Unit regressions assert these security gates are present.
+**No migration execution, green CI or browser acceptance is claimed.**
+The dedicated branch still needs reviewed migrations `0032`–`0038`.
+
 ### I-03 — FullFlow is still not a connected acceptance pass [P0, unverified]
 `tests/integration/full-flow.integration.test.ts` uses a rollback transaction
 and mocked actor/session context. It cannot by itself prove issued sessions,
