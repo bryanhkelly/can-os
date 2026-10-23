@@ -18,7 +18,7 @@ New architecture specification: [Curriculum marketplace and portability](./curri
 
 Extended offerings: [Summer and after-school program definitions and workflow limits](./extended-learning-offerings.md).
 
-Public site addresses: [Site public addresses and publishing](./site-public-publishing.md) (address reservation, private preview, and gated enrichment catalog projection; public hosting not enabled).
+Public site addresses: [Site public addresses and publishing](./site-public-publishing.md) (draft preview, public-safe catalog, guarded publish/unpublish decision; public hostname routing not enabled).
 
 Required P1 student experience: [Comprehensive learning-activity tracking](./comprehensive-learning-activity-tracking.md) (distinct from authentication sessions, official attendance, or grading).
 
