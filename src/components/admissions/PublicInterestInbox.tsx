@@ -117,13 +117,11 @@ export function PublicInterestInbox({ items, assignees }: {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  async function changeStatus(row: Row, status: "contacted" | "closed") {
+  async function closeInterest(row: Row) {
     setBusyId(row.id); setError(""); setNotice("");
     try {
-      await setPublicAdmissionsInterestStatus({ data: { interestId: row.id, status } });
-      setNotice(status === "contacted"
-        ? "Contact recorded. This does not verify a guardian or create an Application."
-        : "Interest and its open follow-up closed.");
+      await setPublicAdmissionsInterestStatus({ data: { interestId: row.id, status: "closed" } });
+      setNotice("Interest and its open follow-up closed.");
       await router.invalidate();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not update interest.");
@@ -166,7 +164,7 @@ export function PublicInterestInbox({ items, assignees }: {
             </Link>}
             {row.status !== "closed" && row.status !== "converted" &&
               <button type="button" disabled={busyId !== null}
-                onClick={() => void changeStatus(row, "closed")}
+                onClick={() => void closeInterest(row)}
                 className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
                 Close
               </button>}
