@@ -3,6 +3,7 @@ import { memberships, organizations, people, programs, programPublications, role
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { publicSiteHost, requirePublicSiteSlug } from "@/domain/public-site-address";
+import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { assertSitePublicationScope, sitePublicationManageCapability } from "@/domain/site-publication-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
@@ -52,7 +53,7 @@ export async function requireSitePublisher(actor: AccessContext, siteId: string,
 /** Private authenticated preview. This never serves as a public Host lookup. */
 export async function getSitePublicationDraft(actor: AccessContext, siteId: string) {
   const site = await requireSitePublisher(actor, siteId);
-  const [address, sitePrograms, publishedOfferings] = await Promise.all([
+  const [address, sitePrograms, publishedOfferings, approvedAcademicListings] = await Promise.all([
     db.select({ slug: sitePublications.slug, status: sitePublications.status,
       updatedAt: sitePublications.updatedAt, publishedAt: sitePublications.publishedAt })
       .from(sitePublications).where(eq(sitePublications.siteId, site.id)).limit(1),
@@ -76,6 +77,9 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     // These Seasons already meet the CAN-wide enrichment publication policy,
     // but remain only a PRIVATE preview until the Site itself is published.
     readEnrichmentCatalog(site.id),
+    // The preview is intentionally built from the same public-safe approved
+    // academic catalog as the live host. Draft Program content stays internal.
+    readAcademicProgramCatalog(site.id),
   ]);
   return {
     site,
@@ -98,6 +102,15 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       } : null,
     })),
     catalogPreview: publishedOfferings.map(toPublicSiteEnrichment),
+    // Identical standalone HTML renderer to /published-site. No request ID
+    // generator: this authenticated draft is read-only, not an inquiry form.
+    // The client displays it inside an origin-isolated sandboxed iframe.
+    previewHtml: address[0] ? renderPublicSiteHtml({
+      host: publicSiteHost(address[0].slug),
+      site: { name: site.name, organizationName: site.organizationName },
+      academicPrograms: approvedAcademicListings,
+      offerings: publishedOfferings.map(toPublicSiteEnrichment),
+    }) : null,
   };
 }
 
