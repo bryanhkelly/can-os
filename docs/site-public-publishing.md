@@ -321,3 +321,52 @@ application before readiness.
 canonical GF22 inquiry/application without re-entering the adult contact,
 using a staff-only conversion command with explicit student verification and
 atomic linkage; prevent identity collision or false guardian authorization.
+
+## Bite 8 committed: reviewed public interest to canonical GF22 inquiry
+
+The public-interest inbox now provides a **Review and create inquiry** handoff
+that carries adult contact name, email, selected Site/Program and original
+question into the existing `/admissions/intake` form. It does **not** create
+an Application when the link is opened. Student identity and grade remain
+staff-entered, not invented by a public inquiry. The registrar must explicitly
+confirm that the contact has been reviewed with the family and a new student
+record is appropriate. The existing-student and sibling/household reuse
+selectors are disabled for this narrow handoff; those cases must use the
+ordinary verified admissions workflow rather than creating duplicate
+identities. Contact mismatches are rejected server-side.
+
+The existing `createAdmissionsInquiry` command, not a separate funnel or
+parallel admissions API, performs the conversion in its normal transaction.
+The command uses the verified registrar's `enrollment.decide` capability,
+Program/Site/Organization scope and an additional share lock on the owning
+Program before taking a write lock on the selected interest. It verifies
+the exact Site and Program, contact details, staff confirmation and
+`new` / `contacted` status. Closed or already-converted interests cannot
+be linked. It creates the ordinary `inquiry`-stage Application with existing
+household, student and **pending/unverified** guardian relationship rules.
+The incoming source is recorded as `published_site`; no guardian login,
+relationship verification, academic admission or enrollment is conferred.
+
+Migration `0038_public_interest_conversion.sql` adds nullable
+`application_id`, `converted_at` and `converted_by_person_id`, a
+unique linked-Application index and a database invariant binding the
+`converted` status to linkage evidence. The canonical Application and
+interest update share the same transaction and audit/outbox evidence.
+A retry with the original registrar request ID returns the already-created
+inquiry; a second conversion attempt on the same public interest is denied.
+After success, the registrar is taken to the linked application. The public
+interest inbox shows a **View linked inquiry** action and prevents edits to
+terminal `converted` records.
+
+Added pure policy tests for mismatched contact identity, wrong Site/Program,
+missing staff acknowledgement and terminal/double-conversion conditions.
+**Tests, typecheck, migrations and browser/Neon validation have not been
+executed**, per the current development instruction. Migration `0038`
+requires preceding migrations `0035`–`0037` in the target environment;
+none were applied here. Public tenant hosting remains off by default,
+and no production data or `main` branch was modified.
+
+**Next product bite:** make Site-specific follow-up work actionable within
+existing CAN OS Action/communication ownership: assigned follow-up owner,
+due-date and contact outcome, without granting partner staff unrestricted
+admissions powers or auto-sending family messages.
