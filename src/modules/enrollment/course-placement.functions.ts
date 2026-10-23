@@ -4,7 +4,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { applications, enrollments, programs, sections, terms } from "@/db/schema";
+import { accountPersonGrants, applications, enrollments, people, programs, sections, sectionTeachers, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 
@@ -37,6 +37,17 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      .from(sections).innerJoin(terms, eq(terms.id, sections.termId))
      .where(and(eq(sections.programId, app.programId), eq(sections.active, true),
        inArray(terms.schoolYearId, yearIds)));
+   // UI previews only actual staffed options; a registered Teacher must have
+   // an active named assignment and a current school/institution grant.
+   const teachers=rows.length?await db.select({sectionId:sectionTeachers.sectionId})
+     .from(sectionTeachers).innerJoin(people,eq(people.id,sectionTeachers.personId))
+     .innerJoin(accountPersonGrants,and(
+       eq(accountPersonGrants.personId,sectionTeachers.personId),
+       eq(accountPersonGrants.role,"teacher"),eq(accountPersonGrants.active,true),
+     ))
+     .where(and(inArray(sectionTeachers.sectionId,rows.map(row=>row.id)),
+       eq(people.active,true))):[];
+   const staffedIds=new Set(teachers.map(row=>row.sectionId));
    const enrolled = await db.select({ sectionId: enrollments.sectionId }).from(enrollments)
      .where(and(eq(enrollments.studentProfileId, app.studentProfileId),
        eq(enrollments.kind, "section"), eq(enrollments.status, "active")));
@@ -44,6 +55,7 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
    return { active: true, sections: rows.filter(s => !s.siteId ||
       actor.scope.siteIds?.includes(s.siteId)).map(s => ({
      id: s.id, title: s.title, code: s.code, enrolled: assigned.has(s.id),
+     staffed: staffedIds.has(s.id),
    })) };
  });
 
