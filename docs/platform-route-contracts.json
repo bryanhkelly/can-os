@@ -695,6 +695,15 @@
       "roleJourney": "pending",
       "readBoundary": "pending",
       "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/published-site.ts",
+      "route": "/published-site",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
