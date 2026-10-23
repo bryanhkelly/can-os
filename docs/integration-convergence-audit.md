@@ -41,6 +41,24 @@ were added on `FullFlow` in commit `cf65e286`; they start with `pending`
 acceptance as required. Rerun the checker and pin results to the latest branch SHA.
 
 ### I-02 — Disposable database migration drift [P0, confirmed by read-only inspection]
+**Neon branch isolation requirement (verified 2026-10-23):**
+- Project: `can-os` (`sweet-hall-62441909`).
+- ONLY authorized FullFlow database migration/fixture target:
+  `fullflow-e2e-20261022` (`br-proud-pine-arfju8h2`).
+- Its parent is `test01` (`br-bitter-feather-ar0u63x7`), which is NOT a writable
+  FullFlow migration/fixture target.
+- The default `production` branch (`br-restless-sea-ar9ooo55`) is NEVER a
+  FullFlow migration or test target.
+- Never treat `GitHub FullFlow` as a Neon branch name; these are different
+  versioning systems. Migration SQL is committed to GitHub; applying schema
+  migrations requires an explicit Neon branch connection.
+- Before **any** mutating SQL or migration, verify project + branch ID, database
+  name, host and isolated connection target against the approved branch;
+  compare with production, fail closed on any uncertainty, and use the
+  repository's guarded `TEST_DATABASE_URL` checks.
+- Read-only inspections do not apply migrations. As of this review, **no
+  migration was run** by this review on any Neon branch.
+
 The current source migration journal has 39 entries (through `0038`), while
 the existing isolated `fullflow-e2e-20261022` Neon branch reports **32** applied
 migrations. `scripts/verify-fullflow-schema.mjs` is intentionally fail-closed
