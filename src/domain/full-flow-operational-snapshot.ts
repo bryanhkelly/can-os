@@ -26,8 +26,12 @@ export function summarizeFullFlowOperations(rows: FullFlowRows) {
     const work = rows.submissions.filter(s => assessmentIds.has(s.assessmentId));
     const enrolled = rows.enrollments.filter(e => e.programId === program.id && e.status === "active");
     const programStudents = new Set(enrolled.filter(e => e.kind === "program").map(e => e.studentProfileId));
+    // A Section placement counts toward this Program only if the same student
+    // also has an active Program enrollment. Orphan/misaligned section rows may
+    // need repair, but cannot prove that a Program student reached class.
     const placedStudents = new Set(enrolled.filter(e => e.kind === "section" &&
-      !!e.sectionId && sectionIds.has(e.sectionId)).map(e => e.studentProfileId));
+      !!e.sectionId && sectionIds.has(e.sectionId) && programStudents.has(e.studentProfileId))
+      .map(e => e.studentProfileId));
     const teachers = new Set(rows.teacherAssignments.filter(t => sectionIds.has(t.sectionId))
       .map(t => t.sectionId));
     const unresolved = rows.responses.filter(a => a.programId === program.id &&
