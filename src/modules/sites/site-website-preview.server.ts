@@ -26,9 +26,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
     ? (await readEnrichmentCatalog(site.id)).map(toPublicSiteEnrichment)
     : [];
   const host = address ? publicSiteHost(address.slug) : null;
-  const [local, history] = address ? await Promise.all([
-    readCurrentLocalContent(site.id), readLocalContentHistory(site.id),
-  ]) : [null, []];
+  const local = address ? await readCurrentLocalContent(site.id) : null;
+  const history = address ? await readLocalContentHistory(site.id) : [];
   const editingContent: SiteLocalContent | null = history[0]?.content ?? local?.content ?? null;
   return {
     siteName: site.name,
