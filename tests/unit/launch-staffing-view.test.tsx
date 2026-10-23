@@ -24,7 +24,7 @@ const snapshot: Snapshot = {
   program: { id: "program", name: "School", status: "launching", organizationId: "org",
     academicProviderOrganizationId: "org", siteId: "site", deliveryModel: { onsite: true } },
   years: [], terms: [], catalog: [], teachingStaff: [{ personId: "teacher", first: "Alex", last: "Teacher" }],
-  qualificationCatalog: [{ key: "license", title: "Teaching license" }], policyPublished: false,canAuthorCatalog:false,
+  qualificationCatalog: [{ key: "license", title: "Teaching license" }], policyPublished: false,canAuthorCatalog:false,canPublishTeacherPolicy:true,
   teacherPolicies: [], canReviseTeacherPolicy: false,
   sections: [{
     id: "section", title: "Science", code: "SCI", termId: "term", active: true, teachers: [],
@@ -53,6 +53,12 @@ describe("launch staffing presentation", () => {
     expect(html).toContain('disabled=""');
     expect(html).toContain("Add instructor");
     expect(html).not.toContain("Instructor assigned.");
+  });
+  it("hides initial publication without an explicit institutional publisher grant", () => {
+    const html = render({...snapshot,canPublishTeacherPolicy:false});
+    expect(html).toContain("verified, program-scoped institutional staffing-policy publisher");
+    expect(html).not.toContain("Publish reviewed requirements");
+    expect(html).not.toContain("I confirm these requirements are reviewed");
   });
   it("shows published status without suggesting that publication verifies a teacher", () => {
     const html = render({ ...snapshot, policyPublished: true });
