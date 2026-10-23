@@ -9,6 +9,7 @@ import {
 } from "@/modules/activities/extended-learning.functions";
 import { programTypeLabels } from "@/domain/program-offerings";
 import type { EnrichmentPackage } from "@/domain/enrichment-packages";
+import { listEnrichmentSessionRoster } from "@/modules/activities/enrichment-roster.functions";
 import { extendedLearningReadinessTasks } from "@/domain/extended-learning-readiness-tasks";
 
 type Planning = Awaited<ReturnType<typeof listExtendedSeasonPlanning>>;
@@ -49,6 +50,8 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [packageFrom, setPackageFrom] = useState("");
   const [packageThrough, setPackageThrough] = useState("");
   const [packageWeekdays, setPackageWeekdays] = useState<number[]>([0,1,2,3,4,5,6]);
+  const [roster, setRoster] = useState<Awaited<ReturnType<typeof listEnrichmentSessionRoster>> | null>(null);
+  const [rosterLoading, setRosterLoading] = useState(false);
   const programs = planning.programs.filter(p => !siteId || p.siteId === siteId);
   const selectable = programs.filter(p => p.status !== "paused" && p.status !== "closed");
   const selected = selectable.find(p => p.id === programId);
@@ -93,6 +96,17 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to publish registration");
     } finally { setBusy(false); }
+  }
+
+  async function showRoster(seasonId: string, sessionId: string) {
+    if (roster?.session.id === sessionId) { setRoster(null); return; }
+    setRoster(null); setRosterLoading(true); setError("");
+    try {
+      const result = await listEnrichmentSessionRoster({data:{seasonId,sessionId}});
+      setRoster(result);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to view session roster");
+    } finally {setRosterLoading(false);}
   }
 
   function addPackage(seasonId: string) {
@@ -349,6 +363,38 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                         timeZone:meetings.at(-1)!.timezone}).format(new Date(meetings.at(-1)!.startsAt))}
                       {" · "}{meetings[0]!.location}
                     </div>}
+                    {season.status === "registration" && !!meetings.length &&
+                      <details className="mt-2 rounded-lg border p-2">
+                        <summary className="cursor-pointer text-xs font-semibold">Daily registered rosters</summary>
+                        <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
+                          {meetings.map(session => <button key={session.id} type="button"
+                            className="block w-full rounded border px-2 py-1 text-left text-xs"
+                            onClick={()=>showRoster(season.id,session.id)}>
+                            {new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",
+                              timeZone:session.timezone}).format(new Date(session.startsAt))}
+                            {" · "}{session.location}
+                          </button>)}
+                        </div>
+                        {rosterLoading && <p className="mt-2 text-xs">Loading roster…</p>}
+                        {roster && meetings.some(item=>item.id===roster.session.id) &&
+                          <div className="mt-2 rounded-lg border p-3">
+                            <p className="text-xs font-semibold">
+                              {roster.count} registered for {new Intl.DateTimeFormat("en-US",{
+                                dateStyle:"medium",timeZone:roster.session.timezone,
+                              }).format(new Date(roster.session.startsAt))}
+                            </p>
+                            {!roster.roster.length ? <p className="mt-2 text-xs">No confirmed seat allocations.</p>
+                              : <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+                                {roster.roster.map(child=><li key={child.id}>
+                                  {child.firstName} {child.lastName}
+                                  {" · "}{child.status.replaceAll("_"," ")}
+                                </li>)}
+                              </ul>}
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              Registered participants only; no attendance or pickup release is implied.
+                            </p>
+                          </div>}
+                      </details>}
                     {season.status === "draft" && <button type="button"
                       className="mt-2 rounded-lg border px-3 py-2 text-xs font-semibold"
                       onClick={() => {
