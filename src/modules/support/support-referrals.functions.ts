@@ -268,7 +268,9 @@ export const advanceSupportReferral = createServerFn({ method: "POST" })
           recipientPersonId: referral.reporterPersonId,
           type: data.nextStage === "accepted" ? "support_referral_accepted" : "support_referral_update",
           title: data.nextStage === "accepted" ? "Student support referral accepted" : "Academic support update",
-          body: data.nextStage === "accepted" ? "A specialist has accepted your referral." : note.slice(0, 400),
+          body: data.nextStage === "accepted"
+            ? "A specialist has accepted your referral."
+            : "Your referral has been reviewed. Contact the coordinator for information approved for sharing.",
           resourceType: "action", resourceId: record.id,
         });
       }
@@ -304,7 +306,7 @@ export const saveSupportPlan = createServerFn({ method: "POST" })
       } else {
         await tx.update(s.supportReferrals).set({ nextReviewAt: date, updatedAt: new Date() }).where(eq(s.supportReferrals.id, referral.id));
       }
-      await recordAudit(tx, actor, { action: "support_plan.save", resourceType: "action", resourceId: record.id, after: { goal, targetDate: date.toISOString() }, scope: { siteId: record.siteId } });
+      await recordAudit(tx, actor, { action: "support_plan.save", resourceType: "action", resourceId: record.id, after: { referralId: referral.id, planUpdated: true, targetDate: date.toISOString() }, scope: { siteId: record.siteId } });
       await emitEvent(tx,{eventType:EventTypes.SupportPlanSaved,aggregateType:"action",aggregateId:record.id,
         actorPersonId:actor.actorPersonId,payload:{referralId:referral.id,targetDate:date.toISOString()}});
       return { saved: true };
@@ -348,7 +350,7 @@ export const completeSupportService = createServerFn({ method: "POST" })
         .where(and(eq(s.supportServices.id, data.serviceId), eq(s.supportServices.referralId, referral.id), eq(s.supportServices.status, "scheduled")))
         .returning({ id: s.supportServices.id });
       if (!updated) throw new Error("Scheduled service not found");
-      await recordAudit(tx, actor, { action: "support_service.complete", resourceType: "support_service", resourceId: updated.id, after: { outcome, referralId: referral.id }, scope: { siteId: record.siteId } });
+      await recordAudit(tx, actor, { action: "support_service.complete", resourceType: "support_service", resourceId: updated.id, after: { referralId: referral.id, serviceCompleted: true }, scope: { siteId: record.siteId } });
       await emitEvent(tx,{eventType:EventTypes.SupportServiceCompleted,aggregateType:"support_service",aggregateId:updated.id,
         actorPersonId:actor.actorPersonId,payload:{referralId:referral.id}});
       return { saved: true };
