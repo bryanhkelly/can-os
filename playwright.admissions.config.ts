@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import { DATABASE_URL, TEST_ACCESS_TOKEN_PEPPER, baseURL } from "./tests/e2e/env";
 
 if (!DATABASE_URL || DATABASE_URL !== process.env.TEST_DATABASE_URL ||
@@ -9,6 +10,11 @@ const testHost = new URL(DATABASE_URL).hostname.replace(/-pooler(?=\.)/, "").toL
 const applicationHost = process.env.CAN_APPLICATION_DB_HOST?.replace(/-pooler(?=\.)/, "").toLowerCase();
 if (!applicationHost || testHost === applicationHost)
   throw new Error("Browser acceptance requires a different disposable database endpoint from the application.");
+
+// Verify the actual Neon project/branch before allowing direct Playwright entry.
+execFileSync(process.execPath, ["scripts/verify-fullflow-neon-branch.mjs"], {
+  stdio: "inherit", env: process.env,
+});
 
 export default defineConfig({
   testDir: "./tests/e2e",
