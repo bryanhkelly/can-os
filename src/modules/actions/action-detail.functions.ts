@@ -39,8 +39,9 @@ export const getActionDetail = createServerFn({ method: "GET" })
         resolvedAt: action.resolvedAt?.toISOString() ?? null,
         resolutionNote: action.resolutionNote,
         siteId: action.siteId, programId: action.programId,
-        canManageOperations: actor.role === "registrar" && action.siteId !== null,
-        workspaceHome: actor.role === "registrar" ? "/operations" as const
+        canManageOperations: actor.role === "registrar" && action.siteId !== null && action.type !== "public_interest_follow_up",
+        workspaceHome: action.type === "public_interest_follow_up" ? "/admissions/intake" as const
+          : actor.role === "registrar" ? "/operations" as const
           : actor.role === "teacher" ? "/teacher" as const
           : actor.role === "counselor" ? "/counselor" as const : "/coach" as const,
       };

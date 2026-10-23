@@ -74,6 +74,7 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    if(!record)throw new AuthorizationError("action scope");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
+   if(record.type==="public_interest_follow_up")throw new Error("Use the admissions intake follow-up lifecycle");
    if(record.type===openingHandoffType)throw new Error("Use the named-recipient opening handoff in Site Today");
    const academic=record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId!==null;
    if(academic&&data.status==="resolved"){
@@ -123,6 +124,7 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    if(!record||["resolved","cancelled"].includes(record.status))throw new AuthorizationError("active action scope");
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
+   if(record.type==="public_interest_follow_up")throw new Error("Use the admissions intake follow-up lifecycle");
    if(record.type===openingHandoffType)throw new Error("Use the named-recipient opening handoff in Site Today");
    const academic=record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId!==null;
    if(academic)await assertAcademicActionAuthority(tx,actor,record);
@@ -159,7 +161,7 @@ export const setOperationsActionDeadline=createServerFn({method:"POST"})
        throw new AuthorizationError("action school ownership");
      if(record.programId&&!actor.scope.programIds?.includes(record.programId))
        throw new AuthorizationError("action program");
-     if(record.type==="support_referral"||record.type===openingHandoffType)
+     if(record.type==="support_referral"||record.type===openingHandoffType||record.type==="public_interest_follow_up")
        throw new Error("Use the Action's owning domain workflow");
      if(record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId)
        await assertAcademicActionAuthority(tx,actor,record);

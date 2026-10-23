@@ -9,6 +9,7 @@ import { publishableAcademicProgram } from "@/domain/academic-program-publicatio
 import { publicAdmissionsInterestInput, type PublicAdmissionsInterestInput } from "@/domain/public-admissions-interest";
 import { isPublicSiteSlug } from "@/domain/public-site-address";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { ensurePublicInterestFollowUp } from "./public-interest-follow-up.server";
 
 const BUDGET = 30;
 const WINDOW_SECONDS = 60;
@@ -118,6 +119,12 @@ export async function recordPublicAdmissionsInterest(
       status: "new",
     }).onConflictDoNothing().returning({ id: publicAdmissionsInterests.id });
     if (!created) return; // Retry with the same form request ID.
+    // One canonical Action per accepted interest, atomically with the lead.
+    // The preceding cooldown lock/unique request key prevent retry duplicates.
+    await ensurePublicInterestFollowUp(tx, {
+      interestId: created.id, organizationId: matched.organizationId,
+      siteId: matched.siteId, programId: input.programId,
+    });
 
     // Events/audit intentionally never include a raw visitor name/email/note.
     await emitEvent(tx, {
