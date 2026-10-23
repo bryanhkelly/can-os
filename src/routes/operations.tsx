@@ -1,6 +1,7 @@
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 import type { listLaunches } from "@/modules/programs/launch.functions";
 import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
+import { isGuidedAcademicSchool } from "@/domain/guided-school-journey";
 import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
@@ -114,14 +115,14 @@ function OperationsPage(){
     </div>
    </section>}
   {dashboard&&dashboard.programs.length>0&&<section className="mt-7 space-y-4" aria-label="Guided school launch and operations">
-    <h2 className="font-serif text-2xl">Your next school operations steps</h2>
-    <p className="text-sm text-muted-foreground">Follow verified program evidence through launch, instruction, enrollment and daily school operations. Links open the actual owning workflow.</p>
-    {dashboard.programs.filter(p=>p.type==="high_school_extension"||Boolean(selected.programId))
+    <h2 className="font-serif text-2xl">Get your first students into class</h2>
+    <p className="text-sm text-muted-foreground">Follow the existing launch, course, admissions and classroom workflows for each school. A website is optional to begin registrar-assisted applications; school opening and child attendance still require independent approvals.</p>
+    {dashboard.programs.filter(p=>isGuidedAcademicSchool(p.type))
       .slice(0,selected.programId?1:4).map(program=>
        <GuidedSchoolJourney key={program.id} program={program}
         journey={launches?.launches.find(launch=>launch.id===program.id)??null}/>)}
-    {!dashboard.programs.some(p=>p.type==="high_school_extension"||Boolean(selected.programId))&&
-      <p className="rounded-lg border p-4 text-sm">Select an individual program to review its guided operating journey.</p>}
+    {!dashboard.programs.some(p=>isGuidedAcademicSchool(p.type))&&
+      <p className="rounded-lg border p-4 text-sm">There are no academic school programs in this scope yet. Start a school launch to create one.</p>}
   </section>}
   <section className="mt-7 rounded-xl border bg-card p-5" aria-label="FullFlow operational record">
    <h2 className="font-serif text-2xl">Connected school operational record</h2>
