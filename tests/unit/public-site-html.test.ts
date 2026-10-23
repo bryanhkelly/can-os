@@ -38,4 +38,29 @@ describe("standalone public site HTML", () => {
     expect(html).toContain("There are no programs to display");
     expect(html).not.toContain("Register now");
   });
+  it("renders approved academic marketing without implying enrollment or trusting description HTML", () => {
+    const html = renderPublicSiteHtml({
+      host: "academy.can-os.com",
+      site: { name: "Partner Academy", organizationName: "Partner Church" },
+      offerings: [],
+      academicPrograms: [{
+        programId: "p", title: "Ninth Grade Hybrid Academy",
+        typeLabel: "High school extension",
+        summary: "Students learn <script> with mentorship & coaching.",
+        grades: { min: "9", max: "9" },
+        delivery: { onsite: true, liveOnline: true,
+          asynchronous: true, onsiteDaysPerWeek: 2 },
+        availability: "planned",
+      }],
+    });
+    expect(html).toContain("Ninth Grade Hybrid Academy");
+    expect(html).toContain("Grades 9–9");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("&amp; coaching");
+    expect(html).toContain("2 onsite days per week");
+    expect(html).toContain("Program planned");
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("Apply now");
+  });
+
 });
