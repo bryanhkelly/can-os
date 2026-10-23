@@ -1,5 +1,26 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 registrar seat and add/drop preview (23 October 2026)
+
+**Source committed, test execution pending.** Extended the same real
+admissions registrar selector beyond verified teaching identity, first lesson,
+and signed institutional services to avoid promoting a **full class** or a
+Section whose **add/drop window has ended** as placeable. The preview reads
+canonical `getSectionRegistrationPolicy` capacity/deadline rules and counts
+only active Section enrollments, while the transactional placement command
+continues to lock and independently recheck roster capacity, deadline,
+student credit limits, schedule conflicts and prerequisites.
+
+On a one-seat class the rollback-only family-to-class test now asserts that
+placing the first learner makes `readyForPlacement=false` for any additional
+registration, without hiding the learner's already assigned class. The
+registrar UI explains teacher, curriculum, agreement, seat and deadline
+readiness separately from completed student placements. No new tables,
+migration or production writes. CI acceptance remains blocked before
+allocation of GitHub-hosted runners.
+
+---
+
 ## P0 registrar class-choice consistency — no false-ready Sections (23 October 2026)
 
 **Source committed, runtime acceptance pending.** Corrected another
