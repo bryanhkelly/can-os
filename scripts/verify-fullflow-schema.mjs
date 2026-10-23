@@ -52,11 +52,15 @@ async function main() {
       "effective_from", "effective_through", "reviewed_by_person_id", "reviewed_at",
       "revoked_at", "revocation_reason",
     ],
+    site_local_content_versions: [
+      "id", "site_id", "revision", "status", "content", "flagged_fields",
+      "created_by_person_id", "restored_from_revision", "created_at",
+    ],
   };
   const columns = await query`
     SELECT table_name, column_name FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name IN ('auth_request_rate_limits', 'access_sessions', 'lesson_progress', 'submissions', 'learning_activity_sessions', 'learning_activity_events', 'program_site_authorizations')
+      AND table_name IN ('auth_request_rate_limits', 'access_sessions', 'lesson_progress', 'submissions', 'learning_activity_sessions', 'learning_activity_events', 'program_site_authorizations', 'site_local_content_versions')
   `;
   const present = new Set(columns.map(row => `${row.table_name}.${row.column_name}`));
   const missing = Object.entries(required).flatMap(([table, names]) =>
@@ -71,6 +75,8 @@ async function main() {
     "learning_activity_events_client_uq",
     "program_site_authorization_version_uq",
     "program_site_authorization_current_uq",
+    "site_local_content_site_revision_uq",
+    "site_local_content_site_status_idx",
   ];
   const indexes = await query`
     SELECT indexname FROM pg_indexes WHERE schemaname = 'public'

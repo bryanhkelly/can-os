@@ -22,13 +22,17 @@ const pendingTags = [
 
 export function assessFullFlowMigrationReadiness(input) {
   const { project, branch, applied, lastTimestamp, journal, types, columns, tables,
-    authorizationColumns = [], authorizationIndexes = [], authorizationConstraints = [] } = input;
+    authorizationColumns = [], authorizationIndexes = [], authorizationConstraints = [],
+    localCopyColumns = [], localCopyIndexes = [], localCopyConstraints = [] } = input;
   const issues = [];
   // A previously reviewed 0032-0038 sequence is already applied on the
   // dedicated branch. Before applying 0039, verify that exact committed base
   // and that the new operating-authorization table is not partially present.
-  if (journal.entries.length === 40 &&
-      journal.entries[39]?.tag === "0039_program_site_authorizations") {
+  const includes0039 = [40,41].includes(journal.entries.length) &&
+    journal.entries[39]?.tag === "0039_program_site_authorizations";
+  const includes0040 = journal.entries.length === 41 &&
+    journal.entries[40]?.tag === "0040_site_local_content";
+  if (includes0039 && (journal.entries.length === 40 || includes0040)) {
     const found = new Set(tables.map(row => row.table_name));
     const enumValues = new Set(types.map(row => row.typname + "." + row.enumlabel));
     const cols = new Map(columns.map(row => [row.table_name + "." + row.column_name, row]));
@@ -44,13 +48,19 @@ export function assessFullFlowMigrationReadiness(input) {
       issues.push("0032-0038 database prerequisites do not match the reviewed FullFlow state");
     const pre0039 = applied === 39 &&
       String(lastTimestamp) === String(journal.entries[38].when) &&
-      !found.has("program_site_authorizations");
+      !found.has("program_site_authorizations") &&
+      !found.has("site_local_content_versions");
     const post0039 = applied === 40 &&
       String(lastTimestamp) === String(journal.entries[39].when) &&
-      found.has("program_site_authorizations");
-    if (!pre0039 && !post0039)
-      issues.push("0039 migration ledger/table state is inconsistent or unexpected");
-    if (post0039) {
+      found.has("program_site_authorizations") &&
+      !found.has("site_local_content_versions");
+    const post0040 = includes0040 && applied === 41 &&
+      String(lastTimestamp) === String(journal.entries[40].when) &&
+      found.has("program_site_authorizations") &&
+      found.has("site_local_content_versions");
+    if (!pre0039 && !post0039 && !post0040)
+      issues.push("0039/0040 migration ledger/table state is inconsistent or unexpected");
+    if (post0039 || post0040) {
       const actualColumns = new Set(authorizationColumns.map(row => row.column_name));
       const requiredColumns = [
         "id", "program_id", "site_id", "host_organization_id",
@@ -76,12 +86,35 @@ export function assessFullFlowMigrationReadiness(input) {
         if (!actualConstraints.has(name)) issues.push("0039 authorization constraint missing: " + name);
       }
     }
+    if (post0040) {
+      const columns = new Set(localCopyColumns.map(row => row.column_name));
+      for (const name of [
+        "id", "site_id", "revision", "status", "content", "flagged_fields",
+        "created_by_person_id", "restored_from_revision", "created_at",
+      ]) {
+        if (!columns.has(name)) issues.push("0040 Site-local content column missing: " + name);
+      }
+      const indexes = new Set(localCopyIndexes.map(row => row.indexname));
+      for (const name of ["site_local_content_site_revision_uq", "site_local_content_site_status_idx"]) {
+        if (!indexes.has(name)) issues.push("0040 Site-local content index missing: " + name);
+      }
+      const constraints = new Set(localCopyConstraints.map(row => row.conname));
+      for (const name of [
+        "site_local_content_positive_revision_ck", "site_local_content_status_ck",
+        "site_local_content_document_ck", "site_local_content_flagged_ck",
+      ]) {
+        if (!constraints.has(name)) issues.push("0040 Site-local content constraint missing: " + name);
+      }
+    }
+    const pendingMigrations = pre0039
+      ? ["0039_program_site_authorizations", ...(includes0040 ? ["0040_site_local_content"] : [])]
+      : post0039 && includes0040 ? ["0040_site_local_content"] : [];
     return {
       ready: issues.length === 0, issues, appliedMigrations: applied,
-      pendingMigrations: post0039 ? [] : ["0039_program_site_authorizations"],
+      pendingMigrations,
       target: "fullflow-e2e-20261022",
       status: issues.length ? "HOLD_REVIEW_DRIFT" :
-        post0039 ? "UP_TO_DATE" : "PRECONDITIONS_MATCH_NOT_APPLIED",
+        pendingMigrations.length ? "PRECONDITIONS_MATCH_NOT_APPLIED" : "UP_TO_DATE",
     };
   }
   if (project !== "sweet-hall-62441909" || branch !== "br-proud-pine-arfju8h2")
@@ -115,11 +148,12 @@ async function main() {
   const url = process.env.TEST_DATABASE_URL;
   await verifyFullFlowNeonBranch(url);
   const journal = JSON.parse(readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url),"utf8"));
-  if (![39,40].includes(journal.entries.length))
+  if (![39,40,41].includes(journal.entries.length))
     throw new Error("Unexpected migration journal length; re-review the pending migration set");
   const query = neon(url);
   const [[identity],[ledger],types,columns,tables,
-    authorizationColumns,authorizationIndexes,authorizationConstraints] = await Promise.all([
+    authorizationColumns,authorizationIndexes,authorizationConstraints,
+    localCopyColumns,localCopyIndexes,localCopyConstraints] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
                  current_setting('neon.branch_id', true) AS branch`,
     query`SELECT count(*)::int AS applied, max(created_at) AS last_timestamp FROM drizzle.__drizzle_migrations`,
@@ -132,7 +166,7 @@ async function main() {
             (table_name IN ('activity_seasons','activity_registrations') AND column_name='metadata'))`,
     query`SELECT table_name FROM information_schema.tables
           WHERE table_schema='public' AND
-          table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations')`,
+          table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations','site_local_content_versions')`,
     query`SELECT column_name FROM information_schema.columns
       WHERE table_schema='public' AND table_name='program_site_authorizations'`,
     query`SELECT indexname FROM pg_indexes
@@ -140,10 +174,18 @@ async function main() {
     query`SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid
       JOIN pg_namespace n ON n.oid=t.relnamespace
       WHERE n.nspname='public' AND t.relname='program_site_authorizations'`,
+    query`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='site_local_content_versions'`,
+    query`SELECT indexname FROM pg_indexes
+      WHERE schemaname='public' AND tablename='site_local_content_versions'`,
+    query`SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid
+      JOIN pg_namespace n ON n.oid=t.relnamespace
+      WHERE n.nspname='public' AND t.relname='site_local_content_versions'`,
   ]);
   const review = assessFullFlowMigrationReadiness({
     ...identity, ...ledger, journal, types, columns, tables,
     authorizationColumns, authorizationIndexes, authorizationConstraints,
+    localCopyColumns, localCopyIndexes, localCopyConstraints,
   });
   process.stdout.write(JSON.stringify(review,null,2)+"\n");
   if (!review.ready) process.exitCode = 1;
