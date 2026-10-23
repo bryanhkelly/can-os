@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import {
   DATABASE_URL,
   TEST_ACCESS_TOKEN_PEPPER,
@@ -8,13 +9,23 @@ import {
 
 // Dotenv-free: set DATABASE_URL in the shell (or via `node --env-file`), always
 // pointing at a disposable Neon branch — never the production database.
-if (!DATABASE_URL) {
+if (!DATABASE_URL || DATABASE_URL !== process.env.TEST_DATABASE_URL ||
+    process.env.CAN_TEST_DB_WRITES_ENABLED !== "true" ||
+    process.env.APP_ENV !== "test" || process.env.NODE_ENV !== "test" ||
+    !process.env.CAN_APPLICATION_DB_HOST) {
   throw new Error(
-    "DATABASE_URL is required for Playwright e2e tests. " +
-      "Point it at a disposable Neon branch (never production), e.g. " +
-      "DATABASE_URL=postgres://... npm run test:e2e",
+    "FullFlow browser tests require the guarded TEST_DATABASE_URL, " +
+    "matching DATABASE_URL, explicit test environment and distinct application host.",
   );
 }
+const branchHost = new URL(DATABASE_URL).hostname.replace(/-pooler(?=\.)/, "").toLowerCase();
+if (branchHost === process.env.CAN_APPLICATION_DB_HOST.replace(/-pooler(?=\.)/, "").toLowerCase()) {
+  throw new Error("Browser tests must not use the application database endpoint.");
+}
+// Unlike URL comparisons, this queries the server's actual Neon branch identity.
+execFileSync(process.execPath, ["scripts/verify-fullflow-neon-branch.mjs"], {
+  stdio: "inherit", env: process.env,
+});
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -33,10 +44,11 @@ export default defineConfig({
   webServer: {
     command: "npm run dev",
     url: baseURL,
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 180_000,
     env: {
       DATABASE_URL,
+      APP_ENV: "test", NODE_ENV: "test", CAN_TEST_DB_WRITES_ENABLED: "true",
       // Hashes the synthetic session secrets the fixture inserts.
       CAN_ACCESS_TOKEN_PEPPER: TEST_ACCESS_TOKEN_PEPPER,
       // Guards POST /api/jobs (markOverdueSubmissionsMissing + event worker).
