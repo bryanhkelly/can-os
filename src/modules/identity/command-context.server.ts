@@ -67,7 +67,12 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  // assigned Section AND a current independently verified institutional
  // academic agreement. Preserve original Organization/Site/Program scope:
  // never turn institution membership into a host-wide grant.
- if(context.role==="teacher"&&context.actorPersonId&&organizations.length){
+ if(context.role==="teacher"&&context.actorPersonId&&organizations.length&&
+    context.grantSiteId===null){
+  // A school-specific CAN teacher grant does not silently extend to an
+  // unrelated church Site. Cross-institution assignment requires original
+  // CAN organization-wide membership, plus the named Section assignment
+  // and current independently approved agreement below.
   const assignments=await db.select({
     sectionId:sections.id,programId:sections.programId,
   }).from(sectionTeachers)
