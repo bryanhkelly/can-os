@@ -77,8 +77,6 @@ export const consentToStudentLearningAccount=createServerFn({method:"POST"})
       eq(guardianRelationships.studentPersonId,app.studentPersonId),
       eq(guardianRelationships.guardianPersonId,actor.actorPersonId!),
       eq(guardianRelationships.canManageEnrollment,true),
-      // Guardian relationship verification is independent of email ownership.
-      eq(guardianRelationships.metadata,guardianRelationships.metadata),
     )).limit(1);
    if(!guardian)throw new AuthorizationError("current guardian authorization");
    const [verified]=await tx.select({metadata:guardianRelationships.metadata})
