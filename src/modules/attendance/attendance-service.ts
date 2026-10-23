@@ -19,6 +19,7 @@ import {
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import type { AccessContext } from "@/domain/access-context";
 import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 import {
@@ -85,7 +86,9 @@ export async function recordAttendance(
       const guardians = await tx
         .select({ personId: guardianRelationships.guardianPersonId })
         .from(guardianRelationships)
-        .where(eq(guardianRelationships.studentPersonId, student.personId));
+        .where(guardianRelationshipPredicate({
+          studentPersonId:student.personId,access:"attendance-excuse",
+        }));
 
       await emitEvent(tx, {
         eventType: EventTypes.StudentMarkedAbsent,
@@ -187,9 +190,11 @@ export async function submitAttendanceExcuse(
       .from(guardianRelationships)
       .where(
         and(
-          eq(guardianRelationships.guardianPersonId, actorPersonId),
-          eq(guardianRelationships.studentPersonId, student.personId),
-          eq(guardianRelationships.canSubmitAttendanceExcuse, true),
+          guardianRelationshipPredicate({
+            guardianPersonId:actorPersonId,
+            studentPersonId:student.personId,
+            access:"attendance-excuse",
+          }),
         ),
       )
       .limit(1);
@@ -647,7 +652,9 @@ export async function recordAttendanceRevision(
     .from(studentProfiles).where(eq(studentProfiles.id,input.studentProfileId)).limit(1);
    if(student){
     const guardians=await tx.select({personId:guardianRelationships.guardianPersonId})
-     .from(guardianRelationships).where(eq(guardianRelationships.studentPersonId,student.personId));
+     .from(guardianRelationships).where(guardianRelationshipPredicate({
+      studentPersonId:student.personId,access:"attendance-excuse",
+    }));
     for(const guardian of guardians){
      await notify(tx,{recipientPersonId:guardian.personId,type:"student_absent",
       title:"Attendance needs your attention",
