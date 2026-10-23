@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {guidedSchoolJourney, type SchoolProgramRecord} from "@/domain/guided-school-journey";
+import {guidedSchoolJourney, isGuidedAcademicSchool, type SchoolProgramRecord} from "@/domain/guided-school-journey";
 import {prioritizeSchoolActions,schoolActionBacklog} from "@/domain/operations-action-triage";
 
 const program:SchoolProgramRecord={
@@ -16,6 +16,22 @@ const program:SchoolProgramRecord={
 };
 
 describe("guided school launch",()=>{
+  it("shows independent church academies but not enrichment in school guidance",()=>{
+    expect(isGuidedAcademicSchool("church_hosted_academy")).toBe(true);
+    expect(isGuidedAcademicSchool("high_school_extension")).toBe(true);
+    expect(isGuidedAcademicSchool("summer_enrichment")).toBe(false);
+    expect(isGuidedAcademicSchool("after_school_enrichment")).toBe(false);
+  });
+  it("sends schools without applicants to the real registrar intake, not website publishing",()=>{
+    const steps=guidedSchoolJourney({...program,type:"church_hosted_academy"},null);
+    expect(steps[2]?.nextAction).toBe("Start your first family application");
+    expect(steps[2]?.href).toContain("/admissions/intake?programId=");
+    expect(steps[2]?.href).toContain("&siteId=");
+    const started=guidedSchoolJourney({...program,counts:{...program.counts,applications:1}},null);
+    expect(started[2]?.href).toContain("/admissions?programId=");
+    expect(started[2]?.href).not.toContain("/admissions/intake");
+  });
+
   it("never turns an empty launch into an approved or successful school",()=>{
     const steps=guidedSchoolJourney(program,{
       status:"in_progress",
