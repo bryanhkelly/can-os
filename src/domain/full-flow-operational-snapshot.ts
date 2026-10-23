@@ -20,6 +20,13 @@ export function summarizeFullFlowOperations(rows: FullFlowRows) {
   const result = rows.programs.map(program => {
     const sections = rows.sections.filter(s => s.programId === program.id && s.active);
     const sectionIds = new Set(sections.map(section => section.id));
+    const teachers = new Set(rows.teacherAssignments.filter(t => sectionIds.has(t.sectionId))
+      .map(t => t.sectionId));
+    // An active enrollment into an unstaffed or unpublished Section must
+    // not count as first-student-to-class completion.
+    const instructionalIds = new Set(sections.filter(section =>
+      section.versionStatus === "published" && teachers.has(section.id))
+      .map(section => section.id));
     const assessments = rows.assessments.filter(a => sectionIds.has(a.sectionId) &&
       (a.status === "published" || a.status === "closed"));
     const assessmentIds = new Set(assessments.map(a => a.id));
@@ -30,10 +37,8 @@ export function summarizeFullFlowOperations(rows: FullFlowRows) {
     // also has an active Program enrollment. Orphan/misaligned section rows may
     // need repair, but cannot prove that a Program student reached class.
     const placedStudents = new Set(enrolled.filter(e => e.kind === "section" &&
-      !!e.sectionId && sectionIds.has(e.sectionId) && programStudents.has(e.studentProfileId))
+      !!e.sectionId && instructionalIds.has(e.sectionId) && programStudents.has(e.studentProfileId))
       .map(e => e.studentProfileId));
-    const teachers = new Set(rows.teacherAssignments.filter(t => sectionIds.has(t.sectionId))
-      .map(t => t.sectionId));
     const unresolved = rows.responses.filter(a => a.programId === program.id &&
       ["open","in_progress","waiting"].includes(a.status)).length;
     return {
