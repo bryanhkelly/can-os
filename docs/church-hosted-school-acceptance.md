@@ -293,3 +293,51 @@ authenticated separate-session browser acceptance, and actual test execution.
 The implementation is a bounded local staff delegation, not a complete
 supervised school day. Do not claim school-opening acceptance from these
 records.
+
+
+## Increment 5 — multiple named Section facilitators with least-privilege rosters (2026-10-23)
+
+**Source committed, runtime tests unverified.** This extends the previous
+one-per-Program local facilitator model without another table or migration.
+The Site director remains an exact-Site, Program-specific responsibility.
+
+- Each onsite **Section + Person** now receives its own independent
+  `program_responsibility_assignments` key on the current
+  `school_configuration_versions` draft, linked to a Program/Site-bound
+  `role_assignments` row. The exact Site must already have an active,
+  nonsynthetic, email-verified `room_facilitator` account grant.
+  This permits several facilitators **per Program and per Section** without
+  granting them Program-wide student access.
+- The church's launch workspace provides a separate **Staff each onsite
+  class** panel with named Section selection, 90-day appointment,
+  independent renewals and revocations. Changes are serialized by Program
+  and audited with canonical events. A legacy Program-wide facilitator
+  appointment can be revoked but **not newly granted** for an independent
+  church/CAN school.
+- Church/CAN facilitator pupil-roster queries omit all general
+  Program-enrollment rows and select only verified current **Section
+  enrollments** for their own effective Section appointments. The active
+  CAN/church onsite-services agreement is independently checked even for
+  read-only Section discovery; revocation or expiry removes roster access.
+  The canonical attendance write transaction and replay recheck exact
+  Section assignment under the same lock as appointment/revocation.
+- Affirmative instructional duty acceptance likewise checks the actor's
+  current **named Section** authorization while holding the Program
+  delegation lock. The separate staffing plan still determines which
+  *scheduled block* was assigned. Scheduled-block views for facilitators
+  omit unrelated Sections, but historical inability-to-cover reporting
+  on an otherwise currently assigned block remains available after
+  delegated authority expires.
+- Same-organization and nonchurch models retain their previous Site grant
+  rules; this cannot authorize academic grade changes, admission, student
+  case access, institutional records or child checkout.
+
+**Next required P0 bite:** Join named Section appointments with current
+`delivery_arrangements`/schedule periods and independently verified
+screening/training for each adult; verify that **every** active instructional
+block has an eligible assigned adult, backup and a real room plan. A
+Section appointment alone **is not a staffed or supervised class**.
+Additional required work: instructor/facilitator handoff, valid room
+capacity, direct safeguarding reporting, approved school opening,
+runtime cross-site/contract-revocation tests, and real browser sessions.
+No active student records were created and no production database was changed.
