@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accountPersonGrants, actions, applications, assessments, courseTemplateVersions, curriculumAdoptions,
-  enrollments, people, programs, sections, sectionTeachers, submissions,
+  enrollments, people, programs, sections, sectionTeachers, submissions, terms,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -44,9 +44,10 @@ export async function readFullFlowOperations(actor: AccessContext) {
   const [sectionsRows, adoptions, applicationsRows, enrollmentRows, responses] = await Promise.all([
     db.select({
       id: sections.id, programId: sections.programId, active: sections.active,
-      versionStatus: courseTemplateVersions.status,
+      versionStatus: courseTemplateVersions.status,schoolYearId:terms.schoolYearId,
     }).from(sections).innerJoin(courseTemplateVersions,
       eq(courseTemplateVersions.id, sections.courseTemplateVersionId))
+      .innerJoin(terms,eq(terms.id,sections.termId))
       .where(and(inArray(sections.programId, selected),inArray(sections.siteId, siteIds))),
     db.select({programId: curriculumAdoptions.programId, status: curriculumAdoptions.status})
       .from(curriculumAdoptions).where(inArray(curriculumAdoptions.programId, selected)),
@@ -55,7 +56,7 @@ export async function readFullFlowOperations(actor: AccessContext) {
     db.select({
       programId: enrollments.programId, kind: enrollments.kind,
       status: enrollments.status, studentProfileId: enrollments.studentProfileId,
-      sectionId: enrollments.sectionId,
+      sectionId: enrollments.sectionId,schoolYearId:enrollments.schoolYearId,
     }).from(enrollments).where(inArray(enrollments.programId, selected)),
     db.select({ programId: actions.programId, status: actions.status })
       .from(actions).where(and(
