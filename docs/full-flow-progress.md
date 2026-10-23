@@ -1,5 +1,44 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 registrar class-choice consistency — no false-ready Sections (23 October 2026)
+
+**Source committed, runtime acceptance pending.** Corrected another
+family-to-class blocker in the actual `/admissions` registrar journey:
+`listEnrollmentPlacements` was still running a *separate, weaker*
+`section_teachers` + site-grant SQL query. It could call a class staffed
+while the atomic placement command would reject a disabled or unverified
+teacher or a host-only teacher at a CAN-operated church school.
+
+That preview now calls the **same** `verifiedTeacherSectionIds` verifier
+as `activateSectionEnrollment`, plus
+`staffedPublishedSectionIds` to identify a truly placeable class.
+The additional `readyForPlacement` result requires an authorized
+academic instructor, the published first lesson and the currently verified
+church/CAN school-of-record, curriculum and instructional agreement.
+The actual registrar selector now offers only these ready Sections.
+Missing/expired agreement and inadequate teaching identity are shown
+as actionable readiness holds rather than another empty, failed enrollment
+attempt. The enrollment command still rechecks all conditions under its
+canonical transaction and maintains independent capacity, add/drop,
+schedule and prerequisite checks.
+
+The existing rollback-only family acceptance adds assertions verifying
+that disabling the teacher flips `readyForPlacement` false, and restoring
+verified teacher access flips it true. The separate church/CAN
+authorization acceptance proves host staff never count as CAN teaching
+coverage and signed-agreement revocation denies access.
+
+**Database:** required existing tables and account grant columns were
+confirmed on the isolated `fullflow-e2e-20261022` Neon branch; the latest
+read-only check showed **43 migration journal entries**. No migration
+or production write was performed by this increment. Tests have
+**not** executed: GitHub Actions still fail before allocating runners.
+Next task is running cross-persona acceptance with a trusted test runner,
+fixing actual errors, and verifying preview plus atomic placement on
+the same canonical student and Section.
+
+---
+
 ## P0 CAN-operated church classroom staffing and revocation (23 October 2026)
 
 **Source committed on `FullFlow`; tests remain unexecuted.** A church-owned
