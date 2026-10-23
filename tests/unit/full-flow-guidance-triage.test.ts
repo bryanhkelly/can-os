@@ -57,6 +57,12 @@ describe("guided school launch",()=>{
     expect(steps[4]?.evidence).toContain("1 outstanding guardian");
     expect(steps[5]?.state).toBe("review");
   });
+  it("flags active students without a valid class placement",()=>{
+    const steps=guidedSchoolJourney({...program,status:"active",counts:{
+      ...program.counts,applications:2,activeProgramStudents:2,placedStudents:1,
+    }},null);
+    expect(steps[2]?.evidence).toContain("1 awaiting classes");
+  });
   it("requires all existing sections staffed before claiming instructional coverage",()=>{
     const steps=guidedSchoolJourney({...program,counts:{
       ...program.counts,sections:2,publishedSections:2,staffedSections:1,
