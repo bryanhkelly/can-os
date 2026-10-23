@@ -27,19 +27,19 @@ describe("FullFlow operational record projection", () => {
   const rows:FullFlowRows={
     programs:[p("A"),p("B")],
     sections:[
-      {id:"sec-A",programId:"A",active:true,versionStatus:"published"},
-      {id:"sec-B",programId:"B",active:true,versionStatus:"draft"},
-      {id:"sec-A-closed",programId:"A",active:false,versionStatus:"published"},
+      {id:"sec-A",schoolYearId:"year-A",programId:"A",active:true,versionStatus:"published"},
+      {id:"sec-B",schoolYearId:"year-B",programId:"B",active:true,versionStatus:"draft"},
+      {id:"sec-A-closed",schoolYearId:"year-A",programId:"A",active:false,versionStatus:"published"},
     ],
     teacherAssignments:[{sectionId:"sec-A",personId:"teacher-A"},{sectionId:"sec-A",personId:"teacher-A-2"}],
     adoptions:[{programId:"A",status:"active"},{programId:"A",status:"revoked"},{programId:"B",status:"active"}],
     applications:[{programId:"A",stage:"accepted"},{programId:"A",stage:"eligibility"},{programId:"B",stage:"application"}],
     enrollments:[
-      {programId:"A",kind:"program",status:"active",studentProfileId:"student-1",sectionId:null},
-      {programId:"A",kind:"program",status:"active",studentProfileId:"student-1",sectionId:null},
-      {programId:"A",kind:"section",status:"active",studentProfileId:"student-1",sectionId:"sec-A"},
-      {programId:"B",kind:"program",status:"active",studentProfileId:"student-2",sectionId:null},
-      {programId:"B",kind:"section",status:"inactive",studentProfileId:"student-2",sectionId:"sec-B"},
+      {programId:"A",kind:"program",status:"active",studentProfileId:"student-1",sectionId:null,schoolYearId:"year-A"},
+      {programId:"A",kind:"program",status:"active",studentProfileId:"student-1",sectionId:null,schoolYearId:"year-A"},
+      {programId:"A",kind:"section",status:"active",studentProfileId:"student-1",sectionId:"sec-A",schoolYearId:"year-A"},
+      {programId:"B",kind:"program",status:"active",studentProfileId:"student-2",sectionId:null,schoolYearId:"year-B"},
+      {programId:"B",kind:"section",status:"inactive",studentProfileId:"student-2",sectionId:"sec-B",schoolYearId:"year-B"},
     ],
     assessments:[{id:"assessment-A",sectionId:"sec-A",status:"published"},
       {id:"assessment-B",sectionId:"sec-B",status:"published"},
@@ -74,9 +74,9 @@ describe("FullFlow operational record projection", () => {
     const snapshot=summarizeFullFlowOperations({
       ...rows,
       enrollments:[
-        {programId:"A",kind:"program",status:"active",studentProfileId:"student-1",sectionId:null},
-        {programId:"A",kind:"section",status:"active",studentProfileId:"different-student",sectionId:"sec-A"},
-        {programId:"B",kind:"section",status:"active",studentProfileId:"student-1",sectionId:"sec-B"},
+        {programId:"A",kind:"program",status:"active",studentProfileId:"student-1",sectionId:null,schoolYearId:"year-A"},
+        {programId:"A",kind:"section",status:"active",studentProfileId:"different-student",sectionId:"sec-A",schoolYearId:"year-A"},
+        {programId:"B",kind:"section",status:"active",studentProfileId:"student-1",sectionId:"sec-B",schoolYearId:"year-B"},
       ],
     });
     expect(snapshot.programs[0]?.counts.activeProgramStudents).toBe(1);
@@ -93,6 +93,15 @@ describe("FullFlow operational record projection", () => {
       sections:rows.sections.map(row=>row.id==="sec-A"?{...row,versionStatus:"draft"}:row),
     });
     expect(unpublished.programs[0]?.counts.placedStudents).toBe(0);
+  });
+  it("rejects a class assigned in the wrong school year",()=>{
+    const wrong=summarizeFullFlowOperations({...rows,
+      enrollments:rows.enrollments.map(enrollment=>
+        enrollment.kind==="section" && enrollment.programId==="A"
+          ? {...enrollment,schoolYearId:"last-year"} : enrollment),
+    });
+    expect(wrong.programs[0]?.counts.activeProgramStudents).toBe(1);
+    expect(wrong.programs[0]?.counts.placedStudents).toBe(0);
   });
   it("returns zeros rather than inventing readiness for a school with no program", () => {
     const snapshot=summarizeFullFlowOperations({
