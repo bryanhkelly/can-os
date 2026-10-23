@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  accessAccounts, applications, householdMemberships, households,
+  accessAccounts, applications, guardianRelationships, householdMemberships, households,
   people, programs, studentProfiles,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -68,6 +68,16 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
       }
     }));
     const activePrograms=verified.filter((program):program is NonNullable<typeof program>=>program!==null);
+    // A registrar may have created an inquiry on behalf of a family.
+    // The adult can resume it only AFTER the precise child relationship is
+    // independently verified. Own submissions remain visible while pending.
+    const verifiedRelations=await db.select({studentPersonId:guardianRelationships.studentPersonId})
+      .from(guardianRelationships).where(and(
+        eq(guardianRelationships.guardianPersonId,actor.actorPersonId),
+        eq(guardianRelationships.canManageEnrollment,true),
+        sql`${guardianRelationships.metadata}->>'verification' = 'verified'`,
+      ));
+    const verifiedStudentIds=verifiedRelations.map(row=>row.studentPersonId);
     const existing=await db.select({
       applicationId:applications.id,programId:applications.programId,
       programName:programs.name,studentFirstName:people.legalFirstName,
@@ -77,7 +87,8 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
       .innerJoin(programs,eq(programs.id,applications.programId))
       .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
       .innerJoin(people,eq(people.id,studentProfiles.personId))
-      .where(and(eq(applications.submittedByPersonId,actor.actorPersonId),
+      .where(and(or(eq(applications.submittedByPersonId,actor.actorPersonId),
+          ...(verifiedStudentIds.length?[inArray(studentProfiles.personId,verifiedStudentIds)]:[])),
         inArray(applications.programId,programIds),
         inArray(programs.organizationId,organizationIds),
         inArray(programs.siteId,siteIds)))
