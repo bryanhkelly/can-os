@@ -172,12 +172,10 @@ export async function changeSitePublication(
     // Only a changed-to-published state requires content readiness.
     // This queries the canonical published Seasons inside the same transaction.
     // Unpublishing is never prevented by empty or expired offerings.
-    const [enrichmentListings, academicListings] =
-      input.action === "publish" && current.status === "draft"
-        ? await Promise.all([
-          readEnrichmentCatalog(site.id, tx),
-          readAcademicProgramCatalog(site.id, tx),
-        ]) : [[], []];
+    // Keep queries sequential on the same transactional connection.
+    const needsReadiness = input.action === "publish" && current.status === "draft";
+    const enrichmentListings = needsReadiness ? await readEnrichmentCatalog(site.id, tx) : [];
+    const academicListings = needsReadiness ? await readAcademicProgramCatalog(site.id, tx) : [];
     const eligibleCount = enrichmentListings.length + academicListings.length;
     const decision = planSitePublicationTransition({
       current, action: input.action, expectedRevision: input.expectedRevision,
