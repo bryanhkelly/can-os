@@ -288,6 +288,13 @@
       "when": 1792735200000,
       "tag": "0040_site_local_content",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792738800000,
+      "tag": "0041_pending_guardian_access_defaults",
+      "breakpoints": true
     }
   ]
 }
