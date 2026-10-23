@@ -533,8 +533,10 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
    metadata:applications.metadata}).from(applications)
    .innerJoin(programs,eq(programs.id,applications.programId))
    .where(eq(applications.id,data.applicationId)).limit(1);
-  if(!application||!actor.scope.programIds?.includes(application.programId))
-   throw new AuthorizationError("admissions invitation");
+  if(!application||!actor.scope.programIds?.includes(application.programId)||
+    !actor.scope.organizationIds?.includes(application.organizationId)||
+    (application.siteId!==null&&!actor.scope.siteIds?.includes(application.siteId)))
+   throw new AuthorizationError("admissions invitation Program, school and site scope");
   const contactId=String(application.metadata.contactPersonId??"");
   const [contact]=await db.select({email:people.email})
    .from(people).where(eq(people.id,contactId)).limit(1);
@@ -582,9 +584,13 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
    const [app]=await tx.select({
     id:applications.id,programId:applications.programId,
     studentProfileId:applications.studentProfileId,metadata:applications.metadata,
-   }).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
-   if(!app||!actor.scope.programIds?.includes(app.programId))
-    throw new AuthorizationError("guardian relationship verification");
+    organizationId:programs.organizationId,siteId:programs.siteId,
+   }).from(applications).innerJoin(programs,eq(programs.id,applications.programId))
+     .where(eq(applications.id,data.applicationId)).limit(1);
+   if(!app||!actor.scope.programIds?.includes(app.programId)||
+      !actor.scope.organizationIds?.includes(app.organizationId)||
+      (app.siteId!==null&&!actor.scope.siteIds?.includes(app.siteId)))
+    throw new AuthorizationError("guardian relationship verification Program, school and site scope");
    assertRecordWriteAllowed(app.metadata,"registrar");
    const contactId=String(app.metadata.contactPersonId??"");
    const [learner]=await tx.select({personId:studentProfiles.personId})
