@@ -247,16 +247,16 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
         {sections.filter(s => s.enrolled).map(s =>
           <span key={s.id} className="rounded-full border px-2 py-1 text-xs">Assigned: {s.title}</span>)}
       </div>
-      {sections.some(s => !s.enrolled && (!s.staffed||!s.curriculumReady)) && <p role="status" className="text-xs text-amber-700">
-        Some classes cannot accept students yet: assign an active, school-authorized teacher
-        and publish their instructional course version.
+      {sections.some(s => !s.enrolled && !s.readyForPlacement) && <p role="status" className="text-xs text-amber-700">
+        Some classes cannot accept students yet: verify an institutional teacher
+        with a published first lesson and current CAN–church academic services agreement.
       </p>}
-      {sections.some(s => !s.enrolled && s.staffed && s.curriculumReady) ? <div className="flex flex-wrap items-end gap-2">
+      {sections.some(s => !s.enrolled && s.readyForPlacement) ? <div className="flex flex-wrap items-end gap-2">
         <label className="min-w-48 flex-1 text-xs">Available section
           <select value={chosen} onChange={e => setChosen(e.target.value)}
             className="mt-1 block w-full rounded-md border bg-background p-2">
             <option value="">Select a section</option>
-            {sections.filter(s => !s.enrolled && s.staffed && s.curriculumReady).map(s =>
+            {sections.filter(s => !s.enrolled && s.readyForPlacement).map(s =>
               <option key={s.id} value={s.id}>{s.title} ({s.code})</option>)}
           </select>
         </label>
@@ -267,7 +267,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
       </div> : <p className="text-xs text-muted-foreground">
         {sections.length
           ? sections.every(s => s.enrolled) ? "All currently available sections are assigned."
-            : "No available instructional class is both staffed and curriculum-ready. Assign a teacher and publish the course before activation."
+            : "No class is ready for placement: verify the responsible institution's teacher, first lesson and operating agreement."
           : "No eligible sections are configured for this student's active school year."}
       </p>}
     </div>}
