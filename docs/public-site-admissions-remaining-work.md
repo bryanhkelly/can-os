@@ -95,7 +95,7 @@ tests or release gates have passed.
 - **Depends on:** Existing `actions` schema and scoped action workflow;
   public interest inbox.
 
-**PUB-10 — Contact outcome and contact history.** `Partial`
+**PUB-10 — Contact outcome and contact history.** `Committed / unverified`
 - **Implement:** Distinguish attempted contact, reached, tour requested,
   declined/not interested and no response; record when/by whom and next
   follow-up, ideally as existing Action evidence and (when appropriate)
@@ -105,8 +105,30 @@ tests or release gates have passed.
 - **DoD:** Contact outcome survives reload, affects queue sorting,
   supports reschedule/closure and is auditable; interest conversion
   preserves and closes/resolves its follow-up without erasing history.
-- **Depends on:** PUB-09, current unverified `contacted/closed/converted`
-  dispositions.
+- **Implementation (stacked draft, no passing-run evidence):**
+  `src/domain/public-interest-contact-history.ts` defines the five
+  staff-recorded outcomes (attempted, reached, tour requested, not interested,
+  no response), retry-safe append-only records stored in the existing Action
+  `evidence` JSONB, and size bounds. `recordPublicInterestContact` requires
+  a verified scoped registrar, locks the source interest to serialize with
+  status, reassignment and GF22 conversion, and writes server-attributed
+  outcome/date/note/next deadline with AuditEvent and DomainEvent evidence.
+  An explicit "not interested" result closes the interest and resolves
+  the Action in the same transaction; reached/tour updates the coarse
+  contacted state. Notes remain in restricted Action evidence and are not
+  copied into event/audit payloads or public website data.
+  The admissions inbox displays the full chronological contact log,
+  staff attribution and deadlines, and sorts open overdue work before
+  ordinary items, with closed/resolved at the end.
+- **Open acceptance:** Unit tests added but not executed in this session.
+  Typecheck, browser workflow, disposable-Neon integration, restart/retry
+  and cross-site/disabled actor denials remain unverified. Contact logging
+  does not send email/SMS or fabricate a CommunicationThread; outbound
+  provider, consent and delivery receipts are later integrations.
+  Action history is capped at 100 entries per interest; consider a
+  normalized activity ledger if real use exceeds that limit.
+- **Depends on:** PUB-09 (stacked PR), current
+  `contacted/closed/converted` dispositions.
 
 **PUB-11 — Confirmed program inquiry → family application CTA.** `Partial`
 - **Implement:** Show *Apply* only when the actual Program admissions/

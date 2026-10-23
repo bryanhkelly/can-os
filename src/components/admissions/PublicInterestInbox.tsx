@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
+import { PublicContactHistory } from "./PublicContactHistory";
 import {
   assignPublicInterestFollowUp, listPublicAdmissionsInterests,
   listPublicInterestFollowUpAssignees, resolvePublicInterestFollowUp,
@@ -116,13 +117,11 @@ export function PublicInterestInbox({ items, assignees }: {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  async function changeStatus(row: Row, status: "contacted" | "closed") {
+  async function closeInterest(row: Row) {
     setBusyId(row.id); setError(""); setNotice("");
     try {
-      await setPublicAdmissionsInterestStatus({ data: { interestId: row.id, status } });
-      setNotice(status === "contacted"
-        ? "Contact recorded. This does not verify a guardian or create an Application."
-        : "Interest and its open follow-up closed.");
+      await setPublicAdmissionsInterestStatus({ data: { interestId: row.id, status: "closed" } });
+      setNotice("Interest and its open follow-up closed.");
       await router.invalidate();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not update interest.");
@@ -163,14 +162,9 @@ export function PublicInterestInbox({ items, assignees }: {
               className="rounded-lg border px-3 py-2 text-xs font-semibold">
               Review and create inquiry
             </Link>}
-            {row.status === "new" && <button type="button" disabled={busyId !== null}
-              onClick={() => void changeStatus(row, "contacted")}
-              className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
-              Mark contacted
-            </button>}
             {row.status !== "closed" && row.status !== "converted" &&
               <button type="button" disabled={busyId !== null}
-                onClick={() => void changeStatus(row, "closed")}
+                onClick={() => void closeInterest(row)}
                 className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
                 Close
               </button>}
@@ -179,6 +173,7 @@ export function PublicInterestInbox({ items, assignees }: {
         {row.message && <p className="mt-3 whitespace-pre-wrap text-sm">{row.message}</p>}
         <FollowUpControls row={row} assignees={assignees}
           onSaved={async () => { await router.invalidate(); }} />
+        <PublicContactHistory row={row} onSaved={async () => { await router.invalidate(); }} />
       </article>)}
       {items.length === 0 && <p className="text-sm text-muted-foreground">
         No public information requests in your authorized programs.
