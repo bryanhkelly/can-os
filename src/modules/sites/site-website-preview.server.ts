@@ -1,68 +1,15 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
-import type { SiteLocalContent } from "@/domain/site-local-content";
-import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import {
-  memberships, organizations, people, roleAssignments,
-  sitePublications, sites,
-} from "@/db/schema";
+import { sitePublications } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
-import { AuthorizationError } from "@/domain/command-context";
-import {
-  assertPartnerWebsitePreviewScope, siteWebsiteDraftReadCapability,
-} from "@/domain/site-publication-policy";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
+import type { SiteLocalContent } from "@/domain/site-local-content";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
-
-/**
- * PUB-18: A site editor sees only their active, site-specific membership's
- * public-safe draft projection. They NEVER receive the institutional publisher
- * DTO (which includes internal Programs) or any publisher mutation.
- *
- * Provisioning requires BOTH an active verified account-person grant with
- * role="site_website_editor", organizationId and siteId AND a same-person
- * role_assignment for the Site carrying "site.website.draft.read".
- * Neither a network agreement nor a general role creates these grants.
- */
-type Reader = Pick<typeof db, "select">;
-
-export async function requirePartnerWebsiteEditor(actor: AccessContext, executor: Reader = db) {
-  const siteId = actor.grantSiteId;
-  if (!siteId || !actor.actorPersonId || actor.role !== "site_website_editor") {
-    throw new AuthorizationError("site-specific website editor membership");
-  }
-
-  const [site] = await executor.select({
-    id: sites.id, organizationId: sites.organizationId,
-    name: sites.name, organizationName: organizations.name,
-  }).from(sites)
-    .innerJoin(organizations, eq(organizations.id, sites.organizationId))
-    .where(eq(sites.id, siteId)).limit(1);
-  if (!site) throw new AuthorizationError("partner website Site does not exist");
-  assertPartnerWebsitePreviewScope(actor, site);
-
-  const [assignment] = await executor.select({ id: roleAssignments.id })
-    .from(roleAssignments)
-    .innerJoin(memberships, and(
-      eq(memberships.personId, roleAssignments.personId),
-      eq(memberships.organizationId, roleAssignments.organizationId),
-    ))
-    .innerJoin(people, eq(people.id, roleAssignments.personId))
-    .where(and(
-      eq(roleAssignments.personId, actor.actorPersonId),
-      eq(people.active, true),
-      eq(roleAssignments.roleKey, "site_website_editor"),
-      eq(roleAssignments.organizationId, site.organizationId),
-      eq(roleAssignments.siteId, site.id),
-      isNull(roleAssignments.programId),
-      sql`${roleAssignments.capabilities} @> ${JSON.stringify([siteWebsiteDraftReadCapability])}::jsonb`,
-    )).limit(1);
-  if (!assignment) throw new AuthorizationError("explicit Site website editor assignment");
-  return site;
-}
+import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
+import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 
 /** Public-safe private preview; institution-owned fields are still read-only. */
 export async function getPartnerWebsitePreview(actor: AccessContext) {
