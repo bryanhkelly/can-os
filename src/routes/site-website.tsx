@@ -139,6 +139,11 @@ function LocalWebsiteCopyEditor({
       approval. Official curriculum, admissions, tuition, accreditation and
       school-of-record information comes from CAN OS and cannot be edited here.
     </p>
+    {!data.canPublish && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
+      You can preview this Site, but your current verified Site assignment has not
+      been granted local website publishing. Ask the Site administrator to assign
+      that specific capability; CAN academic approval is not required for church copy.
+    </p>}
     {data.localContentStatus === "review_required" && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
       Your latest proposed wording includes a protected claim. It is held for review;
       the last published church copy remains unchanged.
@@ -160,7 +165,7 @@ function LocalWebsiteCopyEditor({
                 ({ ...old, [field.key]: e.target.value }))}
               className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />}
       </label>)}
-      <button type="submit" disabled={busy}
+      <button type="submit" disabled={busy || !data.canPublish}
         className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
         {busy ? "Saving…" : "Publish church-owned content"}
       </button>
@@ -177,7 +182,7 @@ function LocalWebsiteCopyEditor({
           className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
           <span>Revision {version.revision} · {version.status === "published" ? "Published" : "Held for review"}
             {" · "}{new Date(version.createdAt).toLocaleString()}</span>
-          {version.status === "published" && version.revision < data.currentRevision &&
+          {data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
             <button type="button" disabled={busy} onClick={() => void restore(version.revision)}
               className="rounded-lg border px-3 py-1 text-xs disabled:opacity-50">
               Restore as new revision
