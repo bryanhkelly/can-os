@@ -72,6 +72,10 @@ export async function startFamilyApplication(
 
   return db.transaction(async (tx) => {
     if (input.parentSelfService) {
+      // Serialize concurrent submissions by this verified adult and Program,
+      // including first submissions where no Household exists yet. A retry
+      // and a fresh browser request must not create duplicate Student people.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"family-application:"+actorPersonId+":"+input.programId}))`);
       const [opening] = await tx.select({status:programs.status,organizationId:programs.organizationId,
         siteId:programs.siteId}).from(programs).where(eq(programs.id,input.programId)).for("share").limit(1);
       assertGuardianApplicationOpening(opening,context.scope);
@@ -174,8 +178,12 @@ export async function startFamilyApplication(
       const [duplicate] = await tx.select({id:applications.id}).from(applications)
         .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
         .innerJoin(people,eq(people.id,studentProfiles.personId))
-        .where(and(eq(applications.householdId,householdId),
-          eq(applications.programId,input.programId),
+        .where(and(eq(applications.programId,input.programId),
+          // This exact authenticated adult's own submission or a child
+          // already in their selected Household. Never match by surname
+          // alone, and never infer a verified guardian relationship.
+          sql`(${applications.submittedByPersonId} = ${actorPersonId}
+            OR ${applications.householdId} = ${householdId})`,
           inArray(applications.stage,["inquiry","application","eligibility","accepted"]),
           sql`lower(btrim(${people.legalFirstName})) = ${input.student.legalFirstName.trim().toLowerCase()}`,
           sql`lower(btrim(${people.legalLastName})) = ${input.student.legalLastName.trim().toLowerCase()}`,
