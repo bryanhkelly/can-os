@@ -51,10 +51,13 @@ or [integration convergence plan](./integration-convergence-audit.md).
 | Registrar-scoped inquiry inbox, contacted/closed disposition | `src/components/admissions/PublicInterestInbox.tsx`; `src/modules/enrollment/public-admissions-interest.functions.ts` | Committed / unverified |
 | Staff-reviewed conversion to canonical GF22 Application `inquiry` stage | `src/modules/enrollment/admissions-intake.functions.ts`; `src/routes/admissions.intake.tsx`; migration `0038` | Committed / unverified |
 
-**Not yet shipped:** publicly resolving and hosted websites, family account
-signup, enrollment-ready application submission, payments or registration CTAs,
-automated follow-up/assignments, partner content editing, custom designs/domains,
-site-generation during onboarding, network-wide website operations.
+**Not yet operationally accepted:** publicly resolving and hosted
+websites, family account signup, enrollment-ready application submission,
+payments or registration CTAs, and network-wide website operations.
+Draft-site generation during new Site creation **and** first Program launch
+at an existing Site is now source-committed, not validated or publicly live.
+Partner local website editing is also source-committed but not fully accepted.
+Follow-up assignments and advanced designs/domains remain separate work.
 
 ## Current priority: one connected school journey
 
