@@ -101,6 +101,9 @@ export async function setSiteLocalDelegation(actor: AccessContext, input: {
     assertLocalDelegationIssuer(actor, {
       organizationId: host.organizationId, siteId: host.siteId, programId: host.id,
     });
+    if (host.requiresDelegation && input.responsibility === "room_facilitator" &&
+        input.action === "appoint")
+      throw new AuthorizationError("Use named, Section-specific facilitator appointments for church/CAN schools");
     // Serializes concurrent appointees and revocation with the same Program.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:" + host.id}))`);
     let config = await currentConfiguration(tx, host.id);
