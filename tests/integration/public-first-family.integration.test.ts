@@ -15,7 +15,6 @@ vi.mock("@/db/client",()=>({
     return state.tx;
   },
 }));
-vi.mock("@/tanstack/react-start",()=>({}));
 vi.mock("@tanstack/react-start",()=>({
  createServerFn:()=>({
   parse:(value:unknown)=>value,
