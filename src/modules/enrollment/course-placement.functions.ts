@@ -2,7 +2,7 @@ import {activateSectionEnrollment} from "./section-allocation.service";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accountPersonGrants, applications, enrollments, people, programs, sections, sectionTeachers, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -40,10 +40,16 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
    // UI previews only actual staffed options; a registered Teacher must have
    // an active named assignment and a current school/institution grant.
    const teachers=rows.length?await db.select({sectionId:sectionTeachers.sectionId})
-     .from(sectionTeachers).innerJoin(people,eq(people.id,sectionTeachers.personId))
+     .from(sectionTeachers)
+     .innerJoin(sections,eq(sections.id,sectionTeachers.sectionId))
+     .innerJoin(programs,eq(programs.id,sections.programId))
+     .innerJoin(people,eq(people.id,sectionTeachers.personId))
      .innerJoin(accountPersonGrants,and(
        eq(accountPersonGrants.personId,sectionTeachers.personId),
        eq(accountPersonGrants.role,"teacher"),eq(accountPersonGrants.active,true),
+       or(eq(accountPersonGrants.organizationId,programs.organizationId),
+          eq(accountPersonGrants.organizationId,programs.academicProviderOrganizationId)),
+       or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,sections.siteId)),
      ))
      .where(and(inArray(sectionTeachers.sectionId,rows.map(row=>row.id)),
        eq(people.active,true))):[];
