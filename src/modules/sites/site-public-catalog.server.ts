@@ -4,6 +4,7 @@ import { organizations, sitePublications, sites } from "@/db/schema";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { isSitePubliclyPublished, toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
+import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 
 /**
  * Public Site projection, independently gated by an approved Site publication
@@ -31,10 +32,14 @@ export async function readPublishedSiteCatalog(slug: string) {
       )).for("share", { of: sitePublications }).limit(1);
     if (!site || !isSitePubliclyPublished(site)) return null;
 
-    const offerings = await readEnrichmentCatalog(site.id, tx);
+    const [offerings, academicPrograms] = await Promise.all([
+      readEnrichmentCatalog(site.id, tx),
+      readAcademicProgramCatalog(site.id, tx),
+    ]);
     return {
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
+      academicPrograms,
       offerings: offerings.map(toPublicSiteEnrichment),
     };
   });
