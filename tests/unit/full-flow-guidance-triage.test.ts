@@ -24,7 +24,7 @@ describe("guided school launch",()=>{
   });
   it("sends schools without applicants to the real registrar intake, not website publishing",()=>{
     const steps=guidedSchoolJourney({...program,type:"church_hosted_academy"},null);
-    expect(steps[2]?.nextAction).toBe("Start your first family application");
+    expect(steps[2]?.nextAction).toBe("Start your first family intake");
     expect(steps[2]?.href).toContain("/admissions/intake?programId=");
     expect(steps[2]?.href).toContain("&siteId=");
     const started=guidedSchoolJourney({...program,counts:{...program.counts,applications:1}},null);
