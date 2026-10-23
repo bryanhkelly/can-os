@@ -71,6 +71,11 @@ function GuardianApplyWorkspace({data}:{
         {data.applications.map(app=><article className="rounded-lg border p-3" key={app.applicationId}>
           <p className="font-semibold">{app.studentFirstName} {app.studentLastName}</p>
           <p className="text-sm">{app.programName} · {app.stage.replaceAll("_"," ")}</p>
+          <p role="status" className="mt-1 text-xs text-muted-foreground">
+            {app.guardianVerified
+              ? "Guardian authority verified. Review your enrollment checklist and any offers."
+              : "Independent guardian verification pending. Admissions must verify your relationship before forms or offers are available."}
+          </p>
           <p className="mt-1 text-xs text-muted-foreground">Last updated {new Date(app.updatedAt).toLocaleDateString()}</p>
         </article>)}
       </div>:<p className="mt-3 text-sm">No applications submitted from this family account yet.</p>}
