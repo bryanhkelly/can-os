@@ -200,6 +200,8 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
     expect(staleDuty.statuses[0]).toMatchObject({
       status:"not_reported",canRespond:false,canAccept:false,
     });
+    expect(staleDuty.unacknowledged).toBe(0); // closure is NOT missed duty
+    expect(staleDuty.coverageExceptions).toBe(0);
     await expect(duty.respondToOnsiteDuty({data:dutyRequest}))
       .rejects.toThrow("current named onsite duty assignment");
     await tx.update(s.academicCalendarDays).set({
