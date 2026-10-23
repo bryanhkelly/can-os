@@ -23,6 +23,10 @@ vi.mock("@/db/client", () => {
       callback({ select }),
   } };
 });
+vi.mock("@/modules/sites/academic-program-catalog.server", () => ({
+  readAcademicProgramCatalog: async () => [],
+}));
+
 vi.mock("@/modules/activities/enrichment-catalog.server", () => ({
   readEnrichmentCatalog: async (siteId: string) => {
     state.enrichmentSiteIds.push(siteId);
