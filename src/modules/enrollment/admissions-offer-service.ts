@@ -47,7 +47,7 @@ async function assertGuardian(tx:Transaction,actorId:string|null,studentProfileI
  const [profile]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,studentProfileId)).limit(1);
  if(!profile)throw new Error("Student not found");
  const [relationship]=await tx.select({id:guardianRelationships.id,canManageEnrollment:guardianRelationships.canManageEnrollment,metadata:guardianRelationships.metadata}).from(guardianRelationships).where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.guardianPersonId,actorId),eq(guardianRelationships.canManageEnrollment,true))).for("share").limit(1);
- if(!isVerifiedEnrollmentGuardian(relationship))throw new AuthorizationError("Independently verified guardian authority is required for enrollment offers");
+ if(!isVerifiedEnrollmentGuardian(relationship))throw new AuthorizationError("Guardian is not authorized for enrollment without independent verification");
 }
 async function ready(tx:Transaction,applicationId:string){
  const [journey]=await tx.select({id:journeys.id,status:journeys.status}).from(journeys).where(and(eq(journeys.participantType,"application"),eq(journeys.participantId,applicationId))).for("update").limit(1);
