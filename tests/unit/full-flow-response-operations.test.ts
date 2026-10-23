@@ -83,6 +83,17 @@ describe("FullFlow operational record projection", () => {
     expect(snapshot.programs[0]?.counts.placedStudents).toBe(0);
     expect(snapshot.programs[1]?.counts.placedStudents).toBe(0);
   });
+  it("does not report first student in class when the Section is unstaffed or has draft curriculum",()=>{
+    const unstaffed=summarizeFullFlowOperations({...rows,
+      teacherAssignments:[],
+    });
+    expect(unstaffed.programs[0]?.counts.activeProgramStudents).toBe(1);
+    expect(unstaffed.programs[0]?.counts.placedStudents).toBe(0);
+    const unpublished=summarizeFullFlowOperations({...rows,
+      sections:rows.sections.map(row=>row.id==="sec-A"?{...row,versionStatus:"draft"}:row),
+    });
+    expect(unpublished.programs[0]?.counts.placedStudents).toBe(0);
+  });
   it("returns zeros rather than inventing readiness for a school with no program", () => {
     const snapshot=summarizeFullFlowOperations({
       ...rows,programs:[],sections:[],teacherAssignments:[],adoptions:[],
