@@ -358,5 +358,53 @@ integration("GF36 co-curriculars and athletics", () => {
     const [unopened] = await db.select({ status: schema.activitySeasons.status })
       .from(schema.activitySeasons).where(eq(schema.activitySeasons.id, seasonId));
     expect(unopened.status).toBe("draft");
+
+    // A regular noncredit after-school timetable reuses the canonical calendar,
+    // not an academic Section or a second scheduler.
+    await db.insert(schema.accountPersonGrants).values({
+      accountId: readinessAccount.id,
+      personId: coach.id, role: "teacher",
+      organizationId: org.id, siteId: site.id, active: true,
+    });
+    const { scheduleExtendedSessions } = await import(
+      "@/modules/activities/extended-learning-sessions.server"
+    );
+    const scheduleInput = {
+      seasonId, fromDate: "2028-02-07", throughDate: "2028-02-16",
+      weekdays: [1,3], startTime: "15:00", endTime: "17:00",
+      location: "Homework Room", facilitatorPersonId: coach.id,
+    };
+    await expect(scheduleExtendedSessions({
+      ...readinessContext, scope: { ...readinessContext.scope,
+        siteIds: [crypto.randomUUID()] },
+    }, scheduleInput)).rejects.toThrow(/authorized season/);
+    await expect(scheduleExtendedSessions(readinessContext, {
+      ...scheduleInput, facilitatorPersonId: guardian.id,
+    })).rejects.toThrow(/verified, active grant/);
+    for (const writer of ["writeAudit", "emitEvent"] as const) {
+      await expectEvidenceFailure(db, writer, () =>
+        scheduleExtendedSessions(readinessContext, scheduleInput));
+      const records = await db.select().from(schema.calendarEvents)
+        .where(eq(schema.calendarEvents.type, "extended_learning_session"));
+      expect(records.filter(item => item.sourceId === seasonId)).toHaveLength(0);
+    }
+    const saved = await scheduleExtendedSessions(readinessContext, scheduleInput);
+    expect(saved).toMatchObject({ created: 4, total: 4, timezone: "America/New_York" });
+    const replayed = await scheduleExtendedSessions(readinessContext, scheduleInput);
+    expect(replayed.created).toBe(0);
+    const sessions = await db.select().from(schema.calendarEvents)
+      .where(eq(schema.calendarEvents.type, "extended_learning_session"));
+    const ownSessions = sessions.filter(item => item.sourceId === seasonId);
+    expect(ownSessions).toHaveLength(4);
+    expect(ownSessions[0]?.startsAt.toISOString()).toBe("2028-02-07T20:00:00.000Z");
+    expect(ownSessions.every(item => item.metadata.extendedLearningDraft === true)).toBe(true);
+    expect(ownSessions.every(item => item.metadata.extendedLearningSession &&
+      (item.metadata.extendedLearningSession as { facilitatorPersonId?: string }).facilitatorPersonId === coach.id)).toBe(true);
+    await expect(scheduleExtendedSessions(readinessContext, {
+      ...scheduleInput, location: "Different Room",
+    })).rejects.toThrow(/different details/);
+    const [stillDraft] = await db.select({ status: schema.activitySeasons.status })
+      .from(schema.activitySeasons).where(eq(schema.activitySeasons.id, seasonId));
+    expect(stillDraft.status).toBe("draft");
   });
 });
