@@ -238,6 +238,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/guardian.apply.tsx",
+      "route": "/guardian/apply",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/guardian.attendance.tsx",
       "route": "/guardian/attendance",
       "owner": "family",
