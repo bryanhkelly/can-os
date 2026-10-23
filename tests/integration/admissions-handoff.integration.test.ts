@@ -415,7 +415,7 @@ integration("cross-persona admissions through active classes",()=>{
     state.actor={...learner,scope:{...learner.scope,programIds:[]}};
     await expect(getMyStudentToday()).rejects.toThrow("active student membership");
     const course=first(await tx.insert(s.courseTemplates).values({owningOrganizationId:org.id,code:key,title:"Enrolled Science",subject:"Science"}).returning());
-    const version=first(await tx.insert(s.courseTemplateVersions).values({courseTemplateId:course.id,version:1,status:"published"}).returning());
+    const version=first(await tx.insert(s.courseTemplateVersions).values({courseTemplateId:course.id,version:1,status:"published",curriculum:{learning:{version:1,modules:[{id:"intro",title:"Science introduction",lessons:[{id:"first",title:"First science lesson",body:"Read the science introduction and discuss your observations.",resources:[]}]}]}}}).returning());
     const section=first(await tx.insert(s.sections).values({programId:program.id,siteId:site.id,termId:time.term.id,
      courseTemplateVersionId:version.id,code:key,title:"Enrolled Science"}).returning());
     await tx.insert(s.sectionRegistrationPolicies).values({sectionId:section.id,enrollmentCapacity:1,
