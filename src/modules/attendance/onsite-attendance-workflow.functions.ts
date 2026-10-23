@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -151,6 +152,9 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
       inArray(enrollments.programId, permittedIds),
       ...(studentId ? [eq(enrollments.studentProfileId, studentId)] : []))) : [];
 
+  // A stale Section enrollment does not establish physical attendance
+  // eligibility after its Program enrollment or school year is withdrawn.
+  const activeProgramEnrollment=alias(enrollments,"onsite_current_program_enrollment");
   const sectionsAtSite = await db.select({
     studentProfileId: enrollments.studentProfileId, programId: sections.programId,
     siteId: sections.siteId, sectionId: sections.id, sectionTitle: sections.title,
@@ -159,11 +163,20 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
   }).from(enrollments)
     .innerJoin(sections, eq(sections.id, enrollments.sectionId))
     .innerJoin(terms, eq(terms.id, sections.termId))
+    .innerJoin(activeProgramEnrollment,and(
+      eq(activeProgramEnrollment.studentProfileId,enrollments.studentProfileId),
+      eq(activeProgramEnrollment.programId,sections.programId),
+      eq(activeProgramEnrollment.schoolYearId,terms.schoolYearId),
+      eq(activeProgramEnrollment.kind,"program"),
+      eq(activeProgramEnrollment.status,"active"),
+    ))
     .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
     .innerJoin(studentProfiles, eq(studentProfiles.id, enrollments.studentProfileId))
     .innerJoin(people, eq(people.id, studentProfiles.personId))
     .leftJoin(sectionTeachers, eq(sectionTeachers.sectionId, sections.id))
     .where(and(eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
+      eq(enrollments.programId,sections.programId),
+      eq(enrollments.schoolYearId,terms.schoolYearId),
       eq(sections.active, true), eq(schoolYears.status, "active"),
       lte(schoolYears.startsOn, date), gte(schoolYears.endsOn, date),
       inArray(sections.programId, permittedIds),
