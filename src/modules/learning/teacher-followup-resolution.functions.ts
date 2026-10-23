@@ -3,6 +3,8 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { STUDENT_LEARNING_GOAL_TYPE } from "@/domain/teacher-student-goal";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { accessibleClasses } from "./class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 import {
   teacherFollowUpResolutionInput,
   teacherFollowUpResolutionNote,
@@ -14,9 +16,9 @@ async function teacherActor() {
   if (actor.role !== "teacher" || !actor.actorPersonId)
     throw new AuthorizationError("verified teacher required");
   assertCapability(actor, "teacher:read");
-  if (!actor.scope.organizationIds?.length ||
-      !actor.scope.siteIds?.length || !actor.scope.programIds?.length)
-    throw new AuthorizationError("authorized school/section scope");
+  if (!(actor.scope.siteIds?.length && actor.scope.programIds?.length) &&
+      !actor.scope.sectionIds?.length)
+    throw new AuthorizationError("authorized named teaching Section");
   return { ...actor, actorPersonId: actor.actorPersonId };
 }
 
@@ -30,6 +32,9 @@ export const getTeacherLearningFollowUps = createServerFn({ method: "GET" })
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await teacherActor();
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+    const sectionIds=(await accessibleClasses(actor as Actor)).map(row=>row.id);
+    if(!sectionIds.length)return {items:[],truncated:false,
+      note:"No current named and authorized teaching Sections."};
     const recent = new Date(Date.now() - 30 * 24 * 60 * 60_000);
     const rows = await db.select({
       id: s.actions.id, title: s.actions.title, description: s.actions.description,
@@ -67,9 +72,7 @@ export const getTeacherLearningFollowUps = createServerFn({ method: "GET" })
         eq(s.actions.organizationId, s.programs.organizationId),
         eq(s.actions.programId, s.sections.programId),
         eq(s.actions.siteId, s.sections.siteId),
-        inArray(s.programs.organizationId, actor.scope.organizationIds ?? []),
-        inArray(s.sections.siteId, actor.scope.siteIds ?? []),
-        inArray(s.sections.programId, actor.scope.programIds ?? []),
+        inArray(s.sections.id,sectionIds),
       ))
       .orderBy(asc(s.actions.dueAt), desc(s.actions.createdAt)).limit(101);
     const parentIds = rows.map(row => row.id);
