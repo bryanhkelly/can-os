@@ -84,7 +84,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
         host.scope.programIds=[launch.programId];
         const services=[
           "academic_instruction","academic_records","onsite_supervision",
-          "school_of_record","credit_issuance","admissions",
+          "school_of_record","credit_issuance","admissions","curriculum",
         ];
         await expect(requestProgramSiteAuthorization(unrelated,{
           programId:launch.programId,services,
@@ -168,11 +168,94 @@ integration("Church-owned Site with independently authorized CAN academic servic
         expect(await requireInstitutionalAcademicProgramAuthority(tx,steward,
           launch.programId,["academic_instruction","academic_records"]))
           .toBe(authorizationId);
-        await expect(requireCurrentProgramSiteAuthorization(tx,launch.programId,[
+        expect(await requireCurrentProgramSiteAuthorization(tx,launch.programId,[
           "curriculum",
-        ])).rejects.toThrow();
-        await expect(requireChurchHostedOperatingServices(tx,launch.programId,
-          ["curriculum"])).rejects.toThrow();
+        ])).toBe(authorizationId);
+        expect(await requireChurchHostedOperatingServices(tx,launch.programId,
+          ["curriculum"])).toBe(authorizationId);
+        // P0: a church facilitator or local "teacher" cannot become the
+        // institution's academic instructor. The original provider-wide CAN
+        // identity, signed curriculum agreement AND exact Section assignment
+        // must jointly authorize one real class. Revoke and prove immediate
+        // denial from a still-signed-in CAN teacher context.
+        const {createAcademicTimeFixture}=await import("./helpers/academic-time");
+        const time=await createAcademicTimeFixture({
+          organizationId:church.id,siteId:site.id,
+          programId:launch.programId,suffix:"teacher-"+suffix,
+        });
+        const [course]=await tx.insert(s.courseTemplates).values({
+          owningOrganizationId:can.id,code:"can-"+suffix,
+          title:"CAN First Class",subject:"Mathematics",
+        }).returning();
+        const [curriculum]=await tx.insert(s.courseTemplateVersions).values({
+          courseTemplateId:course!.id,version:1,status:"published",
+          curriculum:{learning:{version:1,modules:[{
+            id:"intro",title:"Beginning Algebra",lessons:[{
+              id:"first",title:"Your First Lesson",body:"Practice working with expressions.",resources:[],
+            }],
+          }]}},
+        }).returning();
+        const [section]=await tx.insert(s.sections).values({
+          programId:launch.programId,siteId:site.id,termId:time.term.id,
+          courseTemplateVersionId:curriculum!.id,code:"first-"+suffix,
+          title:"First CAN Class",
+        }).returning();
+        const [localPerson,canPerson]=await Promise.all([
+          tx.insert(s.people).values({
+            legalFirstName:"Local",legalLastName:"Facilitator",
+          }).returning().then(x=>x[0]!),
+          tx.insert(s.people).values({
+            legalFirstName:"CAN",legalLastName:"Instructor",
+          }).returning().then(x=>x[0]!),
+        ]);
+        const [localAccount,canAccount]=await Promise.all([
+          tx.insert(s.accessAccounts).values({
+            emailNormalized:"local-"+suffix+"@example.invalid",
+            emailVerifiedAt:new Date(),
+          }).returning().then(x=>x[0]!),
+          tx.insert(s.accessAccounts).values({
+            emailNormalized:"can-teacher-"+suffix+"@example.invalid",
+            emailVerifiedAt:new Date(),
+          }).returning().then(x=>x[0]!),
+        ]);
+        const [localGrant,canGrant]=await Promise.all([
+          tx.insert(s.accountPersonGrants).values({
+            accountId:localAccount.id,personId:localPerson.id,role:"teacher",
+            organizationId:church.id,siteId:site.id,
+          }).returning().then(x=>x[0]!),
+          tx.insert(s.accountPersonGrants).values({
+            accountId:canAccount.id,personId:canPerson.id,role:"teacher",
+            organizationId:can.id,siteId:null,
+          }).returning().then(x=>x[0]!),
+        ]);
+        await tx.insert(s.sectionTeachers).values([
+          {sectionId:section!.id,personId:localPerson.id},
+          {sectionId:section!.id,personId:canPerson.id},
+        ]);
+        const {verifiedTeacherSectionIds}=await import(
+          "@/modules/enrollment/verified-section-teachers.server");
+        expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(true);
+        await tx.update(s.accountPersonGrants).set({active:false})
+          .where(eq(s.accountPersonGrants.id,canGrant.id));
+        // Even with an active host local teacher assignment, no CAN teacher
+        // means enrollment cannot claim an actually staffed academic class.
+        expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(false);
+        await tx.update(s.accountPersonGrants).set({active:true})
+          .where(eq(s.accountPersonGrants.id,canGrant.id));
+        const localTeacher=contextFor("teacher",localPerson.id,church.id,site.id);
+        localTeacher.scope.programIds=[launch.programId];
+        const canTeacher=contextFor("teacher",canPerson.id,can.id,null);
+        canTeacher.scope.sectionIds=[section!.id];
+        const {authorizeClass,accessibleClasses}=await import(
+          "@/modules/learning/class-access.server");
+        await expect(authorizeClass(localTeacher as any,section!.id))
+          .rejects.toThrow("CAN academic provider teacher");
+        expect((await authorizeClass(canTeacher as any,section!.id)).section.id)
+          .toBe(section!.id);
+        expect((await accessibleClasses(canTeacher as any)).map(x=>x.id))
+          .toEqual([section!.id]);
+        expect((await accessibleClasses(localTeacher as any)).map(x=>x.id))
+          .not.toContain(section!.id);
         const [original] = await tx.select({
           organizationId:s.programs.organizationId,
           status:s.programs.status,
@@ -185,6 +268,12 @@ integration("Church-owned Site with independently authorized CAN academic servic
         await revokeProgramSiteAuthorization(host,{
           authorizationId,reason:"The host church withdrew contractual authorization.",
         });
+        // Session-derived Section scope can remain cached: it is NOT authority
+        // after the signed CAN/church academic agreement has been revoked.
+        expect((await accessibleClasses(canTeacher as any)).map(x=>x.id))
+          .not.toContain(section!.id);
+        await expect(authorizeClass(canTeacher as any,section!.id))
+          .rejects.toThrow();
         await expect(requireCurrentProgramSiteAuthorization(tx,launch.programId,[
           "academic_instruction",
         ])).rejects.toThrow();
