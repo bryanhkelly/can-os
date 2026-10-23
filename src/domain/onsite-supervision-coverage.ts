@@ -17,6 +17,8 @@ export type SupervisionBlockInput = {
   facilitatorPersonId: string | null;
   facilitatorName: string | null;
   verifiedSiteStaffGrant: boolean;
+  /** False if this specific site-local date lacks an approved instructional calendar day. */
+  instructionalDayConfirmed?: boolean;
   overlappingFacilitatorAssignments?: boolean;
 };
 
@@ -46,7 +48,7 @@ export function coversLocalSupervisionBlock(input:{
 
 export type SupervisionGap =
   "schedule_missing" | "facilitator_missing" | "staff_grant_missing" |
-  "facilitator_conflict" | "room_unconfigured";
+  "facilitator_conflict" | "room_unconfigured" | "calendar_unverified";
 
 function minutes(input: string | null): number | null {
   if (!input) return null;
@@ -65,6 +67,7 @@ export function summarizeOnsiteSupervision(
     const gaps: SupervisionGap[] = [];
     if (!row.periodId || start === null || end === null || end <= start)
       gaps.push("schedule_missing");
+    if (row.instructionalDayConfirmed === false) gaps.push("calendar_unverified");
     if (!row.facilitatorPersonId) gaps.push("facilitator_missing");
     else if (!row.verifiedSiteStaffGrant) gaps.push("staff_grant_missing");
     if (row.overlappingFacilitatorAssignments) gaps.push("facilitator_conflict");
@@ -97,6 +100,6 @@ export function summarizeOnsiteSupervision(
     unassignedOrConflicting:blocks.filter(x=>!x.assignedPlan).length,
     roomAssignmentsUnverified:blocks.length,
     hasConfirmedPhysicalCoverage:false as const,
-    note:"This is a staffing PLAN from section schedules and current assignments. No authoritative room assignment, on-duty acknowledgment, onsite presence, child release or custody approval exists in this view.",
+    note:"This is a staffing PLAN from approved instructional days, section schedules and current assignments. A closure or missing calendar entry cannot be treated as scheduled instruction. No authoritative room assignment, onsite presence, child release or custody approval exists in this view.",
   };
 }
