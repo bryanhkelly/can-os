@@ -177,6 +177,17 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
    if (data.publicInterestId) {
     if (!program.siteId || data.existingStudent || data.existingApplicationId)
      throw new Error("Public interest conversion requires a newly reviewed student intake");
+    // Keep Site/Organization ownership stable for the duration of the
+    // conversion, even if another administrator is moving the Program.
+    const [boundProgram] = await tx.select({
+      organizationId:programs.organizationId,siteId:programs.siteId,
+    }).from(programs).where(eq(programs.id,data.programId))
+      .for("share").limit(1);
+    if (!boundProgram || boundProgram.organizationId!==program.organizationId ||
+      boundProgram.siteId!==program.siteId ||
+      !actor.scope.organizationIds?.includes(boundProgram.organizationId) ||
+      !actor.scope.siteIds?.includes(boundProgram.siteId))
+     throw new AuthorizationError("public interest Program ownership changed");
     const [interest] = await tx.select({
       id:publicAdmissionsInterests.id,
       status:publicAdmissionsInterests.status,
