@@ -138,10 +138,21 @@ tests or release gates have passed.
   cannot open admissions and does not enable public hostname routing.
   An empty provisioned Site still shows the branded site shell.
   Unit coverage for template parity without active forms is source-committed.
+- **Third source-committed bite (PUB-18 foundation):** An isolated
+  `/site-website` workspace permits a specifically assigned
+  `site_website_editor` to review the same private, public-safe HTML
+  without entering CAN's registrar publishing workspace. The only session
+  capability is `site.website.draft.read`; access also requires an
+  active, Site-bound verified account-person grant and a matching
+  same-Person, same-Organization/Site, membership-backed
+  `role_assignments` entry. The partner cannot list raw Programs or
+  access admissions; both service and unit denial tests are added.
+  Grant creation is **not automated**.
 - **Still outstanding:** Additional real partner/network onboarding entry
-  points, editable and reviewed Site profile fields, independent church
-  partner editor permissions, host/institution role-separated approval
-  boundaries, true editorial draft versus approved snapshot management,
+  points, editable and reviewed Site profile fields, a first-class safe
+  Site-editor grant provisioning/invitation workflow, independent
+  host/institution role-separated approval of protected claims,
+  true editorial draft versus approved snapshot management,
   and verified disposable-Neon/route/browser acceptance. The new Site
   command requires migration `0035` to exist on its isolated target DB;
   do not deploy it to an unmigrated environment. Site creation is a
@@ -215,6 +226,27 @@ tests or release gates have passed.
 - **DoD:** Scoped host may edit **only its draft**; it cannot self-approve
   protected academic claims, change unrelated Sites, or read student
   applications without a separate relationship-specific grant.
+- **First committed permission bite on `FullFlow` (unverified):**
+  `site_website_editor` is a separate role with only
+  `site.website.draft.read`. Its verified active account grant **must**
+  specify the host Organization AND exact Site; the read service also
+  demands an explicit same-Person Site role assignment with that
+  capability and host Organization Membership. Org-wide grants, network
+  affiliation, revoked role assignments, foreign Sites and registrar
+  impersonation cannot satisfy this read boundary. `/site-website`
+  displays ONLY the approved public-safe website projection in a sandboxed
+  iframe (no unpublished Site/Program notes, family data or live forms).
+  Site-publication and academic-marketing commands remain registrar-only.
+  This is **read-only preparation**, not partner editorial write access.
+  Existing installations need an authorized separate process to provision
+  this verified Site grant and RoleAssignment; none are auto-created.
+  Added unit/service tests and a pending route contract but no passing
+  execution evidence.
+- **Next small bite:** Design an auditable, restricted partner draft-copy
+  proposal and review boundary using canonical Site records; do **not**
+  let partner notes overwrite approved claims. Before institution-approved
+  academic publication, establish real provider/issuer authorization
+  independent from the host's current `programs.organizationId` ownership.
 - **Depends on:** Explicit host/institution contracts, PUB-13.
 
 **PUB-19 — Publication lifecycle and change management.** `Partial`
