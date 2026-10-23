@@ -28,9 +28,10 @@
   The page offers one "Activate enrollment and assign class" command, which
   uses the existing Section allocation service **within the Program activation
   transaction**. Staff identity/grant, active Section, matching program/year,
-  live church/CAN academic agreement, class capacity, policy, prerequisites,
-  schedule and audit/outbox all fail closed; any rejection rolls back
-  enrollment and Section placement together. For a church-hosted CAN program
+  live church/CAN academic agreement, **published instructional course**
+  version, class capacity, policy, prerequisites, schedule and audit/outbox
+  all fail closed; any rejection rolls back enrollment and Section placement
+  together. For a church-hosted CAN program
   the direct activation path refuses a missing Section ID entirely.
 - **CAN teaching team:** a CAN account assigned as the Section teacher
   receives only independently approved **Section-level** academic visibility
