@@ -10,7 +10,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
 import { siteDate } from "@/domain/expected-attendance";
-import { summarizeOnsiteSupervision, type SupervisionBlockInput } from "@/domain/onsite-supervision-coverage";
+import { coversLocalSupervisionBlock, summarizeOnsiteSupervision, type SupervisionBlockInput } from "@/domain/onsite-supervision-coverage";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 
 const inputSchema=z.object({date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}).strict();
@@ -88,16 +88,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         .where(and(inArray(deliveryArrangements.sectionId,ids),
           eq(deliveryArrangements.status,"active"))),
     ]);
-    const candidates=arrangements.filter(row=>{
-      if(!["onsite","hybrid"].includes(row.modality))return false;
-      if(!row.facilitatorPersonId)return true;
-      // Effective windows may start/end partway through the selected day;
-      // such partial windows are NOT treated as full-day cover.
-      const start=new Date(data.date+"T00:00:00Z").getTime()-86400_000;
-      const end=new Date(data.date+"T00:00:00Z").getTime()+2*86400_000;
-      return (!row.from || row.from.getTime()<=start) &&
-        (!row.through || row.through.getTime()>=end);
-    });
+    const candidates=arrangements.filter(row=>["onsite","hybrid"].includes(row.modality));
     const peopleIds=[...new Set(candidates.map(row=>row.facilitatorPersonId)
       .filter((id):id is string=>!!id))];
     const [activePeople,staffGrants]=await Promise.all([
@@ -128,20 +119,23 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         row.yearId===section.schoolYearId &&
         (row.programId===null||row.programId===section.programId));
       const assigned=bySection.get(section.id)??[];
-      const uniqueIds=[...new Set(assigned.map(row=>row.facilitatorPersonId).filter(
-        (id):id is string=>!!id))];
-      const personId=uniqueIds.length===1?uniqueIds[0]!:null;
-      const person=personId?peopleById.get(personId):null;
-      const approved=!!person?.active && staffGrants.some(grant=>
-        grant.personId===personId);
       for(const period of templates.length?templates:[null]){
+        const eligible=period?assigned.filter(row=>coversLocalSupervisionBlock({
+          date:data.date,timeZone:site.timezone,startsAtLocal:period.starts,
+          endsAtLocal:period.ends,effectiveFrom:row.from,effectiveThrough:row.through,
+        })):[];
+        const uniqueIds=[...new Set(eligible.map(row=>row.facilitatorPersonId).filter(
+          (id):id is string=>!!id))];
+        const personId=uniqueIds.length===1?uniqueIds[0]!:null;
+        const person=personId?peopleById.get(personId):null;
+        const approved=!!person?.active && staffGrants.some(grant=>grant.personId===personId);
         result.push({
           sectionId:section.id,sectionTitle:section.title,
           programId:section.programId,programName:section.programName,
           periodId:period?.periodId??null,periodLabel:period?.label??null,
           startsAtLocal:period?.starts??null,endsAtLocal:period?.ends??null,
           facilitatorPersonId:personId,
-          facilitatorName:person?.active?person.firstName+" "+person.lastName:null,
+          facilitatorName:approved&&person?person.firstName+" "+person.lastName:null,
           verifiedSiteStaffGrant:approved,
           overlappingFacilitatorAssignments:uniqueIds.length>1,
         });
