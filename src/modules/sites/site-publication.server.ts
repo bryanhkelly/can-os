@@ -5,6 +5,8 @@ import { AuthorizationError } from "@/domain/command-context";
 import { publicSiteHost, requirePublicSiteSlug } from "@/domain/public-site-address";
 import { assertSitePublicationScope, sitePublicationManageCapability } from "@/domain/site-publication-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
+import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 type Reader = Pick<typeof db, "select">;
@@ -47,7 +49,7 @@ async function requireSitePublisher(actor: AccessContext, siteId: string, execut
 /** Private authenticated preview. This never serves as a public Host lookup. */
 export async function getSitePublicationDraft(actor: AccessContext, siteId: string) {
   const site = await requireSitePublisher(actor, siteId);
-  const [address, sitePrograms] = await Promise.all([
+  const [address, sitePrograms, publishedOfferings] = await Promise.all([
     db.select({ slug: sitePublications.slug, status: sitePublications.status })
       .from(sitePublications).where(eq(sitePublications.siteId, site.id)).limit(1),
     db.select({
@@ -58,6 +60,9 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       eq(programs.organizationId, site.organizationId),
       inArray(programs.id, actor.scope.programIds ?? []),
     )).orderBy(asc(programs.name)),
+    // These Seasons already meet the CAN-wide enrichment publication policy,
+    // but remain only a PRIVATE preview until the Site itself is published.
+    readEnrichmentCatalog(site.id),
   ]);
   return {
     site,
@@ -67,6 +72,7 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       status: address[0].status,
     } : null,
     programs: sitePrograms,
+    catalogPreview: publishedOfferings.map(toPublicSiteEnrichment),
   };
 }
 
