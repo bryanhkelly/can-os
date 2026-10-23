@@ -6,7 +6,7 @@ import {
   sitePublications, sites,
 } from "@/db/schema";
 import { publishableAcademicProgram } from "@/domain/academic-program-publication";
-import { parsePublicAdmissionsInterest, type PublicAdmissionsInterestInput } from "@/domain/public-admissions-interest";
+import { publicAdmissionsInterestInput, type PublicAdmissionsInterestInput } from "@/domain/public-admissions-interest";
 import { isPublicSiteSlug } from "@/domain/public-site-address";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -53,7 +53,7 @@ export async function recordPublicAdmissionsInterest(
   input: PublicAdmissionsInterestInput,
 ): Promise<void> {
   if (!isPublicSiteSlug(slug)) throw new Error("This Site is not accepting inquiries");
-  const data = parsePublicAdmissionsInterest(new URLSearchParams(input));
+  const data = publicAdmissionsInterestInput.parse(input);
   if (data.website.trim()) return; // Bot honeypot; do not write contact records.
   const pepper = process.env.CAN_ACCESS_TOKEN_PEPPER;
   if (!pepper || pepper.length < 32) throw new Error("Inquiry security is unavailable");
