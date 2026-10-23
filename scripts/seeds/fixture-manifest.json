@@ -1175,6 +1175,65 @@
         "access_sessions",
         "audit_events"
       ]
+    },
+    "/enrichment": {
+      "persona": "public visitor",
+      "fixtureRequired": false,
+      "rationale": "Enrichment catalog depends on approved, publishable extended Program/Season and permission snapshots introduced in pending isolated migrations 0032-0034. Do not seed fictional approved offerings or imply live enrollment. A real synthetic catalog/browser fixture is required after schema convergence.",
+      "interactions": [
+        "review only publishable extended offerings and their approved windows",
+        "confirm no unapproved, draft, stale or closed offerings appear",
+        "open the guardian enrollment journey without revealing student information"
+      ],
+      "downstreamRecords": []
+    },
+    "/guardian/enrichment": {
+      "persona": "guardian",
+      "fixtureRequired": false,
+      "rationale": "Guardian enrollment needs independently verified household/child relationship, published Season and session-package permission/seat state. The pending 0032-0034 schema has not been migrated on the isolated FullFlow Neon branch, and no authenticated connected browser fixture verifies these transitions.",
+      "interactions": [
+        "select only children whose enrollment relationship is verified",
+        "review a published offer and accept the current permission version",
+        "register or waitlist within capacity and verify canonical activity registration and audit",
+        "deny unauthorized child and stale or unpublished offerings"
+      ],
+      "downstreamRecords": [
+        "activity_registrations",
+        "consent_records",
+        "audit_events"
+      ]
+    },
+    "/site/day": {
+      "persona": "site_leader, site_staff or room_facilitator",
+      "fixtureRequired": false,
+      "rationale": "Staff-specific original-site grants, active year, expected roster, delivery-arrangement coverage and current attendance corrections require a connected authenticated onsite-day fixture. Existing generic school seeds are not evidence of supervised-day readiness, release or safeguarding.",
+      "interactions": [
+        "resolve only the original granted site and its local expected roster",
+        "record arrival, absence and attendance corrections with reason",
+        "review instructional staffing duty acknowledgment and day-attendance reconciliation",
+        "deny unrelated site, unscheduled child, academic grade and child release authority"
+      ],
+      "downstreamRecords": [
+        "attendance_events",
+        "actions",
+        "audit_events"
+      ]
+    },
+    "/sites/$siteId/publish": {
+      "persona": "authorized site registrar",
+      "fixtureRequired": false,
+      "rationale": "Public site publication needs an authorized original Site grant and canonical site/program publication rows from pending migrations 0035-0036. Public DNS/hostname routing is not yet deployed. Synthetic publishing and browser approval flows remain unverified.",
+      "interactions": [
+        "reserve a unique public slug without making a Site public",
+        "publish only reviewed, non-misleading program marketing after explicit approval",
+        "unpublish and confirm unauthenticated public catalog becomes unavailable",
+        "deny cross-site publisher, stale revision and claims of school being already operational"
+      ],
+      "downstreamRecords": [
+        "site_publications",
+        "program_publications",
+        "audit_events"
+      ]
     }
   }
 }
