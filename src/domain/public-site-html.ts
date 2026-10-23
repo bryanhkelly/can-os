@@ -1,4 +1,5 @@
 import type { PublicAcademicProgram } from "./academic-program-publication";
+import type { SiteLocalContent } from "./site-local-content";
 
 /** Standalone, escaped HTML. No hydration, external scripts or CAN OS shell. */
 type PublicOffering = ReturnType<typeof import("./public-site-catalog").toPublicSiteEnrichment>;
@@ -7,6 +8,8 @@ export type PublicSitePage = {
   site: { name: string; organizationName: string };
   offerings: PublicOffering[];
   academicPrograms?: PublicAcademicProgram[];
+  /** Locally authored church copy, separately versioned and safety screened. */
+  localContent?: SiteLocalContent | null;
 };
 
 export function escapePublicHtml(value: string): string {
@@ -27,6 +30,24 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const school = escapePublicHtml(page.site.name);
   const org = escapePublicHtml(page.site.organizationName);
   const host = escapePublicHtml(page.host);
+  const local = page.localContent;
+  const localItems = local ? [
+    ["Welcome", local.welcomeMessage],
+    ["Our community", local.localDescription],
+    ["Denominational identity", local.denomination],
+    ["Statement of faith", local.statementOfFaith],
+    ["Spiritual formation", local.spiritualFormation],
+  ].filter((item): item is [string, string] => Boolean(item[1]?.trim())) : [];
+  const localSection = localItems.length ? `<section aria-labelledby="church-identity-title" class="church-section">
+    <p class="tag">Content provided by the local church</p>
+    <h2 id="church-identity-title">Our church and community</h2>
+    ${localItems.map(([label, value]) => `<div class="local-field">
+      <h3>${escapePublicHtml(label)}</h3>
+      <p>${escapePublicHtml(value)}</p>
+    </div>`).join("\\n")}
+    <p class="availability">Local religious and community information reflects the church partner.
+    Academic, enrollment and institutional statements are managed separately by CAN.</p>
+  </section>` : "";
   const academicCards = (page.academicPrograms ?? []).map(program => {
     const modes = [
       program.delivery.onsite ? "Onsite" : null,
@@ -109,6 +130,9 @@ main{padding-top:42px;padding-bottom:64px}
 .season,.availability{font-size:.9rem;color:#475467;line-height:1.5}
 .price{font-weight:700;font-size:1.16rem;margin-top:20px}
 .empty{padding:28px;border:1px solid #dce2e8;border-radius:14px;background:white}
+.church-section{border:1px solid #dce2e8;border-radius:14px;padding:24px;background:#fff;margin-bottom:36px}
+.local-field{margin-top:18px}.local-field h3{font-size:1rem;margin:0 0 6px}
+.local-field p{white-space:pre-line;overflow-wrap:anywhere;color:#475467;line-height:1.6;margin:0}
 footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-size:.82rem;color:#667085}
 .inquiry-form{margin-top:22px;padding-top:18px;border-top:1px solid #dce2e8;display:grid;gap:12px}
 .inquiry-form label{display:grid;gap:5px;font-size:.82rem;color:#475467}
@@ -125,6 +149,7 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
   <p class="intro">Discover academic and enrichment opportunities at this location.
   Listings are reviewed marketing information, not accreditation, admission or
   registration approvals.</p>
+  ${localSection}
   ${academicCards ? `<section aria-labelledby="academic-title">
     <h2 id="academic-title">Academic programs</h2>
     <div class="grid">${academicCards}</div>
