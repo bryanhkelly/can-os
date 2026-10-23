@@ -20,6 +20,30 @@ export type SupervisionBlockInput = {
   overlappingFacilitatorAssignments?: boolean;
 };
 
+/** Compare an assigned adult's effective UTC interval to a specific
+ * site-local scheduled block. Cross-time-zone sections must not be declared
+ * staffed merely because the effective window touches the same UTC date. */
+export function coversLocalSupervisionBlock(input:{
+  date:string;timeZone:string;startsAtLocal:string;endsAtLocal:string;
+  effectiveFrom:Date|null;effectiveThrough:Date|null;
+}):boolean{
+  const start=minutes(input.startsAtLocal), end=minutes(input.endsAtLocal);
+  if(start===null||end===null||end<=start)return false;
+  const stamp=(minute:number)=>input.date+"T"+String(Math.floor(minute/60)).padStart(2,"0")+
+    ":"+String(minute%60).padStart(2,"0")+":00";
+  const local=(date:Date)=>{
+    const parts=new Intl.DateTimeFormat("en-US",{
+      timeZone:input.timeZone,year:"numeric",month:"2-digit",day:"2-digit",
+      hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23",
+    }).formatToParts(date);
+    const byType=Object.fromEntries(parts.map(part=>[part.type,part.value]));
+    return byType.year+"-"+byType.month+"-"+byType.day+
+      "T"+byType.hour+":"+byType.minute+":"+byType.second;
+  };
+  return (!input.effectiveFrom||local(input.effectiveFrom)<=stamp(start)) &&
+    (!input.effectiveThrough||local(input.effectiveThrough)>=stamp(end));
+}
+
 export type SupervisionGap =
   "schedule_missing" | "facilitator_missing" | "staff_grant_missing" |
   "facilitator_conflict" | "room_unconfigured";
