@@ -20,7 +20,7 @@ async function loadHostProgram(tx: Reader, programId: string) {
     id: programs.id, siteId: programs.siteId,
     organizationId: programs.organizationId,
     hostOrganizationId: programs.hostOrganizationId,
-    deliveryModel: programs.deliveryModel,
+    deliveryModel: programs.deliveryModel, gradeRange: programs.gradeRange,
     name: programs.name,
   }).from(programs).where(eq(programs.id, programId)).limit(1);
   if (!program?.siteId || !program.deliveryModel.onsite)
@@ -86,11 +86,34 @@ export async function setSiteLocalDelegation(actor: AccessContext, input: {
     });
     // Serializes concurrent appointees and revocation with the same Program.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:" + host.id}))`);
-    const config = await currentConfiguration(tx, host.id);
-    if (!config) throw new Error("Configure this Program's school operations before delegating onsite responsibilities");
-
-    // A church registrar cannot create a legal CAN service entitlement.
-    await requireChurchHostedOperatingServices(tx, host.id, ["onsite_supervision"]);
+    let config = await currentConfiguration(tx, host.id);
+    // Revocation is available even if CAN services are suspended or the
+    // configuration has disappeared. Never require a live agreement to revoke.
+    if (input.action === "appoint") {
+      await requireChurchHostedOperatingServices(tx, host.id, ["onsite_supervision"]);
+      if (!config) {
+        // A planning record is NOT an approved operating configuration,
+        // contract, child-safety signoff, or opening entitlement.
+        const [draft] = await tx.insert(schoolConfigurationVersions).values({
+          programId: host.id, version: 1, deploymentModel: "church_hosted_site",
+          status: "draft",
+          config: {
+            grades: host.gradeRange,
+            delivery: {
+              onsite: host.deliveryModel.onsite === true,
+              asynchronous: host.deliveryModel.asynchronous === true,
+              liveOnline: host.deliveryModel.liveOnline === true,
+              ...(host.deliveryModel.onsiteDaysPerWeek
+                ? { onsiteDaysPerWeek: host.deliveryModel.onsiteDaysPerWeek } : {}),
+            },
+            services: ["onsite_supervision"],
+          },
+        }).returning({ id: schoolConfigurationVersions.id, version: schoolConfigurationVersions.version });
+        if (!draft) throw new Error("Cannot create a local school planning configuration");
+        config = draft;
+      }
+    }
+    if (!config) return { changed: false, responsibility: input.responsibility, assignmentId: null };
     const key = input.responsibility;
     const [current] = await tx.select({
       id: programResponsibilityAssignments.id,
