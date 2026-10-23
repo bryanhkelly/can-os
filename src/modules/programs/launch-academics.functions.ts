@@ -18,7 +18,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { and,asc,eq,inArray,isNull,or } from "drizzle-orm";
 import { z } from "zod";
 import { evaluateSectionReadiness } from "./section-readiness-service";
-import { assignLaunchInstructor,evaluateLaunchTeacher } from "@/modules/staffing/launch-staffing.server";
+import { assignLaunchInstructor,evaluateLaunchTeacher,launchTeacherRolePredicate } from "@/modules/staffing/launch-staffing.server";
 import { canAuthorQualificationCatalog } from "@/modules/profiles/qualification-catalog.server";
 import { requireActor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
@@ -70,15 +70,17 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
   }).from(terms).where(inArray(terms.schoolYearId,years.map(y=>y.id)))
    .orderBy(asc(terms.startsOn)):[];
   const catalog=await listLaunchEligibleCourses(program);
-  const personnel=await db.select({
+  // Reuse the assignment service's authority rule. A church choosing CAN as
+  // provider is NOT entitled to list CAN's organization-wide faculty; the
+  // external teacher needs an explicit assignment to this Program.
+  const personnel=program.siteId?await db.select({
    personId:roleAssignments.personId,first:people.legalFirstName,last:people.legalLastName,
   }).from(roleAssignments)
    .innerJoin(people,eq(people.id,roleAssignments.personId))
-   .where(and(eq(roleAssignments.roleKey,"teacher"),eq(people.active,true),
-    inArray(roleAssignments.organizationId,
-     [program.organizationId,program.academicProviderOrganizationId]),
-    program.siteId?or(isNull(roleAssignments.siteId),eq(roleAssignments.siteId,program.siteId)):isNull(roleAssignments.siteId),
-    or(isNull(roleAssignments.programId),eq(roleAssignments.programId,program.id))));
+   .where(and(eq(people.active,true),launchTeacherRolePredicate({
+    organizationId:program.organizationId,providerId:program.academicProviderOrganizationId,
+    programId:program.id,siteId:program.siteId,
+   }))):[];
   const teachingStaff=[...new Map(personnel.map(p=>[p.personId,p])).values()];
   const sectionRows=await db.select({
    id:sections.id,title:sections.title,code:sections.code,termId:sections.termId,
