@@ -8,7 +8,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
 import {
   assertChurchCANOperatingIdentity, assertCurrentOperatingAuthorization,
-  assertOperatingAgreementEvidence, normalizeOperatingServices,
+  assertOperatingAgreementEvidence, normalizeOperatingServices, recommendedChurchOperatingServices,
   type OperatingProgramIdentity, type OperatingService,
 } from "@/domain/program-site-operating-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -346,6 +346,7 @@ export async function getHostProgramSiteAuthorization(
     organizationId: programs.organizationId, siteId: programs.siteId,
     hostOrganizationId: programs.hostOrganizationId,
     institutionOrganizationId: programs.academicProviderOrganizationId,
+    creditIssuingOrganizationId: programs.creditIssuingOrganizationId,
   }).from(programs).where(eq(programs.id, programId)).limit(1);
   if (!program || actor.role !== "registrar" || actor.demoFacilitator ||
       !actor.scope.organizationIds?.includes(program.organizationId) ||
@@ -360,6 +361,8 @@ export async function getHostProgramSiteAuthorization(
     return {
       eligible: false, programId, siteId: program.siteId,
       institutionOrganizationId: program.institutionOrganizationId,
+      recommendedServices: recommendedChurchOperatingServices(program.creditIssuingOrganizationId !== null),
+      canIssueCredit: program.creditIssuingOrganizationId !== null,
       authorization: null,
     };
   const identity = await loadOperatingIdentity(db, programId);
@@ -378,6 +381,8 @@ export async function getHostProgramSiteAuthorization(
   return {
     eligible: true, programId, siteId: identity.siteId,
     institutionOrganizationId: identity.institutionOrganizationId,
+    recommendedServices: recommendedChurchOperatingServices(identity.creditIssuingOrganizationId !== null),
+    canIssueCredit: identity.creditIssuingOrganizationId !== null,
     authorization: record ?? null,
   };
 }
