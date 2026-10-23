@@ -4,6 +4,17 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { extendedRegistrationOpeningReadiness } from "./registration-policy";
 const extendedTypes = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const scheduleInput = z.object({
+  seasonId: z.string().uuid(),
+  fromDate: day,
+  throughDate: day,
+  weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+  startTime: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),
+  endTime: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),
+  location: z.string().trim().min(2).max(120),
+  facilitatorPersonId: z.string().uuid().optional(),
+}).strict();
+
 const assignmentInput = z.object({
   seasonId: z.string().uuid(),
   recipientPersonId: z.string().uuid(),
@@ -22,18 +33,20 @@ const draftInput = z.object({
 /** Only Programs under the verified registrar's organization, site and program scopes. */
 export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).handler(async () => {
   // Keep server-only DB and identity imports out of UI component/module evaluation.
-  const [{ db }, { actions, activities, activitySeasons, programs }, { requireActor },
-    { listOpeningOperators }, { extendedLearningReadinessActionType }] = await Promise.all([
+  const [{ db }, { actions, activities, activitySeasons, calendarEvents, programs }, { requireActor },
+    { listOpeningOperators }, { extendedLearningReadinessActionType },
+    { listExtendedSessionStaff }] = await Promise.all([
     import("@/db/client"), import("@/db/schema"), import("@/modules/identity/actors.server"),
     import("@/modules/programs/opening-handoff.server"),
     import("@/domain/extended-learning-readiness-tasks"),
+    import("./extended-learning-sessions.server"),
   ]);
   const actor = await requireActor(["registrar"], "program.read");
   const ids = actor.scope.programIds ?? [];
   const siteIds = actor.scope.siteIds ?? [];
   const orgIds = actor.scope.organizationIds ?? [];
   if (!ids.length || !siteIds.length || !orgIds.length)
-    return { programs: [], seasons: [], readiness: [], assignments: [], operators: [] };
+    return { programs: [], seasons: [], readiness: [], assignments: [], operators: [], staff: [], sessions: [] };
 
   const rows = await db.select({
     id: programs.id, name: programs.name, type: programs.type,
@@ -44,7 +57,7 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
     isNull(programs.creditIssuingOrganizationId),
   )).orderBy(asc(programs.name)).limit(100);
 
-  if (!rows.length) return { programs: rows, seasons: [], readiness: [], assignments: [], operators: [] };
+  if (!rows.length) return { programs: rows, seasons: [], readiness: [], assignments: [], operators: [], staff: [], sessions: [] };
   const seasons = await db.select({
     id: activitySeasons.id, activityId: activities.id, programId: activities.programId,
     siteId: activities.siteId,
@@ -93,7 +106,36 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
     }),
   })))).flatMap(item => item.people.map(person => ({ programId: item.programId, ...person })));
 
-  return { programs: rows, seasons, readiness,
+  const sessionRows = seasons.length ? await db.select({
+    id: calendarEvents.id, seasonId: calendarEvents.sourceId,
+    startsAt: calendarEvents.startsAt, endsAt: calendarEvents.endsAt,
+    timezone: calendarEvents.timezone, metadata: calendarEvents.metadata,
+  }).from(calendarEvents).where(and(
+    eq(calendarEvents.sourceType, "activity_season"),
+    eq(calendarEvents.type, "extended_learning_session"),
+    inArray(calendarEvents.sourceId, seasons.map(s => s.id)),
+    inArray(calendarEvents.siteId, siteIds),
+    inArray(calendarEvents.organizationId, orgIds),
+    inArray(calendarEvents.programId, rows.map(p => p.id)),
+  )).orderBy(asc(calendarEvents.startsAt)).limit(3000) : [];
+  const staff = (await Promise.all(rows.map(async program => ({
+    programId: program.id,
+    people: await listExtendedSessionStaff(program.organizationId, program.siteId),
+  })))).flatMap(item => item.people.map(person => ({ programId: item.programId, ...person })));
+
+  return { programs: rows, seasons, readiness, staff,
+    sessions: sessionRows.map(item => {
+      const details = item.metadata.extendedLearningSession;
+      const fields = typeof details === "object" && details !== null ? details as Record<string, unknown> : {};
+      return {
+        id: item.id, seasonId: item.seasonId,
+        startsAt: item.startsAt.toISOString(),
+        endsAt: item.endsAt?.toISOString() ?? null,
+        timezone: item.timezone,
+        location: typeof fields.location === "string" ? fields.location : "",
+        facilitatorPersonId: typeof fields.facilitatorPersonId === "string" ? fields.facilitatorPersonId : null,
+      };
+    }),
     assignments: assignments.map(item => ({
       id: item.id, seasonId: item.seasonId, ownerPersonId: item.ownerPersonId,
       status: item.status, requirementKey: typeof item.metadata?.requirementKey === "string"
@@ -123,4 +165,16 @@ export const createExtendedReadinessAssignmentsFn = createServerFn({ method: "PO
     ]);
     const actor = await requireActor(["registrar"], "program.launch.start");
     return ensureExtendedReadinessAssignments(actor, data);
+  });
+
+/** Publish draft planning sessions to the canonical calendar, not to enrollment. */
+export const scheduleExtendedSessionsFn = createServerFn({ method: "POST" })
+  .validator((value: unknown) => scheduleInput.parse(value))
+  .handler(async ({ data }) => {
+    const [{ requireActor }, { scheduleExtendedSessions }] = await Promise.all([
+      import("@/modules/identity/actors.server"),
+      import("./extended-learning-sessions.server"),
+    ]);
+    const actor = await requireActor(["registrar"], "program.launch.start");
+    return scheduleExtendedSessions(actor, data);
   });
