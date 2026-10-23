@@ -13,6 +13,7 @@ import { and,eq,inArray } from "drizzle-orm";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { activateSectionEnrollment } from "./section-allocation.service";
 import { isVerifiedEnrollmentGuardian } from "@/domain/guardian-offer-visibility";
 
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
@@ -163,15 +164,19 @@ export async function respondToSyntheticAdmissionOffer(context:AccessContext,off
   return offerId;
  });
 }
-export async function activateSyntheticOfferedEnrollment(context:AccessContext,offerId:string){
+export async function activateSyntheticOfferedEnrollment(context:AccessContext,offerId:string,sectionId?:string){
  guarded(context,"registrar");assertCapability(context,"enrollment.activate");
  return db.transaction(async tx=>{
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
   requireAdmissionsProgramScope(context,lookup.programId);
-  await requireChurchHostedOperatingServices(tx,lookup.programId,[
-    "admissions","school_of_record",
+  const churchAuthorization=await requireChurchHostedOperatingServices(tx,lookup.programId,[
+    "admissions","school_of_record","academic_instruction",
   ]);
+  // In church-hosted CAN schools an active enrollment cannot be the terminal
+  // handoff. Require a named instructional Section in the SAME transaction.
+  if(churchAuthorization && !sectionId)
+    throw new Error("Choose a staffed class to activate this church-hosted school enrollment");
   await lockAdmissionsApplication(tx,lookup.applicationId);
   const {pool,organizationId}=await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
@@ -189,11 +194,23 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   // Site-less virtual programs have no onsite roster to coordinate.
   if(programSite.siteId)await lockAttendanceConfigurationAtSite(tx,programSite.siteId);
   const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(eq(enrollments.studentProfileId,app.studentProfileId),eq(enrollments.programId,offer!.programId),eq(enrollments.schoolYearId,offer!.schoolYearId),eq(enrollments.status,"active"),eq(enrollments.kind,"program"))).limit(1);
-  if(existing)return existing.id;
+  if(existing){
+    if(sectionId)await activateSectionEnrollment(tx,{
+      studentProfileId:app.studentProfileId,sectionId,actor:context,
+      source:"accepted_offer_activation",applicationId:app.id,
+    });
+    return existing.id;
+  }
   const journey=await ready(tx,app.id);
   if(await occupancy(tx,offer!.programId,offer!.schoolYearId,new Date())>pool.capacity)throw new Error("Seat pool capacity exceeded");
   const [enrollment]=await tx.insert(enrollments).values({studentProfileId:app.studentProfileId,kind:"program",status:"active",organizationId,programId:offer!.programId,schoolYearId:offer!.schoolYearId,startedAt:new Date()}).returning({id:enrollments.id});
   if(!enrollment)throw new Error("Enrollment activation failed");
+  // A failed staffing, Section, schedule, capacity or academic-authority
+  // check rolls back the Program enrollment, readiness state and all events.
+  if(sectionId)await activateSectionEnrollment(tx,{
+    studentProfileId:app.studentProfileId,sectionId,actor:context,
+    source:"accepted_offer_activation",applicationId:app.id,
+  });
   await tx.update(journeys).set({status:"active",completedAt:new Date(),updatedAt:new Date()}).where(eq(journeys.id,journey.id));
   const [student]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
   if(!student)throw new Error("Student profile missing during activation");
