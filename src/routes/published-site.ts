@@ -35,7 +35,7 @@ export const Route = createFileRoute("/published-site")({
           if (!catalog) return new Response("Not found", {
             status: 404, headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
           });
-          return new Response(renderPublicSiteHtml(catalog), { status: 200, headers });
+          return new Response(renderPublicSiteHtml(catalog, { makeRequestId: () => crypto.randomUUID() }), { status: 200, headers });
         } catch {
           // Fail closed on a missing migration, database error or unexpected data.
           return new Response("Site temporarily unavailable", {
