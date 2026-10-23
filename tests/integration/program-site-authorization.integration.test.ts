@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Database } from "@/db/client";
 import { resolveAccessContext } from "@/domain/access-context";
 import type { AccessContext } from "@/domain/access-context";
+import type { Actor } from "@/modules/identity/actors.server";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 const state = vi.hoisted(() => ({ tx: undefined as Transaction | undefined }));
@@ -61,7 +62,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
           owningOrganizationId:can.id,audience:"partner",title:"Program launch",
           configuration:{requirements:[{key:"staffing",title:"Staffing",blocking:true,owner:"partner"}]},
         });
-        const contextFor=(role:"registrar"|"can_network_steward",personId:string,orgId:string,siteId:string|null):AccessContext=>{
+        const contextFor=(role:"registrar"|"can_network_steward"|"teacher",personId:string,orgId:string,siteId:string|null):AccessContext=>{
           const grant={id:crypto.randomUUID(),accountId:crypto.randomUUID(),personId,role,
             organizationId:orgId,siteId,active:true};
           return resolveAccessContext({
@@ -248,13 +249,13 @@ integration("Church-owned Site with independently authorized CAN academic servic
         canTeacher.scope.sectionIds=[section!.id];
         const {authorizeClass,accessibleClasses}=await import(
           "@/modules/learning/class-access.server");
-        await expect(authorizeClass(localTeacher as any,section!.id))
+        await expect(authorizeClass(localTeacher as Actor,section!.id))
           .rejects.toThrow("CAN academic provider teacher");
-        expect((await authorizeClass(canTeacher as any,section!.id)).section.id)
+        expect((await authorizeClass(canTeacher as Actor,section!.id)).section.id)
           .toBe(section!.id);
-        expect((await accessibleClasses(canTeacher as any)).map(x=>x.id))
+        expect((await accessibleClasses(canTeacher as Actor)).map(x=>x.id))
           .toEqual([section!.id]);
-        expect((await accessibleClasses(localTeacher as any)).map(x=>x.id))
+        expect((await accessibleClasses(localTeacher as Actor)).map(x=>x.id))
           .not.toContain(section!.id);
         const [original] = await tx.select({
           organizationId:s.programs.organizationId,
@@ -270,9 +271,9 @@ integration("Church-owned Site with independently authorized CAN academic servic
         });
         // Session-derived Section scope can remain cached: it is NOT authority
         // after the signed CAN/church academic agreement has been revoked.
-        expect((await accessibleClasses(canTeacher as any)).map(x=>x.id))
+        expect((await accessibleClasses(canTeacher as Actor)).map(x=>x.id))
           .not.toContain(section!.id);
-        await expect(authorizeClass(canTeacher as any,section!.id))
+        await expect(authorizeClass(canTeacher as Actor,section!.id))
           .rejects.toThrow();
         await expect(requireCurrentProgramSiteAuthorization(tx,launch.programId,[
           "academic_instruction",
