@@ -239,6 +239,13 @@
       "when": 1792710000000,
       "tag": "0033_extended_season_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792713600000,
+      "tag": "0034_enrichment_packages",
+      "breakpoints": true
     }
   ]
 }
