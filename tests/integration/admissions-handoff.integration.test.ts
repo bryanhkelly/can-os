@@ -422,12 +422,34 @@ integration("cross-persona admissions through active classes",()=>{
      addDropEndsOn:"2099-01-01",withdrawalEndsOn:"2099-02-01"});
     state.actor=staff;
     expect((await listEnrollmentPlacements({data:{applicationId}})).active).toBe(true);
+    // An unstaffed Section shell must not satisfy the classroom handoff.
+    await expect(placeEnrolledStudent({data:{applicationId,sectionId:section.id}}))
+      .rejects.toThrow("Assign an active teacher");
+    const classTeacher=first(await tx.insert(s.people).values({
+      legalFirstName:"Assigned",legalLastName:"Instructor",
+    }).returning());
+    const teacherAccount=first(await tx.insert(s.accessAccounts).values({
+      emailNormalized:`instructor-${suffix}@example.invalid`,
+    }).returning());
+    await tx.insert(s.accountPersonGrants).values({
+      accountId:teacherAccount.id,personId:classTeacher.id,role:"teacher",
+      organizationId:org.id,siteId:site.id,
+    });
+    await tx.insert(s.sectionTeachers).values({sectionId:section.id,personId:classTeacher.id});
+    expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
+      .toEqual(expect.arrayContaining([expect.objectContaining({
+        id:section.id,staffed:true,curriculumReady:true,
+      })]));
     await placeEnrolledStudent({data:{applicationId,sectionId:section.id}});
     expect(await placeEnrolledStudent({data:{applicationId,sectionId:section.id}})).toMatchObject({created:false});
     state.actor=learner;
     expect((await getMyStudentToday()).sections.map(row=>row.sectionId)).toEqual([section.id]);
     expect((await accessibleClasses(learner)).map(row=>row.id)).toEqual([section.id]);
     await authorizeClass(learner,section.id);
+    const instructor=act("teacher",classTeacher.id);
+    expect((await accessibleClasses(instructor)).map(row=>row.id)).toEqual([section.id]);
+    await authorizeClass(instructor,section.id);
+    state.actor=learner;
     const unrelated=act("guardian",outsider.id);
     await expect(authorizeClass(unrelated,section.id,student.personId)).rejects.toThrow();
     state.actor=family;
