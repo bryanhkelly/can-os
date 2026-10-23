@@ -23,6 +23,9 @@ vi.mock("@/db/client", () => {
       callback({ select }),
   } };
 });
+vi.mock("@/modules/sites/site-local-content.server", () => ({
+  readCurrentLocalContent: async () => null,
+}));
 vi.mock("@/modules/sites/academic-program-catalog.server", () => ({
   readAcademicProgramCatalog: async () => [],
 }));
