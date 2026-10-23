@@ -58,6 +58,10 @@ static CI is green.
 
 
 
+## Church-Hosted School: distinct CAN institution / independent church site
+
+See [Church-Hosted School acceptance](./church-hosted-school-acceptance.md). An initial `FullFlow` increment separates host Organization options from CAN academic provider and credit issuer options in the live launch form, validates CAN/issuer intent server-side for church-hosted cross-organization arrangements, and adds pure/GF3 tests. **This does not establish verified academic service agreements, a school-of-record grant, site authorization, site-day readiness or full-flow acceptance.** The existing host-owned `programs.organization_id` remains unchanged. Next bite: independent, revocable academic-services Site authorization with verified agreement evidence; only then enforce institutional operating scope. Current result: HOLD.
+
 ## Connected learning and school-operations workstream
 
 User-approved order: **comprehensive learning activity → teacher intervention →
