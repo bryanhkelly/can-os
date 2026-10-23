@@ -686,6 +686,15 @@
       "roleJourney": "account holder reviews and revokes signed-in sessions",
       "readBoundary": "verified account via /access/sessions API",
       "writeBoundary": "delegated to account-owned authenticated session endpoint"
+    },
+    {
+      "file": "src/routes/sites.$siteId.publish.tsx",
+      "route": "/sites/$siteId/publish",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
