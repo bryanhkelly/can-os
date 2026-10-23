@@ -81,6 +81,7 @@ async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, se
       inArray(programs.id, actor.scope.programIds!),
       inArray(programs.organizationId, actor.scope.organizationIds!),
       inArray(programs.siteId, actor.scope.siteIds!),
+      ...(isOnsiteAttendanceRole(actor.role) ? [eq(programs.siteId, actor.grantSiteId!)] : []),
       ...(selectedId ? [eq(programs.id, selectedId)] : []),
     ));
   return rows.filter(p => p.deliveryModel.onsite === true);
