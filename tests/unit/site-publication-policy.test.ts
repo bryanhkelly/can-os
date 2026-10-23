@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { roleCapabilities, type AccessContext } from "@/domain/access-context";
-import { assertPartnerWebsitePreviewScope, assertSitePublicationScope, sitePublicationManageCapability, siteWebsiteDraftReadCapability } from "@/domain/site-publication-policy";
+import { assertPartnerWebsitePreviewScope, assertSitePublicationScope, sitePublicationManageCapability, siteWebsiteDraftReadCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 
 const site = { id: "site-a", organizationId: "school-a" };
 function actor(overrides: Partial<AccessContext> = {}): AccessContext {
@@ -44,7 +44,7 @@ describe("PUB-18 church website partner role boundary", () => {
   it("allows a verified Site-specific partner but not publisher mutation capability", () => {
     expect(() => assertPartnerWebsitePreviewScope(partner(), site)).not.toThrow();
     expect(() => assertSitePublicationScope(partner(), site)).toThrow();
-    expect(roleCapabilities.site_website_editor).toEqual([siteWebsiteDraftReadCapability]);
+    expect(roleCapabilities.site_website_editor).toEqual([siteWebsiteDraftReadCapability, siteWebsiteLocalPublishCapability]);
     for (const denied of [
       "site.publication.manage", "enrollment.decide", "admissions:read",
       "program.launch.start", "student:read", "action.resolve",
