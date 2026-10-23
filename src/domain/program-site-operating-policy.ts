@@ -7,6 +7,21 @@ export const operatingServices = [
 ] as const;
 export type OperatingService = (typeof operatingServices)[number];
 
+/** The normal church-to-CAN classroom pathway uses more than the four
+ * launch-opening services: admissions requires its own entitlement and
+ * grading/transcript workflows need academic records. Do not silently
+ * contract credit issuance for a noncredit Program.
+ * Local staff permissions and safeguarding reviews remain separate.
+ */
+export function recommendedChurchOperatingServices(hasCreditIssuer:boolean): OperatingService[] {
+  const essentials: OperatingService[] = [
+    "academic_instruction", "curriculum", "school_of_record",
+    "admissions", "academic_records", "onsite_supervision",
+  ];
+  if(hasCreditIssuer) essentials.push("credit_issuance");
+  return essentials;
+}
+
 export type OperatingProgramIdentity = {
   programId: string;
   programOrganizationId: string;
