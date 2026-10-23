@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { emptySiteLocalContent, siteLocalContentLimits, type SiteLocalContent } from "@/domain/site-local-content";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
@@ -22,8 +22,8 @@ function PartnerSiteWebsitePage() {
   const data = outcome.data;
   return <WorkspaceShell
     eyebrow="CAN OS · Church partner website"
-    title={data.siteName + " · website draft"}
-    subtitle={data.organizationName + " · read-only review, not publication approval"}>
+    title={data.siteName + " · church website"}
+    subtitle={data.organizationName + " · edit local content, review CAN-approved school listings"}>
     <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">Your proposed Site address</h2>
       {data.host ? <>
@@ -38,12 +38,13 @@ function PartnerSiteWebsitePage() {
         addresses from this partner workspace.
       </p>}
       <p className="mt-3 text-sm text-muted-foreground">
-        This partner account cannot publish the website, approve academic claims,
-        open admissions, access student records or change institutional operations.
-        Protected decisions remain with the separately authorized institution.
+        You may publish your church-owned descriptions and theological content without
+        routine CAN approval. CAN remains responsible for the Site's institutional
+        launch status, academic claims and admissions. This account cannot change
+        those records or access student information.
       </p>
     </section>
-    {data.host && <LocalWebsiteCopyEditor key={data.currentRevision} data={data} />}
+    {data.host && <LocalWebsiteCopyEditor data={data} />}
     <section aria-labelledby="partner-preview-title" className="mt-6 rounded-xl border bg-card p-5">
       <h2 id="partner-preview-title" className="text-xl font-semibold">
         Private website preview
@@ -93,6 +94,9 @@ function LocalWebsiteCopyEditor({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  useEffect(() => {
+    setContent(data.editingContent ?? emptySiteLocalContent);
+  }, [data.currentRevision, data.editingContent]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
