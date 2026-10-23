@@ -78,6 +78,33 @@
   explicit institution identity reconciliation; an email match is not
   permission to adopt a prior student or Household.
 
+## GF-B local Site continuation — staffed Sections (23 October 2026)
+
+**Source committed, not runtime accepted.** An independent church/CAN Program
+now supports several separately appointed, expiring **Section-specific**
+facilitators. The registrar launches this from **Staff each onsite class**,
+using current SchoolConfigurationVersion, ProgramResponsibilityAssignment,
+RoleAssignment and existing Site-specific staff grants (no new migration).
+For this church/CAN model, the server rejects new Program-wide facilitator
+appointments while retaining revocation of existing ones.
+
+Onsite pupil roster queries for facilitators now draw ONLY from their
+current, explicitly delegated Section enrollments, not the full Program
+enrollment. Revocation of the independent CAN/church operating agreement
+also denies these read queries. New attendance writes and idempotent
+replays, plus affirmative scheduled duty acceptance, recheck the specific
+Section appointment; negative inability-to-cover reporting remains
+separate. Site leaders retain their distinct director-level permission.
+
+**Not achieved:** named staff assignment does not yet prove a current
+teacher/facilitator delivery arrangement, whole-block qualified adult
+coverage, screening/training, physical supervision, room capacity or
+safe school opening. Next P0 is the active per-Section schedule +
+qualified local coverage/readiness gate, then the same enrolled child's
+actual Section placement and attendance acceptance on isolated Neon.
+
+---
+
 ## Current GF-B priority-two handoff — local Site authority (23 October 2026)
 
 **Source committed, unverified.** The requested next implementation was
