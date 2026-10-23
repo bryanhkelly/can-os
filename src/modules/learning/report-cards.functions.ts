@@ -10,6 +10,7 @@ import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { gradeLabelForPercentage,isPassingGrade } from "@/domain/grade-scale-policy";
 import { verifiedSectionCreditUnits,countTranscriptRowsWithUnrecordedCredits } from "@/domain/section-credit-policy";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
@@ -218,6 +219,10 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
       if (!section) throw new AuthorizationError("assigned teacher");
       assertSiteScope(context, section.siteId);
       assertProgramScope(context,section.programId);
+      // Require live CAN/church authorization even for a previously assigned teacher.
+      await requireInstitutionalAcademicProgramAuthority(tx,context,section.programId,[
+        "academic_instruction","academic_records",
+      ]);
 
       const [period] = await tx
         .select({
@@ -566,6 +571,10 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
       if (!section) throw new AuthorizationError("assigned teacher");
       assertSiteScope(context, section.siteId);
       assertProgramScope(context,section.programId);
+      // Require live CAN/church authorization even for a previously assigned teacher.
+      await requireInstitutionalAcademicProgramAuthority(tx,context,section.programId,[
+        "academic_instruction","academic_records",
+      ]);
 
       const [gradeScale]=grade.gradeScaleId?await tx.select({configuration:s.gradeScales.configuration})
        .from(s.gradeScales).where(eq(s.gradeScales.id,grade.gradeScaleId)).limit(1):[];
@@ -778,6 +787,8 @@ export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" }
           eq(s.sectionGrades.status, "finalized"),
           inArray(s.sections.siteId, context.scope.siteIds),
           inArray(s.sections.programId, context.scope.programIds),
+          // Only an authenticated issuer registrar may select an official record.
+          inArray(s.programs.creditIssuingOrganizationId,context.scope.organizationIds??[]),
           sql`concat_ws(' ', ${s.people.legalFirstName}, ${s.people.legalLastName}) ilike ${namePattern} escape '!'`,
         ))
         .orderBy(s.people.legalLastName, s.people.legalFirstName)
@@ -801,6 +812,8 @@ export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" }
           sql`${s.enrollments.metadata}->>'withdrawalNotation' = 'W'`,
           inArray(s.sections.siteId, context.scope.siteIds),
           inArray(s.sections.programId, context.scope.programIds),
+          // Only an authenticated issuer registrar may select an official record.
+          inArray(s.programs.creditIssuingOrganizationId,context.scope.organizationIds??[]),
           sql`concat_ws(' ', ${s.people.legalFirstName}, ${s.people.legalLastName}) ilike ${namePattern} escape '!'`,
         ))
         .orderBy(s.people.legalLastName, s.people.legalFirstName)
@@ -915,14 +928,31 @@ export const issueTranscript = createServerFn({ method: "POST" })
     // A host school's read access to its students does not authorize that
     // registrar to issue an official document in an external institution's name.
     // The active grant must include the actual credit issuer organization.
-    // Future CAN-host institutional delegation needs a separately verified,
-    // issuer-approved relationship; provider metadata is never sufficient.
+    // Provider metadata cannot confer credit issuance authority.
     if (!context.scope.organizationIds?.includes(issuingOrganizationId)) {
       throw new AuthorizationError("official transcript requires a verified credit-issuer organization grant");
     }
     const issuingOrganization = rows[0]!.creditIssuingOrganization;
 
     return db.transaction(async (tx) => {
+      // Resolve every source Section and current issuer under the same
+      // transaction as issuance; past transcripts remain immutable after
+      // revocation, but a new CAN-issued record requires a live agreement.
+      const sectionIds=[...new Set(rows.map(row=>row.sectionId))];
+      const sourceSections=await tx.select({
+        id:s.sections.id,programId:s.sections.programId,
+        creditIssuer:s.programs.creditIssuingOrganizationId,
+      }).from(s.sections)
+        .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+        .where(inArray(s.sections.id,sectionIds));
+      if(sourceSections.length!==sectionIds.length ||
+         sourceSections.some(section=>section.creditIssuer!==issuingOrganizationId))
+        throw new AuthorizationError("current authorized transcript source and credit issuer");
+      for(const programId of new Set(sourceSections.map(section=>section.programId))) {
+        await requireInstitutionalAcademicProgramAuthority(tx,context,programId,[
+          "school_of_record","academic_records","credit_issuance",
+        ]);
+      }
       const [issuance] = await tx
         .insert(s.transcriptIssuances)
         .values({
