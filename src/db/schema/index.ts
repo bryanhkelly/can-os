@@ -42,3 +42,4 @@ export * from "./site-publications";
 export * from "./program-publications";
 export * from "./public-admissions-interests";
 export * from "./program-site-authorizations";
+export * from "./site-local-content";
