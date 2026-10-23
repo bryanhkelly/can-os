@@ -4,13 +4,14 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { admissionOffers, applications, courseTemplateVersions, enrollments, programs, sections, terms } from "@/db/schema";
+import { admissionOffers, applications, courseTemplateVersions, enrollments, programs, schoolYears, sections, sites, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasAccessibleFirstLesson } from "@/domain/first-class-lesson";
 import { verifiedTeacherSectionIds } from "./verified-section-teachers.server";
 import { staffedPublishedSectionIds } from "./instructional-section-readiness.server";
 import { getSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
+import { canAddStudentToSection } from "@/domain/section-registration-window";
 
 async function registrar() {
   const actor = await getCommandContext(getRequest());
@@ -45,9 +46,12 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
    if (!yearIds.length) return { active: false, sections: [] };
    const rows = await db.select({ id: sections.id, title: sections.title,
      code: sections.code, schoolYearId: terms.schoolYearId, siteId: sections.siteId,
+     siteTimezone:sites.timezone,yearTimezone:schoolYears.timezone,
      curriculumStatus:courseTemplateVersions.status,
      curriculum:courseTemplateVersions.curriculum })
      .from(sections).innerJoin(terms, eq(terms.id, sections.termId))
+     .innerJoin(schoolYears,eq(schoolYears.id,terms.schoolYearId))
+     .leftJoin(sites,eq(sites.id,sections.siteId))
      .innerJoin(courseTemplateVersions,eq(courseTemplateVersions.id,sections.courseTemplateVersionId))
      .where(and(eq(sections.programId, app.programId), eq(sections.active, true),
        inArray(terms.schoolYearId, yearIds)));
@@ -72,7 +76,7 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      id:row.id,policy:await getSectionRegistrationPolicy(row.id,db),
    })));
    const policyBySection=new Map(policies.map(row=>[row.id,row.policy]));
-   const today=new Date().toISOString().slice(0,10);
+   const now=new Date();
    const enrolled = await db.select({ sectionId: enrollments.sectionId }).from(enrollments)
      .where(and(eq(enrollments.studentProfileId, app.studentProfileId),
        eq(enrollments.kind, "section"), eq(enrollments.status, "active")));
@@ -83,8 +87,12 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      staffed: staffedIds.has(s.id),
      curriculumReady:s.curriculumStatus==="published" && hasAccessibleFirstLesson(s.curriculum),
      readyForPlacement:readyIds.has(s.id) &&
-       (occupied.get(s.id)??0)<(policyBySection.get(s.id)?.enrollmentCapacity??0) &&
-       today<=(policyBySection.get(s.id)?.addDropEndsOn??""),
+       !!policyBySection.get(s.id) && canAddStudentToSection({
+         addDropEndsOn:policyBySection.get(s.id)!.addDropEndsOn,
+         enrollmentCapacity:policyBySection.get(s.id)!.enrollmentCapacity,
+         occupiedSeats:occupied.get(s.id)??0,
+         timezone:s.siteTimezone??s.yearTimezone,now,
+       }),
    })) };
  });
 
