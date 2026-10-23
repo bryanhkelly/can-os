@@ -6,6 +6,7 @@ import { publicSiteHost, requirePublicSiteSlug } from "@/domain/public-site-addr
 import { assertSitePublicationScope, sitePublicationManageCapability } from "@/domain/site-publication-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
+import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
@@ -50,7 +51,8 @@ async function requireSitePublisher(actor: AccessContext, siteId: string, execut
 export async function getSitePublicationDraft(actor: AccessContext, siteId: string) {
   const site = await requireSitePublisher(actor, siteId);
   const [address, sitePrograms, publishedOfferings] = await Promise.all([
-    db.select({ slug: sitePublications.slug, status: sitePublications.status })
+    db.select({ slug: sitePublications.slug, status: sitePublications.status,
+      updatedAt: sitePublications.updatedAt, publishedAt: sitePublications.publishedAt })
       .from(sitePublications).where(eq(sitePublications.siteId, site.id)).limit(1),
     db.select({
       id: programs.id, name: programs.name, type: programs.type,
@@ -70,6 +72,8 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       host: publicSiteHost(address[0].slug),
       slug: address[0].slug,
       status: address[0].status,
+      updatedAt: address[0].updatedAt.toISOString(),
+      publishedAt: address[0].publishedAt?.toISOString() ?? null,
     } : null,
     programs: sitePrograms,
     catalogPreview: publishedOfferings.map(toPublicSiteEnrichment),
@@ -115,5 +119,78 @@ export async function reserveSitePublicAddress(
       siteId: site.id, payload: { slug, status: "draft" },
     });
     return { siteId: site.id, host: publicSiteHost(slug), status: "draft" as const };
+  });
+}
+
+/**
+ * Controlled site-level marketing publication. This is distinct from each
+ * offering's operator-approved enrichment publication and from registration.
+ * A row lock serializes publish/unpublish decisions for one canonical Site.
+ */
+export async function changeSitePublication(
+  actor: AccessContext,
+  input: {
+    siteId: string;
+    action: SitePublicationAction;
+    expectedRevision: string;
+    reason: string;
+    contentReviewed: boolean;
+  },
+): Promise<{ siteId: string; status: "draft" | "published"; publishedAt: string | null; updatedAt: string; changed: boolean }> {
+  return db.transaction(async tx => {
+    const site = await requireSitePublisher(actor, input.siteId, tx);
+    const [current] = await tx.select({
+      siteId: sitePublications.siteId, slug: sitePublications.slug,
+      status: sitePublications.status, publishedAt: sitePublications.publishedAt,
+      updatedAt: sitePublications.updatedAt,
+    }).from(sitePublications).where(eq(sitePublications.siteId, site.id))
+      .for("update").limit(1);
+    if (!current) throw new Error("Reserve a public address before changing publication status");
+    requirePublicSiteSlug(current.slug);
+
+    // Only a changed-to-published state requires content readiness.
+    // This queries the canonical published Seasons inside the same transaction.
+    // Unpublishing is never prevented by empty or expired offerings.
+    const eligible = input.action === "publish" && current.status === "draft"
+      ? await readEnrichmentCatalog(site.id, tx) : [];
+    const decision = planSitePublicationTransition({
+      current, action: input.action, expectedRevision: input.expectedRevision,
+      reason: input.reason, contentReviewed: input.contentReviewed,
+      eligibleOfferingCount: eligible.length, now: new Date(),
+    });
+    if (!decision.changed) {
+      return { siteId: site.id, status: decision.status,
+        publishedAt: decision.publishedAt?.toISOString() ?? null,
+        updatedAt: decision.updatedAt.toISOString(), changed: false };
+    }
+
+    const [updated] = await tx.update(sitePublications).set({
+      status: decision.status, publishedAt: decision.publishedAt,
+      updatedAt: decision.updatedAt,
+    }).where(eq(sitePublications.siteId, site.id))
+      .returning({ siteId: sitePublications.siteId });
+    if (!updated) throw new Error("Site publication update failed");
+
+    const scope = { organizationId: site.organizationId, siteId: site.id };
+    await writeAudit(tx, actor, {
+      action: input.action === "publish" ? "site.publication.publish" : "site.publication.unpublish",
+      entityType: "site", entityId: site.id, scope,
+      before: { status: current.status, publishedAt: current.publishedAt?.toISOString() ?? null,
+        updatedAt: current.updatedAt.toISOString() },
+      after: { status: decision.status, publishedAt: decision.publishedAt?.toISOString() ?? null,
+        updatedAt: decision.updatedAt.toISOString(), reason: input.reason.trim(),
+        contentReviewed: input.action === "publish" && input.contentReviewed,
+        eligibleOfferingCount: input.action === "publish" ? eligible.length : null },
+    });
+    await emitEvent(tx, {
+      eventType: input.action === "publish" ? "SitePublished" : "SiteUnpublished",
+      aggregateType: "site", aggregateId: site.id, actorPersonId: actor.actorPersonId,
+      ...scope,
+      payload: { slug: current.slug, status: decision.status,
+        publishedAt: decision.publishedAt?.toISOString() ?? null },
+    });
+    return { siteId: site.id, status: decision.status,
+      publishedAt: decision.publishedAt?.toISOString() ?? null,
+      updatedAt: decision.updatedAt.toISOString(), changed: true };
   });
 }
