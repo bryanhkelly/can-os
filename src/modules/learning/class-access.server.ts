@@ -2,6 +2,7 @@ import { and, eq, inArray, or } from "drizzle-orm";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { requireActor, assertSiteGranted, assertProgramGranted, type Actor } from "@/modules/identity/actors.server";
+import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
 export type ClassTransaction = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
 export async function classActor() {
@@ -30,7 +31,13 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
   // host Organization or its unrelated Programs and Sites.
   const institutionalSection=actor.role==="teacher" &&
     actor.scope.sectionIds?.includes(section.id)===true;
-  if(!institutionalSection){
+  if(institutionalSection){
+    // Recheck authoritative evidence on this request (and within the current
+    // mutation transaction when supplied), not only when the session loaded.
+    await requireInstitutionalAcademicProgramAuthority(query,actor,section.programId,[
+      "academic_instruction","curriculum",
+    ]);
+  }else{
     assertSiteGranted(actor, section.siteId);
     assertProgramGranted(actor, section.programId);
   }
