@@ -244,6 +244,20 @@ integration("GF25 report card and transcript", () => {
       role: "registrar",
       capabilities: new Set(["enrollment:manage"]),
     };
+    // A host registrar can read the school's own student records, but cannot
+    // impersonate the independently named CAN credit issuer.
+    state.context = {
+      ...state.context,
+      scope: { ...scope, organizationIds: [host!.id] },
+    };
+    await expect(issueTranscript({
+      data: { studentPersonId: student!.id, purpose: "Unauthorized external issuer" },
+    })).rejects.toThrow("verified credit-issuer organization grant");
+    const unauthorizedIssuances = await db.select({id:s.transcriptIssuances.id})
+      .from(s.transcriptIssuances).where(eq(s.transcriptIssuances.studentProfileId,profile!.id));
+    expect(unauthorizedIssuances).toHaveLength(0);
+    state.context = { ...state.context, scope };
+
     const { issuanceId } = await issueTranscript({
       data: { studentPersonId: student!.id, purpose: "Official transcript" },
     });
