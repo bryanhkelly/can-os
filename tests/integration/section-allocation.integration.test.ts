@@ -41,7 +41,7 @@ describe("section allocation prerequisites", () => {
       owningOrganizationId: org!.id, code: `${title}-${suffix}`, title, subject: "Science",
     }))).returning();
     const versions = await db.insert(s.courseTemplateVersions).values(courses.map(course => ({
-      courseTemplateId: course.id, version: 1,
+      courseTemplateId: course.id, version: 1, status:"published" as const,
     }))).returning();
     const sections = await db.insert(s.sections).values(versions.map((version, index) => ({
       programId: program!.id, siteId: site!.id, termId: time.term.id,
@@ -49,6 +49,21 @@ describe("section allocation prerequisites", () => {
     }))).returning();
     const introductory = sections[0]!;
     const advanced = sections[1]!;
+    // Classroom placement needs a real active teaching assignment and an
+    // independently verified school role, not just a Section shell.
+    const [instructor]=await db.insert(s.people).values({
+      legalFirstName:"Verified",legalLastName:"Instructor",
+    }).returning();
+    const [account]=await db.insert(s.accessAccounts).values({
+      emailNormalized:`teacher-${suffix}@example.invalid`,
+    }).returning();
+    await db.insert(s.accountPersonGrants).values({
+      accountId:account!.id,personId:instructor!.id,role:"teacher",
+      organizationId:org!.id,siteId:site!.id,
+    });
+    await db.insert(s.sectionTeachers).values({
+      sectionId:advanced.id,personId:instructor!.id,
+    });
     await replaceSectionRegistrationPolicy(db, {
       sectionId: advanced.id, enrollmentCapacity: 10, prerequisites: [courses[0]!.code],
       addDropEndsOn: time.term.endsOn, withdrawalEndsOn: time.term.endsOn,
