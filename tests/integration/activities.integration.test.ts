@@ -436,9 +436,9 @@ integration("GF36 co-curriculars and athletics", () => {
     await expect(publishExtendedSeason(readinessContext, {
       ...policy, permissionVersion:"changed-without-revision",
     })).rejects.toThrow(/controlled revision/);
-    const [publishedActivity] = await db.select().from(schema.activities)
-      .where(eq(schema.activities.id, activityId));
-    expect((publishedActivity.metadata.enrichmentPublication as {
+    const [publishedSeason] = await db.select().from(schema.activitySeasons)
+      .where(eq(schema.activitySeasons.id, seasonId));
+    expect((publishedSeason.metadata.enrichmentPublication as {
       permissionVersion:string
     }).permissionVersion).toBe(policy.permissionVersion);
 
@@ -499,5 +499,79 @@ integration("GF36 co-curriculars and athletics", () => {
     expect(outsideFee.amountCents).toBe(12500);
     expect(await db.select().from(schema.enrollments)
       .where(eq(schema.enrollments.studentProfileId,outsideChild.id))).toHaveLength(0);
+
+    // Selectable week/day packages share the same season and date-specific
+    // seat inventory: two students can book distinct days in a 1-seat program.
+    const [packageSeason] = await db.insert(schema.activitySeasons).values({
+      activityId, name:"Flexible February 2028",startsOn:"2028-02-21",
+      endsOn:"2028-02-23",capacity:1,status:"draft",
+    }).returning({id:schema.activitySeasons.id});
+    const calendarPackage = await scheduleExtendedSessions(readinessContext, {
+      seasonId:packageSeason.id,fromDate:"2028-02-21",throughDate:"2028-02-23",
+      weekdays:[1,3],startTime:"15:00",endTime:"17:00",
+      location:"Art Studio",facilitatorPersonId:coach.id,
+    });
+    expect(calendarPackage.created).toBe(2);
+    const events = await db.select().from(schema.calendarEvents)
+      .where(eq(schema.calendarEvents.sourceId,packageSeason.id));
+    expect(events).toHaveLength(2);
+    const ordered = events.sort((a,b)=>a.startsAt.getTime()-b.startsAt.getTime());
+    const packageA = crypto.randomUUID();
+    const packageB = crypto.randomUUID();
+    const packageFull = crypto.randomUUID();
+    const packages = [
+      {id:packageA,title:"Monday",priceCents:4500,sessionIds:[ordered[0]!.id]},
+      {id:packageB,title:"Wednesday",priceCents:5500,sessionIds:[ordered[1]!.id]},
+      {id:packageFull,title:"Both days",priceCents:9000,
+        sessionIds:[ordered[0]!.id,ordered[1]!.id]},
+    ];
+    await publishExtendedSeason(readinessContext,{
+      ...policy,seasonId:packageSeason.id,packages,
+    });
+    const baseChoice={
+      activitySeasonId:packageSeason.id,householdId:household.id,
+      consentVersion:policy.permissionVersion,acknowledged:true,
+    };
+    const mon=await activities.registerForActivity(guardianContext,{
+      ...baseChoice,studentProfileId:outsideChild.id,
+      selectedPackageIds:[packageA],
+    });
+    const wed=await activities.registerForActivity(guardianContext,{
+      ...baseChoice,studentProfileId:sibling.id,
+      selectedPackageIds:[packageB],
+    });
+    const [mreg]=await db.select().from(schema.activityRegistrations)
+      .where(eq(schema.activityRegistrations.id,mon));
+    const [wreg]=await db.select().from(schema.activityRegistrations)
+      .where(eq(schema.activityRegistrations.id,wed));
+    expect(mreg.status).toBe("pending");
+    expect(wreg.status).toBe("pending");
+    expect(mreg.metadata.enrichmentSelection).toMatchObject({
+      packageIds:[packageA],sessionIds:[ordered[0]!.id],amountCents:4500,
+    });
+    expect(wreg.metadata.enrichmentSelection).toMatchObject({
+      packageIds:[packageB],sessionIds:[ordered[1]!.id],amountCents:5500,
+    });
+    const [mFee]=await db.select().from(schema.financialObligations)
+      .where(eq(schema.financialObligations.id,mreg.financialObligationId!));
+    const [wFee]=await db.select().from(schema.financialObligations)
+      .where(eq(schema.financialObligations.id,wreg.financialObligationId!));
+    expect([mFee.amountCents,wFee.amountCents]).toEqual([4500,5500]);
+    await expect(activities.registerForActivity(guardianContext,{
+      ...baseChoice,studentProfileId:outsideChild.id,
+      selectedPackageIds:[packageB],
+    })).rejects.toThrow(/different package choices/);
+    await expect(activities.registerForActivity(guardianContext,{
+      ...baseChoice,studentProfileId:student.id,
+      selectedPackageIds:[packageA,packageFull],
+    })).rejects.toThrow(/overlapping/);
+    const waitlisted=await activities.registerForActivity(guardianContext,{
+      ...baseChoice,studentProfileId:student.id,
+      selectedPackageIds:[packageFull],
+    });
+    const [waitReg]=await db.select().from(schema.activityRegistrations)
+      .where(eq(schema.activityRegistrations.id,waitlisted));
+    expect(waitReg.status).toBe("waitlisted");
+    expect(waitReg.financialObligationId).toBeNull();
   });
 });
