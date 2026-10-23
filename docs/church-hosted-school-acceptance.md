@@ -69,6 +69,36 @@ GF3 fixture has **not been executed** by an authenticated Node test runner.
 A real agreement-approval/expiry/revocation service is still required before
 a separate church/CAN institution can lawfully activate.
 
+
+## Increment 2 — verified CAN–church operating authorization (source committed, not accepted)
+
+A new `program_site_authorizations` model (`0039`, **not applied**) links one
+church-owned Site and canonical Program to an independent CAN academic institution.
+Each version records precise contracted services, host requester, independent CAN
+reviewer, a third-party verified agreement document, effective dates and revocation.
+Existing `sites.organization_id` and `programs.organization_id` remain with the host.
+
+- The church registrar can request a service scope from academic launch; a verified CAN
+  steward has a separate request queue and independently approves/denies it. Either
+  authorized contracting party can revoke an active agreement. No user role is granted
+  by signing, selecting the provider or approving the relationship.
+- Before opening a church Program served by CAN, the activation service verifies
+  the current contract's independent document evidence, issuer, exact parties,
+  Site, Program and required service entitlements. It also serializes against
+  concurrent revocation. A Program may remain in planning until that check passes.
+- The documented acceptance fixture now calls actual launch, request, review,
+  evidence-verification, revocation and authorization commands against synthetic
+  data in a rollback-only transaction; expected denials include unrelated host,
+  wrong-site evidence and missing service. This fixture is **not yet executed**.
+- The read-only schema/migration guard now recognizes `0039`, checks its column and
+  integrity/index contracts and fails closed if the dedicated database is behind.
+  Confirm exact committed SQL, review, then apply only to the isolated FullFlow
+  Neon branch through the guarded migration path with explicit approval.
+- **Still missing:** independently verified institutional user grants, role-limited
+  academic commands across church/CAN organizations, operational responsibility
+  delegation, child-safety intake/escalation, live browser acceptance. The new
+  agreement is service entitlement, not school accreditation or an opening permit.
+
 ## Required connected acceptance (each stage preserves IDs and audit history)
 
 1. **Church requests local CAN site authorization.** Verified church registrar initiates

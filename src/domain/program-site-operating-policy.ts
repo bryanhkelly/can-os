@@ -97,6 +97,10 @@ export function assertCurrentOperatingAuthorization(
   at = new Date(),
 ): void {
   assertChurchCANOperatingIdentity(identity);
+  // A helper called without an explicit service must never become a generic
+  // cross-organization authorization token for an unrelated operation.
+  normalizeOperatingServices(required);
+  const contracted = normalizeOperatingServices(row.services);
   if (row.status !== "approved" || row.revokedAt !== null ||
       row.programId !== identity.programId || row.siteId !== identity.siteId ||
       row.hostOrganizationId !== identity.hostOrganizationId ||
@@ -105,6 +109,6 @@ export function assertCurrentOperatingAuthorization(
       !row.reviewedAt || row.reviewedAt > at ||
       !row.effectiveFrom || row.effectiveFrom > at ||
       !row.effectiveThrough || row.effectiveThrough <= at ||
-      required.some(service => !row.services.includes(service)))
+      required.some(service => !contracted.includes(service)))
     throw new AuthorizationError("current independently approved Program-Site service entitlement");
 }

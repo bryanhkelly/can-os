@@ -65,5 +65,9 @@ describe("Church-CAN Program-Site authorization policy", () => {
     ]) expect(() => assertCurrentOperatingAuthorization({ ...approval,services:s,...altered },identity,s,now)).toThrow();
     expect(() => assertCurrentOperatingAuthorization({ ...approval,services:s },
       identity,["academic_records"],now)).toThrow();
+    expect(() => assertCurrentOperatingAuthorization({ ...approval,services:s },
+      identity,[],now)).toThrow();
+    expect(() => assertCurrentOperatingAuthorization({ ...approval,services:["unrecognized"] as never },
+      identity,["academic_instruction"],now)).toThrow();
   });
 });
