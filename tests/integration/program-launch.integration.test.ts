@@ -100,6 +100,7 @@ integration("GF3 host / program launch", () => {
       actorPersonId: operator!.id,
       capabilities: new Set([
         "program.launch.start",
+        "program.read",
         "journey.requirement.complete",
         "calendar.event.create",
         "program.activate",
@@ -112,6 +113,11 @@ integration("GF3 host / program launch", () => {
       },
       requestId: `gf3-${suffix}`,
     });
+
+    const [unrelatedAcademicOrganization] = await db.insert(schema.organizations).values({
+      type: "christian_school", name: `Unrelated Academic School ${suffix}`,
+      slug: `unrelated-academic-${suffix}`,
+    }).returning();
 
     const scenarios = [
       {
@@ -162,6 +168,23 @@ integration("GF3 host / program launch", () => {
         scope: { ...context.scope, programIds: [] as string[] },
       };
       launchState.context = launchContext;
+      const options = await launchFunctions.listLaunchOptions();
+      expect(options.organizations.map(org => org.id)).toContain(host.id);
+      expect(options.organizations.map(org => org.id)).not.toContain(canOrg.id);
+      expect(options.academicProviderOrganizations.map(org => org.id)).toContain(canOrg.id);
+      expect(options.creditIssuingOrganizations.map(org => org.id)).toContain(canOrg.id);
+      expect(options.academicProviderOrganizations.map(org => org.id)).not.toContain(unrelatedAcademicOrganization.id);
+
+      if (scenario.programType === "church_hosted_academy") {
+        await expect(programsModule.startProgramLaunch(context, {
+          hostOrganizationId: host.id, siteId: site.id, jurisdictionId: jurisdiction.id,
+          type: scenario.programType, name: "Unauthorized provider",
+          slug: `unauthorized-provider-${suffix}`, gradeRange: scenario.gradeRange,
+          deliveryModel: { onsite: true, onsiteDaysPerWeek: 5 },
+          academicProviderOrganizationId: unrelatedAcademicOrganization.id,
+          creditIssuingOrganizationId: unrelatedAcademicOrganization.id,
+        })).rejects.toThrow(/must be a CAN network organization/);
+      }
 
       const launch = await programsModule.startProgramLaunch(context, {
         hostOrganizationId: host.id,
