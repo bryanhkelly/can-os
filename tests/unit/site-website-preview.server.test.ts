@@ -50,6 +50,11 @@ vi.mock("@/modules/activities/enrichment-catalog.server", () => ({
   },
 }));
 
+vi.mock("@/modules/sites/site-local-content.server", () => ({
+  readCurrentLocalContent: async () => null,
+  readLocalContentHistory: async () => [],
+}));
+
 import { getPartnerWebsitePreview } from "@/modules/sites/site-website-preview.server";
 
 function editor(overrides: Partial<AccessContext> = {}): AccessContext {
@@ -106,7 +111,8 @@ describe("read-only church partner website", () => {
     expect(result.previewHtml).not.toContain("applicationId");
     expect(Object.keys(result).sort()).toEqual([
       "approvedAcademicCount", "approvedEnrichmentCount",
-      "host", "organizationName", "previewHtml", "siteName", "status",
+      "currentRevision", "editingContent", "host", "localContentStatus",
+      "localHistory", "organizationName", "previewHtml", "siteName", "status",
     ]);
     expect(state.catalogSiteIds).toEqual(["site-a", "site-a"]);
   });
