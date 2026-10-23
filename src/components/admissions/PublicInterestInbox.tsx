@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import {
   assignPublicInterestFollowUp, listPublicAdmissionsInterests,
@@ -24,9 +24,19 @@ function FollowUpControls({ row, assignees, onSaved }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Synchronize with server-authoritative changes after router invalidation,
+  // including another registrar reassigning the same inquiry.
+  useEffect(() => {
+    setOwner(row.followUpOwnerPersonId ?? "");
+    setDeadline(localDateTime(row.followUpDueAt));
+  }, [row.followUpOwnerPersonId, row.followUpDueAt]);
   const candidates = assignees.filter(person => person.organizationId === row.organizationId &&
     (person.siteId === null || person.siteId === row.siteId))
     .filter((person, index, all) => all.findIndex(p => p.personId === person.personId) === index);
+  const assignedPerson = candidates.find(person => person.personId === row.followUpOwnerPersonId);
+  const ownerLabel = assignedPerson
+    ? `${assignedPerson.firstName} ${assignedPerson.lastName}`
+    : row.followUpOwnerPersonId ? "Previously assigned registrar" : "Unassigned";
   const due = row.followUpDueAt ? new Date(row.followUpDueAt) : null;
   const overdue = due !== null && due.getTime() < Date.now() &&
     row.followUpStatus !== "resolved" && row.followUpStatus !== "cancelled";
@@ -49,7 +59,7 @@ function FollowUpControls({ row, assignees, onSaved }: {
   return <div className="mt-4 rounded-lg border p-3">
     <p className="text-sm font-semibold">Family inquiry follow-up</p>
     <p className="mt-1 text-xs text-muted-foreground">
-      {row.followUpStatus ?? "Not yet assigned"} · {due
+      {row.followUpStatus ?? "Not yet assigned"} · {ownerLabel} · {due
         ? `Due ${due.toLocaleString()}` : "No deadline recorded"}
       {overdue ? " · Overdue" : ""}
       {row.followUpOwnerPersonId && !candidates.some(person => person.personId === row.followUpOwnerPersonId)
