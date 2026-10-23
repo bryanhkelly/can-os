@@ -33,6 +33,7 @@ import { lockLaunchTeacherClaims } from "@/modules/staffing/launch-staffing.serv
 import { assertOpeningOperator,createOpeningHandoff,listOpeningHandoffs } from "./opening-handoff.server";
 import { listExtendedSessionStaff } from "@/modules/activities/extended-learning-sessions.server";
 import { requireCurrentProgramSiteAuthorization } from "./program-site-authorization.server";
+import { ensureExistingSitePublicationDraftForLaunch } from "@/modules/sites/site-public-provisioning.server";
 
 export async function startProgramLaunch(
   context: CommandContext,
@@ -56,7 +57,14 @@ export async function startProgramLaunch(
     accreditationAuthorityOrganizationId?: string;
     journeyDefinitionKey?: string;
   },
-): Promise<{ programId: string; journeyId: string }> {
+): Promise<{
+  programId: string;
+  journeyId: string;
+  publicSiteDraft: {
+    siteId: string; slug: string; host: string;
+    status: "draft" | "published"; created: boolean;
+  } | null;
+}> {
   assertCapability(context, "program.launch.start");
   const creditMode = resolveProgramCreditMode(input);
 
@@ -88,9 +96,10 @@ export async function startProgramLaunch(
       creditMode,
     });
 
+    let launchSite: { id: string; organizationId: string; slug: string } | null = null;
     if (input.siteId) {
       const [site] = await tx
-        .select({ organizationId: sites.organizationId })
+        .select({ id: sites.id, organizationId: sites.organizationId, slug: sites.slug })
         .from(sites)
         .where(eq(sites.id, input.siteId))
         .limit(1);
@@ -100,6 +109,7 @@ export async function startProgramLaunch(
       if (site.organizationId !== input.hostOrganizationId) {
         throw new Error("Site must belong to the host Organization");
       }
+      launchSite = site;
     }
 
     const [program] = await tx
@@ -183,7 +193,17 @@ export async function startProgramLaunch(
       },
     });
 
-    return { programId: program.id, journeyId };
+    // Close the pre-existing-Site gap: a real Program launch creates (or
+    // reuses) its Site's PRIVATE website address in this same transaction.
+    // There is no change to Site/Program publication, admissions readiness,
+    // publisher grants or DNS. Site-less Programs have no website to reserve.
+    const draft = launchSite
+      ? await ensureExistingSitePublicationDraftForLaunch(tx, context, launchSite)
+      : null;
+    return {
+      programId: program.id, journeyId,
+      publicSiteDraft: draft && launchSite ? { siteId: launchSite.id, ...draft } : null,
+    };
   });
 }
 
