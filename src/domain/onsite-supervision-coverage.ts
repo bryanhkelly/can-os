@@ -17,6 +17,12 @@ export type SupervisionBlockInput = {
   facilitatorPersonId: string | null;
   facilitatorName: string | null;
   verifiedSiteStaffGrant: boolean;
+  /** Only required for independently church-hosted CAN Programs. */
+  requiresSectionDelegation?: boolean;
+  /** The actual named person's appointment must cover this entire block. */
+  verifiedSectionDelegation?: boolean;
+  /** The current church/CAN contract must authorize supervised onsite services. */
+  authorizedSupervisionService?: boolean;
   /** False if this specific site-local date lacks an approved instructional calendar day. */
   instructionalDayConfirmed?: boolean;
   overlappingFacilitatorAssignments?: boolean;
@@ -48,7 +54,8 @@ export function coversLocalSupervisionBlock(input:{
 
 export type SupervisionGap =
   "schedule_missing" | "facilitator_missing" | "staff_grant_missing" |
-  "facilitator_conflict" | "room_unconfigured" | "calendar_unverified";
+  "facilitator_conflict" | "room_unconfigured" | "calendar_unverified" |
+  "section_delegation_missing" | "operating_agreement_missing";
 
 function minutes(input: string | null): number | null {
   if (!input) return null;
@@ -70,6 +77,10 @@ export function summarizeOnsiteSupervision(
     if (row.instructionalDayConfirmed === false) gaps.push("calendar_unverified");
     if (!row.facilitatorPersonId) gaps.push("facilitator_missing");
     else if (!row.verifiedSiteStaffGrant) gaps.push("staff_grant_missing");
+    if (row.requiresSectionDelegation && row.verifiedSectionDelegation !== true)
+      gaps.push("section_delegation_missing");
+    if (row.requiresSectionDelegation && row.authorizedSupervisionService !== true)
+      gaps.push("operating_agreement_missing");
     if (row.overlappingFacilitatorAssignments) gaps.push("facilitator_conflict");
     // CAN OS currently has no authoritative section-room assignment; never
     // silently claim that an instructional section has a supervised room.
