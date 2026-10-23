@@ -34,6 +34,7 @@ function EnrichmentFamilyView({ data }: {
   const [householdId, setHouseholdId] = useState(data.family.households[0]?.id ?? "");
   const [studentSelections, setStudentSelections] = useState<Record<string,string>>({});
   const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
+  const [packageSelections, setPackageSelections] = useState<Record<string,string[]>>({});
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -66,8 +67,18 @@ function EnrichmentFamilyView({ data }: {
         throw new Error("Choose a child and family household to register.");
       if (acknowledged[seasonId] !== true)
         throw new Error("Read and acknowledge the published permission statement.");
+      const offer = data.catalog.find(item => item.seasonId === seasonId);
+      if (!offer) throw new Error("Offering no longer available");
+      const selectedPackageIds = packageSelections[seasonId] ?? [];
+      if (offer.packages.length && !selectedPackageIds.length)
+        throw new Error("Select at least one camp package or weekly option");
+      const selectedPackages = offer.packages.filter(item => selectedPackageIds.includes(item.id));
+      const count = selectedPackages.flatMap(item => item.sessionIds);
+      if (new Set(count).size !== count.length)
+        throw new Error("Selected package options contain overlapping days");
       const registered = await registerEnrichmentChild({ data: {
         seasonId, studentProfileId, householdId, permissionVersion, acknowledged: true,
+        ...(offer.packages.length ? { selectedPackageIds } : {}),
       } });
       setNotice(registered.status === "waitlisted"
         ? "Your child is on the waitlist. No activity fee was charged."
@@ -160,6 +171,12 @@ function EnrichmentFamilyView({ data }: {
         const selected = studentSelections[offer.seasonId] ?? data.family.children[0]?.studentProfileId ?? "";
         const prior = data.family.registrations.find(r =>
           r.seasonId === offer.seasonId && r.studentProfileId === selected);
+        const chosenIds = packageSelections[offer.seasonId] ?? [];
+        const selectedPackages = offer.packages.filter(option=>chosenIds.includes(option.id));
+        const packageSessions = selectedPackages.flatMap(option=>option.sessionIds);
+        const packageConflict = new Set(packageSessions).size !== packageSessions.length;
+        const quotedPrice = selectedPackages.reduce((sum,item)=>sum+item.priceCents,0);
+        const requestedWaitlist = selectedPackages.some(option=>option.seatsRemaining === 0);
         return <article key={offer.seasonId} className="rounded-xl border bg-card p-5">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{offer.siteName} · {offer.programName}</p>
           <h3 className="mt-1 text-xl font-semibold">{offer.name}</h3>
@@ -168,12 +185,12 @@ function EnrichmentFamilyView({ data }: {
             First session: {new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",
               timeZone:offer.meetingTimezone}).format(new Date(offer.firstMeeting))}
           </p>}
-          <div className="mt-3 flex flex-wrap gap-4 text-sm">
-            <span>{usd(offer.feeAmountCents)}</span>
+          {offer.packages.length === 0 && <div className="mt-3 flex flex-wrap gap-4 text-sm">
+            <span>Full season: {usd(offer.feeAmountCents)}</span>
             <span>{offer.seatsRemaining === 0 ? "Waitlist available" :
               offer.seatsRemaining === null ? "Capacity not specified" :
               `${offer.seatsRemaining} seats remaining`}</span>
-          </div>
+          </div>}
           <label className="mt-4 block text-sm">Register child
             <select value={selected}
               onChange={e => setStudentSelections(prev => ({
@@ -187,6 +204,37 @@ function EnrichmentFamilyView({ data }: {
           {prior ? <p className="mt-3 text-sm font-semibold">
             Existing registration: {prior.status.replaceAll("_", " ")}
           </p> : <>
+            {!!offer.packages.length && <fieldset className="mt-4 rounded-lg border p-3">
+              <legend className="px-2 text-sm font-semibold">Choose enrollment weeks or days</legend>
+              <div className="grid gap-2">
+                {offer.packages.map(option=><label key={option.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+                  <span className="flex items-center gap-2">
+                    <input type="checkbox" checked={chosenIds.includes(option.id)}
+                      onChange={event=>setPackageSelections(current=>{
+                        const ids=current[offer.seasonId] ?? [];
+                        return {...current, [offer.seasonId]: event.target.checked
+                          ? [...ids,option.id] : ids.filter(id=>id!==option.id)};
+                      })}/>
+                    {option.title} <span className="text-xs text-muted-foreground">
+                      ({option.sessionIds.length} sessions)
+                    </span>
+                  </span>
+                  <span>{usd(option.priceCents)}
+                    {" · "}{option.seatsRemaining === 0 ? "Waitlist" :
+                      option.seatsRemaining === null ? "Capacity not specified" :
+                      `${option.seatsRemaining} seats`}
+                  </span>
+                </label>)}
+              </div>
+              <p className="mt-2 text-sm font-semibold">
+                Selected total: {usd(quotedPrice)}
+                {requestedWaitlist && " · At least one selection is waitlisted"}
+              </p>
+              {packageConflict && <p role="alert" className="mt-2 text-xs text-red-700">
+                These packages have overlapping days. Choose non-overlapping options.
+              </p>}
+            </fieldset>}
             <div className="mt-4 rounded-lg border p-3 text-sm">
               <p className="mb-2 font-semibold">Participation consent · version {offer.permissionVersion}</p>
               <p className="whitespace-pre-wrap">{offer.permissionText}</p>
@@ -200,7 +248,8 @@ function EnrichmentFamilyView({ data }: {
             </label>
             <button type="button" onClick={() => register(offer.seasonId, offer.permissionVersion)}
               disabled={busy || !selected || !householdId || !offer.registrationOpen ||
-                !acknowledged[offer.seasonId]}
+                !acknowledged[offer.seasonId] || packageConflict ||
+                (offer.packages.length > 0 && !chosenIds.length)}
               className="mt-4 rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
               {offer.registrationOpen ? "Submit registration" : "Registration window is closed"}
             </button>
