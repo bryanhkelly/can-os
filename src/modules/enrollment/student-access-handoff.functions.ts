@@ -229,14 +229,19 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
        status:"approved",reviewedByPersonId:actor.actorPersonId,
        reviewedAt:new Date(),updatedAt:new Date(),
      }).where(eq(studentAccessConsents.id,consent.id));
+     // Only the first independently reviewed authorization emits the
+     // institutional approval event. Passwordless resend is not a new
+     // decision and must not duplicate official approval history.
+     await emitEvent(tx,{eventType:"StudentLearningAccessApproved",
+       aggregateType:"student_access_consent",aggregateId:consent.id,
+       actorPersonId:actor.actorPersonId,organizationId:app.organizationId,
+       siteId:app.siteId!,programId:app.programId,
+       payload:{applicationId:app.id,studentProfileId:app.studentProfileId}});
    }
-   await emitEvent(tx,{eventType:"StudentLearningAccessApproved",
-     aggregateType:"student_access_consent",aggregateId:consent.id,
-     actorPersonId:actor.actorPersonId,organizationId:app.organizationId,
-     siteId:app.siteId!,programId:app.programId,
-     payload:{applicationId:app.id,studentProfileId:app.studentProfileId}});
    await writeAudit(tx,{actorPersonId:actor.actorPersonId,
-     action:"student.access.registrar_approved",resourceType:"student_access_consent",
+     action:consent.status==="pending_review"
+       ?"student.access.registrar_approved":"student.access.login_link_requested",
+     resourceType:"student_access_consent",
      resourceId:consent.id,
      scope:{organizationId:app.organizationId,programId:app.programId,siteId:app.siteId},
      after:{studentProfileId:app.studentProfileId,status:"approved",
