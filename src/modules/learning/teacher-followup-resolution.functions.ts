@@ -75,6 +75,7 @@ export const getTeacherLearningFollowUps = createServerFn({ method: "GET" })
     const parentIds = rows.map(row => row.id);
     const goalRows = parentIds.length ? await db.select({
       id: s.actions.id, parentActionId: s.actions.parentActionId,
+      ownerPersonId: s.actions.ownerPersonId, subjectId: s.actions.subjectId,
       status: s.actions.status,
     }).from(s.actions).where(and(
       eq(s.actions.type, STUDENT_LEARNING_GOAL_TYPE),
@@ -92,7 +93,9 @@ export const getTeacherLearningFollowUps = createServerFn({ method: "GET" })
         studentName: `${row.firstName} ${row.lastName}`,
         studentGoal: (() => {
           const goal = goalByParent.get(row.id);
-          return goal ? { id: goal.id, status: goal.status } : null;
+          return goal && goal.ownerPersonId === row.studentPersonId &&
+            goal.subjectId === row.studentProfileId
+            ? { id: goal.id, status: goal.status } : null;
         })(),
         approach: typeof row.metadata.approach === "string" ? row.metadata.approach : "check_in",
       })),
