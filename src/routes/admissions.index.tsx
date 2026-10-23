@@ -1,4 +1,5 @@
 import { listEnrollmentPlacements, placeEnrolledStudent } from "@/modules/enrollment/course-placement.functions";
+import {StudentLearningAccessHandoff} from "@/components/enrollment/StudentLearningAccessHandoff";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
@@ -146,6 +147,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
              <CoursePlacement applicationId={x.id}
                acceptedOfferId={latest?.status==="accepted"?latest.id:undefined}
                enrollmentActivated={activated} />}
+          {activated&&<StudentLearningAccessHandoff applicationId={x.id} role="registrar"/>}
           <Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
         </article>;
       })}
