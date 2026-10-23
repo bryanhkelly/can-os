@@ -319,24 +319,14 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                   </div>
                 );
               })()}
-              {(() => {
-                const gate = planning.readiness.find(item => item.seasonId === season.id);
-                return gate ? (
-                  <div className="mt-2 text-xs">
-                    <p className="font-semibold">{gate.ready ? "Readiness checks satisfied" : "Registration opening blocked"}</p>
-                    {!gate.ready && <ul className="mt-1 list-disc pl-5">
-                      {gate.blockers.map(blocker => <li key={blocker}>{blocker}</li>)}
-                    </ul>}
-                  </div>
-                ) : null;
-              })()}
-              {(() => {
+              {season.status === "draft" && (() => {
                 const tasks = planning.assignments.filter(a => a.seasonId === season.id);
                 const available = planning.operators.filter(p => p.programId === season.programId);
                 const existingOwner = tasks[0]?.ownerPersonId ?? "";
                 const operatorId = readinessOwners[season.id] ?? existingOwner;
                 return (
-                  <div className="mt-3 rounded-lg border p-3">
+                  <details className="mt-3 rounded-lg border p-3">
+                    <summary className="cursor-pointer text-xs font-semibold">Optional evidence requests</summary>
                     <p className="text-xs font-semibold">
                       Evidence requests: {tasks.length}/{extendedLearningReadinessTasks.length} recorded
                     </p>
@@ -373,7 +363,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                     {!available.length && <p className="mt-2 text-xs text-muted-foreground">
                       No active site registrar/operator is currently eligible for these tasks.
                     </p>}
-                  </div>
+                  </details>
                 );
               })()}
             </li>
