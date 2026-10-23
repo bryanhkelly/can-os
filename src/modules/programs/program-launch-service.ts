@@ -1,4 +1,5 @@
 import { db } from "@/db/client";
+import { assertChurchHostedProviderIntent } from "@/domain/church-hosted-provider";
 import { resolveProgramCreditMode, isExtendedLearningType, type ProgramType, type ProgramCreditMode } from "@/domain/program-offerings";
 import {
 journeys,
@@ -60,13 +61,31 @@ export async function startProgramLaunch(
 
   return db.transaction(async (tx) => {
     const [host] = await tx
-      .select({ id: organizations.id })
+      .select({ id: organizations.id, type: organizations.type })
       .from(organizations)
       .where(eq(organizations.id, input.hostOrganizationId))
       .limit(1);
 
     if (!host) throw new Error("Host Organization not found");
     assertOrganizationScope(context, input.hostOrganizationId);
+    // The host and academic institution can be independent organizations.
+    // Never trust client-supplied provider IDs without checking the actual entities.
+    const [academicProvider] = await tx.select({ id: organizations.id, type: organizations.type })
+      .from(organizations).where(eq(organizations.id, input.academicProviderOrganizationId)).limit(1);
+    const [creditIssuer] = input.creditIssuingOrganizationId
+      ? await tx.select({ id: organizations.id, type: organizations.type })
+          .from(organizations).where(eq(organizations.id, input.creditIssuingOrganizationId)).limit(1)
+      : [];
+    if (!academicProvider) throw new Error("Academic provider Organization not found");
+    if (creditMode === "credit_bearing" && !creditIssuer) throw new Error("Credit issuer Organization not found");
+    assertChurchHostedProviderIntent({
+      programType: input.type,
+      hostOrganizationId: host.id, hostOrganizationType: host.type,
+      academicProviderOrganizationId: academicProvider.id,
+      academicProviderOrganizationType: academicProvider.type,
+      creditIssuingOrganizationId: creditIssuer?.id ?? null,
+      creditMode,
+    });
 
     if (input.siteId) {
       const [site] = await tx
