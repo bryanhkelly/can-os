@@ -4,6 +4,14 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { extendedRegistrationOpeningReadiness } from "./registration-policy";
 const extendedTypes = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const publishInput = z.object({
+  seasonId: z.string().uuid(),
+  permissionVersion: z.string().trim().min(1).max(80),
+  permissionText: z.string().trim().min(30).max(6000),
+  feeAmountCents: z.number().int().min(0).max(10000000),
+  operationalResponsibilityConfirmed: z.literal(true),
+}).strict();
+
 const scheduleInput = z.object({
   seasonId: z.string().uuid(),
   fromDate: day,
@@ -177,4 +185,16 @@ export const scheduleExtendedSessionsFn = createServerFn({ method: "POST" })
     ]);
     const actor = await requireActor(["registrar"], "program.launch.start");
     return scheduleExtendedSessions(actor, data);
+  });
+
+/** Registrar-controlled release of an ACTIVE noncredit Program's scheduled offering. */
+export const publishExtendedSeasonFn = createServerFn({ method: "POST" })
+  .validator((value: unknown) => publishInput.parse(value))
+  .handler(async ({ data }) => {
+    const [{ requireActor }, { publishExtendedSeason }] = await Promise.all([
+      import("@/modules/identity/actors.server"),
+      import("./enrichment-publication.server"),
+    ]);
+    const actor = await requireActor(["registrar"], "program.launch.start");
+    return publishExtendedSeason(actor, data);
   });
