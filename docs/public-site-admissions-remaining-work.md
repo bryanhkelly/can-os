@@ -160,10 +160,7 @@ tests or release gates have passed.
 - **Depends on:** Canonical launch/Site workflow and PUB-13; `0035` schema.
 
 **PUB-13 — Site profile, editorial copy and true preview.** `Partial`
-- **Implement:** Versioned public fields with ownership-specific approval, not blanket review. for hero, school
-  description, grades, delivery schedule, location/contact method, FAQ,
-  program details and clear "host / education provider / school of record"
-  descriptions. Make an authenticated preview use the **same public HTML
+- **Implement:** Versioned public fields with ownership-specific approval, not blanket review. Church-owned hero, local description, denomination and spiritual-formation copy publish directly; CAN-owned grades, delivery, academic Program details and verified "host / education provider / school of record" descriptions remain authoritative. Make an authenticated preview use the **same public HTML
   projection** as the tenant page. Avoid unsanitized markdown/HTML or
   public staff/student information.
 - **DoD:** Draft preview accurately matches approved output; content edit
