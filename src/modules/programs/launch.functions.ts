@@ -237,10 +237,19 @@ export const createLaunchSite = createServerFn({method:"POST"})
   const actor=await registrarContext("program.launch.start");
   if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.grantSiteId!==null)
    throw new AuthorizationError("organization-wide site creation");
-  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const [{db},s,{provisionNewSitePublicationDraft}]=await Promise.all([
+   import("@/db/client"),import("@/db/schema"),
+   import("@/modules/sites/site-public-provisioning.server"),
+  ]);
   return db.transaction(async tx=>{
    const [site]=await tx.insert(s.sites).values({...data}).returning({id:s.sites.id});
    if(!site)throw new Error("Failed to create Site");
+   // PUB-12: a private website address is created WITH the canonical Site.
+   // The independent publication and admissions-readiness approvals do not
+   // happen during onboarding, and no new publishing grant is issued.
+   const publicSiteDraft=await provisionNewSitePublicationDraft(tx,actor,{
+    id:site.id,organizationId:data.organizationId,slug:data.slug,
+   });
    await emitEvent(tx,{
     eventType:EventTypes.SiteCreated,aggregateType:"site",aggregateId:site.id,
     actorPersonId:actor.actorPersonId,organizationId:data.organizationId,
@@ -250,7 +259,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
     action:"site.create",entityType:"site",entityId:site.id,
     scope:{organizationId:data.organizationId,siteId:site.id},
     after:{name:data.name,timezone:data.timezone}});
-   return {siteId:site.id};
+   return {siteId:site.id,publicSiteDraft};
   });
  });
 /** Create a unique orientation event and expose it to site/program calendars. */
