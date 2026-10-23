@@ -51,6 +51,8 @@ export async function startFamilyApplication(
     };
     guardianRelationshipLabel?: string;
     journeyDefinitionKey?: string;
+    /** Only the verified guardian-facing server command may set this. */
+    parentSelfService?: true;
   },
 ): Promise<{
   applicationId: string;
@@ -68,6 +70,15 @@ export async function startFamilyApplication(
   const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
+    if (input.parentSelfService) {
+      const [opening] = await tx.select({status:programs.status,organizationId:programs.organizationId,
+        siteId:programs.siteId}).from(programs).where(eq(programs.id,input.programId)).for("share").limit(1);
+      if (!opening || opening.status !== "active" || !opening.siteId ||
+          !context.scope.organizationIds?.includes(opening.organizationId) ||
+          !context.scope.siteIds?.includes(opening.siteId))
+        throw new AuthorizationError("active school and authorized family application scope");
+      await requireChurchHostedOperatingServices(tx,input.programId,["admissions","school_of_record"]);
+    }
     const [existing] = await tx
       .select({
         applicationId: applications.id,
@@ -178,6 +189,9 @@ export async function startFamilyApplication(
       guardianPersonId: actorPersonId,
       studentPersonId: studentPerson.id,
       relationshipLabel: input.guardianRelationshipLabel ?? "parent",
+      ...(input.parentSelfService ? {canViewAcademics:false,canManageEnrollment:false,
+        canSubmitAttendanceExcuse:false,
+        metadata:{verification:"pending",source:"authenticated_guardian_application"}} : {}),
     });
 
     const [studentProfile] = await tx
