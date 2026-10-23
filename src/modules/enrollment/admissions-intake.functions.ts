@@ -11,6 +11,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { enrollmentJourneyDefinitionKey } from "@/domain/enrollment-form";
 import { emitEvent,writeAudit } from "@/platform/mutation";
+import { completePublicInterestFollowUp } from "./public-interest-follow-up.server";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,isNull,or,sql } from "drizzle-orm";
@@ -327,6 +328,13 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
       isNull(publicAdmissionsInterests.applicationId),
     )).returning({id:publicAdmissionsInterests.id});
     if (!linked) throw new Error("Public interest was already converted; refresh admissions");
+    // Follow-up belongs to the source interest. Completing a verified GF22
+    // handoff resolves the existing Action in the SAME transaction.
+    await completePublicInterestFollowUp(tx, actor, {
+      interestId: interestToConvert.id, organizationId: program.organizationId,
+      siteId: program.siteId!, programId: data.programId,
+      resolutionNote: "Reviewed interest converted to admissions inquiry",
+    });
     await writeAudit(tx,actor,{
       action:"admissions.public_interest.convert",
       entityType:"public_admissions_interest",entityId:interestToConvert.id,
