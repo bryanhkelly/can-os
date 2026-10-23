@@ -1,5 +1,40 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 CAN-operated church classroom staffing and revocation (23 October 2026)
+
+**Source committed on `FullFlow`; tests remain unexecuted.** A church-owned
+Site may use CAN as a **different institutional academic provider**. A
+teacher grant belonging solely to the host church must **not** make the
+admissions placement screen call that classroom academically staffed, even
+if somebody inserted a `section_teachers` assignment.
+
+The shared Section staffing check now accepts the original provider-wide
+verified teacher membership where the provider differs from the Program
+owner; only when a school owns **its own** academics can a Site-bound
+teacher grant satisfy placement. Canonical class workspace and gradebook
+authorization additionally reject host-only teacher access to independently
+CAN-operated church academic Sections, require a named CAN-delegated Section
+and original institution-wide grant, and independently check the current
+academic-instruction + curriculum authorization. A previously signed-in
+CAN teacher's **class directory** now rechecks the live operating agreement
+rather than showing a stale delegated class after cancellation.
+
+The rollback-only `program-site-authorization.integration.test.ts` now
+creates a real church Program + CAN publisher course + Section + two
+independently email-verified teacher accounts. It verifies that host-only
+teaching membership does **not** count as staffed, CAN teacher membership
+does, church staff cannot open the CAN-owned class, the CAN teacher can
+open only their assigned Section, and contract revocation removes the
+teacher's Section from the directory and denies class entry.
+
+**No new schema, Site ownership transfer, production writes, or new general
+partner roles.** The dedicated Neon + browser first-family-to-class
+acceptance remains the only release-critical blocker. GitHub-hosted CI
+and Neon test workflows still failed before any job runner or step was
+allocated; source tests are not passing evidence.
+
+---
+
 ## P0 learner membership integrity — prevent orphan Section access (23 October 2026)
 
 **Source committed; execution not yet verified.** An active Section
