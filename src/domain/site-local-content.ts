@@ -45,6 +45,8 @@ const protectedClaims = [
   /\b(?:state[- ]licensed school|certified high school|official CAN curriculum|CAN[- ]approved)\b/i,
   /\b(?:official(?:ly)? (?:endorsed|recognized|affiliated) by (?:a |the )?denomination)\b/i,
   /\b(?:only (?:accept|admit|enroll) (?:children|students|families) who)\b/i,
+  /\\b(?:only|never|do not|won't)\\s+(?:admit|accept|enroll)\\b/i,
+  /\\b(?:school admissions policy|academic admission requirement|CAN(?: Academy| OS)?(?:'s)? official (?:faith|theology|doctrine))\\b/i,
 ];
 const unsafeText = [
   /<\s*\/?\s*(?:script|iframe|style|img|a|svg|object|embed|form)\b/i,
