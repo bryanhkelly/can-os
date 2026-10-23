@@ -22,6 +22,8 @@ export const getMyStudentToday = createServerFn({ method: "GET" }).handler(async
   const [membership] = await db.select({ id: enrollments.id }).from(enrollments)
     .innerJoin(programs, eq(programs.id, enrollments.programId))
     .where(and(eq(enrollments.studentProfileId, profile.id),
+      // A surviving Section record does not reauthorize a withdrawn Program.
+      eq(enrollments.kind,"program"),
       eq(enrollments.status, "active"),
       inArray(enrollments.programId,context.scope.programIds??[]),
       inArray(programs.siteId, context.scope.siteIds))).limit(1);
