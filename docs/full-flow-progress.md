@@ -1,5 +1,38 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 learner membership integrity — prevent orphan Section access (23 October 2026)
+
+**Source committed; execution not yet verified.** An active Section
+enrollment can survive after its matching Program enrollment is withdrawn,
+transferred or cancelled. Previously a learner could still open that
+Section's lesson and see it in Student Today because class access
+checked only the Section row.
+
+The canonical `authorizeClass` student/guardian read now requires **both**
+an active Section membership and an independently active Program membership
+for the **same Person/StudentProfile, Program and school year**. The
+`accessibleClasses` student/guardian directory applies the same
+Program/Section/year join. Teacher Section discovery remains independent of
+enrollment and is not broadened to Site or Organization access. Student Today
+reads only Section records with a matching active same-year Program, and its
+entrypoint requires active Program membership rather than any active row.
+
+The existing rollback-only admissions journey now deliberately withdraws
+the just-placed student's Program membership while leaving Section active;
+checks first-lesson denial, class-directory disappearance and Student Today
+denial; restores fixture state and confirms the student returns. This closes
+a high-impact same-ID family-to-class revocation gap and does not require
+new schema or unrelated Site CMS work.
+
+**Remaining release blocker:** Actual database and authenticated browser
+execution for first family → offer → Section → student lesson → teacher
+class/gradebook, with CAN/church cross-organization persona test evidence.
+Recent GitHub Actions failures have **zero runner/steps** and no retrievable
+job logs; they cannot be treated as failing tests or successful tests.
+No production environment was changed.
+
+---
+
 ## Current P0 lesson + teacher gradebook handoff (23 October 2026)
 
 **Source committed, actual execution not yet verified.** Closed a material
