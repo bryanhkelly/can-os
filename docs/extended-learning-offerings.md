@@ -69,3 +69,40 @@ Next: accept restricted, properly scoped document references as submitted
 evidence; implement independently authorized approval/rejection,
 expiry/revocation and signed site staffing/child-release checks without
 conflating evidence submission or task closure with operational clearance.
+
+## Session scheduling: canonical calendar, not another school year
+
+Registrars now have a **Plan recurring sessions** form on the noncredit summer
+or after-school Season planner. Enter a bounded date range within the Season,
+selected weekdays, same-day site-local start/end time, a room/location and
+optionally a verified active facilitator/teacher/paraeducator/site staff person
+at that exact host Site. The existing `dateTimeInputInTimezone` and canonical
+`scheduled_occurrences` / `calendar_events` projector produce dated
+sessions across daylight-saving changes. Skipped/nonexistent local times
+and ambiguous DST start hours are errors, not silent reinterpreted times.
+The scheduler caps one request at 180 occurrences.
+
+Each meeting is a distinct `activity_season` calendar projection with a
+stable per-date-and-local-start key. Replaying identical details adds zero
+meetings; conflicting details are refused instead of silently overwriting
+room/staff/times. Calendar rows, attendee restriction, audit evidence, and
+outbox events are all written in **one transaction**; failures roll back the
+batch. Draft sessions are participant-restricted on ordinary calendars and
+excluded from Student Today; scoped registrars see the entire season schedule
+in the launch planner. Staff assignment verifies identity/site membership,
+**not** professional qualification/background clearance. No family-facing
+publication, enrollment, childcare clearance, grades, Section, or new
+school-year record is produced.
+
+The existing separately added six-readiness-Action workflow is not expanded
+here. Summer and enrichment setup must reuse CAN's shared operational
+approval processes. Next actual functional gap is a family-facing
+enrichment catalog/registration pathway that reuses existing guardian
+consent, capacity/waitlist, and financial-obligation services, including
+participants who are not CAN full-time students. The prior blanket guardian
+block for extended programs is still in place and needs a carefully
+authorized replacement, not a new checklist engine.
+
+This slice requires previously committed 0032/0033 migrations for its
+Program/Season model; it does not add a new schema migration. Database and
+browser acceptance remain release gates.
