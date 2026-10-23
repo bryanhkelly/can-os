@@ -219,7 +219,17 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    !action.programId||(context.scope.programIds??[]).includes(action.programId)).map(action=>action.id));
  const missingAssessmentByAction=new Map(followUps.filter(a=>typeof a.metadata.assessmentId==="string").map(a=>[a.id,a.metadata.assessmentId as string]));
 
- return rows.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
+ // A notification addressed to an adult is not continuing authority to
+ // reveal child-specific content after guardianship is unverified or revoked.
+ // Filter the whole sensitive notification (including title/body), not only
+ // its deep link. Staff and student notifications retain their own ownership
+ // checks and projection paths.
+ const visible=rows.filter(n=>context.role!=="guardian"||!n.resourceId||
+   (n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
+    n.resourceType==="application"?enrollmentStudent.has(n.resourceId):
+    n.resourceType==="admission_offer"?permittedGuardianOffers.has(n.resourceId):
+    n.resourceType==="submission"?guardianSubmissionById.has(n.resourceId):true));
+ return visible.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
   date:n.createdAt.toISOString(),href:n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&
