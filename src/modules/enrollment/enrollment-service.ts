@@ -383,9 +383,14 @@ export async function activateEnrollmentFromApplication(
 
     if (!application) throw new Error("Application not found");
     requireEnrollmentProgramScope(context, application.programId);
-    await requireChurchHostedOperatingServices(tx,application.programId,[
+    const hostedAgreement=await requireChurchHostedOperatingServices(tx,application.programId,[
       "admissions","school_of_record",
     ]);
+    // Legacy direct activation has no accepted guardian offer or atomic
+    // Section assignment. It must not serve an independently church-hosted
+    // CAN Academy even when a seat pool has not yet been configured.
+    if(hostedAgreement)
+      throw new Error("Church-hosted activation requires an accepted admission offer and a staffed Section in one transaction");
     assertApplicationOffersAllowed(application);
     if (application.stage !== "accepted") {
       throw new Error("Application must be accepted before activation");
