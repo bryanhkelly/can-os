@@ -54,6 +54,32 @@ lesson and submission → teacher grade and guardian view → onsite-day reconci
   unchanged requirements; no agreement is automatically approved.
 - These are source changes with tests added, **not** recorded passing runs.
 
+**Additional academic parent application and schema fixes (23 October 2026; source unverified):**
+- New `/guardian/apply` permits an **existing, real, email-verified guardian
+  account** with a verified school membership to start a canonical
+  `Application` and enrollment `Journey`. The school must be active and
+  within the original Organization/Program/Site grant, and the current
+  CAN/church service authorization is checked **in the same creation transaction**.
+  A repeated request ID is idempotent. Parents can revisit their own
+  submitted applications and reuse a household they actually belong to.
+  New child relationships have pending verification and no permission bits.
+- Admissions intake resolves the submitting parent only for explicitly
+  marked self-submitted Applications, while staff-entered inquiries continue
+  to require a separately recorded contact. Registrar verification then
+  enables the standard guardian account, forms and offer path.
+- `0041_pending_guardian_access_defaults.sql` changes three default values
+  for new guardian relationships (academic, enrollment and attendance to
+  false), without rewriting existing rows. Registered in Drizzle journal.
+  **Applied and inspected on isolated Neon `fullflow-e2e-20261022` only**;
+  production unchanged. Ledger timestamp `1792738800000`.
+- Offer acceptance/activation use the same independently verified guardian
+  policy. Unit regressions cover family scope, parent/staff identity
+  separation and pending guardian relationships.
+- **Still absent:** uninvited public parent signup, editable application
+  drafts, safe student identity deduplication, general school account
+  self-provisioning, and connected browser/multi-role acceptance. Source
+  committed is not release readiness.
+
 **Still P0 / not implemented or accepted:** the parent's independent self-service
 application and safe verified account-start experience; CAN staff's effective
 cross-organization academic permissions and local delegated responsibility;
