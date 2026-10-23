@@ -65,9 +65,17 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
                  WHEN ${actions.dueAt} < now() THEN 0 ELSE 1 END`,
         asc(actions.dueAt), desc(publicAdmissionsInterests.createdAt),
       ).limit(200);
+    const authorIds = [...new Set(rows.flatMap(row =>
+      publicInterestContactHistory(row.followUpEvidence ?? []).map(item => item.actorPersonId)))];
+    const authors = authorIds.length ? await db.select({
+      id: people.id, firstName: people.legalFirstName, lastName: people.legalLastName,
+    }).from(people).where(inArray(people.id, authorIds)).limit(5000) : [];
+    const contactActors = Object.fromEntries(authors.map(person =>
+      [person.id, `${person.firstName} ${person.lastName}`]));
     return rows.map(({ followUpEvidence, ...row }) => ({
       ...row,
       contactHistory: publicInterestContactHistory(followUpEvidence ?? []),
+      contactActors,
       createdAt: row.createdAt.toISOString(),
       contactedAt: row.contactedAt?.toISOString() ?? null,
       convertedAt: row.convertedAt?.toISOString() ?? null,
