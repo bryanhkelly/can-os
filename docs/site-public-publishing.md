@@ -1,5 +1,11 @@
 # Site public addresses and publishing — FullFlow
 
+> **Current next-work queue:** [Public Site → Admissions remaining-work backlog](./public-site-admissions-remaining-work.md).
+> This document retains Bites 1–8 as implementation history; its earlier
+> "Next narrow bites" lists are historical, **not** the active priority order.
+> Committed source does not imply executed tests, applied migrations, deployed
+> DNS/TLS or production acceptance.
+
 ## Goal
 
 Every canonical Site may reserve a globally unique public address such as
