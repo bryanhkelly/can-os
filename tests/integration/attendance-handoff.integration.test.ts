@@ -184,6 +184,30 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
     await expect(duty.respondToOnsiteDuty({data:{
       ...dutyRequest,response:"cannot_cover",reason:"unavailable",
     }})).rejects.toThrow("duty already answered");
+    // Regression: a repeating weekly timetable alone cannot justify duty
+    // acknowledgment when the current academic calendar closes the site.
+    await tx.update(s.academicCalendarDays).set({
+      type:"closure",instructionalMinutes:0,
+    }).where(and(eq(s.academicCalendarDays.academicCalendarId,calendar.id),
+      eq(s.academicCalendarDays.calendarDate,todaySite)));
+    const closedPlan=await supervision.getOnsiteSupervisionPlan({data:{date:todaySite}});
+    expect(closedPlan.blocks[0]).toMatchObject({
+      instructionalDayConfirmed:false,assignedPlan:false,canRespond:false,
+      canAccept:false,
+    });
+    expect(closedPlan.blocks[0]?.gaps).toContain("calendar_unverified");
+    const staleDuty=await duty.getOnsiteDutyResponses({data:{date:todaySite}});
+    expect(staleDuty.statuses[0]).toMatchObject({
+      status:"not_reported",canRespond:false,canAccept:false,
+    });
+    await expect(duty.respondToOnsiteDuty({data:dutyRequest}))
+      .rejects.toThrow("current named onsite duty assignment");
+    await tx.update(s.academicCalendarDays).set({
+      type:"instructional",instructionalMinutes:360,
+    }).where(and(eq(s.academicCalendarDays.academicCalendarId,calendar.id),
+      eq(s.academicCalendarDays.calendarDate,todaySite)));
+    expect((await duty.getOnsiteDutyResponses({data:{date:todaySite}}))
+      .statuses[0]?.status).toBe("accepted");
     state.actor={...supervisorActor,grantSiteId:crypto.randomUUID()};
     await expect(supervision.getOnsiteSupervisionPlan({data:{date}}))
       .rejects.toThrow("site-bound");
