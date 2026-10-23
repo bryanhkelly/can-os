@@ -14,6 +14,28 @@ import { evaluateQualificationCoverage, instructionalWindow, type CoveragePolicy
 
 type Reader = Pick<Database, "select" | "selectDistinctOn">;
 
+/**
+ * The host may nominate existing teachers in its own organization. An
+ * independent CAN academic provider may expose ONLY teachers explicitly
+ * delegated to this host Program; a network-wide teacher role alone must not
+ * leak a provider's personnel directory or authorize cross-tenant instruction.
+ * Keep both the launch picker and assignment check on this same predicate.
+ */
+export function launchTeacherRolePredicate(scope: {
+  organizationId: string; providerId: string; programId: string; siteId: string;
+}) {
+  return and(
+    eq(roleAssignments.roleKey,"teacher"),
+    or(isNull(roleAssignments.siteId),eq(roleAssignments.siteId,scope.siteId)),
+    or(
+      and(eq(roleAssignments.organizationId,scope.organizationId),
+        or(isNull(roleAssignments.programId),eq(roleAssignments.programId,scope.programId))),
+      and(eq(roleAssignments.organizationId,scope.providerId),
+        eq(roleAssignments.programId,scope.programId)),
+    ),
+  );
+}
+
 export async function launchStaffingContext(sectionId: string, executor: Reader = db) {
   const [section] = await executor.select({
     id: sections.id, programId: sections.programId, siteId: sections.siteId, active: sections.active,
@@ -41,11 +63,11 @@ export async function evaluateLaunchTeacher(sectionId: string, personId: string,
   const section = await launchStaffingContext(sectionId, executor);
   const [role] = await executor.select({ id: roleAssignments.id }).from(roleAssignments)
     .innerJoin(people,eq(people.id,roleAssignments.personId)).where(and(
-    eq(roleAssignments.personId, personId), eq(roleAssignments.roleKey, "teacher"),
-    eq(people.active,true),
-    inArray(roleAssignments.organizationId, [section.organizationId, section.providerId]),
-    or(isNull(roleAssignments.siteId), eq(roleAssignments.siteId, section.siteId)),
-    or(isNull(roleAssignments.programId), eq(roleAssignments.programId, section.programId)),
+    eq(roleAssignments.personId, personId),eq(people.active,true),
+    launchTeacherRolePredicate({
+      organizationId:section.organizationId,providerId:section.providerId,
+      programId:section.programId,siteId:section.siteId,
+    }),
   )).orderBy(roleAssignments.id).limit(1);
   if (!role) return { eligible: false, reasons: ["Teacher role is not granted for this program and site."],
     policyRuleIds: [], claimIds: [], verificationEventIds: [], roleAssignmentId: null, window: section.window };
