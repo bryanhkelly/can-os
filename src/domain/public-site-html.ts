@@ -20,7 +20,10 @@ function money(cents: number): string {
     .format(cents / 100);
 }
 
-export function renderPublicSiteHtml(page: PublicSitePage): string {
+export function renderPublicSiteHtml(page: PublicSitePage, options?: {
+  /** Caller supplies one server-generated random request ID per form. */
+  makeRequestId?: () => string;
+}): string {
   const school = escapePublicHtml(page.site.name);
   const org = escapePublicHtml(page.site.organizationName);
   const host = escapePublicHtml(page.host);
@@ -31,6 +34,24 @@ export function renderPublicSiteHtml(page: PublicSitePage): string {
       program.delivery.asynchronous ? "Self-paced online" : null,
     ].filter(Boolean).join(" · ");
     const onsiteDays = program.delivery.onsiteDaysPerWeek;
+    const requestId = options?.makeRequestId?.();
+    const inquiryForm = requestId ? `<form action="/inquiry" method="post" class="inquiry-form">
+        <input type="hidden" name="requestId" value="${escapePublicHtml(requestId)}"/>
+        <input type="hidden" name="programId" value="${escapePublicHtml(program.programId)}"/>
+        <label>First name<input name="firstName" autocomplete="given-name" maxlength="80" required/></label>
+        <label>Last name<input name="lastName" autocomplete="family-name" maxlength="80" required/></label>
+        <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required/></label>
+        <label>Question (optional; please do not include student information)
+          <textarea name="message" maxlength="500" rows="2"></textarea>
+        </label>
+        <div aria-hidden="true" class="bot-field">
+          <label>Website<input name="website" tabindex="-1" autocomplete="off"/></label>
+        </div>
+        <label class="consent"><input type="checkbox" name="contactConsent" value="yes" required/>
+          I agree to be contacted about this program. This is not an application or enrollment request.
+        </label>
+        <button type="submit">Request information</button>
+      </form>` : "";
     return `<article class="card">
       <p class="tag">${escapePublicHtml(program.typeLabel)}</p>
       <h3>${escapePublicHtml(program.title)}</h3>
@@ -42,6 +63,7 @@ export function renderPublicSiteHtml(page: PublicSitePage): string {
       <p class="availability">${program.availability === "planned"
         ? "Program planned · admissions not open on this page"
         : "Current program · contact the Site about admissions"}</p>
+      ${inquiryForm}
     </article>`;
   }).join("\n");
   const cards = page.offerings.map(item => {
@@ -88,6 +110,12 @@ main{padding-top:42px;padding-bottom:64px}
 .price{font-weight:700;font-size:1.16rem;margin-top:20px}
 .empty{padding:28px;border:1px solid #dce2e8;border-radius:14px;background:white}
 footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-size:.82rem;color:#667085}
+.inquiry-form{margin-top:22px;padding-top:18px;border-top:1px solid #dce2e8;display:grid;gap:12px}
+.inquiry-form label{display:grid;gap:5px;font-size:.82rem;color:#475467}
+.inquiry-form input:not([type=checkbox]),.inquiry-form textarea{width:100%;padding:10px;border:1px solid #bcc6d2;border-radius:8px;font:inherit}
+.inquiry-form .consent{display:flex;align-items:start;gap:8px;line-height:1.4}
+.inquiry-form button{background:#1d2939;color:white;border:none;border-radius:8px;padding:12px;font-weight:700;cursor:pointer}
+.bot-field{display:none}
 </style>
 </head>
 <body>
