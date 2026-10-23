@@ -5,6 +5,7 @@ import {
   sections, sectionTeachers,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { hasAccessibleFirstLesson } from "@/domain/first-class-lesson";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
 /**
@@ -18,7 +19,8 @@ export async function staffedPublishedSectionIds(
   executor:Pick<typeof db,"select">=db,
 ):Promise<Set<string>> {
   if(!ids.length)return new Set();
-  const rows=await executor.select({id:sections.id,programId:sections.programId}).from(sections)
+  const rows=await executor.select({id:sections.id,programId:sections.programId,
+    curriculum:courseTemplateVersions.curriculum}).from(sections)
     .innerJoin(programs,eq(programs.id,sections.programId))
     .innerJoin(courseTemplateVersions,eq(courseTemplateVersions.id,sections.courseTemplateVersionId))
     .innerJoin(sectionTeachers,eq(sectionTeachers.sectionId,sections.id))
@@ -50,5 +52,6 @@ export async function staffedPublishedSectionIds(
       // support a guardian claim that this is a ready teaching class.
     }
   }
-  return new Set(rows.filter(row=>permitted.has(row.programId)).map(row=>row.id));
+  return new Set(rows.filter(row=>permitted.has(row.programId) &&
+    hasAccessibleFirstLesson(row.curriculum)).map(row=>row.id));
 }
