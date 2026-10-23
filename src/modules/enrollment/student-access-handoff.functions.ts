@@ -21,6 +21,10 @@ const consentInput=z.object({
  acknowledged:z.literal(true),
 }).strict();
 const idInput=z.object({applicationId:uuid}).strict();
+const studentAccessReviewInput=idInput.extend({
+ confirmedIndependentIdentity:z.literal(true).optional(),
+ reviewMethod:z.enum(["institutional_school_record","verified_in_person"]).optional(),
+}).strict();
 const statement="I am this student's independently verified parent or legal guardian. I authorize CAN OS to send this student a separate school learning sign-in link to the email I provided. This does not grant my account student access.";
 
 async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.transaction>[0]>[0],applicationId:string){
@@ -159,7 +163,7 @@ export const getStudentLearningHandoff=createServerFn({method:"GET"})
  });
 
 export const provisionStudentLearningAccess=createServerFn({method:"POST"})
- .validator((v:unknown)=>idInput.parse(v))
+ .validator((v:unknown)=>studentAccessReviewInput.parse(v))
  .handler(async({data})=>{
   const actor=await getCommandContext(getRequest());
   if(actor.role!=="registrar"||!actor.actorPersonId||actor.demoFacilitator)
@@ -177,6 +181,9 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
       consent.studentProfileId!==app.studentProfileId||
       consent.programId!==app.programId||consent.siteId!==app.siteId)
     throw new AuthorizationError("valid guardian consent pending independent registrar approval");
+   if(consent.status==="pending_review"&&
+      (data.confirmedIndependentIdentity!==true||!data.reviewMethod))
+    throw new AuthorizationError("independent student identity verification and evidence method required");
    const [guardian]=await tx.select({permission:guardianRelationships.canManageEnrollment,
       metadata:guardianRelationships.metadata}).from(guardianRelationships).where(and(
        eq(guardianRelationships.guardianPersonId,consent.guardianPersonId),
@@ -232,7 +239,8 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
      action:"student.access.registrar_approved",resourceType:"student_access_consent",
      resourceId:consent.id,
      scope:{organizationId:app.organizationId,programId:app.programId,siteId:app.siteId},
-     after:{studentProfileId:app.studentProfileId,status:"approved"},
+     after:{studentProfileId:app.studentProfileId,status:"approved",
+       ...(consent.status==="pending_review"?{reviewMethod:data.reviewMethod}:{} )},
      context:{accountId:actor.accountId,sessionId:actor.sessionId}});
    return normalized;
   });
