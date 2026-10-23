@@ -1,4 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
+import { db } from "@/db/client";
+import * as s from "@/db/schema";
 import { readEnrichmentPublication } from "@/domain/enrichment-publication";
 import { readEnrichmentPackages, sessionOccupancy } from "@/domain/enrichment-packages";
 import { isExtendedLearningType } from "@/domain/program-offerings";
@@ -13,9 +15,8 @@ const extended = ["summer_enrichment", "summer_program", "after_school_enrichmen
  * Public-safe program catalog: published/open noncredit offerings only.
  * No identity, private staffing details, student data, or draft schedules.
  */
-export async function readEnrichmentCatalog(siteId?: string) {
-  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-  const rows = await db.select({
+export async function readEnrichmentCatalog(siteId?: string, executor: Pick<typeof db, "select"> = db) {
+  const rows = await executor.select({
     seasonId: s.activitySeasons.id, name: s.activities.name,
     seasonName: s.activitySeasons.name,
     startsOn: s.activitySeasons.startsOn, endsOn: s.activitySeasons.endsOn,
@@ -62,7 +63,7 @@ export async function readEnrichmentCatalog(siteId?: string) {
   const ids = published.map(row => row.seasonId);
   // Read only sessions belonging to already published offerings. Draft-only
   // calendar rows are never returned through the public catalog.
-  const sessionRows = ids.length ? await db.select({
+  const sessionRows = ids.length ? await executor.select({
     id: s.calendarEvents.id,
     seasonId: s.calendarEvents.sourceId,
     startsAt: s.calendarEvents.startsAt,
@@ -78,7 +79,7 @@ export async function readEnrichmentCatalog(siteId?: string) {
   for (const item of sessionRows) if (item.seasonId &&
     item.metadata.extendedLearningDraft === false && !firstSession.has(item.seasonId))
     firstSession.set(item.seasonId, item);
-  const registrationRows = ids.length ? await db.select({
+  const registrationRows = ids.length ? await executor.select({
     seasonId: s.activityRegistrations.activitySeasonId,
     status: s.activityRegistrations.status,
     metadata: s.activityRegistrations.metadata,
