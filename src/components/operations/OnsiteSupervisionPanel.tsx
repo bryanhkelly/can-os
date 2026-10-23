@@ -9,6 +9,7 @@ type Responses = Awaited<ReturnType<typeof getOnsiteDutyResponses>>;
 
 const labels: Record<string,string> = {
   schedule_missing:"Instructional block has no valid scheduled time",
+  calendar_unverified:"No verified instructional day on the current academic calendar; duty response unavailable",
   facilitator_missing:"No named facilitator in the active delivery arrangement",
   staff_grant_missing:"Assigned adult lacks a verified active site-staff grant",
   facilitator_conflict:"Facilitator is assigned to overlapping instructional blocks",
