@@ -88,7 +88,15 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
 
    <section aria-label="Your children" className="mt-12">
     <h2 className="text-lg font-semibold">Your children</h2>
-    {children.length === 0 && <p className="mt-4 text-sm text-muted-foreground">No students are connected to your account yet.</p>}
+    {children.length === 0 && <div className="mt-4 rounded-xl border bg-card p-5">
+     <p className="font-semibold">Waiting for your first child to be enrolled?</p>
+     <p className="mt-2 text-sm text-muted-foreground">Your school must connect a verified guardian relationship before your child appears here. You can review any pending admission offer or enrollment checklist without an active class assignment.</p>
+     <Link to="/guardian/admission-offers" search={{student:undefined}}
+       className="mt-3 inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
+       View applications and enrollment offers →
+     </Link>
+     <p className="mt-2 text-xs text-muted-foreground">If no application appears, contact the school's admissions team. Signing in alone does not submit an application or authorize student access.</p>
+    </div>}
     {children.length > 0 && <div className="mt-4 grid gap-4 sm:grid-cols-2">
      {children.map(child => <article key={child.studentProfileId} className="rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
