@@ -35,13 +35,12 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   termId:s.sections.termId,startsOn:s.terms.startsOn,endsOn:s.terms.endsOn,
   programId:s.sections.programId,siteId:s.sections.siteId,
   organizationId:s.programs.organizationId,schoolYearId:s.terms.schoolYearId,
-  siteTimezone:s.sites.timezone,schoolYearTimezone:s.schoolYears.timezone,
+  schoolYearTimezone:s.schoolYears.timezone,
   curriculumStatus:s.courseTemplateVersions.status,
   curriculum:s.courseTemplateVersions.curriculum})
   .from(s.sections).innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
   .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
   .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.terms.schoolYearId))
-  .leftJoin(s.sites,eq(s.sites.id,s.sections.siteId))
   .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
   .where(and(eq(s.sections.id,sectionId),eq(s.sections.active,true)))
   .limit(1).for("update");
@@ -74,7 +73,12 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  if(already)return {enrollmentId:already.id,created:false};
  const policy=await getSectionRegistrationPolicy(sectionId,tx);
  const now=new Date();
- const timezone=section.siteTimezone??section.schoolYearTimezone;
+ // This Section is locked FOR UPDATE. Resolve the Site timezone separately
+ // instead of left-joining a nullable Site into PostgreSQL's locked query.
+ const [siteClock]=section.siteId?await tx.select({timezone:s.sites.timezone})
+  .from(s.sites).where(eq(s.sites.id,section.siteId)).limit(1):[];
+ if(section.siteId&&!siteClock)throw new Error("Section host Site missing");
+ const timezone=siteClock?.timezone??section.schoolYearTimezone;
  const today=dateKeyInTimezone(now.toISOString(),timezone);
  if(today>policy.addDropEndsOn)throw new Error("Add/drop deadline has passed");
  const [rosterCount]=await tx.select({total:sql<number>`count(*)::int`}).from(s.enrollments)
