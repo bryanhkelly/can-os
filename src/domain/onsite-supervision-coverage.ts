@@ -23,6 +23,9 @@ export type SupervisionBlockInput = {
   verifiedSectionDelegation?: boolean;
   /** The current church/CAN contract must authorize supervised onsite services. */
   authorizedSupervisionService?: boolean;
+  /** Internal source IDs for invalidating stale duty acknowledgements; removed before response. */
+  delegationVersion?: string | null;
+  agreementVersion?: string | null;
   /** False if this specific site-local date lacks an approved instructional calendar day. */
   instructionalDayConfirmed?: boolean;
   overlappingFacilitatorAssignments?: boolean;
