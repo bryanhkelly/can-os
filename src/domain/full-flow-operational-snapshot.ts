@@ -5,12 +5,12 @@
 export type FullFlowRows = {
   programs: Array<{id:string;name:string;status:string;type:string;siteId:string|null;
     academicProviderOrganizationId:string;creditIssuingOrganizationId:string|null}>;
-  sections: Array<{id:string;programId:string;active:boolean;versionStatus:string}>;
+  sections: Array<{id:string;programId:string;active:boolean;versionStatus:string;schoolYearId:string}>;
   teacherAssignments: Array<{sectionId:string;personId:string}>;
   adoptions: Array<{programId:string;status:string}>;
   applications: Array<{programId:string;stage:string}>;
   enrollments: Array<{programId:string|null;kind:string;status:string;
-    studentProfileId:string;sectionId:string|null}>;
+    studentProfileId:string;sectionId:string|null;schoolYearId:string|null}>;
   assessments: Array<{id:string;sectionId:string;status:string}>;
   submissions: Array<{assessmentId:string;status:string;studentProfileId:string}>;
   responses: Array<{programId:string|null;status:string}>;
@@ -24,20 +24,23 @@ export function summarizeFullFlowOperations(rows: FullFlowRows) {
       .map(t => t.sectionId));
     // An active enrollment into an unstaffed or unpublished Section must
     // not count as first-student-to-class completion.
-    const instructionalIds = new Set(sections.filter(section =>
+    const instructionalYears = new Map(sections.filter(section =>
       section.versionStatus === "published" && teachers.has(section.id))
-      .map(section => section.id));
+      .map(section => [section.id,section.schoolYearId] as const));
     const assessments = rows.assessments.filter(a => sectionIds.has(a.sectionId) &&
       (a.status === "published" || a.status === "closed"));
     const assessmentIds = new Set(assessments.map(a => a.id));
     const work = rows.submissions.filter(s => assessmentIds.has(s.assessmentId));
     const enrolled = rows.enrollments.filter(e => e.programId === program.id && e.status === "active");
     const programStudents = new Set(enrolled.filter(e => e.kind === "program").map(e => e.studentProfileId));
-    // A Section placement counts toward this Program only if the same student
-    // also has an active Program enrollment. Orphan/misaligned section rows may
-    // need repair, but cannot prove that a Program student reached class.
+    const studentProgramYears = new Set(enrolled.filter(e => e.kind === "program" && e.schoolYearId)
+      .map(e => `${e.studentProfileId}:${e.schoolYearId}`));
+    // Enrollment into an older or different school year's Section cannot
+    // satisfy the current Program enrollment-to-class handoff.
     const placedStudents = new Set(enrolled.filter(e => e.kind === "section" &&
-      !!e.sectionId && instructionalIds.has(e.sectionId) && programStudents.has(e.studentProfileId))
+      !!e.sectionId && !!e.schoolYearId &&
+      instructionalYears.get(e.sectionId) === e.schoolYearId &&
+      studentProgramYears.has(`${e.studentProfileId}:${e.schoolYearId}`))
       .map(e => e.studentProfileId));
     const unresolved = rows.responses.filter(a => a.programId === program.id &&
       ["open","in_progress","waiting"].includes(a.status)).length;
