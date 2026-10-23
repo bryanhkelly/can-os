@@ -86,7 +86,10 @@ export async function accessibleClasses(actor: Actor) {
   const projection = { id: s.sections.id, title: s.sections.title, code: s.sections.code };
   const scope = and(eq(s.sections.active, true),
     inArray(s.sections.siteId, actor.scope.siteIds ?? []),
-    inArray(s.sections.programId, actor.scope.programIds ?? []),
+    inArray(s.sections.programId, actor.scope.programIds ?? []));
+  // The teacher branch has no student enrollment join; keep this predicate
+  // strictly on the student/guardian directory query below.
+  const studentScope=and(scope,
     eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
     eq(s.enrollments.programId,s.sections.programId),
     eq(s.enrollments.schoolYearId,s.terms.schoolYearId));
@@ -125,8 +128,8 @@ export async function accessibleClasses(actor: Actor) {
         guardianPersonId: actor.actorPersonId,
         access: "academic",
       }),
-    )).where(scope).orderBy(s.sections.title)
-    : await query.where(and(scope, eq(s.studentProfiles.personId, actor.actorPersonId))).orderBy(s.sections.title);
+    )).where(studentScope).orderBy(s.sections.title)
+    : await query.where(and(studentScope, eq(s.studentProfiles.personId, actor.actorPersonId))).orderBy(s.sections.title);
   return [...new Map(rows.map(row => [`${row.id}:${row.studentPersonId}`, {
     id: row.id, title: row.title, code: row.code, studentPersonId: row.studentPersonId,
     studentName: `${row.preferredName ?? row.firstName} ${row.lastName}`,
