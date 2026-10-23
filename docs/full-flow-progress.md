@@ -126,6 +126,28 @@ This checklist records evidence and blockers, not automatic production acceptanc
 - **HQ-created location:** authorized denomination HQ administrator creates a `Site` with `organization_id` belonging to that denomination. No school program, admissions or student record is automatically created. Implemented in this bite.
 - **Site-requested affiliation:** an authorized local school/site administrator identifies the denomination, submits an affiliation request, HQ reviews and accepts/denies. Keep the original site owner and school grants intact. **Implemented in code in bite 1C; isolated database and browser acceptance remain pending.** Do **not** use `organizations.parent_organization_id` to impersonate a reviewed multi-network affiliation or silently grant HQ academic access.
 
+## Integration repairs — 23 October 2026
+
+The six-stage journey remains unaccepted. Two launch-to-staffing integration
+defects were patched on `FullFlow`:
+
+- **Initial teacher qualification policies** now require the same explicit,
+  program-scoped institutional publisher role grant as revisions. The launch
+  UI hides publication from unauthorized registrars; integration fixtures
+  check denial with no persisted policy and authorized publication.
+- **CAN academic-provider teacher discovery** now uses the exact same scope
+  predicate as assignment eligibility. Selecting CAN as an external provider
+  does not expose its organization-wide teacher directory or grant those
+  teachers instructional authority. External staff must have an explicitly
+  Program-scoped role assignment; GF3 fixtures assert both sides.
+
+**Acceptance evidence:** Changes are committed; the new tests are **not
+executed**. Dedicated FullFlow Neon is at **39/39 migrations**, verified by
+read-only SQL. GitHub Actions continues to report pre-step failures without
+an assigned runner, so these are not application test assertions. The next
+priority is executing the guarded FullFlow database suite and fixing its
+first actual runtime failure.
+
 ## Bite register
 
 | Bite | Goal | Implementation | Acceptance |
