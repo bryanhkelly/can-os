@@ -11,6 +11,7 @@ import {
   listTranscriptIssuanceCandidates,
 } from "@/modules/learning/report-cards.functions";
 import { createAcademicTimeFixture } from "./helpers/academic-time";
+import { summarizeRecordedTranscriptCredits } from "@/domain/recorded-credit-summary";
 
 const state = vi.hoisted(() => ({
   context: null as {
@@ -334,6 +335,25 @@ integration("GF25 report card and transcript", () => {
       capabilities: new Set(["student:read"]),
     };
     const academicHistory = await getStudentTranscript({ data: {} });
+    const creditReview = summarizeRecordedTranscriptCredits(academicHistory.rows);
+    expect(creditReview.byIssuer).toEqual([
+      expect.objectContaining({
+        issuerId: issuer!.id,
+        issuerName: issuer!.name,
+        earnedUnits: 1, attemptedUnits: 1,
+        incompleteEntries: 1, conflictingEntries: 0,
+        subjects: [expect.objectContaining({
+          subject: "Science", earnedUnits: 1, attemptedUnits: 1,
+          incompleteEntries: 1,
+        })],
+      }),
+    ]);
+    expect(creditReview.graduationStatus).toBe("not_evaluated");
+    expect(creditReview.diplomaAuthorized).toBe(false);
+    expect(academicHistory.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({sectionId: section!.id, subject: "Science", terminalPeriod:true}),
+      expect.objectContaining({sectionId: uncreditedSection!.id, subject: "Science", terminalPeriod:true}),
+    ]));
     expect(academicHistory.rows).toEqual(expect.arrayContaining([
       expect.objectContaining({ sectionId: section!.id, creditsEarned: 1 }),
       expect.objectContaining({
