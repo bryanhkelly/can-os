@@ -90,9 +90,13 @@ export const listEnrichmentCatalog = createServerFn({ method: "GET" }).handler(a
       row.capacity === null ? null : ids.length
         ? Math.max(0, Math.min(...ids.map(id => row.capacity! - (occupied.get(id) ?? row.capacity!))))
         : 0;
-    const packageAvailability = packages.map(item => ({
-      ...item, seatsRemaining: seatsFor(item.sessionIds),
-    }));
+    const packageAvailability = packages.map(item => {
+      const available = item.sessionIds.every(id => sessions.includes(id));
+      return {
+        ...item, available,
+        seatsRemaining: available ? seatsFor(item.sessionIds) : 0,
+      };
+    });
     return {
     seasonId: row.seasonId, name: row.name, seasonName: row.seasonName,
     programName: row.programName, programType: row.programType,
