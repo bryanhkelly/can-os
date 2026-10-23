@@ -1,5 +1,39 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## Current P0 lesson + teacher gradebook handoff (23 October 2026)
+
+**Source committed, actual execution not yet verified.** Closed a material
+school-of-record operational gap: an explicitly Section-assigned CAN teacher
+at an independently owned church Site could reach the class workspace but
+`gradebook.functions.ts` still required the **church's Site/Program grant**
+for its Section list, class roster, gradebook, assessment creation,
+assessment publication and graded-work return. An institution teacher
+must never receive such a host-wide permission.
+
+Gradebook and assessment endpoints now share the existing
+`authorizeClass` contract: (a) real teacher identity and canonical
+`section_teachers` relationship, (b) original Site/Program scope **or**
+one explicitly institution-delegated Section, and (c) current independently
+verified institution academic authority for cross-organization CAN teaching.
+Teacher Section discovery reuses the same `accessibleClasses` directory.
+Assessment creation, state transitions and return-for-revision recheck
+authorization **inside their write transaction**. The shared canonical
+`gradeSubmission` service now rechecks Section/contract access in its own
+write transaction for verified teacher callers, before GradePosted/audit.
+
+The existing rollback-only admissions integration fixture now explicitly
+reads the *same placed student's* first published lesson through student and
+teacher workspaces, and checks the teacher's gradebook Section, roster and
+student ID. This increases test coverage, but does **not** establish a passing
+browser or database acceptance run. No production rollout/migration.
+
+**Next release-critical gate:** Run actual isolated-Neon and authenticated
+browser acceptance of the full family-to-class flow across CAN institution,
+church host, registrar, parent, student and teacher personas; fix runtime
+failures before building ancillary content, website or staffing features.
+
+---
+
 ## Current P0 focus — put an admitted student in a usable class (23 October 2026)
 
 **Critical path:** first public parent → email-verified canonical Application →
