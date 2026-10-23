@@ -8,6 +8,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { isExtendedLearningType } from "@/domain/program-offerings";
 import { enrichmentPublicationSchema, readEnrichmentPublication } from "@/domain/enrichment-publication";
+import { verifyEnrichmentPackages, readEnrichmentPackages, type EnrichmentPackage } from "@/domain/enrichment-packages";
 import { listExtendedSessionStaff } from "./extended-learning-sessions.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
@@ -22,6 +23,7 @@ export async function publishExtendedSeason(
     permissionVersion: string;
     permissionText: string;
     feeAmountCents: number;
+    packages?: EnrichmentPackage[];
     operationalResponsibilityConfirmed: true;
   },
 ) {
@@ -39,7 +41,8 @@ export async function publishExtendedSeason(
       id: activitySeasons.id, status: activitySeasons.status,
       startsOn: activitySeasons.startsOn, endsOn: activitySeasons.endsOn,
       activityId: activities.id, activityStatus: activities.status,
-      metadata: activities.metadata, activitySiteId: activities.siteId,
+      activityMetadata: activities.metadata, seasonMetadata: activitySeasons.metadata,
+      activitySiteId: activities.siteId,
       capacity: activitySeasons.capacity,
       feeAmountCents: activitySeasons.feeAmountCents,
       programId: programs.id, type: programs.type,
@@ -65,11 +68,14 @@ export async function publishExtendedSeason(
     if (!site || site.organizationId !== season.organizationId)
       throw new AuthorizationError("verified hosting site");
     if (season.status === "registration") {
-      const existing = readEnrichmentPublication(season.metadata);
+      const existing = readEnrichmentPublication(season.seasonMetadata) ??
+        readEnrichmentPublication(season.activityMetadata);
       if (existing?.seasonId === season.id &&
         existing.permissionVersion === input.permissionVersion &&
         existing.permissionText === input.permissionText &&
-        season.feeAmountCents === input.feeAmountCents)
+        season.feeAmountCents === input.feeAmountCents &&
+        JSON.stringify(readEnrichmentPackages(season.seasonMetadata)) ===
+          JSON.stringify(input.packages ?? []))
         return { seasonId: season.id, status: "registration" as const, created: false };
       throw new Error("Offering already published. Changes require a controlled revision.");
     }
@@ -97,6 +103,19 @@ export async function publishExtendedSeason(
         item.metadata.cancelled === true;
     })) throw new Error("All sessions require a currently eligible onsite facilitator");
 
+    const packages = input.packages?.length
+      ? verifyEnrichmentPackages(input.packages, calendar.map(row => row.id))
+      : [];
+    if (input.packages && !input.packages.length)
+      throw new Error("Choose at least one enrollment package or use full-season pricing");
+    // Ensure every scheduled day is sold by at least one option, so no
+    // disappearing daily rosters or accidentally unsellable sessions.
+    if (packages.length) {
+      const covered = new Set(packages.flatMap(item => item.sessionIds));
+      if (calendar.some(item => !covered.has(item.id)))
+        throw new Error("Published packages must cover every dated session");
+    }
+
     const publishedAt = new Date().toISOString();
     const publication = enrichmentPublicationSchema.parse({
       version: 1, permissionVersion: input.permissionVersion,
@@ -105,11 +124,12 @@ export async function publishExtendedSeason(
       siteId: season.programSiteId, programId: season.programId,
       seasonId: season.id, operationalResponsibilityConfirmed: true,
     });
-    await tx.update(activities).set({
-      metadata: { ...season.metadata, enrichmentPublication: publication },
-      updatedAt: new Date(),
-    }).where(eq(activities.id, season.activityId));
     await tx.update(activitySeasons).set({
+      metadata: {
+        ...season.seasonMetadata,
+        enrichmentPublication: publication,
+        enrichmentPackages: packages,
+      },
       status: "registration", feeAmountCents: input.feeAmountCents,
       updatedAt: new Date(),
     }).where(eq(activitySeasons.id, season.id));
@@ -133,7 +153,9 @@ export async function publishExtendedSeason(
       before: { status: "draft" },
       after: { status: "registration", permissionVersion: input.permissionVersion,
         feeAmountCents: input.feeAmountCents, publishedAt,
-        recordedOperatorAttestation: true, sessionCount: calendar.length },
+        recordedOperatorAttestation: true, sessionCount: calendar.length,
+        packages: packages.map(item => ({ id:item.id, title:item.title,
+          priceCents:item.priceCents, sessionIds:item.sessionIds })) },
     });
     await emitEvent(tx, {
       eventType: "ExtendedLearningRegistrationPublished",
