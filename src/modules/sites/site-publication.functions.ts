@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { getSitePublicationDraft, reserveSitePublicAddress } from "./site-publication.server";
+import { changeSitePublication, getSitePublicationDraft, reserveSitePublicAddress } from "./site-publication.server";
 
 const uuid = z.string().uuid();
 
@@ -20,3 +20,20 @@ export const reserveSitePublicationAddress = createServerFn({ method: "POST" })
   }).strict().parse(value))
   .handler(async ({ data }) =>
     reserveSitePublicAddress(await getCommandContext(getRequest()), data));
+
+/**
+ * Explicit, scoped Site marketing-publish decision. This does not publish
+ * internal school Programs, change enrollment, or configure external DNS.
+ */
+export const setSitePublicationStatus = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    siteId: uuid,
+    action: z.enum(["publish", "unpublish"]),
+    expectedRevision: z.string().datetime({ offset: true }),
+    reason: z.string().trim().min(10).max(500),
+    contentReviewed: z.boolean(),
+  }).strict().parse(value))
+  .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    return changeSitePublication(await getCommandContext(getRequest()), data);
+  });
