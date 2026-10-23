@@ -4,6 +4,8 @@ import {
   accountPersonGrants, courseTemplateVersions, people, programs,
   sections, sectionTeachers,
 } from "@/db/schema";
+import { AuthorizationError } from "@/domain/command-context";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
 /**
  * Public status and an assignment row are not proof a learner can enter a
@@ -16,7 +18,7 @@ export async function staffedPublishedSectionIds(
   executor:Pick<typeof db,"select">=db,
 ):Promise<Set<string>> {
   if(!ids.length)return new Set();
-  const rows=await executor.select({id:sections.id}).from(sections)
+  const rows=await executor.select({id:sections.id,programId:sections.programId}).from(sections)
     .innerJoin(programs,eq(programs.id,sections.programId))
     .innerJoin(courseTemplateVersions,eq(courseTemplateVersions.id,sections.courseTemplateVersionId))
     .innerJoin(sectionTeachers,eq(sectionTeachers.sectionId,sections.id))
@@ -35,5 +37,18 @@ export async function staffedPublishedSectionIds(
       eq(courseTemplateVersions.status,"published"),
       eq(people.active,true),
     ));
-  return new Set(rows.map(row=>row.id));
+  const permitted=new Set<string>();
+  for(const programId of new Set(rows.map(row=>row.programId))){
+    try{
+      await requireChurchHostedOperatingServices(executor,programId,[
+        "academic_instruction","curriculum","school_of_record",
+      ]);
+      permitted.add(programId);
+    }catch(error){
+      if(!(error instanceof AuthorizationError))throw error;
+      // A revoked, expired or unsigned institution/host agreement cannot
+      // support a guardian claim that this is a ready teaching class.
+    }
+  }
+  return new Set(rows.filter(row=>permitted.has(row.programId)).map(row=>row.id));
 }
