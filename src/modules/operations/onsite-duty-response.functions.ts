@@ -11,6 +11,7 @@ import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { getOnsiteSupervisionPlan } from "./onsite-supervision.functions";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
 import { writeAudit } from "@/platform/mutation";
 
 const dutyType = "onsite_instruction_duty_response";
@@ -121,8 +122,13 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
       // after expiry/revocation: suppressing a safety-relevant exception is
       // worse than retaining an accurate operational warning. Neither result
       // certifies child custody or physical presence.
-      if(data.response==="accepted")
-        await requireChurchHostedOperatingServices(tx,block.programId,["onsite_supervision"]);
+      if (data.response === "accepted") {
+        // A Site role and an instructional plan do not themselves delegate
+        // authority to accept onsite coverage for a church/CAN Program.
+        if (actor.role === "room_facilitator")
+          await requireCurrentSiteLocalDelegate(tx, actor, block.programId, "room_facilitator");
+        await requireChurchHostedOperatingServices(tx, block.programId, ["onsite_supervision"]);
+      }
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-duty:"+key}))`);
       const [prior]=await tx.select({id:actions.id,metadata:actions.metadata})
         .from(actions).where(and(eq(actions.type,dutyType),eq(actions.siteId,site.id),
