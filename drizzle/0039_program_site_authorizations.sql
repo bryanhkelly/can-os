@@ -20,6 +20,7 @@ CREATE TABLE "program_site_authorizations" (
   "review_reason" text,
   "revoked_by_person_id" uuid REFERENCES "public"."people"("id") ON DELETE RESTRICT,
   "revoked_at" timestamptz,
+  "revocation_reason" text,
   "created_at" timestamptz DEFAULT now() NOT NULL,
   "updated_at" timestamptz DEFAULT now() NOT NULL,
   CONSTRAINT "program_site_authorization_status_ck" CHECK ("status" IN ('requested','approved','denied','revoked')),
@@ -28,7 +29,11 @@ CREATE TABLE "program_site_authorizations" (
     OR ("status" = 'denied' AND "reviewed_at" IS NOT NULL AND "reviewed_by_person_id" IS NOT NULL)
     OR ("status" IN ('approved','revoked') AND "reviewed_at" IS NOT NULL AND "reviewed_by_person_id" IS NOT NULL AND "evidence_document_id" IS NOT NULL AND "effective_from" IS NOT NULL AND "effective_through" IS NOT NULL AND "effective_from" < "effective_through")
   ),
-  CONSTRAINT "program_site_authorization_revoked_ck" CHECK (("status" = 'revoked') = ("revoked_at" IS NOT NULL)),
+  CONSTRAINT "program_site_authorization_revoked_ck" CHECK (
+    ("status" = 'revoked') = ("revoked_at" IS NOT NULL)
+    AND ("status" = 'revoked') = ("revoked_by_person_id" IS NOT NULL)
+    AND ("status" = 'revoked') = ("revocation_reason" IS NOT NULL)
+  ),
   CONSTRAINT "program_site_authorization_distinct_review_ck" CHECK ("reviewed_by_person_id" IS DISTINCT FROM "requested_by_person_id"),
   CONSTRAINT "program_site_authorization_services_ck" CHECK (jsonb_typeof("services") = 'array' AND jsonb_array_length("services") > 0)
 );

@@ -16,13 +16,16 @@ export type OperatingProgramIdentity = {
   hostOrganizationType: string;
   institutionOrganizationId: string;
   institutionOrganizationType: string;
+  creditIssuingOrganizationId: string | null;
 };
 export function assertChurchCANOperatingIdentity(value: OperatingProgramIdentity): void {
   if (!value.siteId || value.siteOrganizationId !== value.hostOrganizationId ||
       value.programOrganizationId !== value.hostOrganizationId ||
       value.hostOrganizationType !== "church" ||
       value.institutionOrganizationType !== "can_network" ||
-      value.institutionOrganizationId === value.hostOrganizationId)
+      value.institutionOrganizationId === value.hostOrganizationId ||
+      (value.creditIssuingOrganizationId !== null &&
+       value.creditIssuingOrganizationId !== value.institutionOrganizationId))
     throw new AuthorizationError("independently hosted CAN Program and church-owned Site");
 }
 export function normalizeOperatingServices(values: readonly string[]): OperatingService[] {
@@ -54,7 +57,7 @@ export function assertOperatingAgreementEvidence(
   effectiveThrough: Date,
   at = new Date(),
 ): void {
-  const meta = doc?.metadata;
+  const meta: Record<string, unknown> = doc?.metadata ?? {};
   if (!doc || doc.subjectType !== "program" || doc.subjectId !== identity.programId ||
       doc.category !== "program_site_operating_agreement" ||
       !doc.verifiedAt || doc.verifiedAt > at ||
@@ -62,12 +65,14 @@ export function assertOperatingAgreementEvidence(
       doc.verifiedByPersonId === requesterId ||
       doc.verifiedByPersonId === reviewerId ||
       (doc.expiresAt !== null && doc.expiresAt < effectiveThrough) ||
-      meta?.hostOrganizationId !== identity.hostOrganizationId ||
-      meta?.institutionOrganizationId !== identity.institutionOrganizationId ||
-      meta?.siteId !== identity.siteId ||
-      meta?.hostSignatureVerified !== true || meta?.institutionSignatureVerified !== true ||
-      !Array.isArray(meta?.authorizedServices) ||
-      !services.every(service => meta.authorizedServices.includes(service)))
+      meta.hostOrganizationId !== identity.hostOrganizationId ||
+      meta.institutionOrganizationId !== identity.institutionOrganizationId ||
+      meta.siteId !== identity.siteId ||
+      (identity.creditIssuingOrganizationId !== null &&
+        meta.creditIssuingOrganizationId !== identity.creditIssuingOrganizationId) ||
+      meta.hostSignatureVerified !== true || meta.institutionSignatureVerified !== true ||
+      !Array.isArray(meta.authorizedServices) ||
+      !services.every(service => (meta.authorizedServices as string[]).includes(service)))
     throw new AuthorizationError("independently verified two-party operating agreement evidence");
 }
 export type ApprovedOperatingAuthorization = {

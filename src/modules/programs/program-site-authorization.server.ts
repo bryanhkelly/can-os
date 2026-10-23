@@ -23,6 +23,7 @@ async function loadOperatingIdentity(
     id: programs.id, organizationId: programs.organizationId,
     siteId: programs.siteId, hostOrganizationId: programs.hostOrganizationId,
     institutionOrganizationId: programs.academicProviderOrganizationId,
+    creditIssuingOrganizationId: programs.creditIssuingOrganizationId,
   }).from(programs).where(eq(programs.id, programId)).limit(1);
   if (!program) throw new AuthorizationError("existing program");
   const hostId = program.hostOrganizationId ?? program.organizationId;
@@ -39,6 +40,7 @@ async function loadOperatingIdentity(
     hostOrganizationId: hostId, hostOrganizationType: host?.type ?? "",
     institutionOrganizationId: program.institutionOrganizationId,
     institutionOrganizationType: institution?.type ?? "",
+    creditIssuingOrganizationId: program.creditIssuingOrganizationId,
   };
   assertChurchCANOperatingIdentity(identity);
   return identity;
@@ -72,6 +74,8 @@ export async function requestProgramSiteAuthorization(
     const identity = await loadOperatingIdentity(tx, input.programId);
     assertHostRequester(actor, identity);
     const services = normalizeOperatingServices(input.services);
+    if (services.includes("credit_issuance") && identity.creditIssuingOrganizationId === null)
+      throw new AuthorizationError("credit issuance cannot be contracted for a noncredit Program");
     const [last] = await tx.select().from(programSiteAuthorizations)
       .where(eq(programSiteAuthorizations.programId, identity.programId))
       .orderBy(desc(programSiteAuthorizations.version)).limit(1);
@@ -217,7 +221,7 @@ export async function revokeProgramSiteAuthorization(
     const now = new Date();
     await tx.update(programSiteAuthorizations).set({
       status: "revoked", revokedByPersonId: actor.actorPersonId,
-      revokedAt: now, updatedAt: now, reviewReason: reason,
+      revokedAt: now, revocationReason: reason, updatedAt: now,
     }).where(eq(programSiteAuthorizations.id, record.id));
     await writeAudit(tx, actor, {
       action: "program.site.authorization.revoke",

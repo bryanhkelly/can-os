@@ -27,6 +27,7 @@ export const programSiteAuthorizations = pgTable("program_site_authorizations", 
   reviewReason: text("review_reason"),
   revokedByPersonId: uuid("revoked_by_person_id").references(() => people.id, { onDelete: "restrict" }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  revocationReason: text("revocation_reason"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, table => [

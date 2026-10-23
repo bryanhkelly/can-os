@@ -9,6 +9,7 @@ const identity = {
   siteId: "church-site", siteOrganizationId: "church",
   hostOrganizationId: "church", hostOrganizationType: "church",
   institutionOrganizationId: "can", institutionOrganizationType: "can_network",
+  creditIssuingOrganizationId: "can",
 };
 const approval = {
   status: "approved", programId: "program", siteId: "church-site",
@@ -24,7 +25,8 @@ const document = {
   verifiedAt: new Date("2026-10-18"), verifiedByPersonId: "independent-verifier",
   expiresAt: new Date("2027-11-01"),
   metadata: { hostOrganizationId: "church", institutionOrganizationId: "can",
-    siteId: "church-site", hostSignatureVerified: true, institutionSignatureVerified: true,
+    siteId: "church-site", creditIssuingOrganizationId: "can",
+    hostSignatureVerified: true, institutionSignatureVerified: true,
     authorizedServices: ["academic_instruction", "onsite_supervision"] },
 };
 describe("Church-CAN Program-Site authorization policy", () => {
@@ -32,6 +34,9 @@ describe("Church-CAN Program-Site authorization policy", () => {
     expect(() => assertChurchCANOperatingIdentity(identity)).not.toThrow();
     expect(() => assertChurchCANOperatingIdentity({ ...identity, siteOrganizationId: "other-church" })).toThrow();
     expect(() => assertChurchCANOperatingIdentity({ ...identity, institutionOrganizationId: "church" })).toThrow();
+    expect(() => assertChurchCANOperatingIdentity({
+      ...identity, creditIssuingOrganizationId: "unrelated-issuer",
+    })).toThrow();
   });
   it("rejects fake/duplicate service scopes", () => {
     expect(normalizeOperatingServices(["onsite_supervision", "academic_instruction"]))
@@ -47,6 +52,7 @@ describe("Church-CAN Program-Site authorization policy", () => {
       { ...document, expiresAt: new Date("2026-11-01") },
       { ...document, metadata: { ...document.metadata, hostSignatureVerified: false } },
       { ...document, metadata: { ...document.metadata, siteId: "other" } },
+      { ...document, metadata: { ...document.metadata, creditIssuingOrganizationId: "unrelated" } },
     ]) expect(() => assertOperatingAgreementEvidence(changed,identity,[...approval.services],
       "church-requester","can-reviewer",approval.effectiveThrough,now)).toThrow();
   });
