@@ -273,3 +273,51 @@ The app's normal deployment host must remain on the platform-host pathway.
 bound to a published Site and Program, feeding existing canonical admissions
 inquiry/lead records without exposing private workflow or accepting a school
 application before readiness.
+
+## Bite 7 committed: public academic inquiries into GF22 intake
+
+- The public academic Program landing page now offers a **script-free, same-origin
+  Request Information** form for an adult contact's name, email and optional
+  question. A separately required contact-consent acknowledgement explains this
+  is **not** an application or enrollment request. Students' names, ages,
+  school records and guardian verification are never requested or created.
+- `netlify/edge-functions/site-host-gate.ts` permits only the tenant-scoped
+  `POST /inquiry` path in addition to read-only Site catalog GET, internally
+  rewriting the POST to `/published-site/inquiry`. It does not expose CAN OS
+  admin, workspace, session or RPC POSTs on tenant subdomains.
+- `src/routes/published-site.inquiry.ts` checks the exact verified HTTPS
+  tenant origin, requires an Origin matching the same origin, requires the
+  default-off hosting flag, applies a 30-per-minute **global atomic SQL
+  admission limit**, and rejects malformed, duplicate-field, oversized or
+  non-form-encoded requests. A honeypot diverts simple bots. The strict
+  public landing CSP permits forms only to `self`; there is no client JS.
+  This coarse global cap is not a replacement for trusted-edge abuse controls.
+- `public_admissions_interests` (migration `0037`, **not applied**) is an
+  unverified admissions contact queue keyed to real canonical Site and
+  Program IDs. It is **not** another application, a student/household
+  identity, a login, or a CRM. No parent is implicitly verified.
+- Before insertion, the command transaction proves that the requested
+  Program and Site still have separate publication approvals, that the
+  Program belongs to the Site and organization, and that its academic
+  Program status is eligible. A share lock on Site publication serializes
+  against unpublish. Server-only HMAC-based contact deduplication suppresses
+  repeat email/Site/Program requests over 24 hours; request UUID unique keys
+  protect HTTP retries. The contact email is stored only for staff follow-up.
+  Audit/outbox events intentionally contain no contact name, email or note.
+- `/admissions/intake` now includes **Public program interest**, visible only
+  to the existing authenticated and program/site-scoped registrar role with
+  `enrollment.decide`. Staff may review contact details, mark contacted, or
+  close requests with transactional audit/events. A **Begin verified inquiry**
+  link takes staff to the existing GF22 intake form with Site and Program
+  selected. Staff must still verify the family, collect actual student
+  identity, then create the canonical Application using the existing command;
+  no anonymous visitor or interest record can bypass that workflow.
+- Targeted unit contracts were authored for body limits, contact consent,
+  tenant route isolation and script-free public forms; **not executed**.
+  Typecheck, migrations, edge deployment and browser acceptance remain
+  unverified as requested. Public hosting flag and production data unchanged.
+
+**Next product bite:** connect a reviewed public interest to the specific
+canonical GF22 inquiry/application without re-entering the adult contact,
+using a staff-only conversion command with explicit student verification and
+atomic linkage; prevent identity collision or false guardian authorization.
