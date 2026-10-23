@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, people, programResponsibilityAssignments,
