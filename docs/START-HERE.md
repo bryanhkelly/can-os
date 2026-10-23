@@ -20,6 +20,8 @@ Extended offerings: [Summer and after-school program definitions and workflow li
 
 Public site addresses: [Site public addresses and publishing](./site-public-publishing.md) (academic/enrichment publishing, default-off public site and inquiry intake into GF22; rollout unverified).
 
+Church-Hosted School flow: [Institutional authorization, supervised-day and multi-role acceptance](./church-hosted-school-acceptance.md). This is not yet accepted.
+
 Required P1 student experience: [Comprehensive learning-activity tracking](./comprehensive-learning-activity-tracking.md) (distinct from authentication sessions, official attendance, or grading).
 
 Connected five-track implementation: [Learning activity → teacher intervention → student success → academic progression → hybrid site](./connected-learning-success-progression-hybrid.md).
