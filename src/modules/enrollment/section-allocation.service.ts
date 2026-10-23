@@ -3,6 +3,7 @@ import * as s from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import type { CommandContext } from "@/domain/command-context";
 import { isPassingGrade } from "@/domain/grade-scale-policy";
+import { requireAccessibleFirstLesson } from "@/domain/first-class-lesson";
 import { findSectionScheduleConflicts } from "@/modules/academic-time/section-schedule-service";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { getSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
@@ -31,7 +32,8 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   termId:s.sections.termId,startsOn:s.terms.startsOn,endsOn:s.terms.endsOn,
   programId:s.sections.programId,siteId:s.sections.siteId,
   organizationId:s.programs.organizationId,schoolYearId:s.terms.schoolYearId,
-  curriculumStatus:s.courseTemplateVersions.status})
+  curriculumStatus:s.courseTemplateVersions.status,
+  curriculum:s.courseTemplateVersions.curriculum})
   .from(s.sections).innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
   .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
   .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
@@ -40,6 +42,7 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  if(!section)throw new Error("Section not active");
  if(section.curriculumStatus!=="published")
   throw new Error("Publish the instructional course version before placing students in this class");
+ requireAccessibleFirstLesson(section.curriculum);
  // Active roster membership must land in a real, staffed instructional class,
  // not a Section shell whose assigned teacher has no current school access.
  const [staffed]=await tx.select({id:s.sectionTeachers.id})
