@@ -53,6 +53,14 @@ export function planExtendedSessions(
     throw new Error("Choose unique weekdays");
 
   const weekdays = new Set(pattern.weekdays);
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  });
+  const localKey = (d: Date) => {
+    const v = Object.fromEntries(fmt.formatToParts(d).map(x => [x.type, x.value]));
+    return `${v.year}-${v.month}-${v.day}T${v.hour}:${v.minute}`;
+  };
   const sessions: PlannedSession[] = [];
   for (let stamp = from; stamp <= through; stamp += 86400000) {
     if (!weekdays.has(new Date(stamp).getUTCDay())) continue;
@@ -60,20 +68,14 @@ export function planExtendedSessions(
     const startsAt = new Date(dateTimeInputInTimezone(`${date}T${pattern.startTime}`, timezone));
     const endsAt = new Date(dateTimeInputInTimezone(`${date}T${pattern.endTime}`, timezone));
     if (endsAt <= startsAt) throw new Error("Local session must end after it starts");
-    // A repeated local clock hour at fall DST is ambiguous; do not silently choose an instant.
-    // Comparing the converted instant one hour away detects the usual DST fold.
-    const local = `${date}T${pattern.startTime}`;
-    const fmt = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-    });
-    const localKey = (d: Date) => {
-      const v = Object.fromEntries(fmt.formatToParts(d).map(x => [x.type, x.value]));
-      return `${v.year}-${v.month}-${v.day}T${v.hour}:${v.minute}`;
-    };
-    if (localKey(new Date(startsAt.getTime() - 3600000)) === local ||
-        localKey(new Date(startsAt.getTime() + 3600000)) === local)
-      throw new Error(`Ambiguous daylight-saving start time on ${date}`);
+    // A repeated local clock hour at fall DST is ambiguous; block either boundary.
+    // Compare adjacent UTC instants to detect the repeated wall clock hour.
+    for (const [instant, clock] of [[startsAt, pattern.startTime], [endsAt, pattern.endTime]] as const) {
+      const local = `${date}T${clock}`;
+      if (localKey(new Date(instant.getTime() - 3600000)) === local ||
+          localKey(new Date(instant.getTime() + 3600000)) === local)
+        throw new Error(`Ambiguous daylight-saving time on ${date}`);
+    }
     sessions.push({ date, startsAt, endsAt, instanceKey: `extended:${date}:${pattern.startTime}` });
     if (sessions.length > MAX_EXTENDED_SESSIONS_PER_BATCH)
       throw new Error(`Schedule at most ${MAX_EXTENDED_SESSIONS_PER_BATCH} sessions per request`);
