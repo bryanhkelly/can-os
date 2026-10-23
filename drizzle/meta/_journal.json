@@ -281,6 +281,13 @@
       "when": 1792731600000,
       "tag": "0039_program_site_authorizations",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792735200000,
+      "tag": "0040_site_local_content",
+      "breakpoints": true
     }
   ]
 }
