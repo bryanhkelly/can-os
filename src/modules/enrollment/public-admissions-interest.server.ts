@@ -18,13 +18,15 @@ const WINDOW_SECONDS = 60;
  * headers/IP/email are trusted as identity. Edge-side bot defenses are still
  * necessary before a production tenant-host launch.
  */
-export async function admitPublicAdmissionsInterest(): Promise<{
+export async function admitPublicAdmissionsInterest(
+ route:"public_site_inquiry"|"public_site_family_start"="public_site_inquiry",
+): Promise<{
   allowed: boolean; retryAfterSeconds: number;
 }> {
   const row = await db.execute(sql`
     INSERT INTO auth_request_rate_limits AS bucket
       (route, window_started_at, request_count)
-    VALUES ('public_site_inquiry', now(), 1)
+    VALUES (${route}, now(), 1)
     ON CONFLICT (route) DO UPDATE SET
       request_count = CASE
         WHEN bucket.window_started_at <= now() - interval '60 seconds' THEN 1
