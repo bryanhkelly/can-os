@@ -8,8 +8,9 @@ import {useWorkspaceSession} from "./WorkspaceSession";
 const NotificationTray=lazy(()=>import("./NotificationTray").then(module=>({default:module.NotificationTray})));
 const AskCanConversation=lazy(()=>import("@/components/conversation/AskCanConversation").then(module=>({default:module.AskCanConversation})));
 
-export const workspaceHome:Record<string,string>={room_facilitator:"/site/day",site_staff:"/site/day",site_leader:"/site/day",paraeducator:"/profiles",student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor",network_admin:"/network",can_network_steward:"/network-steward"};
+export const workspaceHome:Record<string,string>={site_website_editor:"/site-website",room_facilitator:"/site/day",site_staff:"/site/day",site_leader:"/site/day",paraeducator:"/profiles",student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor",network_admin:"/network",can_network_steward:"/network-steward"};
 export const workspaceLinks:Record<string,{title:string;path:string}[]>={
+ site_website_editor:[{title:"Site website",path:"/site-website"}],
  room_facilitator:[{title:"Onsite day",path:"/site/day"}],
  site_staff:[{title:"Onsite day",path:"/site/day"}],
  site_leader:[{title:"Onsite day",path:"/site/day"}],
