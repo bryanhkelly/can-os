@@ -73,17 +73,50 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     (!selected.programId || row.programId === selected.programId))}/>
   <section className="mt-8 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">New inquiry</h2>
+   {selected.interest&&!selectedInterest&&<p role="alert" className="mt-3 rounded-lg border p-3 text-sm">
+    This public interest is unavailable in your authorized Site and Program scope.
+   </p>}
+   {selectedInterest&&!convertibleInterest&&<p role="status" className="mt-3 rounded-lg border p-3 text-sm">
+    This public interest is {selectedInterest.status}; it cannot be converted again.
+    {selectedInterest.applicationId&&<>{" "}
+      <Link to="/admissions/intake"
+        search={{siteId:selectedInterest.siteId,programId:selectedInterest.programId,
+          application:selectedInterest.applicationId,interest:undefined}}
+        className="underline">View linked admissions inquiry</Link>
+    </>}
+   </p>}
+   {convertibleInterest&&<div className="mt-3 space-y-2 rounded-lg border p-4 text-sm">
+     <p className="font-semibold">Public request selected · {convertibleInterest.programName}</p>
+     <p>Adult contact fields and the original inquiry note are prefilled. Confirm
+       the contact with the family and enter the student's identity below.
+       Public contact details do not prove guardianship or confer school access.</p>
+     <p>If this student or guardian already has a CAN OS record, exit this handoff
+       and use ordinary verified intake to avoid duplicate identities.</p>
+     <label className="flex items-start gap-2">
+       <input type="checkbox" checked={contactReviewed}
+         onChange={e=>setContactReviewed(e.target.checked)}/>
+       <span>I reviewed the adult contact with the family, confirmed the new
+         student's identity and checked that a new unverified intake record
+         is appropriate. Formal guardian verification remains a separate step.</span>
+     </label>
+   </div>}
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void perform(
     async()=>{
      if(existingStudentKey&&!existingStudent)throw new Error("The selected student is no longer available. Choose a student again.");
      if(existingStudent&&!existingStudent.householdId&&!createHouseholdConfirmed)
       throw new Error("Confirm creation of the missing household before continuing.");
-     await createAdmissionsInquiry({data:existingStudent?{
+     if(convertibleInterest&&!contactReviewed)
+      throw new Error("Confirm the family contact and student identity before continuing.");
+     const created=await createAdmissionsInquiry({data:existingStudent?{
       requestId,programId,source,notes,existingStudent:{studentProfileId:existingStudent.studentProfileId,
        guardianPersonId:existingStudent.guardianPersonId,...(existingStudent.householdId?
         {householdId:existingStudent.householdId}:{createHousehold:true})},
      }:{requestId,programId,...(existingApplicationId?{existingApplicationId}:{}),studentFirstName,studentLastName,
-      guardianFirstName,guardianLastName,guardianEmail,gradeLevel,source,notes}});
+      guardianFirstName,guardianLastName,guardianEmail,gradeLevel,source,notes,
+      ...(convertibleInterest?{publicInterestId:convertibleInterest.id,contactReviewed:true as const}:{})}});
+     if(convertibleInterest)await router.navigate({to:"/admissions/intake",
+       search:{siteId:convertibleInterest.siteId,programId,
+        application:created.applicationId,interest:undefined}});
      setRequestId(crypto.randomUUID());setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);},"Inquiry created; continue the normal admissions and enrollment checklist.");}}>
     <label className="text-sm sm:col-span-2">Program<select className="mt-1 w-full rounded border bg-background p-2" required value={programId} onChange={e=>{setProgramId(e.target.value);setExistingApplicationId("");setExistingStudentKey("");setCreateHouseholdConfirmed(false);}}>
      <option value="">Choose program</option>{programs.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
