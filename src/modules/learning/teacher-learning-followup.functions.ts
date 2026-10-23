@@ -4,6 +4,8 @@ import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { teacherLearningFollowUpInput } from "@/domain/teacher-learning-followup";
+import { authorizeClass } from "./class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 /**
@@ -35,12 +37,13 @@ export const createTeacherLearningFollowUp = createServerFn({ method: "POST" })
           eq(s.sectionTeachers.personId, actor.actorPersonId!),
         )).where(and(
           eq(s.sections.id, data.sectionId), eq(s.sections.active, true),
-          inArray(s.sections.siteId, actor.scope.siteIds ?? []),
-          inArray(s.sections.programId, actor.scope.programIds ?? []),
-          inArray(s.programs.organizationId, actor.scope.organizationIds ?? []),
         )).limit(1);
       if (!section || !section.siteId)
         throw new AuthorizationError("assigned active section");
+      // CAN staff on independently hosted sites receive a named teaching
+      // Section, not church-wide Program/Site authority. Use the identical
+      // class authorizer as gradebook and lesson delivery within this txn.
+      await authorizeClass(actor as Actor,section.id,undefined,tx);
       const [student] = await tx.select({
         id: s.studentProfiles.id,
       }).from(s.enrollments)
