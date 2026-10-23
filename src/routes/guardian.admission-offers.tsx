@@ -63,7 +63,16 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
        <button disabled={busy!==null||!o.progress.canAccept} className="rounded border px-4 py-2 disabled:opacity-50" onClick={()=>respond(o.id,"accept")}>Accept</button>
        <button disabled={busy!==null} className="rounded border px-4 py-2" onClick={()=>respond(o.id,"decline")}>Decline</button>
      </div>}
-     {o.enrollmentActive&&<p className="mt-2 text-sm">{o.sectionCount} assigned classes · <Link to="/guardian" className="underline">View family home →</Link></p>}
+     {o.enrollmentActive&&<div className="mt-3 space-y-2">
+       <p className="text-sm">{o.sectionCount
+        ? `${o.sectionCount} assigned ${o.sectionCount===1?"class":"classes"} — your child can start learning.`
+        : "Enrollment is active; the school has not assigned a class yet."}</p>
+       <div className="flex flex-wrap gap-3 text-sm">
+        {o.sectionCount>0&&<Link to="/classes" search={{student:app.studentPersonId}}
+          className="rounded-lg border px-3 py-2 font-semibold">Open your child's classes →</Link>}
+        <Link to="/guardian" className="rounded-lg border px-3 py-2">Family home →</Link>
+       </div>
+     </div>}
     </div>)}{app.offers.length===0&&<p className="mt-3 text-sm">No offers yet.</p>}
   </section>)}
   {applications.length===0&&<p className="rounded-lg border p-4">No enrollment offers are currently available for the children in your authorized programs.</p>}
