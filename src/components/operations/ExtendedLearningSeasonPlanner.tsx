@@ -71,7 +71,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
     try {
       if (!publishSeasonId || !operatorConfirmed) throw new Error("Confirm the release responsibility");
       const dollars = Number(feeDollars);
-      if (!Number.isFinite(dollars) || dollars < 0 || Math.round(dollars * 100) !== dollars * 100)
+      if (!Number.isFinite(dollars) || dollars < 0 || Math.abs(Math.round(dollars * 100) - dollars * 100) > 1e-6)
         throw new Error("Enter a fee in dollars and cents");
       await publishExtendedSeasonFn({ data: {
         seasonId: publishSeasonId,
