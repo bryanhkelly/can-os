@@ -99,6 +99,7 @@ async function finalizedGradeRows(
       sectionGradeId: s.sectionGrades.id,
       sectionId: s.sectionGrades.sectionId,
       sectionTitle: s.sections.title,
+      subject:s.courseTemplates.subject,
       sectionMetadata:s.sections.metadata,
       gradingPeriodId: s.sectionGrades.gradingPeriodId,
       gradingPeriodSequence:s.gradingPeriods.sequence,
@@ -119,6 +120,8 @@ async function finalizedGradeRows(
     })
     .from(s.sectionGrades)
     .innerJoin(s.sections, eq(s.sections.id, s.sectionGrades.sectionId))
+    .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
+    .innerJoin(s.courseTemplates,eq(s.courseTemplates.id,s.courseTemplateVersions.courseTemplateId))
     .innerJoin(s.gradingPeriods, eq(s.gradingPeriods.id, s.sectionGrades.gradingPeriodId))
     .innerJoin(s.terms, eq(s.terms.id, s.sectionGrades.termId))
     .innerJoin(s.schoolYears, eq(s.schoolYears.id, s.terms.schoolYearId))
@@ -159,6 +162,7 @@ async function finalizedGradeRows(
       ...rest,
       finalizedAt: row.finalizedAt?.toISOString() ?? null,
       creditConfigured:creditUnits!==null,
+      terminalPeriod,
       creditsAttempted:terminalPeriod?creditUnits:0,
       creditsEarned:terminalPeriod?(creditUnits===null?null:passes?creditUnits:0):0,
     };
@@ -692,6 +696,7 @@ export const getStudentReportCard = createServerFn({ method: "GET" })
 async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
  const rows=await db.select({
   enrollmentId:s.enrollments.id,sectionId:s.sections.id,sectionTitle:s.sections.title,
+  subject:s.courseTemplates.subject,
   sectionMetadata:s.sections.metadata,
   termId:s.terms.id,termName:s.terms.name,schoolYearId:s.schoolYears.id,
   schoolYearName:s.schoolYears.name,programName:s.programs.name,
@@ -700,6 +705,8 @@ async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
   endedAt:s.enrollments.endedAt,
  }).from(s.enrollments)
   .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
+  .innerJoin(s.courseTemplates,eq(s.courseTemplates.id,s.courseTemplateVersions.courseTemplateId))
   .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
   .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.terms.schoolYearId))
   .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
@@ -709,7 +716,8 @@ async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
    inArray(s.sections.siteId,viewer.siteIds),inArray(s.sections.programId,viewer.programIds)));
  return rows.filter(row=>row.metadata.withdrawalNotation==="W").map(row=>({
   sectionGradeId:"withdrawal:"+row.enrollmentId,
-  sectionId:row.sectionId,sectionTitle:row.sectionTitle,
+  sectionId:row.sectionId,sectionTitle:row.sectionTitle,subject:row.subject,
+  terminalPeriod:true,
   gradingPeriodName:"Withdrawal",termId:row.termId,termName:row.termName,
   schoolYearId:row.schoolYearId,schoolYearName:row.schoolYearName,
   letterGrade:"W",percentage:null,score:null,programName:row.programName,
