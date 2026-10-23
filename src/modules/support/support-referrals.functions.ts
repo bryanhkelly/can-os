@@ -4,7 +4,7 @@ import { actorSiteIds,recordAudit,requireActor,type Actor } from "@/modules/iden
 import { emitEvent,notify } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray } from "drizzle-orm";
+import { and,desc,eq,inArray,or,sql } from "drizzle-orm";
 import { z } from "zod";
 
 const stages = ["submitted","accepted","plan_created","in_service","review","closed"] as const;
@@ -28,12 +28,33 @@ async function taughtStudentIds(db: any, s: any, actor: Actor): Promise<string[]
   return [...new Set(rows.map((r: { studentProfileId: string }) => r.studentProfileId))] as string[];
 }
 
+/** A site role alone does not authorize reading or changing confidential cases.
+ * Case owners and explicitly delegated, unexpired sensitive-access grantees can act.
+ */
+function casePermission(s: any, actor: Actor, permission: "read" | "write") {
+  return or(
+    eq(s.actions.ownerPersonId, actor.actorPersonId),
+    sql`EXISTS (
+      SELECT 1 FROM sensitive_access_grants AS g
+      WHERE g.resource_type = 'support_referral'
+        AND g.resource_id = ${s.supportReferrals.id}
+        AND g.site_id = ${s.actions.siteId}
+        AND g.grantee_person_id = ${actor.actorPersonId}
+        AND g.classification = 'support_case'
+        AND g.allowed_fields @> ${JSON.stringify([permission])}::jsonb
+        AND g.revoked_at IS NULL
+        AND g.valid_from <= now()
+        AND g.valid_through > now()
+    )`,
+  );
+}
+
 async function loadReferral(tx: any, s: any, referralId: string, actor: Actor) {
   const [record] = await tx.select({ action: s.actions, referral: s.supportReferrals }).from(s.actions)
     .innerJoin(s.supportReferrals, eq(s.supportReferrals.actionId, s.actions.id))
-    .where(and(eq(s.actions.id, referralId), eq(s.actions.type, "support_referral"), inArray(s.actions.siteId, actor.scope.siteIds??[]),inArray(s.actions.programId,actor.scope.programIds??[])))
+    .where(and(eq(s.actions.id, referralId), eq(s.actions.type, "support_referral"), inArray(s.actions.siteId, actor.scope.siteIds??[]),inArray(s.actions.programId,actor.scope.programIds??[]),casePermission(s,actor,"write")))
     .for("update").limit(1);
-  if (!record) throw new AuthorizationError("referral at authorized site and program");
+  if (!record) throw new AuthorizationError("explicit support-case writer assignment");
   return record;
 }
 
@@ -76,13 +97,18 @@ export const getSupportReferrals = createServerFn({ method: "GET" }).handler(asy
       inArray(s.actions.siteId, sites),
       inArray(s.actions.programId,actor.scope.programIds??[]),
       subjectIds ? inArray(s.actions.subjectId, subjectIds) : undefined,
+       actor.role === "teacher"
+         ? eq(s.supportReferrals.reporterPersonId, actor.actorPersonId)
+         : casePermission(s, actor, "read"),
     ))
     .orderBy(desc(s.actions.createdAt)).limit(100);
   const referrals = rows;
   const referralIds = referrals.map((x: { referralId: string }) => x.referralId);
   const [plans, services, owners] = await Promise.all([
-    referralIds.length ? db.select().from(s.supportPlans).where(inArray(s.supportPlans.referralId, referralIds)) : [],
-    referralIds.length ? db.select().from(s.supportServices).where(inArray(s.supportServices.referralId, referralIds)) : [],
+    actor.role !== "teacher" && referralIds.length
+      ? db.select().from(s.supportPlans).where(inArray(s.supportPlans.referralId, referralIds)) : [],
+    actor.role !== "teacher" && referralIds.length
+      ? db.select().from(s.supportServices).where(inArray(s.supportServices.referralId, referralIds)) : [],
     (() => { const ids = [...new Set(referrals.map((r: { ownerPersonId: string | null }) => r.ownerPersonId).filter((x: string | null): x is string => Boolean(x)))]; return ids.length ? db.select({ id: s.people.id, firstName: s.people.legalFirstName, lastName: s.people.legalLastName }).from(s.people).where(inArray(s.people.id, ids)) : []; })(),
   ]);
   const names = new Map(owners.map((w: { id: string; firstName: string; lastName: string }) => [w.id, `${w.firstName} ${w.lastName}`]));
@@ -92,8 +118,8 @@ export const getSupportReferrals = createServerFn({ method: "GET" }).handler(asy
       id: row.id, title: row.title, description: row.description ?? "", status: row.status,
       studentProfileId: row.studentProfileId, requestedArea: row.requestedArea,
       priority: row.priority, stage: row.stage, category: row.category,
-      notes: row.notes, academicRecommendation: row.academicRecommendation,
-      nextReview: row.nextReviewAt ? row.nextReviewAt.toISOString() : "",
+      notes: row.notes, academicRecommendation: actor.role === "teacher" ? null : row.academicRecommendation,
+      nextReview: actor.role === "teacher" ? "" : row.nextReviewAt ? row.nextReviewAt.toISOString() : "",
       plan: plan ? { goal: plan.goal, intervention: plan.intervention, targetDate: plan.targetDate.toISOString() } : null,
       services: services.filter((x: any) => x.referralId === row.referralId).map((x: any) => ({ id: x.id, kind: x.kind, scheduledAt: x.scheduledAt.toISOString(), status: x.status, outcome: x.outcome })),
       assignedTo: row.ownerPersonId ? names.get(row.ownerPersonId) ?? "Unassigned" : "Unassigned",
