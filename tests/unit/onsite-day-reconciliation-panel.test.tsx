@@ -15,11 +15,11 @@ const roster = {
     {studentProfileId:"student-1",programId:"program-1",
       programName:"CAN Site",studentName:"Student One",
       sectionTitle:null,occurrenceKey:"2026-10-22:site-day",
-      attendanceEventId:"event-1",status:"present"},
+      attendanceEventId:"event-1",status:"present" as const},
     {studentProfileId:"student-2",programId:"program-1",
       programName:"CAN Site",studentName:"Student Two",
       sectionTitle:null,occurrenceKey:"2026-10-22:site-day",
-      attendanceEventId:null,status:"unmarked"},
+      attendanceEventId:null,status:"unmarked" as const},
   ],
 };
 
@@ -38,7 +38,7 @@ describe("site day attendance reconciliation panel",()=>{
   it("distinguishes two program entries from a single actual headcount",()=>{
     const html=renderToStaticMarkup(
       <OnsiteDayReconciliationPanel date="2026-10-22" roster={{
-        ...roster,students:[{...roster.students[0]!,status:"present"}],
+        ...roster,students:[{...roster.students[0]!,status:"present" as const}],
       }}/>);
     expect(html).toContain("1 distinct students");
     expect(html).toContain("program-attendance entries");
