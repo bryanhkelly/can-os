@@ -129,11 +129,28 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
       effectiveFrom:new Date(date+"T00:00:00Z".replace("Z","Z")),
       effectiveThrough:new Date(new Date(date+"T00:00:00Z").getTime()+7*86400_000),
     });
-    // Backdate plan start far enough to cover the entire school-local day
-    // in the conservative coverage view.
+    // Cover both the historical attendance fixture and a distinct scheduled
+    // TODAY duty, without fabricating a backdated staffing acknowledgment.
     await tx.update(s.deliveryArrangements).set({
       effectiveFrom:new Date(new Date(date+"T00:00:00Z").getTime()-7*86400_000),
+      effectiveThrough:new Date(Date.now()+10*86400_000),
     }).where(eq(s.deliveryArrangements.sectionId,section.id));
+    const todaySite=siteDate(new Date(),"America/Los_Angeles");
+    if(todaySite!==date){
+      await tx.insert(s.academicCalendarDays).values({
+        academicCalendarId:calendar.id,calendarDate:todaySite,
+        type:"instructional",instructionalMinutes:360,
+      });
+    }
+    const todayWeekday=new Date(todaySite+"T12:00:00Z").getUTCDay();
+    const originalWeekday=new Date(date+"T12:00:00Z").getUTCDay();
+    if(todayWeekday!==originalWeekday){
+      await tx.insert(s.scheduleTemplatePeriods).values({
+        scheduleTemplateId:schedule.id,dayOfWeek:todayWeekday,
+        sequence:1,label:"Instruction",startsAtLocal:"08:30",
+        endsAtLocal:"15:00",type:"instruction",
+      });
+    }
     const supervisorActor=act("room_facilitator",facilitator.id);
     const supervision=await import("@/modules/operations/onsite-supervision.functions");
     const sitePlan=await supervision.getOnsiteSupervisionPlan({data:{date}});
@@ -144,9 +161,41 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
       facilitatorName:"Onsite Facilitator",assignedPlan:true,
       gaps:["room_unconfigured"],
     });
+    const duty=await import("@/modules/operations/onsite-duty-response.functions");
+    const todaysPlan=await supervision.getOnsiteSupervisionPlan({data:{date:todaySite}});
+    const assignedBlock=first(todaysPlan.blocks.filter(block=>block.canRespond));
+    expect(assignedBlock.canAccept).toBe(true);
+    const dutyRequest={
+      date:todaySite,sectionId:assignedBlock.sectionId,
+      periodId:assignedBlock.periodId!,
+      response:"accepted" as const,confirmed:true as const,
+    };
+    const initialDuty=await duty.getOnsiteDutyResponses({data:{date:todaySite}});
+    expect(initialDuty.statuses.find(block=>block.sectionId===assignedBlock.sectionId &&
+      block.periodId===assignedBlock.periodId)?.status).toBe("not_reported");
+    const dutyResponse=await duty.respondToOnsiteDuty({data:dutyRequest});
+    expect(dutyResponse.created).toBe(true);
+    expect(await duty.respondToOnsiteDuty({data:dutyRequest})).toEqual({
+      responseId:dutyResponse.responseId,created:false,response:"accepted",
+    });
+    expect((await duty.getOnsiteDutyResponses({data:{date:todaySite}}))
+      .statuses.find(block=>block.sectionId===assignedBlock.sectionId &&
+        block.periodId===assignedBlock.periodId)?.status).toBe("accepted");
+    await expect(duty.respondToOnsiteDuty({data:{
+      ...dutyRequest,response:"cannot_cover",reason:"unavailable",
+    }})).rejects.toThrow("duty already answered");
     state.actor={...supervisorActor,grantSiteId:crypto.randomUUID()};
     await expect(supervision.getOnsiteSupervisionPlan({data:{date}}))
       .rejects.toThrow("site-bound");
+    await expect(duty.respondToOnsiteDuty({data:dutyRequest}))
+      .rejects.toThrow("site-bound");
+    const differentStaff=act("site_leader",siteLeader.id);
+    await expect(duty.respondToOnsiteDuty({data:dutyRequest}))
+      .rejects.toThrow("current named onsite duty assignment");
+    state.actor=differentStaff;
+    await expect(duty.respondToOnsiteDuty({data:{
+      ...dutyRequest,date,
+    }})).rejects.toThrow("only today's scheduled duty");
     state.actor=staff;
     expect(first((await flow.listExpectedOnsiteRoster({data:{date}})).students).status).toBe("unmarked");
     const onsiteReview=await import("@/modules/operations/onsite-day-review.functions");
