@@ -116,7 +116,7 @@ export const attestOnsiteDayReview = createServerFn({method:"POST"})
         title:"Onsite attendance review for "+data.date,
         description:"Staff reviewed all expected attendance entries at the time of this snapshot.",
         subjectType:"site",subjectId:site.id,organizationId:site.organizationId,
-        siteId:site.id,ownerPersonId:actor.actorPersonId,requestedAt:undefined,
+        siteId:site.id,ownerPersonId:actor.actorPersonId,
         metadata:{date:data.date,fingerprint,
           expectedEntries:summary.expectedEntries,markedEntries:summary.markedEntries,
           programs:summary.programs.length,confirmedRecordsReviewed:true,
