@@ -10,6 +10,14 @@ if (preflight.error) throw preflight.error;
 if (preflight.status !== 0) process.exit(preflight.status ?? 1);
 if (process.argv.includes("--preflight")) process.exit(0);
 
+// Offline endpoint checks cannot prove the active Neon branch. Resolve and
+// attest the actual Postgres branch before any persistent browser fixture.
+const branch = spawnSync(process.execPath, ["scripts/verify-fullflow-neon-branch.mjs"], {
+  stdio: "inherit", env: process.env,
+});
+if (branch.error) throw branch.error;
+if (branch.status !== 0) process.exit(branch.status ?? 1);
+
 const result = spawnSync(process.execPath, [
   "node_modules/@playwright/test/cli.js", "test", "--config=playwright.admissions.config.ts", ...process.argv.slice(2),
 ], {
