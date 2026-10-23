@@ -80,7 +80,7 @@ async function main() {
   ];
   const indexes = await query`
     SELECT indexname FROM pg_indexes WHERE schemaname = 'public'
-      AND tablename IN ('auth_request_rate_limits', 'access_sessions', 'lesson_progress', 'submissions', 'learning_activity_sessions', 'learning_activity_events', 'program_site_authorizations')
+      AND tablename IN ('auth_request_rate_limits', 'access_sessions', 'lesson_progress', 'submissions', 'learning_activity_sessions', 'learning_activity_events', 'program_site_authorizations', 'site_local_content_versions')
   `;
   const foundIndexes = new Set(indexes.map(row => row.indexname));
   const missingIndexes = expectedIndexes.filter(name => !foundIndexes.has(name));
