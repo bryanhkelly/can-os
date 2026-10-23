@@ -72,7 +72,7 @@ a separate church/CAN institution can lawfully activate.
 
 ## Increment 2 — verified CAN–church operating authorization (source committed, not accepted)
 
-A new `program_site_authorizations` model (`0039`, **not applied**) links one
+A new `program_site_authorizations` model (`0039`, **applied on isolated FullFlow Neon only; production unchanged**) links one
 church-owned Site and canonical Program to an independent CAN academic institution.
 Each version records precise contracted services, host requester, independent CAN
 reviewer, a third-party verified agreement document, effective dates and revocation.
@@ -197,10 +197,7 @@ Flow B runs end to end.
 
 ### Remaining P0 gaps before calling Golden Flow B complete
 
-1. **Apply migrations only in the disposable environment:** review `0039`
-   authorization and `0040` local-site-content source/ledger, apply through the
-   guarded test-only path and record actual DB acceptance. Last confirmed
-   dedicated FullFlow Neon state had migrations through `0038`.
+1. **Isolated migration gate resolved:** `0039`, `0040` and subsequent guardian default migration `0041` are recorded on the dedicated FullFlow Neon branch; no production application. Execute the guarded schema/integration checks and verify exact latest commit before relying on runtime persistence.
 2. **Separate, minimally scoped CAN staff grants:** the current authenticated
    `getCommandContext` projects Programs from `programs.organization_id`,
    which is **the host church**. A CAN academic provider/issuer cannot gain
@@ -240,3 +237,59 @@ Flow B runs end to end.
 school/academic authorizations but must not erase prior attendance evidence or
 suppress a person's ability to record or externally report an urgent child
 safety concern. Preserve emergency reporting and independent agency pathways.
+
+
+## Increment 4 — church local director and facilitator delegation (2026-10-23)
+
+**Source-committed on `FullFlow`; no recorded passing typecheck or
+integration/browser acceptance.** Priority two was taken ahead of further
+CAN academic staff-access work by explicit product direction.
+
+- Existing `school_configuration_versions`, `program_responsibility_assignments`,
+  `role_assignments`, verified `account_person_grants` and Program–Site
+  authorization contracts are reused. **No new migration** is necessary.
+- A verified church **host registrar** with `admin.manage` and the exact
+  Organization/Site/Program relationship may appoint a **site director**
+  (`site_leader`) or first **room facilitator** (`room_facilitator`) from
+  existing **active, email-verified, exact-Site** staff accounts. No new
+  staff account or login permission is minted by an appointment.
+- For a separate church/CAN institution the current, independently verified,
+  non-expired `onsite_supervision` service authorization must exist.
+  Appointments expire within 90 days. Replacements/revocations are audited
+  with canonical DomainEvents, scope, effective dates and named people.
+  Concurrent changes serialize by Program and reject stale assignment IDs.
+  Revocation remains possible after agreement withdrawal.
+- When first needed, the command creates `school_configuration_versions`
+  version 1 **draft only**, derived from the canonical Program grade/delivery
+  configuration. The draft does **not** certify academic school configuration,
+  trained/screened personnel, safeguarding readiness, attendance, custody,
+  or campus opening.
+- `/operations/launch/$programId` now offers a scoped, staff-only local
+  responsibility panel with verified candidate selection, expiration and
+  revocation. The active named relationship is checked for a separate,
+  verified session at runtime, not inferred from a role dropdown.
+- For independently church-hosted CAN Programs, site directors and
+  facilitators must have a **current responsibility linked to the most recent
+  school configuration** to read pupil attendance rosters or record attendance.
+  Canonical attendance transaction checks the current assignment *again*
+  under the same Program lock used for revocation. Site director's complete
+  school attendance snapshot attestation and facilitator's affirmative
+  scheduled duty response also require current named authority inside their
+  write transactions. **Cannot-cover reporting remains possible** when an
+  agreement/delegation expires, to avoid suppressing safety exceptions.
+  Same-organization and other nonchurch school operating paths retain their
+  existing staff-grant behavior.
+- No delegated role receives academic grading/credit, institutional record,
+  counseling, student-wide case, legal custody release or accreditation
+  permissions from this implementation.
+
+**Still required before P0 acceptance:** Multiple simultaneous room
+facilitators / deputies per Program (this first model binds one appointment
+per responsibility key), independent verified staff screening/training and
+backup capacity, Section/room-limited student roster, real child-safety
+policy and statutory reporting, approved school-config activation, a real
+church/CAN agreement, full transactional denial/concurrency integration,
+authenticated separate-session browser acceptance, and actual test execution.
+The implementation is a bounded local staff delegation, not a complete
+supervised school day. Do not claim school-opening acceptance from these
+records.
