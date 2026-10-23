@@ -56,6 +56,7 @@ function LaunchWizardPage() {
   const [created, setCreated] = useState<{
     programId: string;
     journeyId: string;
+    programType: (typeof programTypes)[number];
     publicSiteDraft: {
       siteId: string;
       host: string;
@@ -144,7 +145,7 @@ function LaunchWizardPage() {
           ...(siteId ? { siteId } : {}),
         },
       });
-      setCreated(result);
+      setCreated({...result,programType:type});
       await router.invalidate();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to start launch");
@@ -236,7 +237,17 @@ function LaunchWizardPage() {
             {created && <div role="status" className="mt-4 rounded-lg border p-3 text-sm">
               <p>Launch started. Program <code>{created.programId}</code> with Launch Journey{" "}
                 <code>{created.journeyId}</code> is now in the checklist below.</p>
-              {created.publicSiteDraft && <div className="mt-3 rounded-lg border p-3">
+              <nav aria-label="Next steps for your new program" className="mt-4 flex flex-wrap gap-3">
+                <Link to="/operations/launch/$programId" params={{programId:created.programId}}
+                  search={{siteId:created.publicSiteDraft?.siteId,programId:undefined}}
+                  className="rounded-lg border px-3 py-2 text-sm font-semibold">1. Set up classes and staff →</Link>
+                {!isExtendedLearningType(created.programType) && <Link to="/admissions/intake"
+                  search={{siteId:created.publicSiteDraft?.siteId,programId:created.programId}}
+                  className="rounded-lg border px-3 py-2 text-sm font-semibold">2. Start the first family inquiry →</Link>}
+              </nav>
+              <p className="mt-3 text-xs text-muted-foreground">These are planning actions, not authorization to open. Institutional agreements, academic readiness and child safety must still be independently approved before active enrollment or onsite attendance.</p>
+              {created.publicSiteDraft && <details className="mt-3 rounded-lg border p-3">
+                <summary className="cursor-pointer text-sm font-semibold">Optional: website and marketing setup</summary>
                 <p className="font-semibold">
                   {created.publicSiteDraft.created
                     ? "Website draft automatically prepared"
@@ -253,7 +264,7 @@ function LaunchWizardPage() {
                   className="mt-2 inline-block underline">
                   Review Site website (separate publisher grant required) →
                 </Link>
-              </div>}
+              </details>}
               {!created.publicSiteDraft && <p className="mt-2 text-xs text-muted-foreground">
                 No local Site was selected, so this Program launch has no Site website draft.
               </p>}
@@ -465,9 +476,14 @@ function LaunchWizardPage() {
                       <h3 className="font-semibold">{launch.name}</h3>
                       <span className="text-xs uppercase text-muted-foreground">{launch.status}</span>
                     </div>
-                    <Link to="/operations/launch/$programId" params={{programId:launch.id}}
-                      search={{siteId:launch.siteId??undefined,programId:undefined}}
-                      className="mt-2 inline-block text-xs font-semibold underline">Configure classes and instructors →</Link>
+                    <nav className="mt-3 flex flex-wrap gap-4 text-xs font-semibold" aria-label={launch.name+" launch next actions"}>
+                      <Link to="/operations/launch/$programId" params={{programId:launch.id}}
+                        search={{siteId:launch.siteId??undefined,programId:undefined}}
+                        className="underline">Configure classes and instructors →</Link>
+                      {!isExtendedLearningType(launch.type)&&<Link to="/admissions/intake"
+                        search={{siteId:launch.siteId??undefined,programId:launch.id}}
+                        className="underline">Start family intake →</Link>}
+                    </nav>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {programTypeLabels[launch.type] ?? launch.type}
                       {launch.journey ? ` · Journey: ${launch.journey.status}` : " · No launch journey"}
