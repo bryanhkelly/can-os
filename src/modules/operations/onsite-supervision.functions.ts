@@ -51,10 +51,12 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         lte(schoolYears.startsOn,data.date),gte(schoolYears.endsOn,data.date),
         lte(terms.startsOn,data.date),gte(terms.endsOn,data.date),
         inArray(sections.programId,actor.scope.programIds??[])))
-      .limit(250);
-    const onsiteSections=sectionsAtSite.filter(row=>row.deliveryModel.onsite===true);
+      .limit(251);
+    const projectionTruncated=sectionsAtSite.length>250;
+    const onsiteSections=sectionsAtSite.slice(0,250).filter(row=>row.deliveryModel.onsite===true);
     if(!onsiteSections.length){
-      return {date:data.date,siteId:site.id,...summarizeOnsiteSupervision([])};
+      return {date:data.date,siteId:site.id,projectionTruncated,
+        ...summarizeOnsiteSupervision([])};
     }
     const ids=onsiteSections.map(row=>row.id);
     const templateIds=[...new Set(onsiteSections.map(r=>r.scheduleTemplateId)
@@ -145,5 +147,9 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         });
       }
     }
-    return {date:data.date,siteId:site.id,...summarizeOnsiteSupervision(result)};
+    const projection=summarizeOnsiteSupervision(result);
+    // Person IDs are needed for overlap detection, not for the client.
+    const blocks=projection.blocks.map(({facilitatorPersonId:_id,...block})=>block);
+    return {date:data.date,siteId:site.id,projectionTruncated,
+      ...projection,blocks};
   });
