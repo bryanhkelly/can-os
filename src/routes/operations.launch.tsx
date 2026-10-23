@@ -53,7 +53,16 @@ function LaunchWizardPage() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [created, setCreated] = useState<{ programId: string; journeyId: string } | null>(null);
+  const [created, setCreated] = useState<{
+    programId: string;
+    journeyId: string;
+    publicSiteDraft: {
+      siteId: string;
+      host: string;
+      status: "draft" | "published";
+      created: boolean;
+    } | null;
+  } | null>(null);
   const [openingRecipients,setOpeningRecipients]=useState<Record<string,string>>({});
   const [opened,setOpened]=useState<{siteId:string|null;name:string}|null>(null);
 
@@ -224,12 +233,31 @@ function LaunchWizardPage() {
           {extendedPlanning ? <ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId} /> : <p role="status" className="rounded-lg border p-3 text-sm">Extended-learning planning is unavailable. Verify database migrations 0032–0033; school launches remain accessible.</p>}
           <details className="rounded-xl border bg-card p-5">
             <summary className="cursor-pointer text-lg font-semibold">Start a new program launch</summary>
-            {created && (
-              <p role="status" className="mt-4 rounded-lg border p-3 text-sm">
-                Launch started. Program <code>{created.programId}</code> with Launch Journey{" "}
-                <code>{created.journeyId}</code> is now in the checklist below.
-              </p>
-            )}
+            {created && <div role="status" className="mt-4 rounded-lg border p-3 text-sm">
+              <p>Launch started. Program <code>{created.programId}</code> with Launch Journey{" "}
+                <code>{created.journeyId}</code> is now in the checklist below.</p>
+              {created.publicSiteDraft && <div className="mt-3 rounded-lg border p-3">
+                <p className="font-semibold">
+                  {created.publicSiteDraft.created
+                    ? "Website draft automatically prepared"
+                    : "Existing Site website address retained"}
+                </p>
+                <p className="mt-1 font-mono">{created.publicSiteDraft.host}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {created.publicSiteDraft.status === "published"
+                    ? "The Site already has a marketing approval; launch does not change its status or open admissions."
+                    : "Private draft only. Publishing requires a separate authorized review; no admissions or hosting is opened."}
+                </p>
+                <Link to="/sites/$siteId/publish"
+                  params={{siteId:created.publicSiteDraft.siteId}}
+                  className="mt-2 inline-block underline">
+                  Review Site website (separate publisher grant required) →
+                </Link>
+              </div>}
+              {!created.publicSiteDraft && <p className="mt-2 text-xs text-muted-foreground">
+                No local Site was selected, so this Program launch has no Site website draft.
+              </p>}
+            </div>}
             <div className="mt-4 rounded-lg border p-4">
               <p className="font-semibold text-sm">Suggested school-in-a-box starting point</p>
               <p className="mt-2 text-sm text-muted-foreground">Grade 9 hybrid extension: two on-site days and asynchronous instruction on the remaining days. This only pre-fills the proposal; your school must verify its staffing, calendar, academic provider and legal credit issuer before opening.</p>
