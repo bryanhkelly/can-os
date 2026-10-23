@@ -4,6 +4,24 @@ CAN OS uses Neon PostgreSQL as the production system of record.
 
 ## Environments
 
+**FullFlow branch-specific safety (2026-10-23):** For FullFlow use the single
+approved disposable branch `fullflow-e2e-20261022` (ID
+`br-proud-pine-arfju8h2`, project `sweet-hall-62441909`).
+The connected `scripts/run-integration-tests.mjs` runner and
+`scripts/verify-fullflow-schema.mjs` require a real SQL identity check
+against Postgres settings `neon.project_id` and `neon.branch_id`.
+Matching URL hostnames or a caller-supplied branch label are NOT sufficient.
+An offline `--preflight` checks only endpoint separation; it does not verify
+actual Neon branch identity. The recommended protected migration command is
+`npm run db:migrate:fullflow -- --preflight` (read-only connection check), then
+`npm run db:migrate:fullflow` after migration review. Both require
+`TEST_DATABASE_URL`, `CAN_TEST_DB_WRITES_ENABLED=true`, a distinct
+`CAN_APPLICATION_DB_HOST`, and a nonproduction Node environment. The
+migration wrapper passes the database-attested URL to the existing Drizzle
+`db:migrate` command; never run unrestricted `db:push` or `db:migrate`
+against the application database as a way of fixing test branch drift.
+
+
 Use separate Neon branches for:
 
 - production
