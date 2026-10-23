@@ -36,6 +36,8 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       email: publicAdmissionsInterests.contactEmail,
       message: publicAdmissionsInterests.message,
       status: publicAdmissionsInterests.status,
+      applicationId: publicAdmissionsInterests.applicationId,
+      convertedAt: publicAdmissionsInterests.convertedAt,
       createdAt: publicAdmissionsInterests.createdAt,
       contactedAt: publicAdmissionsInterests.contactedAt,
     }).from(publicAdmissionsInterests)
@@ -50,6 +52,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       ...row,
       createdAt: row.createdAt.toISOString(),
       contactedAt: row.contactedAt?.toISOString() ?? null,
+      convertedAt: row.convertedAt?.toISOString() ?? null,
     }));
   });
 
@@ -79,8 +82,8 @@ export const setPublicAdmissionsInterestStatus = createServerFn({ method: "POST"
         )).for("update", { of: publicAdmissionsInterests }).limit(1);
       if (!current) throw new AuthorizationError("admissions interest scope");
       if (current.status === data.status) return { changed: false };
-      if (current.status === "closed")
-        throw new Error("Closed interest requests cannot be modified");
+      if (current.status === "closed" || current.status === "converted")
+        throw new Error("Closed or converted interest requests cannot be modified");
       const now = new Date();
       await tx.update(publicAdmissionsInterests).set({
         status: data.status,
