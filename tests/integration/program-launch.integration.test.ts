@@ -279,6 +279,16 @@ integration("GF3 host / program launch", () => {
       const [qualification] = await db.insert(schema.qualificationDefinitions).values({
         key: `gf3-license-${suffix}-${index}`, kind: "license", title: "Synthetic GF3 teaching qualification",
       }).returning();
+      // A verified membership and explicit publisher assignment—not the generic
+      // registrar capability—authorizes the institutional staffing policy.
+      await db.insert(schema.memberships).values({
+        personId: operator.id, organizationId: host.id,
+      }).onConflictDoNothing();
+      await db.insert(schema.roleAssignments).values({
+        personId: operator.id, organizationId: host.id, siteId: site.id,
+        programId: launch.programId, roleKey: "staffing_policy_publisher",
+        capabilities: ["staffing.policy.publish"],
+      });
       await launchAcademics.publishLaunchTeacherPolicy({ data: {
         programId: launch.programId, qualificationKeys: [qualification.key], confirmed: true,
       } });
