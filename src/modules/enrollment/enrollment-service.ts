@@ -29,7 +29,7 @@ import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
-import { and,eq } from "drizzle-orm";
+import { and,eq,inArray,sql } from "drizzle-orm";
 
 /** Enrollment commands must never interpret an absent program grant as global access. */
 function requireEnrollmentProgramScope(context:CommandContext,programId:string):void {
@@ -144,6 +144,11 @@ export async function startFamilyApplication(
       if (!membership) {
         throw new Error("Guardian is not a member of the supplied Household");
       }
+      // Serialize sibling submissions within the same household. Never merge
+      // two children based solely on a matching name; require admissions
+      // review if the household already has that student's open application.
+      if(input.parentSelfService)await tx.select({id:households.id}).from(households)
+        .where(eq(households.id,householdId)).for("update").limit(1);
     } else {
       const [household] = await tx
         .insert(households)
@@ -163,6 +168,19 @@ export async function startFamilyApplication(
         relationshipLabel: "guardian",
         isPrimaryContact: true,
       });
+    }
+
+    if(input.parentSelfService) {
+      const [duplicate] = await tx.select({id:applications.id}).from(applications)
+        .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
+        .innerJoin(people,eq(people.id,studentProfiles.personId))
+        .where(and(eq(applications.householdId,householdId),
+          eq(applications.programId,input.programId),
+          inArray(applications.stage,["inquiry","application","eligibility","accepted"]),
+          sql`lower(btrim(${people.legalFirstName})) = ${input.student.legalFirstName.trim().toLowerCase()}`,
+          sql`lower(btrim(${people.legalLastName})) = ${input.student.legalLastName.trim().toLowerCase()}`,
+        )).limit(1);
+      if(duplicate)throw new Error("This household already has an open application for this student and school. Continue that application or contact admissions for identity resolution.");
     }
 
     const [studentPerson] = await tx
