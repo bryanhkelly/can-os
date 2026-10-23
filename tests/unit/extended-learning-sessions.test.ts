@@ -40,5 +40,7 @@ describe("Summer and after-school recurring sessions", () => {
     const fall={startsOn:"2027-11-07",endsOn:"2027-11-07"};
     expect(()=>planExtendedSessions({fromDate:fall.startsOn,throughDate:fall.endsOn,
       weekdays:[0],startTime:"01:30",endTime:"02:30"},fall,"America/New_York")).toThrow(/Ambiguous/);
+    expect(()=>planExtendedSessions({fromDate:fall.startsOn,throughDate:fall.endsOn,
+      weekdays:[0],startTime:"00:30",endTime:"01:30"},fall,"America/New_York")).toThrow(/Ambiguous/);
   });
 });
