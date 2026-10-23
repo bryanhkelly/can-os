@@ -2,12 +2,14 @@ import {activateSectionEnrollment} from "./section-allocation.service";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accountPersonGrants, admissionOffers, applications, courseTemplateVersions, enrollments, people, programs, sections, sectionTeachers, terms } from "@/db/schema";
+import { admissionOffers, applications, courseTemplateVersions, enrollments, programs, sections, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasAccessibleFirstLesson } from "@/domain/first-class-lesson";
+import { verifiedTeacherSectionIds } from "./verified-section-teachers.server";
+import { staffedPublishedSectionIds } from "./instructional-section-readiness.server";
 
 async function registrar() {
   const actor = await getCommandContext(getRequest());
@@ -48,23 +50,12 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      .innerJoin(courseTemplateVersions,eq(courseTemplateVersions.id,sections.courseTemplateVersionId))
      .where(and(eq(sections.programId, app.programId), eq(sections.active, true),
        inArray(terms.schoolYearId, yearIds)));
-   // UI previews only actual staffed options; a registered Teacher must have
-   // an active named assignment and a current school/institution grant.
-   const teachers=rows.length?await db.select({sectionId:sectionTeachers.sectionId})
-     .from(sectionTeachers)
-     .innerJoin(sections,eq(sections.id,sectionTeachers.sectionId))
-     .innerJoin(programs,eq(programs.id,sections.programId))
-     .innerJoin(people,eq(people.id,sectionTeachers.personId))
-     .innerJoin(accountPersonGrants,and(
-       eq(accountPersonGrants.personId,sectionTeachers.personId),
-       eq(accountPersonGrants.role,"teacher"),eq(accountPersonGrants.active,true),
-       or(eq(accountPersonGrants.organizationId,programs.organizationId),
-          eq(accountPersonGrants.organizationId,programs.academicProviderOrganizationId)),
-       or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,sections.siteId)),
-     ))
-     .where(and(inArray(sectionTeachers.sectionId,rows.map(row=>row.id)),
-       eq(people.active,true))):[];
-   const staffedIds=new Set(teachers.map(row=>row.sectionId));
+   // One canonical source of live teacher identity for both placement
+   // preview and the atomic placement command. Also project the independent
+   // CAN/church operating agreement and published first-lesson gate.
+   const sectionIds=rows.map(row=>row.id);
+   const staffedIds=await verifiedTeacherSectionIds(sectionIds,db);
+   const readyIds=await staffedPublishedSectionIds(sectionIds,db);
    const enrolled = await db.select({ sectionId: enrollments.sectionId }).from(enrollments)
      .where(and(eq(enrollments.studentProfileId, app.studentProfileId),
        eq(enrollments.kind, "section"), eq(enrollments.status, "active")));
@@ -72,7 +63,9 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
    return { active: active.length>0, sections: rows.filter(s => !s.siteId ||
       actor.scope.siteIds?.includes(s.siteId)).map(s => ({
      id: s.id, title: s.title, code: s.code, enrolled: assigned.has(s.id),
-     staffed: staffedIds.has(s.id), curriculumReady:s.curriculumStatus==="published" && hasAccessibleFirstLesson(s.curriculum),
+     staffed: staffedIds.has(s.id),
+     curriculumReady:s.curriculumStatus==="published" && hasAccessibleFirstLesson(s.curriculum),
+     readyForPlacement:readyIds.has(s.id),
    })) };
  });
 
