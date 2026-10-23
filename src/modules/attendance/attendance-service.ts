@@ -566,6 +566,17 @@ export async function recordAttendanceRevision(
  return db.transaction(async tx=>{
   const key="attendance:"+input.studentProfileId+":"+input.occurrenceKey;
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+  // Site/role grants are not operational delegation. Recheck the named,
+  // time-bounded Program responsibility INSIDE this write transaction, even
+  // for replayed mutation IDs. The same lock serializes appointment/revocation.
+  const siteActor = context as AccessContext;
+  if (onsite && (siteActor.role === "site_leader" || siteActor.role === "room_facilitator")) {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:" + input.programId}))`);
+    const { requireCurrentSiteLocalDelegate } = await import(
+      "@/modules/operations/site-local-delegation.server");
+    await requireCurrentSiteLocalDelegate(tx, siteActor, input.programId,
+      siteActor.role === "site_leader" ? "site_director" : "room_facilitator");
+  }
   const sourceKey="manual-revision:"+input.mutationId;
   const [repeat]=await tx.select({
    id:attendanceEvents.id,studentProfileId:attendanceEvents.studentProfileId,
