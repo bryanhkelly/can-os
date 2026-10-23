@@ -29,8 +29,18 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL !== testUrl) {
   if (host === appHost) throw new Error("Refusing migrations against the application DATABASE_URL endpoint.");
 }
 await verifyFullFlowNeonBranch(testUrl);
+// Even on the correct branch, Drizzle must not silently continue from a
+// partially applied or manually altered schema. Review all seven migrations
+// against the known 0031 starting ledger before calling the migrator.
+const review = spawnSync(process.execPath, ["scripts/review-fullflow-migrations.mjs"], {
+  stdio: "inherit", env: process.env,
+});
+if (review.error) throw review.error;
+if (review.status !== 0) {
+  throw new Error("Dedicated FullFlow migration preconditions changed; no SQL was applied.");
+}
 if (process.argv.includes("--preflight")) {
-  console.log("Verified FullFlow migration target; no SQL applied.");
+  console.log("Verified FullFlow branch and migration preconditions; no SQL applied.");
   process.exit(0);
 }
 if (process.argv.slice(2).length) {
