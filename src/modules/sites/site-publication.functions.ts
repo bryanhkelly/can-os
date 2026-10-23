@@ -3,6 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { changeSitePublication, getSitePublicationDraft, reserveSitePublicAddress } from "./site-publication.server";
+import { changeAcademicProgramPublication } from "./academic-program-publication.server";
 
 const uuid = z.string().uuid();
 
@@ -36,4 +37,20 @@ export const setSitePublicationStatus = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     return changeSitePublication(await getCommandContext(getRequest()), data);
+  });
+
+/** Reviewed and reversible approval of academic marketing; no admissions action. */
+export const setAcademicProgramMarketingStatus = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    siteId: uuid,
+    programId: uuid,
+    action: z.enum(["publish", "unpublish"]),
+    expectedRevision: z.string().datetime({ offset: true }).nullable(),
+    summary: z.string().max(2000),
+    reason: z.string().trim().min(10).max(500),
+    contentReviewed: z.boolean(),
+  }).strict().parse(value))
+  .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    return changeAcademicProgramPublication(await getCommandContext(getRequest()), data);
   });
