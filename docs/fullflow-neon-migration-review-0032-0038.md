@@ -1,11 +1,59 @@
 # FullFlow dedicated Neon schema reconciliation — 0032–0038
 
-**Reviewed:** 2026-10-23 · **Status: READY FOR CONTROLLED APPLICATION, NOT APPLIED**
+**Reviewed and applied:** 2026-10-23 · **Status: APPLIED AND POSTCHECKED ON DEDICATED NEON BRANCH; INTEGRATION ACCEPTANCE PENDING**
 **GitHub branch:** `FullFlow`; **Neon project:** `sweet-hall-62441909`;
 **ONLY migration target:** `fullflow-e2e-20261022` (`br-proud-pine-arfju8h2`, `neondb`).
 `production` and `test01` must not be written by the FullFlow workflow.
 
-## Verified database starting state (read-only Neon queries)
+## Application evidence — 23 October 2026
+
+The user explicitly authorized applying `0032`–`0038` to the dedicated FullFlow
+Neon branch. Before applying SQL, Neon attested project
+`sweet-hall-62441909`, branch `br-proud-pine-arfju8h2`, database `neondb`,
+with **32** migration ledger rows ending in `0031`. A point-in-time backup
+branch was created from that state before any migration:
+
+- `fullflow-pre-0032-0038-20261023` — `br-spring-heart-arjhajgf`, parent
+  `br-proud-pine-arfju8h2`, created at LSN `0/AA4A998`, ready.
+- Source: the **unchanged** committed files on GitHub `FullFlow`. All seven
+  migrations were executed sequentially **directly through the branch-scoped
+  Neon SQL transaction connector**, not through the local npm/Drizzle CLI.
+  Each transaction contained an independent Postgres-reported branch/project
+  attestation, an exact preceding Drizzle ledger count and timestamp guard,
+  the unmodified committed migration statements, and one ledger insert with
+  the original Drizzle timestamp and PostgreSQL-computed SHA-256 of the
+  complete source SQL file. If any statement failed, its transaction would
+  have rolled back.
+- Applied: `0032_extended_program_offerings`,
+  `0033_extended_season_drafts`, `0034_enrichment_packages`,
+  `0035_site_publications`, `0036_program_publications`,
+  `0037_public_admissions_interests`, `0038_public_interest_conversion`.
+- Read-only verification after completion confirms exactly **39** ledger
+  rows, latest timestamp `1792728000000` (`0038`), and **7/7** hashes and
+  migration timestamps matching the original GitHub SQL files.
+- Verified schema changes: expected `program_type` and Season enums;
+  nullable `programs.credit_issuing_organization_id`; default-empty,
+  nonnullable activity metadata; all three publication/interest tables;
+  unique indexes, foreign keys, public interest conversion status and
+  integrity constraints.
+- Verified pre-existing row counts unchanged: **1,038 Programs, 1,192 Sites,
+  44 Activity Seasons, 87 Activity Registrations**. New publication/interest
+  tables contain zero rows. No synthetic enrolments or live website
+  publication were created.
+- The independent `production` and `test01` branches were not used as SQL
+  targets. This proof is a schema/data postcheck, **not** a connected service,
+  authentication or browser test pass.
+
+**Operational note:** `npm run db:review:fullflow` and the
+`db:migrate:fullflow` wrapper were written as **pre-0032 guards**. They will
+correctly reject this **now-migrated** database until the preflight is updated
+to distinguish an already-migrated 39-row ledger from migration drift. The
+normal `verify-fullflow-schema.mjs` checker is intended to accept the new
+39-migration state.
+
+---
+
+## Original database starting state (read-only pre-migration Neon queries)
 
 - Postgres reports `neon.project_id=sweet-hall-62441909`,
   `neon.branch_id=br-proud-pine-arfju8h2`.
@@ -19,7 +67,7 @@
   pending `metadata` columns.
 - `site_publications`, `program_publications` and
   `public_admissions_interests` do not exist on this branch.
-- Existing branch data at inspection: 1,192 Sites, 1,038 Programs, 44
+- Original branch data before application: 1,192 Sites, 1,038 Programs, 44
   Activity Seasons, 87 Activity Registrations. These are branch records;
   their presence is not live acceptance proof.
 
@@ -72,4 +120,4 @@ a **runner-provisioning/Actions execution blocker**, not an observed
 failed test assertion. Diagnose GitHub account/runner/Actions
 availability independently. Do not label static changes as CI-green.
 
-**No database write is made by this review document or its inspection scripts.**
+**The review document/inspection scripts remain read-only; the seven explicitly authorized migrations were applied through the branch-scoped Neon SQL transaction connector as described above.**
