@@ -90,6 +90,43 @@ describe("planned hybrid onsite section supervision",()=>{
     expect(result.unassignedOrConflicting).toBe(0);
     expect(result.plannedAssignments).toBe(3);
   });
+  it("does not count a church/CAN Section without its named effective delegation",()=>{
+    const missing=summarizeOnsiteSupervision([period({
+      requiresSectionDelegation:true, verifiedSectionDelegation:false,
+      authorizedSupervisionService:true, instructionalDayConfirmed:true,
+    })]);
+    expect(missing.plannedAssignments).toBe(0);
+    expect(missing.blocks[0]?.gaps).toContain("section_delegation_missing");
+    expect(missing.hasConfirmedPhysicalCoverage).toBe(false);
+
+    const expiredAgreement=summarizeOnsiteSupervision([period({
+      requiresSectionDelegation:true, verifiedSectionDelegation:true,
+      authorizedSupervisionService:false, instructionalDayConfirmed:true,
+    })]);
+    expect(expiredAgreement.plannedAssignments).toBe(0);
+    expect(expiredAgreement.blocks[0]?.gaps).toContain("operating_agreement_missing");
+
+    const planned=summarizeOnsiteSupervision([period({
+      requiresSectionDelegation:true, verifiedSectionDelegation:true,
+      authorizedSupervisionService:true, instructionalDayConfirmed:true,
+    })]);
+    expect(planned.plannedAssignments).toBe(1);
+    expect(planned.blocks[0]?.gaps).toEqual(["room_unconfigured"]);
+    expect(planned.hasConfirmedPhysicalCoverage).toBe(false);
+  });
+  it("a valid Site grant or contract alone never makes a church/CAN class staffed",()=>{
+    const result=summarizeOnsiteSupervision([period({
+      requiresSectionDelegation:true,
+      verifiedSiteStaffGrant:true,
+      verifiedSectionDelegation:false,
+      authorizedSupervisionService:false,
+    })]);
+    expect(result.blocks[0]?.gaps).toEqual(expect.arrayContaining([
+      "section_delegation_missing","operating_agreement_missing","room_unconfigured",
+    ]));
+    expect(result.unassignedOrConflicting).toBe(1);
+  });
+
   it("marks malformed or overlapping facilitator plans incomplete",()=>{
     const result=summarizeOnsiteSupervision([
       period({startsAtLocal:"25:00",endsAtLocal:"10:00"}),
