@@ -110,6 +110,7 @@ integration("GF3 host / program launch", () => {
       scope: {
         organizationIds: [hostId],
         ...(siteId ? { siteIds: [siteId] } : {}),
+        programIds: [] as string[],
       },
       requestId: `gf3-${suffix}`,
     });
@@ -204,6 +205,9 @@ integration("GF3 host / program launch", () => {
         academicProviderOrganizationId: canOrg.id,
         creditIssuingOrganizationId: canOrg.id,
       });
+      // The service caller and the mocked signed-in registrar must both use
+      // explicit, current Program scope; undefined is not a realistic grant.
+      context.scope.programIds = [launch.programId];
       launchContext.scope.programIds = [launch.programId];
 
       const [launchingProgram] = await db
@@ -217,6 +221,14 @@ integration("GF3 host / program launch", () => {
       expect(launchingProgram.academicProviderOrganizationId).toBe(canOrg.id);
 
       if (scenario.programType === "church_hosted_academy") {
+        // Authorization scope must be checked before exposing an unrelated
+        // organization's institutional agreement/opening decision.
+        await expect(
+          programsModule.activateProgram({
+            ...context, scope: {...context.scope,
+              organizationIds: [unrelatedAcademicOrganization.id]},
+          }, launch.programId),
+        ).rejects.toThrow("verified organization grant");
         // Planning a church-owned campus with a CAN academic provider is
         // allowed; without an independently approved institution/site
         // agreement the Program must NOT be activated, even from draft.
