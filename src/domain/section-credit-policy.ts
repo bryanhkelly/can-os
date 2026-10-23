@@ -21,10 +21,13 @@ export function countTranscriptRowsWithUnrecordedCredits(rows: readonly {
   creditConfigured?: boolean;
   creditsAttempted?: number | null;
   creditsEarned?: number | null;
+  terminalPeriod?: boolean;
 }[]): number {
   return rows.filter(row =>
+    // Interim grading periods are reported, not separate credit awards.
+    row.terminalPeriod !== false && (
     row.creditConfigured === false ||
     row.creditsAttempted == null ||
-    row.creditsEarned == null,
+    row.creditsEarned == null),
   ).length;
 }
