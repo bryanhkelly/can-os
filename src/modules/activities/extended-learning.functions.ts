@@ -9,8 +9,8 @@ const scheduleInput = z.object({
   fromDate: day,
   throughDate: day,
   weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
-  startTime: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),
-  endTime: z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   location: z.string().trim().min(2).max(120),
   facilitatorPersonId: z.string().uuid().optional(),
 }).strict();
@@ -120,7 +120,7 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
   )).orderBy(asc(calendarEvents.startsAt)).limit(3000) : [];
   const staff = (await Promise.all(rows.map(async program => ({
     programId: program.id,
-    people: await listExtendedSessionStaff(program.organizationId, program.siteId),
+    people: program.siteId ? await listExtendedSessionStaff(program.organizationId, program.siteId) : [],
   })))).flatMap(item => item.people.map(person => ({ programId: item.programId, ...person })));
 
   return { programs: rows, seasons, readiness, staff,
