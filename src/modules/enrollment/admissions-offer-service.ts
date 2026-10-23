@@ -112,10 +112,15 @@ export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{
   if(!offer)throw new Error("Offer issuance failed");
   const [profile]=await tx.select({personId:studentProfiles.personId}).from(studentProfiles).where(eq(studentProfiles.id,app.studentProfileId)).limit(1);
   if(!profile)throw new Error("Student profile missing");
-  const guardians=await tx.select({personId:guardianRelationships.guardianPersonId}).from(guardianRelationships)
+  const guardians=await tx.select({personId:guardianRelationships.guardianPersonId,
+    canManageEnrollment:guardianRelationships.canManageEnrollment,
+    metadata:guardianRelationships.metadata}).from(guardianRelationships)
    .where(and(eq(guardianRelationships.studentPersonId,profile.personId),eq(guardianRelationships.canManageEnrollment,true)));
+  // Do not disclose a child's admission offer through a notification to an
+  // unverified or revoked prospective guardian, even if a legacy flag is true.
+  const verifiedGuardians=guardians.filter(isVerifiedEnrollmentGuardian);
   // status relies on the column default ("unread"), matching the prior inline insert.
-  if(guardians.length)await notifyMany(tx,[...new Set(guardians.map(g=>g.personId))].map(recipientPersonId=>({
+  if(verifiedGuardians.length)await notifyMany(tx,[...new Set(verifiedGuardians.map(g=>g.personId))].map(recipientPersonId=>({
    recipientPersonId,type:"admission_offer_issued",title:"New enrollment offer",
    body:"An enrollment offer is ready for your review.",resourceType:"admission_offer",resourceId:offer.id
   })));
