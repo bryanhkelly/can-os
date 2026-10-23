@@ -19,7 +19,10 @@ import { writeAudit } from "@/platform/mutation";
  * Fresh corrections make the prior snapshot stale at the next read.
  */
 const input = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value=>{
+    const stamp=new Date(value+"T12:00:00Z");
+    return Number.isFinite(stamp.getTime()) && stamp.toISOString().slice(0,10)===value;
+  },"Invalid school date"),
 }).strict();
 
 const reviewType = "onsite_attendance_day_review";
@@ -41,10 +44,9 @@ async function reviewContext(date: string) {
   const onsiteIds=onsitePrograms.filter(row=>row.deliveryModel.onsite===true).map(row=>row.id);
   const coversAllPrograms=onsiteIds.length>0 &&
     onsiteIds.every(id=>actor.scope.programIds?.includes(id));
-  if (date > today || date < earliest ||
-      new Date(date+"T12:00:00Z").toISOString().slice(0,10) !== date)
+  if (date > today || date < earliest)
     throw new AuthorizationError("recent valid school-local review date");
-  return { actor, site, today, coversAllPrograms };
+  return { actor, site, coversAllPrograms };
 }
 
 async function currentSnapshot(date: string) {
@@ -67,7 +69,7 @@ async function currentSnapshot(date: string) {
 async function lastReview(siteId: string, date: string) {
   const [row] = await db.select({
     id:actions.id,createdAt:actions.createdAt,
-    reviewer:actions.ownerPersonId,metadata:actions.metadata,
+    metadata:actions.metadata,
   }).from(actions).where(and(eq(actions.siteId,siteId),eq(actions.type,reviewType),
     eq(actions.subjectType,"site"),eq(actions.subjectId,siteId),
     sql`${actions.metadata}->>'date' = ${date}`))
@@ -88,7 +90,6 @@ export const getOnsiteDayReview = createServerFn({method:"GET"})
         review.metadata.fingerprint===fingerprint?"reviewed_snapshot" as const:
           "stale_after_changes" as const,
       reviewedAt:review?.createdAt.toISOString()??null,
-
       readyForAttendanceReview:coversAllPrograms && summary.readyForAttendanceReview,
       unresolvedIssues:summary.issues.length,
       note:"Review is an attendance snapshot attestation only. New attendance edits or calendar changes invalidate it. It is not staff duty confirmation, child checkout, school certification, or a locked official record.",
