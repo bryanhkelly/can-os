@@ -9,6 +9,9 @@ import {
 } from "@/modules/enrollment/guardian-family-applications.functions";
 
 export const Route = createFileRoute("/guardian/apply")({
+  validateSearch:(search:Record<string,unknown>):{programId?:string}=>({
+    programId:typeof search.programId==="string" ? search.programId : undefined,
+  }),
   loader: safeLoader(getGuardianFamilyApplicationWorkspace,{
     authMessage:"Sign in with your verified family account to apply to a school.",
   }),
@@ -25,7 +28,9 @@ function GuardianApplyWorkspace({data}:{
   data:Awaited<ReturnType<typeof getGuardianFamilyApplicationWorkspace>>;
 }){
   const router=useRouter();
-  const [programId,setProgramId]=useState(data.programs[0]?.id??"");
+  const requested=Route.useSearch().programId;
+  const selectedProgram=data.programs.find(item=>item.id===requested);
+  const [programId,setProgramId]=useState(selectedProgram?.id??data.programs[0]?.id??"");
   const [householdId,setHouseholdId]=useState(data.households[0]?.id??"");
   const [firstName,setFirstName]=useState("");
   const [lastName,setLastName]=useState("");
