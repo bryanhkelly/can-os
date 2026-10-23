@@ -225,3 +225,51 @@ The app's normal deployment host must remain on the platform-host pathway.
 5. After safe external routing, implement an explicitly published school
    Program catalog and guardian inquiry/application handoff. No parallel
    admissions or registration system.
+
+## Bite 6 committed: academic Program marketing, separate from enrollment
+
+- A new `program_publications` table holds **explicitly approved marketing
+  snapshots** for canonical Programs, keyed by the real `program_id` and
+  associated with its Site. Migration `0036_program_publications.sql` and
+  Drizzle schema/journal are committed but **not applied**. Snapshots include
+  reviewed title, description, grade range, and delivery model, plus approval
+  actor, timestamp and status. Operational Program/academic records remain
+  the source of truth for running education, admissions and credit.
+- Eligible academic models: church-hosted academies, high-school extensions,
+  full schools, microschools, hybrid programs, homeschool cohorts. Summer and
+  after-school offerings keep their existing activity-season publication flow.
+- A scoped, explicitly assigned Site publisher can independently approve or
+  withdraw an academic Program's public marketing. Publish requires the
+  Program to belong to the Site and Organization, fall in the actor's verified
+  Program scope, be neither paused nor closed, and have a human-reviewed
+  30–2000-character plain-text summary and reason. The publisher may market
+  a `draft` or `launching` program **without** opening admissions.
+- Approval/unpublication has a transactional audit record and domain event.
+  The Site publication row is locked before marketing decisions, so an
+  unpublish of the Site and an individual Program decision cannot race past
+  one another. Every Site still needs its **own** publication approval.
+- The private Site publisher view now offers per-program approval forms,
+  disclosure review and withdrawal, while preserving the original internal
+  Program list and enrichment preview.
+- Site publishing readiness can now be satisfied by an approved academic
+  Program listing **or** an approved noncredit enrichment Season. There is
+  no artificial requirement to run a summer camp before launching a
+  ninth-grade academy's public page.
+- The public catalog and escaped, server-rendered landing page now include
+  only approved academic listings at the same Site/Organization, excluding
+  paused/closed Programs. Rendering clearly distinguishes a **planned**
+  academic offering from an operating one and never asserts accreditation,
+  diploma authority, credit approval or actual application availability.
+- Approved copy is snapshotted and not silently changed by later edits to
+  canonical Program metadata. To change approved copy in this small slice,
+  withdraw and approve a fresh snapshot. Broader content versioning and
+  partner-proposed edits are subsequent features.
+- Focused policy/unit fixtures were committed or updated but, per the
+  current development instruction, test execution, typecheck, migrations
+  and deployed acceptance were **not** performed. Public hosting still
+  defaults off. No production DB data or `main` branch was changed.
+
+**Next product bite:** A family-facing `Request Information` entry point
+bound to a published Site and Program, feeding existing canonical admissions
+inquiry/lead records without exposing private workflow or accepting a school
+application before readiness.
