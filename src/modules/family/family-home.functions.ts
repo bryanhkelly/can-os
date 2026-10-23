@@ -5,6 +5,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
+import { staffedPublishedSectionIds } from "@/modules/enrollment/instructional-section-readiness.server";
 
 /**
  * Family Home is a read model over canonical domain state.
@@ -56,17 +57,33 @@ async function guardianStudents(s: Schema, guardianPersonId: string, siteIds: st
 
 async function activeSectionIds(s: Schema, studentProfileId: string, siteIds: string[],programIds:string[]) {
  const { db } = await import("@/db/client");
- const rows = await db.select({ sectionId: s.enrollments.sectionId })
-  .from(s.enrollments)
-  .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+ const programs=await db.select({
+  programId:s.enrollments.programId,yearId:s.enrollments.schoolYearId,
+ }).from(s.enrollments).where(and(
+  eq(s.enrollments.studentProfileId,studentProfileId),
+  eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+  inArray(s.enrollments.programId,programIds),
+ ));
+ const validYears=new Set(programs.filter(row=>row.programId&&row.yearId)
+  .map(row=>`${row.programId}:${row.yearId}`));
+ if(!validYears.size)return [];
+ const rows=await db.select({
+  sectionId:s.sections.id,programId:s.sections.programId,
+  yearId:s.enrollments.schoolYearId,termYearId:s.terms.schoolYearId,
+ }).from(s.enrollments)
+  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
   .where(and(
-   eq(s.enrollments.studentProfileId, studentProfileId),
-   eq(s.enrollments.status, "active"),
-   eq(s.sections.active,true),
-   inArray(s.sections.siteId, siteIds),
-   inArray(s.sections.programId,programIds),
+    eq(s.enrollments.studentProfileId,studentProfileId),
+    eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+    eq(s.sections.active,true),
+    inArray(s.sections.siteId,siteIds),
+    inArray(s.sections.programId,programIds),
   ));
- return rows.map(row => row.sectionId).filter((id): id is string => !!id);
+ const matching=[...new Set(rows.filter(row=>row.yearId===row.termYearId&&
+   validYears.has(`${row.programId}:${row.yearId}`)).map(row=>row.sectionId))];
+ const ready=await staffedPublishedSectionIds(matching,db);
+ return matching.filter(id=>ready.has(id));
 }
 
 export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () => {
