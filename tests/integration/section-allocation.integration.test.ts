@@ -57,6 +57,7 @@ describe("section allocation prerequisites", () => {
     }).returning();
     const [account]=await db.insert(s.accessAccounts).values({
       emailNormalized:`teacher-${suffix}@example.invalid`,
+      emailVerifiedAt:new Date(),
     }).returning();
     await db.insert(s.accountPersonGrants).values({
       accountId:account!.id,personId:instructor!.id,role:"teacher",
@@ -82,6 +83,23 @@ describe("section allocation prerequisites", () => {
         scope: { organizationIds: [org!.id], siteIds: [site!.id], programIds: [program!.id] },
       },
     };
+    // A Section teacher link cannot turn disabled, unverified or synthetic
+    // accounts into a "staffed" class for a newly admitted student.
+    await db.update(s.accessAccounts).set({disabled:true}).where(eq(s.accessAccounts.id,account!.id));
+    await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
+      .rejects.toThrow("Assign an active teacher");
+    await db.update(s.accessAccounts).set({disabled:false,emailVerifiedAt:null})
+      .where(eq(s.accessAccounts.id,account!.id));
+    await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
+      .rejects.toThrow("Assign an active teacher");
+    await db.update(s.accessAccounts).set({emailVerifiedAt:new Date()})
+      .where(eq(s.accessAccounts.id,account!.id));
+    await db.update(s.accountPersonGrants).set({isSynthetic:true})
+      .where(eq(s.accountPersonGrants.accountId,account!.id));
+    await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
+      .rejects.toThrow("Assign an active teacher");
+    await db.update(s.accountPersonGrants).set({isSynthetic:false})
+      .where(eq(s.accountPersonGrants.accountId,account!.id));
     await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
       .rejects.toThrow("Unmet prerequisites");
     expect(await db.select().from(s.enrollments).where(and(
