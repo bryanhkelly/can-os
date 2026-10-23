@@ -59,6 +59,7 @@ export const listEnrichmentCatalog = createServerFn({ method: "GET" }).handler(a
   // Read only sessions belonging to already published offerings. Draft-only
   // calendar rows are never returned through the public catalog.
   const sessionRows = ids.length ? await db.select({
+    id: s.calendarEvents.id,
     seasonId: s.calendarEvents.sourceId,
     startsAt: s.calendarEvents.startsAt,
     endsAt: s.calendarEvents.endsAt,
