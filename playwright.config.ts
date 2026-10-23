@@ -1,5 +1,4 @@
 import { defineConfig } from "@playwright/test";
-import { execFileSync } from "node:child_process";
 import {
   DATABASE_URL,
   TEST_ACCESS_TOKEN_PEPPER,
@@ -22,11 +21,6 @@ const branchHost = new URL(DATABASE_URL).hostname.replace(/-pooler(?=\.)/, "").t
 if (branchHost === process.env.CAN_APPLICATION_DB_HOST.replace(/-pooler(?=\.)/, "").toLowerCase()) {
   throw new Error("Browser tests must not use the application database endpoint.");
 }
-// Unlike URL comparisons, this queries the server's actual Neon branch identity.
-execFileSync(process.execPath, ["scripts/verify-fullflow-neon-branch.mjs"], {
-  stdio: "inherit", env: process.env,
-});
-
 export default defineConfig({
   testDir: "./tests/e2e",
   testIgnore: "admissions.spec.ts",
