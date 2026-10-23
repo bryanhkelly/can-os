@@ -6,14 +6,11 @@ import {
 import { operatingServices, type OperatingService } from "@/domain/program-site-operating-policy";
 
 type Status = Awaited<ReturnType<typeof getHostProgramSiteAuthorizationFn>>;
-const defaults: OperatingService[] = [
-  "academic_instruction", "onsite_supervision", "school_of_record", "credit_issuance",
-];
 
 /** This only requests an agreement. School opening and CAN staff grants remain separate. */
 export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
   const [status,setStatus] = useState<Status|null>(null);
-  const [selected,setSelected] = useState<OperatingService[]>(defaults);
+  const [selected,setSelected] = useState<OperatingService[]>([]);
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState("");
   const [notice,setNotice] = useState("");
@@ -21,6 +18,10 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
   const load = useCallback(async () => {
     const result = await getHostProgramSiteAuthorizationFn({data:{programId}});
     setStatus(result);
+    // The first proposal includes the services needed after school opening,
+    // not just the launch gate. Keep a user-edited proposal across refreshes.
+    setSelected(current => current.length ? current.filter(service =>
+      result.canIssueCredit || service !== "credit_issuance") : result.recommendedServices);
   },[programId]);
   useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:"Unable to load agreement status"));},[load]);
   async function request() {
@@ -55,6 +56,10 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
     {!status?<p className="mt-3 text-sm">Checking institutional authorization…</p>:
     status.authorization?<div className="mt-3 text-sm">
       <p><strong>Request v{status.authorization.version}:</strong> {status.authorization.status}</p>
+      {status.authorization.status==="requested"&&<p role="status" className="mt-2">
+        Awaiting independent CAN review of the agreement and its verified evidence.
+        You can continue planning classes, but this request does not open admissions or the school.
+      </p>}
       <p className="mt-1 text-xs">Services: {status.authorization.services.join(", ")}</p>
       {status.authorization.effectiveThrough&&<p className="mt-1 text-xs">
         Term ends: {new Date(status.authorization.effectiveThrough).toLocaleDateString()}
@@ -77,7 +82,8 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
     <div className="mt-3">
       <p className="text-sm font-semibold">Request service scope</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        {operatingServices.map(service=><label key={service} className="flex items-center gap-2 text-xs">
+        {operatingServices.filter(service=>status.canIssueCredit||service!=="credit_issuance")
+          .map(service=><label key={service} className="flex items-center gap-2 text-xs">
           <input type="checkbox" checked={selected.includes(service)} onChange={e=>setSelected(v=>
             e.target.checked?[...v,service]:v.filter(x=>x!==service))}/>
           {service.replace(/_/g," ")}
@@ -88,6 +94,8 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
         {busy?"Requesting…":"Request CAN operating authorization"}
       </button>
       <p className="mt-2 text-xs text-muted-foreground">
+        This proposal includes admissions and academic records because students
+        need both to progress from family application into classes and official results.
         Requests do not activate your school or authorize staff to serve students.
       </p>
     </div>}
