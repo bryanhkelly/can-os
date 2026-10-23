@@ -100,6 +100,45 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
      state.actor=actor;return actor;
     }
     const staff=act("registrar",registrar.id);
+
+    // Hybrid planning reads the already-configured instructional schedule,
+    // current facilitator assignment, and a REAL non-synthetic staff grant.
+    await tx.update(s.sections).set({scheduleTemplateId:schedule.id})
+      .where(eq(s.sections.id,section.id));
+    const staffAccount=first(await tx.insert(s.accessAccounts).values({
+      emailNormalized:`facilitator-${suffix}@example.test`,
+    }).returning());
+    await tx.insert(s.accountPersonGrants).values({
+      accountId:staffAccount.id,personId:facilitator.id,
+      role:"room_facilitator",siteId:site.id,organizationId:org.id,
+      active:true,isSynthetic:false,
+    });
+    await tx.insert(s.deliveryArrangements).values({
+      sectionId:section.id,academicProviderOrganizationId:org.id,
+      instructorPersonId:teacher.id,facilitatorPersonId:facilitator.id,
+      status:"active",modality:"hybrid",
+      effectiveFrom:new Date(date+"T00:00:00Z".replace("Z","Z")),
+      effectiveThrough:new Date(new Date(date+"T00:00:00Z").getTime()+7*86400_000),
+    });
+    // Backdate plan start far enough to cover the entire school-local day
+    // in the conservative coverage view.
+    await tx.update(s.deliveryArrangements).set({
+      effectiveFrom:new Date(new Date(date+"T00:00:00Z").getTime()-7*86400_000),
+    }).where(eq(s.deliveryArrangements.sectionId,section.id));
+    const supervisorActor=act("room_facilitator",facilitator.id);
+    const supervision=await import("@/modules/operations/onsite-supervision.functions");
+    const sitePlan=await supervision.getOnsiteSupervisionPlan({data:{date}});
+    expect(sitePlan.plannedAssignments).toBe(1);
+    expect(sitePlan.hasConfirmedPhysicalCoverage).toBe(false);
+    expect(sitePlan.blocks[0]).toMatchObject({
+      sectionId:section.id,programId:program.id,
+      facilitatorName:"Onsite Facilitator",assignedPlan:true,
+      gaps:["room_unconfigured"],
+    });
+    state.actor={...supervisorActor,grantSiteId:crypto.randomUUID()};
+    await expect(supervision.getOnsiteSupervisionPlan({data:{date}}))
+      .rejects.toThrow("site-bound");
+    state.actor=staff;
     expect(first((await flow.listExpectedOnsiteRoster({data:{date}})).students).status).toBe("unmarked");
     const taught=act("teacher",teacher.id);
     const absent={date,studentProfileId:student.id,programId:program.id,status:"absent" as const,
