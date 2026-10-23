@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { accountPersonGrants, admissionOffers, applications, courseTemplateVersions, enrollments, people, programs, sections, sectionTeachers, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { hasAccessibleFirstLesson } from "@/domain/first-class-lesson";
 
 async function registrar() {
   const actor = await getCommandContext(getRequest());
@@ -41,7 +42,8 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
    if (!yearIds.length) return { active: false, sections: [] };
    const rows = await db.select({ id: sections.id, title: sections.title,
      code: sections.code, schoolYearId: terms.schoolYearId, siteId: sections.siteId,
-     curriculumStatus:courseTemplateVersions.status })
+     curriculumStatus:courseTemplateVersions.status,
+     curriculum:courseTemplateVersions.curriculum })
      .from(sections).innerJoin(terms, eq(terms.id, sections.termId))
      .innerJoin(courseTemplateVersions,eq(courseTemplateVersions.id,sections.courseTemplateVersionId))
      .where(and(eq(sections.programId, app.programId), eq(sections.active, true),
@@ -70,7 +72,7 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
    return { active: active.length>0, sections: rows.filter(s => !s.siteId ||
       actor.scope.siteIds?.includes(s.siteId)).map(s => ({
      id: s.id, title: s.title, code: s.code, enrolled: assigned.has(s.id),
-     staffed: staffedIds.has(s.id), curriculumReady:s.curriculumStatus==="published",
+     staffed: staffedIds.has(s.id), curriculumReady:s.curriculumStatus==="published" && hasAccessibleFirstLesson(s.curriculum),
    })) };
  });
 
