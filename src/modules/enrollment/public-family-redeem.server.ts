@@ -6,6 +6,7 @@ import {
 } from "@/db/schema";
 import { hashAccessSecret, issueOpaqueSecret, sessionCookieHeader } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
+import { uniqueAccountPersonId } from "@/domain/verified-family-person";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { recordSessionSecurityEvent } from "@/modules/identity/session-security-audit.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -76,16 +77,16 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
   // The account row is now serialized against concurrent family links.
   const grants=await tx.select({
     id:accountPersonGrants.id,personId:accountPersonGrants.personId,
+    role:accountPersonGrants.role,
     organizationId:accountPersonGrants.organizationId,siteId:accountPersonGrants.siteId,
   }).from(accountPersonGrants)
     .innerJoin(people,eq(people.id,accountPersonGrants.personId))
     .where(and(eq(accountPersonGrants.accountId,account.id),
-      eq(accountPersonGrants.role,"guardian"),
       eq(accountPersonGrants.active,true),eq(people.active,true)));
-  const distinctPeople=[...new Set(grants.map(grant=>grant.personId))];
-  if(distinctPeople.length>1)
-    throw new AuthorizationError("ambiguous family identity: contact school admissions");
-  let personId=distinctPeople[0];
+  // A staff/teacher account with the same verified email can also be a
+  // parent. Reuse the SAME known Person, but never infer one if this account
+  // has grants for more than one existing Person.
+  let personId=uniqueAccountPersonId(grants);
   if(!personId){
     const [person]=await tx.insert(people).values({
       legalFirstName:intent.firstName,legalLastName:intent.lastName,email:intent.email,
@@ -94,7 +95,7 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
     if(!person)throw new Error("Unable to create prospective family identity");
     personId=person.id;
   }
-  const matchingGrant=grants.find(g=>g.personId===personId &&
+  const matchingGrant=grants.find(g=>g.role==="guardian" && g.personId===personId &&
     g.organizationId===school.organizationId &&
     (g.siteId===null||g.siteId===school.siteId));
   const [createdGrant]=matchingGrant?[matchingGrant]:await tx.insert(accountPersonGrants).values({
