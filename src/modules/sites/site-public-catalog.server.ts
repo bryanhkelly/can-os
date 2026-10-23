@@ -32,10 +32,10 @@ export async function readPublishedSiteCatalog(slug: string) {
       )).for("share", { of: sitePublications }).limit(1);
     if (!site || !isSitePubliclyPublished(site)) return null;
 
-    const [offerings, academicPrograms] = await Promise.all([
-      readEnrichmentCatalog(site.id, tx),
-      readAcademicProgramCatalog(site.id, tx),
-    ]);
+    // Use the same locked transaction sequentially, avoiding concurrent
+    // statements on one database connection.
+    const offerings = await readEnrichmentCatalog(site.id, tx);
+    const academicPrograms = await readAcademicProgramCatalog(site.id, tx);
     return {
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
