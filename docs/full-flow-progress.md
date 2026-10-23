@@ -39,8 +39,12 @@ lesson and submission → teacher grade and guardian view → onsite-day reconci
   classes now have an explicit contextual `/classes` link. This is not
   anonymous online application signup.
 - Guardian verification and invitation recheck registrar Program, owner
-  Organization and Site scope. Unit policy tests cover unverified,
-  pending, duplicate and revoked relationships.
+  Organization and Site scope. The shared enrollment application authorizer
+  now requires independent guardian verification for checklists, forms and
+  document workflows—not only the offer-list projection. Unit policy tests
+  cover unverified, pending, duplicate and revoked relationships.
+  The guardian offers workspace also gives pending applicants an explicit
+  application status and checklist next action instead of "No offers yet."
 - The church operating-authorization proposal previously defaulted to
   only four services and omitted **admissions** and **academic_records**,
   both required downstream. It now recommends the complete class/admissions/
