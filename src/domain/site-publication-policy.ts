@@ -26,6 +26,7 @@ export function assertSitePublicationScope(
  * The server also checks a matching current role assignment and membership.
  */
 export const siteWebsiteDraftReadCapability = "site.website.draft.read";
+export const siteWebsiteLocalPublishCapability = "site.website.local.publish";
 
 export function assertPartnerWebsitePreviewScope(
   actor: AccessContext,
