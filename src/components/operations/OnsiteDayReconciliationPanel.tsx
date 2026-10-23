@@ -82,6 +82,11 @@ export function OnsiteDayReconciliationPanel({date,roster}:{
     </p>}
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
     {review&&<>
+      {!review.coversAllPrograms&&<p role="status" className="mt-3 rounded border p-3 text-sm">
+        Your current program grant does not cover every active onsite program at this site.
+        This is a partial program reconciliation, not a site-wide closeout.
+        Contact the school registrar for full scope.
+      </p>}
       <p className="mt-4 text-sm font-semibold" role="status">
         {review.status==="reviewed_snapshot"
           ? "Site leader reviewed this attendance snapshot"
