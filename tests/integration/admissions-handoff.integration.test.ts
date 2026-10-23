@@ -65,6 +65,8 @@ integration("cross-persona admissions through active classes",()=>{
   const {getAdmissionsDashboard}=await import("@/modules/enrollment/admissions-dashboard.functions");
   const {placeEnrolledStudent,listEnrollmentPlacements}=await import("@/modules/enrollment/course-placement.functions");
   const {getFamilyHome}=await import("@/modules/family/family-home.functions");
+  const {listExpectedOnsiteRoster,markExpectedOnsiteAttendance}
+   =await import("@/modules/attendance/onsite-attendance-workflow.functions");
   const {getMyStudentToday}=await import("@/modules/student-experience/student-today.functions");
   const {accessibleClasses,authorizeClass}=await import("@/modules/learning/class-access.server");
   const {getClassWorkspace}=await import("@/modules/learning/class-workspace.functions");
@@ -485,6 +487,28 @@ integration("cross-persona admissions through active classes",()=>{
       .toEqual(expect.arrayContaining([expect.objectContaining({
         id:section.id,enrolled:true,readyForPlacement:false,
       })]));
+    // Same admitted learner, not a parallel synthetic attendance roster.
+    // A published SchoolYear calendar and onsite schedule determine whether
+    // the church expects the student on this particular date.
+    state.actor=staff;
+    vi.useFakeTimers({toFake:["Date"]});
+    vi.setSystemTime(new Date("2027-09-14T18:00:00Z"));
+    try{
+      const scheduled=await listExpectedOnsiteRoster({data:{date:"2027-09-14"}});
+      expect(scheduled.students).toEqual(expect.arrayContaining([
+        expect.objectContaining({studentProfileId:profileId,programId:program.id}),
+      ]));
+      const present=await markExpectedOnsiteAttendance({data:{
+        studentProfileId:profileId,programId:program.id,date:"2027-09-14",
+        status:"present",mutationId:crypto.randomUUID(),
+        expectedPreviousEventId:null,note:"",
+      }});
+      expect(present.attendanceEventId).toBeTruthy();
+      const recorded=await listExpectedOnsiteRoster({data:{date:"2027-09-14"}});
+      expect(recorded.students).toEqual(expect.arrayContaining([
+        expect.objectContaining({studentProfileId:profileId,status:"present"}),
+      ]));
+    }finally{vi.useRealTimers();}
     state.actor=learner;
     expect((await getMyStudentToday()).sections.map(row=>row.sectionId)).toEqual([section.id]);
     expect((await accessibleClasses(learner)).map(row=>row.id)).toEqual([section.id]);
