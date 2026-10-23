@@ -53,10 +53,11 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
     // Keep safety-relevant "cannot cover" available; show affirmative
     // acceptance only with a current named local facilitator delegation.
     const canAcceptPrograms = new Map<string, boolean>();
-    if (actor.role === "room_facilitator") {
+    if (actor.role === "room_facilitator" || actor.role === "site_leader") {
       for (const programId of new Set(plan.blocks.map(block => block.programId))) {
         try {
-          await requireCurrentSiteLocalDelegate(db, actor, programId, "room_facilitator");
+          await requireCurrentSiteLocalDelegate(db, actor, programId,
+            actor.role === "site_leader" ? "site_director" : "room_facilitator");
           canAcceptPrograms.set(programId, true);
         } catch (error) {
           if (!(error instanceof AuthorizationError)) throw error;
@@ -85,7 +86,8 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
         sectionId:block.sectionId,periodId:block.periodId,
         canRespond:block.canRespond&&!truncated,
         canAccept:block.canAccept&&!truncated &&
-          (actor.role !== "room_facilitator" || canAcceptPrograms.get(block.programId) === true),
+          (!["room_facilitator", "site_leader"].includes(actor.role) ||
+            canAcceptPrograms.get(block.programId) === true),
         status:record?.metadata.response==="accepted"?"accepted" as const:
           record?.metadata.response==="cannot_cover"?"cannot_cover" as const:
           "not_reported" as const,
@@ -139,9 +141,10 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
       // certifies child custody or physical presence.
       if (data.response === "accepted") {
         // Serialize a current affirmative duty response against revocation.
-        if (actor.role === "room_facilitator") {
+        if (actor.role === "room_facilitator" || actor.role === "site_leader") {
           await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:" + block.programId}))`);
-          await requireCurrentSiteLocalDelegate(tx, actor, block.programId, "room_facilitator");
+          await requireCurrentSiteLocalDelegate(tx, actor, block.programId,
+            actor.role === "site_leader" ? "site_director" : "room_facilitator");
         }
         // A Site role and an instructional plan do not themselves delegate
         // authority to accept onsite coverage for a church/CAN Program.
