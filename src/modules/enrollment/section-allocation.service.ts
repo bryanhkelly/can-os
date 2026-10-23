@@ -30,12 +30,16 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  const [section]=await tx.select({id:s.sections.id,metadata:s.sections.metadata,
   termId:s.sections.termId,startsOn:s.terms.startsOn,endsOn:s.terms.endsOn,
   programId:s.sections.programId,siteId:s.sections.siteId,
-  organizationId:s.programs.organizationId,schoolYearId:s.terms.schoolYearId})
+  organizationId:s.programs.organizationId,schoolYearId:s.terms.schoolYearId,
+  curriculumStatus:s.courseTemplateVersions.status})
   .from(s.sections).innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
   .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+  .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
   .where(and(eq(s.sections.id,sectionId),eq(s.sections.active,true)))
   .limit(1).for("update");
  if(!section)throw new Error("Section not active");
+ if(section.curriculumStatus!=="published")
+  throw new Error("Publish the instructional course version before placing students in this class");
  // Active roster membership must land in a real, staffed instructional class,
  // not a Section shell whose assigned teacher has no current school access.
  const [staffed]=await tx.select({id:s.sectionTeachers.id})
