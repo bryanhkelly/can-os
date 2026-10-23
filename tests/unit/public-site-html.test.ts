@@ -63,4 +63,28 @@ describe("standalone public site HTML", () => {
     expect(html).not.toContain("Apply now");
   });
 
+  it("renders script-free same-origin inquiry forms only for approved academic items", () => {
+    const program = {
+      programId: "00000000-0000-4000-8000-000000000002",
+      title: "Academy", typeLabel: "Hybrid program",
+      summary: "An approved academic marketing description.",
+      grades: { min: "9", max: "12" },
+      delivery: { onsite: true, asynchronous: true,
+        liveOnline: false, onsiteDaysPerWeek: 2 },
+      availability: "planned" as const,
+    };
+    const html = renderPublicSiteHtml({
+      host: "school.can-os.com",
+      site: { name: "School", organizationName: "Organization" },
+      academicPrograms: [program],
+      offerings: [],
+    }, { makeRequestId: () => "00000000-0000-4000-8000-000000000001" });
+    expect(html).toContain('action="/inquiry" method="post"');
+    expect(html).toContain('name="contactConsent" value="yes" required');
+    expect(html).toContain('name="programId"');
+    expect(html).toContain('name="website"');
+    expect(html).toContain("not an application or enrollment request");
+    expect(html).not.toContain("<script");
+  });
+
 });
