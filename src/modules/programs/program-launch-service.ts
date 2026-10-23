@@ -118,6 +118,19 @@ export async function startProgramLaunch(
       insertErrorLabel: "Launch",
     });
 
+    // Reuse the same Journey, but do not present traditional teacher/Section
+    // provisioning as a requirement for a noncredit camp or after-school club.
+    if (isExtendedLearningType(input.type) && creditMode === "non_credit") {
+      await tx.update(journeyRequirements).set({
+        key: "enrichment-session-readiness",
+        title: "Dated enrichment sessions and onsite facilitators ready",
+        updatedAt: new Date(),
+      }).where(and(
+        eq(journeyRequirements.journeyId, journeyId),
+        eq(journeyRequirements.key, "teacher-readiness"),
+      ));
+    }
+
     await emitEvent(tx, {
       eventType: EventTypes.ProgramLaunchStarted,
       aggregateType: "program",
