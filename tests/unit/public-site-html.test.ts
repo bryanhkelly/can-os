@@ -87,4 +87,41 @@ describe("standalone public site HTML", () => {
     expect(html).not.toContain("<script");
   });
 
+  it("uses one website template for the authenticated read-only preview and public host", () => {
+    const page = {
+      host: "fellowship-academy.can-os.com",
+      site: { name: "Fellowship Academy", organizationName: "Fellowship Church" },
+      offerings: [],
+      academicPrograms: [{
+        programId: "00000000-0000-4000-8000-000000000002",
+        title: "Hybrid Grade 9",
+        typeLabel: "High school extension",
+        summary: "Approved school program information.",
+        grades: { min: "9", max: "9" },
+        delivery: {
+          onsite: true, liveOnline: false, asynchronous: true,
+          onsiteDaysPerWeek: 2,
+        },
+        availability: "planned" as const,
+      }],
+    };
+    const draft = renderPublicSiteHtml(page);
+    const hosted = renderPublicSiteHtml(page, {
+      makeRequestId: () => "00000000-0000-4000-8000-000000000001",
+    });
+    for (const shared of [
+      "<!doctype html>", "<title>Fellowship Academy | Programs</title>",
+      "Fellowship Church", "Hybrid Grade 9", "Approved school program information.",
+      "Program planned", "fellowship-academy.can-os.com",
+    ]) {
+      expect(draft).toContain(shared);
+      expect(hosted).toContain(shared);
+    }
+    expect(draft).not.toContain("<form");
+    expect(draft).not.toContain('name="contactEmail"');
+    expect(draft).not.toContain('action="/inquiry"');
+    expect(draft).not.toContain("<script");
+    expect(hosted).toContain('action="/inquiry"');
+  });
+
 });
