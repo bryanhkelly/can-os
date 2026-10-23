@@ -292,6 +292,26 @@ integration("GF3 host / program launch", () => {
       await launchAcademics.publishLaunchTeacherPolicy({ data: {
         programId: launch.programId, qualificationKeys: [qualification.key], confirmed: true,
       } });
+
+      // Selecting CAN as a provider must not expose every CAN-wide teacher.
+      // Only an explicitly program-delegated CAN teacher is a candidate.
+      const [networkWideTeacher,delegatedTeacher] = await db.insert(schema.people).values([
+        {legalFirstName:"CAN",legalLastName:"NetworkWide-"+suffix},
+        {legalFirstName:"CAN",legalLastName:"Delegated-"+suffix},
+      ]).returning();
+      await db.insert(schema.roleAssignments).values([
+        {personId:networkWideTeacher.id,organizationId:canOrg.id,roleKey:"teacher"},
+        {personId:delegatedTeacher.id,organizationId:canOrg.id,
+          programId:launch.programId,roleKey:"teacher"},
+      ]);
+      const teacherChoices=await launchAcademics.getLaunchAcademicSetup({data:{programId:launch.programId}});
+      const visibleTeacherIds=teacherChoices.teachingStaff.map(teacher=>teacher.personId);
+      expect(visibleTeacherIds).not.toContain(networkWideTeacher.id);
+      expect(visibleTeacherIds).toContain(delegatedTeacher.id);
+      const candidateIds=teacherChoices.sections.flatMap(section=>section.candidates.map(candidate=>candidate.personId));
+      expect(candidateIds).not.toContain(networkWideTeacher.id);
+      expect(candidateIds).toContain(delegatedTeacher.id);
+
       const [claim] = await db.insert(schema.qualificationClaims).values({
         personId: launchTeacher.id, definitionId: qualification.id,
         issuedAt: new Date("2027-01-01"), expiresAt: new Date("2028-01-01"),
