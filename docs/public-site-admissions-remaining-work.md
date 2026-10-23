@@ -106,7 +106,7 @@ tests or release gates have passed.
 
 ### Build the out-of-the-box partner website (P1)
 
-**PUB-12 — Generate draft website from Site onboarding.** `Not started`
+**PUB-12 — Generate draft website from Site onboarding.** `Partial / committed, unverified`
 - **Implement:** On a real church/school Site creation or launch Journey,
   provision a private Site-publication draft with suggested unique slug,
   canonical Site/Program/Organization mapping and templated academic/
@@ -116,6 +116,24 @@ tests or release gates have passed.
 - **DoD:** Complete onboarding → immediately see an editable private
   website and correct linked Programs; no second CMS/SIS and no unrelated
   organization's Site data. Address reservation failures have actionable UI.
+- **First source-committed bite on `FullFlow`:** The existing authorized
+  `createLaunchSite` command now reserves a `site_publications` row with
+  `status=draft`, `published_at=NULL` in the same transaction as the
+  canonical Site. `suggestedSitePublicSlugs` uses the chosen Site slug
+  when available, then a deterministic canonical Site-ID suffix; database
+  uniqueness still decides collisions. DomainEvent/AuditEvent records use
+  the existing public-address reservation contract. Launch Studio shows the
+  newly reserved address and links to the existing separately authorized
+  private publishing workspace. No Program, institution, application,
+  DNS or public approval is fabricated. Source tests cover slug choices.
+- **Still outstanding:** Additional real partner/network onboarding entry
+  points, full professional website template and reviewed profile fields,
+  access for independent church partner editors, multi-organization
+  institution/host approval boundaries, a matching public HTML preview,
+  and verified disposable-Neon/route/browser acceptance. The new Site
+  command requires migration `0035` to exist on its isolated target DB;
+  do not deploy it to an unmigrated environment. Site creation is a
+  transaction: address reservation failure rolls back the new Site.
 - **Depends on:** Canonical launch/Site workflow and PUB-13; `0035` schema.
 
 **PUB-13 — Site profile, editorial copy and true preview.** `Partial`
