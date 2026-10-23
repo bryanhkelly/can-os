@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { actions, sites } from "@/db/schema";
+import { actions, programs, sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { deriveOnsiteDayReconciliation } from "@/domain/onsite-day-reconciliation";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
@@ -35,10 +35,16 @@ async function reviewContext(date: string) {
     throw new AuthorizationError("authorized onsite site");
   const today=siteDate(new Date(),site.timezone);
   const earliest=siteDate(new Date(Date.now()-30*86400_000),site.timezone);
+  const onsitePrograms=await db.select({id:programs.id,deliveryModel:programs.deliveryModel})
+    .from(programs).where(and(eq(programs.siteId,site.id),
+      eq(programs.organizationId,site.organizationId),eq(programs.status,"active")));
+  const onsiteIds=onsitePrograms.filter(row=>row.deliveryModel.onsite===true).map(row=>row.id);
+  const coversAllPrograms=onsiteIds.length>0 &&
+    onsiteIds.every(id=>actor.scope.programIds?.includes(id));
   if (date > today || date < earliest ||
       new Date(date+"T12:00:00Z").toISOString().slice(0,10) !== date)
     throw new AuthorizationError("recent valid school-local review date");
-  return { actor, site, today };
+  return { actor, site, today, coversAllPrograms };
 }
 
 async function currentSnapshot(date: string) {
@@ -72,17 +78,18 @@ async function lastReview(siteId: string, date: string) {
 export const getOnsiteDayReview = createServerFn({method:"GET"})
   .validator((value:unknown)=>input.parse(value))
   .handler(async ({data})=>{
-    const {actor,site}=await reviewContext(data.date);
+    const {actor,site,coversAllPrograms}=await reviewContext(data.date);
     const {summary,fingerprint}=await currentSnapshot(data.date);
     const review=await lastReview(site.id,data.date);
     return {
-      date:data.date,canAttest:actor.role==="site_leader",
+      date:data.date,canAttest:actor.role==="site_leader" && coversAllPrograms,
+      coversAllPrograms,
       status:!review?"not_reviewed" as const:
         review.metadata.fingerprint===fingerprint?"reviewed_snapshot" as const:
           "stale_after_changes" as const,
       reviewedAt:review?.createdAt.toISOString()??null,
-      reviewerPersonId:review?.reviewer??null,
-      readyForAttendanceReview:summary.readyForAttendanceReview,
+
+      readyForAttendanceReview:coversAllPrograms && summary.readyForAttendanceReview,
       unresolvedIssues:summary.issues.length,
       note:"Review is an attendance snapshot attestation only. New attendance edits or calendar changes invalidate it. It is not staff duty confirmation, child checkout, school certification, or a locked official record.",
     };
@@ -94,7 +101,9 @@ export const attestOnsiteDayReview = createServerFn({method:"POST"})
     confirmedRecordsReviewed:z.literal(true),
   }).strict().parse(value))
   .handler(async ({data})=>{
-    const {actor,site}=await reviewContext(data.date);
+    const {actor,site,coversAllPrograms}=await reviewContext(data.date);
+    if (!coversAllPrograms)
+      throw new AuthorizationError("all active onsite site programs must be in the verified grant");
     if (actor.role!=="site_leader")
       throw new AuthorizationError("site leader attendance review authority");
     const {summary,fingerprint}=await currentSnapshot(data.date);
