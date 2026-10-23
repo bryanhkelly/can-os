@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { loadEnvFile } from "node:process";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { neon } from "@neondatabase/serverless";
 import { verifyFullFlowNeonBranch } from "./verify-fullflow-neon-branch.mjs";
 
@@ -74,7 +76,7 @@ async function main() {
   if (!review.ready) process.exitCode = 1;
 }
 
-if (process.argv[1] && import.meta.url === new URL("file://" + process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch(error => {
     console.error(error instanceof Error ? error.message : "Read-only migration preflight failed");
     process.exitCode = 1;
