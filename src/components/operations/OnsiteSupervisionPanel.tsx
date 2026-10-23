@@ -44,6 +44,9 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
       Refresh supervision plan
     </button>}
     {plan&&<>
+      {plan.projectionTruncated&&<p role="alert" className="mt-3 rounded border p-3 text-sm">
+        Coverage listing was capped. These counts are incomplete; do not use this plan to certify site staffing.
+      </p>}
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded border p-3">Planned facilitator assignments
           <strong className="mt-1 block text-2xl">{plan.plannedAssignments}</strong>
