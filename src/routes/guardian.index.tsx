@@ -47,6 +47,9 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
   title="Family home"
   subtitle="Everything that needs your attention across your children, in one place."
   actions={<div className="flex flex-wrap gap-2">
+   <Link to="/guardian/apply" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">
+    Apply to school
+   </Link>
    <Link to="/guardian/enrichment" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">
     Summer &amp; enrichment
    </Link>
@@ -95,7 +98,10 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
        className="mt-3 inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
        View applications and enrollment offers →
      </Link>
-     <p className="mt-2 text-xs text-muted-foreground">If no application appears, contact the school's admissions team. Signing in alone does not submit an application or authorize student access.</p>
+     <p className="mt-2 text-xs text-muted-foreground">If your verified family account has been invited to an eligible school, you can submit a new application. Otherwise, contact admissions to connect your family membership. Signing in alone does not authorize student access.</p>
+     <Link to="/guardian/apply" className="mt-3 inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
+       Start or check my application →
+     </Link>
     </div>}
     {children.length > 0 && <div className="mt-4 grid gap-4 sm:grid-cols-2">
      {children.map(child => <article key={child.studentProfileId} className="rounded-xl border bg-card p-5">
