@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { applications, guardianRelationships, programs, studentProfiles } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import type { AccessContext } from "@/domain/access-context";
+import { isVerifiedEnrollmentGuardian } from "@/domain/guardian-offer-visibility";
 
 export async function authorizeEnrollmentApplication(
   actor: AccessContext, applicationId: string, executor: Pick<typeof db, "select"> = db,
@@ -24,11 +25,18 @@ export async function authorizeEnrollmentApplication(
       !actor.scope.organizationIds?.includes(application.organizationId))
     throw new AuthorizationError("enrollment application school and program scope");
   if (actor.role === "guardian") {
-    const [relationship] = await executor.select({ id: guardianRelationships.id }).from(guardianRelationships)
+    const [relationship] = await executor.select({
+      id: guardianRelationships.id,
+      canManageEnrollment: guardianRelationships.canManageEnrollment,
+      metadata: guardianRelationships.metadata,
+    }).from(guardianRelationships)
       .where(and(eq(guardianRelationships.guardianPersonId, actor.actorPersonId),
         eq(guardianRelationships.studentPersonId, application.studentPersonId),
         eq(guardianRelationships.canManageEnrollment, true))).for("share").limit(1);
-    if (!relationship) throw new AuthorizationError("current managing guardian relationship");
+    // A default capability bit on an unverified prospective relationship is
+    // not lawful permission to view or sign a child's enrollment documents.
+    if (!isVerifiedEnrollmentGuardian(relationship))
+      throw new AuthorizationError("independently verified managing guardian relationship");
   }
   return application;
 }
