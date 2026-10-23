@@ -246,21 +246,27 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
               {season.status === "draft" && (() => {
                 const active = publishSeasonId === season.id;
                 const isProgramActive = planning.programs.some(p => p.id === season.programId && p.status === "active");
+                const openingReadiness = planning.readiness.find(item => item.seasonId === season.id);
+                const canPublish = openingReadiness?.ready === true;
                 const scheduled = planning.sessions.filter(item => item.seasonId === season.id);
                 return <div className="mt-3 rounded-lg border p-3">
                   <p className="text-sm font-semibold">Family registration</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Publication requires an active noncredit program, dated meetings with eligible onsite
-                    facilitators, and a real operator-published guardian permission statement.
+                    Publishing requires independently approved safeguarding, screened staff, emergency response,
+                     authorized child release and session coverage. An attestation cannot replace approvals.
                   </p>
                   <button type="button" className="mt-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                    disabled={!isProgramActive || !scheduled.length || busy}
+                    disabled={!canPublish || !isProgramActive || !scheduled.length || busy}
                     onClick={() => {
                       setPublishSeasonId(active ? "" : season.id);
                       setOperatorConfirmed(false);
                       setPackages([]); setPackageTitle("");
                       setPackageFrom(season.startsOn); setPackageThrough(season.endsOn);
-                    }}>{active ? "Close publication" : "Publish family registration"}</button>
+                    }}>{active ? "Close publication" : canPublish ? "Publish family registration" : "Registration opening blocked"}</button>
+                   {!canPublish && <p role="status" className="mt-2 text-xs">
+                     Registration remains blocked pending independently verified operational approvals.
+                     {openingReadiness?.blockers?.length ? " Missing: " + openingReadiness.blockers.join("; ") : ""}
+                   </p>}
                   {!isProgramActive && <p className="mt-2 text-xs">Activate the program through the existing launch controls first.</p>}
                   {!scheduled.length && <p className="mt-2 text-xs">Plan dated sessions first.</p>}
                   {active && <form onSubmit={publishSeason} className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -341,7 +347,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                       This records my attestation; CAN OS does not certify regulatory compliance.
                     </label>
                     <div className="sm:col-span-2">
-                      <button type="submit" disabled={busy || !operatorConfirmed}
+                      <button type="submit" disabled={busy || !operatorConfirmed || !canPublish}
                         className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
                         {busy ? "Publishing…" : "Publish enrollment to families"}
                       </button>

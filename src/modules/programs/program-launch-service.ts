@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { assertChurchHostedProviderIntent } from "@/domain/church-hosted-provider";
+import { assertChurchHostedProviderIntent, assertChurchHostedActivationAuthorization } from "@/domain/church-hosted-provider";
 import { resolveProgramCreditMode, isExtendedLearningType, type ProgramType, type ProgramCreditMode } from "@/domain/program-offerings";
 import {
 journeys,
@@ -279,6 +279,16 @@ export async function activateProgram(
       .limit(1);
 
     if (!program) throw new Error("Program not found");
+    // The church's host grant and a selected CAN provider do not prove
+    // institutional authority; retain planning but deny unsupported operation.
+    // A future resolver must verify an independently approved agreement,
+    // effective dates and exact Site/Program before replacing null.
+    assertChurchHostedActivationAuthorization({
+      programType: program.type,
+      hostOrganizationId: program.hostOrganizationId ?? program.organizationId,
+      academicProviderOrganizationId: program.academicProviderOrganizationId,
+      verifiedProgramSiteAuthorizationId: null,
+    });
     assertProgramScope(context, programId);
     if (!context.scope.organizationIds?.includes(program.organizationId))
       throw new Error("Program activation requires the verified organization grant");

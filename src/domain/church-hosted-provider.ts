@@ -25,3 +25,21 @@ export function assertChurchHostedProviderIntent(input: {
     throw new Error("Church-hosted CAN instruction must designate the same CAN institution as credit issuer");
   }
 }
+
+/**
+ * Selecting a CAN provider is launch intent, not authority to operate.
+ * The caller must load and independently verify the Program-Site authorization
+ * against its approved agreement and expiry before supplying an identifier.
+ */
+export function assertChurchHostedActivationAuthorization(input: {
+  programType: ProgramType;
+  hostOrganizationId: string;
+  academicProviderOrganizationId: string;
+  verifiedProgramSiteAuthorizationId: string | null;
+}): void {
+  if (input.programType === "church_hosted_academy" &&
+      input.academicProviderOrganizationId !== input.hostOrganizationId &&
+      !input.verifiedProgramSiteAuthorizationId) {
+    throw new Error("Church-hosted CAN Academy activation requires independently verified Program-Site institutional authorization");
+  }
+}
