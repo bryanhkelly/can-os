@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   academicCalendars, academicCalendarDays, accessAccounts, accountPersonGrants,
-  deliveryArrangements, people, programs, scheduleTemplatePeriods,
+  deliveryArrangements, organizations, people, programs, scheduleTemplatePeriods,
   scheduleTemplates, schoolYears, sections, sites, terms,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
@@ -14,6 +14,8 @@ import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
 import { siteDate } from "@/domain/expected-attendance";
 import { coversLocalSupervisionBlock, summarizeOnsiteSupervision, type SupervisionBlockInput } from "@/domain/onsite-supervision-coverage";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { verifiedScheduledSectionFacilitators, scheduledBlockHasNamedFacilitator } from "./section-coverage-verification.server";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
 const inputSchema=z.object({date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}).strict();
 
@@ -26,7 +28,9 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     const actor=await getCommandContext(getRequest());
     assertOnsiteAttendanceScope(actor);
     const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,
-      timezone:sites.timezone}).from(sites).where(eq(sites.id,actor.grantSiteId!)).limit(1);
+      timezone:sites.timezone,hostType:organizations.type}).from(sites)
+      .innerJoin(organizations,eq(organizations.id,sites.organizationId))
+      .where(eq(sites.id,actor.grantSiteId!)).limit(1);
     if(!site || !actor.scope.organizationIds?.includes(site.organizationId))
       throw new AuthorizationError("site staffing organization");
     if (siteDate(new Date(data.date+"T12:00:00Z"),"UTC")!==data.date)
@@ -39,6 +43,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     const sectionsAtSite=await db.select({
       id:sections.id,title:sections.title,programId:sections.programId,
       programName:programs.name,deliveryModel:programs.deliveryModel,
+      academicProviderOrganizationId:programs.academicProviderOrganizationId,
       scheduleTemplateId:sections.scheduleTemplateId,
       schoolYearId:schoolYears.id,
     }).from(sections)
@@ -128,6 +133,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         .from(accountPersonGrants)
         .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
         .where(and(eq(accessAccounts.disabled,false),eq(accountPersonGrants.isSynthetic,false),
+          sql`${accessAccounts.emailVerifiedAt} is not null`,
           inArray(accountPersonGrants.personId,peopleIds),
           eq(accountPersonGrants.siteId,site.id),
           eq(accountPersonGrants.organizationId,site.organizationId),
@@ -135,6 +141,31 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
           inArray(accountPersonGrants.role,["room_facilitator","site_staff","site_leader"]))):Promise.resolve([]),
     ]);
     const peopleById=new Map(activePeople.map(row=>[row.id,row]));
+    const independent = new Set(onsiteSections.filter(row =>
+      site.hostType === "church" &&
+      row.academicProviderOrganizationId !== site.organizationId)
+      .map(row => row.programId));
+    const programBySection = new Map(onsiteSections.map(row => [row.id,row.programId]));
+    const namedCandidates = candidates.filter(row => row.facilitatorPersonId &&
+      independent.has(programBySection.get(row.sectionId) ?? ""))
+      .map(row => ({
+        programId: programBySection.get(row.sectionId)!,
+        sectionId:row.sectionId,
+        personId:row.facilitatorPersonId!,
+      }));
+    const verifiedDelegations=await verifiedScheduledSectionFacilitators(db,
+      {siteId:site.id,organizationId:site.organizationId},namedCandidates);
+    const authorizedContracts = new Map<string, string | null>();
+    for (const programId of independent) {
+      try {
+        const agreement=await requireChurchHostedOperatingServices(db,programId,
+          ["onsite_supervision"]);
+        authorizedContracts.set(programId,agreement);
+      } catch (error) {
+        if (!(error instanceof AuthorizationError)) throw error;
+        authorizedContracts.set(programId,null);
+      }
+    }
     const bySection=new Map<string,typeof candidates>();
     for(const entry of candidates){
       const items=bySection.get(entry.sectionId)??[];items.push(entry);
@@ -162,7 +193,19 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
           (id):id is string=>!!id))];
         const personId=uniqueIds.length===1?uniqueIds[0]!:null;
         const person=personId?peopleById.get(personId):null;
-        const approved=!!person?.active && staffGrants.some(grant=>grant.personId===personId);
+        const requiresSectionDelegation=independent.has(section.programId);
+        const approved=!!person?.active && staffGrants.some(grant=>
+          grant.personId===personId &&
+          (!requiresSectionDelegation || grant.role==="room_facilitator"));
+        const verifiedTerm=personId && requiresSectionDelegation
+          ? verifiedDelegations.get(section.programId + ":" +
+              "room_facilitator:" + section.id + ":" + personId) : undefined;
+        const namedCurrent=personId && period && requiresSectionDelegation
+          ? scheduledBlockHasNamedFacilitator(verifiedDelegations,{
+              programId:section.programId,sectionId:section.id,personId,
+              date:data.date,timeZone:site.timezone,
+              startsAtLocal:period.starts,endsAtLocal:period.ends,
+            }) : !requiresSectionDelegation;
         result.push({
           sectionId:section.id,sectionTitle:section.title,
           programId:section.programId,programName:section.programName,
@@ -171,6 +214,15 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
           facilitatorPersonId:personId,
           facilitatorName:approved&&person?person.firstName+" "+person.lastName:null,
           verifiedSiteStaffGrant:approved,
+          requiresSectionDelegation,
+          verifiedSectionDelegation:!!namedCurrent,
+          authorizedSupervisionService:!requiresSectionDelegation ||
+            authorizedContracts.get(section.programId)!=null,
+          // Private fingerprint, not a claim of background screening.
+          delegationVersion:verifiedTerm ? [verifiedTerm.id,
+            verifiedTerm.effectiveFrom.toISOString(),
+            verifiedTerm.effectiveThrough.toISOString()].join(":") : null,
+          agreementVersion:authorizedContracts.get(section.programId)??null,
           instructionalDayConfirmed:instructionalByYear.get(section.schoolYearId)===true,
           overlappingFacilitatorAssignments:uniqueIds.length>1,
         });
@@ -178,14 +230,17 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     }
     const projection=summarizeOnsiteSupervision(result);
     // Person IDs are needed for overlap detection, not for the client.
-    const blocks=projection.blocks.map(({facilitatorPersonId:assignedPersonId,...block})=>({
+    const blocks=projection.blocks.map(({
+      facilitatorPersonId:assignedPersonId,delegationVersion,agreementVersion,...block
+    })=>({
       ...block,
       // An acknowledgment is valid only for this exact assignment/time
       // fingerprint. Changes to the scheduled duty invalidate older records.
       planToken:createHash("sha256").update(JSON.stringify([
         site.id,data.date,block.sectionId,block.periodId,block.startsAtLocal,
         block.endsAtLocal,assignedPersonId,block.verifiedSiteStaffGrant,
-        block.assignedPlan,
+        block.verifiedSectionDelegation,block.authorizedSupervisionService,
+        delegationVersion,agreementVersion,block.assignedPlan,
       ])).digest("hex"),
       // Derived ONLY from the verified, original site grant and current active
       // instruction plan. Never accept a browser-supplied facilitator ID.
