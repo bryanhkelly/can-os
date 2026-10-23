@@ -1,5 +1,51 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## Product override — first enrolled student into a real class (23 October 2026)
+
+**Priority P0: churches and families, not additional website features.** The shortest
+accepted operating journey is: independently owned church/Site → verified CAN
+institutional relationship and delegated local authority → academic Program,
+school year, published instructional Section and qualified teacher → real family
+intake and verified guardian invitation → reviewed application, offer, consent,
+active Program enrollment and **actual Section placement** → signed-in student
+lesson and submission → teacher grade and guardian view → onsite-day reconciliation.
+
+**Source-committed UX/integrity improvements (not browser accepted):**
+
+- Operations now includes church-hosted academies in its academic-school guided
+  journey; first-family navigation uses the real registrar intake instead of
+  detouring through website publishing.
+- Program launch prioritizes class setup and registrar-assisted family intake;
+  private website editing is deliberately optional and secondary.
+- Active guardian accounts without enrolled children point to admission offers
+  and enrollment requirements rather than a dead-end family summary.
+- Registrar admissions loads eligible Sections for an enrolled child on entry,
+  while retaining the existing explicit, authorized placement command.
+- The operational projection counts a placed student only if the **same**
+  StudentProfile has an active Program enrollment and eligible active Section;
+  Operations shows enrolled students awaiting placement and never labels the
+  enrollment-to-class step complete while any active student remains unplaced.
+- Unit regressions for school-type guidance, first-family routing, unplaced
+  students and orphan Section placement were added; **no test run is claimed**.
+
+**Still P0 / not implemented or accepted:** the parent's independent self-service
+application and safe verified account-start experience; CAN staff's effective
+cross-organization academic permissions and local delegated responsibility;
+legal/evidence-backed school-of-record agreement, opening/safeguarding and
+day-supervision approval; executed disposable-Neon test and separate-session
+church, CAN, guardian, teacher and student browser acceptance. The existing
+staff-created inquiry is **not** a public self-service application. Do not
+represent a school as ready because a private website draft or published
+marketing page exists.
+
+**Next implementation order:** (1) verified CAN/church authority and church
+operator access; (2) parent start/resume of one canonical application with
+email ownership and guardian relationship checks; (3) enrollment/Section
+placement handoff and classroom activation; (4) onsite school day; (5) execute
+single-program multi-role acceptance. Website customization, SEO and campaign
+optimizations remain secondary until this path is green.
+
+
 ## Product priorities — cumulative implementation, 22 October 2026
 
 The agreed order is **guided launch → action ownership/deadlines → Student 360 →
