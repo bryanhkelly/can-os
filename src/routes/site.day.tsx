@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import { OnsiteSupervisionPanel } from "@/components/operations/OnsiteSupervisionPanel";
 import {
   getOnsiteStaffDayContext, listExpectedOnsiteRoster,
   markExpectedOnsiteAttendance,
@@ -160,5 +161,6 @@ export function SiteDayPage() {
       <button type="button" onClick={() => void load(date)}
         className="mt-6 text-sm underline">Refresh school roster</button>
     </>}
+    {context && date && <OnsiteSupervisionPanel date={date} />}
   </main>;
 }
