@@ -23,6 +23,10 @@ function PublicEnrichment() {
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.siteName}</p>
         <h2 className="mt-1 text-lg font-semibold">{item.name}</h2>
         <p className="mt-2 text-sm text-muted-foreground">{item.seasonName} · {item.startsOn} to {item.endsOn}</p>
+        {item.firstMeeting && item.meetingTimezone && <p className="mt-1 text-sm text-muted-foreground">
+          First session: {new Intl.DateTimeFormat("en-US",{dateStyle:"medium",
+            timeStyle:"short",timeZone:item.meetingTimezone}).format(new Date(item.firstMeeting))}
+        </p>
         <p className="mt-3 text-sm">
           {new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(item.feeAmountCents / 100)}
           {" · "}{item.seatsRemaining === 0 ? "Waitlist" :
