@@ -249,7 +249,8 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
       </div>
       {sections.some(s => !s.enrolled && !s.readyForPlacement) && <p role="status" className="text-xs text-amber-700">
         Some classes cannot accept students yet: verify an institutional teacher
-        with a published first lesson and current CAN–church academic services agreement.
+        with a published first lesson, a current CAN–church academic agreement,
+         an open add/drop window, and available Section capacity.
       </p>}
       {sections.some(s => !s.enrolled && s.readyForPlacement) ? <div className="flex flex-wrap items-end gap-2">
         <label className="min-w-48 flex-1 text-xs">Available section
@@ -267,7 +268,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
       </div> : <p className="text-xs text-muted-foreground">
         {sections.length
           ? sections.every(s => s.enrolled) ? "All currently available sections are assigned."
-            : "No class is ready for placement: verify the responsible institution's teacher, first lesson and operating agreement."
+            : "No class is ready for placement: verify its teacher, first lesson, operating agreement, remaining capacity and add/drop deadline."
           : "No eligible sections are configured for this student's active school year."}
       </p>}
     </div>}
