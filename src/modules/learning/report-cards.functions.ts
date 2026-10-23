@@ -912,6 +912,14 @@ export const issueTranscript = createServerFn({ method: "POST" })
     const issuingOrganizationId = rows[0]!.creditIssuingOrganizationId;
     if(rows.some(row=>row.creditIssuingOrganizationId!==issuingOrganizationId))
       throw new AuthorizationError("A single official transcript cannot combine credits issued by separate organizations without a transfer-credit agreement");
+    // A host school's read access to its students does not authorize that
+    // registrar to issue an official document in an external institution's name.
+    // The active grant must include the actual credit issuer organization.
+    // Future CAN-host institutional delegation needs a separately verified,
+    // issuer-approved relationship; provider metadata is never sufficient.
+    if (!context.scope.organizationIds?.includes(issuingOrganizationId)) {
+      throw new AuthorizationError("official transcript requires a verified credit-issuer organization grant");
+    }
     const issuingOrganization = rows[0]!.creditIssuingOrganization;
 
     return db.transaction(async (tx) => {
