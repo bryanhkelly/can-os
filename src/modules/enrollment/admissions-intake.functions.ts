@@ -1,8 +1,9 @@
 import { db,type Database } from "@/db/client";
-import { accessAccounts,accountPersonGrants,admissionOffers,applications,enrollments,guardianRelationships,householdMemberships,households,journeyRequirements,journeys,people,programs,studentProfiles } from "@/db/schema";
+import { accessAccounts,accountPersonGrants,admissionOffers,applications,enrollments,guardianRelationships,householdMemberships,households,journeyRequirements,journeys,people,programs,publicAdmissionsInterests,studentProfiles } from "@/db/schema";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { offerHoldsSeat } from "@/domain/admissions-policy";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
+import { assertPublicInterestConversion } from "@/domain/public-interest-conversion";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
@@ -25,9 +26,11 @@ const inquiryDetails=z.object({
  notes:z.string().trim().max(3000).optional(),
 });
 const applicant=z.union([
- inquiryDetails.extend({existingStudent:existingStudentSchema,existingApplicationId:z.never().optional()}).strict(),
+ inquiryDetails.extend({existingStudent:existingStudentSchema,existingApplicationId:z.never().optional(),
+  publicInterestId:z.never().optional(),contactReviewed:z.never().optional()}).strict(),
  inquiryDetails.extend({
   existingStudent:z.never().optional(),existingApplicationId:uuid.optional(),
+  publicInterestId:uuid.optional(),contactReviewed:z.literal(true).optional(),
   studentFirstName:z.string().trim().min(1).max(100),studentLastName:z.string().trim().min(1).max(100),
   gradeLevel:z.string().trim().max(10).optional(),guardianFirstName:z.string().trim().min(1).max(100),
   guardianLastName:z.string().trim().min(1).max(100),guardianEmail:z.string().trim().email(),
@@ -163,6 +166,8 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
      throw new Error("Inquiry request key reused for another student or household");
     if(!data.existingStudent&&repeat.metadata.existingStudent===true)
      throw new Error("Inquiry request key reused for a different intake mode");
+    if((repeat.metadata.publicInterestId??null)!==(data.publicInterestId??null))
+     throw new Error("Inquiry request key reused with a different public interest");
     return {applicationId:repeat.id};
    }
    let guardianPersonId:string;
