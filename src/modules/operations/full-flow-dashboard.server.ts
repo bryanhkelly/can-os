@@ -8,6 +8,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { gradeResponseActionType } from "@/domain/grade-response-policy";
 import { summarizeFullFlowOperations } from "@/domain/full-flow-operational-snapshot";
+import { staffedPublishedSectionIds } from "@/modules/enrollment/instructional-section-readiness.server";
 
 /**
  * The school operational dashboard is a live join/projection of the very same
@@ -66,7 +67,7 @@ export async function readFullFlowOperations(actor: AccessContext) {
       )),
   ]);
   const sectionIds = sectionsRows.map(s => s.id);
-  const [teacherAssignments, assessmentsRows] = sectionIds.length ? await Promise.all([
+  const [candidateTeachers, assessmentsRows] = sectionIds.length ? await Promise.all([
     // An assignment row alone is not active staffing. Its teacher must be
     // an active Person with an active school/CAN teaching grant. This matches
     // the transactional Section allocation guard, not a launch draft.
@@ -86,6 +87,10 @@ export async function readFullFlowOperations(actor: AccessContext) {
     db.select({id: assessments.id, sectionId: assessments.sectionId, status: assessments.status})
       .from(assessments).where(inArray(assessments.sectionId, sectionIds)),
   ]) : [[], []];
+  const readySections=await staffedPublishedSectionIds(sectionIds,db);
+  // A live role grant without current CAN/church academic agreement, or a
+  // draft course, cannot prove real instructional capacity on this dashboard.
+  const teacherAssignments=candidateTeachers.filter(row=>readySections.has(row.sectionId));
   const assessmentIds = assessmentsRows.map(a => a.id);
   const submissionRows = assessmentIds.length ? await db.select({
     assessmentId: submissions.assessmentId, status: submissions.status,
