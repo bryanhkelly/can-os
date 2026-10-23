@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, actions, people, programs, publicAdmissionsInterests } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { publicInterestContactHistory } from "@/domain/public-interest-contact-history";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 import { completePublicInterestFollowUp, ensurePublicInterestFollowUp, publicInterestFollowUpType, publicInterestSubjectType } from "./public-interest-follow-up.server";
@@ -36,6 +37,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       followUpOwnerPersonId: actions.ownerPersonId,
       followUpDueAt: actions.dueAt,
       followUpStatus: actions.status,
+      followUpEvidence: actions.evidence,
       programName: programs.name,
       firstName: publicAdmissionsInterests.contactFirstName,
       lastName: publicAdmissionsInterests.contactLastName,
@@ -58,9 +60,14 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         inArray(programs.organizationId, actor.scope.organizationIds),
         inArray(publicAdmissionsInterests.siteId, actor.scope.siteIds ?? []),
         eq(publicAdmissionsInterests.siteId, programs.siteId),
-      )).orderBy(desc(publicAdmissionsInterests.createdAt)).limit(200);
-    return rows.map(row => ({
+      )).orderBy(
+        sql`CASE WHEN ${publicAdmissionsInterests.status} IN ('closed', 'converted') THEN 2
+                 WHEN ${actions.dueAt} < now() THEN 0 ELSE 1 END`,
+        asc(actions.dueAt), desc(publicAdmissionsInterests.createdAt),
+      ).limit(200);
+    return rows.map(({ followUpEvidence, ...row }) => ({
       ...row,
+      contactHistory: publicInterestContactHistory(followUpEvidence ?? []),
       createdAt: row.createdAt.toISOString(),
       contactedAt: row.contactedAt?.toISOString() ?? null,
       convertedAt: row.convertedAt?.toISOString() ?? null,
