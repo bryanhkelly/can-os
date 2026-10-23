@@ -173,3 +173,55 @@ DNS/certificate, hostname-based routing, or public website route is enabled.
 4. Independently add academic-program publicity, site content/brand editing,
    new-guardian signup, applications and CAN OS registration CTAs in small
    validated slices. Publishing a Site cannot bypass these workflows.
+
+## Bite 5 committed: isolated public hostname landing page
+
+- Added `src/routes/published-site.ts`, a **server-only GET route** that
+  renders independently from CAN OS's client-side router, session provider,
+  private navigation and hydration scripts. It serves escaped, static HTML
+  for the approved public enrichment catalog, with strict CSP, `no-store`,
+  no links into private site/guardian workspaces and `noindex` until launch.
+- The server route requires `CAN_PUBLIC_SITE_HOSTING_ENABLED=true` and an
+  exact HTTPS hostname of the form `[site].can-os.com`, matched from the
+  actual request URL. A conflicting `Host` header, untrusted forwarded
+  hostname, non-tenant origin, other method or path fails closed.
+- Added `netlify/edge-functions/site-host-gate.ts` with Netlify inline
+  `path: "/*"` configuration. It leaves recognized platform hosts and
+  other deployment domains alone; on tenant hosts, it denies **all** app
+  paths, identity endpoints, RPC, private dashboard routes, and static asset
+  paths. The **only** allowed request is HTTPS GET `/`, internally rewritten
+  to `/published-site`; that server-only route is the sole exception
+  when the rewrite is processed. Unsupported tenant label/paths return 404.
+- The **same rollout switch** must be set in the Netlify Edge Functions
+  runtime and TanStack server runtime. Both default to **disabled**.
+  No credentials, registration forms or authenticated entry points are
+  exposed under tenant hostnames.
+- Added pure host/route-denial tests, including malformed hostnames,
+  a disabled switch, forged `X-Forwarded-Host`, conflicting `Host`,
+  private route denial and normal CAN OS host pass-through. Added renderer
+  tests for escaped publisher content, no client scripts and empty state.
+- Added the server route to the route contract inventory with acceptance
+  fields **pending**. Source presence is not browser/edge verification.
+
+**CRITICAL: not live or accepted yet.** No wildcard DNS or TLS was
+provisioned. The Netlify edge integration, rewritten requests, SSR handler,
+cross-origin/session isolation, database migrations and automated tests have
+not been executed together. Do not turn on `CAN_PUBLIC_SITE_HOSTING_ENABLED`
+or point a partner hostname to the app before these checks pass.
+The app's normal deployment host must remain on the platform-host pathway.
+
+### Priorities after Bite 5
+
+1. Typecheck, unit tests and static route-contract check; repair failures.
+2. Apply migration `0035` in a disposable Neon branch only. Exercise
+   tenant-read/publication transitions, publication audit rollbacks,
+   cross-site denial, and concurrent unpublish/read behavior.
+3. Run a deployed Netlify preview with the flag enabled **only for a
+   disposable test tenant domain**, verifying rewrite behavior, root
+   isolation, HTTP methods, private RPC denial, CSP and correct 404s.
+4. When that acceptance is recorded, deliberately configure wildcard
+   DNS/certificate and enable the production switch. Only then advertise
+   `[site].can-os.com` as a working URL.
+5. After safe external routing, implement an explicitly published school
+   Program catalog and guardian inquiry/application handoff. No parallel
+   admissions or registration system.
