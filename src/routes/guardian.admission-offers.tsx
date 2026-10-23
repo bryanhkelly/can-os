@@ -73,7 +73,18 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
         <Link to="/guardian" className="rounded-lg border px-3 py-2">Family home →</Link>
        </div>
      </div>}
-    </div>)}{app.offers.length===0&&<p className="mt-3 text-sm">No offers yet.</p>}
+    </div>)}{app.offers.length===0&&<div className="mt-3 rounded-lg border p-3 text-sm">
+      <p role="status" className="font-semibold">No enrollment offer has been issued yet.</p>
+      <p className="mt-2 text-muted-foreground">Your school is reviewing this application
+        ({app.applicationStage.replaceAll("_"," ")}). Use the enrollment checklist to
+        complete any requested forms or corrections. An application is not an active
+        enrollment or class assignment.</p>
+      {app.blockers.length>0&&<p className="mt-2">
+        {app.blockers.length} required ${app.blockers.length===1?"item needs":"items need"} review.
+      </p>}
+      <button type="button" className="mt-3 rounded border px-3 py-2 font-semibold"
+        onClick={()=>setChecklist(app.applicationId)}>Review enrollment checklist →</button>
+     </div>}
   </section>)}
   {applications.length===0&&<p className="rounded-lg border p-4">No enrollment offers are currently available for the children in your authorized programs.</p>}
   <Link to="/guardian" className="text-sm underline">Back to family home →</Link>
