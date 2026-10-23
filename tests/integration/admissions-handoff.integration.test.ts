@@ -539,6 +539,17 @@ integration("cross-persona admissions through active classes",()=>{
     }})).toMatchObject({status:"approved"});
     expect(state.studentInvite).toHaveBeenCalledOnce();
     expect(state.studentInvite).toHaveBeenCalledWith(email);
+    const approvalEvents=await tx.select({id:s.domainEvents.id}).from(s.domainEvents)
+      .where(eq(s.domainEvents.eventType,"StudentLearningAccessApproved"));
+    expect(approvalEvents).toHaveLength(1);
+    // Email resend can be retried without creating another institutional
+    // account approval event or changing the recorded reviewer decision.
+    expect(await provisionStudentLearningAccess({data:{applicationId}}))
+      .toMatchObject({status:"approved"});
+    expect(state.studentInvite).toHaveBeenCalledTimes(2);
+    expect(await tx.select({id:s.domainEvents.id}).from(s.domainEvents)
+      .where(eq(s.domainEvents.eventType,"StudentLearningAccessApproved")))
+      .toHaveLength(1);
     const [studentAccount]=await tx.select().from(s.accessAccounts)
       .where(eq(s.accessAccounts.emailNormalized,email));
     if(!studentAccount)throw new Error("Student account was not provisioned");
