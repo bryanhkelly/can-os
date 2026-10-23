@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql, lte, gt } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, people, programResponsibilityAssignments,
@@ -26,7 +26,7 @@ export async function verifiedScheduledSectionFacilitators(
   candidates: readonly ScheduledSectionAdult[],
 ) {
   if (!candidates.length) return new Map<string, {
-    effectiveFrom: Date; effectiveThrough: Date;
+    id: string; effectiveFrom: Date; effectiveThrough: Date;
   }>();
 
   const programIds = [...new Set(candidates.map(candidate => candidate.programId))];
@@ -43,12 +43,14 @@ export async function verifiedScheduledSectionFacilitators(
       activeConfigurationByProgram.set(config.programId, config.id);
   }
   if (!activeConfigurationByProgram.size)
-    return new Map<string, { effectiveFrom: Date; effectiveThrough: Date }>();
+    return new Map<string, { id: string; effectiveFrom: Date; effectiveThrough: Date }>();
 
   const keys = [...new Set(candidates.map(candidate =>
     sectionFacilitatorKey(candidate.sectionId, candidate.personId)))];
   const activeConfigIds = [...activeConfigurationByProgram.values()];
   const rows = await tx.select({
+    id: programResponsibilityAssignments.id,
+    roleAssignmentId: roleAssignments.id,
     key: programResponsibilityAssignments.responsibilityKey,
     configurationVersionId: programResponsibilityAssignments.configurationVersionId,
     organizationId: programResponsibilityAssignments.accountableOrganizationId,
@@ -88,7 +90,7 @@ export async function verifiedScheduledSectionFacilitators(
     candidate.programId + ":" + sectionFacilitatorKey(candidate.sectionId, candidate.personId),
     candidate,
   ]));
-  const verified = new Map<string, { effectiveFrom: Date; effectiveThrough: Date }>();
+  const verified = new Map<string, { id: string; effectiveFrom: Date; effectiveThrough: Date }>();
   for (const row of rows) {
     if (!row.programId || !row.effectiveFrom || !row.effectiveThrough) continue;
     if (activeConfigurationByProgram.get(row.programId) !== row.configurationVersionId)
@@ -99,6 +101,7 @@ export async function verifiedScheduledSectionFacilitators(
         row.organizationId !== scope.organizationId || row.siteId !== scope.siteId ||
         row.key !== sectionFacilitatorKey(candidate.sectionId, candidate.personId)) continue;
     verified.set(matchKey, {
+      id: row.roleAssignmentId,
       effectiveFrom: row.effectiveFrom, effectiveThrough: row.effectiveThrough,
     });
   }
@@ -106,7 +109,7 @@ export async function verifiedScheduledSectionFacilitators(
 }
 
 export function scheduledBlockHasNamedFacilitator(
-  verified: ReadonlyMap<string, { effectiveFrom: Date; effectiveThrough: Date }>,
+  verified: ReadonlyMap<string, { id?: string; effectiveFrom: Date; effectiveThrough: Date }>,
   input: ScheduledSectionAdult & {
     date: string; timeZone: string; startsAtLocal: string | null;
     endsAtLocal: string | null;
