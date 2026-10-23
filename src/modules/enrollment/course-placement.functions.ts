@@ -4,7 +4,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accountPersonGrants, applications, enrollments, people, programs, sections, sectionTeachers, terms } from "@/db/schema";
+import { accountPersonGrants, admissionOffers, applications, enrollments, people, programs, sections, sectionTeachers, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 
@@ -30,7 +30,14 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      .from(enrollments).where(and(eq(enrollments.studentProfileId, app.studentProfileId),
        eq(enrollments.programId, app.programId), eq(enrollments.kind, "program"),
        eq(enrollments.status, "active")));
-   const yearIds = active.map(e => e.schoolYearId).filter((id): id is string => !!id);
+   const acceptedOffers=await db.select({schoolYearId:admissionOffers.schoolYearId})
+     .from(admissionOffers).where(and(
+       eq(admissionOffers.applicationId,data.applicationId),
+       eq(admissionOffers.programId,app.programId),
+       eq(admissionOffers.status,"accepted"),
+     ));
+   const yearIds = [...new Set([...active.map(e=>e.schoolYearId),
+     ...acceptedOffers.map(offer=>offer.schoolYearId)].filter((id):id is string=>!!id))];
    if (!yearIds.length) return { active: false, sections: [] };
    const rows = await db.select({ id: sections.id, title: sections.title,
      code: sections.code, schoolYearId: terms.schoolYearId, siteId: sections.siteId })
@@ -58,7 +65,7 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      .where(and(eq(enrollments.studentProfileId, app.studentProfileId),
        eq(enrollments.kind, "section"), eq(enrollments.status, "active")));
    const assigned = new Set(enrolled.map(e => e.sectionId));
-   return { active: true, sections: rows.filter(s => !s.siteId ||
+   return { active: active.length>0, sections: rows.filter(s => !s.siteId ||
       actor.scope.siteIds?.includes(s.siteId)).map(s => ({
      id: s.id, title: s.title, code: s.code, enrolled: assigned.has(s.id),
      staffed: staffedIds.has(s.id),
