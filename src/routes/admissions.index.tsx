@@ -139,10 +139,13 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           <div className="mt-4 flex flex-wrap gap-2">
             {years.filter(year => canIssueAnotherOffer(x.stage, x.outstandingRequirements, x.offers, year.id,new Date(),x.disposition)).map(year => <button key={year.id} disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => issueAdmissionOffer({ data: { applicationId: x.id, schoolYearId: year.id } }))}>Registrar: Issue offer · {year.name}</button>)}
             {latest?.status === "issued" && <p className="text-xs text-muted-foreground">Waiting for guardian response in the guardian enrollment-offers workspace.</p>}
-            {latest?.status === "accepted" && !activated && <button disabled={busy !== null||x.outstandingRequirements>0} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => activateOfferedEnrollment({ data: { offerId: latest.id } }))}>Registrar: Activate enrollment</button>}
+            {latest?.status === "accepted" && !activated && <p role="status" className="text-xs">Accepted offer ready. Select a staffed class below to activate enrollment and placement together.</p>}}
           </div>
           {x.offers.filter(offer=>offer.status==="issued").map(offer=><OfferWithdrawal key={offer.id} offerId={offer.id}/>)}
-          {x.enrollments.length > 0 && <CoursePlacement applicationId={x.id} />}
+          {(x.enrollments.length > 0 || latest?.status === "accepted") &&
+             <CoursePlacement applicationId={x.id}
+               acceptedOfferId={latest?.status==="accepted"?latest.id:undefined}
+               enrollmentActivated={activated} />}
           <Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
         </article>;
       })}
@@ -180,7 +183,9 @@ function OfferWithdrawal({offerId}:{offerId:string}){
  </details>;
 }
 
-function CoursePlacement({ applicationId }: { applicationId: string }) {
+function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }: {
+  applicationId: string; acceptedOfferId?: string; enrollmentActivated: boolean;
+}) {
   const router = useRouter();
   const [sections, setSections] = useState<Awaited<ReturnType<typeof listEnrollmentPlacements>>["sections"]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -216,7 +221,9 @@ function CoursePlacement({ applicationId }: { applicationId: string }) {
     if (!chosen) return;
     setBusy(true); setError("");
     try {
-      await placeEnrolledStudent({ data: { applicationId, sectionId: chosen } });
+      if(acceptedOfferId&&!enrollmentActivated)
+        await activateOfferedEnrollment({data:{offerId:acceptedOfferId,sectionId:chosen}});
+      else await placeEnrolledStudent({ data: { applicationId, sectionId: chosen } });
       setChosen("");
       await refresh();
       await router.invalidate();
@@ -252,7 +259,7 @@ function CoursePlacement({ applicationId }: { applicationId: string }) {
         </label>
         <button type="button" disabled={!chosen || busy} onClick={place}
           className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">
-          Assign student
+          {acceptedOfferId&&!enrollmentActivated?"Activate enrollment and assign class":"Assign student"}
         </button>
       </div> : <p className="text-xs text-muted-foreground">
         {sections.length
