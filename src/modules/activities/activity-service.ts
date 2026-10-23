@@ -24,6 +24,8 @@ import { publishProjection } from "@/platform/calendar/projection";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { and,count,eq,inArray } from "drizzle-orm";
 import { assertSeasonRegistrationOpen, assertLegacyActivityRegistrationAllowed } from "./registration-policy";
+import { assertEnrichmentRegistrationPublished } from "@/domain/enrichment-publication";
+import { isExtendedLearningType } from "@/domain/program-offerings";
 
 export async function createActivity(
   context: CommandContext,
@@ -151,6 +153,8 @@ export async function registerForActivity(
     studentProfileId: string;
     householdId: string;
     consentVersion: string;
+    /** Must be a conscious guardian decision on the current published language. */
+    acknowledged?: boolean;
     consentDocumentId?: string;
     physicalDocumentId?: string;
     physicalExpiresOn?: string;
@@ -175,6 +179,11 @@ export async function registerForActivity(
         siteId: activities.siteId,
         programId: activities.programId,
         programType: programs.type,
+        programStatus: programs.status,
+        programSiteId: programs.siteId,
+        creditIssuerId: programs.creditIssuingOrganizationId,
+        activityStatus: activities.status,
+        activityMetadata: activities.metadata,
       })
       .from(activitySeasons)
       .innerJoin(activities, eq(activities.id, activitySeasons.activityId))
@@ -184,7 +193,16 @@ export async function registerForActivity(
       .for("update", { of: activitySeasons });
 
     if (!record) throw new Error("Activity season not found");
-    assertLegacyActivityRegistrationAllowed(record.programType);
+    const publication = record.programType && isExtendedLearningType(record.programType)
+      ? assertEnrichmentRegistrationPublished({
+        programType: record.programType, programStatus: record.programStatus,
+        activityStatus: record.activityStatus, seasonStatus: record.seasonStatus,
+        siteId: record.siteId, programSiteId: record.programSiteId,
+        programId: record.programId, seasonId: record.seasonId,
+        creditIssuerId: record.creditIssuerId, metadata: record.activityMetadata,
+        consentVersion: input.consentVersion, acknowledged: input.acknowledged,
+      })
+      : null;
     assertSeasonRegistrationOpen(record, new Date());
 
     const [student] = await tx
@@ -201,6 +219,7 @@ export async function registerForActivity(
       .where(guardianRelationshipPredicate({
         guardianPersonId: actorPersonId,
         studentPersonId: student.personId,
+        ...(publication ? { access: "enrollment" as const } : {}),
       }))
       .limit(1);
 
@@ -219,6 +238,20 @@ export async function registerForActivity(
 
     if (!householdMember) throw new Error("Guardian is not in supplied Household");
 
+    // A repeated click must not create duplicate consent or payment obligations.
+    // A withdrawn application requires an explicit staff-managed reapplication.
+    const [prior] = await tx.select({
+      id: activityRegistrations.id, status: activityRegistrations.status,
+    }).from(activityRegistrations).where(and(
+      eq(activityRegistrations.activitySeasonId, input.activitySeasonId),
+      eq(activityRegistrations.studentProfileId, input.studentProfileId),
+    )).limit(1);
+    if (prior) {
+      if (prior.status === "withdrawn")
+        throw new Error("This registration was withdrawn; contact the program to reapply");
+      return prior.id;
+    }
+
     // Serialize all seat allocations through the same season row lock.
     const [occupied] = await tx.select({ total: count() }).from(activityRegistrations)
       .where(and(eq(activityRegistrations.activitySeasonId, input.activitySeasonId),
@@ -235,6 +268,13 @@ export async function registerForActivity(
         signerPersonId: actorPersonId,
         documentId: input.consentDocumentId,
         version: input.consentVersion,
+        signatureEvidence: publication ? {
+          acknowledged: true, permissionText: publication.permissionText,
+          permissionVersion: publication.permissionVersion,
+          publishedAt: publication.publishedAt,
+          seasonId: input.activitySeasonId, studentProfileId: input.studentProfileId,
+          guardianPersonId: actorPersonId,
+        } : {},
       })
       .returning({ id: consentRecords.id });
 
