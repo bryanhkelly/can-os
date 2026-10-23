@@ -268,7 +268,7 @@ export async function requireCurrentProgramSiteAuthorization(
       isNull(programSiteAuthorizations.revokedAt),
       lte(programSiteAuthorizations.effectiveFrom, at),
       gt(programSiteAuthorizations.effectiveThrough, at),
-    )).limit(2);
+    )).for("share", { of: programSiteAuthorizations }).limit(2);
   for (const { authorization, evidence } of rows) {
     try {
       assertCurrentOperatingAuthorization(authorization, identity, requiredServices, at);

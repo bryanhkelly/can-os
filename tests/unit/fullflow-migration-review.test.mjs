@@ -93,6 +93,20 @@ describe("FullFlow 0039 Program-Site authorization migration gate", () => {
     const result = assessFullFlowMigrationReadiness({
       ...state, applied: 40, lastTimestamp: "1792731600000",
       tables: [...state.tables, {table_name:"program_site_authorizations"}],
+      authorizationColumns: [
+        "id","program_id","site_id","host_organization_id","institution_organization_id",
+        "version","status","services","requested_by_person_id","requested_at",
+        "evidence_document_id","effective_from","effective_through","reviewed_by_person_id",
+        "reviewed_at","review_reason","revoked_by_person_id","revoked_at",
+        "revocation_reason","created_at","updated_at",
+      ].map(column_name=>({column_name})),
+      authorizationIndexes: ["program_site_authorization_version_uq",
+        "program_site_authorization_current_uq"].map(indexname=>({indexname})),
+      authorizationConstraints: [
+        "program_site_authorization_status_ck","program_site_authorization_review_ck",
+        "program_site_authorization_revoked_ck","program_site_authorization_distinct_review_ck",
+        "program_site_authorization_services_ck",
+      ].map(conname=>({conname})),
     });
     expect(result).toMatchObject({ready: true,status:"UP_TO_DATE",pendingMigrations:[]});
   });
@@ -107,5 +121,33 @@ describe("FullFlow 0039 Program-Site authorization migration gate", () => {
     ]) {
       expect(assessFullFlowMigrationReadiness({...state,...change}).ready).toBe(false);
     }
+  });
+
+  it("rejects missing 0039 authorization invariants despite a matching ledger", () => {
+    const state=migratedBase();
+    const completeState={
+      ...state, applied:40, lastTimestamp:"1792731600000",
+      tables:[...state.tables,{table_name:"program_site_authorizations"}],
+      authorizationColumns:[
+        "id","program_id","site_id","host_organization_id","institution_organization_id",
+        "version","status","services","requested_by_person_id","requested_at",
+        "evidence_document_id","effective_from","effective_through","reviewed_by_person_id",
+        "reviewed_at","review_reason","revoked_by_person_id","revoked_at",
+        "revocation_reason","created_at","updated_at",
+      ].map(column_name=>({column_name})),
+      authorizationIndexes:["program_site_authorization_version_uq",
+        "program_site_authorization_current_uq"].map(indexname=>({indexname})),
+      authorizationConstraints:[
+        "program_site_authorization_status_ck","program_site_authorization_review_ck",
+        "program_site_authorization_revoked_ck","program_site_authorization_distinct_review_ck",
+        "program_site_authorization_services_ck",
+      ].map(conname=>({conname})),
+    };
+    expect(assessFullFlowMigrationReadiness(completeState).ready).toBe(true);
+    for (const altered of [
+      {authorizationColumns:completeState.authorizationColumns.filter(x=>x.column_name!=="revocation_reason")},
+      {authorizationIndexes:completeState.authorizationIndexes.filter(x=>x.indexname!=="program_site_authorization_current_uq")},
+      {authorizationConstraints:completeState.authorizationConstraints.filter(x=>x.conname!=="program_site_authorization_review_ck")},
+    ]) expect(assessFullFlowMigrationReadiness({...completeState,...altered}).ready).toBe(false);
   });
 });

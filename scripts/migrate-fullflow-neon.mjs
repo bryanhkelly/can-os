@@ -30,8 +30,8 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL !== testUrl) {
 }
 await verifyFullFlowNeonBranch(testUrl);
 // Even on the correct branch, Drizzle must not silently continue from a
-// partially applied or manually altered schema. Review all seven migrations
-// against the known 0031 starting ledger before calling the migrator.
+// partially applied or manually altered schema. Inspect the committed journal
+// against the reviewed prior ledger and the current additive migration.
 const review = spawnSync(process.execPath, ["scripts/review-fullflow-migrations.mjs"], {
   stdio: "inherit", env: process.env,
 });

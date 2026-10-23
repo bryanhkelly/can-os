@@ -21,7 +21,8 @@ const pendingTags = [
 ];
 
 export function assessFullFlowMigrationReadiness(input) {
-  const { project, branch, applied, lastTimestamp, journal, types, columns, tables } = input;
+  const { project, branch, applied, lastTimestamp, journal, types, columns, tables,
+    authorizationColumns = [], authorizationIndexes = [], authorizationConstraints = [] } = input;
   const issues = [];
   // A previously reviewed 0032-0038 sequence is already applied on the
   // dedicated branch. Before applying 0039, verify that exact committed base
@@ -49,6 +50,32 @@ export function assessFullFlowMigrationReadiness(input) {
       found.has("program_site_authorizations");
     if (!pre0039 && !post0039)
       issues.push("0039 migration ledger/table state is inconsistent or unexpected");
+    if (post0039) {
+      const actualColumns = new Set(authorizationColumns.map(row => row.column_name));
+      const requiredColumns = [
+        "id", "program_id", "site_id", "host_organization_id",
+        "institution_organization_id", "version", "status", "services",
+        "requested_by_person_id", "requested_at", "evidence_document_id",
+        "effective_from", "effective_through", "reviewed_by_person_id",
+        "reviewed_at", "review_reason", "revoked_by_person_id",
+        "revoked_at", "revocation_reason", "created_at", "updated_at",
+      ];
+      const missingColumns = requiredColumns.filter(col => !actualColumns.has(col));
+      if (missingColumns.length)
+        issues.push("0039 authorization table columns missing: " + missingColumns.join(", "));
+      const actualIndexes = new Set(authorizationIndexes.map(row => row.indexname));
+      for (const name of ["program_site_authorization_version_uq", "program_site_authorization_current_uq"]) {
+        if (!actualIndexes.has(name)) issues.push("0039 authorization index missing: " + name);
+      }
+      const actualConstraints = new Set(authorizationConstraints.map(row => row.conname));
+      for (const name of [
+        "program_site_authorization_status_ck", "program_site_authorization_review_ck",
+        "program_site_authorization_revoked_ck", "program_site_authorization_distinct_review_ck",
+        "program_site_authorization_services_ck",
+      ]) {
+        if (!actualConstraints.has(name)) issues.push("0039 authorization constraint missing: " + name);
+      }
+    }
     return {
       ready: issues.length === 0, issues, appliedMigrations: applied,
       pendingMigrations: post0039 ? [] : ["0039_program_site_authorizations"],
@@ -91,7 +118,8 @@ async function main() {
   if (![39,40].includes(journal.entries.length))
     throw new Error("Unexpected migration journal length; re-review the pending migration set");
   const query = neon(url);
-  const [[identity],[ledger],types,columns,tables] = await Promise.all([
+  const [[identity],[ledger],types,columns,tables,
+    authorizationColumns,authorizationIndexes,authorizationConstraints] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
                  current_setting('neon.branch_id', true) AS branch`,
     query`SELECT count(*)::int AS applied, max(created_at) AS last_timestamp FROM drizzle.__drizzle_migrations`,
@@ -105,8 +133,18 @@ async function main() {
     query`SELECT table_name FROM information_schema.tables
           WHERE table_schema='public' AND
           table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations')`,
+    query`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='program_site_authorizations'`,
+    query`SELECT indexname FROM pg_indexes
+      WHERE schemaname='public' AND tablename='program_site_authorizations'`,
+    query`SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid
+      JOIN pg_namespace n ON n.oid=t.relnamespace
+      WHERE n.nspname='public' AND t.relname='program_site_authorizations'`,
   ]);
-  const review = assessFullFlowMigrationReadiness({ ...identity, ...ledger, journal, types, columns, tables });
+  const review = assessFullFlowMigrationReadiness({
+    ...identity, ...ledger, journal, types, columns, tables,
+    authorizationColumns, authorizationIndexes, authorizationConstraints,
+  });
   process.stdout.write(JSON.stringify(review,null,2)+"\n");
   if (!review.ready) process.exitCode = 1;
 }
