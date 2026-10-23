@@ -148,6 +148,15 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
                acceptedOfferId={latest?.status==="accepted"?latest.id:undefined}
                enrollmentActivated={activated} />}
           {activated&&<StudentLearningAccessHandoff applicationId={x.id} role="registrar"/>}
+          {activated&&<div className="mt-3 rounded-lg border p-3 text-sm">
+            <p className="font-semibold">Connect the classroom to the supervised school day</p>
+            <p className="mt-1 text-muted-foreground">Check that this student appears on the expected onsite
+              attendance roster for an actual scheduled instructional day. Presence must be recorded by
+              authorized onsite staff; class enrollment alone does not mark attendance or certify supervision.</p>
+            <Link to="/staff/attendance" className="mt-2 inline-block font-semibold underline">
+              Review scheduled school attendance →
+            </Link>
+          </div>}
           <Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
         </article>;
       })}
