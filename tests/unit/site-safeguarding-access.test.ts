@@ -12,13 +12,14 @@ const base: VerifiedAccessGrant = {
 };
 
 describe("site safeguarding report-only authorization", () => {
-  it.each(onsiteSafeguardingRoles)("%s has only a report-submission capability", role => {
+  it.each(onsiteSafeguardingRoles)("%s has safeguarded reporting without full incident access", role => {
     const ctx = resolveAccessContext({
       accountId: base.accountId, sessionId: "login-1", activeGrantId: base.id,
     }, [{ ...base, role }]);
     expect(ctx.role).toBe(role);
     expect(ctx.grantSiteId).toBe(site);
     expect(ctx.capabilities.has("safeguarding.concern.submit")).toBe(true);
+    expect(ctx.capabilities.has("onsite.attendance.record")).toBe(role !== "paraeducator");
     expect(() => assertOnsiteSafeguardingSubmissionScope(ctx, site)).not.toThrow();
     for (const capability of [
       "incident.file", "incident.read", "incident.amend", "incident.close",
