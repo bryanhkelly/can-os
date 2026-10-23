@@ -4,7 +4,7 @@ import { siteWebsiteDraftReadCapability } from "@/domain/site-publication-policy
 
 const state = vi.hoisted(() => ({
   sites: [] as Array<{ id: string; organizationId: string; name: string; organizationName: string }>,
-  assignments: [] as Array<{ id: string }>,
+  assignments: [] as Array<{ id: string; capabilities: string[] }>,
   addresses: [] as Array<{ slug: string; status: string }>,
   reads: 0,
   catalogSiteIds: [] as string[],
@@ -73,7 +73,8 @@ beforeEach(() => {
     id: "site-a", organizationId: "org-a",
     name: "Partner Academy", organizationName: "Partner Church",
   }];
-  state.assignments = [{ id: "explicit-partner-assignment" }];
+  state.assignments = [{ id: "explicit-partner-assignment",
+    capabilities: ["site.website.draft.read", "site.website.local.publish"] }];
   state.addresses = [{ slug: "partner-academy", status: "draft" }];
   state.reads = 0;
   state.catalogSiteIds = [];
@@ -103,6 +104,7 @@ describe("read-only church partner website", () => {
     const result = await getPartnerWebsitePreview(editor());
     expect(result.host).toBe("partner-academy.can-os.com");
     expect(result.status).toBe("draft");
+    expect(result.canPublish).toBe(true);
     expect(result.approvedAcademicCount).toBe(1);
     expect(result.previewHtml).toContain("Approved Academy");
     expect(result.previewHtml).toContain("Partner Church");
@@ -110,11 +112,17 @@ describe("read-only church partner website", () => {
     expect(result.previewHtml).not.toContain("studentProfileId");
     expect(result.previewHtml).not.toContain("applicationId");
     expect(Object.keys(result).sort()).toEqual([
-      "approvedAcademicCount", "approvedEnrichmentCount",
+      "approvedAcademicCount", "approvedEnrichmentCount", "canPublish",
       "currentRevision", "editingContent", "host", "localContentStatus",
       "localHistory", "organizationName", "previewHtml", "siteName", "status",
     ]);
     expect(state.catalogSiteIds).toEqual(["site-a", "site-a"]);
+  });
+
+  it("allows viewing without local publish privilege, but hides publishing controls", async () => {
+    state.assignments = [{ id: "read-only-partner", capabilities: ["site.website.draft.read"] }];
+    const result = await getPartnerWebsitePreview(editor());
+    expect(result.canPublish).toBe(false);
   });
 
   it("does not fabricate a public address or query Program details for unprovisioned Sites", async () => {
