@@ -5,6 +5,7 @@ import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { isSitePubliclyPublished, toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
+import { readCurrentLocalContent } from "./site-local-content.server";
 
 /**
  * Public Site projection, independently gated by an approved Site publication
@@ -36,10 +37,12 @@ export async function readPublishedSiteCatalog(slug: string) {
     // statements on one database connection.
     const offerings = await readEnrichmentCatalog(site.id, tx);
     const academicPrograms = await readAcademicProgramCatalog(site.id, tx);
+    const locallyPublished = await readCurrentLocalContent(site.id, tx);
     return {
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
       academicPrograms,
+      localContent: locallyPublished?.content ?? null,
       offerings: offerings.map(toPublicSiteEnrichment),
     };
   });
