@@ -4,7 +4,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accountPersonGrants, admissionOffers, applications, enrollments, people, programs, sections, sectionTeachers, terms } from "@/db/schema";
+import { accountPersonGrants, admissionOffers, applications, courseTemplateVersions, enrollments, people, programs, sections, sectionTeachers, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 
@@ -40,8 +40,10 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      ...acceptedOffers.map(offer=>offer.schoolYearId)].filter((id):id is string=>!!id))];
    if (!yearIds.length) return { active: false, sections: [] };
    const rows = await db.select({ id: sections.id, title: sections.title,
-     code: sections.code, schoolYearId: terms.schoolYearId, siteId: sections.siteId })
+     code: sections.code, schoolYearId: terms.schoolYearId, siteId: sections.siteId,
+     curriculumStatus:courseTemplateVersions.status })
      .from(sections).innerJoin(terms, eq(terms.id, sections.termId))
+     .innerJoin(courseTemplateVersions,eq(courseTemplateVersions.id,sections.courseTemplateVersionId))
      .where(and(eq(sections.programId, app.programId), eq(sections.active, true),
        inArray(terms.schoolYearId, yearIds)));
    // UI previews only actual staffed options; a registered Teacher must have
@@ -68,7 +70,7 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
    return { active: active.length>0, sections: rows.filter(s => !s.siteId ||
       actor.scope.siteIds?.includes(s.siteId)).map(s => ({
      id: s.id, title: s.title, code: s.code, enrolled: assigned.has(s.id),
-     staffed: staffedIds.has(s.id),
+     staffed: staffedIds.has(s.id), curriculumReady:s.curriculumStatus==="published",
    })) };
  });
 
