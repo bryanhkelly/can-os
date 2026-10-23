@@ -59,6 +59,8 @@ integration("cross-persona admissions through active classes",()=>{
   const {getFamilyHome}=await import("@/modules/family/family-home.functions");
   const {getMyStudentToday}=await import("@/modules/student-experience/student-today.functions");
   const {accessibleClasses,authorizeClass}=await import("@/modules/learning/class-access.server");
+  const {getClassWorkspace}=await import("@/modules/learning/class-workspace.functions");
+  const {getGradebookSections,getGradebook}=await import("@/modules/learning/gradebook.functions");
   const {getNotifications}=await import("@/modules/communication/notification-center.functions");
   const rollback=new Error("rollback-admissions-handoff");
   const suffix=crypto.randomUUID().slice(0,8);
@@ -85,7 +87,7 @@ integration("cross-persona admissions through active classes",()=>{
     const guardian=first(await tx.insert(s.people).values({legalFirstName:"Admissions",legalLastName:"Guardian"}).returning());
     const registrar=first(await tx.insert(s.people).values({legalFirstName:"Admissions",legalLastName:"Registrar"}).returning());
     const outsider=first(await tx.insert(s.people).values({legalFirstName:"Unrelated",legalLastName:"Guardian"}).returning());
-    function act(role:"guardian"|"registrar"|"student",personId:string):Actor{
+    function act(role:"guardian"|"registrar"|"student"|"teacher",personId:string):Actor{
      const actor:Actor={actorPersonId:personId,role,accountId:crypto.randomUUID(),sessionId:crypto.randomUUID(),
       grantId:crypto.randomUUID(),capabilities:new Set(roleCapabilities[role]),
       scope:{organizationIds:[org.id],siteIds:[site.id],programIds:[program.id]}};
@@ -460,7 +462,17 @@ integration("cross-persona admissions through active classes",()=>{
     const instructor=act("teacher",classTeacher.id);
     expect((await accessibleClasses(instructor)).map(row=>row.id)).toEqual([section.id]);
     await authorizeClass(instructor,section.id);
+    // The same just-activated Section and student must be usable by BOTH
+    // the newly placed learner and the teacher's gradebook, not only SIS.
+    expect((await getGradebookSections()).sections.map(row=>row.id)).toContain(section.id);
+    const gradebook=await getGradebook({data:{sectionId:section.id}});
+    expect(gradebook.students.map(row=>row.studentProfileId)).toContain(profileId);
+    const teacherClass=await getClassWorkspace({data:{sectionId:section.id}});
+    expect(teacherClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
+    expect(teacherClass.roster.some(row=>row.profileId===profileId)).toBe(true);
     state.actor=learner;
+    const studentClass=await getClassWorkspace({data:{sectionId:section.id}});
+    expect(studentClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
     const unrelated=act("guardian",outsider.id);
     await expect(authorizeClass(unrelated,section.id,student.personId)).rejects.toThrow();
     state.actor=family;
