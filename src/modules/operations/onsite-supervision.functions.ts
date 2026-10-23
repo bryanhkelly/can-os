@@ -100,7 +100,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         lastName:people.legalLastName,active:people.active})
         .from(people).where(inArray(people.id,peopleIds)):Promise.resolve([]),
       peopleIds.length?db.select({personId:accountPersonGrants.personId,
-        programId:accountPersonGrants.programId,role:accountPersonGrants.role})
+        role:accountPersonGrants.role})
         .from(accountPersonGrants).where(and(
           inArray(accountPersonGrants.personId,peopleIds),
           eq(accountPersonGrants.siteId,site.id),
@@ -126,8 +126,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
       const personId=uniqueIds.length===1?uniqueIds[0]!:null;
       const person=personId?peopleById.get(personId):null;
       const approved=!!person?.active && staffGrants.some(grant=>
-        grant.personId===personId &&
-        (grant.programId===null||grant.programId===section.programId));
+        grant.personId===personId);
       for(const period of templates.length?templates:[null]){
         result.push({
           sectionId:section.id,sectionTitle:section.title,
