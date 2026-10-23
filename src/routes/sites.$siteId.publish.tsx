@@ -4,7 +4,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
-import { getSitePublicationDraftView, reserveSitePublicationAddress } from "@/modules/sites/site-publication.functions";
+import { getSitePublicationDraftView, reserveSitePublicationAddress, setSitePublicationStatus } from "@/modules/sites/site-publication.functions";
 
 export const Route = createFileRoute("/sites/$siteId/publish")({
   loader: ({ params }) => safeLoader(
@@ -28,6 +28,8 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [reason, setReason] = useState("");
+  const [contentReviewed, setContentReviewed] = useState(false);
 
   async function reserve(event: FormEvent) {
     event.preventDefault();
@@ -43,9 +45,31 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
     }
   }
 
+  async function updatePublication(action: "publish" | "unpublish") {
+    if (!data.address) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const result = await setSitePublicationStatus({ data: {
+        siteId: data.site.id, action, expectedRevision: data.address.updatedAt,
+        reason, contentReviewed: action === "publish" && contentReviewed,
+      } });
+      setNotice(result.changed
+        ? (action === "publish"
+            ? "Catalog approved. Public hostname routing is not yet active."
+            : "Site catalog unpublished and no longer publicly readable.")
+        : "No change was needed. The site is already in that state.");
+      setReason(""); setContentReviewed(false);
+      await router.invalidate();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to change publication.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const candidate = isPublicSiteSlug(slug) ? publicSiteHost(slug) : null;
   return <WorkspaceShell eyebrow="CAN OS · Site publishing" title={data.site.name + " · public site"}
-    subtitle="Reserve a site address and privately preview existing school and enrichment programs. Publishing is not enabled."
+    subtitle="Reserve an address and approve or withdraw the catalog. Public hostname routing is not yet active."
     breadcrumbs={<><Link to="/sites/$siteId" params={{ siteId: data.site.id }} className="underline">Site Today</Link><span>/</span><span>Public site</span></>}>
     {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
@@ -54,7 +78,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       <p className="mt-2 text-sm text-muted-foreground">Addresses must be globally unique. Reserving one does not activate DNS, allow public access, or open applications.</p>
       {data.address ? <div className="mt-4 space-y-2">
         <p className="font-medium">{data.address.host}</p>
-        <p className="text-sm text-muted-foreground">Recorded status: {data.address.status}. Address changes and publication require separate approved workflows.</p>
+        <p className="text-sm text-muted-foreground">Recorded status: {data.address.status}. {data.address.publishedAt
+          ? "Approved " + new Date(data.address.publishedAt).toLocaleString()
+          : "Not published"}. Address changes require separate approval.</p>
       </div> : <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={reserve}>
         <label className="flex-1 text-sm">Subdomain
           <input aria-label="Public site subdomain" className="mt-1 block w-full rounded-lg border bg-background p-2"
@@ -67,7 +93,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       </form>}
     </section>
     <section className="mt-6 rounded-xl border bg-card p-5">
-      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Private preview · not published</p>
+      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Private editor preview · authenticated only</p>
       <div className="mt-5 border-b pb-5">
         <p className="font-serif text-3xl">{data.site.name}</p>
         <p className="mt-1 text-sm text-muted-foreground">{data.site.organizationName}</p>
@@ -79,7 +105,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         {data.programs.map(program => <article key={program.id} className="rounded-lg border p-4">
           <h3 className="font-medium">{program.name}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{program.type.replaceAll("_"," ")} · Grades {program.gradeRange.min}–{program.gradeRange.max}</p>
-          <p className="mt-2 text-xs text-muted-foreground">Internal status: {program.status}. Not published.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Internal status: {program.status}. Not in the public enrichment catalog.</p>
         </article>)}
         {!data.programs.length && <p className="text-sm text-muted-foreground">No programs are currently available for this private preview.</p>}
       </div>
@@ -106,7 +132,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           <p className="mt-1 text-xs text-muted-foreground">
             {item.registrationOpen ? "CAN enrichment registration currently open" :
               "CAN enrichment registration window not open"}
-            {" · "}Site website unpublished
+            {" · "}Public site hostname routing not yet active
           </p>
         </article>)}
         {!data.catalogPreview.length && <p className="text-sm text-muted-foreground">
