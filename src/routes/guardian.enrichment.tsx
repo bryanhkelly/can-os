@@ -70,6 +70,8 @@ function EnrichmentFamilyView({ data }: {
       const offer = data.catalog.find(item => item.seasonId === seasonId);
       if (!offer) throw new Error("Offering no longer available");
       const selectedPackageIds = packageSelections[seasonId] ?? [];
+      if (offer.packages.some(item => selectedPackageIds.includes(item.id) && !item.available))
+        throw new Error("A selected package has canceled or unavailable sessions");
       if (offer.packages.length && !selectedPackageIds.length)
         throw new Error("Select at least one camp package or weekly option");
       const selectedPackages = offer.packages.filter(item => selectedPackageIds.includes(item.id));
@@ -177,6 +179,7 @@ function EnrichmentFamilyView({ data }: {
         const packageConflict = new Set(packageSessions).size !== packageSessions.length;
         const quotedPrice = selectedPackages.reduce((sum,item)=>sum+item.priceCents,0);
         const requestedWaitlist = selectedPackages.some(option=>option.seatsRemaining === 0);
+        const unavailableSelection = selectedPackages.some(option=>!option.available);
         return <article key={offer.seasonId} className="rounded-xl border bg-card p-5">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{offer.siteName} · {offer.programName}</p>
           <h3 className="mt-1 text-xl font-semibold">{offer.name}</h3>
@@ -211,6 +214,7 @@ function EnrichmentFamilyView({ data }: {
                   className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
                   <span className="flex items-center gap-2">
                     <input type="checkbox" checked={chosenIds.includes(option.id)}
+                      disabled={!option.available}
                       onChange={event=>setPackageSelections(current=>{
                         const ids=current[offer.seasonId] ?? [];
                         return {...current, [offer.seasonId]: event.target.checked
@@ -221,7 +225,8 @@ function EnrichmentFamilyView({ data }: {
                     </span>
                   </span>
                   <span>{usd(option.priceCents)}
-                    {" · "}{option.seatsRemaining === 0 ? "Waitlist" :
+                    {" · "}{!option.available ? "Unavailable" :
+                      option.seatsRemaining === 0 ? "Waitlist" :
                       option.seatsRemaining === null ? "Capacity not specified" :
                       `${option.seatsRemaining} seats`}
                   </span>
@@ -248,7 +253,7 @@ function EnrichmentFamilyView({ data }: {
             </label>
             <button type="button" onClick={() => register(offer.seasonId, offer.permissionVersion)}
               disabled={busy || !selected || !householdId || !offer.registrationOpen ||
-                !acknowledged[offer.seasonId] || packageConflict ||
+                !acknowledged[offer.seasonId] || packageConflict || unavailableSelection ||
                 (offer.packages.length > 0 && !chosenIds.length)}
               className="mt-4 rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
               {offer.registrationOpen ? "Submit registration" : "Registration window is closed"}
