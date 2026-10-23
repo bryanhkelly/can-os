@@ -46,7 +46,12 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
   eyebrow="CAN OS · Family"
   title="Family home"
   subtitle="Everything that needs your attention across your children, in one place."
-  actions={<Link to="/messages" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Family inbox</Link>}
+  actions={<div className="flex flex-wrap gap-2">
+   <Link to="/guardian/enrichment" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">
+    Summer &amp; enrichment
+   </Link>
+   <Link to="/messages" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Family inbox</Link>
+  </div>}
  >
   <QueryState loading={loading ? "Loading your family…" : ""} error={error}>
    <div className="mt-7 grid gap-3 sm:grid-cols-3">
