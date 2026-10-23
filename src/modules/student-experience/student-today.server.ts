@@ -4,10 +4,11 @@
  * from the demo UI until a real student session exists.
  */
 import { and, asc, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import {
   actions, assessments, calendarEvents, enrollments, people, sections,
-  scheduledOccurrences, studentProfiles, submissions,
+  scheduledOccurrences, studentProfiles, submissions, terms,
 } from "@/db/schema";
 
 export type StudentTodayData = Awaited<ReturnType<typeof getStudentToday>>;
@@ -29,6 +30,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
 
   if (!student) throw new Error("Student not found");
 
+  const activeProgramMembership=alias(enrollments,"student_today_active_program");
   const activeSections = await db
     .select({
       sectionId: sections.id,
@@ -39,10 +41,20 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
     })
     .from(enrollments)
     .innerJoin(sections, eq(enrollments.sectionId, sections.id))
+    .innerJoin(terms,eq(terms.id,sections.termId))
+    .innerJoin(activeProgramMembership,and(
+      eq(activeProgramMembership.studentProfileId,enrollments.studentProfileId),
+      eq(activeProgramMembership.programId,sections.programId),
+      eq(activeProgramMembership.schoolYearId,terms.schoolYearId),
+      eq(activeProgramMembership.kind,"program"),
+      eq(activeProgramMembership.status,"active"),
+    ))
     .where(and(
       eq(enrollments.studentProfileId, studentProfileId),
       eq(enrollments.kind, "section"),
       eq(enrollments.status, "active"),
+      eq(enrollments.programId,sections.programId),
+      eq(enrollments.schoolYearId,terms.schoolYearId),
       eq(sections.active, true),
       ...(scope?[inArray(sections.siteId,scope.siteIds),inArray(sections.programId,scope.programIds)]:[]),
     ));
