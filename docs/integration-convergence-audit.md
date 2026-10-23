@@ -40,13 +40,26 @@ The static route-contract checker rejects missing ownership. All three entries
 were added on `FullFlow` in commit `cf65e286`; they start with `pending`
 acceptance as required. Rerun the checker and pin results to the latest branch SHA.
 
-### I-02 — Disposable database migration drift [P0, confirmed by read-only inspection]
+### I-02 — Dedicated Neon migrations reconciled [P0 schema gate RESOLVED; runtime acceptance pending]
+
+**Completed 2026-10-23:** Explicitly authorized migration `0032`–`0038`
+was applied to `fullflow-e2e-20261022` with one branch-verified transaction
+per committed SQL file, preserving original Drizzle source SHA-256 and
+timestamps. A pre-migration recovery branch
+`fullflow-pre-0032-0038-20261023`
+(`br-spring-heart-arjhajgf`) was created first. Read-only postcheck shows
+**39/39** ledger entries, all seven new hashes matching GitHub source, correct
+new enums, columns, tables, indexes and constraints, and unchanged existing
+Program/Site/Activity record counts. This is not a connected application test.
+**Neither production nor test01 was used as a SQL target.**
 
 **Current migration review:** [Dedicated Neon 0032–0038 SQL/branch preconditions](./fullflow-neon-migration-review-0032-0038.md).
 A read-only, server-identity-attested `npm run db:review:fullflow` command is
-committed and the protected `db:migrate:fullflow` wrapper now refuses to
-invoke Drizzle unless its preconditions match migration 0031. Review is
-not authorization to apply migrations. All DB inspections remain read-only.
+committed. Those reviewed pre-0032 guards intentionally fail once the
+target has 39 migrations and need a post-application/no-op mode before reuse.
+The migration run used the branch-scoped Neon SQL connector with explicit
+user authorization; its SQL transactions are recorded in the linked review.
+Post-migration verification queries remained read-only.
 **Neon branch isolation requirement (verified 2026-10-23):**
 - Project: `can-os` (`sweet-hall-62441909`).
 - ONLY authorized FullFlow database migration/fixture target:
@@ -65,13 +78,12 @@ not authorization to apply migrations. All DB inspections remain read-only.
 - Read-only inspections do not apply migrations. As of this review, **no
   migration was run** by this review on any Neon branch.
 
-The current source migration journal has 39 entries (through `0038`), while
-the existing isolated `fullflow-e2e-20261022` Neon branch reports **32** applied
-migrations. `scripts/verify-fullflow-schema.mjs` is intentionally fail-closed
-when the ledger differs. Do not rerun mutable fixtures against this old schema.
-Prepare and review migrations **only on a guarded disposable branch**, confirm
-hash/ledger/index parity, then execute the integration suite. Never migrate
-production as part of acceptance repair.
+Before the authorized migration run, the source journal had 39 entries
+while the dedicated branch had 32. That **specific schema drift is now
+resolved**, with all seven migrations applied and postchecked. The next
+gate is to run the guarded `verify-fullflow-schema.mjs` check and
+connected FullFlow service acceptance from a trusted runner; neither was
+executed by the Neon SQL migration session.
 
 **Branch enforcement improvement (2026-10-23):** The code now checks
 Postgres-reported `neon.project_id` and `neon.branch_id` against the approved
