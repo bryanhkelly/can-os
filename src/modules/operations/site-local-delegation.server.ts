@@ -259,6 +259,8 @@ export async function requireCurrentSiteLocalDelegate(
       eq(roleAssignments.siteId, host.siteId),
       eq(roleAssignments.programId, programId),
       eq(roleAssignments.roleKey, localResponsibilityRoles[responsibility]),
+      sql`${roleAssignments.capabilities} @> ${JSON.stringify(["onsite.attendance.record"])}::jsonb`,
+      sql`${roleAssignments.metadata}->>'origin' = 'local_site_delegation'`,
       lte(programResponsibilityAssignments.effectiveFrom, now),
       gt(programResponsibilityAssignments.effectiveThrough, now),
       eq(accountPersonGrants.id, actor.grantId),
