@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { getOnsiteSupervisionPlan } from "@/modules/operations/onsite-supervision.functions";
+import {
+  getOnsiteDutyResponses, respondToOnsiteDuty,
+} from "@/modules/operations/onsite-duty-response.functions";
 
 type Plan = Awaited<ReturnType<typeof getOnsiteSupervisionPlan>>;
+type Responses = Awaited<ReturnType<typeof getOnsiteDutyResponses>>;
 
 const labels: Record<string,string> = {
   schedule_missing:"Instructional block has no valid scheduled time",
@@ -16,21 +20,45 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
   const [plan,setPlan]=useState<Plan|null>(null);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
+  const [responses,setResponses]=useState<Responses|null>(null);
+  const [dutyBusy,setDutyBusy]=useState("");
+  const [dutyMessage,setDutyMessage]=useState("");
   const [nonce,setNonce]=useState(0);
   useEffect(()=>{
     if (!date) return;
     let active=true;
-    setLoading(true);setPlan(null);setError("");
-    void getOnsiteSupervisionPlan({data:{date}}).then(result=>{
+    setLoading(true);setPlan(null);setResponses(null);setError("");setDutyMessage("");
+    void Promise.all([
+      getOnsiteSupervisionPlan({data:{date}}),
+      getOnsiteDutyResponses({data:{date}}),
+    ]).then(([result,duties])=>{
       if (!active) return;
-      setPlan(result);setError("");setLoading(false);
+      setPlan(result);setResponses(duties);setError("");setLoading(false);
     }).catch(()=>{
       if (!active) return;
-      setPlan(null);setLoading(false);
-      setError("Supervision planning is unavailable. Verify assignments with your site leader.");
+      setPlan(null);setResponses(null);setLoading(false);
+      setError("Staffing coverage or duty responses are unavailable. No confirmed coverage is assumed.");
     });
     return ()=>{active=false};
   },[date,nonce]);
+  async function answerDuty(sectionId:string,periodId:string,response:"accepted"|"cannot_cover") {
+    if(dutyBusy)return;
+    setDutyBusy(sectionId+":"+periodId);setDutyMessage("");setError("");
+    try{
+      await respondToOnsiteDuty({data:{
+        date,sectionId,periodId,response,
+        ...(response==="cannot_cover"?{reason:"unavailable" as const}:{}),
+        confirmed:true as const,
+      }});
+      setDutyMessage(response==="accepted"
+        ?"Your availability response was saved. This is not a supervision or student handoff certification."
+        :"Coverage exception recorded. Contact the site leader directly to arrange supervision.");
+      const next=await getOnsiteDutyResponses({data:{date}});
+      setResponses(next);
+    }catch{
+      setError("Duty response could not be saved. Refresh your assignment and contact the site leader.");
+    }finally{setDutyBusy("")}
+  }
   return <section className="mt-10" aria-label="Planned onsite supervision">
     <h2 className="font-serif text-2xl">Instructional supervision plan</h2>
     <p className="mt-2 text-sm text-muted-foreground">
@@ -44,7 +72,13 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
       onClick={()=>{setLoading(true);setError("");setNonce(n=>n+1)}}>
       Refresh supervision plan
     </button>}
+    {dutyMessage&&<p role="status" className="mt-3 text-sm">{dutyMessage}</p>}
     {plan&&<>
+      {responses&&<p className="mt-3 text-sm">
+        {responses.unacknowledged} planned blocks not responded to ·
+        {" "}{responses.coverageExceptions} staffing exceptions.
+        A response is not verified physical presence or a completed handoff.
+      </p>}
       {plan.projectionTruncated&&<p role="alert" className="mt-3 rounded border p-3 text-sm">
         Coverage listing was capped. These counts are incomplete; do not use this plan to certify site staffing.
       </p>}
@@ -61,7 +95,10 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
         Verify the academic calendar and instructional schedules before treating the site as unstaffed.
       </p>}
       <ul className="mt-4 grid gap-3">
-        {plan.blocks.slice(0,60).map((block,index)=><li
+        {plan.blocks.slice(0,60).map((block,index)=>{
+          const duty=responses?.statuses.find(row=>row.sectionId===block.sectionId&&
+            row.periodId===block.periodId);
+          return <li
           key={block.sectionId+":"+(block.periodId??"missing")+":"+index}
           className="rounded-lg border p-3">
           <p className="font-semibold">{block.sectionTitle}</p>
@@ -80,7 +117,28 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
           {block.gaps.length>0&&<ul className="mt-2 list-inside list-disc text-xs text-muted-foreground">
             {block.gaps.map(gap=><li key={gap}>{labels[gap]??gap}</li>)}
           </ul>}
-        </li>)}
+          {duty&&<p className="mt-2 text-xs font-semibold" role="status">
+            Duty response: {duty.status==="accepted"?"Assigned adult reports availability":
+              duty.status==="cannot_cover"?"Coverage gap reported":"Awaiting assigned adult's response"}
+          </p>}
+          {duty?.canRespond&&duty.status==="not_reported"&&block.periodId&&<>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {duty.canAccept&&<button type="button" disabled={!!dutyBusy}
+                onClick={()=>void answerDuty(block.sectionId,block.periodId!,"accepted")}
+                className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                I can cover this scheduled block
+              </button>}
+              <button type="button" disabled={!!dutyBusy}
+                onClick={()=>void answerDuty(block.sectionId,block.periodId!,"cannot_cover")}
+                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+                I cannot cover this block
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              For coverage gaps, contact your site leader directly. The app does not arrange a substitute.
+            </p>
+          </>}
+        </li>})}
       </ul>
       {plan.blocks.length>60&&<p className="mt-3 text-sm">
         Showing 60 of {plan.blocks.length} instructional blocks. Use school staffing administration for the complete plan.
