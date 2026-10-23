@@ -41,6 +41,7 @@ export async function publishExtendedSeason(
       activityId: activities.id, activityStatus: activities.status,
       metadata: activities.metadata, activitySiteId: activities.siteId,
       capacity: activitySeasons.capacity,
+      feeAmountCents: activitySeasons.feeAmountCents,
       programId: programs.id, type: programs.type,
       programStatus: programs.status, creditIssuerId: programs.creditIssuingOrganizationId,
       organizationId: programs.organizationId, programSiteId: programs.siteId,
@@ -67,7 +68,8 @@ export async function publishExtendedSeason(
       const existing = readEnrichmentPublication(season.metadata);
       if (existing?.seasonId === season.id &&
         existing.permissionVersion === input.permissionVersion &&
-        existing.permissionText === input.permissionText)
+        existing.permissionText === input.permissionText &&
+        season.feeAmountCents === input.feeAmountCents)
         return { seasonId: season.id, status: "registration" as const, created: false };
       throw new Error("Offering already published. Changes require a controlled revision.");
     }
