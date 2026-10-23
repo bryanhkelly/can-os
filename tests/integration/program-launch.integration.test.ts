@@ -457,6 +457,18 @@ integration("GF3 host / program launch", () => {
       expect(extensionProgram.type).toBe("high_school_extension");
       expect(extensionProgram.status).toBe("launching");
       expect(extension.journeyId).toBeTruthy();
+      if (scenario.orgType === "church") {
+        // Switching a church-owned CAN site from church_hosted_academy to
+        // high_school_extension must not bypass institutional authorization.
+        await expect(programsModule.activateProgram({
+          ...context, scope: {
+            ...context.scope, siteIds: [site.id, extraSite.siteId],
+            programIds: [launch.programId, extension.programId],
+          },
+        }, extension.programId)).rejects.toThrow(
+          "independently verified Program-Site institutional authorization",
+        );
+      }
       launchState.context = launchContext;
       expect(await db.select().from(schema.domainEvents).where(and(
         eq(schema.domainEvents.aggregateId, extraSite.siteId),
