@@ -56,6 +56,26 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ].filter(Boolean).join(" · ");
     const onsiteDays = program.delivery.onsiteDaysPerWeek;
     const requestId = options?.makeRequestId?.();
+    const applyRequestId = options?.makeRequestId?.();
+    // A published active academic Program can invite first-time families to
+    // verify their email. The receiving server checks the live operating
+    // authorization; this is not a claim of admission or school readiness.
+    const applicationForm = program.availability === "operating" && applyRequestId ?
+      `<form action="/apply" method="post" class="inquiry-form">
+        <h4>Start your school application</h4>
+        <p class="availability">Verify your email first. No child information is
+          collected on this public page, and guardian authority is reviewed by the school.</p>
+        <input type="hidden" name="requestId" value="${escapePublicHtml(applyRequestId)}"/>
+        <input type="hidden" name="programId" value="${escapePublicHtml(program.programId)}"/>
+        <label>Parent or guardian first name<input name="firstName" autocomplete="given-name" maxlength="80" required/></label>
+        <label>Parent or guardian last name<input name="lastName" autocomplete="family-name" maxlength="80" required/></label>
+        <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required/></label>
+        <div aria-hidden="true" class="bot-field"><label>Website<input name="website" tabindex="-1" autocomplete="off"/></label></div>
+        <label class="consent"><input type="checkbox" name="contactConsent" value="yes" required/>
+          I agree to receive an email verification link to begin or resume my application.
+        </label>
+        <button type="submit">Verify email to apply</button>
+      </form>` : "";
     const inquiryForm = requestId ? `<form action="/inquiry" method="post" class="inquiry-form">
         <input type="hidden" name="requestId" value="${escapePublicHtml(requestId)}"/>
         <input type="hidden" name="programId" value="${escapePublicHtml(program.programId)}"/>
@@ -84,6 +104,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <p class="availability">${program.availability === "planned"
         ? "Program planned · admissions not open on this page"
         : "Current program · contact the Site about admissions"}</p>
+      ${applicationForm}
       ${inquiryForm}
     </article>`;
   }).join("\n");
