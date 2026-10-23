@@ -11,7 +11,9 @@ const labels: Record<string,string> = {
   schedule_missing:"Instructional block has no valid scheduled time",
   calendar_unverified:"No verified instructional day on the current academic calendar; duty response unavailable",
   facilitator_missing:"No named facilitator in the active delivery arrangement",
-  staff_grant_missing:"Assigned adult lacks a verified active site-staff grant",
+  staff_grant_missing:"Assigned adult lacks a verified active Site staff grant",
+  section_delegation_missing:"Assigned adult lacks a current, time-valid appointment to this exact Section",
+  operating_agreement_missing:"CAN–church onsite supervision agreement is not currently authorized",
   facilitator_conflict:"Facilitator is assigned to overlapping instructional blocks",
   room_unconfigured:"Physical room / duty location is not recorded in CAN OS",
 };
