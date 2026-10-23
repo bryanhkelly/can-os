@@ -170,6 +170,42 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
      throw new Error("Inquiry request key reused with a different public interest");
     return {applicationId:repeat.id};
    }
+   // A selected web interest is untrusted contact data, not a Student,
+   // Household or verified guardian. Lock it before creating those records,
+   // so concurrent registrar attempts cannot create duplicate conversions.
+   let interestToConvert: { id: string; priorStatus: string } | null = null;
+   if (data.publicInterestId) {
+    if (!program.siteId || data.existingStudent || data.existingApplicationId)
+     throw new Error("Public interest conversion requires a newly reviewed student intake");
+    const [interest] = await tx.select({
+      id:publicAdmissionsInterests.id,
+      status:publicAdmissionsInterests.status,
+      applicationId:publicAdmissionsInterests.applicationId,
+      siteId:publicAdmissionsInterests.siteId,
+      programId:publicAdmissionsInterests.programId,
+      firstName:publicAdmissionsInterests.contactFirstName,
+      lastName:publicAdmissionsInterests.contactLastName,
+      email:publicAdmissionsInterests.contactEmail,
+    }).from(publicAdmissionsInterests).where(and(
+      eq(publicAdmissionsInterests.id,data.publicInterestId),
+      eq(publicAdmissionsInterests.programId,data.programId),
+      eq(publicAdmissionsInterests.siteId,program.siteId),
+    )).for("update").limit(1);
+    if (!interest) throw new AuthorizationError("public interest intake scope");
+    assertPublicInterestConversion({
+      interest,
+      request:{
+        programId:data.programId,siteId:program.siteId,
+        guardianFirstName:data.guardianFirstName,
+        guardianLastName:data.guardianLastName,
+        guardianEmail:data.guardianEmail,
+        contactReviewed:data.contactReviewed===true,
+        hasExistingStudent:false,
+        hasExistingApplication:false,
+      },
+    });
+    interestToConvert = { id:interest.id, priorStatus:interest.status };
+   }
    let guardianPersonId:string;
    let householdId:string;
    let studentProfileId:string;
@@ -249,9 +285,39 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     householdId,studentProfileId,programId:data.programId,
     submittedByPersonId:actor.actorPersonId!,stage:"inquiry",
     idempotencyKey,
-    metadata:{synthetic,source:data.source,notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardianPersonId,
+    metadata:{synthetic,source:interestToConvert?"published_site":data.source,
+     notes:data.notes??"",origin:"registrar_intake",contactPersonId:guardianPersonId,
+     ...(interestToConvert?{publicInterestId:interestToConvert.id,contactReviewedByRegistrar:true}:{}),
      ...(data.existingStudent?{existingStudent:true,createdHousehold:data.existingStudent.createHousehold===true}:{})},
    }).returning({id:applications.id});
+   if (interestToConvert) {
+    const now = new Date();
+    const [linked] = await tx.update(publicAdmissionsInterests).set({
+      applicationId:application!.id,
+      status:"converted",convertedAt:now,convertedByPersonId:actor.actorPersonId!,
+      updatedAt:now,
+    }).where(and(
+      eq(publicAdmissionsInterests.id,interestToConvert.id),
+      inArray(publicAdmissionsInterests.status,["new","contacted"]),
+      isNull(publicAdmissionsInterests.applicationId),
+    )).returning({id:publicAdmissionsInterests.id});
+    if (!linked) throw new Error("Public interest was already converted; refresh admissions");
+    await writeAudit(tx,actor,{
+      action:"admissions.public_interest.convert",
+      entityType:"public_admissions_interest",entityId:interestToConvert.id,
+      scope:{organizationId:program.organizationId,siteId:program.siteId,programId:data.programId},
+      before:{status:interestToConvert.priorStatus},
+      after:{status:"converted",applicationId:application!.id,
+        contactReviewConfirmed:true,guardianRelationshipVerification:"pending"},
+    });
+    await emitEvent(tx,{
+      eventType:"PublicAdmissionsInterestConverted",
+      aggregateType:"public_admissions_interest",aggregateId:interestToConvert.id,
+      actorPersonId:actor.actorPersonId,
+      organizationId:program.organizationId,siteId:program.siteId,programId:data.programId,
+      payload:{applicationId:application!.id,status:"converted"},
+    });
+   }
    await emitEvent(tx,{eventType:"AdmissionsInquiryCreated",aggregateType:"application",
     aggregateId:application!.id,actorPersonId:actor.actorPersonId,
     payload:{programId:data.programId,studentProfileId,existingStudent:!!data.existingStudent,
