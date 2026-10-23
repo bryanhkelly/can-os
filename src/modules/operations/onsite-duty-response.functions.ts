@@ -88,6 +88,10 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
       .orderBy(desc(actions.createdAt),desc(actions.id)).limit(501);
     const truncated=rows.length>500;
     const statuses=plan.blocks.map(block=>{
+      const currentlyAuthorized = actor.role === "room_facilitator"
+        ? canAcceptSections.get(block.sectionId) === true
+        : actor.role === "site_leader"
+        ? canAcceptPrograms.get(block.programId) === true : true;
       const record=!truncated&&block.verifiedSiteStaffGrant
         ? rows.find(row=>row.sectionId===block.sectionId&&
           row.metadata.periodId===block.periodId&&
@@ -102,8 +106,9 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
             ? canAcceptSections.get(block.sectionId) === true
             : actor.role === "site_leader"
             ? canAcceptPrograms.get(block.programId) === true : true),
-        status:record?.metadata.response==="accepted"?"accepted" as const:
-          record?.metadata.response==="cannot_cover"?"cannot_cover" as const:
+        status:record?.metadata.response==="accepted"
+          ? currentlyAuthorized ? "accepted" as const : "stale_after_delegation" as const
+          :record?.metadata.response==="cannot_cover"?"cannot_cover" as const:
           "not_reported" as const,
         respondedAt:record?.createdAt.toISOString()??null,
         isOwnResponse:record?.ownerPersonId===actor.actorPersonId,
@@ -115,10 +120,11 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
       // Do not count a closed/unconfigured school day as a missed staffing
       // acknowledgment. Those blocks remain visible as schedule warnings.
       unacknowledged:statuses.filter((row,index)=>
-        row.status==="not_reported" &&
+        (row.status==="not_reported" || row.status==="stale_after_delegation") &&
         plan.blocks[index]?.instructionalDayConfirmed===true &&
         plan.blocks[index]?.assignedPlan===true).length,
-      coverageExceptions:statuses.filter(row=>row.status==="cannot_cover").length,
+      coverageExceptions:statuses.filter(row=>row.status==="cannot_cover" ||
+        row.status==="stale_after_delegation").length,
       truncated:truncated||plan.projectionTruncated,
       note:"An acknowledgment records one assigned adult's stated availability for a scheduled block, not verified physical presence, room supervision, child custody, or an accepted handoff. Contact the site lead directly for coverage gaps.",
     };
