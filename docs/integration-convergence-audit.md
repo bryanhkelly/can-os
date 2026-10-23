@@ -41,6 +41,12 @@ were added on `FullFlow` in commit `cf65e286`; they start with `pending`
 acceptance as required. Rerun the checker and pin results to the latest branch SHA.
 
 ### I-02 — Disposable database migration drift [P0, confirmed by read-only inspection]
+
+**Current migration review:** [Dedicated Neon 0032–0038 SQL/branch preconditions](./fullflow-neon-migration-review-0032-0038.md).
+A read-only, server-identity-attested `npm run db:review:fullflow` command is
+committed and the protected `db:migrate:fullflow` wrapper now refuses to
+invoke Drizzle unless its preconditions match migration 0031. Review is
+not authorization to apply migrations. All DB inspections remain read-only.
 **Neon branch isolation requirement (verified 2026-10-23):**
 - Project: `can-os` (`sweet-hall-62441909`).
 - ONLY authorized FullFlow database migration/fixture target:
@@ -101,7 +107,14 @@ academic year, sections, enrollment, school-year and site projections join on
 these values. First design and test a narrowly scoped, effective and revocable
 academic service authorization keyed to the existing Program and Site.
 
-### I-05 — Issuer-specific transcript authority is not enforced [P0, confirmed]
+### I-05 — Issuer-specific transcript authority [P0, initial fail-closed guard committed]
+
+An additional command guard now denies transcript issuance when the authenticated
+registrar's verified Organization scope does not include the credit issuer.
+GF25 integration assertions explicitly deny host-only authority and check that
+no official issuance row was inserted. **The database integration test is not
+yet executed.** This interim control does not implement CAN's future verified
+cross-organization delegation, which remains a separate P0 requirement.
 `issueTranscript` checks registrar role, `enrollment:manage`, scope and
 grade rows, then adopts the rows' `creditIssuingOrganizationId` as the
 issuer. It does not establish that the *issuing actor* is authorized by that
@@ -138,7 +151,14 @@ coverage or approved jurisdictional policy. Block actual onsite minors until
 separately approved legal/child-protection controls and restricted workflow
 exist and pass authenticated, negative-access and offline acceptance.
 
-### I-09 — CI result attribution remains unresolved [P0 evidence]
+### I-09 — CI runtime unavailable; no source execution [P0 evidence]
+
+GitHub Actions API job results on the reviewed FullFlow SHA show failed jobs
+with `runner_id=0`, `runner_name=""`, `steps=[]` and completion in
+roughly two seconds. **No runner accepted the job and no tests executed.**
+This is an Actions execution/runner provisioning obstacle, not verified
+application test failure. Diagnose the repository/account/organization Actions
+availability or billing and re-run actual build/typecheck/unit checks.
 The `FullFlow` CI and Admissions Neon Acceptance workflows were reporting
 failure during this review. The connected API did not provide current job
 steps/logs, so failure causes are **not diagnosed**; missing test secrets,
@@ -149,6 +169,25 @@ Capture exact SHA, run, failed step and logs, fix underlying cause, rerun.
 A host share/tuition simulation is not a ledger. Do not add actual invoices,
 payments, ESA reimbursement or financial claims while the single-school
 academic/onsite flow and institutional controls remain unproven.
+
+### I-11 — Incomplete fixture route registration [P0, source fix committed]
+
+The route fixture coverage manifest omitted `/enrichment`,
+`/guardian/enrichment`, `/site/day` and `/sites/$siteId/publish`.
+The checker requires a row for every surfaced route. All four now have
+specific personas and needed interactions, but are explicitly flagged
+`fixtureRequired:false` with the missing schema, verified relationships and
+browser-story blockers. **This removes a manifest omission; it does not
+prove any feature has usable fixture data.**
+
+### I-12 — FullFlow branch enforcement previously leaked into unrelated suites [P0, corrected]
+
+Earlier FullFlow Neon pinning was accidentally attached to the generic
+admissions, GF1 and curriculum browser/migration runners. Those suites
+have independent isolated Neon targets. Corrected: only `full-flow`
+mode, its schema checker and the explicit `db:migrate:fullflow` command
+require `br-proud-pine-arfju8h2`. Independent suites retain their
+existing, separately guarded test connections and CI commands.
 
 ## Integration order and small acceptance bites
 
