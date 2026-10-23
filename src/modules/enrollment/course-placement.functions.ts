@@ -2,7 +2,7 @@ import {activateSectionEnrollment} from "./section-allocation.service";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { admissionOffers, applications, courseTemplateVersions, enrollments, programs, sections, terms } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -10,6 +10,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasAccessibleFirstLesson } from "@/domain/first-class-lesson";
 import { verifiedTeacherSectionIds } from "./verified-section-teachers.server";
 import { staffedPublishedSectionIds } from "./instructional-section-readiness.server";
+import { getSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
 
 async function registrar() {
   const actor = await getCommandContext(getRequest());
@@ -56,6 +57,22 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
    const sectionIds=rows.map(row=>row.id);
    const staffedIds=await verifiedTeacherSectionIds(sectionIds,db);
    const readyIds=await staffedPublishedSectionIds(sectionIds,db);
+   // A published, staffed class can still have no available seat or have
+   // passed add/drop. Mirror those mandatory enrollment guards before
+   // offering it to a registrar; the write transaction is authoritative.
+   const occupancy=sectionIds.length?await db.select({
+     sectionId:enrollments.sectionId,
+     count:sql<number>`count(*)::int`,
+   }).from(enrollments).where(and(
+     inArray(enrollments.sectionId,sectionIds),
+     eq(enrollments.kind,"section"),eq(enrollments.status,"active"),
+   )).groupBy(enrollments.sectionId):[];
+   const occupied=new Map(occupancy.map(row=>[row.sectionId,row.count]));
+   const policies=await Promise.all(rows.map(async row=>({
+     id:row.id,policy:await getSectionRegistrationPolicy(row.id,db),
+   })));
+   const policyBySection=new Map(policies.map(row=>[row.id,row.policy]));
+   const today=new Date().toISOString().slice(0,10);
    const enrolled = await db.select({ sectionId: enrollments.sectionId }).from(enrollments)
      .where(and(eq(enrollments.studentProfileId, app.studentProfileId),
        eq(enrollments.kind, "section"), eq(enrollments.status, "active")));
@@ -65,7 +82,9 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      id: s.id, title: s.title, code: s.code, enrolled: assigned.has(s.id),
      staffed: staffedIds.has(s.id),
      curriculumReady:s.curriculumStatus==="published" && hasAccessibleFirstLesson(s.curriculum),
-     readyForPlacement:readyIds.has(s.id),
+     readyForPlacement:readyIds.has(s.id) &&
+       (occupied.get(s.id)??0)<(policyBySection.get(s.id)?.enrollmentCapacity??0) &&
+       today<=(policyBySection.get(s.id)?.addDropEndsOn??""),
    })) };
  });
 
