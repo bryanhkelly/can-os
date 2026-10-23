@@ -342,8 +342,13 @@ Program/Site/Organization scope and an additional share lock on the owning
 Program before taking a write lock on the selected interest. It verifies
 the exact Site and Program, contact details, staff confirmation and
 `new` / `contacted` status. Closed or already-converted interests cannot
-be linked. It creates the ordinary `inquiry`-stage Application with existing
-household, student and **pending/unverified** guardian relationship rules.
+be linked. A further scoped lookup rejects attempts to create a second
+household when the contact email already belongs to an application within
+the registrar's authorized school programs; staff must use the verified
+existing-household route for siblings. This does not claim global
+identity-deduplication or verify the adult solely from an email.
+The command creates the ordinary `inquiry`-stage Application with existing
+student/household creation and **pending/unverified** guardian relationship rules.
 The incoming source is recorded as `published_site`; no guardian login,
 relationship verification, academic admission or enrollment is conferred.
 
