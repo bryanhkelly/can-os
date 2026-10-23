@@ -1,5 +1,57 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 implementation slices — first public family and staffed class (23 October 2026)
+
+**Source committed on FullFlow, not released or browser accepted.**
+
+- **Published Site → email proof → canonical Application:** active academic
+  program cards offer "Verify email to apply" through the dedicated tenant
+  `POST /apply`. The Netlify edge host gate rewrites ONLY that exact action;
+  tenant origins continue to deny account, session, private and RPC routes.
+  The action accepts a bounded adult-only form with honeypot, same-origin and
+  database-backed global/cooldown limits, checks Site and Program publication
+  and current CAN/church service authority, and emails a short-lived hashed
+  token to the CAN OS platform origin.
+- **New parent account and resume:** `/family/join` atomically consumes that
+  one-use token and establishes a real email-verified, Site-scoped **guardian**
+  account/session. Existing accounts and verified family Person identities
+  are reused only where the account-to-guardian relationship is unambiguous;
+  ambiguous multiple guardian Person identities are denied, not silently
+  merged. The parent lands at `/guardian/apply?programId=...`, submits a
+  canonical Application and Journey through the existing authorized
+  `startFamilyApplication` transaction, and later sees their own previously
+  submitted application by authenticating again. Child relationships remain
+  unverified and all three permissions false until explicit registrar review.
+  Public email ownership **does not** prove legal guardianship.
+- **Accepted enrollment → actual staffed class:** the registrar can preview
+  Sections belonging to an accepted offer's school year **before** activation.
+  The page offers one "Activate enrollment and assign class" command, which
+  uses the existing Section allocation service **within the Program activation
+  transaction**. Staff identity/grant, active Section, matching program/year,
+  live church/CAN academic agreement, class capacity, policy, prerequisites,
+  schedule and audit/outbox all fail closed; any rejection rolls back
+  enrollment and Section placement together. For a church-hosted CAN program
+  the direct activation path refuses a missing Section ID entirely.
+- **CAN teaching team:** a CAN account assigned as the Section teacher
+  receives only independently approved **Section-level** academic visibility
+  for a church-hosted class. Institutional organization membership is checked
+  against current signed operating evidence on session use and per-class
+  access, including within mutation transactions. The church Site,
+  organization and other programs are **not** added to the CAN account's grant.
+- **Database:** `0042_public_family_start_requests.sql` is in Drizzle's
+  journal and **applied to isolated Neon `fullflow-e2e-20261022`**.
+  The ten-column pending verification record has a unique token hash and
+  expiration/status and school indexes; no change to production data.
+  New regressions cover tenant host isolation, first-family CTA, constrained
+  adult request, and the church-offer Section requirement.
+- **Not yet accepted:** branch CI and Admissions Neon acceptance failures
+  remain unresolved/uninspected as passing evidence; no multi-role
+  browser run, DNS/TLS/feature flag rollout, public deliverability check or
+  real teacher lesson/grade/guardian acceptance is claimed. Existing family
+  records created through an independent registrar inquiry still require
+  explicit institution identity reconciliation; an email match is not
+  permission to adopt a prior student or Household.
+
 ## Product override — first enrolled student into a real class (23 October 2026)
 
 **Priority P0: churches and families, not additional website features.** The shortest
