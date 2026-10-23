@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { requireActor, assertSiteGranted, assertProgramGranted, type Actor } from "@/modules/identity/actors.server";
@@ -7,7 +7,9 @@ export type ClassTransaction = Parameters<Parameters<typeof import("@/db/client"
 export async function classActor() {
   const actor = await requireActor(["student", "guardian", "teacher"]);
   assertCapability(actor, actor.role === "student" ? "student:read" : actor.role === "guardian" ? "student:related-read" : "teacher:read");
-  if (!actor.scope.siteIds?.length || !actor.scope.programIds?.length) throw new AuthorizationError("class delivery scope");
+  if (!(actor.scope.siteIds?.length && actor.scope.programIds?.length) &&
+      !(actor.role==="teacher" && actor.scope.sectionIds?.length))
+    throw new AuthorizationError("class delivery scope");
   return actor;
 }
 
@@ -24,8 +26,14 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
     .innerJoin(s.courseTemplates, eq(s.courseTemplates.id, s.courseTemplateVersions.courseTemplateId))
     .where(and(eq(s.sections.id, sectionId), eq(s.sections.active, true))).limit(1);
   if (!section) throw new AuthorizationError("active class");
-  assertSiteGranted(actor, section.siteId);
-  assertProgramGranted(actor, section.programId);
+  // An independent CAN teacher receives ONLY this Section, never the
+  // host Organization or its unrelated Programs and Sites.
+  const institutionalSection=actor.role==="teacher" &&
+    actor.scope.sectionIds?.includes(section.id)===true;
+  if(!institutionalSection){
+    assertSiteGranted(actor, section.siteId);
+    assertProgramGranted(actor, section.programId);
+  }
   if (actor.role === "teacher") {
     const [assigned] = await query.select({ id: s.sectionTeachers.id }).from(s.sectionTeachers)
       .where(and(eq(s.sectionTeachers.sectionId, sectionId), eq(s.sectionTeachers.personId, actor.actorPersonId))).limit(1);
@@ -57,9 +65,16 @@ export async function accessibleClasses(actor: Actor) {
   const scope = and(eq(s.sections.active, true),
     inArray(s.sections.siteId, actor.scope.siteIds ?? []), inArray(s.sections.programId, actor.scope.programIds ?? []));
   if (actor.role === "teacher") {
+    const delegated=actor.scope.sectionIds??[];
     const rows = await db.select(projection).from(s.sections)
       .innerJoin(s.sectionTeachers, eq(s.sectionTeachers.sectionId, s.sections.id))
-      .where(and(scope, eq(s.sectionTeachers.personId, actor.actorPersonId))).orderBy(s.sections.title);
+      .where(and(eq(s.sections.active,true),
+        eq(s.sectionTeachers.personId,actor.actorPersonId),
+        delegated.length ? (
+          // Host-local assignments continue to be checked by the existing
+          // Site/Program scope; delegated assignments are exact Section IDs.
+          or(scope,inArray(s.sections.id,delegated))
+        ) : scope)).orderBy(s.sections.title);
     return rows.map(row => ({ ...row, studentPersonId: null, studentName: null }));
   }
   const query = db.select({ ...projection, studentPersonId: s.studentProfiles.personId,
