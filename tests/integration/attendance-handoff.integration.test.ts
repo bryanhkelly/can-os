@@ -78,6 +78,7 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
     const guardian=first(await tx.insert(s.people).values({legalFirstName:"Attendance",legalLastName:"Guardian"}).returning());
     const teacher=first(await tx.insert(s.people).values({legalFirstName:"Attendance",legalLastName:"Teacher"}).returning());
     const registrar=first(await tx.insert(s.people).values({legalFirstName:"Attendance",legalLastName:"Registrar"}).returning());
+    const facilitator=first(await tx.insert(s.people).values({legalFirstName:"Onsite",legalLastName:"Facilitator"}).returning());
     const outsider=first(await tx.insert(s.people).values({legalFirstName:"Other",legalLastName:"Guardian"}).returning());
     const student=first(await tx.insert(s.studentProfiles).values({personId:learner.id,gradeLevel:"9"}).returning());
     studentId=student.id;
@@ -92,9 +93,9 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
      {studentProfileId:student.id,kind:"program",status:"active",organizationId:org.id,programId:program.id,schoolYearId:schoolYear.id},
      {studentProfileId:student.id,kind:"section",status:"active",organizationId:org.id,programId:program.id,schoolYearId:schoolYear.id,sectionId:section.id},
     ]);
-    function act(role:"registrar"|"teacher"|"guardian",personId:string):Actor{
+    function act(role:"registrar"|"teacher"|"guardian"|"room_facilitator",personId:string):Actor{
      const actor:Actor={actorPersonId:personId,role,accountId:crypto.randomUUID(),sessionId:crypto.randomUUID(),
-      grantId:crypto.randomUUID(),capabilities:new Set(roleCapabilities[role]),
+      grantId:crypto.randomUUID(),grantSiteId:site.id,capabilities:new Set(roleCapabilities[role]),
       scope:{organizationIds:[org.id],siteIds:[site.id],programIds:[program.id]}};
      state.actor=actor;return actor;
     }
@@ -105,6 +106,37 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
      mutationId:crypto.randomUUID(),expectedPreviousEventId:null};
     const original=await flow.markExpectedOnsiteAttendance({data:absent});originalId=original.attendanceEventId;
     expect(await flow.markExpectedOnsiteAttendance({data:absent})).toEqual(original);
+
+    // The facilitator is physically assigned to this site, not a registrar.
+    // Their attendance event goes through the same authoritative ledger.
+    const room=act("room_facilitator",facilitator.id);
+    const siteDay=await flow.getOnsiteStaffDayContext();
+    expect(siteDay).toMatchObject({siteId:site.id,siteName:site.name});
+    expect(first((await flow.listExpectedOnsiteRoster({data:{date}})).students))
+      .toMatchObject({studentProfileId:student.id,attendanceEventId:originalId,status:"absent"});
+    await expect(flow.listExpectedPendingExcuses()).rejects.toThrow("onsite staff cannot review");
+    await expect(flow.markExpectedOnsiteAttendance({data:{
+      ...absent,mutationId:crypto.randomUUID(),
+    }})).rejects.toThrow("prior-record acknowledgement");
+    await expect(flow.markExpectedOnsiteAttendance({data:{
+      ...absent,expectedPreviousEventId:originalId,
+      mutationId:crypto.randomUUID(),note:"too short",
+    }})).rejects.toThrow("Explain any onsite attendance correction");
+    expect(await flow.markExpectedOnsiteAttendance({data:{
+      ...absent,expectedPreviousEventId:originalId,
+      mutationId:crypto.randomUUID(),note:"I verified the original absence.",
+    }})).toEqual(original);
+    state.actor={...room,grantSiteId:crypto.randomUUID()};
+    await expect(flow.markExpectedOnsiteAttendance({data:{
+      ...absent,expectedPreviousEventId:originalId,
+      mutationId:crypto.randomUUID(),note:"Original mark reviewed.",
+    }})).rejects.toThrow("site-bound");
+    state.actor=room;
+    await expect(recordAttendanceRevision(room,{
+      studentProfileId:student.id,programId:program.id,siteId:site.id,sectionId:section.id,
+      occurrenceKey:date+":site-day",expectedAt:new Date(),status:"present",
+      mutationId:crypto.randomUUID(),expectedPreviousEventId:originalId,
+    })).rejects.toThrow("scheduled site-day");
     const family=act("guardian",guardian.id);
     expect(first((await getFamilyHome()).children).unexcusedAbsences).toBe(1);
     expect((await getGuardianNeedsYou()).items.filter(row=>row.kind==="excuse")).toHaveLength(1);
