@@ -10,12 +10,18 @@ vi.mock("@/db/client", () => {
   const query = {
     innerJoin() { return this; },
     where() { return this; },
+    for() { return this; },
     limit() { return Promise.resolve(state.rows); },
   };
-  return { db: { select: () => {
+  const select = () => {
     state.reads += 1;
     return { from: () => query };
-  } } };
+  };
+  return { db: {
+    select,
+    transaction: async (callback: (tx: { select: typeof select }) => Promise<unknown>) =>
+      callback({ select }),
+  } };
 });
 vi.mock("@/modules/activities/enrichment-catalog.server", () => ({
   readEnrichmentCatalog: async (siteId: string) => {
