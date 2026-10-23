@@ -129,8 +129,9 @@ function OperationsPage(){
    <p className="mt-2 text-sm text-muted-foreground">Live records from the same authorized school programs, curriculum releases, enrollments, classrooms, grades and guardian follow-ups. Numbers are not simulated readiness approvals.</p>
    {!dashboard ? <p className="mt-4 text-sm" role="alert">The connected school record could not be loaded. Launch and grading status cannot be verified from this screen.</p> : <>
     <p className="mt-2 text-xs text-muted-foreground">Refreshed {new Date(dashboard.asOf).toLocaleString()}</p>
-    <div className="mt-4 grid gap-3 sm:grid-cols-4">
+    <div className="mt-4 grid gap-3 sm:grid-cols-5">
      {[["Active students",dashboard.totals.activeProgramStudents],
+       ["Awaiting class placement",dashboard.programs.reduce((sum,p)=>sum+Math.max(0,p.counts.activeProgramStudents-p.counts.placedStudents),0)],
        ["Class placements",dashboard.totals.placedStudents],
        ["Graded submissions",dashboard.totals.gradedWork],
        ["Guardian questions open",dashboard.totals.unresolvedGuardianResponses]]
@@ -148,7 +149,12 @@ function OperationsPage(){
        <div><dt className="text-xs text-muted-foreground">Curriculum &amp; teaching</dt>
         <dd>{program.counts.adoptedCurriculumPacks} adopted packs · {program.counts.publishedSections} published sections · {program.counts.staffedSections}/{program.counts.sections} staffed sections</dd></div>
        <div><dt className="text-xs text-muted-foreground">Admissions &amp; enrollment</dt>
-        <dd>{program.counts.applications} applications · {program.counts.acceptedApplications} accepted · {program.counts.activeProgramStudents} active students · {program.counts.placedStudents} class placements</dd></div>
+        <dd>{program.counts.applications} applications · {program.counts.acceptedApplications} accepted · {program.counts.activeProgramStudents} active students · {program.counts.placedStudents} class placements</dd>
+        {program.counts.activeProgramStudents>program.counts.placedStudents&&<dd className="mt-2 font-semibold">
+          {program.counts.activeProgramStudents-program.counts.placedStudents} student(s) awaiting a class.{" "}
+          <Link to="/admissions" search={{siteId:program.siteId??undefined,programId:program.id}}
+            className="underline">Place enrolled students →</Link>
+        </dd>}</div>
        <div><dt className="text-xs text-muted-foreground">Learning &amp; responses</dt>
         <dd>{program.counts.publishedAssessments} assessments · {program.counts.submittedWork} awaiting grading · {program.counts.gradedWork} graded · {program.counts.unresolvedGuardianResponses} open family questions</dd></div>
       </dl>
