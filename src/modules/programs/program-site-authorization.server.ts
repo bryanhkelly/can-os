@@ -282,6 +282,38 @@ export async function requireCurrentProgramSiteAuthorization(
   throw new AuthorizationError("current independently verified CAN-church operating authority");
 }
 
+/** Institutional academic writes are not authorized merely because a church
+ * Program names CAN as its provider. This check is intentionally separate from
+ * the actor's verified role / Program / Section relationship checks.
+ *
+ * Same-organization and non-church Programs keep their existing workflows.
+ * Any independently church-owned CAN Program requires BOTH an original
+ * CAN-organization membership and a live, service-specific agreement.
+ * Call inside the mutation transaction, after verifying resource scope.
+ */
+export async function requireInstitutionalAcademicProgramAuthority(
+  tx: Reader,
+  actor: Pick<AccessContext, "scope">,
+  programId: string,
+  requiredServices: readonly OperatingService[],
+): Promise<string | null> {
+  const [program] = await tx.select({
+    organizationId: programs.organizationId,
+    hostOrganizationId: programs.hostOrganizationId,
+    institutionOrganizationId: programs.academicProviderOrganizationId,
+  }).from(programs).where(eq(programs.id, programId)).limit(1);
+  if (!program) throw new AuthorizationError("existing academic Program");
+  const hostId = program.hostOrganizationId ?? program.organizationId;
+  const [host] = await tx.select({type: organizations.type})
+    .from(organizations).where(eq(organizations.id, hostId)).limit(1);
+  if (!host) throw new AuthorizationError("existing Program host");
+  if (host.type !== "church" || program.institutionOrganizationId === hostId)
+    return null;
+  if (!actor.scope.organizationIds?.includes(program.institutionOrganizationId))
+    throw new AuthorizationError("verified CAN institutional Organization membership");
+  return requireCurrentProgramSiteAuthorization(tx, programId, requiredServices);
+}
+
 /** Authenticated, minimal host workspace projection. Never returns other
  * churches' agreement evidence or CAN administrative lists.
  */
