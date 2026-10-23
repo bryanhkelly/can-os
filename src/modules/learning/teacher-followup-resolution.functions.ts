@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { STUDENT_LEARNING_GOAL_TYPE } from "@/domain/teacher-student-goal";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { accessibleClasses } from "./class-access.server";
@@ -36,6 +37,7 @@ export const getTeacherLearningFollowUps = createServerFn({ method: "GET" })
     if(!sectionIds.length)return {items:[],truncated:false,
       note:"No current named and authorized teaching Sections."};
     const recent = new Date(Date.now() - 30 * 24 * 60 * 60_000);
+    const activeProgram=alias(s.enrollments,"followup_active_program");
     const rows = await db.select({
       id: s.actions.id, title: s.actions.title, description: s.actions.description,
       status: s.actions.status, dueAt: s.actions.dueAt,
@@ -61,6 +63,13 @@ export const getTeacherLearningFollowUps = createServerFn({ method: "GET" })
         eq(s.enrollments.studentProfileId, s.studentProfiles.id),
         eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active"),
       ))
+      .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+      .innerJoin(activeProgram,and(
+        eq(activeProgram.studentProfileId,s.enrollments.studentProfileId),
+        eq(activeProgram.programId,s.sections.programId),
+        eq(activeProgram.schoolYearId,s.terms.schoolYearId),
+        eq(activeProgram.kind,"program"),eq(activeProgram.status,"active"),
+      ))
       .where(and(
         eq(s.actions.type, "academic_intervention"),
         eq(s.actions.subjectType, "student_profile"),
@@ -72,6 +81,7 @@ export const getTeacherLearningFollowUps = createServerFn({ method: "GET" })
         eq(s.actions.organizationId, s.programs.organizationId),
         eq(s.actions.programId, s.sections.programId),
         eq(s.actions.siteId, s.sections.siteId),
+        eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
         inArray(s.sections.id,sectionIds),
       ))
       .orderBy(asc(s.actions.dueAt), desc(s.actions.createdAt)).limit(101);
