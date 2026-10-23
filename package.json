@@ -9,6 +9,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:migrate:fullflow": "node scripts/migrate-fullflow-neon.mjs",
+    "db:review:fullflow": "node scripts/review-fullflow-migrations.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "demo:provision-registrar": "node --import tsx scripts/provision-demo-registrar.mjs",
