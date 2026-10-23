@@ -371,8 +371,8 @@ function LaunchWizardPage() {
                     Academic provider
                     <select aria-label="Academic provider organization" className={selectClass} value={academicProviderOrganizationId} onChange={(e) => setAcademicProviderOrganizationId(e.target.value)} required>
                       <option value="">Select academic provider…</option>
-                      {options.organizations.map((organization) => (
-                        <option key={organization.id} value={organization.id}>{organization.name}</option>
+                      {options.academicProviderOrganizations.map((organization) => (
+                        <option key={organization.id} value={organization.id}>{organization.name}{organization.type === "can_network" ? " (CAN academic provider)" : ""}</option>
                       ))}
                     </select>
                   </label>
@@ -381,14 +381,15 @@ function LaunchWizardPage() {
                       Credit-issuing organization
                       <select aria-label="Credit issuing organization" className={selectClass} value={creditIssuingOrganizationId} onChange={(e) => setCreditIssuingOrganizationId(e.target.value)} required>
                         <option value="">Select credit issuer…</option>
-                        {options.organizations.map((organization) => (
-                          <option key={organization.id} value={organization.id}>{organization.name}</option>
+                        {options.creditIssuingOrganizations.map((organization) => (
+                          <option key={organization.id} value={organization.id}>{organization.name}{organization.type === "can_network" ? " (CAN credit issuer)" : ""}</option>
                         ))}
                       </select>
                     </label>
                   ) : (
                     <p className="text-xs text-muted-foreground">Noncredit offering: no credit issuer required; it does not contribute to official transcripts.</p>
                   )}
+                  <p className="text-xs text-muted-foreground">Selecting CAN as the academic provider or credit issuer records a proposed arrangement only. It does not prove an executed agreement, school-of-record authority, accreditation or CAN staff access to the host's student records. Separate approval and access grants are required before operating.</p>
                 </div>
               </fieldset>
 
