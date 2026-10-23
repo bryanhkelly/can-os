@@ -341,3 +341,48 @@ Additional required work: instructor/facilitator handoff, valid room
 capacity, direct safeguarding reporting, approved school opening,
 runtime cross-site/contract-revocation tests, and real browser sessions.
 No active student records were created and no production database was changed.
+
+
+## Increment 6 — scheduled block coverage requires live named authority (2026-10-23)
+
+**Source-committed; not yet runtime accepted.** The existing school-day staffing
+projection previously counted a Site-staff grant plus active delivery arrangement
+as a planned Section assignment even if the church/CAN Section's separately
+named facilitator delegation was expired, missing or assigned to another adult.
+That was an insufficient readiness signal.
+
+The projection now batch-verifies, for every candidate named adult and Section:
+- the **latest** canonical SchoolConfigurationVersion's exact
+  `room_facilitator:<sectionId>:<personId>` responsibility;
+- the matching active, nonsynthetic, email-verified Site-specific account,
+  active person, local RoleAssignment provenance and capability;
+- the appointment's **entire scheduled instructional block**, not merely the
+  school date or the actor's Site-wide access;
+- the CAN/church `onsite_supervision` agreement's **current** effective,
+  evidence-verified authorization for independent church/CAN Programs.
+
+Missing/expired or wrong-Section authority adds
+`section_delegation_missing` and missing service authority adds
+`operating_agreement_missing`. Neither counts as
+`plannedAssignments`; both are displayed as unresolved gaps. The
+instructional calendar, active Section delivery arrangement, overlapping
+staff duties and original Site account grant checks remain in force.
+
+An affirmative response's existing `planToken` now includes the
+delegation's specific role-assignment ID and effective term plus the
+independent CAN/church authorization ID. Reappointment, revocation, or
+a contract replacement cannot silently carry forward an earlier
+positive coverage acknowledgment. The corresponding current-authorization
+server checks still run when a staff member affirmatively accepts duty.
+A staff member already assigned to a block can still report
+`cannot_cover` even after their separate delegated authority expires.
+
+**Unchanged safety hold:** `hasConfirmedPhysicalCoverage=false`;
+no checked-in adult, student custody, room allocation, age-appropriate
+ratios, qualifications, background screening, emergency response,
+backup adult, or approved school opening is inferred from this projection.
+Next critical bite is explicit block-specific primary/backup coverage
+with verified training/screening and room location, then separate
+physical check-in. Existing nonchurch/Same-Org models retain their
+previous role behavior, except the generic email-verification hardening.
+No new migration or production action is required by this bite.
