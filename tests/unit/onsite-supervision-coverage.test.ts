@@ -22,7 +22,7 @@ describe("planned hybrid onsite section supervision",()=>{
     expect(result.blocks[0]).toMatchObject({
       assignedPlan:true,gaps:["room_unconfigured"],
     });
-    expect(result.note).toMatch(/not.*onsite presence/i);
+    expect(result.note).toMatch(/no authoritative room assignment.*onsite presence/i);
   });
   it("reports missing schedules, facilitators and active site authorizations",()=>{
     const result=summarizeOnsiteSupervision([
