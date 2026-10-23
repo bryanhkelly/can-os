@@ -20,6 +20,13 @@ describe("isolated FullFlow acceptance runner", () => {
     );
   });
 
+  it("requires a database-attested Neon branch before launching any connected fixture", () => {
+    const source = readFileSync(script, "utf8");
+    expect(source).toContain('scripts/verify-fullflow-neon-branch.mjs');
+    expect(source.indexOf('scripts/verify-fullflow-neon-branch.mjs'))
+      .toBeLessThan(source.indexOf('node_modules/vitest/vitest.mjs'));
+  });
+
   it("accepts the safe full-flow --preflight without contacting a database", () => {
     const outcome = spawnSync(process.execPath, [script, "full-flow", "--preflight"], {
       encoding: "utf8",
