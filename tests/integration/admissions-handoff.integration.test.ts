@@ -430,12 +430,23 @@ integration("cross-persona admissions through active classes",()=>{
     }).returning());
     const teacherAccount=first(await tx.insert(s.accessAccounts).values({
       emailNormalized:`instructor-${suffix}@example.invalid`,
+      emailVerifiedAt:new Date(),
     }).returning());
     await tx.insert(s.accountPersonGrants).values({
       accountId:teacherAccount.id,personId:classTeacher.id,role:"teacher",
       organizationId:org.id,siteId:site.id,
     });
     await tx.insert(s.sectionTeachers).values({sectionId:section.id,personId:classTeacher.id});
+    // The family-to-class preview and actual placement must agree on
+    // verified sign-in status, not merely the existence of a staff row.
+    await tx.update(s.accessAccounts).set({disabled:true})
+      .where(eq(s.accessAccounts.id,teacherAccount.id));
+    expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
+      .toEqual(expect.arrayContaining([expect.objectContaining({id:section.id,staffed:false})]));
+    await expect(placeEnrolledStudent({data:{applicationId,sectionId:section.id}}))
+      .rejects.toThrow("Assign an active teacher");
+    await tx.update(s.accessAccounts).set({disabled:false})
+      .where(eq(s.accessAccounts.id,teacherAccount.id));
     expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
       .toEqual(expect.arrayContaining([expect.objectContaining({
         id:section.id,staffed:true,curriculumReady:true,
