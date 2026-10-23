@@ -15,16 +15,25 @@ export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
  if(actor.role!=="guardian"||!actor.actorPersonId)throw new AuthorizationError("guardian enrollment offers");
  assertCapability(actor,"enrollment.apply");
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const relations=await db.select({studentPersonId:s.guardianRelationships.studentPersonId}).from(s.guardianRelationships)
+ const relations=await db.select({
+  studentPersonId:s.guardianRelationships.studentPersonId,
+  metadata:s.guardianRelationships.metadata,
+ }).from(s.guardianRelationships)
   .where(and(eq(s.guardianRelationships.guardianPersonId,actor.actorPersonId),eq(s.guardianRelationships.canManageEnrollment,true),...(data.studentPersonId?[eq(s.guardianRelationships.studentPersonId,data.studentPersonId)]:[])));
- if(!relations.length)return [];
+ // A legacy or self-asserted relationship may have canManageEnrollment=true
+ // without independent verification. Never expose a child's admissions record
+ // or offers until the school has verified that precise relationship.
+ const verifiedStudents=relations.filter(r=>r.metadata.verification==="verified")
+  .map(r=>r.studentPersonId);
+ if(!verifiedStudents.length)return [];
  const profiles=await db.select({id:s.studentProfiles.id,personId:s.studentProfiles.personId}).from(s.studentProfiles)
-  .where(inArray(s.studentProfiles.personId,relations.map(r=>r.studentPersonId)));
+  .where(inArray(s.studentProfiles.personId,verifiedStudents));
  if(!profiles.length)return [];
  const students=await db.select({profileId:s.studentProfiles.id,firstName:s.people.legalFirstName,lastName:s.people.legalLastName})
   .from(s.studentProfiles).innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
   .where(inArray(s.studentProfiles.id,profiles.map(p=>p.id)));
  const nameByProfile=new Map(students.map(p=>[p.profileId,[p.firstName,p.lastName].filter(Boolean).join(" ")]));
+ const personByProfile=new Map(profiles.map(p=>[p.id,p.personId]));
  const apps=await db.select({id:s.applications.id,programId:s.applications.programId,studentProfileId:s.applications.studentProfileId,programName:s.programs.name,
   stage:s.applications.stage,metadata:s.applications.metadata})
   .from(s.applications).innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
@@ -41,7 +50,7 @@ export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
   .from(s.journeyRequirements).where(and(inArray(s.journeyRequirements.journeyId,journeys.map(journey=>journey.id)),
    eq(s.journeyRequirements.blocking,true))):[];
  const enrollments=await db.select({studentProfileId:s.enrollments.studentProfileId,programId:s.enrollments.programId,
-  schoolYearId:s.enrollments.schoolYearId,kind:s.enrollments.kind,sectionActive:s.sections.active})
+  schoolYearId:s.enrollments.schoolYearId,kind:s.enrollments.kind,sectionActive:s.sections.active,sectionProgramId:s.sections.programId})
   .from(s.enrollments).leftJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
   .where(and(inArray(s.enrollments.studentProfileId,profiles.map(profile=>profile.id)),
    inArray(s.enrollments.programId,permitted.map(app=>app.programId)),eq(s.enrollments.status,"active")));
@@ -51,12 +60,13 @@ export const getGuardianAdmissionOffers=createServerFn({method:"GET"})
   const journey=journeys.find(row=>row.applicationId===app.id);
   const blockers=requirements.filter(row=>row.journeyId===journey?.id&&row.status!=="complete")
    .map(({id,title,status})=>({id,title,status}));
-  return {applicationId:app.id,studentName:nameByProfile.get(app.studentProfileId)??"Student",program:app.programName,
+  return {applicationId:app.id,studentPersonId:personByProfile.get(app.studentProfileId)!,
+   studentName:nameByProfile.get(app.studentProfileId)??"Student",program:app.programName,
    applicationStage:app.stage,waitlisted:app.metadata.admissionsDisposition==="waitlisted",
    blockers,offers:offers.filter(o=>o.applicationId===app.id).map(o=>{
     const active=enrollments.filter(row=>row.studentProfileId===app.studentProfileId&&row.programId===app.programId&&row.schoolYearId===o.schoolYearId);
     const enrollmentActive=active.some(row=>row.kind==="program");
-    const sectionCount=active.filter(row=>row.kind==="section"&&row.sectionActive===true).length;
+    const sectionCount=active.filter(row=>row.kind==="section"&&row.sectionActive===true&&row.sectionProgramId===app.programId).length;
     return {id:o.id,status:o.status,expiresAt:o.expiresAt?.toISOString()??null,schoolYearId:o.schoolYearId,
      schoolYearName:years.find(year=>year.id===o.schoolYearId)?.name??o.schoolYearId,
      enrollmentActive,sectionCount,progress:admissionOfferProgress({status:o.status,expiresAt:o.expiresAt?.toISOString()??null,
