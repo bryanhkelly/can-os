@@ -1,5 +1,3 @@
-import type { PublicSiteEnrichmentInput } from "./public-site-catalog";
-
 /** Standalone, escaped HTML. No hydration, external scripts or CAN OS shell. */
 type PublicOffering = ReturnType<typeof import("./public-site-catalog").toPublicSiteEnrichment>;
 export type PublicSitePage = {
