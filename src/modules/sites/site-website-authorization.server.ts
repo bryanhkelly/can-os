@@ -30,7 +30,7 @@ export async function requirePartnerWebsiteEditor(
   assertPartnerWebsitePreviewScope(actor, site);
   if (!actor.capabilities.has(capability)) throw new AuthorizationError("partner website publishing permission");
 
-  const [assignment] = await executor.select({ id: roleAssignments.id })
+  const [assignment] = await executor.select({ id: roleAssignments.id, capabilities: roleAssignments.capabilities })
     .from(roleAssignments)
     .innerJoin(memberships, and(
       eq(memberships.personId, roleAssignments.personId),
@@ -47,6 +47,7 @@ export async function requirePartnerWebsiteEditor(
       sql`${roleAssignments.capabilities} @> ${JSON.stringify([capability])}::jsonb`,
     )).limit(1);
   if (!assignment) throw new AuthorizationError("explicit Site website editor assignment");
-  return site;
+  return { ...site, canPublish: assignment.capabilities.includes(siteWebsiteLocalPublishCapability) };
+
 }
 
