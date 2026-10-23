@@ -8,6 +8,7 @@ import {
   type listExtendedSeasonPlanning,
 } from "@/modules/activities/extended-learning.functions";
 import { programTypeLabels } from "@/domain/program-offerings";
+import type { EnrichmentPackage } from "@/domain/enrichment-packages";
 import { extendedLearningReadinessTasks } from "@/domain/extended-learning-readiness-tasks";
 
 type Planning = Awaited<ReturnType<typeof listExtendedSeasonPlanning>>;
@@ -42,6 +43,12 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [permissionText, setPermissionText] = useState("");
   const [feeDollars, setFeeDollars] = useState("0");
   const [operatorConfirmed, setOperatorConfirmed] = useState(false);
+  const [packages, setPackages] = useState<EnrichmentPackage[]>([]);
+  const [packageTitle, setPackageTitle] = useState("");
+  const [packagePrice, setPackagePrice] = useState("0");
+  const [packageFrom, setPackageFrom] = useState("");
+  const [packageThrough, setPackageThrough] = useState("");
+  const [packageWeekdays, setPackageWeekdays] = useState<number[]>([0,1,2,3,4,5,6]);
   const programs = planning.programs.filter(p => !siteId || p.siteId === siteId);
   const selectable = programs.filter(p => p.status !== "paused" && p.status !== "closed");
   const selected = selectable.find(p => p.id === programId);
@@ -76,15 +83,47 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       await publishExtendedSeasonFn({ data: {
         seasonId: publishSeasonId,
         permissionVersion, permissionText, feeAmountCents: Math.round(dollars * 100),
+        ...(packages.length ? { packages } : {}),
         operationalResponsibilityConfirmed: true,
       } });
-      setPublishSeasonId(""); setOperatorConfirmed(false);
+      setPublishSeasonId(""); setOperatorConfirmed(false); setPackages([]);
       setPermissionText(""); setPermissionVersion("");
       setSuccess("Offering published to the enrichment catalog. Families can now register.");
       await router.invalidate();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to publish registration");
     } finally { setBusy(false); }
+  }
+
+  function addPackage(seasonId: string) {
+    setError("");
+    const season = planning.seasons.find(item => item.id === seasonId);
+    const matching = planning.sessions.filter(item => {
+      if (item.seasonId !== seasonId) return false;
+      const date = new Date(item.startsAt);
+      const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+        timeZone: item.timezone, year:"numeric", month:"2-digit", day:"2-digit",
+      }).formatToParts(date).map(part => [part.type,part.value]));
+      const dayKey = `${parts.year}-${parts.month}-${parts.day}`;
+      const weekday = new Date(dayKey+"T00:00:00Z").getUTCDay();
+      return dayKey >= packageFrom && dayKey <= packageThrough &&
+        packageWeekdays.includes(weekday);
+    });
+    const dollars = Number(packagePrice);
+    if (!season || !packageTitle.trim() || packageTitle.trim().length < 2 ||
+        !Number.isFinite(dollars) || dollars < 0 || dollars > 100000 ||
+        Math.abs(dollars * 100 - Math.round(dollars * 100)) > 1e-6 ||
+        !packageFrom || !packageThrough || packageFrom > packageThrough ||
+        !matching.length)
+      return setError("Enter a package name, valid price and dates that match scheduled sessions");
+    if (packages.length >= 30) return setError("Maximum 30 package options");
+    setPackages(items => [...items, {
+      id: crypto.randomUUID(),
+      title: packageTitle.trim(),
+      priceCents: Math.round(dollars*100),
+      sessionIds: matching.map(item => item.id),
+    }]);
+    setPackageTitle("");
   }
 
   async function assignReadiness(seasonId: string, programId: string) {
@@ -205,6 +244,8 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                     onClick={() => {
                       setPublishSeasonId(active ? "" : season.id);
                       setOperatorConfirmed(false);
+                      setPackages([]); setPackageTitle("");
+                      setPackageFrom(season.startsOn); setPackageThrough(season.endsOn);
                     }}>{active ? "Close publication" : "Publish family registration"}</button>
                   {!isProgramActive && <p className="mt-2 text-xs">Activate the program through the existing launch controls first.</p>}
                   {!scheduled.length && <p className="mt-2 text-xs">Plan dated sessions first.</p>}
@@ -217,6 +258,62 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
                       <input className={inputClass} required maxLength={80} value={permissionVersion}
                         placeholder="summer-2027-v1" onChange={e => setPermissionVersion(e.target.value)}/>
                     </label>
+                    <div className="sm:col-span-2 rounded-lg border p-3">
+                      <p className="text-sm font-semibold">Optional week / weekday / day packages</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Leave empty for one full-season price. Otherwise add saleable
+                        weeks or day combinations; together the packages must cover every scheduled day.
+                        Families may choose multiple non-overlapping options.
+                      </p>
+                      <ul className="mt-2 space-y-1">
+                        {packages.map(item => <li key={item.id}
+                          className="flex items-center justify-between gap-2 text-xs">
+                          <span>{item.title} · {item.sessionIds.length} sessions ·
+                            {" "}${(item.priceCents/100).toFixed(2)}</span>
+                          <button type="button" className="underline"
+                            onClick={() => setPackages(all=>all.filter(p=>p.id!==item.id))}>
+                            Remove
+                          </button>
+                        </li>)}
+                      </ul>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <label className="text-xs">Package name
+                          <input className={inputClass} value={packageTitle}
+                            maxLength={100} placeholder="Week 1 / M-W-F / Full camp"
+                            onChange={e=>setPackageTitle(e.target.value)}/>
+                        </label>
+                        <label className="text-xs">Package fee (USD)
+                          <input className={inputClass} type="number" min={0} max={100000} step="0.01"
+                            value={packagePrice} onChange={e=>setPackagePrice(e.target.value)}/>
+                        </label>
+                        <label className="text-xs">From
+                          <input className={inputClass} type="date" min={season.startsOn}
+                            max={season.endsOn} value={packageFrom}
+                            onChange={e=>setPackageFrom(e.target.value)}/>
+                        </label>
+                        <label className="text-xs">Through
+                          <input className={inputClass} type="date" min={packageFrom||season.startsOn}
+                            max={season.endsOn} value={packageThrough}
+                            onChange={e=>setPackageThrough(e.target.value)}/>
+                        </label>
+                        <fieldset className="col-span-2">
+                          <legend className="text-xs">Include weekdays</legend>
+                          <div className="mt-1 flex flex-wrap gap-3">
+                            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day,i)=>
+                              <label key={day} className="text-xs">
+                                <input type="checkbox" checked={packageWeekdays.includes(i)}
+                                  onChange={e=>setPackageWeekdays(days=>e.target.checked
+                                    ? [...days,i] : days.filter(value=>value!==i))}/>
+                                {" "}{day}
+                              </label>)}
+                          </div>
+                        </fieldset>
+                        <button type="button" onClick={()=>addPackage(season.id)}
+                          className="col-span-2 rounded-lg border p-2 text-xs font-semibold">
+                          Add package option
+                        </button>
+                      </div>
+                    </div>
                     <label className="text-xs sm:col-span-2">Published guardian participation permission
                       <textarea className={inputClass} rows={5} required minLength={30} maxLength={6000}
                         placeholder="Write the approved participation permission families must acknowledge."
