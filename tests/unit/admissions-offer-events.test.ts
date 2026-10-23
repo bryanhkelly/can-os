@@ -152,7 +152,7 @@ describe("transactional admissions events", () => {
   });
 
   it("emits offer issuance alongside audit", async () => {
-    selectRows([application], [pool], [year], [program], [], [], [], [journey], [], [], [], [{personId:"student-person"}], [{personId:"guardian-person"}]);
+    selectRows([application], [pool], [year], [program], [], [], [], [journey], [], [], [], [{personId:"student-person"}], [{personId:"guardian-person",canManageEnrollment:true,metadata:{verification:"verified"}}]);
     await expect(issueSyntheticAdmissionOffer(registrarContext, input)).resolves.toBe("created");
     expect(values).toHaveBeenCalledWith(expect.objectContaining({
       eventType: "AdmissionOfferIssued", aggregateId: "created",
@@ -194,7 +194,7 @@ describe("transactional admissions events", () => {
   });
 
   it("allows issuing an offer for a live (non-synthetic) application", async () => {
-    selectRows([{ ...application, metadata: { synthetic: false } }], [pool], [year], [program], [], [], [], [journey], [], [], [], [{personId:"student-person"}], [{personId:"guardian-person"}]);
+    selectRows([{ ...application, metadata: { synthetic: false } }], [pool], [year], [program], [], [], [], [journey], [], [], [], [{personId:"student-person"}], [{personId:"guardian-person",canManageEnrollment:true,metadata:{verification:"verified"}}]);
     await expect(issueSyntheticAdmissionOffer(registrarContext, input)).resolves.toBe("created");
     expect(values).toHaveBeenCalledWith(expect.objectContaining({ action: "admissions.offer.issue" }));
   });
