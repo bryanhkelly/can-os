@@ -53,6 +53,40 @@
   explicit institution identity reconciliation; an email match is not
   permission to adopt a prior student or Household.
 
+## Current GF-B priority-two handoff — local Site authority (23 October 2026)
+
+**Source committed, unverified.** The requested next implementation was
+**priority 2** (church local director/facilitator delegation), while standalone
+CAN academic staff access work was intentionally skipped for this bite.
+
+- A host registrar can explicitly appoint/revoke **one Program-specific local
+  director and one initial room facilitator** from already active, email-verified,
+  Site-bound staff accounts. Uses canonical SchoolConfigurationVersion (a draft
+  is provisioned at first appointment), ProgramResponsibilityAssignment,
+  RoleAssignment, and current CAN/church onsite-supervision agreement.
+- Appointments have a 90-day maximum term, optimistic conflict checks,
+  exact Organization/Site/Program scopes, original active account-grant
+  verification, transactional audit and domain events. Revocation remains
+  available after agreement loss and serializes with actual onsite affirmative
+  duty/attendance mutations.
+- Independent church/CAN Programs now re-check named delegation at actual
+  pupil-roster read and attendance-write boundaries, whole-site director
+  attendance attestation, and facilitator/leader **affirmative** scheduled
+  duty acceptance. Legacy same-Organization/nonchurch programs retain their
+  previous role-and-duty behavior. Staff can still report inability to cover
+  a duty after expiry/revocation.
+- Registrar launch now exposes the local staff handoff. **No new database
+  migration** was necessary; the existing canonical tables are reused.
+
+**HOLD:** Actual execution of unit/database/browser tests, safe multi-facilitator
+and deputy scheduling (the first assignment model has only one per role per
+Program), independently verified staff screening/training, room-limited student
+rosters, safeguarding and school opening approvals, and real cross-Organization
+CAN academic staff access remain separate blockers. Draft school configuration
+does not constitute a completed campus readiness review.
+
+---
+
 ## Product override — first enrolled student into a real class (23 October 2026)
 
 **Priority P0: churches and families, not additional website features.** The shortest
