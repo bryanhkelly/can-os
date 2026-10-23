@@ -530,8 +530,13 @@ integration("cross-persona admissions through active classes",()=>{
       .toBe("pending_review");
     state.actor=staff;
     state.studentInvite.mockClear();
-    expect(await provisionStudentLearningAccess({data:{applicationId}}))
-      .toMatchObject({status:"approved"});
+    await expect(provisionStudentLearningAccess({data:{applicationId}}))
+      .rejects.toThrow("independent student identity verification");
+    expect(state.studentInvite).not.toHaveBeenCalled();
+    expect(await provisionStudentLearningAccess({data:{
+      applicationId,confirmedIndependentIdentity:true,
+      reviewMethod:"institutional_school_record",
+    }})).toMatchObject({status:"approved"});
     expect(state.studentInvite).toHaveBeenCalledOnce();
     expect(state.studentInvite).toHaveBeenCalledWith(email);
     const [studentAccount]=await tx.select().from(s.accessAccounts)
