@@ -4,6 +4,7 @@ import {
   createExtendedSeasonDraftFn,
   createExtendedReadinessAssignmentsFn,
   scheduleExtendedSessionsFn,
+  publishExtendedSeasonFn,
   type listExtendedSeasonPlanning,
 } from "@/modules/activities/extended-learning.functions";
 import { programTypeLabels } from "@/domain/program-offerings";
@@ -36,6 +37,11 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [scheduleEnd, setScheduleEnd] = useState("15:00");
   const [scheduleLocation, setScheduleLocation] = useState("");
   const [scheduleStaffId, setScheduleStaffId] = useState("");
+  const [publishSeasonId, setPublishSeasonId] = useState("");
+  const [permissionVersion, setPermissionVersion] = useState("");
+  const [permissionText, setPermissionText] = useState("");
+  const [feeDollars, setFeeDollars] = useState("0");
+  const [operatorConfirmed, setOperatorConfirmed] = useState(false);
   const programs = planning.programs.filter(p => !siteId || p.siteId === siteId);
   const selectable = programs.filter(p => p.status !== "paused" && p.status !== "closed");
   const selected = selectable.find(p => p.id === programId);
@@ -58,6 +64,27 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function publishSeason(event: React.FormEvent) {
+    event.preventDefault(); setBusy(true); setError(""); setSuccess("");
+    try {
+      if (!publishSeasonId || !operatorConfirmed) throw new Error("Confirm the release responsibility");
+      const dollars = Number(feeDollars);
+      if (!Number.isFinite(dollars) || dollars < 0 || Math.round(dollars * 100) !== dollars * 100)
+        throw new Error("Enter a fee in dollars and cents");
+      await publishExtendedSeasonFn({ data: {
+        seasonId: publishSeasonId,
+        permissionVersion, permissionText, feeAmountCents: Math.round(dollars * 100),
+        operationalResponsibilityConfirmed: true,
+      } });
+      setPublishSeasonId(""); setOperatorConfirmed(false);
+      setPermissionText(""); setPermissionVersion("");
+      setSuccess("Offering published to the enrichment catalog. Families can now register.");
+      await router.invalidate();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to publish registration");
+    } finally { setBusy(false); }
   }
 
   async function assignReadiness(seasonId: string, programId: string) {
@@ -161,6 +188,56 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
             <li key={season.id} className="rounded-lg border p-3 text-sm">
               <strong>{season.offeringName}</strong> · {season.name} · {season.startsOn} to {season.endsOn}
               <span className="ml-2 text-xs text-muted-foreground">{season.status} · {season.capacity ?? "Uncapped"} seats</span>
+              {season.status === "registration" &&
+                <a href="/enrichment" className="ml-3 text-xs underline">View public catalog</a>}
+              {season.status === "draft" && (() => {
+                const active = publishSeasonId === season.id;
+                const isProgramActive = planning.programs.some(p => p.id === season.programId && p.status === "active");
+                const scheduled = planning.sessions.filter(item => item.seasonId === season.id);
+                return <div className="mt-3 rounded-lg border p-3">
+                  <p className="text-sm font-semibold">Family registration</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Publication requires an active noncredit program, dated meetings with eligible onsite
+                    facilitators, and a real operator-published guardian permission statement.
+                  </p>
+                  <button type="button" className="mt-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                    disabled={!isProgramActive || !scheduled.length || busy}
+                    onClick={() => {
+                      setPublishSeasonId(active ? "" : season.id);
+                      setOperatorConfirmed(false);
+                    }}>{active ? "Close publication" : "Publish family registration"}</button>
+                  {!isProgramActive && <p className="mt-2 text-xs">Activate the program through the existing launch controls first.</p>}
+                  {!scheduled.length && <p className="mt-2 text-xs">Plan dated sessions first.</p>}
+                  {active && <form onSubmit={publishSeason} className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label className="text-xs">Fee per participant (USD)
+                      <input className={inputClass} type="number" min={0} max={100000}
+                        step="0.01" required value={feeDollars} onChange={e => setFeeDollars(e.target.value)}/>
+                    </label>
+                    <label className="text-xs">Consent version
+                      <input className={inputClass} required maxLength={80} value={permissionVersion}
+                        placeholder="summer-2027-v1" onChange={e => setPermissionVersion(e.target.value)}/>
+                    </label>
+                    <label className="text-xs sm:col-span-2">Published guardian participation permission
+                      <textarea className={inputClass} rows={5} required minLength={30} maxLength={6000}
+                        placeholder="Write the approved participation permission families must acknowledge."
+                        value={permissionText} onChange={e => setPermissionText(e.target.value)}/>
+                    </label>
+                    <label className="sm:col-span-2 flex items-start gap-2 text-xs">
+                      <input type="checkbox" required checked={operatorConfirmed} className="mt-1"
+                        onChange={e => setOperatorConfirmed(e.target.checked)}/>
+                      I am the authorized registrar publishing this offering and accept responsibility
+                      for confirming site operations, supervision, emergency procedures and child release.
+                      This records my attestation; CAN OS does not certify regulatory compliance.
+                    </label>
+                    <div className="sm:col-span-2">
+                      <button type="submit" disabled={busy || !operatorConfirmed}
+                        className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                        {busy ? "Publishing…" : "Publish enrollment to families"}
+                      </button>
+                    </div>
+                  </form>}
+                </div>;
+              })()}
               {(() => {
                 const meetings = planning.sessions.filter(item => item.seasonId === season.id);
                 const staff = planning.staff.filter(person => person.programId === season.programId);
