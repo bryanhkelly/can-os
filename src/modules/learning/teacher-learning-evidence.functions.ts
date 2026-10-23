@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { accessibleClasses } from "./class-access.server";
@@ -28,14 +29,25 @@ export const getTeacherLearningEvidence = createServerFn({ method: "GET" }).hand
     .map(row=>({sectionId:row.id,sectionTitle:row.title}));
   const sectionIds = assigned.map(row => row.sectionId);
   if (!sectionIds.length) return { students: [], truncated: false, note: "No currently assigned sections." };
+  const activeProgram=alias(s.enrollments,"teacher_evidence_program_membership");
   const roster = await db.select({
     sectionId: s.enrollments.sectionId,
     studentProfileId: s.studentProfiles.id, studentPersonId: s.studentProfiles.personId,
     firstName: s.people.legalFirstName, lastName: s.people.legalLastName,
   }).from(s.enrollments)
+    .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+    .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+    .innerJoin(activeProgram,and(
+      eq(activeProgram.studentProfileId,s.enrollments.studentProfileId),
+      eq(activeProgram.programId,s.sections.programId),
+      eq(activeProgram.schoolYearId,s.terms.schoolYearId),
+      eq(activeProgram.kind,"program"),eq(activeProgram.status,"active"),
+    ))
     .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
     .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
     .where(and(inArray(s.enrollments.sectionId, sectionIds),
+      eq(s.enrollments.programId,s.sections.programId),
+      eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
       eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active")))
     .limit(501);
   const selected = roster.filter(
