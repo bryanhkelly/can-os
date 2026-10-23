@@ -27,7 +27,7 @@ export default function siteHostGate(request: Request): Response | URL | undefin
     status: 404,
     headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
   });
-  if (decision.rewrite) return new URL("/published-site", request.url);
+  if (decision.rewrite) return new URL(request.method === "POST" ? "/published-site/inquiry" : "/published-site", request.url);
   // Netlify can invoke the edge function again for the internal rewrite.
   // The origin re-checks exact Host and publication before any content read.
   return undefined;
