@@ -127,3 +127,49 @@ host resolution, edge configuration and negative cross-site tests are complete.
 decision after reviewing public content and readiness; validate host-routing
 and tests on an isolated database before exposing public website traffic.
 Program marketing visibility must remain independent of opening registration.
+
+## Bite 4 committed: explicit Publish / Unpublish decision
+
+The `/sites/$siteId/publish` editor now includes explicit approval and
+withdrawal actions. They are **not** a deployment command; no wildcard
+DNS/certificate, hostname-based routing, or public website route is enabled.
+
+- Both commands use the same verified session, `site.publication.manage`
+  capability and explicit institutionally verified site-level assignment.
+  Scoped access is rechecked inside the write transaction.
+- The publisher must reserve a globally unique address first. The database
+  publication row is locked with `FOR UPDATE` to serialize opposing
+  decisions. The command requires the previously viewed `updated_at` revision,
+  rejects stale changes, and advances the revision monotonically.
+- Publication requires a fresh confirmation that public Site content was
+  reviewed, a reason, and at least **one eligible enriched Season** returned
+  by the canonical `readEnrichmentCatalog(siteId, tx)` within the transaction.
+  This intentionally supports only summer/after-school enrichment in this
+  slice; academic Program publication and applications remain a future workflow.
+- Unpublish clears `published_at` and returns the Site to `draft`,
+  even when offerings are empty, ended, or withdrawn. No catalog or
+  registration records are modified by this command.
+- Each successful transition updates the publication row and writes an Audit
+  and Domain Event in the **same transaction**; rejected transitions roll
+  back. Repeated already-in-target requests are no-ops and write no events.
+  Review reasons are stored only as decision evidence. Do not enter student PII.
+- Public-safe catalog reads use a shared lock on the Site publication row
+  throughout projection, serializing against a concurrent unpublish decision.
+  A `draft` or invalid Site never reaches the canonical enrichment reader.
+- Added pure decision-policy tests for content gates, revision conflicts,
+  unpublish, idempotence, invalid stored state and monotonic revisions.
+  Existing catalog-gate tests were updated for the transactional read boundary.
+  **All tests, typecheck and browser acceptance are unverified until executed.**
+
+### Open gates before external hostname launch
+
+1. Apply and verify migration `0035` on a **disposable Neon branch** and
+   validate publish, unpublish, cross-tenant denial, audit rollback and
+   public read gating with real database transaction isolation.
+2. Execute `npm run typecheck`, unit tests and route-contract check.
+3. Build a minimal hostname-resolved public landing/catalog page, configure
+   verified wildcard DNS/TLS and isolate public host routing from CAN OS
+   administration, SSR sessions and private routes.
+4. Independently add academic-program publicity, site content/brand editing,
+   new-guardian signup, applications and CAN OS registration CTAs in small
+   validated slices. Publishing a Site cannot bypass these workflows.
