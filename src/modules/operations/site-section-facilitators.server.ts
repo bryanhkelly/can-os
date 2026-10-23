@@ -160,6 +160,9 @@ export async function activeFacilitatorSectionIds(tx: Reader, actor: AccessConte
   if (actor.demoFacilitator || actor.role !== "room_facilitator" ||
       !actor.actorPersonId || !actor.grantSiteId || !actor.accountId || !actor.grantId ||
       !actor.scope.programIds?.includes(programId)) return [];
+  // Revoking or expiring the church/CAN operating agreement must immediately
+  // revoke pupil-roster reads, not only new attendance/duty writes.
+  await requireChurchHostedOperatingServices(tx, programId, ["onsite_supervision"]);
   const config = await latestConfig(tx, programId);
   if (!config) return [];
   const now = new Date();
