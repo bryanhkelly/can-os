@@ -244,12 +244,6 @@ export const createLaunchSite = createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [site]=await tx.insert(s.sites).values({...data}).returning({id:s.sites.id});
    if(!site)throw new Error("Failed to create Site");
-   // PUB-12: a private website address is created WITH the canonical Site.
-   // The independent publication and admissions-readiness approvals do not
-   // happen during onboarding, and no new publishing grant is issued.
-   const publicSiteDraft=await provisionNewSitePublicationDraft(tx,actor,{
-    id:site.id,organizationId:data.organizationId,slug:data.slug,
-   });
    await emitEvent(tx,{
     eventType:EventTypes.SiteCreated,aggregateType:"site",aggregateId:site.id,
     actorPersonId:actor.actorPersonId,organizationId:data.organizationId,
@@ -259,6 +253,11 @@ export const createLaunchSite = createServerFn({method:"POST"})
     action:"site.create",entityType:"site",entityId:site.id,
     scope:{organizationId:data.organizationId,siteId:site.id},
     after:{name:data.name,timezone:data.timezone}});
+   // PUB-12: create the draft within the same transaction, AFTER the Site
+   // creation evidence. Nothing is public, and no publishing grant is issued.
+   const publicSiteDraft=await provisionNewSitePublicationDraft(tx,actor,{
+    id:site.id,organizationId:data.organizationId,slug:data.slug,
+   });
    return {siteId:site.id,publicSiteDraft};
   });
  });
