@@ -15,6 +15,10 @@ export function canAddStudentToSection(input: {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(addDropEndsOn) ||
       !Number.isSafeInteger(enrollmentCapacity) || enrollmentCapacity<1 ||
       !Number.isSafeInteger(occupiedSeats) || occupiedSeats<0) return false;
+  const [year,month,day]=addDropEndsOn.split("-").map(Number);
+  const boundary=new Date(Date.UTC(year!,month!-1,day!));
+  if (!Number.isFinite(boundary.getTime()) ||
+      boundary.toISOString().slice(0,10)!==addDropEndsOn) return false;
   return dateKeyInTimezone(now.toISOString(),timezone)<=addDropEndsOn &&
     occupiedSeats<enrollmentCapacity;
 }
