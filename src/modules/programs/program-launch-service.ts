@@ -32,6 +32,7 @@ import { evaluateSectionReadiness } from "./section-readiness-service";
 import { lockLaunchTeacherClaims } from "@/modules/staffing/launch-staffing.server";
 import { assertOpeningOperator,createOpeningHandoff,listOpeningHandoffs } from "./opening-handoff.server";
 import { listExtendedSessionStaff } from "@/modules/activities/extended-learning-sessions.server";
+import { requireCurrentProgramSiteAuthorization } from "./program-site-authorization.server";
 
 export async function startProgramLaunch(
   context: CommandContext,
@@ -293,12 +294,19 @@ export async function activateProgram(
     const [hostOrganization] = await tx.select({ type: organizations.type })
       .from(organizations).where(eq(organizations.id, hostOrganizationId)).limit(1);
     if (!hostOrganization) throw new Error("Program host organization not found");
+    const crossOrganizationChurch = hostOrganization.type === "church" &&
+      program.academicProviderOrganizationId !== hostOrganizationId;
+    const operatingAuthorizationId = crossOrganizationChurch
+      ? await requireCurrentProgramSiteAuthorization(tx, program.id,
+          ["academic_instruction", "onsite_supervision",
+            ...(program.creditIssuingOrganizationId ? ["school_of_record", "credit_issuance"] as const : [])])
+      : null;
     assertChurchHostedActivationAuthorization({
       programType: program.type,
       hostOrganizationId,
       hostOrganizationType: hostOrganization.type,
       academicProviderOrganizationId: program.academicProviderOrganizationId,
-      verifiedProgramSiteAuthorizationId: null,
+      verifiedProgramSiteAuthorizationId: operatingAuthorizationId,
     });
     if (program.siteId) {
       await lockAttendanceConfigurationAtSite(tx, program.siteId);
