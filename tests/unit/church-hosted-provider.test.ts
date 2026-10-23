@@ -43,6 +43,7 @@ describe("church-hosted activation needs independently verified authority", () =
     expect(() => assertChurchHostedActivationAuthorization({
       programType: "church_hosted_academy",
       hostOrganizationId: "church",
+      hostOrganizationType: "church",
       academicProviderOrganizationId: "can",
       verifiedProgramSiteAuthorizationId: null,
     })).toThrow(/independently verified/);
@@ -52,15 +53,35 @@ describe("church-hosted activation needs independently verified authority", () =
       expect(() => assertChurchHostedActivationAuthorization({
         programType,
         hostOrganizationId: "host",
+        hostOrganizationType: "church",
         academicProviderOrganizationId: "host",
         verifiedProgramSiteAuthorizationId: null,
       })).not.toThrow();
     }
   });
+  it("denies reclassifying a church/CAN program as a high-school extension to evade authorization", () => {
+    expect(() => assertChurchHostedActivationAuthorization({
+      programType: "high_school_extension",
+      hostOrganizationId: "church",
+      hostOrganizationType: "church",
+      academicProviderOrganizationId: "can",
+      verifiedProgramSiteAuthorizationId: null,
+    })).toThrow(/independently verified/);
+  });
+  it("preserves an independently operated K-8 extension where the host is a school", () => {
+    expect(() => assertChurchHostedActivationAuthorization({
+      programType: "high_school_extension",
+      hostOrganizationId: "school",
+      hostOrganizationType: "christian_school",
+      academicProviderOrganizationId: "external",
+      verifiedProgramSiteAuthorizationId: null,
+    })).not.toThrow();
+  });
   it("treats a separately checked authorization as the necessary additional input", () => {
     expect(() => assertChurchHostedActivationAuthorization({
       programType: "church_hosted_academy",
       hostOrganizationId: "church",
+      hostOrganizationType: "church",
       academicProviderOrganizationId: "can",
       verifiedProgramSiteAuthorizationId: "verified-record",
     })).not.toThrow();
