@@ -56,13 +56,44 @@ signup, enrollment-ready application submission, payments or registration CTAs,
 automated follow-up/assignments, partner content editing, custom designs/domains,
 site-generation during onboarding, network-wide website operations.
 
+## Current priority: one connected school journey
+
+**Critical-path override (23 October 2026):** Complete the actual
+Organization/Site → Program/authority → family application/enrollment →
+instruction/Section → guardian/teacher → school operator journey, rather than
+expanding a stand-alone lead-management product. The school launch can be
+marketed before readiness, but admissions and operations cannot be opened
+without their own authoritative approval checks.
+
+**Just-closed source gap:** Existing Sites, not only newly created Sites, now
+receive (or reuse) a **private** website reservation when a legitimate Program
+launch starts there. `startProgramLaunch` calls
+`ensureExistingSitePublicationDraftForLaunch` inside the canonical launch
+transaction and Launch Studio displays the reserved address. The path reuses
+existing Site records, locks ownership to the verified organization/site
+scope, is idempotent, never resets a published address, never grants publisher
+access and does not open hosting or admissions. Source committed, unverified.
+Sites created through `createLaunchSite` retain their original same-transaction
+provisioning.
+
+**Next true gaps after that source change:**
+1. Verified publisher access handoff and responsible **institution vs host**
+   decision; do not auto-grant local registrars or allow host copy to assert
+   CAN academic authority.
+2. A canonical, readiness-gated **family application entry** for a published
+   academic program, with verified household/guardian reuse (PUB-11/17).
+3. A joined **accepted/enrolled student → assigned instructional Section →
+   learning/grade/guardian → Site operations** handoff using the same Program.
+4. Deferred public DNS/TLS rollout and external acceptance gates before any
+   tenant-host family traffic; source code does not prove deployment.
+
 ## Ordered remaining PRODUCT bites
 
 Each ID is independently assignable and should be delivered against its
 existing owning module; **DoD** is the behavior required, not a claim that
 tests or release gates have passed.
 
-### Next: complete a useful inquiry follow-up loop (P1)
+### Deferred: inquiry follow-up optimization (P2, off critical path)
 
 **PUB-09 — Assign lead follow-up owner and due date.** `Not started`
 - **Implement:** Create/reuse a canonical `Action` for `public_admissions_interest`
@@ -75,7 +106,7 @@ tests or release gates have passed.
   submission does not create duplicate Actions. No unrestricted partner
   access to GF22 or student data.
 - **Depends on:** Existing `actions` schema and scoped action workflow;
-  public interest inbox. **Best next small development bite.**
+  public interest inbox. **Not on the current school-launch critical path.**
 
 **PUB-10 — Contact outcome and contact history.** `Partial`
 - **Implement:** Distinguish attempted contact, reached, tour requested,
@@ -126,6 +157,13 @@ tests or release gates have passed.
   newly reserved address and links to the existing separately authorized
   private publishing workspace. No Program, institution, application,
   DNS or public approval is fabricated. Source tests cover slug choices.
+- **Additional gap closure (existing Site + Program launch):** The canonical
+  `startProgramLaunch` now reserves/reuses a private public-address row for
+  *previously existing* Sites that lacked a website. The helper uses the
+  transaction and verified launch permissions, retains already-published
+  Site state, and returns the reserved host for a Launch Studio handoff.
+  It does not approve academic content, issue a Site publisher grant,
+  or start admissions. This is committed but unverified.
 - **Second source-committed bite on `FullFlow`:** The existing
   registrar + explicitly authorized Site-publisher read now generates
   `previewHtml` from `renderPublicSiteHtml`, the **exact same** escaped
@@ -358,24 +396,23 @@ authorize running them now or applying production migrations.
 
 ## Suggested order of next small development handoffs
 
-1. **PUB-09a** — Create a canonical Action on the first accepted public interest;
-   idempotently link it to that interest without storing the email in public
-   Action metadata. Scope owner assignment conservatively.
-2. **PUB-09b** — Add authorized assignment, due-date and overdue queue UI;
-   connect existing Action completion with converted/closed state.
-3. **PUB-10** — Capture contact outcome and next step on the Action/communication
-   timeline, without sending unapproved messages.
-4. **PUB-12** — Create the draft Site page automatically during real school
-   onboarding, with address conflicts handled.
-5. **PUB-13/18** — Add safe Site copy, institution-approved disclosure and
-   partner draft/review rights.
-6. **PUB-11/17** — Connect readiness-gated family application and verified
-   existing-household reuse.
-7. **PUB-14** — Link enrichment signups to existing guardian registration.
-8. **PUB-15/16/19–22** — Improve site discovery, branding, lifecycle, network
-   repeatability and economics **after** canonical enrollment handoff.
-9. **GATE-01–09** — Track continuously as release blockers; execute before
-   any external/production launch, not as a silent assumption about prior code.
+1. **Institution/host publisher handoff:** authorized school operator sees
+   the existing Site's generated draft and can request/receive an explicit
+   publisher role, with CAN institutional approvals separate.
+2. **PUB-11/17:** connect a published academic offering to one readiness-gated
+   canonical, authenticated guardian application and safe existing-family reuse.
+3. **GF22 → GF2:** take that same application through authorized offer,
+   consent and activation into one real Enrollment.
+4. **FullFlow stages 2–6:** use the SAME Program/Student/Enrollment in Section
+   staffing, learning, grading, guardian view and Site day/operations. Preserve
+   institutional approval and child safety gates.
+5. **PUB-14:** reuse existing guardian enrichment registration and payment
+   context for independently open approved activity Seasons.
+6. **PUB-09/10, PUB-15/16/19–22:** follow-up management, branding, campaigns,
+   tours, network templating and analytics **after** the core school journey.
+7. **GATE-01–09:** remain tracked as prerequisites to production exposure.
+   Execute on an explicitly approved isolated environment before rollout;
+   never treat postponed verification as a pass.
 
 ## Relationship to the broader CAN OS backlog
 
