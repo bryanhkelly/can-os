@@ -46,8 +46,11 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
   const {actor,program}=await setupContext(data.programId);
   const canAuthorCatalog=await canAuthorQualificationCatalog(actor,program);
   const teacherPolicies=await listLaunchTeacherPolicies(program.id);
-  const canReviseTeacherPolicy=["draft","launching","ready"].includes(program.status)&&
+  // Both initial publication and revisions require the same explicit,
+  // program-scoped institutional staffing-policy publisher grant.
+  const canPublishTeacherPolicy=["draft","launching","ready"].includes(program.status)&&
    await hasInstitutionalProgramCapability(actor,program,teacherPolicyPublisherCapability);
+  const canReviseTeacherPolicy=canPublishTeacherPolicy;
   const qualificationCatalog=await db.select({key:qualificationDefinitions.key,title:qualificationDefinitions.title})
    .from(qualificationDefinitions).orderBy(asc(qualificationDefinitions.title));
   const [publishedPolicy]=await db.select({id:complianceFrameworkVersions.id})
@@ -99,7 +102,8 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
     readiness:{...readiness,items:readiness.items.map(({evidence,...item})=>item)}};
   }));
   return {program,years,terms:termRows,catalog,teachingStaff,sections:sectionSnapshots,
-   qualificationCatalog,policyPublished:Boolean(publishedPolicy),canAuthorCatalog,teacherPolicies,canReviseTeacherPolicy};
+   qualificationCatalog,policyPublished:Boolean(publishedPolicy),canAuthorCatalog,teacherPolicies,
+   canPublishTeacherPolicy,canReviseTeacherPolicy};
  });
 
 export const provisionLaunchSection=createServerFn({method:"POST"})
@@ -168,10 +172,15 @@ export const publishLaunchTeacherPolicy=createServerFn({method:"POST"})
   confirmed:z.literal(true)}).parse(v))
  .handler(async({data})=>{
   const {actor,program}=await setupContext(data.programId);
-  assertCapability(actor,"staffing.policy.publish");
+  assertCapability(actor,teacherPolicyPublisherCapability);
   if(!program.siteId)throw new Error("A school site is required before publishing teacher policy");
+  if(!await hasInstitutionalProgramCapability(actor,program,teacherPolicyPublisherCapability))
+   throw new AuthorizationError("explicit staffing policy publisher");
   return db.transaction(async tx=>{
    await lockAttendanceConfigurationAtSite(tx,program.siteId!);
+   // Read the effective grant again in the same transaction as the write.
+   if(!await hasInstitutionalProgramCapability(actor,program,teacherPolicyPublisherCapability,tx))
+    throw new AuthorizationError("explicit staffing policy publisher");
    const [current]=await tx.select({status:programs.status}).from(programs)
     .where(eq(programs.id,program.id)).for("update").limit(1);
    if(!current||!["draft","launching","ready"].includes(current.status))
