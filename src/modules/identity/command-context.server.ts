@@ -1,6 +1,6 @@
-import {and,eq,gt,isNull,inArray} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray,not} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,accountPersonGrants,people,programs,sites as schoolSites} from "@/db/schema";
+import {accessAccounts,accessSessions,accountPersonGrants,people,programs,sectionTeachers,sections,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
@@ -62,6 +62,43 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  if(organizations.length){
   const permitted=await db.select({id:programs.id,siteId:programs.siteId}).from(programs).where(inArray(programs.organizationId,organizations));
   context.scope.programIds=authorizedProgramIds(permitted,organizations,grantSites);
+ }
+ // A CAN teacher can serve a church-owned class only through their own
+ // assigned Section AND a current independently verified institutional
+ // academic agreement. Preserve original Organization/Site/Program scope:
+ // never turn institution membership into a host-wide grant.
+ if(context.role==="teacher"&&context.actorPersonId&&organizations.length){
+  const assignments=await db.select({
+    sectionId:sections.id,programId:sections.programId,
+  }).from(sectionTeachers)
+    .innerJoin(sections,eq(sections.id,sectionTeachers.sectionId))
+    .innerJoin(programs,eq(programs.id,sections.programId))
+    .where(and(eq(sectionTeachers.personId,context.actorPersonId),
+      eq(sections.active,true),
+      inArray(programs.academicProviderOrganizationId,organizations),
+      not(inArray(programs.organizationId,organizations))));
+  if(assignments.length){
+   const {requireInstitutionalAcademicProgramAuthority}=await import(
+     "@/modules/programs/program-site-authorization.server");
+   const authorizedPrograms=new Set<string>();
+   const deniedPrograms=new Set<string>();
+   for(const assignment of assignments){
+    if(authorizedPrograms.has(assignment.programId)||deniedPrograms.has(assignment.programId))continue;
+    try{
+     await requireInstitutionalAcademicProgramAuthority(db,context,assignment.programId,[
+       "academic_instruction","curriculum",
+     ]);
+     authorizedPrograms.add(assignment.programId);
+    }catch(error){
+     if(!(error instanceof AuthorizationError))throw error;
+     deniedPrograms.add(assignment.programId);
+    }
+   }
+   context.scope.sectionIds=[
+    ...new Set([...(context.scope.sectionIds??[]),
+      ...assignments.filter(row=>authorizedPrograms.has(row.programId)).map(row=>row.sectionId)]),
+   ];
+  }
  }
  return context;
 }
