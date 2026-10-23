@@ -284,6 +284,26 @@ export async function requireCurrentProgramSiteAuthorization(
 export async function getHostProgramSiteAuthorization(
   actor: AccessContext, programId: string,
 ) {
+  const [program] = await db.select({
+    organizationId: programs.organizationId, siteId: programs.siteId,
+    hostOrganizationId: programs.hostOrganizationId,
+    institutionOrganizationId: programs.academicProviderOrganizationId,
+  }).from(programs).where(eq(programs.id, programId)).limit(1);
+  if (!program || actor.role !== "registrar" || actor.demoFacilitator ||
+      !actor.scope.organizationIds?.includes(program.organizationId) ||
+      !actor.scope.programIds?.includes(programId) ||
+      !program.siteId || !actor.scope.siteIds?.includes(program.siteId))
+    throw new AuthorizationError("host registrar Program and Site scope");
+  const [host] = await db.select({ type: organizations.type })
+    .from(organizations).where(eq(organizations.id,
+      program.hostOrganizationId ?? program.organizationId)).limit(1);
+  if (host?.type !== "church" ||
+      program.institutionOrganizationId === (program.hostOrganizationId ?? program.organizationId))
+    return {
+      eligible: false, programId, siteId: program.siteId,
+      institutionOrganizationId: program.institutionOrganizationId,
+      authorization: null,
+    };
   const identity = await loadOperatingIdentity(db, programId);
   assertHostRequester(actor, identity);
   const [record] = await db.select({
@@ -298,7 +318,7 @@ export async function getHostProgramSiteAuthorization(
     .where(eq(programSiteAuthorizations.programId, programId))
     .orderBy(desc(programSiteAuthorizations.version)).limit(1);
   return {
-    programId, siteId: identity.siteId,
+    eligible: true, programId, siteId: identity.siteId,
     institutionOrganizationId: identity.institutionOrganizationId,
     authorization: record ?? null,
   };

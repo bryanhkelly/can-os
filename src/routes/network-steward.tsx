@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
+import { CANOperatingAuthorizationDesk } from "@/components/networks/CANOperatingAuthorizationDesk";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { safeLoader } from "@/lib/safe-loader";
 import {
@@ -135,5 +136,6 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
         {!data.agreements.length && <li className="text-sm text-muted-foreground">No agreements recorded.</li>}
       </ul>
     </section>
+    <CANOperatingAuthorizationDesk/>
   </WorkspaceShell>;
 }

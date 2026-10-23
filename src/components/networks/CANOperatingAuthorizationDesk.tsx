@@ -1,0 +1,85 @@
+import { useCallback, useEffect, useState } from "react";
+import {
+  listCANOperatingAuthorizationDeskFn, reviewProgramSiteAuthorizationFn,
+  revokeProgramSiteAuthorizationFn,
+} from "@/modules/programs/program-site-authorization.functions";
+
+type Desk=Awaited<ReturnType<typeof listCANOperatingAuthorizationDeskFn>>;
+export function CANOperatingAuthorizationDesk() {
+  const [desk,setDesk]=useState<Desk|null>(null);
+  const [inputs,setInputs]=useState<Record<string,{evidence:string;from:string;through:string;reason:string}>>({});
+  const [busy,setBusy]=useState(false);
+  const [notice,setNotice]=useState("");
+  const [error,setError]=useState("");
+  const load=useCallback(async()=>{setDesk(await listCANOperatingAuthorizationDeskFn());},[]);
+  useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:"Unable to load operating authorizations"));},[load]);
+  const update=(id:string,key:"evidence"|"from"|"through"|"reason",value:string)=>
+    setInputs(rows=>({...rows,[id]:{evidence:"",from:"",through:"",reason:"",...rows[id],[key]:value}}));
+  async function decide(id:string,decision:"approved"|"denied"|"revoked") {
+    const value=inputs[id]??{evidence:"",from:"",through:"",reason:""};
+    setBusy(true);setNotice("");setError("");
+    try {
+      if(decision==="revoked")
+        await revokeProgramSiteAuthorizationFn({data:{authorizationId:id,reason:value.reason}});
+      else
+        await reviewProgramSiteAuthorizationFn({data:{
+          authorizationId:id,decision,reason:value.reason,
+          ...(decision==="approved"?{
+            evidenceDocumentId:value.evidence,
+            effectiveFrom:new Date(value.from+"T00:00:00Z").toISOString(),
+            effectiveThrough:new Date(value.through+"T00:00:00Z").toISOString(),
+          }:{}),
+        }});
+      await load();setNotice("Independent operating authorization decision recorded.");
+    }catch(e){setError(e instanceof Error?e.message:"Unable to record decision");}
+    finally{setBusy(false);}
+  }
+  return <section className="mt-6 rounded-xl border bg-card p-5">
+    <h2 className="font-serif text-2xl">CAN–church institutional service agreements</h2>
+    <p className="mt-2 text-sm text-muted-foreground">
+      Only separately verified contracts may authorize CAN services at independently owned churches.
+      Agreement approval does not issue user grants, certify child-safety readiness or activate schools.
+    </p>
+    {error&&<p className="mt-3 text-sm" role="alert">{error}</p>}
+    {notice&&<p className="mt-3 text-sm" role="status">{notice}</p>}
+    {!desk?<p className="mt-3 text-sm">Loading scoped requests…</p>:
+      desk.authorizations.length===0?<p className="mt-3 text-sm">No church-site requests for this CAN institution.</p>:
+      <div className="mt-3 space-y-3">{desk.authorizations.map(item=>{
+        const value=inputs[item.id]??{evidence:"",from:"",through:"",reason:""};
+        return <article key={item.id} className="rounded-lg border p-3 text-sm">
+          <p className="font-semibold">{item.programName} · {item.hostName}</p>
+          <p className="mt-1 text-xs">{item.status} · Version {item.version} · {item.services.join(", ")}</p>
+          {(item.status==="requested"||item.status==="approved")&&<div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {item.status==="requested"&&<>
+              <label className="text-xs sm:col-span-2">Independently verified two-party agreement document ID
+                <input className="mt-1 w-full rounded border bg-background p-2" value={value.evidence}
+                  onChange={e=>update(item.id,"evidence",e.target.value)}/>
+              </label>
+              <label className="text-xs">Effective from
+                <input type="date" className="mt-1 w-full rounded border bg-background p-2" value={value.from}
+                  onChange={e=>update(item.id,"from",e.target.value)}/>
+              </label>
+              <label className="text-xs">Effective through (exclusive)
+                <input type="date" className="mt-1 w-full rounded border bg-background p-2" value={value.through}
+                  onChange={e=>update(item.id,"through",e.target.value)}/>
+              </label>
+            </>}
+            <label className="text-xs sm:col-span-2">Decision reason
+              <input className="mt-1 w-full rounded border bg-background p-2" minLength={10} maxLength={500}
+                value={value.reason} onChange={e=>update(item.id,"reason",e.target.value)}/>
+            </label>
+            <div className="sm:col-span-2 flex flex-wrap gap-2">
+              {item.status==="requested"&&<>
+                <button type="button" disabled={busy||value.reason.trim().length<10||!value.evidence||!value.from||!value.through}
+                  onClick={()=>void decide(item.id,"approved")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Approve verified agreement</button>
+                <button type="button" disabled={busy||value.reason.trim().length<10}
+                  onClick={()=>void decide(item.id,"denied")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Deny request</button>
+              </>}
+              {item.status==="approved"&&<button type="button" disabled={busy||value.reason.trim().length<10}
+                onClick={()=>void decide(item.id,"revoked")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Revoke agreement</button>}
+            </div>
+          </div>}
+        </article>;
+      })}</div>}
+  </section>;
+}
