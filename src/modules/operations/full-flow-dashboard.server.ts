@@ -1,8 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  actions, applications, assessments, courseTemplateVersions, curriculumAdoptions,
-  enrollments, programs, sections, sectionTeachers, submissions,
+  accountPersonGrants, actions, applications, assessments, courseTemplateVersions, curriculumAdoptions,
+  enrollments, people, programs, sections, sectionTeachers, submissions,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -66,8 +66,22 @@ export async function readFullFlowOperations(actor: AccessContext) {
   ]);
   const sectionIds = sectionsRows.map(s => s.id);
   const [teacherAssignments, assessmentsRows] = sectionIds.length ? await Promise.all([
+    // An assignment row alone is not active staffing. Its teacher must be
+    // an active Person with an active school/CAN teaching grant. This matches
+    // the transactional Section allocation guard, not a launch draft.
     db.select({sectionId: sectionTeachers.sectionId, personId: sectionTeachers.personId})
-      .from(sectionTeachers).where(inArray(sectionTeachers.sectionId, sectionIds)),
+      .from(sectionTeachers)
+      .innerJoin(people,eq(people.id,sectionTeachers.personId))
+      .innerJoin(sections,eq(sections.id,sectionTeachers.sectionId))
+      .innerJoin(programs,eq(programs.id,sections.programId))
+      .innerJoin(accountPersonGrants,and(
+        eq(accountPersonGrants.personId,sectionTeachers.personId),
+        eq(accountPersonGrants.active,true),eq(accountPersonGrants.role,"teacher"),
+        or(eq(accountPersonGrants.organizationId,programs.organizationId),
+           eq(accountPersonGrants.organizationId,programs.academicProviderOrganizationId)),
+        or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,sections.siteId)),
+      ))
+      .where(and(inArray(sectionTeachers.sectionId, sectionIds),eq(people.active,true))),
     db.select({id: assessments.id, sectionId: assessments.sectionId, status: assessments.status})
       .from(assessments).where(inArray(assessments.sectionId, sectionIds)),
   ]) : [[], []];
