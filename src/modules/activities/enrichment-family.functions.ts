@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { readEnrichmentPublication } from "@/domain/enrichment-publication";
+import { readEnrichmentPackages, sessionOccupancy } from "@/domain/enrichment-packages";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { isExtendedLearningType } from "@/domain/program-offerings";
 
@@ -23,6 +24,7 @@ export const listEnrichmentCatalog = createServerFn({ method: "GET" }).handler(a
     capacity: s.activitySeasons.capacity,
     activityStatus: s.activities.status,
     activityMetadata: s.activities.metadata,
+    seasonMetadata: s.activitySeasons.metadata,
     siteId: s.sites.id, siteName: s.sites.name,
     programId: s.programs.id, programName: s.programs.name,
     programType: s.programs.type, programStatus: s.programs.status,
@@ -43,7 +45,8 @@ export const listEnrichmentCatalog = createServerFn({ method: "GET" }).handler(a
 
   const now = new Date();
   const published = rows.flatMap(row => {
-    const permission = readEnrichmentPublication(row.activityMetadata);
+    const permission = readEnrichmentPublication(row.seasonMetadata) ??
+      readEnrichmentPublication(row.activityMetadata);
     if (!permission || !isExtendedLearningType(row.programType) ||
       row.creditIssuerId !== null || row.programSiteId !== row.siteId ||
       permission.seasonId !== row.seasonId ||
@@ -73,16 +76,28 @@ export const listEnrichmentCatalog = createServerFn({ method: "GET" }).handler(a
   const registrationRows = ids.length ? await db.select({
     seasonId: s.activityRegistrations.activitySeasonId,
     status: s.activityRegistrations.status,
+    metadata: s.activityRegistrations.metadata,
   }).from(s.activityRegistrations).where(inArray(s.activityRegistrations.activitySeasonId, ids)) : [];
-  const occupied = new Map<string,number>();
-  for (const entry of registrationRows) if (["pending","eligible","conditional"].includes(entry.status))
-    occupied.set(entry.seasonId, (occupied.get(entry.seasonId) ?? 0) + 1);
-  return published.map(row => ({
+  return published.map(row => {
+    const packages = readEnrichmentPackages(row.seasonMetadata);
+    const sessions = sessionRows.filter(event => event.seasonId === row.seasonId &&
+      event.metadata.extendedLearningDraft === false && event.metadata.cancelled !== true)
+      .map(event => event.id ?? "").filter(Boolean);
+    const bookings = registrationRows.filter(entry => entry.seasonId === row.seasonId);
+    const occupied = sessionOccupancy(sessions, bookings);
+    const seatsFor = (ids: readonly string[]): number | null =>
+      row.capacity === null ? null : ids.length
+        ? Math.max(0, Math.min(...ids.map(id => row.capacity! - (occupied.get(id) ?? row.capacity!))))
+        : 0;
+    const packageAvailability = packages.map(item => ({
+      ...item, seatsRemaining: seatsFor(item.sessionIds),
+    }));
+    return {
     seasonId: row.seasonId, name: row.name, seasonName: row.seasonName,
     programName: row.programName, programType: row.programType,
     siteName: row.siteName, startsOn: row.startsOn, endsOn: row.endsOn,
-    capacity: row.capacity, seatsRemaining: row.capacity === null ? null :
-      Math.max(0, row.capacity - (occupied.get(row.seasonId) ?? 0)),
+    capacity: row.capacity, seatsRemaining: seatsFor(sessions),
+    packages: packageAvailability,
     feeAmountCents: row.feeAmountCents ?? 0,
     firstMeeting: firstSession.get(row.seasonId)?.startsAt.toISOString() ?? null,
     meetingTimezone: firstSession.get(row.seasonId)?.timezone ?? null,
@@ -90,7 +105,8 @@ export const listEnrichmentCatalog = createServerFn({ method: "GET" }).handler(a
     permissionText: row.permission.permissionText,
     registrationOpen: (!row.registrationOpensAt || now >= row.registrationOpensAt) &&
       (!row.registrationClosesAt || now <= row.registrationClosesAt),
-  }));
+  };
+  });
 });
 
 /** All manageable child profiles, including children not in any CAN school enrollment. */
@@ -117,6 +133,7 @@ export const getEnrichmentFamily = createServerFn({ method: "GET" }).handler(asy
     seasonId: s.activityRegistrations.activitySeasonId,
     studentProfileId: s.activityRegistrations.studentProfileId,
     status: s.activityRegistrations.status,
+    metadata: s.activityRegistrations.metadata,
     offeringName: s.activities.name,
     seasonName: s.activitySeasons.name,
     startsOn: s.activitySeasons.startsOn, endsOn: s.activitySeasons.endsOn,
@@ -217,6 +234,7 @@ export const addEnrichmentChild = createServerFn({ method: "POST" })
 export const registerEnrichmentChild = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
     seasonId: uuid, studentProfileId: uuid, householdId: uuid,
+    selectedPackageIds: z.array(uuid).min(1).max(30).optional(),
     permissionVersion: z.string().min(1).max(80),
     acknowledged: z.literal(true),
   }).strict().parse(value))
@@ -231,6 +249,7 @@ export const registerEnrichmentChild = createServerFn({ method: "POST" })
       studentProfileId: data.studentProfileId,
       householdId: data.householdId,
       consentVersion: data.permissionVersion,
+      selectedPackageIds: data.selectedPackageIds,
       acknowledged: true,
     });
     const [registration] = await db.select({ status: s.activityRegistrations.status })
