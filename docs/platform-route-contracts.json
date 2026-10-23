@@ -713,6 +713,33 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/enrichment.tsx",
+      "route": "/enrichment",
+      "owner": "activities",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.enrichment.tsx",
+      "route": "/guardian/enrichment",
+      "owner": "activities",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/site.day.tsx",
+      "route": "/site/day",
+      "owner": "attendance",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
