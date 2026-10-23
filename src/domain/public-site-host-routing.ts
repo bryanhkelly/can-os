@@ -36,9 +36,10 @@ export function classifyPublicSiteRequest(
   }
   // The ONLY tenant write is a restricted anonymous admissions-interest intake.
   // All other POST, RPC, session, dashboard and asset paths are denied.
-  if (method === "POST" && url.pathname === "/inquiry")
+  if (method === "POST" && (url.pathname === "/inquiry" || url.pathname === "/apply"))
     return { kind: "site", slug, rewrite: true };
-  if (method === "POST" && url.pathname === "/published-site/inquiry")
+  if (method === "POST" && (url.pathname === "/published-site/inquiry" ||
+      url.pathname === "/published-site/family-start"))
     return { kind: "site", slug, rewrite: false };
   if (method === "GET" && url.pathname === "/")
     return { kind: "site", slug, rewrite: true };
@@ -58,7 +59,8 @@ export function slugForPublicSiteOrigin(
   const url = new URL(request.url);
   const routeAllowed =
     (request.method === "GET" && url.pathname === "/published-site") ||
-    (request.method === "POST" && url.pathname === "/published-site/inquiry");
+    (request.method === "POST" &&
+      (url.pathname === "/published-site/inquiry" || url.pathname === "/published-site/family-start"));
   if (!routeAllowed || url.protocol !== "https:" || url.search || url.hash)
     return null;
   const hostHeader = request.headers.get("host");
