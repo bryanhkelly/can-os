@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
+import { verifyFullFlowNeonBranch } from "./verify-fullflow-neon-branch.mjs";
 
 /**
  * Read-only, branch-scoped guard for the connected FullFlow acceptance suite.
@@ -22,6 +23,7 @@ async function main() {
   const migrationSql = readFileSync(new URL(`../drizzle/${latest.tag}.sql`, import.meta.url));
   const expectedHash = createHash("sha256").update(migrationSql).digest("hex");
 
+  await verifyFullFlowNeonBranch(url);
   const query = neon(url);
   const [ledger] = await query`
     SELECT hash, created_at,
