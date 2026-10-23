@@ -102,19 +102,24 @@ export function SiteDayPage() {
     {error && <p role="alert" className="mt-4 rounded border p-3 text-sm">{error}</p>}
     {loading && !error && <p role="status" className="mt-5 text-sm">Loading scheduled roster…</p>}
     {roster && <>
+      <p className="mt-3 text-xs text-muted-foreground">
+        These are expected student-program attendance entries, not a deduplicated headcount or proof
+        of physical presence until a staff member records the observation. Corrections are limited
+        to the previous 30 days and must include a reason.
+      </p>
       {roster.programs.some(program => program.configuration !== "configured") &&
         <p role="status" className="mt-5 rounded border p-4 text-sm">
           One or more onsite calendars or schedules are incomplete. No presence is inferred
           from missing configuration; ask the school registrar to correct the schedule.
         </p>}
       <div className="mt-6 grid grid-cols-3 gap-3 text-sm" aria-label="Onsite day summary">
-        <div className="rounded border p-3">Expected onsite
+        <div className="rounded border p-3">Expected program roster entries
           <strong className="mt-1 block text-2xl">{roster.students.length}</strong></div>
-        <div className="rounded border p-3">Staff marked
+        <div className="rounded border p-3">Staff-marked entries
           <strong className="mt-1 block text-2xl">
             {roster.students.filter(student => !["unmarked","expected"].includes(student.status)).length}
           </strong></div>
-        <div className="rounded border p-3">Unrecorded
+        <div className="rounded border p-3">Unrecorded entries
           <strong className="mt-1 block text-2xl">
             {roster.students.filter(student => ["unmarked","expected"].includes(student.status)).length}
           </strong></div>
