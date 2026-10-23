@@ -144,7 +144,16 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     }
     const projection=summarizeOnsiteSupervision(result);
     // Person IDs are needed for overlap detection, not for the client.
-    const blocks=projection.blocks.map(({facilitatorPersonId:_id,...block})=>block);
+    const blocks=projection.blocks.map(({facilitatorPersonId:assignedPersonId,...block})=>({
+      ...block,
+      // Derived ONLY from the verified, original site grant and current active
+      // instruction plan. Never accept a browser-supplied facilitator ID.
+      canRespond:!projectionTruncated && data.date===today &&
+        assignedPersonId===actor.actorPersonId && block.verifiedSiteStaffGrant &&
+        block.periodId!==null && block.startsAtLocal!==null && block.endsAtLocal!==null,
+      canAccept:!projectionTruncated && data.date===today &&
+        assignedPersonId===actor.actorPersonId && block.assignedPlan,
+    }));
     return {date:data.date,siteId:site.id,projectionTruncated,
       ...projection,blocks};
   });
