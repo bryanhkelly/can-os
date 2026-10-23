@@ -12,6 +12,7 @@ import { emitEvent,notify,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray } from "drizzle-orm";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
+import { requireSectionForChurchHostedActivation } from "@/domain/accepted-offer-placement";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { activateSectionEnrollment } from "./section-allocation.service";
 import { isVerifiedEnrollmentGuardian } from "@/domain/guardian-offer-visibility";
@@ -175,8 +176,7 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   ]);
   // In church-hosted CAN schools an active enrollment cannot be the terminal
   // handoff. Require a named instructional Section in the SAME transaction.
-  if(churchAuthorization && !sectionId)
-    throw new Error("Choose a staffed class to activate this church-hosted school enrollment");
+  requireSectionForChurchHostedActivation(churchAuthorization,sectionId);
   await lockAdmissionsApplication(tx,lookup.applicationId);
   const {pool,organizationId}=await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
