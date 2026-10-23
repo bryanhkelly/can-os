@@ -53,6 +53,23 @@ export const listEnrichmentCatalog = createServerFn({ method: "GET" }).handler(a
     return [{ ...row, permission }];
   });
   const ids = published.map(row => row.seasonId);
+  // Read only sessions belonging to already published offerings. Draft-only
+  // calendar rows are never returned through the public catalog.
+  const sessionRows = ids.length ? await db.select({
+    seasonId: s.calendarEvents.sourceId,
+    startsAt: s.calendarEvents.startsAt,
+    endsAt: s.calendarEvents.endsAt,
+    timezone: s.calendarEvents.timezone,
+    metadata: s.calendarEvents.metadata,
+  }).from(s.calendarEvents).where(and(
+    eq(s.calendarEvents.sourceType, "activity_season"),
+    eq(s.calendarEvents.type, "extended_learning_session"),
+    inArray(s.calendarEvents.sourceId, ids),
+  )).orderBy(asc(s.calendarEvents.startsAt)).limit(6000) : [];
+  const firstSession = new Map<string, (typeof sessionRows)[number]>();
+  for (const item of sessionRows) if (item.seasonId &&
+    item.metadata.extendedLearningDraft === false && !firstSession.has(item.seasonId))
+    firstSession.set(item.seasonId, item);
   const registrationRows = ids.length ? await db.select({
     seasonId: s.activityRegistrations.activitySeasonId,
     status: s.activityRegistrations.status,
@@ -67,6 +84,8 @@ export const listEnrichmentCatalog = createServerFn({ method: "GET" }).handler(a
     capacity: row.capacity, seatsRemaining: row.capacity === null ? null :
       Math.max(0, row.capacity - (occupied.get(row.seasonId) ?? 0)),
     feeAmountCents: row.feeAmountCents ?? 0,
+    firstMeeting: firstSession.get(row.seasonId)?.startsAt.toISOString() ?? null,
+    meetingTimezone: firstSession.get(row.seasonId)?.timezone ?? null,
     permissionVersion: row.permission.permissionVersion,
     permissionText: row.permission.permissionText,
     registrationOpen: (!row.registrationOpensAt || now >= row.registrationOpensAt) &&
