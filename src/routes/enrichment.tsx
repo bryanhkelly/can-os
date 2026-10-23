@@ -28,10 +28,13 @@ function PublicEnrichment() {
             timeStyle:"short",timeZone:item.meetingTimezone}).format(new Date(item.firstMeeting))}
         </p>
         <p className="mt-3 text-sm">
-          {new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(item.feeAmountCents / 100)}
-          {" · "}{item.seatsRemaining === 0 ? "Waitlist" :
-            item.seatsRemaining === null ? "Seats available" :
-            `${item.seatsRemaining} seats remaining`}
+          {new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(
+            (item.packages.length ? Math.min(...item.packages.map(p=>p.priceCents)) :
+              item.feeAmountCents) / 100)}
+          {item.packages.length ? " starting price · "+item.packages.length+" enrollment options"
+            : " · "+(item.seatsRemaining === 0 ? "Waitlist" :
+              item.seatsRemaining === null ? "Seats available" :
+              `${item.seatsRemaining} seats remaining`)}
         </p>
         <Link to="/guardian/enrichment" className="mt-4 inline-block rounded-lg border px-3 py-2 text-sm font-semibold">
           View details and register
