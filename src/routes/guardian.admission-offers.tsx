@@ -86,7 +86,14 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
         onClick={()=>setChecklist(app.applicationId)}>Review enrollment checklist →</button>
      </div>}
   </section>)}
-  {applications.length===0&&<p className="rounded-lg border p-4">No enrollment offers are currently available for the children in your authorized programs.</p>}
+  {applications.length===0&&<div className="rounded-lg border p-4 text-sm">
+    <p>No verified enrollment applications or offers are available for this family membership.</p>
+    <p className="mt-2 text-muted-foreground">A new family application may still be pending independent
+      guardian verification. You can review applications submitted with your verified email sign-in.</p>
+    <Link to="/guardian/apply" className="mt-3 inline-block rounded border px-3 py-2 font-semibold">
+      View or start my application →
+    </Link>
+  </div>}
   <Link to="/guardian" className="text-sm underline">Back to family home →</Link>
  </main>;
 }
