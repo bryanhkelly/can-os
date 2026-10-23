@@ -26,6 +26,7 @@ import { assertEnrollmentFormApproved, enrollmentJourneyDefinitionKey } from "@/
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { and,eq } from "drizzle-orm";
 
@@ -272,6 +273,11 @@ export async function acceptApplication(
 
     if (!current) throw new Error("Application not found");
     requireEnrollmentProgramScope(context, current.programId);
+    // Admission acceptance under CAN's school-of-record authority requires
+    // live, independently verified church/CAN services; an inquiry does not.
+    await requireChurchHostedOperatingServices(tx,current.programId,[
+      "admissions","school_of_record",
+    ]);
     assertApplicationOffersAllowed(current);
     if (current.stage === "accepted") return;
     assertApplicationAcceptance(current.stage);
@@ -335,6 +341,9 @@ export async function activateEnrollmentFromApplication(
 
     if (!application) throw new Error("Application not found");
     requireEnrollmentProgramScope(context, application.programId);
+    await requireChurchHostedOperatingServices(tx,application.programId,[
+      "admissions","school_of_record",
+    ]);
     assertApplicationOffersAllowed(application);
     if (application.stage !== "accepted") {
       throw new Error("Application must be accepted before activation");
