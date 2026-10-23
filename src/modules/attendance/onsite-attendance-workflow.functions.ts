@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
+import { requireCurrentSiteLocalDelegate } from "@/modules/operations/site-local-delegation.server";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -84,7 +85,22 @@ async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, se
       ...(isOnsiteAttendanceRole(actor.role) ? [eq(programs.siteId, actor.grantSiteId!)] : []),
       ...(selectedId ? [eq(programs.id, selectedId)] : []),
     ));
-  return rows.filter(p => p.deliveryModel.onsite === true);
+  const onsite = rows.filter(p => p.deliveryModel.onsite === true);
+  // Verified role/site membership alone no longer exposes the whole church's
+  // pupil roster. Named director/facilitator delegation is Program-scoped.
+  if (actor.role !== "site_leader" && actor.role !== "room_facilitator")
+    return onsite;
+  const delegated = [];
+  for (const program of onsite) {
+    try {
+      await requireCurrentSiteLocalDelegate(db, actor, program.id,
+        actor.role === "site_leader" ? "site_director" : "room_facilitator");
+      delegated.push(program);
+    } catch (error) {
+      if (!(error instanceof AuthorizationError)) throw error;
+    }
+  }
+  return delegated;
 }
 
 /** One server-authorized program/student/date entitlement, used for reads and writes. */
