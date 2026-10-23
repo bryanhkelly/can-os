@@ -42,6 +42,7 @@ describe("section allocation prerequisites", () => {
     }))).returning();
     const versions = await db.insert(s.courseTemplateVersions).values(courses.map(course => ({
       courseTemplateId: course.id, version: 1, status:"published" as const,
+      curriculum:{learning:{version:1,modules:[{id:"intro",title:"Introduction",lessons:[{id:"first",title:"Welcome to science",body:"Read the introduction and compare examples.",resources:[]}]}]}},
     }))).returning();
     const sections = await db.insert(s.sections).values(versions.map((version, index) => ({
       programId: program!.id, siteId: site!.id, termId: time.term.id,
