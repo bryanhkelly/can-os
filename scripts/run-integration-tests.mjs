@@ -61,15 +61,15 @@ if (process.argv.includes("--preflight")) {
   process.exit(0);
 }
 
-// The offline --preflight only checks endpoint syntax/difference. Every actual
-// integration execution must additionally verify the server-reported Neon
-// project + branch identity BEFORE Vitest can perform any DB write.
-const branchCheck = spawnSync(process.execPath, ["scripts/verify-fullflow-neon-branch.mjs"], {
-  stdio: "inherit",
-  env: process.env,
-});
-if (branchCheck.error) throw branchCheck.error;
-if (branchCheck.status !== 0) fail("FullFlow dedicated Neon branch identity check failed.");
+// Only FullFlow needs the exact dedicated branch ID. Independent Golden Flow
+// acceptance suites retain their own disposable database targets and guards.
+if (mode === "full-flow") {
+  const branchCheck = spawnSync(process.execPath, ["scripts/verify-fullflow-neon-branch.mjs"], {
+    stdio: "inherit", env: process.env,
+  });
+  if (branchCheck.error) throw branchCheck.error;
+  if (branchCheck.status !== 0) fail("FullFlow dedicated Neon branch identity check failed.");
+}
 
 // URL-only preflight remains an offline safety check. On actual FullFlow test
 // execution, additionally prove the isolated database matches committed schema.
