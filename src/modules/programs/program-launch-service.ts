@@ -1,7 +1,11 @@
 import { db } from "@/db/client";
-import { resolveProgramCreditMode, type ProgramType, type ProgramCreditMode } from "@/domain/program-offerings";
+import { resolveProgramCreditMode, isExtendedLearningType, type ProgramType, type ProgramCreditMode } from "@/domain/program-offerings";
 import {
 journeys,
+activities,
+activitySeasons,
+calendarEvents,
+journeyRequirements,
 organizations,
 programs,
 schoolYears,
@@ -26,6 +30,7 @@ import { and,eq,inArray,isNull,or } from "drizzle-orm";
 import { evaluateSectionReadiness } from "./section-readiness-service";
 import { lockLaunchTeacherClaims } from "@/modules/staffing/launch-staffing.server";
 import { assertOpeningOperator,createOpeningHandoff,listOpeningHandoffs } from "./opening-handoff.server";
+import { listExtendedSessionStaff } from "@/modules/activities/extended-learning-sessions.server";
 
 export async function startProgramLaunch(
   context: CommandContext,
@@ -279,7 +284,41 @@ export async function activateProgram(
       throw new Error("Onsite program requires a host site before activation");
     const staffingEvidence:{sectionId:string;evidence:Record<string,unknown>}[]=[];
     const openingSectionIds:string[]=[];
-    if(program.siteId){
+    const noncreditExtended = isExtendedLearningType(program.type) &&
+      program.creditIssuingOrganizationId === null;
+    if (noncreditExtended) {
+      if (!program.siteId) throw new Error("Noncredit enrichment requires a hosting site");
+      const seasons = await tx.select({ id: activitySeasons.id }).from(activitySeasons)
+        .innerJoin(activities, eq(activities.id, activitySeasons.activityId))
+        .where(and(
+          eq(activities.programId, program.id),
+          eq(activities.siteId, program.siteId),
+          inArray(activitySeasons.status, ["draft", "registration"]),
+        ));
+      if (!seasons.length)
+        throw new Error("Plan an enrichment offering season before activating");
+      const meetings = await tx.select({ metadata: calendarEvents.metadata })
+        .from(calendarEvents).where(and(
+          eq(calendarEvents.sourceType, "activity_season"),
+          eq(calendarEvents.type, "extended_learning_session"),
+          eq(calendarEvents.organizationId, program.organizationId),
+          eq(calendarEvents.siteId, program.siteId),
+          eq(calendarEvents.programId, program.id),
+          inArray(calendarEvents.sourceId, seasons.map(row => row.id)),
+        ));
+      if (!meetings.length)
+        throw new Error("Schedule dated enrichment sessions before activation");
+      const currentStaff = await listExtendedSessionStaff(program.organizationId, program.siteId, tx);
+      const staffIds = new Set(currentStaff.map(person => person.personId));
+      if (meetings.some(event => {
+        const detail = event.metadata.extendedLearningSession;
+        const assigned = detail && typeof detail === "object" &&
+          "facilitatorPersonId" in detail ? detail.facilitatorPersonId : null;
+        return typeof assigned !== "string" || !staffIds.has(assigned) ||
+          event.metadata.cancelled === true;
+      })) throw new Error("Assign verified active onsite facilitators to all enrichment sessions");
+    }
+    if(program.siteId && !noncreditExtended){
       const activeYears=await tx.select({id:schoolYears.id})
        .from(schoolYears).where(and(eq(schoolYears.siteId,program.siteId),
         eq(schoolYears.organizationId,program.organizationId),
