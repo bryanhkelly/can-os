@@ -64,7 +64,7 @@ tests or release gates have passed.
 
 ### Next: complete a useful inquiry follow-up loop (P1)
 
-**PUB-09 — Assign lead follow-up owner and due date.** `Not started`
+**PUB-09 — Assign lead follow-up owner and due date.** `Committed / unverified`
 - **Implement:** Create/reuse a canonical `Action` for `public_admissions_interest`
   with `subjectId`, Site/Program/Organization, scoped `ownerPersonId`,
   `dueAt` and status. Initial creation and later reassignment must be
@@ -74,8 +74,26 @@ tests or release gates have passed.
   follow-up; an unrelated site cannot list, claim or mutate it; repeat lead
   submission does not create duplicate Actions. No unrestricted partner
   access to GF22 or student data.
+- **Implementation (source committed, no execution evidence):**
+  `src/modules/enrollment/public-interest-follow-up.server.ts` and
+  `public-admissions-interest.server.ts` create one canonical Action in the
+  accepted public request transaction, with a 48-hour default deadline and no
+  raw contact PII in Action metadata/events. The scoped
+  `public-admissions-interest.functions.ts` commands list eligible active
+  registrars, assign/reassign an owner and due date, send in-app assignment
+  notifications, and resolve with an auditable note. The intake screen shows
+  owner, due date and overdue state. Interest closure and reviewed GF22
+  conversion resolve the same Action; generic Operations mutations redirect
+  this domain-owned type to Admissions. For preexisting interests, the first
+  authorized mutation creates the Action under a row lock.
+- **Open acceptance:** Tests/typecheck, application database migrations,
+  cross-site and disabled/revoked-grant denial, concurrent retry/legacy-row
+  behavior, audit/outbox rollback, notification visibility and browser
+  usability all remain **unverified**. Per-interest uniqueness currently
+  relies on the source interest creation transaction and existing interest
+  row locking, not a DB unique constraint for historical Action rows.
 - **Depends on:** Existing `actions` schema and scoped action workflow;
-  public interest inbox. **Best next small development bite.**
+  public interest inbox.
 
 **PUB-10 — Contact outcome and contact history.** `Partial`
 - **Implement:** Distinguish attempted contact, reached, tour requested,
