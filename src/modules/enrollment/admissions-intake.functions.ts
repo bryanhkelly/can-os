@@ -183,7 +183,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
       organizationId:programs.organizationId,siteId:programs.siteId,
     }).from(programs).where(eq(programs.id,data.programId))
       .for("share").limit(1);
-    if (!boundProgram || boundProgram.organizationId!==program.organizationId ||
+    if (!boundProgram || !boundProgram.siteId || boundProgram.organizationId!==program.organizationId ||
       boundProgram.siteId!==program.siteId ||
       !actor.scope.organizationIds?.includes(boundProgram.organizationId) ||
       !actor.scope.siteIds?.includes(boundProgram.siteId))
