@@ -9,6 +9,7 @@ import { emitEvent, writeAudit } from "@/platform/mutation";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { isAcademicMarketingType } from "@/domain/academic-program-publication";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
+import { readCurrentLocalContent } from "./site-local-content.server";
 import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
@@ -53,7 +54,7 @@ export async function requireSitePublisher(actor: AccessContext, siteId: string,
 /** Private authenticated preview. This never serves as a public Host lookup. */
 export async function getSitePublicationDraft(actor: AccessContext, siteId: string) {
   const site = await requireSitePublisher(actor, siteId);
-  const [address, sitePrograms, publishedOfferings, approvedAcademicListings] = await Promise.all([
+  const [address, sitePrograms, publishedOfferings, approvedAcademicListings, localCopy] = await Promise.all([
     db.select({ slug: sitePublications.slug, status: sitePublications.status,
       updatedAt: sitePublications.updatedAt, publishedAt: sitePublications.publishedAt })
       .from(sitePublications).where(eq(sitePublications.siteId, site.id)).limit(1),
@@ -80,6 +81,7 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     // The preview is intentionally built from the same public-safe approved
     // academic catalog as the live host. Draft Program content stays internal.
     readAcademicProgramCatalog(site.id),
+    readCurrentLocalContent(site.id),
   ]);
   return {
     site,
@@ -109,6 +111,7 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
       host: publicSiteHost(address[0].slug),
       site: { name: site.name, organizationName: site.organizationName },
       academicPrograms: approvedAcademicListings,
+      localContent: localCopy?.content ?? null,
       offerings: publishedOfferings.map(toPublicSiteEnrichment),
     }) : null,
   };
