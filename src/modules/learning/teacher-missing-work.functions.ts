@@ -1,6 +1,8 @@
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { accessibleClasses, authorizeClass } from "./class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
@@ -10,7 +12,8 @@ async function verifiedTeacher(){
  const context=await getCommandContext(getRequest());
  if(context.role!=="teacher"||!context.actorPersonId)throw new AuthorizationError("teacher identity required");
  assertCapability(context,"assignments:grade");
- if(!context.scope.siteIds?.length)throw new AuthorizationError("teacher site membership");
+ if(!context.scope.siteIds?.length && !context.scope.sectionIds?.length)
+  throw new AuthorizationError("teacher named class membership");
  return context;
 }
 
@@ -19,10 +22,9 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
  const context=await verifiedTeacher();
  if(!process.env.DATABASE_URL)return {connected:false,items:[]};
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const assigned=await db.select({sectionId:s.sectionTeachers.sectionId}).from(s.sectionTeachers)
-  .innerJoin(s.sections,and(eq(s.sections.id,s.sectionTeachers.sectionId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[])))
-  .where(eq(s.sectionTeachers.personId,context.actorPersonId!));
- const sectionIds=[...new Set(assigned.map(x=>x.sectionId))];
+ // Teacher Today and gradebook already use this live, exact-Section
+ // authority. Never require a host Site grant for an institution teacher.
+ const sectionIds=[...new Set((await accessibleClasses(context as Actor)).map(x=>x.id))];
  if(!sectionIds.length)return {connected:true,items:[]};
  const now=new Date();
  const due=await db.select({id:s.assessments.id,title:s.assessments.title,dueAt:s.assessments.dueAt,sectionId:s.assessments.sectionId,course:s.sections.title}).from(s.assessments)
@@ -57,8 +59,11 @@ export const createMissingWorkFollowUp=createServerFn({method:"POST"})
     .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
     .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
     .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),eq(s.sectionTeachers.personId,context.actorPersonId!)))
-    .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,new Date()))).limit(1);
+    .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,new Date()))).limit(1);
    if(!assessment)throw new Error("Overdue teacher-assigned assessment not found");
+   // Recheck the named teaching assignment and current CAN/church
+   // institutional agreement inside the Action mutation transaction.
+   await authorizeClass(context as Actor,assessment.sectionId,undefined,tx);
    const [student]=await tx.select({id:s.studentProfiles.id,personId:s.people.id,name:s.people.legalFirstName})
     .from(s.enrollments).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
     .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
