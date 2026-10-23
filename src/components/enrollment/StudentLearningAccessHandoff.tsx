@@ -17,6 +17,8 @@ export function StudentLearningAccessHandoff({
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState("");
  const [error,setError]=useState("");
+ const [independentReviewConfirmed,setIndependentReviewConfirmed]=useState(false);
+ const [reviewMethod,setReviewMethod]=useState<"institutional_school_record"|"verified_in_person">("institutional_school_record");
  useEffect(()=>{
   let live=true;
   void getStudentLearningHandoff({data:{applicationId}})
@@ -38,7 +40,11 @@ export function StudentLearningAccessHandoff({
     setStatus("pending_review");
     setNotice("Student account request signed. Admissions must independently verify the identity and approve the invitation.");
    }else{
-    await provisionStudentLearningAccess({data:{applicationId}});
+    await provisionStudentLearningAccess({data:{
+      applicationId,
+      ...(status==="pending_review"&&independentReviewConfirmed
+        ?{confirmedIndependentIdentity:true as const,reviewMethod}:{}),
+    }});
     setStatus("approved");
     setNotice("Student access approved. A short-lived sign-in link was requested for the verified email address.");
    }
@@ -72,8 +78,23 @@ export function StudentLearningAccessHandoff({
       identity and email destination before access is granted.</p>
      {role==="registrar"&&<>
       <p>Guardian-approved student address: <strong>{email}</strong></p>
-      <button disabled={busy} className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
-       {busy?"Reviewing…":"Approve student account and send sign-in link"}
+      <label className="block">Independent student identity check
+       <select value={reviewMethod} onChange={event=>setReviewMethod(
+         event.target.value==="verified_in_person"?"verified_in_person":"institutional_school_record")}
+        className="mt-1 block w-full rounded border bg-background p-2">
+        <option value="institutional_school_record">Matched institutional student records</option>
+        <option value="verified_in_person">Verified student identity in person</option>
+       </select>
+      </label>
+      <label className="flex items-start gap-2">
+       <input type="checkbox" required checked={independentReviewConfirmed}
+        onChange={event=>setIndependentReviewConfirmed(event.target.checked)}/>
+       I independently checked the student's identity and separate email destination
+       using the selected method, not solely the public form or parent's statement.
+      </label>
+      <button disabled={busy||!independentReviewConfirmed}
+       className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
+       {busy?"Reviewing…":"Approve verified student account and send sign-in link"}
       </button>
      </>}
     </>:status==="approved"?<>
