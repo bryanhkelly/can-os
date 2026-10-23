@@ -32,3 +32,26 @@ export function slugFromPublicSiteHost(host: string): string | null {
   const slug = normalized.slice(0, -suffix.length);
   return isPublicSiteSlug(slug) ? slug : null;
 }
+
+/**
+ * Draft-only address suggestions for a newly created canonical Site.
+ * Prefer the human-readable Site slug; if another Site already reserved it,
+ * use a deterministic suffix from THIS Site's UUID. Never publish here.
+ * Database uniqueness remains the final arbiter of concurrent reservations.
+ */
+export function suggestedSitePublicSlugs(siteSlug: string, siteId: string): readonly string[] {
+  const suffix = siteId.replace(/-/g, "").slice(0, 12).toLowerCase();
+  if (!/^[0-9a-f]{12}$/.test(suffix)) {
+    throw new Error("A canonical Site ID is required for public address provisioning");
+  }
+  const normalized = siteSlug.toLowerCase().replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const base = normalized.slice(0, 48).replace(/-+$/g, "");
+  const withSuffix = (value: string) => {
+    const stem = value.slice(0, 48 - suffix.length - 1).replace(/-+$/g, "");
+    return `${stem || "site"}-${suffix}`;
+  };
+  const preferred = isPublicSiteSlug(base) ? base : withSuffix(normalized);
+  const fallback = withSuffix(normalized);
+  return preferred === fallback ? [fallback] : [preferred, fallback];
+}
