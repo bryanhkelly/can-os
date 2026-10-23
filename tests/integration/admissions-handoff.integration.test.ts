@@ -455,6 +455,12 @@ integration("cross-persona admissions through active classes",()=>{
       })]));
     await placeEnrolledStudent({data:{applicationId,sectionId:section.id}});
     expect(await placeEnrolledStudent({data:{applicationId,sectionId:section.id}})).toMatchObject({created:false});
+    // Once the single-seat Section is occupied, the registrar must not
+    // advertise an extra seat even while teacher + curriculum remain valid.
+    expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
+      .toEqual(expect.arrayContaining([expect.objectContaining({
+        id:section.id,enrolled:true,readyForPlacement:false,
+      })]));
     state.actor=learner;
     expect((await getMyStudentToday()).sections.map(row=>row.sectionId)).toEqual([section.id]);
     expect((await accessibleClasses(learner)).map(row=>row.id)).toEqual([section.id]);
