@@ -167,7 +167,8 @@ export async function activeFacilitatorSectionIds(tx: Reader, actor: AccessConte
   }).from(programResponsibilityAssignments)
     .innerJoin(roleAssignments, eq(roleAssignments.id, programResponsibilityAssignments.responsibleRoleAssignmentId))
     .innerJoin(sections, and(
-      eq(sections.id, sql`substring(${programResponsibilityAssignments.responsibilityKey} from 18 for 36)::uuid`),
+      sql`${programResponsibilityAssignments.responsibilityKey} =
+        ('room_facilitator:' || ${sections.id}::text || ':' || ${roleAssignments.personId}::text)`,
       eq(sections.programId, programId),
       eq(sections.siteId, actor.grantSiteId),
       eq(sections.active, true),
