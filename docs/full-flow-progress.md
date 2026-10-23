@@ -1,5 +1,52 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 canonical workflow wiring — assigned CAN teacher, admitted child, local day (23 October 2026)
+
+**Small patches committed to `FullFlow`; actual Neon/browser tests are NOT passed or executed.**
+
+- The independent CAN teacher's named Section authorization is now used by
+  missing-work lists/follow-up writes, evidence-backed academic intervention
+  creation, the teacher's intervention queue and the shared academic Action
+  resolver. Mutation paths recheck the Section/contract authority *inside*
+  their transaction; CAN receives no host-wide church Organization/Site grant.
+- Teacher Today class headcounts, missing-work queues, learning evidence,
+  intervention listing/writes and onsite room rosters now require current
+  active **Program + Section enrollment for the same student, Program and
+  academic year**, so a withdrawn Program cannot leave phantom in-class
+  students or intervention authority.
+- Student login handoff requires an accepted Application plus exact active
+  Program/Site/year placement. Its **first** independent registrar approval
+  now requires explicit in-person or institutional-record identity attestation
+  and records the review method. Subsequent passwordless-link requests
+  audit a resend separately and do not duplicate institution approval events.
+- The registrar's admitted-student screen links directly to the authorized
+  onsite attendance register, and the related guardian view links to the
+  child's attendance/excuse screen. Enrollment does not claim a physical
+  check-in or discharge; staff must observe and record attendance.
+- Absence notices and legacy excuse submissions require independently
+  verified guardian attendance permissions, not bare relationship flags.
+  All guardian notification deep links to child attendance, enrollment
+  offers, submissions and grade responses use live verified relationships;
+  stale sensitive attendance/application/offer/submission notifications are
+  suppressed rather than merely stripped of hyperlinks. Missing-assignment
+  email recipients now also require verified academic guardianship.
+- Source regression in the same academic-family-to-class rollback test now
+  asserts that a separately attested student can be provisioned and that
+  passwordless resend does not duplicate approval events. It additionally
+  tests the **same student's** attendance via an effective onsite calendar
+  date and actual authorized staff attendance recording. The legacy academic
+  intervention fixture explicitly creates a verified guardian and a
+  matching active Program enrollment.
+
+**Outstanding release blockers:** run `full-flow`, cross-persona
+admissions/onsite tests, typecheck and browser reload acceptance against
+the isolated disposable database. Existing GitHub workflows fail before
+runner allocation, so these source commits are not proof of execution.
+Keep merge/deployment and production migrations on HOLD.
+
+---
+
+
 ## P0 enrollment-to-student-login and return-family usability (23 October 2026)
 
 **Code committed; runtime acceptance not yet executed. GitHub Actions is known
