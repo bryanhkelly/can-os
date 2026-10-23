@@ -32,9 +32,10 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
   return <section className="mt-8 rounded-xl border bg-card p-5">
     <h2 className="font-serif text-2xl">Public program interest</h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      Requests from published program pages. Contact details are unverified;
-      confirm the student's identity and guardian relationship through the
-      normal admissions inquiry process before creating an Application.
+      Requests from published program pages. A registrar may review a contact,
+      confirm the new student identity and carry these details into the normal
+      admissions inquiry. Any guardian relationship remains pending verification;
+      a public request never grants school access.
     </p>
     {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-3 text-sm">{notice}</p>}
@@ -50,11 +51,17 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link to="/admissions/intake"
-              search={{siteId:row.siteId,programId:row.programId,application:undefined}}
+            {row.applicationId ? <Link to="/admissions/intake"
+              search={{siteId:row.siteId,programId:row.programId,
+                application:row.applicationId,interest:undefined}}
               className="rounded-lg border px-3 py-2 text-xs font-semibold">
-              Begin verified inquiry
-            </Link>
+              View linked inquiry
+            </Link> : row.status !== "closed" && <Link to="/admissions/intake"
+              search={{siteId:row.siteId,programId:row.programId,
+                application:undefined,interest:row.id}}
+              className="rounded-lg border px-3 py-2 text-xs font-semibold">
+              Review and create inquiry
+            </Link>}
             {row.status === "new" && <button type="button" disabled={busyId !== null}
               onClick={() => void changeStatus(row, "contacted")}
               className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
