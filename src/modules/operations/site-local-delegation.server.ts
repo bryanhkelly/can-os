@@ -2,7 +2,7 @@ import { and, desc, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, people, programResponsibilityAssignments,
-  programs, roleAssignments, schoolConfigurationVersions, sites,
+  organizations, programs, roleAssignments, schoolConfigurationVersions, sites,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
@@ -20,6 +20,7 @@ async function loadHostProgram(tx: Reader, programId: string) {
     id: programs.id, siteId: programs.siteId,
     organizationId: programs.organizationId,
     hostOrganizationId: programs.hostOrganizationId,
+    academicProviderOrganizationId: programs.academicProviderOrganizationId,
     deliveryModel: programs.deliveryModel, gradeRange: programs.gradeRange,
     name: programs.name,
   }).from(programs).where(eq(programs.id, programId)).limit(1);
@@ -30,7 +31,16 @@ async function loadHostProgram(tx: Reader, programId: string) {
   if (!site || site.organizationId !== program.organizationId ||
       (program.hostOrganizationId ?? program.organizationId) !== site.organizationId)
     throw new AuthorizationError("Site-owned host Program");
-  return { ...program, siteId: site.id, organizationId: site.organizationId };
+  const [hostOrg] = await tx.select({type: organizations.type}).from(organizations)
+    .where(eq(organizations.id, site.organizationId)).limit(1);
+  if (!hostOrg) throw new AuthorizationError("existing host organization");
+  return { ...program, siteId: site.id, organizationId: site.organizationId,
+    // Existing same-organization school day flows retain their original
+    // named-duty checks. Strict new delegation applies to independent
+    // church Site + CAN institution arrangements (GF-B).
+    requiresDelegation: hostOrg.type === "church" &&
+      program.academicProviderOrganizationId !== site.organizationId,
+  };
 }
 
 async function currentConfiguration(tx: Reader, programId: string) {
@@ -225,6 +235,7 @@ export async function requireCurrentSiteLocalDelegate(
       !actor.scope.programIds?.includes(programId)) {
     throw new AuthorizationError("verified Program and local Site duty scope");
   }
+  if (!host.requiresDelegation) return;
   const config = await currentConfiguration(tx, programId);
   if (!config) throw new AuthorizationError("configured local responsibility");
   const now = new Date();
