@@ -12,6 +12,7 @@ import { emitEvent,notify,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray } from "drizzle-orm";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
 /** Trusted server-side command service only. No public route or client-supplied CommandContext. */
 const guarded=(context:AccessContext,role:"registrar"|"guardian")=>{
@@ -86,6 +87,9 @@ export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{
   const [app]=await tx.select().from(applications).where(eq(applications.id,input.applicationId)).limit(1);
   if(!app)throw new Error("Application not found");
   requireAdmissionsProgramScope(context,app.programId);
+  await requireChurchHostedOperatingServices(tx,app.programId,[
+    "admissions","school_of_record",
+  ]);
   assertRecordWriteAllowed(app.metadata,"registrar");
   assertApplicationOffersAllowed(app);
   const {pool}=await lockPool(tx,app.programId,input.schoolYearId);
@@ -159,6 +163,9 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
   requireAdmissionsProgramScope(context,lookup.programId);
+  await requireChurchHostedOperatingServices(tx,lookup.programId,[
+    "admissions","school_of_record",
+  ]);
   await lockAdmissionsApplication(tx,lookup.applicationId);
   const {pool,organizationId}=await lockPool(tx,lookup.programId,lookup.schoolYearId);
   const [offer]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
