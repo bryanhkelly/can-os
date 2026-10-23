@@ -5,6 +5,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { getSitePublicationDraftView, reserveSitePublicationAddress, setSitePublicationStatus } from "@/modules/sites/site-publication.functions";
+import { AcademicProgramMarketingEditor } from "@/components/sites/AcademicProgramMarketingEditor";
 
 export const Route = createFileRoute("/sites/$siteId/publish")({
   loader: ({ params }) => safeLoader(
@@ -67,6 +68,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
     }
   }
 
+  const hasApprovedPublicContent = data.catalogPreview.length > 0 ||
+    data.academicPrograms.some(program => program.marketing?.status === "published" &&
+      !["paused", "closed"].includes(program.status));
   const candidate = isPublicSiteSlug(slug) ? publicSiteHost(slug) : null;
   return <WorkspaceShell eyebrow="CAN OS · Site publishing" title={data.site.name + " · public site"}
     subtitle="Reserve an address and approve or withdraw the catalog. Public hostname routing is not yet active."
@@ -141,6 +145,23 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       </div>
     </section>
     <section className="mt-6 rounded-xl border bg-card p-5">
+      <h2 className="text-xl font-semibold">Academic program marketing</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Approve individual school-year Programs for public discovery. Programs may
+        be planned or launching: marketing approval does not open admissions or
+        certify credit issuance, accreditation, or instructional readiness.
+      </p>
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        {data.academicPrograms.map(program =>
+          <AcademicProgramMarketingEditor
+            key={program.id + (program.marketing?.updatedAt ?? "")}
+            siteId={data.site.id} program={program}/>)}
+        {!data.academicPrograms.length && <p className="text-sm text-muted-foreground">
+          No academic Programs belong to your authorized scope at this Site.
+        </p>}
+      </div>
+    </section>
+    <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">Site publication decision</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Approving this Site controls its public-safe enrichment catalog.
@@ -151,10 +172,10 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         Reserve the Site address before approving its public catalog.
       </p> : <div className="mt-4 space-y-4">
         <p className="text-sm">Current state: <strong>{data.address.status}</strong></p>
-        {data.address.status === "draft" && data.catalogPreview.length === 0 &&
+        {data.address.status === "draft" && !hasApprovedPublicContent &&
           <p role="status" className="rounded-lg border p-3 text-sm">
-            Publishing blocked: first approve at least one summer or after-school
-            offering through the existing CAN OS enrichment workflow.
+            Publishing blocked: approve an academic Program listing or a summer / after-school
+            enrichment offering first.
           </p>}
         <label className="block text-sm">
           Publication decision reason (10–500 characters; no student information)
@@ -176,7 +197,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           onClick={() => void updatePublication(data.address!.status === "published" ? "unpublish" : "publish")}
           disabled={saving || reason.trim().length < 10 ||
             (data.address.status === "draft" &&
-              (!contentReviewed || data.catalogPreview.length === 0))}
+              (!contentReviewed || !hasApprovedPublicContent))}
           className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
           {saving ? "Saving…" : data.address.status === "published"
             ? "Unpublish public catalog" : "Approve public catalog"}
