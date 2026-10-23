@@ -95,7 +95,9 @@ export async function accessibleClasses(actor: Actor) {
     eq(s.enrollments.schoolYearId,s.terms.schoolYearId));
   if (actor.role === "teacher") {
     const delegated=actor.scope.sectionIds??[];
-    const rows = await db.select(projection).from(s.sections)
+    const rows = await db.select({
+      ...projection,siteId:s.sections.siteId,programId:s.sections.programId,
+    }).from(s.sections)
       .innerJoin(s.sectionTeachers, eq(s.sectionTeachers.sectionId, s.sections.id))
       .where(and(eq(s.sections.active,true),
         eq(s.sectionTeachers.personId,actor.actorPersonId),
@@ -104,7 +106,31 @@ export async function accessibleClasses(actor: Actor) {
           // Site/Program scope; delegated assignments are exact Section IDs.
           or(scope,inArray(s.sections.id,delegated))
         ) : scope)).orderBy(s.sections.title);
-    return rows.map(row => ({ ...row, studentPersonId: null, studentName: null }));
+    const available=[];
+    // A previously signed-in CAN teacher must not retain a stale church
+    // class directory entry after the underlying academic agreement expires
+    // or is withdrawn. A Section assignment alone is never a contract.
+    for(const row of rows){
+      const hostLocal=!!row.siteId &&
+        (actor.scope.siteIds??[]).includes(row.siteId) &&
+        (actor.scope.programIds??[]).includes(row.programId);
+      if(!hostLocal){
+        if(!delegated.includes(row.id))continue;
+        try{
+          await requireInstitutionalAcademicProgramAuthority(db,actor,row.programId,[
+            "academic_instruction","curriculum",
+          ]);
+        }catch(error){
+          if(!(error instanceof AuthorizationError))throw error;
+          continue;
+        }
+      }
+      available.push({
+        id:row.id,title:row.title,code:row.code,
+        studentPersonId:null,studentName:null,
+      });
+    }
+    return available;
   }
   const activeProgramMembership=alias(s.enrollments,"class_directory_program_membership");
   const query = db.select({ ...projection, studentPersonId: s.studentProfiles.personId,
