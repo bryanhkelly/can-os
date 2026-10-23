@@ -53,6 +53,18 @@ export const createTeacherLearningFollowUp = createServerFn({ method: "POST" })
           eq(s.studentProfiles.id, data.studentProfileId)))
         .limit(1);
       if (!student) throw new AuthorizationError("currently enrolled student");
+      const [currentProgramEnrollment]=await tx.select({id:s.enrollments.id})
+        .from(s.enrollments)
+        .innerJoin(s.terms,eq(s.terms.schoolYearId,s.enrollments.schoolYearId))
+        .where(and(eq(s.terms.id,(await tx.select({termId:s.sections.termId})
+          .from(s.sections).where(eq(s.sections.id,section.id)).limit(1))[0]!.termId),
+          eq(s.enrollments.studentProfileId,student.id),
+          eq(s.enrollments.programId,section.programId),
+          eq(s.enrollments.kind,"program"),
+          eq(s.enrollments.status,"active")))
+        .limit(1);
+      if(!currentProgramEnrollment)
+        throw new AuthorizationError("active same-year Program enrollment");
 
       const event = (await tx.select({
         id: s.learningActivityEvents.id, lessonId: s.learningActivityEvents.lessonId,
