@@ -73,6 +73,8 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
        <div className="flex flex-wrap gap-3 text-sm">
         {o.sectionCount>0&&<Link to="/classes" search={{student:app.studentPersonId}}
           className="rounded-lg border px-3 py-2 font-semibold">Open your child's classes →</Link>}
+        <Link to="/guardian/attendance" search={{student:app.studentPersonId}}
+         className="rounded-lg border px-3 py-2">Attendance and excuses →</Link>
         <Link to="/guardian" className="rounded-lg border px-3 py-2">Family home →</Link>
        </div>
      </div>}
