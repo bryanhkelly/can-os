@@ -9,6 +9,12 @@ const publishInput = z.object({
   permissionVersion: z.string().trim().min(1).max(80),
   permissionText: z.string().trim().min(30).max(6000),
   feeAmountCents: z.number().int().min(0).max(10000000),
+  packages: z.array(z.object({
+    id: z.string().uuid(),
+    title: z.string().trim().min(2).max(100),
+    priceCents: z.number().int().min(0).max(10000000),
+    sessionIds: z.array(z.string().uuid()).min(1).max(180),
+  }).strict()).min(1).max(30).optional(),
   operationalResponsibilityConfirmed: z.literal(true),
 }).strict();
 
