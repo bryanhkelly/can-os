@@ -406,5 +406,98 @@ integration("GF36 co-curriculars and athletics", () => {
     const [stillDraft] = await db.select({ status: schema.activitySeasons.status })
       .from(schema.activitySeasons).where(eq(schema.activitySeasons.id, seasonId));
     expect(stillDraft.status).toBe("draft");
+
+    // Summer/enrichment family path: publish a real noncredit offer, then reuse
+    // consent, household financial obligation, and the locked seat/waitlist allocator.
+    const { publishExtendedSeason } = await import(
+      "@/modules/activities/enrichment-publication.server"
+    );
+    const policy = {
+      seasonId, permissionVersion: "summer-2028-v1",
+      permissionText: "I consent to participation in this supervised summer workshop and understand the site pickup instructions.",
+      feeAmountCents: 12500, operationalResponsibilityConfirmed: true as const,
+    };
+    await expect(publishExtendedSeason({
+      ...readinessContext, scope: {
+        ...readinessContext.scope, siteIds: [crypto.randomUUID()],
+      },
+    }, policy)).rejects.toThrow(/authorized extended-learning/);
+    for (const writer of ["writeAudit", "emitEvent"] as const) {
+      await expectEvidenceFailure(db, writer, () =>
+        publishExtendedSeason(readinessContext, policy));
+      const [unchanged] = await db.select().from(schema.activitySeasons)
+        .where(eq(schema.activitySeasons.id, seasonId));
+      expect(unchanged.status).toBe("draft");
+    }
+    const published = await publishExtendedSeason(readinessContext, policy);
+    expect(published).toMatchObject({status: "registration", created:true});
+    const repeatPublish = await publishExtendedSeason(readinessContext, policy);
+    expect(repeatPublish.created).toBe(false);
+    await expect(publishExtendedSeason(readinessContext, {
+      ...policy, permissionVersion:"changed-without-revision",
+    })).rejects.toThrow(/controlled revision/);
+    const [publishedActivity] = await db.select().from(schema.activities)
+      .where(eq(schema.activities.id, activityId));
+    expect((publishedActivity.metadata.enrichmentPublication as {
+      permissionVersion:string
+    }).permissionVersion).toBe(policy.permissionVersion);
+
+    // This student has a real GuardianRelationship, but NO school-year/program
+    // enrollment. A summer registration must not manufacture one.
+    const [outsidePerson] = await db.insert(schema.people).values({
+      legalFirstName:"Morgan",legalLastName:`Outside-${suffix}`,
+      metadata:{origin:"guardian_enrichment"},
+    }).returning();
+    const [outsideChild] = await db.insert(schema.studentProfiles).values({
+      personId:outsidePerson.id,gradeLevel:"8",
+      metadata:{origin:"guardian_enrichment"},
+    }).returning();
+    await db.insert(schema.guardianRelationships).values({
+      guardianPersonId:guardian.id,studentPersonId:outsidePerson.id,
+      relationshipLabel:"parent",canManageEnrollment:true,
+    });
+    await db.insert(schema.householdMemberships).values({
+      householdId:household.id,personId:outsidePerson.id,relationshipLabel:"student",
+    });
+
+    const enrollmentBefore = await db.select().from(schema.enrollments)
+      .where(eq(schema.enrollments.studentProfileId,outsideChild.id));
+    expect(enrollmentBefore).toHaveLength(0);
+    const request = {
+      activitySeasonId:seasonId,studentProfileId:outsideChild.id,
+      householdId:household.id,consentVersion:policy.permissionVersion,acknowledged:true,
+    };
+    await expect(activities.registerForActivity(guardianContext,{
+      ...request, acknowledged:false,
+    })).rejects.toThrow(/acknowledge/);
+    await expect(activities.registerForActivity(guardianContext,{
+      ...request, consentVersion:"expired-version",
+    })).rejects.toThrow(/acknowledge/);
+    await expect(activities.registerForActivity({
+      ...guardianContext,actorPersonId:coach.id,
+    },request)).rejects.toThrow(/authorized guardian/);
+
+    for (const writer of ["writeAudit", "emitEvent"] as const) {
+      await expectEvidenceFailure(db,writer,() =>
+        activities.registerForActivity(guardianContext,request));
+      const unchanged = await db.select().from(schema.activityRegistrations)
+        .where(eq(schema.activityRegistrations.studentProfileId,outsideChild.id));
+      expect(unchanged).toHaveLength(0);
+    }
+    const outsideRegistrationId = await activities.registerForActivity(guardianContext,request);
+    const retryId = await activities.registerForActivity(guardianContext,request);
+    expect(retryId).toBe(outsideRegistrationId);
+    const [outsideRegistration] = await db.select().from(schema.activityRegistrations)
+      .where(eq(schema.activityRegistrations.id,outsideRegistrationId));
+    expect(outsideRegistration.status).toBe("pending");
+    const [outsideConsent] = await db.select().from(schema.consentRecords)
+      .where(eq(schema.consentRecords.id,outsideRegistration.consentRecordId!));
+    expect(outsideConsent.version).toBe(policy.permissionVersion);
+    expect(outsideConsent.signatureEvidence.permissionText).toBe(policy.permissionText);
+    const [outsideFee] = await db.select().from(schema.financialObligations)
+      .where(eq(schema.financialObligations.id,outsideRegistration.financialObligationId!));
+    expect(outsideFee.amountCents).toBe(12500);
+    expect(await db.select().from(schema.enrollments)
+      .where(eq(schema.enrollments.studentProfileId,outsideChild.id))).toHaveLength(0);
   });
 });
