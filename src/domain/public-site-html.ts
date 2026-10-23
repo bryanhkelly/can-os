@@ -1,9 +1,12 @@
+import type { PublicAcademicProgram } from "./academic-program-publication";
+
 /** Standalone, escaped HTML. No hydration, external scripts or CAN OS shell. */
 type PublicOffering = ReturnType<typeof import("./public-site-catalog").toPublicSiteEnrichment>;
 export type PublicSitePage = {
   host: string;
   site: { name: string; organizationName: string };
   offerings: PublicOffering[];
+  academicPrograms?: PublicAcademicProgram[];
 };
 
 export function escapePublicHtml(value: string): string {
@@ -21,6 +24,26 @@ export function renderPublicSiteHtml(page: PublicSitePage): string {
   const school = escapePublicHtml(page.site.name);
   const org = escapePublicHtml(page.site.organizationName);
   const host = escapePublicHtml(page.host);
+  const academicCards = (page.academicPrograms ?? []).map(program => {
+    const modes = [
+      program.delivery.onsite ? "Onsite" : null,
+      program.delivery.liveOnline ? "Live online" : null,
+      program.delivery.asynchronous ? "Self-paced online" : null,
+    ].filter(Boolean).join(" · ");
+    const onsiteDays = program.delivery.onsiteDaysPerWeek;
+    return `<article class="card">
+      <p class="tag">${escapePublicHtml(program.typeLabel)}</p>
+      <h3>${escapePublicHtml(program.title)}</h3>
+      <p class="season">Grades ${escapePublicHtml(program.grades.min)}–${escapePublicHtml(program.grades.max)}</p>
+      <p>${escapePublicHtml(program.summary)}</p>
+      <p class="availability">${escapePublicHtml(modes || "Delivery details available by inquiry")}
+        ${onsiteDays !== null && program.delivery.onsite ? ` · ${onsiteDays} onsite days per week` : ""}
+      </p>
+      <p class="availability">${program.availability === "planned"
+        ? "Program planned · admissions not open on this page"
+        : "Current program · contact the Site about admissions"}</p>
+    </article>`;
+  }).join("\n");
   const cards = page.offerings.map(item => {
     const price = item.packages.length
       ? Math.min(...item.packages.map(option => option.priceCents))
@@ -71,10 +94,18 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 <header><p class="brand">CAN Academy · Local partner site</p><p>${org}</p></header>
 <main>
   <h1>${school}</h1>
-  <p class="intro">Explore summer and after-school learning opportunities offered at this location. Information reflects the site's approved catalog. Program enrollment and academic admissions are separate processes.</p>
-  <section aria-labelledby="programs-title">
-    <h2 id="programs-title">Programs and enrichment</h2>
-    ${cards ? `<div class="grid">${cards}</div>` : '<p class="empty">There are no programs to display at this time.</p>'}
+  <p class="intro">Discover academic and enrichment opportunities at this location.
+  Listings are reviewed marketing information, not accreditation, admission or
+  registration approvals.</p>
+  ${academicCards ? `<section aria-labelledby="academic-title">
+    <h2 id="academic-title">Academic programs</h2>
+    <div class="grid">${academicCards}</div>
+  </section>` : ""}
+  <section aria-labelledby="programs-title" style="margin-top:40px">
+    <h2 id="programs-title">Summer and after-school enrichment</h2>
+    ${cards ? `<div class="grid">${cards}</div>` : academicCards
+      ? '<p class="intro">No enrichment opportunities are currently listed.</p>'
+      : '<p class="empty">There are no programs to display at this time.</p>'}
   </section>
 </main>
 <footer>${host} · Powered by CAN OS</footer>
