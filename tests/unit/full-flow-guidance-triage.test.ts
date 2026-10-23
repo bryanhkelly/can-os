@@ -62,6 +62,7 @@ describe("guided school launch",()=>{
       ...program.counts,applications:2,activeProgramStudents:2,placedStudents:1,
     }},null);
     expect(steps[2]?.evidence).toContain("1 awaiting classes");
+    expect(steps[2]?.state).toBe("needs_attention");
   });
   it("requires all existing sections staffed before claiming instructional coverage",()=>{
     const steps=guidedSchoolJourney({...program,counts:{
