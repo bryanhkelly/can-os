@@ -70,6 +70,19 @@ describe("FullFlow operational record projection", () => {
     expect(snapshot.totals.gradedWork).toBe(2);
     expect(snapshot.totals.unresolvedGuardianResponses).toBe(2);
   });
+  it("does not count an orphan Section enrollment as a student's class placement", () => {
+    const snapshot=summarizeFullFlowOperations({
+      ...rows,
+      enrollments:[
+        {programId:"A",kind:"program",status:"active",studentProfileId:"student-1",sectionId:null},
+        {programId:"A",kind:"section",status:"active",studentProfileId:"different-student",sectionId:"sec-A"},
+        {programId:"B",kind:"section",status:"active",studentProfileId:"student-1",sectionId:"sec-B"},
+      ],
+    });
+    expect(snapshot.programs[0]?.counts.activeProgramStudents).toBe(1);
+    expect(snapshot.programs[0]?.counts.placedStudents).toBe(0);
+    expect(snapshot.programs[1]?.counts.placedStudents).toBe(0);
+  });
   it("returns zeros rather than inventing readiness for a school with no program", () => {
     const snapshot=summarizeFullFlowOperations({
       ...rows,programs:[],sections:[],teacherAssignments:[],adoptions:[],
