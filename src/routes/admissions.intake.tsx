@@ -100,7 +100,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
          is appropriate. Formal guardian verification remains a separate step.</span>
      </label>
    </div>}
-   <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void perform(
+   {(!selected.interest||!!convertibleInterest)&&<form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void perform(
     async()=>{
      if(existingStudentKey&&!existingStudent)throw new Error("The selected student is no longer available. Choose a student again.");
      if(existingStudent&&!existingStudent.householdId&&!createHouseholdConfirmed)
@@ -160,7 +160,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     <label className="text-sm">Inquiry source<select value={source} disabled={!!convertibleInterest} onChange={e=>setSource(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"><option value="school_direct">School inquiry</option><option value="published_site">Published Site</option><option value="church_referral">Church referral</option><option value="family_referral">Family referral</option><option value="event">Event</option><option value="other">Other</option></select></label>
     <label className="text-sm sm:col-span-2">Notes<textarea value={notes} onChange={e=>setNotes(e.target.value)} className="mt-1 w-full rounded border bg-background p-2" rows={2}/></label>
     <button type="submit" disabled={busy||!programId||(!!convertibleInterest&&!contactReviewed)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create inquiry</button>
-   </form>
+   </form>}
   </section>
   <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3">
    {stages.map(stage=><div key={stage} className="rounded-lg border p-3"><p className="text-xs capitalize text-muted-foreground">{stage}</p><p className="font-serif text-2xl">{scopedRecords.filter(r=>r.stage===stage).length}</p></div>)}
