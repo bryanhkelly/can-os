@@ -78,6 +78,35 @@
   explicit institution identity reconciliation; an email match is not
   permission to adopt a prior student or Household.
 
+## GF-B schedule-to-delegation coverage gate (23 October 2026)
+
+**Source committed, runtime acceptance pending.** The Site supervision
+projection no longer treats an active delivery arrangement plus a generic
+local staff account grant as enough for an independently church-hosted CAN
+Section's planned staffing. On the exact scheduled block it now requires
+the same adult's verified, latest-configuration **Section-specific
+responsibility**, the active local Site account role, and the institution's
+current evidence-backed `onsite_supervision` agreement.
+
+Missing responsibilities or agreements surface independent, actionable
+`section_delegation_missing` and `operating_agreement_missing` gaps,
+remove the block from planned coverage, and do not activate affirmative
+duty acceptance. Replacing an appointment or operating authorization
+changes the schedule's acknowledgment fingerprint, so a prior accepted
+response does not transfer into a new authorization. Classroom staff
+retain the ability to report inability to cover an assigned block.
+
+The coverage projection continues to flag conflicts, absent calendars,
+missing rooms and unscheduled Sections, and **never** claims physical
+coverage. No schema change or production DB action was made.
+
+**Next blocker:** verified staff training/screening per assigned
+scheduled adult, real Section room occupancy and backup arrangements,
+then separately authenticated end-to-end guardian → enrollment → Section
+→ check-in/attendance → supervised day acceptance.
+
+---
+
 ## GF-B local Site continuation — staffed Sections (23 October 2026)
 
 **Source committed, not runtime accepted.** An independent church/CAN Program
