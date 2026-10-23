@@ -128,6 +128,29 @@ function EnrichmentFamilyView({ data }: {
         </div>
       </form>}
     </section>
+    <section className="mt-8" aria-label="Your enrichment registrations">
+      <h2 className="text-xl font-semibold">Your registrations</h2>
+      {data.family.registrations.length === 0
+        ? <p className="mt-2 text-sm text-muted-foreground">No summer or enrichment registrations recorded yet.</p>
+        : <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+          {data.family.registrations.map(registration => {
+            const child = data.family.children.find(c => c.studentProfileId === registration.studentProfileId);
+            return <li key={registration.id} className="rounded-xl border bg-card p-4">
+              <p className="font-semibold">{registration.offeringName}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {child?.name} {child?.lastName} · {registration.seasonName}
+              </p>
+              <p className="mt-1 text-xs">
+                {registration.startsOn} to {registration.endsOn} ·
+                {" "}{registration.status.replaceAll("_", " ")}
+              </p>
+              {registration.amountCents != null && <p className="mt-2 text-sm">
+                {usd(registration.amountCents)} · {registration.paymentStatus ?? "payment pending"}
+              </p>}
+            </li>;
+          })}
+        </ul>}
+    </section>
     <section className="mt-8 space-y-4" aria-label="Available enrichment programs">
       <h2 className="text-xl font-semibold">Open registration</h2>
       {data.catalog.length === 0 && <p className="rounded-lg border p-5 text-sm text-muted-foreground">
