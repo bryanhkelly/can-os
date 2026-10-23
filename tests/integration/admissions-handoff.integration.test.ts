@@ -6,10 +6,18 @@ import type { Actor } from "@/modules/identity/actors.server";
 
 type Transaction=Parameters<Parameters<Database["transaction"]>[0]>[0];
 const state=vi.hoisted(()=>({tx:undefined as Transaction|undefined,actor:undefined as Actor|undefined,
- verify:vi.fn(),sign:vi.fn(()=>"https://storage.example.invalid/signed"),failDocumentEvent:false,failStageEvent:false,failInquiryEvent:false}));
+ verify:vi.fn(),sign:vi.fn(()=>"https://storage.example.invalid/signed"),
+ studentInvite:vi.fn(async()=>({accepted:true as const})),
+ failDocumentEvent:false,failStageEvent:false,failInquiryEvent:false}));
 vi.mock("@/modules/enrollment/r2-documents.server",async importOriginal=>{
  const original=await importOriginal<typeof import("@/modules/enrollment/r2-documents.server")>();
  return {...original,verifyDocumentObject:state.verify,signR2Object:state.sign,r2Config:vi.fn(()=>({}))};
+});
+// Delivery is mocked, but identity/consent/grant writes remain canonical
+// and part of the same rollback-only Neon acceptance journey.
+vi.mock("@/modules/identity/passwordless-access.server",async importOriginal=>{
+ const original=await importOriginal<typeof import("@/modules/identity/passwordless-access.server")>();
+ return {...original,requestOneTimeAccess:state.studentInvite};
 });
 vi.mock("@/platform/mutation",async importOriginal=>{
  const original=await importOriginal<typeof import("@/platform/mutation")>();
@@ -61,6 +69,9 @@ integration("cross-persona admissions through active classes",()=>{
   const {accessibleClasses,authorizeClass}=await import("@/modules/learning/class-access.server");
   const {getClassWorkspace}=await import("@/modules/learning/class-workspace.functions");
   const {getGradebookSections,getGradebook}=await import("@/modules/learning/gradebook.functions");
+  const {
+   getStudentLearningHandoff,consentToStudentLearningAccount,provisionStudentLearningAccess,
+  }=await import("@/modules/enrollment/student-access-handoff.functions");
   const {getNotifications}=await import("@/modules/communication/notification-center.functions");
   const rollback=new Error("rollback-admissions-handoff");
   const suffix=crypto.randomUUID().slice(0,8);
@@ -103,7 +114,20 @@ integration("cross-persona admissions through active classes",()=>{
        fields:[{key:"contact_plan",label:"Contact plan",type:"text",required:true},
         {key:"school_contact",label:"May the school contact you?",type:"yes_no",required:true}]}}
      ]}});
+    // The student invitation must be authorized by a REAL verified adult
+    // account, not only the test's synthetic command-context role.
+    const [guardianAccount]=await tx.insert(s.accessAccounts).values({
+      emailNormalized:`parent-${suffix}@example.org`,
+      emailVerifiedAt:new Date(),
+    }).returning();
+    const [guardianGrant]=await tx.insert(s.accountPersonGrants).values({
+      accountId:guardianAccount!.id,personId:guardian.id,role:"guardian",
+      organizationId:org.id,siteId:site.id,active:true,isSynthetic:false,
+    }).returning();
     const family=act("guardian",guardian.id);
+    family.accountId=guardianAccount!.id;
+    family.grantId=guardianGrant!.id;
+    family.grantSiteId=site.id;
     const app=await startFamilyApplication(family,{programId:program.id,idempotencyKey:key,journeyDefinitionKey:key,
      student:{legalFirstName:"Accepted",legalLastName:"Learner",gradeLevel:"9"}});
     applicationId=app.applicationId;profileId=app.studentProfileId;
@@ -479,6 +503,50 @@ integration("cross-persona admissions through active classes",()=>{
     state.actor=learner;
     const studentClass=await getClassWorkspace({data:{sectionId:section.id}});
     expect(studentClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
+    // Last-mile P0: the same admitted child can receive a DIFFERENT verified
+    // student account only after their guardian consents and staff approves.
+    state.actor=family;
+    const email=`learner-${suffix}@example.org`;
+    expect((await getStudentLearningHandoff({data:{applicationId}})).status)
+      .toBe("not_requested");
+    const [realSectionEnrollment]=await tx.select({id:s.enrollments.id})
+      .from(s.enrollments).where(and(
+        eq(s.enrollments.studentProfileId,profileId),
+        eq(s.enrollments.kind,"section"),eq(s.enrollments.sectionId,section.id),
+        eq(s.enrollments.status,"active"),
+      ));
+    if(!realSectionEnrollment)throw new Error("Missing Section enrollment fixture");
+    await tx.update(s.enrollments).set({schoolYearId:null})
+      .where(eq(s.enrollments.id,realSectionEnrollment.id));
+    await expect(consentToStudentLearningAccount({data:{
+      applicationId,studentEmail:email,acknowledged:true,
+    }})).rejects.toThrow("actual ready classroom placement");
+    await tx.update(s.enrollments).set({schoolYearId:time.schoolYear.id})
+      .where(eq(s.enrollments.id,realSectionEnrollment.id));
+    await consentToStudentLearningAccount({data:{
+      applicationId,studentEmail:email,acknowledged:true,
+    }});
+    expect((await getStudentLearningHandoff({data:{applicationId}})).status)
+      .toBe("pending_review");
+    state.actor=staff;
+    state.studentInvite.mockClear();
+    expect(await provisionStudentLearningAccess({data:{applicationId}}))
+      .toMatchObject({status:"approved"});
+    expect(state.studentInvite).toHaveBeenCalledOnce();
+    expect(state.studentInvite).toHaveBeenCalledWith(email);
+    const [studentAccount]=await tx.select().from(s.accessAccounts)
+      .where(eq(s.accessAccounts.emailNormalized,email));
+    if(!studentAccount)throw new Error("Student account was not provisioned");
+    const [studentGrant]=await tx.select().from(s.accountPersonGrants)
+      .where(and(eq(s.accountPersonGrants.accountId,studentAccount.id),
+        eq(s.accountPersonGrants.personId,student.personId),
+        eq(s.accountPersonGrants.role,"student")));
+    expect(studentGrant).toMatchObject({
+      active:true,isSynthetic:false,siteId:site.id,organizationId:org.id,
+    });
+    expect((await getStudentLearningHandoff({data:{applicationId}})).status)
+      .toBe("approved");
+    state.actor=learner;
     // A withdrawn Program must remove learning access even when a stale
     // active Section enrollment was left behind. Restore fixture state after
     // proving the deny so remaining enrollment/guardian assertions can run.
@@ -732,7 +800,7 @@ integration("cross-persona admissions through active classes",()=>{
     checked=true;throw rollback;
    });
   }catch(error){if(error!==rollback)throw error;}
-  finally{state.tx=undefined;state.actor=undefined;state.failDocumentEvent=false;state.failStageEvent=false;state.failInquiryEvent=false;vi.unstubAllEnvs();}
+  finally{state.tx=undefined;state.actor=undefined;state.failDocumentEvent=false;state.failStageEvent=false;state.failInquiryEvent=false;state.studentInvite.mockClear();vi.unstubAllEnvs();}
   expect(checked).toBe(true);
   expect(await database.select().from(s.applications).where(eq(s.applications.id,applicationId))).toEqual([]);
   expect(await database.select().from(s.studentProfiles).where(eq(s.studentProfiles.id,profileId))).toEqual([]);
