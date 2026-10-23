@@ -271,6 +271,16 @@ export async function gradeSubmission(
 
     if (!current) throw new Error("Submission not found");
     assertSectionScope(context, current.sectionId);
+    // The gradebook can issue a command from an institution-owned CAN teacher
+    // without a church Site grant. Recheck exact class assignment and current
+    // institutional academic authority IN this write transaction; otherwise
+    // revoking the CAN/church agreement between page load and grading could
+    // still commit a GradePosted event.
+    if ("role" in context && context.role === "teacher") {
+      const { authorizeClass } = await import("./class-access.server");
+      const actor = context as import("@/modules/identity/actors.server").Actor;
+      await authorizeClass(actor, current.sectionId, undefined, tx);
+    }
     if (current.status !== "submitted") {
       throw new Error("Only submitted work can be graded");
     }
