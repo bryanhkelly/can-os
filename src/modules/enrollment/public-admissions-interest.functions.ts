@@ -86,7 +86,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
 export const setPublicAdmissionsInterestStatus = createServerFn({ method: "POST" })
   .validator((v: unknown) => z.object({
     interestId: z.string().uuid(),
-    status: z.enum(["contacted", "closed"]),
+    status: z.literal("closed"),
   }).strict().parse(v))
   .handler(async ({ data }) => {
     const actor = await requireAdmissionsIntakeReader();
@@ -114,7 +114,6 @@ export const setPublicAdmissionsInterestStatus = createServerFn({ method: "POST"
       const now = new Date();
       await tx.update(publicAdmissionsInterests).set({
         status: data.status,
-        contactedAt: current.contactedAt ?? (data.status === "contacted" ? now : null),
         updatedAt: now,
       }).where(eq(publicAdmissionsInterests.id, current.id));
       if (data.status === "closed") await completePublicInterestFollowUp(tx, actor, {
