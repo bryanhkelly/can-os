@@ -34,12 +34,16 @@ export function assertChurchHostedProviderIntent(input: {
 export function assertChurchHostedActivationAuthorization(input: {
   programType: ProgramType;
   hostOrganizationId: string;
+  hostOrganizationType: string;
   academicProviderOrganizationId: string;
   verifiedProgramSiteAuthorizationId: string | null;
 }): void {
-  if (input.programType === "church_hosted_academy" &&
-      input.academicProviderOrganizationId !== input.hostOrganizationId &&
-      !input.verifiedProgramSiteAuthorizationId) {
+  // A church cannot bypass the independent CAN operating agreement by
+  // submitting the same externally provided school as a high-school extension.
+  // Preserve the existing explicit church_hosted_academy gate for other hosts.
+  const requiresAuthorization = input.academicProviderOrganizationId !== input.hostOrganizationId &&
+    (input.programType === "church_hosted_academy" || input.hostOrganizationType === "church");
+  if (requiresAuthorization && !input.verifiedProgramSiteAuthorizationId) {
     throw new Error("Church-hosted CAN Academy activation requires independently verified Program-Site institutional authorization");
   }
 }
