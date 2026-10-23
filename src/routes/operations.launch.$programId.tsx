@@ -6,6 +6,7 @@ import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import { ProgramSiteAuthorizationPanel } from "@/components/operations/ProgramSiteAuthorizationPanel";
 import { LocalSiteDelegationPanel } from "@/components/operations/LocalSiteDelegationPanel";
+import { SectionFacilitatorPanel } from "@/components/operations/SectionFacilitatorPanel";
 import {SectionLifecycleWorkspace} from "@/components/operations/SectionLifecycleManager";
 import {Qualifications} from "@/components/profiles/Qualifications";
 import {QualificationCatalog} from "@/components/profiles/QualificationCatalog";
@@ -57,7 +58,8 @@ function Setup({data}:{data:Snapshot}){
    </div>)}
   </div>
   <ProgramSiteAuthorizationPanel programId={data.program.id}/>
-  {data.program.siteId && <LocalSiteDelegationPanel programId={data.program.id}/> }
+  {data.program.siteId && <LocalSiteDelegationPanel programId={data.program.id}/>
+  {data.program.siteId && <SectionFacilitatorPanel programId={data.program.id}/> } }
   {!data.years.length&&<p className="mt-6 rounded-lg border p-4 text-sm">
    This program has no configured academic year. <Link to="/operations/school-years" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="underline">Set up the school year →</Link>
   </p>}
