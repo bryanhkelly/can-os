@@ -26,6 +26,13 @@ describe("transcripts record academic facts without deciding graduation",()=>{
     expect(countTranscriptRowsWithUnrecordedCredits([missing,missing])).toBe(2);
     expect(countTranscriptRowsWithUnrecordedCredits([])).toBe(0);
   });
+  it("does not inflate missing-credit counts with earlier grading periods",()=>{
+    expect(countTranscriptRowsWithUnrecordedCredits([
+      {terminalPeriod:false,creditConfigured:false,creditsAttempted:0,creditsEarned:0},
+      {terminalPeriod:false,creditConfigured:false,creditsAttempted:null,creditsEarned:null},
+      {terminalPeriod:true,creditConfigured:false,creditsAttempted:null,creditsEarned:null},
+    ])).toBe(1);
+  });
   it("treats absent credit fields as unknown, not as proof of zero credits",()=>{
     expect(countTranscriptRowsWithUnrecordedCredits([
       {creditConfigured:true,creditsAttempted:null,creditsEarned:null},
