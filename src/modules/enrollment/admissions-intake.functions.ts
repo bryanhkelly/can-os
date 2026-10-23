@@ -4,6 +4,7 @@ import { lockAdmissionsApplication } from "@/domain/admissions-application-lock"
 import { offerHoldsSeat } from "@/domain/admissions-policy";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { assertPublicInterestConversion } from "@/domain/public-interest-conversion";
+import { applicationGuardianContact } from "@/domain/application-guardian-contact";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
@@ -18,13 +19,6 @@ import { and,desc,eq,inArray,isNull,or,sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 const uuid=z.string().uuid();
-/** Self-submitted applications reference their verified-account adult, while
- * registrar-created inquiries must use their explicit prospective contact.
- */
-export function applicationGuardianContact(metadata:Record<string,unknown>, submittedByPersonId:string):string {
- return metadata.origin==="authenticated_guardian_application"
-  ?submittedByPersonId:String(metadata.contactPersonId??"");
-}
 const existingStudentSchema=z.object({
  studentProfileId:uuid,guardianPersonId:uuid,householdId:uuid.optional(),createHousehold:z.literal(true).optional(),
 }).strict().refine(student=>Boolean(student.householdId)!==Boolean(student.createHousehold),
