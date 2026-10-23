@@ -262,8 +262,11 @@ export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
 
     if (isOnsiteAttendanceRole(actor.role)) {
       assertOnsiteAttendanceScope(actor, program.siteId);
-      if (data.date !== siteDate(new Date(), program.timezone))
-        throw new AuthorizationError("onsite facilitator may record only the current school-local day");
+      // Permit bounded staff-attested corrections for a missed onsite day;
+      // never permit unrestricted backdating or future attendance.
+      const earliest = siteDate(new Date(Date.now() - 30 * 86400_000), program.timezone);
+      if (data.date < earliest || data.date > siteDate(new Date(), program.timezone))
+        throw new AuthorizationError("onsite staff attendance limited to recent school-local days");
       if (data.expectedPreviousEventId === undefined)
         throw new AuthorizationError("onsite correction requires prior-record acknowledgement");
       if (data.expectedPreviousEventId && (data.note?.trim().length ?? 0) < 10)
