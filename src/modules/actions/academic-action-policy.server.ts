@@ -2,6 +2,8 @@ import { and, eq, or, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accountPersonGrants, enrollments, programs, sections, sectionTeachers } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { authorizeClass } from "@/modules/learning/class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type AcademicResource = {
@@ -19,11 +21,18 @@ export async function assertAcademicActionAuthority(
   resource: AcademicResource,
 ): Promise<void> {
   if (!context.actorPersonId || resource.subjectType !== "student_profile" ||
-      !resource.sectionId || !resource.programId || !resource.organizationId ||
-      !context.scope.organizationIds?.includes(resource.organizationId) ||
+      !resource.sectionId || !resource.programId || !resource.organizationId)
+    throw new AuthorizationError("academic Action scope");
+  if(context.role==="teacher"){
+    // A CAN instructor holds the institution-wide original membership and
+    // an exact delegated Section, not the host church organization or Site.
+    // Recheck contract and assignment under this Action's transaction.
+    await authorizeClass(context as Actor,resource.sectionId,undefined,tx);
+  }else if(!context.scope.organizationIds?.includes(resource.organizationId) ||
       !context.scope.programIds?.includes(resource.programId) ||
       (resource.siteId !== null && !context.scope.siteIds?.includes(resource.siteId)) ||
-      (context.scope.sectionIds !== undefined && !context.scope.sectionIds.includes(resource.sectionId))) {
+      (context.scope.sectionIds !== undefined &&
+        !context.scope.sectionIds.includes(resource.sectionId))){
     throw new AuthorizationError("academic Action scope");
   }
   const [section] = await tx.select({ id: sections.id }).from(sections)
