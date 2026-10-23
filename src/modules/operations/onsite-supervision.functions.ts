@@ -1,11 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createHash } from "node:crypto";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, gte, inArray, lte, or, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, or, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  accessAccounts, accountPersonGrants, deliveryArrangements, people, programs, scheduleTemplatePeriods,
+  academicCalendars, academicCalendarDays, accessAccounts, accountPersonGrants,
+  deliveryArrangements, people, programs, scheduleTemplatePeriods,
   scheduleTemplates, schoolYears, sections, sites, terms,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
@@ -61,10 +62,11 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         ...summarizeOnsiteSupervision([])};
     }
     const ids=onsiteSections.map(row=>row.id);
+    const yearIds=[...new Set(onsiteSections.map(row=>row.schoolYearId))];
     const templateIds=[...new Set(onsiteSections.map(r=>r.scheduleTemplateId)
       .filter((id):id is string=>!!id))];
     const day=new Date(data.date+"T12:00:00Z").getUTCDay();
-    const [periodRows,arrangements]=await Promise.all([
+    const [periodRows,arrangements,calendarRows]=await Promise.all([
       templateIds.length?db.select({
         templateId:scheduleTemplates.id,yearId:scheduleTemplates.schoolYearId,
         programId:scheduleTemplates.programId,siteId:scheduleTemplates.siteId,
@@ -89,7 +91,31 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
       }).from(deliveryArrangements)
         .where(and(inArray(deliveryArrangements.sectionId,ids),
           eq(deliveryArrangements.status,"active"))),
+      db.select({
+        yearId:academicCalendars.schoolYearId,
+        version:academicCalendars.version,
+        dayType:academicCalendarDays.type,
+        minutes:academicCalendarDays.instructionalMinutes,
+      }).from(academicCalendars)
+        .leftJoin(academicCalendarDays,and(
+          eq(academicCalendarDays.academicCalendarId,academicCalendars.id),
+          eq(academicCalendarDays.calendarDate,data.date),
+        ))
+        .where(and(inArray(academicCalendars.schoolYearId,yearIds),
+          eq(academicCalendars.siteId,site.id),eq(academicCalendars.active,true)))
+        .orderBy(desc(academicCalendars.version)),
     ]);
+    // Latest active calendar version is authoritative; an absent/closed day
+    // cannot confer a scheduled onsite duty from a repeating timetable alone.
+    const instructionalByYear=new Map<string,boolean>();
+    for(const dayRow of calendarRows){
+      if(instructionalByYear.has(dayRow.yearId))continue;
+      const instructional=(dayRow.dayType==="instructional"||
+        dayRow.dayType==="makeup"||dayRow.dayType==="special") &&
+        dayRow.minutes!==0 &&
+        (dayRow.dayType!=="special"||(dayRow.minutes??0)>0);
+      instructionalByYear.set(dayRow.yearId,instructional);
+    }
     const candidates=arrangements.filter(row=>["onsite","hybrid"].includes(row.modality));
     const peopleIds=[...new Set(candidates.map(row=>row.facilitatorPersonId)
       .filter((id):id is string=>!!id))];
@@ -139,6 +165,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
           facilitatorPersonId:personId,
           facilitatorName:approved&&person?person.firstName+" "+person.lastName:null,
           verifiedSiteStaffGrant:approved,
+          instructionalDayConfirmed:instructionalByYear.get(section.schoolYearId)===true,
           overlappingFacilitatorAssignments:uniqueIds.length>1,
         });
       }
