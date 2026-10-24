@@ -1,0 +1,104 @@
+import { desc, eq, inArray } from "drizzle-orm";
+import { db } from "@/db/client";
+import {
+  documents, qualificationClaims, qualificationDefinitions,
+  qualificationVerificationEvents,
+} from "@/db/schema";
+import { coversLocalSupervisionBlock } from "@/domain/onsite-supervision-coverage";
+
+/**
+ * Qualification keys are explicit policy prerequisites, NOT an inference from
+ * a person's account, job title, employer, Section assignment or attendance.
+ * The verified review of an uploaded document does not itself establish that
+ * the site is legally cleared to open; jurisdictions must still approve policy.
+ */
+export const ONSITE_SCREENING = "onsite_child_safety_screening";
+export const ONSITE_TRAINING = "onsite_safeguarding_training";
+
+type Reader = Pick<typeof db, "selectDistinctOn">;
+type Evidence = { from: Date; through: Date | null };
+export type AdultSafetyEvidence = {
+  screening: readonly Evidence[];
+  training: readonly Evidence[];
+};
+
+/** Only the LATEST verification decision on each individual claim is trusted.
+ * Approved means an independent reviewer approved an independently verified
+ * document, for the right person, within its effective interval. A newer
+ * revoke/reject/submit decision or expired evidence immediately removes it.
+ */
+export async function verifiedAdultSafetyEvidence(
+  tx: Reader,
+  personIds: readonly string[],
+): Promise<ReadonlyMap<string, AdultSafetyEvidence>> {
+  const ids=[...new Set(personIds)];
+  const result=new Map<string, AdultSafetyEvidence>();
+  if(!ids.length) return result;
+  const claims=await tx.selectDistinctOn([qualificationClaims.id], {
+    claimId:qualificationClaims.id,
+    personId:qualificationClaims.personId,
+    key:qualificationDefinitions.key,
+    issuedAt:qualificationClaims.issuedAt,
+    expiresAt:qualificationClaims.expiresAt,
+    decision:qualificationVerificationEvents.decision,
+    reviewedBy:qualificationVerificationEvents.actorPersonId,
+    reviewedAt:qualificationVerificationEvents.occurredAt,
+    evidenceId:qualificationVerificationEvents.evidenceDocumentId,
+    docSubjectType:documents.subjectType,
+    docSubjectId:documents.subjectId,
+    docVerifiedAt:documents.verifiedAt,
+    docVerifiedBy:documents.verifiedByPersonId,
+    docExpiresAt:documents.expiresAt,
+  }).from(qualificationClaims)
+    .innerJoin(qualificationDefinitions,eq(qualificationDefinitions.id,qualificationClaims.definitionId))
+    .leftJoin(qualificationVerificationEvents,eq(qualificationVerificationEvents.claimId,qualificationClaims.id))
+    .leftJoin(documents,eq(documents.id,qualificationVerificationEvents.evidenceDocumentId))
+    .where(inArray(qualificationClaims.personId,ids))
+    .orderBy(qualificationClaims.id,desc(qualificationVerificationEvents.sequence));
+  for(const row of claims){
+    if(row.key!==ONSITE_SCREENING && row.key!==ONSITE_TRAINING)continue;
+    if(row.decision!=="approve" || !row.evidenceId || !row.reviewedBy ||
+       row.reviewedBy===row.personId || !row.reviewedAt ||
+       row.docSubjectType!=="person" || row.docSubjectId!==row.personId ||
+       !row.docVerifiedAt || !row.docVerifiedBy ||
+       row.docVerifiedBy===row.personId)continue;
+    const from=new Date(Math.max(
+      row.issuedAt?.getTime()??Infinity,
+      row.reviewedAt.getTime(),
+      row.docVerifiedAt.getTime(),
+    ));
+    if(!Number.isFinite(from.getTime()))continue;
+    const expirations=[row.expiresAt,row.docExpiresAt].filter(
+      (value):value is Date=>value!==null,
+    );
+    // Without a bounded expiration this material cannot attest to current
+    // child-safety clearance; older certificates must be periodically reviewed.
+    if(!expirations.length)continue;
+    const through=new Date(Math.min(...expirations.map(x=>x.getTime())));
+    if(through<=from)continue;
+    const existing=result.get(row.personId)??{screening:[],training:[]};
+    if(row.key===ONSITE_SCREENING)
+      result.set(row.personId,{...existing,screening:[...existing.screening,{from,through}]});
+    else result.set(row.personId,{...existing,training:[...existing.training,{from,through}]});
+  }
+  return result;
+}
+
+export function verifiedAdultCoversBlock(
+  evidence:AdultSafetyEvidence|undefined, input:{
+    date:string;timeZone:string;startsAtLocal:string|null;endsAtLocal:string|null;
+  },
+) {
+  const window=input.startsAtLocal && input.endsAtLocal ? {
+    date:input.date,timeZone:input.timeZone,
+    startsAtLocal:input.startsAtLocal,endsAtLocal:input.endsAtLocal,
+  }:null;
+  const covers=(rows:readonly Evidence[]|undefined)=>!!window && !!rows?.some(row=>
+    coversLocalSupervisionBlock({
+      ...window,effectiveFrom:row.from,effectiveThrough:row.through,
+    }));
+  return {
+    screening:covers(evidence?.screening),
+    training:covers(evidence?.training),
+  };
+}
