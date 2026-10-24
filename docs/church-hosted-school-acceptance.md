@@ -441,3 +441,68 @@ surfaces, and outbox reconciliation require further connected tests. School
 opening is still blocked by verified safeguarding and actual supervision
 evidence. CI's unassigned runner failures do not prove these source changes
 work in a browser or database.
+
+## Increment 8 — independently reviewed onsite adult, room and backup planning (2026-10-23)
+
+**Source-committed on `FullFlow`. No GitHub Actions work, production migration,
+or production school-opening change performed. Runtime and separate-session
+acceptance are still unverified.**
+
+P0 safety-plan blockers now appear directly in the live scheduled Section
+coverage projection:
+
+- Church/CAN onsite adult **primary and standby** must have a current, real,
+  email-verified original Site grant and current named Section appointment
+  spanning the whole scheduled block. Primary and standby must be distinct.
+- Independently reviewed qualification claims must have the *latest* decision
+  `approve`, subject-bound independently verified evidence, and effective
+  dates covering the entire site-local block. Exact catalog keys required:
+  `onsite_child_safety_screening` and `onsite_safeguarding_training`.
+  Supporting evidence categories must be respectively
+  `onsite_screening_evidence` and `onsite_training_evidence`. Expired or
+  revoked evidence, missing issue/expiration terms, unverified documents,
+  claimant self-review and an unrelated credential type fail closed.
+  **These keys do not substitute for state-specific legal clearance.**
+- Affirmative `respondToOnsiteDuty` responses re-evaluate the primary
+  adult's verified qualification evidence **inside the mutation transaction**
+  with share locks on claim rows; qualification review locks the same rows for
+  updates. `cannot_cover` safety exceptions remain available without this
+  affirmative gate and after a delegated appointment or contract is revoked.
+- An exact Section, date and schedule-period **room coverage plan** can come
+  only from an already uploaded `documents` record with
+  `subject_type='section'`, `category='onsite_block_room_coverage_plan'`,
+  independent verification, a valid effective window, and metadata naming
+  `siteId`, `programId`, `sectionId`, `periodId`, `date`,
+  `primaryPersonId`, `backupPersonId`, `roomLabel` and
+  `roomCapacity`. For independent church/CAN Programs the document's
+  verifier must also have a **current, original, active, verified CAN
+  `can_network_steward` grant under the academic provider**. A room label
+  in an ordinary Section metadata field is not accepted as reviewed evidence.
+  The existing secure document evidence/review workflow must produce these
+  records; this increment **does not** mint or self-verify documentation.
+- The current Section enrollment count must not exceed the independently
+  reviewed room capacity. Conflicting simultaneous primary or standby staff
+  bookings, or two simultaneous classes using the same reviewed room, fail
+  the planned coverage calculation. Capped room-evidence queries cannot be
+  accepted as complete.
+- The onsite panel identifies screening, training, Section delegation,
+  separate backup, reviewed room, capacity and room-conflict gaps, including
+  an explicitly marked planned room. Changes to these facts enter the exact
+  staff-duty response fingerprint; stale prior affirmative acknowledgments
+  cannot silently carry forward.
+- A cleared primary adult can truthfully acknowledge **their own
+  availability** before a room or backup is fully arranged, but that
+  acknowledgment does not close the room/backup readiness gaps. No staffing
+  plan or `accepted` duty response is a claim of adult physical presence,
+  student custody, site fire/occupancy approval, or completed child handoff.
+
+**Next blocking safety/product work:** School configuration is currently
+`draft` only (its DB enum contains no approved state). There is no genuine
+independently verified school-opening approval, documented operational
+emergency/pickup/mandated-reporting procedures, legally approved state-specific
+clearance policy, witnessed onsite adult check-in or custody/handoff flow.
+The general school opening status MUST remain HOLD. Coverage projections
+continue to expose `hasConfirmedPhysicalCoverage=false` even with a
+reviewed room and two nominated qualified adults. The evidence/document
+creation and independent verification UX, live browser sessions and
+disposable-DB tests also remain incomplete.
