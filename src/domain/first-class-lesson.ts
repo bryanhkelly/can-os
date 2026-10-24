@@ -12,14 +12,21 @@ export const FIRST_PUBLISHED_LESSON_ROUTE="__first_published_lesson__";
  * published version contains an actual learner-facing lesson with material
  * to read, practice or open.
  */
+/** Shared predicate for actual placement readiness and the first-lesson
+ * route; empty lesson shells must never be presented as launch-ready work.
+ */
+export function isLearnerFacingInstruction(lesson:{
+  body:string;activities?:readonly {instructions:string}[];
+  resources:readonly unknown[];
+}):boolean {
+  return lesson.body.trim().length>0 ||
+    lesson.activities?.some(activity=>activity.instructions.trim().length>0)===true ||
+    lesson.resources.length>0;
+}
 export function hasAccessibleFirstLesson(curriculum:Record<string,unknown>):boolean {
   const content=readClassContent(curriculum);
   if(!content)return false;
-  return content.modules.some(module=>module.lessons.some(lesson=>
-    Boolean(lesson.body.trim()) ||
-    lesson.activities?.some(activity=>Boolean(activity.instructions.trim())) === true ||
-    lesson.resources.length>0
-  ));
+  return content.modules.some(module=>module.lessons.some(isLearnerFacingInstruction));
 }
 export function requireAccessibleFirstLesson(curriculum:Record<string,unknown>):void {
   if(!hasAccessibleFirstLesson(curriculum))
