@@ -7,6 +7,7 @@ import { actions, sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
 import { siteDate } from "@/domain/expected-attendance";
+import { inPhysicalCheckInWindow } from "@/domain/onsite-physical-presence-policy";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
@@ -41,28 +42,6 @@ async function schoolSite(){
     !actor.actorPersonId || actor.demoFacilitator)
     throw new AuthorizationError("verified onsite school staff at original Site");
   return {actor,site};
-}
-
-function minutes(value:string|null):number|null{
-  const match=/^(\d{2}):(\d{2})(?::\d{2})?$/.exec(value??"");
-  if(!match)return null;
-  const n=Number(match[1])*60+Number(match[2]);
-  return Number(match[1])<24 && Number(match[2])<60?n:null;
-}
-
-export function inPhysicalCheckInWindow(input:{
-  now:Date;date:string;timezone:string;
-  start:string|null;end:string|null;
-}):boolean{
-  const start=minutes(input.start),end=minutes(input.end);
-  if(start===null || end===null || end<=start ||
-     siteDate(input.now,input.timezone)!==input.date)return false;
-  const parts=new Intl.DateTimeFormat("en-US",{
-    timeZone:input.timezone,hour:"2-digit",minute:"2-digit",hourCycle:"h23",
-  }).formatToParts(input.now);
-  const fields=Object.fromEntries(parts.map(part=>[part.type,part.value]));
-  const current=Number(fields.hour)*60+Number(fields.minute);
-  return Number.isFinite(current) && current>=start-60 && current<end;
 }
 
 async function currentRoom(tx:Pick<typeof db,"select">,
