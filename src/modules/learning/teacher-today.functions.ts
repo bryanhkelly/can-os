@@ -79,6 +79,12 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
 
  // submission_status has no "late" value; late work arrives as status "submitted"
  // with timeliness "late", so the queue keys on ungraded submitted attempts.
+ // A historical submission must not remain in the live daily grading queue
+ // after its student leaves this Section or their same-year Program. Historical
+ // grades remain in the academic record; current teacher work follows the
+ // same enrollment boundary as the roster and missing-work queue.
+ const submittedSection=alias(s.enrollments,"teacher_today_submitted_section");
+ const submittedProgram=alias(s.enrollments,"teacher_today_submitted_program");
  const ungradedRows = await db.select({
   sectionId: s.sections.id,
   assessmentId: s.submissions.assessmentId,
@@ -91,6 +97,20 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
  }).from(s.submissions)
   .innerJoin(s.assessments, eq(s.assessments.id, s.submissions.assessmentId))
   .innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(submittedSection,and(
+    eq(submittedSection.sectionId,s.sections.id),
+    eq(submittedSection.studentProfileId,s.submissions.studentProfileId),
+    eq(submittedSection.programId,s.sections.programId),
+    eq(submittedSection.schoolYearId,s.terms.schoolYearId),
+    eq(submittedSection.kind,"section"),eq(submittedSection.status,"active"),
+  ))
+  .innerJoin(submittedProgram,and(
+    eq(submittedProgram.studentProfileId,s.submissions.studentProfileId),
+    eq(submittedProgram.programId,s.sections.programId),
+    eq(submittedProgram.schoolYearId,s.terms.schoolYearId),
+    eq(submittedProgram.kind,"program"),eq(submittedProgram.status,"active"),
+  ))
   .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.submissions.studentProfileId))
   .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
   .where(and(
