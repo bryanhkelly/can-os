@@ -544,6 +544,11 @@ integration("cross-persona admissions through active classes",()=>{
     // student account only after their guardian consents and staff approves.
     state.actor=family;
     const email=`learner-${suffix}@example.org`;
+    // Never record an approved student login consent for an address to
+    // which the passwordless issuer intentionally cannot send a link.
+    await expect(consentToStudentLearningAccount({data:{
+      applicationId,studentEmail:`learner-${suffix}@can-os.invalid`,acknowledged:true,
+    }})).rejects.toThrow("deliverable student email");
     expect((await getStudentLearningHandoff({data:{applicationId}})).status)
       .toBe("not_requested");
     const [realSectionEnrollment]=await tx.select({id:s.enrollments.id})
