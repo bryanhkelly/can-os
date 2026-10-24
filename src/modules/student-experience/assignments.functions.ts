@@ -214,6 +214,7 @@ export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
    .from(s.assessments)
    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .where(and(eq(s.assessments.id,data.assessmentId),
+     inArray(s.assessments.status,["published","closed"]),
      inArray(s.sections.siteId,context.scope.siteIds!),
      inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
   if(!assessment)throw new AuthorizationError("class assignment history");
