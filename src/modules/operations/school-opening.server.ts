@@ -137,6 +137,8 @@ async function requireVerifiedChurchSiteDirector(
           eq(roleAssignments.siteId,school.siteId),
           eq(roleAssignments.programId,school.programId),
           eq(roleAssignments.roleKey,"site_leader"),
+          sql`${roleAssignments.metadata}->>'origin' = 'local_site_delegation'`,
+          sql`${roleAssignments.capabilities} @> ${JSON.stringify(["onsite.attendance.record"])}::jsonb`,
           eq(accountPersonGrants.active,true),
           eq(accountPersonGrants.isSynthetic,false),
           eq(accessAccounts.disabled,false),eq(people.active,true),
