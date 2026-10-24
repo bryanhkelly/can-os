@@ -97,6 +97,16 @@ export async function assertExpectedOnsiteMarkInTransaction(
     y.startsOn <= input.date && y.endsOn >= input.date);
   if (!matchingYears.length) throw new AuthorizationError("active school year at program site");
 
+  // A confirmed Program enrollment without a classroom seat is not
+  // authorization to mark a child physically present at a church-hosted CAN
+  // school. Recheck inside this locked transaction for every actor role,
+  // including registrars and site directors (not just facilitators).
+  const { requiresIndependentChurchLocalDelegation } = await import(
+    "@/modules/operations/site-local-delegation.server");
+  const independentChurch=await requiresIndependentChurchLocalDelegation(tx,input.programId);
+  if(independentChurch && !input.sectionId)
+    throw new AuthorizationError("church school attendance requires enrolled instructional Section");
+
   if (input.sectionId || role === "teacher") {
     if (!input.sectionId) throw new AuthorizationError("teacher section assignment");
     const [section] = await tx.select({
