@@ -1,5 +1,46 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 learner's revision → feedback → second grading (23 October 2026)
+
+**Source committed, not executed.** Implemented the next small slice
+of the same-child classroom lifecycle. The student now retains the
+previous **returned attempt's teacher comments and annotated response**
+while saving or submitting attempt N+1; the new attempt keeps its
+independent score and status rather than inheriting the earlier grade.
+After the new attempt is graded, the current teacher feedback replaces
+revision instructions. The student's Feedback filter includes work
+that is being revised.
+
+The real `returnSubmissionForRevision` transaction now blocks
+unresolvable returns: a closed assessment, inactive Section or withdrawn
+student's Program/Section membership is not a valid invitation to
+resubmit. The same registrar-admitted learner's rollback-only acceptance
+now exercises first grade → close/reopen hold → teacher return →
+learner's saved draft (with visible feedback) → second submission →
+grade 2 → feedback → historical attempt preservation. The test also
+denies returning the old attempt twice and returning after withdrawal.
+
+Assignment file safety shares the identical current
+Program/Section/year membership check: no new private-file upload,
+attachment association, listing or short-lived download URL can
+be issued from a stale Section-only enrollment. Authorized students
+can still read their own verified attachments after an assessment
+is closed; only modifications require publication. Draft autosave
+and final response updates preserve verified **current-attempt**
+attachment IDs rather than overwriting the response JSON, while
+a new revision does not silently inherit the prior attempt's files.
+Small pure regression cases cover retention, canonical IDs and
+deduplication.
+
+**Remaining acceptance:** these changes were not compiled or
+executed in GitHub Actions, which is intentionally excluded.
+Actual isolated-DB and browser verification is still required before
+calling the full end-to-end learning lifecycle complete. No additional
+migration, deployment or live child record was created by this work.
+
+---
+
+
 ## P0 first assignment → student submission → teacher feedback (23 October 2026)
 
 **Source committed, execution unverified; GitHub Actions deliberately skipped.**
