@@ -17,6 +17,7 @@ const labels: Record<string,string> = {
   facilitator_conflict:"Facilitator is assigned to overlapping instructional blocks",
   room_unconfigured:"No current independently reviewed room/coverage document for this exact block",
   room_capacity_unverified:"Room occupancy limit is missing or exceeded by the active Section roster",
+  room_schedule_conflict:"Two overlapping instructional blocks claim the same reviewed room",
   child_safety_screening_missing:"No independently verified, unexpired child-safety screening covering the entire block",
   safeguarding_training_missing:"No independently verified, unexpired safeguarding training covering the entire block",
   qualified_backup_missing:"No separately named backup with current staff appointment, screening and safeguarding training for this block",
