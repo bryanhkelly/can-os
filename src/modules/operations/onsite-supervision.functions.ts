@@ -15,6 +15,7 @@ import { siteDate } from "@/domain/expected-attendance";
 import { coversLocalSupervisionBlock, summarizeOnsiteSupervision, type SupervisionBlockInput } from "@/domain/onsite-supervision-coverage";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { verifiedScheduledSectionFacilitators, scheduledBlockHasNamedFacilitator } from "./section-coverage-verification.server";
+import { verifiedAdultSafetyEvidence, verifiedAdultCoversBlock } from "./onsite-block-safety.server";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
 const inputSchema=z.object({date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}).strict();
@@ -124,7 +125,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     const candidates=arrangements.filter(row=>["onsite","hybrid"].includes(row.modality));
     const peopleIds=[...new Set(candidates.map(row=>row.facilitatorPersonId)
       .filter((id):id is string=>!!id))];
-    const [activePeople,staffGrants]=await Promise.all([
+    const [activePeople,staffGrants,adultSafety]=await Promise.all([
       peopleIds.length?db.select({id:people.id,firstName:people.legalFirstName,
         lastName:people.legalLastName,active:people.active})
         .from(people).where(inArray(people.id,peopleIds)):Promise.resolve([]),
@@ -139,6 +140,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
           eq(accountPersonGrants.organizationId,site.organizationId),
           eq(accountPersonGrants.active,true),
           inArray(accountPersonGrants.role,["room_facilitator","site_staff","site_leader"]))):Promise.resolve([]),
+      verifiedAdultSafetyEvidence(db,peopleIds),
     ]);
     const peopleById=new Map(activePeople.map(row=>[row.id,row]));
     const independent = new Set(onsiteSections.filter(row =>
@@ -200,6 +202,11 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         const verifiedTerm=personId && requiresSectionDelegation
           ? verifiedDelegations.get(section.programId + ":" +
               "room_facilitator:" + section.id + ":" + personId) : undefined;
+        const safety=personId && requiresSectionDelegation
+          ? verifiedAdultCoversBlock(adultSafety.get(personId),{
+              date:data.date,timeZone:site.timezone,
+              startsAtLocal:period?.starts??null,endsAtLocal:period?.ends??null,
+            }) : {screening:true,training:true};
         const namedCurrent=personId && period && requiresSectionDelegation
           ? scheduledBlockHasNamedFacilitator(verifiedDelegations,{
               programId:section.programId,sectionId:section.id,personId,
@@ -214,6 +221,8 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
           facilitatorPersonId:personId,
           facilitatorName:approved&&person?person.firstName+" "+person.lastName:null,
           verifiedSiteStaffGrant:approved,
+          verifiedSafeguardingScreening:safety.screening,
+          verifiedSafeguardingTraining:safety.training,
           requiresSectionDelegation,
           verifiedSectionDelegation:!!namedCurrent,
           authorizedSupervisionService:!requiresSectionDelegation ||
@@ -240,6 +249,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         site.id,data.date,block.sectionId,block.periodId,block.startsAtLocal,
         block.endsAtLocal,assignedPersonId,block.verifiedSiteStaffGrant,
         block.verifiedSectionDelegation,block.authorizedSupervisionService,
+        block.verifiedSafeguardingScreening,block.verifiedSafeguardingTraining,
         delegationVersion,agreementVersion,block.assignedPlan,
       ])).digest("hex"),
       // Derived ONLY from the verified, original site grant and current active
