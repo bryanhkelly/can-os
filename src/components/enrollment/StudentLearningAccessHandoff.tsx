@@ -17,10 +17,14 @@ export function StudentLearningAccessHandoff({
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState("");
  const [error,setError]=useState("");
+ const [retry,setRetry]=useState(0);
  const [independentReviewConfirmed,setIndependentReviewConfirmed]=useState(false);
  const [reviewMethod,setReviewMethod]=useState<"institutional_school_record"|"verified_in_person">("institutional_school_record");
  useEffect(()=>{
   let live=true;
+  // Switching between children must not retain another child's email or
+  // previous approval status while a new handoff request is in flight.
+  setStatus("loading");setEmail("");setError("");
   void getStudentLearningHandoff({data:{applicationId}})
    .then(result=>{
     if(!live)return;
@@ -28,7 +32,7 @@ export function StudentLearningAccessHandoff({
    })
    .catch(()=>{if(live)setStatus("not_available");});
   return ()=>{live=false;};
- },[applicationId]);
+ },[applicationId,retry]);
  async function submit(event:React.FormEvent){
   event.preventDefault();
   setBusy(true);setError("");setNotice("");
@@ -51,7 +55,14 @@ export function StudentLearningAccessHandoff({
   }catch(e){setError(e instanceof Error?e.message:"Student access handoff could not be completed");}
   finally{setBusy(false);}
  }
- if(status==="not_available")return null;
+ if(status==="not_available")return <section aria-label="Student learning account"
+  className="mt-4 rounded-lg border p-4 text-sm">
+  <h4 className="font-semibold">Student learning account</h4>
+  <p className="mt-2" role="status">We could not verify this student's current school sign-in status.
+   Admissions can confirm classroom placement and account eligibility. No invitation has been sent by this screen.</p>
+  <button type="button" className="mt-3 rounded border px-3 py-2 font-semibold"
+   onClick={()=>setRetry(value=>value+1)}>Check again</button>
+ </section>;
  return <section className="mt-4 rounded-lg border p-4 text-sm">
   <h4 className="font-semibold">Student learning account</h4>
   {status==="loading"?<p className="mt-2">Checking the active class and access status…</p>:
