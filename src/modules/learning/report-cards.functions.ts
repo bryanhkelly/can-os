@@ -9,12 +9,13 @@ import { gradeLabelForPercentage,isPassingGrade } from "@/domain/grade-scale-pol
 import { verifiedSectionCreditUnits,countTranscriptRowsWithUnrecordedCredits } from "@/domain/section-credit-policy";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
+import { listDelegatedCANTranscriptPrograms } from "@/modules/learning/can-transcript-scope.server";
 import { authorizeClass } from "@/modules/learning/class-access.server";
 import type { Actor } from "@/modules/identity/actors.server";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and,asc,desc,eq,inArray,isNotNull,sql } from "drizzle-orm";
+import { and,asc,desc,eq,inArray,isNotNull,or,sql } from "drizzle-orm";
 import { z } from "zod";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,7 +31,25 @@ async function stores() {
   return { db, s };
 }
 
-type Viewer = { context: CommandContext; studentProfileId: string; siteIds: string[]; programIds: string[] };
+type Viewer = {
+  context: CommandContext;
+  studentProfileId: string;
+  siteIds: string[];
+  programIds: string[];
+  /** Exact CAN Program + church Site pairs for official record issuing only. */
+  delegatedPrograms?: Array<{programId:string;siteId:string}>;
+};
+
+/** Institutional pairs are query-local, never the account's global school scope. */
+function authorizedRecordSections(s: Schema, viewer: Viewer) {
+  const local=and(inArray(s.sections.siteId,viewer.siteIds),
+    inArray(s.sections.programId,viewer.programIds));
+  const delegated=(viewer.delegatedPrograms??[]).map(pair=>and(
+    eq(s.sections.siteId,pair.siteId),eq(s.sections.programId,pair.programId),
+  ));
+  return delegated.length ? or(local,...delegated) : local;
+}
+
 
 /**
  * Report cards and transcripts are visible to the student themselves or to a
@@ -132,8 +151,7 @@ async function finalizedGradeRows(
       and(
         eq(s.sectionGrades.studentProfileId, viewer.studentProfileId),
         eq(s.sectionGrades.status, "finalized"),
-        inArray(s.sections.siteId, viewer.siteIds),
-        inArray(s.sections.programId,viewer.programIds),
+        authorizedRecordSections(s,viewer),
         gradingPeriodId ? eq(s.sectionGrades.gradingPeriodId, gradingPeriodId) : undefined,
       ),
     )
@@ -724,7 +742,7 @@ async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
   .innerJoin(s.organizations,eq(s.organizations.id,s.programs.creditIssuingOrganizationId))
   .where(and(eq(s.enrollments.studentProfileId,viewer.studentProfileId),
    eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"withdrawn"),
-   inArray(s.sections.siteId,viewer.siteIds),inArray(s.sections.programId,viewer.programIds)));
+   authorizedRecordSections(s,viewer)));
  return rows.filter(row=>row.metadata.withdrawalNotation==="W").map(row=>({
   sectionGradeId:"withdrawal:"+row.enrollmentId,
   sectionId:row.sectionId,sectionTitle:row.sectionTitle,subject:row.subject,
@@ -763,13 +781,19 @@ export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" }
     if (context.role !== "registrar" || !context.actorPersonId) {
       throw new AuthorizationError("registrar transcript issuance");
     }
-    if (!context.scope.siteIds?.length || !context.scope.programIds?.length) {
-      throw new AuthorizationError("registrar transcript scope");
-    }
     const query = data.query.trim();
     if (query.length < 2) return { candidates: [] };
 
     const { db, s } = await stores();
+    const delegatedPrograms=await listDelegatedCANTranscriptPrograms(context,db);
+    const recordScope:Viewer={
+      context,studentProfileId:"",
+      siteIds:context.scope.siteIds??[],
+      programIds:context.scope.programIds??[],
+      delegatedPrograms,
+    };
+    if(!recordScope.programIds.length && !delegatedPrograms.length)
+      throw new AuthorizationError("registrar's own school or exact institutional Program grant");
     const namePattern = `%${query.replace(/[!%_]/g, "!$&")}%`;
     const [grades, withdrawals] = await Promise.all([
       db.select({
@@ -787,8 +811,7 @@ export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" }
         .innerJoin(s.organizations, eq(s.organizations.id, s.programs.creditIssuingOrganizationId))
         .where(and(
           eq(s.sectionGrades.status, "finalized"),
-          inArray(s.sections.siteId, context.scope.siteIds),
-          inArray(s.sections.programId, context.scope.programIds),
+          authorizedRecordSections(s,recordScope),
           // Only an authenticated issuer registrar may select an official record.
           inArray(s.programs.creditIssuingOrganizationId,context.scope.organizationIds??[]),
           sql`concat_ws(' ', ${s.people.legalFirstName}, ${s.people.legalLastName}) ilike ${namePattern} escape '!'`,
@@ -812,8 +835,7 @@ export const listTranscriptIssuanceCandidates = createServerFn({ method: "GET" }
           eq(s.enrollments.kind, "section"),
           eq(s.enrollments.status, "withdrawn"),
           sql`${s.enrollments.metadata}->>'withdrawalNotation' = 'W'`,
-          inArray(s.sections.siteId, context.scope.siteIds),
-          inArray(s.sections.programId, context.scope.programIds),
+          authorizedRecordSections(s,recordScope),
           // Only an authenticated issuer registrar may select an official record.
           inArray(s.programs.creditIssuingOrganizationId,context.scope.organizationIds??[]),
           sql`concat_ws(' ', ${s.people.legalFirstName}, ${s.people.legalLastName}) ilike ${namePattern} escape '!'`,
@@ -897,14 +919,14 @@ export const issueTranscript = createServerFn({ method: "POST" })
     if (context.role !== "registrar" || !context.actorPersonId) {
       throw new AuthorizationError("registrar transcript issuance");
     }
-    if (!context.scope.siteIds?.length) {
-      throw new AuthorizationError("registrar site membership");
-    }
     if (!UUID.test(data.studentPersonId)) {
       throw new AuthorizationError("student identifier");
     }
     const { db, s } = await stores();
     const actorPersonId = context.actorPersonId;
+    const delegatedPrograms=await listDelegatedCANTranscriptPrograms(context,db);
+    if(!context.scope.programIds?.length && !delegatedPrograms.length)
+      throw new AuthorizationError("registrar's own school or exact CAN academic-record grant");
 
     const [profile] = await db
       .select({ id: s.studentProfiles.id })
@@ -916,8 +938,9 @@ export const issueTranscript = createServerFn({ method: "POST" })
     const viewer: Viewer = {
       context,
       studentProfileId: profile.id,
-      siteIds: context.scope.siteIds,
+      siteIds: context.scope.siteIds??[],
       programIds:context.scope.programIds??[],
+      delegatedPrograms,
     };
     const rows = [...await finalizedGradeRows(db, s, viewer), ...await withdrawalTranscriptRows(db, s, viewer)];
     if (!rows.length) {
@@ -942,7 +965,8 @@ export const issueTranscript = createServerFn({ method: "POST" })
       // revocation, but a new CAN-issued record requires a live agreement.
       const sectionIds=[...new Set(rows.map(row=>row.sectionId))];
       const sourceSections=await tx.select({
-        id:s.sections.id,programId:s.sections.programId,
+        id:s.sections.id,siteId:s.sections.siteId,
+        programId:s.sections.programId,
         creditIssuer:s.programs.creditIssuingOrganizationId,
       }).from(s.sections)
         .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
@@ -950,6 +974,17 @@ export const issueTranscript = createServerFn({ method: "POST" })
       if(sourceSections.length!==sectionIds.length ||
          sourceSections.some(section=>section.creditIssuer!==issuingOrganizationId))
         throw new AuthorizationError("current authorized transcript source and credit issuer");
+      // Re-read the Program role and live agreement within the issuance
+      // transaction. A stale search result is never an academic credential.
+      const currentDelegated=await listDelegatedCANTranscriptPrograms(context,tx);
+      for(const section of sourceSections){
+        const local=context.scope.siteIds?.includes(section.siteId) &&
+          context.scope.programIds?.includes(section.programId);
+        const cross=currentDelegated.some(pair=>pair.programId===section.programId &&
+          pair.siteId===section.siteId);
+        if(!local && !cross)
+          throw new AuthorizationError("current exact CAN record issuance authority");
+      }
       for(const programId of new Set(sourceSections.map(section=>section.programId))) {
         await requireInstitutionalAcademicProgramAuthority(tx,context,programId,[
           "school_of_record","academic_records","credit_issuance",
