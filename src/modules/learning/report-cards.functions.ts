@@ -1,7 +1,5 @@
 import {
 assertCapability,
-assertProgramScope,
-assertSiteScope,
 AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
@@ -11,6 +9,8 @@ import { gradeLabelForPercentage,isPassingGrade } from "@/domain/grade-scale-pol
 import { verifiedSectionCreditUnits,countTranscriptRowsWithUnrecordedCredits } from "@/domain/section-credit-policy";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
+import { authorizeClass } from "@/modules/learning/class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
@@ -187,15 +187,14 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
     if (context.role !== "teacher" || !context.actorPersonId) {
       throw new AuthorizationError("teacher grade finalization");
     }
-    if (!context.scope.siteIds?.length) {
-      throw new AuthorizationError("teacher site membership");
+    if (!context.scope.siteIds?.length && !context.scope.sectionIds?.length) {
+      throw new AuthorizationError("teacher site or exact delegated Section membership");
     }
     if (!UUID.test(data.sectionId) || !UUID.test(data.gradingPeriodId)) {
       throw new AuthorizationError("grade finalization identifiers");
     }
     const { db, s } = await stores();
     const actorPersonId = context.actorPersonId;
-    const siteIds = context.scope.siteIds;
 
     return db.transaction(async (tx) => {
       const [section] = await tx
@@ -214,11 +213,13 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
             eq(s.sectionTeachers.personId, actorPersonId),
           ),
         )
-        .where(and(eq(s.sections.id, data.sectionId), inArray(s.sections.siteId, siteIds)))
+        .where(eq(s.sections.id, data.sectionId))
         .limit(1);
       if (!section) throw new AuthorizationError("assigned teacher");
-      assertSiteScope(context, section.siteId);
-      assertProgramScope(context,section.programId);
+      // Exact Section authorization handles both host-local teaching and
+      // independently delegated CAN faculty, without a host-wide Site grant.
+      // It rechecks assignment and current institutional service evidence.
+      await authorizeClass(context as Actor,section.id,undefined,tx);
       // Require live CAN/church authorization even for a previously assigned teacher.
       await requireInstitutionalAcademicProgramAuthority(tx,context,section.programId,[
         "academic_instruction","academic_records",
@@ -520,12 +521,11 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
     if (context.role !== "teacher" || !context.actorPersonId) {
       throw new AuthorizationError("teacher grade correction");
     }
-    if (!context.scope.siteIds?.length) {
-      throw new AuthorizationError("teacher site membership");
+    if (!context.scope.siteIds?.length && !context.scope.sectionIds?.length) {
+      throw new AuthorizationError("teacher site or exact delegated Section membership");
     }
     const { db, s } = await stores();
     const actorPersonId = context.actorPersonId;
-    const siteIds = context.scope.siteIds;
 
     return db.transaction(async (tx) => {
       const [grade] = await tx
@@ -566,11 +566,13 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
             eq(s.sectionTeachers.personId, actorPersonId),
           ),
         )
-        .where(and(eq(s.sections.id, grade.sectionId), inArray(s.sections.siteId, siteIds)))
+        .where(eq(s.sections.id, grade.sectionId))
         .limit(1);
       if (!section) throw new AuthorizationError("assigned teacher");
-      assertSiteScope(context, section.siteId);
-      assertProgramScope(context,section.programId);
+      // Exact Section authorization handles both host-local teaching and
+      // independently delegated CAN faculty, without a host-wide Site grant.
+      // It rechecks assignment and current institutional service evidence.
+      await authorizeClass(context as Actor,section.id,undefined,tx);
       // Require live CAN/church authorization even for a previously assigned teacher.
       await requireInstitutionalAcademicProgramAuthority(tx,context,section.programId,[
         "academic_instruction","academic_records",
