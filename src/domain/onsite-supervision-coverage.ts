@@ -106,7 +106,7 @@ export function summarizeOnsiteSupervision(
     if (row.roomPlanVerified !== true) gaps.push("room_unconfigured");
     if (row.requiresSectionDelegation && row.namedBackupVerified !== true)
       gaps.push("qualified_backup_missing");
-    if (row.roomPlanVerified && row.roomCapacityAdequate !== true)
+    if (row.requiresSectionDelegation && row.roomPlanVerified && row.roomCapacityAdequate !== true)
       gaps.push("room_capacity_unverified");
     return {
       ...row, gaps, startMinute:start, endMinute:end,
