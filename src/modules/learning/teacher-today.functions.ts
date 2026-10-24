@@ -115,6 +115,8 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
   .where(and(
    inArray(s.assessments.sectionId, sectionIds),
+   eq(s.sections.active, true),
+   eq(s.assessments.status, "published"),
    eq(s.submissions.status, "submitted"),
    isNull(s.submissions.gradedAt),
    isNull(s.submissions.score),
