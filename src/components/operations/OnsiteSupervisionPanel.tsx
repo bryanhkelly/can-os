@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Qualifications } from "@/components/profiles/Qualifications";
 import { getOnsiteSupervisionPlan } from "@/modules/operations/onsite-supervision.functions";
 import {
   getOnsiteDutyResponses, respondToOnsiteDuty,
@@ -211,6 +212,16 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
         Showing 60 of {plan.blocks.length} instructional blocks. Use school staffing administration for the complete plan.
       </p>}
       <p className="mt-3 text-xs text-muted-foreground">{plan.note}</p>
+      <details className="mt-5 rounded border p-3">
+        <summary className="cursor-pointer font-semibold text-sm">My required safety-screening and safeguarding-training evidence</summary>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Verified site staff may upload their own supporting documents to the
+          existing private qualification workflow. A separate authorized reviewer
+          must approve each claim. Uploaded documents do not automatically establish
+          legal clearance or authorizations to supervise students.
+        </p>
+        <Qualifications/>
+      </details>
     </>}
   </section>;
 }
