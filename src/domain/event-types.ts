@@ -59,6 +59,8 @@ export const EventTypes = {
   CalendarEventRescheduled: "CalendarEventRescheduled",
   CalendarEventCancelled: "CalendarEventCancelled",
   ProgramActivated: "ProgramActivated",
+  CANAcademicProgramStaffDelegated: "CANAcademicProgramStaffDelegated",
+  CANAcademicProgramStaffRevoked: "CANAcademicProgramStaffRevoked",
   StudentMarkedAbsent: "StudentMarkedAbsent",
   AttendanceCorrected: "AttendanceCorrected",
   AttendanceExcuseSubmitted: "AttendanceExcuseSubmitted",
