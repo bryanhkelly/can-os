@@ -1,5 +1,47 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 guardian academic membership and returned-feedback parity (24 October 2026)
+
+**Source committed; execution not verified. No GitHub Actions work.**
+
+A guardian with a verified academic relationship could previously see a
+child's assessments and released grades based on an active Section enrollment
+alone even after institutional Program withdrawal. The guardian assignment
+query now requires **active Program + active Section** enrollment for the same
+StudentProfile, canonical Program and Term school year, plus an active
+Section and exact original guardian relationship/Site/Program scope.
+The guardian student picker requires an active Program enrollment (so
+children still appear before first Section placement, but not based on
+orphaned Section records). Both guardian academic endpoints now return
+private/no-store responses.
+
+The independent guardian grade-review action read/write path now enforces
+the same year-matched Program/Section condition before accepting a request
+or showing an existing response. An authorized guardian does not retain a
+school grade-dispute capability after the student's Program is withdrawn.
+
+For the student revision journey, the guardian sees **already released**
+teacher comments and annotations from a previously returned attempt
+while the student saves or submits a new ungraded attempt, but does not
+receive the child's new draft text, future score, or unreleased grading.
+After the second attempt is graded, the guardian sees the newly released
+grade and feedback; prior guidance is no longer presented as current.
+
+Regression coverage was added to the existing same-student
+parent → admission → student account → class → first assignment → revision
+scenario: guardian reads the same released grade as student, sees prior
+returned guidance without the student's draft, then loses grade and
+grade-review access after Program withdrawal. Pure unit coverage checks
+strictly previous released attempts only.
+
+**Remaining P0:** runtime execution and correction of any real errors in
+this same-ID acceptance scenario, followed by the last school-day
+supervision acceptance blockers. No data migration or production change
+from this patch.
+
+---
+
+
 ## P0 learner's revision → feedback → second grading (23 October 2026)
 
 **Source committed, not executed.** Implemented the next small slice
