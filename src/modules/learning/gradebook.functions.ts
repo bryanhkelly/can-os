@@ -321,11 +321,13 @@ export const createAssessment = createServerFn({ method: "POST" })
    await authorizeClass(context as Actor,data.sectionId,undefined,tx);
    const [teachingSection]=await tx.select({
       id:s.sections.id,versionId:s.sections.courseTemplateVersionId,
+      programId:s.sections.programId,schoolYearId:s.terms.schoolYearId,
       curriculum:s.courseTemplateVersions.curriculum,status:s.courseTemplateVersions.status,
      })
     .from(s.sectionTeachers)
     .innerJoin(s.sections,eq(s.sections.id,s.sectionTeachers.sectionId))
     .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
+    .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
     .where(and(eq(s.sectionTeachers.personId,context.actorPersonId!),
      eq(s.sections.id,data.sectionId),eq(s.sections.active,true)))
     .limit(1);
@@ -353,12 +355,20 @@ export const createAssessment = createServerFn({ method: "POST" })
    let assignedCount = 0;
    if (status === "published" && dueAt) {
     // Publishing assigns the assessment to actively enrolled students, matching publishAssessment.
+    const activeProgramMembership=alias(s.enrollments,"new_assessment_program_enrollment");
     const enrolled = await tx.select({ studentProfileId: s.enrollments.studentProfileId })
      .from(s.enrollments)
+     .innerJoin(activeProgramMembership,and(
+      eq(activeProgramMembership.studentProfileId,s.enrollments.studentProfileId),
+      eq(activeProgramMembership.kind,"program"),eq(activeProgramMembership.status,"active"),
+      eq(activeProgramMembership.programId,teachingSection.programId),
+      eq(activeProgramMembership.schoolYearId,teachingSection.schoolYearId),
+     ))
      .where(and(
-      eq(s.enrollments.kind, "section"),
-      eq(s.enrollments.sectionId, data.sectionId),
-      eq(s.enrollments.status, "active"),
+      eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+      eq(s.enrollments.sectionId,data.sectionId),
+      eq(s.enrollments.programId,teachingSection.programId),
+      eq(s.enrollments.schoolYearId,teachingSection.schoolYearId),
      ));
     assignedCount = enrolled.length;
     if (enrolled.length) {
@@ -407,9 +417,10 @@ export const manageAssessment = createServerFn({method:"POST"})
     id:s.assessments.id,sectionId:s.assessments.sectionId,
     status:s.assessments.status,dueAt:s.assessments.dueAt,
     availableAt:s.assessments.availableAt,siteId:s.sections.siteId,
-    programId:s.sections.programId
+    programId:s.sections.programId,schoolYearId:s.terms.schoolYearId
    }).from(s.assessments)
     .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+    .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
     .innerJoin(s.sectionTeachers,and(
      eq(s.sectionTeachers.sectionId,s.sections.id),
      eq(s.sectionTeachers.personId,context.actorPersonId!)))
@@ -441,9 +452,19 @@ export const manageAssessment = createServerFn({method:"POST"})
    if(!updated)throw new Error("Assessment status changed, refresh before retrying");
    let assignedCount=0;
    if(data.action==="publish"){
+    const activeProgramMembership=alias(s.enrollments,"published_assessment_program_enrollment");
     const enrolled=await tx.select({studentProfileId:s.enrollments.studentProfileId})
-     .from(s.enrollments).where(and(eq(s.enrollments.kind,"section"),
+     .from(s.enrollments)
+     .innerJoin(activeProgramMembership,and(
+      eq(activeProgramMembership.studentProfileId,s.enrollments.studentProfileId),
+      eq(activeProgramMembership.programId,assessment.programId),
+      eq(activeProgramMembership.schoolYearId,assessment.schoolYearId),
+      eq(activeProgramMembership.kind,"program"),eq(activeProgramMembership.status,"active"),
+     ))
+     .where(and(eq(s.enrollments.kind,"section"),
       eq(s.enrollments.sectionId,assessment.sectionId),
+      eq(s.enrollments.programId,assessment.programId),
+      eq(s.enrollments.schoolYearId,assessment.schoolYearId),
       eq(s.enrollments.status,"active")));
     assignedCount=enrolled.length;
     if(enrolled.length)await tx.insert(s.submissions)
