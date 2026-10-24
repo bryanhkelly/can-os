@@ -1,5 +1,46 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 first assignment → student submission → teacher feedback (23 October 2026)
+
+**Source committed, execution unverified; GitHub Actions deliberately skipped.**
+The canonical student's authenticated assignment read, response-draft,
+final submission and feedback-history paths now use the existing
+`authorizeClass`/student directory rule: a current active **Program plus
+Section** enrollment for the same student, Program and school year.
+The read path omits withdrawn students' assignments and feedback, and
+write paths recheck inside the same transaction before creating any
+SubmissionReceived or draft/audit record.
+
+The connected rollback-only admissions fixture now drives a real teacher
+`createAssessment` publication, reads it from the same independently
+provisioned and passwordless-redeemed student's assignment view,
+submits the learner's written answer, grades it using the actual teacher
+service, and reads the **grade plus teacher feedback** from the exact
+same student. On Program withdrawal, assignment reads disappear and
+subsequent drafts are denied.
+
+New assignments published through the gradebook's immediate-publish and
+draft-to-publish routes, and through the older shared publication service,
+now target **only** students with same-year active Program and Section
+membership. Regression coverage asserts that an orphan Section enrollment
+does not generate fresh assigned work after withdrawal. Direct legacy
+student submission is also checked against active Program+Section membership.
+
+The shared grade-posting service now uses the same live teacher-of-Section
+authorization for host teachers and separately delegated CAN institution
+teachers rather than wrongly requiring all teachers to have a global
+`sectionIds` grant; nonteacher/service contexts retain their existing
+explicit Section capability boundary.
+
+No database migration, live email, merge or production deployment.
+All integration cases have been authored but **not run**. Next P0 bite:
+exercise actual first-lesson assessment resources and the end-to-end
+returned-for-revision lifecycle, then targeted non-Actions runtime
+acceptance when an appropriate test environment is available.
+
+---
+
+
 ## P0 canonical workflow wiring — assigned CAN teacher, admitted child, local day (23 October 2026)
 
 **Small patches committed to `FullFlow`; actual Neon/browser tests are NOT passed or executed.**
