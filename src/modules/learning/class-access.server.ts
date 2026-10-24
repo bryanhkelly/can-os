@@ -5,6 +5,7 @@ import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import {
   requireActor, assertSiteGranted, assertProgramGranted, type Actor,
 } from "@/modules/identity/actors.server";
+import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
 import {
   evaluateTeachingEligibility, requireTeachingEligibility,
 } from "@/modules/staffing/teaching-eligibility.server";
@@ -85,6 +86,11 @@ export async function authorizeClass(
     assertProgramGranted(actor, section.programId);
   }
   if (actor.role === "teacher") {
+    // A provider grant held by the same person is not a substitute for the
+    // current session's verified provider membership and delegated scope.
+    await requireInstitutionalAcademicProgramAuthority(query, actor, section.programId, [
+      "academic_instruction", "curriculum",
+    ]);
     await requireTeachingEligibility(sectionId, actor.actorPersonId, query, {
       requireAssignment: true,
       horizon: "current",
@@ -169,6 +175,14 @@ export async function accessibleClasses(actor: Actor) {
         (actor.scope.programIds ?? []).includes(row.programId);
       if (!hostLocal && (actor.grantSiteId !== null || !delegated.includes(row.id)))
         continue;
+      try {
+        await requireInstitutionalAcademicProgramAuthority(db, actor, row.programId, [
+          "academic_instruction", "curriculum",
+        ]);
+      } catch (error) {
+        if (error instanceof AuthorizationError) continue;
+        throw error;
+      }
       const eligibility = await evaluateTeachingEligibility(
         row.id,
         actor.actorPersonId,
@@ -196,7 +210,7 @@ export async function accessibleClasses(actor: Actor) {
     lastName: s.people.legalLastName,
   }).from(s.sections)
     .innerJoin(s.enrollments, and(
-      eq(s.enrollments.sectionId, s.sections.id),
+      eq(s.enrollments.sectionId, sectionId),
       eq(s.enrollments.kind, "section"),
       eq(s.enrollments.status, "active"),
     ))
@@ -204,7 +218,7 @@ export async function accessibleClasses(actor: Actor) {
     .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
     .innerJoin(s.terms, eq(s.terms.id, s.sections.termId))
     .innerJoin(activeProgramMembership, and(
-      eq(activeProgramMembership.studentProfileId, s.enrollments.studentProfileId),
+      eq(activeProgramMembership.studentProfileId, s.studentProfiles.id),
       eq(activeProgramMembership.programId, s.sections.programId),
       eq(activeProgramMembership.schoolYearId, s.terms.schoolYearId),
       eq(activeProgramMembership.kind, "program"),
