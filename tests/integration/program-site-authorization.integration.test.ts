@@ -34,6 +34,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
           getHostProgramSiteAuthorization, listCANOperatingAuthorizationDesk,
         } = await import("@/modules/programs/program-site-authorization.server");
         const {listDelegatedCANTranscriptPrograms}=await import("@/modules/learning/can-transcript-scope.server");
+        const {delegateCANAcademicProgramStaff,revokeCANAcademicProgramStaff,listCANAcademicProgramStaff}=await import("@/modules/programs/can-academic-staff-delegation.server");
         const suffix = crypto.randomUUID().slice(0,8);
         const [can, church, other] = await Promise.all([
           tx.insert(s.organizations).values({
@@ -184,6 +185,41 @@ integration("Church-owned Site with independently authorized CAN academic servic
         expect(await listDelegatedCANTranscriptPrograms(canRegistrar,tx)).toEqual([]);
         await tx.update(s.roleAssignments).set({capabilities:["academic_records.issue"]})
           .where(eq(s.roleAssignments.id,recordRole!.id));
+        // The steward can delegate only to an already verified active CAN
+        // employee's original CAN Organization account, without creating a
+        // church Site account or widening their ordinary Program projection.
+        const [staffPerson]=await tx.insert(s.people).values({
+          legalFirstName:"CAN",legalLastName:"Records Officer",
+        }).returning();
+        const [staffAccount]=await tx.insert(s.accessAccounts).values({
+          emailNormalized:"can-records-"+suffix+"@example.invalid",
+          emailVerifiedAt:new Date(),
+        }).returning();
+        await tx.insert(s.accountPersonGrants).values({
+          personId:staffPerson!.id,accountId:staffAccount!.id,
+          organizationId:can.id,siteId:null,role:"registrar",
+        });
+        const staffActor=contextFor("registrar",staffPerson!.id,can.id,null);
+        const staffCommand={
+          programId:launch.programId,personId:staffPerson!.id,
+          role:"registrar" as const,
+          reason:"CAN maintains the official academic record for this school.",
+        };
+        await expect(delegateCANAcademicProgramStaff(host,staffCommand)).rejects.toThrow();
+        const granted=await delegateCANAcademicProgramStaff(steward,staffCommand);
+        expect(granted.created).toBe(true);
+        expect((await delegateCANAcademicProgramStaff(steward,staffCommand)).created).toBe(false);
+        expect((await listCANAcademicProgramStaff(steward,launch.programId)).current
+          .some(row=>row.id===granted.roleAssignmentId)).toBe(true);
+        expect(await listDelegatedCANTranscriptPrograms(staffActor,tx))
+          .toEqual([{programId:launch.programId,siteId:site.id}]);
+        await revokeCANAcademicProgramStaff(steward,{
+          roleAssignmentId:granted.roleAssignmentId,
+          reason:"The academic registrar is no longer assigned to this school.",
+        });
+        expect(await listDelegatedCANTranscriptPrograms(staffActor,tx)).toEqual([]);
+        const renewed=await delegateCANAcademicProgramStaff(steward,staffCommand);
+        expect(renewed.created).toBe(true);
         // Contracting authority is not a host registrar's CAN membership.
         await expect(requireInstitutionalAcademicProgramAuthority(tx,host,
           launch.programId,["academic_instruction","academic_records"]))
@@ -294,6 +330,14 @@ integration("Church-owned Site with independently authorized CAN academic servic
           authorizationId,reason:"The host church withdrew contractual authorization.",
         });
         expect(await listDelegatedCANTranscriptPrograms(canRegistrar,tx)).toEqual([]);
+        expect(await listDelegatedCANTranscriptPrograms(staffActor,tx)).toEqual([]);
+        await expect(delegateCANAcademicProgramStaff(steward,staffCommand)).rejects.toThrow();
+        // Removing an employee's Program grant remains possible even when
+        // the school-services agreement has already been suspended.
+        await revokeCANAcademicProgramStaff(steward,{
+          roleAssignmentId:renewed.roleAssignmentId,
+          reason:"Remove all remaining record access after school service withdrawal.",
+        });
         // Session-derived Section scope can remain cached: it is NOT authority
         // after the signed CAN/church academic agreement has been revoked.
         expect((await accessibleClasses(canTeacher as Actor)).map(x=>x.id))
