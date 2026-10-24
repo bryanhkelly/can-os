@@ -65,7 +65,7 @@ integration("cross-persona admissions through active classes",()=>{
   const intake=await import("@/modules/enrollment/admissions-intake.functions");
   const {getAdmissionsDashboard}=await import("@/modules/enrollment/admissions-dashboard.functions");
   const {placeEnrolledStudent,listEnrollmentPlacements}=await import("@/modules/enrollment/course-placement.functions");
-  const {getFamilyHome}=await import("@/modules/family/family-home.functions");
+  const {getFamilyHome,getGuardianNeedsYou}=await import("@/modules/family/family-home.functions");
   const {listExpectedOnsiteRoster,markExpectedOnsiteAttendance}
    =await import("@/modules/attendance/onsite-attendance-workflow.functions");
   const {getMyStudentToday}=await import("@/modules/student-experience/student-today.functions");
@@ -735,6 +735,20 @@ integration("cross-persona admissions through active classes",()=>{
     expect(notices.some(row=>row.title==="Enrollment confirmed")).toBe(true);
     expect(notices.filter(row=>row.title==="Enrollment confirmed")).toHaveLength(1);
     expect(notices.filter(row=>row.title==="Enrollment offer withdrawn")).toHaveLength(1);
+    // Needs You must apply the same CURRENT verified-guardian rule as the
+    // notification center, including titles/bodies after revocation.
+    expect((await getGuardianNeedsYou()).items.some(row=>
+      row.kind==="notification"&&row.title==="Enrollment document requested")).toBe(true);
+    await tx.update(s.guardianRelationships).set({
+      canManageEnrollment:false,canViewAcademics:false,
+    }).where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),
+      eq(s.guardianRelationships.studentPersonId,student.personId)));
+    expect((await getGuardianNeedsYou()).items.some(row=>
+      row.title==="Enrollment document requested")).toBe(false);
+    await tx.update(s.guardianRelationships).set({
+      canManageEnrollment:true,canViewAcademics:true,
+    }).where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),
+      eq(s.guardianRelationships.studentPersonId,student.personId)));
     expect(notices.find(row=>row.title==="Enrollment offer withdrawn")?.href).toContain(`offer=${issued.offerId}`);
     expect(JSON.stringify(notices)).not.toContain(withdraw.reason);
     await tx.update(s.sections).set({active:false}).where(eq(s.sections.id,section.id));
