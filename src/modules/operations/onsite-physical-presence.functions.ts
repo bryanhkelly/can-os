@@ -8,7 +8,8 @@ import { AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { writeAudit } from "@/platform/mutation";
+import { emitEvent,writeAudit } from "@/platform/mutation";
+import { EventTypes } from "@/domain/event-types";
 import { getOnsiteSupervisionPlan } from "./onsite-supervision.functions";
 import { requireCurrentSectionFacilitator } from "./site-section-facilitators.server";
 import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
@@ -147,6 +148,15 @@ export const reportOnsitePhysicalPresence=createServerFn({method:"POST"})
           role,physicallyPresent:true,scope:"self_attested_presence_only"},
       }).returning({id:actions.id});
       if(!record)throw new Error("Unable to record named staff arrival");
+      await emitEvent(tx,{
+        eventType:EventTypes.OnsiteAdultPresenceReported,
+        aggregateType:"action",aggregateId:record.id,
+        actorPersonId:actor.actorPersonId,
+        organizationId:site.organizationId,siteId:site.id,
+        programId:block.programId,sectionId:block.sectionId,
+        payload:{date:data.date,periodId:data.periodId,
+          planToken:block.planToken,role},
+      });
       await writeAudit(tx,actor,{
         action:"onsite.staff.presence_reported",entityType:"action",entityId:record.id,
         scope:{organizationId:site.organizationId,siteId:site.id,
@@ -216,6 +226,14 @@ export const witnessOnsiteBlockPresence=createServerFn({method:"POST"})
           roomEvidenceId:room.id,scope:"human_witnessed_adult_presence_only"},
       }).returning({id:actions.id});
       if(!record)throw new Error("Cannot store witnessed staffing evidence");
+      await emitEvent(tx,{
+        eventType:EventTypes.OnsiteBlockPresenceWitnessed,
+        aggregateType:"action",aggregateId:record.id,
+        actorPersonId:actor.actorPersonId,
+        organizationId:site.organizationId,siteId:site.id,
+        programId:block.programId,sectionId:block.sectionId,
+        payload:{date:data.date,periodId:data.periodId,planToken:block.planToken},
+      });
       await writeAudit(tx,actor,{
         action:"onsite.block.presence_witnessed",entityType:"action",entityId:record.id,
         scope:{organizationId:site.organizationId,siteId:site.id,
