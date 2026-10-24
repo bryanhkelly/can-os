@@ -249,15 +249,24 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
   }
  }
 
- const notificationItems = unread.map(row => ({
-  id: row.id,
-  kind: "notification" as const,
-  type: row.type,
-  title: row.title,
-  detail: row.body ?? "",
-  href: `/notifications?notification=${encodeURIComponent(row.id)}`,
-  createdAt: row.createdAt.toISOString(),
- }));
+ // Reuse the notification center's live verified-guardian checks. A
+ // notification addressed to an adult is not authority to display a child's
+ // application, offer, attendance or submission after access is revoked.
+ // Filtering only the link would still disclose its title and body.
+ const { getNotifications } = await import("@/modules/communication/notification-center.functions");
+ const visibleNotifications = new Map((await getNotifications()).map(row => [row.id, row]));
+ const notificationItems = unread.filter(row => visibleNotifications.has(row.id)).map(row => {
+  const visible = visibleNotifications.get(row.id)!;
+  return {
+   id: row.id,
+   kind: "notification" as const,
+   type: row.type,
+   title: visible.title,
+   detail: visible.body,
+   href: visible.href ?? `/notifications?notification=${encodeURIComponent(row.id)}`,
+   createdAt: row.createdAt.toISOString(),
+  };
+ });
  const actionItems = openActions.map(row => ({
   id: row.id,
   kind: "action" as const,
