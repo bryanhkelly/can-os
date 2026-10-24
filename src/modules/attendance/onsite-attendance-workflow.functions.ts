@@ -88,6 +88,18 @@ async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, se
       ...(selectedId ? [eq(programs.id, selectedId)] : []),
     ));
   const onsite = rows.filter(p => p.deliveryModel.onsite === true);
+  // An independently hosted CAN school has explicit director and named
+  // Section facilitator appointments, NOT a site_staff-wide roster role.
+  // A generic staff grant must never reveal the church's children or enable
+  // the attendance command, including an offline mutation replay.
+  if(actor.role==="site_staff"){
+    const permitted=[];
+    for(const program of onsite){
+      if(!await requiresIndependentChurchLocalDelegation(db,program.id))
+        permitted.push(program);
+    }
+    return permitted;
+  }
   // Verified role/site membership alone no longer exposes the whole church's
   // pupil roster. Named director/facilitator delegation is Program-scoped.
   if (actor.role !== "site_leader" && actor.role !== "room_facilitator")
