@@ -506,3 +506,76 @@ continue to expose `hasConfirmedPhysicalCoverage=false` even with a
 reviewed room and two nominated qualified adults. The evidence/document
 creation and independent verification UX, live browser sessions and
 disposable-DB tests also remain incomplete.
+
+## Increment 9 — reviewed school opening and witnessed onsite adult arrival (2026-10-23)
+
+**Committed source only on `FullFlow`, untested; requires unexecuted migrations
+`0044_school_configuration_operating_approval.sql` and
+`0045_onsite_safety_qualification_definitions.sql`.** No changes to production
+Neon and no GitHub Actions troubleshooting were performed.
+
+- The canonical `school_configuration_status` now distinguishes
+  `draft`, `approved`, and `suspended`. Only a real original CAN network
+  steward can approve the latest school configuration, separately from
+  the church registrar. The decision requires a current authorized
+  church/CAN institutional agreement, a current named church Site director
+  and **five independently verified Program-bound evidence documents**:
+  legal/jurisdiction opening authority, facility approval, mandated/safeguarding
+  reporting procedure, emergency response, and authorized pickup.
+  Documents must match Program, Site, host, CAN institution and jurisdiction,
+  be in-term, and be approved by a current independently verified CAN steward
+  *other than* the approving officer and uploader. The newest document for
+  each category supersedes older documents; withdrawn evidence fails closed.
+  CAN's agreement desk displays the current evidence categories and the
+  separate opening approval/suspension controls.
+- Church/CAN Program **activation** now requires the institution's currently
+  approved configuration inside the activation transaction, in addition to
+  existing Journey and academic/teacher readiness checks. Ordinary school
+  ownership types are unchanged. Runtime physical arrival also rechecks
+  approval, independent institutional service agreement, current policy
+  evidence and current appointed Site director. Emergency institutional
+  suspension can be performed even if the contract has been withdrawn.
+  Suspended configurations require a newly approved version to reopen.
+- Canonical original Site adult identities now use a separate
+  **self-reported physical arrival** command bounded to a site-local 60-minute
+  pre-arrival window and the end of the exact instructional period. Both
+  primary and named backup must individually check in with valid original
+  Site identity, current Section delegation, independently approved screening
+  and safeguarding training, exact independently reviewed room/backup plan
+  and approved school-opening configuration. No client may supply or
+  impersonate a Person ID.
+- A *different*, currently authorized Site director must personally witness
+  both arrivals. The same transaction rechecks current adult credentials,
+  Section delegation and the opening approval. The witness Action and staff
+  arrival Actions are immutable and separately audited; canonical DomainEvents
+  are registered. Revocation, changes to staff/room evidence/authorization
+  or a currently unresolved `cannot_cover` report invalidate current
+  witness readiness. A human attestation does **not** certify continuous
+  physical presence, pupil custody, a completed checkout or external legal
+  clearance. `hasConfirmedPhysicalCoverage` remains conservative on the
+  purely *planned* staffing endpoint.
+- The existing **real** private R2 qualification upload and independent
+  review service is now usable by original verified room facilitators, local
+  site leaders and staff for only the two safety qualifications. Uploaded
+  documents remain actual `category='qualification'` evidence, and the
+  final independent `qualification_verification_events.decision='approve'`
+  is checked. Earlier custom evidence-category checks were impossible to
+  satisfy with the canonical upload service and have been removed. The
+  onsite panel links staff to existing upload UI. Definitions are installed
+  only once migration 0045 is applied. Reviewer capabilities and existing
+  actual person affiliation are still mandatory.
+- Unit scenarios were committed for original school-local check-in windows.
+  They and all connected browser/Neon cases are **not executed** and must not
+  be represented as passing tests.
+
+**Remaining P0:** School-opening legal/facility/emergency/pickup proof still
+requires an approved **secure document submission and independent CAN
+verification UX**; the five document categories are currently an authorization
+reader, not a full evidence uploader. State-by-state safeguarding/mandated
+reporting policy and background-check acceptability require legal/operational
+configuration, not generic metadata. Program/school suspension must be connected
+to scheduled onsite admissions and physical site operations without silencing
+actual emergency/attendance/incident evidence. No completed child arrival,
+custody handoff, authorized pickup or continuous site supervision is inferred.
+Live distinct-person, 2-adult school-day acceptance and disposable Neon schema
+validation must pass before Golden Flow B can leave **HOLD**.
