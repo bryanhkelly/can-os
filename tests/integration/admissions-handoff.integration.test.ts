@@ -592,7 +592,7 @@ integration("cross-persona admissions through active classes",()=>{
       role:"student",organizationId:org.id,siteId:site.id,
       active:true,isSynthetic:true,
     });
-    const syntheticMail=vi.fn();
+    const syntheticMail=vi.fn(async (_message:{to:string;accessUrl:string})=>{});
     await access.requestOneTimeAccess(
       `synthetic-student-${suffix}@example.org`,syntheticMail);
     expect(syntheticMail).not.toHaveBeenCalled();
