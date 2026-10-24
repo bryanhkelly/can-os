@@ -639,6 +639,14 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(authorizeClass(learner,section.id)).rejects.toThrow("active class enrollment");
     expect((await accessibleClasses(learner)).map(row=>row.id)).not.toContain(section.id);
     await expect(getMyStudentToday()).rejects.toThrow("active student membership");
+    // The former child's class must also vanish from CURRENT teacher rosters
+    // without deleting historical assessments or their audit trail.
+    state.actor=instructor;
+    expect((await getClassWorkspace({data:{sectionId:section.id}})).roster
+      .some(row=>row.profileId===profileId)).toBe(false);
+    expect((await getGradebook({data:{sectionId:section.id}})).students
+      .some(row=>row.studentProfileId===profileId)).toBe(false);
+    state.actor=learner;
     await tx.update(s.enrollments).set({status:"active"})
       .where(eq(s.enrollments.id,activeProgram.id));
     expect((await getMyStudentToday()).sections.map(row=>row.sectionId)).toContain(section.id);
