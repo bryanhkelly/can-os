@@ -12,6 +12,7 @@ import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,desc,eq,inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { signPrivateObjectUrl } from "@/platform/storage/r2";
 
@@ -125,13 +126,18 @@ export const getGradebook = createServerFn({ method: "GET" })
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   const [section] = await db.select({ id:s.sections.id,code:s.sections.code,
     title:s.sections.title,versionId:s.sections.courseTemplateVersionId,
+    programId:s.sections.programId,schoolYearId:s.terms.schoolYearId,
     curriculum:s.courseTemplateVersions.curriculum,status:s.courseTemplateVersions.status })
    .from(s.sections)
    .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
+   .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
    .where(eq(s.sections.id, data.sectionId))
    .limit(1);
   if (!section) throw new AuthorizationError("section");
 
+  // A stale Section enrollment after a Program withdrawal must never leave
+  // a child on the teacher's current roster or gradebook.
+  const activeProgramMembership=alias(s.enrollments,"gradebook_active_program_enrollment");
   const studentRows = await db.select({
    studentProfileId: s.enrollments.studentProfileId,
    personId: s.people.id,
@@ -142,8 +148,17 @@ export const getGradebook = createServerFn({ method: "GET" })
    .from(s.enrollments)
    .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
    .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
+   .innerJoin(activeProgramMembership,and(
+    eq(activeProgramMembership.studentProfileId,s.enrollments.studentProfileId),
+    eq(activeProgramMembership.programId,section.programId),
+    eq(activeProgramMembership.schoolYearId,section.schoolYearId),
+    eq(activeProgramMembership.kind,"program"),
+    eq(activeProgramMembership.status,"active"),
+   ))
    .where(and(
     eq(s.enrollments.sectionId, data.sectionId),
+    eq(s.enrollments.programId,section.programId),
+    eq(s.enrollments.schoolYearId,section.schoolYearId),
     eq(s.enrollments.kind, "section"),
     eq(s.enrollments.status, "active"),
    ))
