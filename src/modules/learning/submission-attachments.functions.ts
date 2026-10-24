@@ -3,6 +3,8 @@ import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { authorizeClass } from "./class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 import { writeAudit } from "@/platform/mutation";
 import { signPrivateObjectUrl,verifyPrivateObject } from "@/platform/storage/r2";
 import { createServerFn } from "@tanstack/react-start";
@@ -97,14 +99,17 @@ type DbSchema = typeof import("@/db/schema");
 type Tx = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
 /** Published synthetic assessment at a scoped site where the student is actively enrolled. */
-async function requireEnrolledAssessment(tx: Tx, s: DbSchema, assessmentId: string, studentId: string, siteIds: string[], programIds: string[]) {
+async function requireEnrolledAssessment(tx: Tx, s: DbSchema, assessmentId: string, studentId: string, actor: Actor) {
   const [assessment] = await tx.select({ id: s.assessments.id, sectionId: s.assessments.sectionId, metadata: s.assessments.metadata })
     .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
-    .where(and(eq(s.assessments.id, assessmentId), eq(s.assessments.status, "published"), inArray(s.sections.siteId, siteIds),inArray(s.sections.programId,programIds))).limit(1);
+    .where(and(eq(s.assessments.id, assessmentId), eq(s.assessments.status, "published"),
+      inArray(s.sections.siteId,actor.scope.siteIds??[]),
+      inArray(s.sections.programId,actor.scope.programIds??[]))).limit(1);
   if (!assessment) throw new AuthorizationError("published assessment in authorized school and program");
-  const [enrollment] = await tx.select({ id: s.enrollments.id }).from(s.enrollments).where(and(
-    eq(s.enrollments.studentProfileId, studentId), eq(s.enrollments.sectionId, assessment.sectionId), eq(s.enrollments.status, "active"))).limit(1);
-  if (!enrollment) throw new Error("Student is not enrolled");
+  // Preserve the same active Program, Section and school year boundary for
+  // all learning files, including short-lived download URL issuance.
+  const enrollment=await authorizeClass(actor,assessment.sectionId,undefined,tx);
+  if(enrollment.studentProfileId!==studentId)throw new AuthorizationError("current student learning scope");
   return assessment;
 }
 
@@ -141,7 +146,7 @@ export const createSubmissionAttachmentUpload = createServerFn({ method: "POST" 
     const key = newAttachmentKey("assignment", data.assessmentId);
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async (tx) => {
-      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!,context.scope.programIds??[]);
+      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context as Actor);
       const [document] = await tx.insert(s.documents).values({
         subjectType: "assessment",
         subjectId: assessment.id,
@@ -260,9 +265,13 @@ export const listSubmissionAttachments = createServerFn({ method: "GET" })
       .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
       .where(and(eq(s.assessments.id, data.assessmentId), inArray(s.sections.siteId, context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
     if (!assessment) return { attachments: [] };
-    const [enrollment] = await db.select({ id: s.enrollments.id }).from(s.enrollments).where(and(
-      eq(s.enrollments.studentProfileId, studentId), eq(s.enrollments.sectionId, assessment.sectionId), eq(s.enrollments.status, "active"))).limit(1);
-    if (!enrollment) return { attachments: [] };
+    try {
+      const enrollment=await authorizeClass(context as Actor,assessment.sectionId);
+      if(enrollment.studentProfileId!==studentId)return {attachments:[]};
+    } catch(error) {
+      if(error instanceof AuthorizationError)return {attachments:[]};
+      throw error;
+    }
     const [latest] = await db.select({ response: s.submissions.response }).from(s.submissions)
       .where(and(eq(s.submissions.assessmentId, assessment.id), eq(s.submissions.studentProfileId, studentId)))
       .orderBy(desc(s.submissions.attemptNumber)).limit(1);
@@ -417,7 +426,7 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
   const assessment=await requireEnrolledAssessment(tx,s,data.assessmentId,studentId,
-    context.scope.siteIds??[],context.scope.programIds??[]);
+    context as Actor);
   const [latest]=await tx.select({response:s.submissions.response})
    .from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),
     eq(s.submissions.studentProfileId,studentId)))
