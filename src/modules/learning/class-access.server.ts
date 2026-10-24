@@ -169,19 +169,28 @@ export async function accessibleClasses(actor: Actor) {
         delegated.length ? or(scope, inArray(s.sections.id, delegated)) : scope,
       )).orderBy(s.sections.title);
     const available = [];
+    const independentByProgram = new Map<string, boolean>();
     for (const row of rows) {
+      let independent = independentByProgram.get(row.programId);
+      if (independent === undefined) {
+        independent = await isIndependentChurchAcademicProgram(db, row.programId);
+        independentByProgram.set(row.programId, independent);
+      }
       const hostLocal = !!row.siteId &&
         (actor.scope.siteIds ?? []).includes(row.siteId) &&
         (actor.scope.programIds ?? []).includes(row.programId);
-      if (!hostLocal && (actor.grantSiteId !== null || !delegated.includes(row.id)))
-        continue;
-      try {
-        await requireInstitutionalAcademicProgramAuthority(db, actor, row.programId, [
-          "academic_instruction", "curriculum",
-        ]);
-      } catch (error) {
-        if (error instanceof AuthorizationError) continue;
-        throw error;
+      if (independent) {
+        if (actor.grantSiteId !== null || !delegated.includes(row.id)) continue;
+      } else if (!hostLocal && !delegated.includes(row.id)) continue;
+      if (independent || !hostLocal) {
+        try {
+          await requireInstitutionalAcademicProgramAuthority(db, actor, row.programId, [
+            "academic_instruction", "curriculum",
+          ]);
+        } catch (error) {
+          if (error instanceof AuthorizationError) continue;
+          throw error;
+        }
       }
       const eligibility = await evaluateTeachingEligibility(
         row.id,
