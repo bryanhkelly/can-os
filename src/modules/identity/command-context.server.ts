@@ -1,6 +1,6 @@
-import {and,eq,gt,isNull,inArray,not} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray,not,or} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,accountPersonGrants,people,programs,sectionTeachers,sections,sites as schoolSites} from "@/db/schema";
+import {accessAccounts,accessSessions,accountPersonGrants,people,programs,roleAssignments,sectionTeachers,sections,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
@@ -78,6 +78,15 @@ export async function getCommandContext(request: Request): Promise<AccessContext
   }).from(sectionTeachers)
     .innerJoin(sections,eq(sections.id,sectionTeachers.sectionId))
     .innerJoin(programs,eq(programs.id,sections.programId))
+    // Retaining a historical Section teacher assignment is NOT permission
+    // after CAN revokes the explicit provider-owned, Program-scoped role.
+    .innerJoin(roleAssignments,and(
+      eq(roleAssignments.personId,sectionTeachers.personId),
+      eq(roleAssignments.roleKey,"teacher"),
+      eq(roleAssignments.organizationId,programs.academicProviderOrganizationId),
+      eq(roleAssignments.programId,sections.programId),
+      or(isNull(roleAssignments.siteId),eq(roleAssignments.siteId,sections.siteId)),
+    ))
     .where(and(eq(sectionTeachers.personId,context.actorPersonId),
       eq(sections.active,true),
       inArray(programs.academicProviderOrganizationId,organizations),
