@@ -109,6 +109,25 @@ integration("GF4 cross-role attendance and operational exceptions",()=>{
       active:true,isSynthetic:false,
     });
     const staff=act("registrar",registrar.id);
+    // Even with the right Section UUID, an enrollment in the wrong academic
+    // year cannot be used to claim a supervised attendance record.
+    const [sectionSeat]=await tx.select({id:s.enrollments.id})
+      .from(s.enrollments).where(and(
+        eq(s.enrollments.studentProfileId,student.id),
+        eq(s.enrollments.sectionId,section.id),
+        eq(s.enrollments.kind,"section"),
+      ));
+    if(!sectionSeat)throw new Error("Missing Section seat in attendance fixture");
+    await tx.update(s.enrollments).set({schoolYearId:null})
+      .where(eq(s.enrollments.id,sectionSeat.id));
+    await expect(recordAttendanceRevision(staff,{
+      studentProfileId:student.id,programId:program.id,siteId:site.id,
+      sectionId:section.id,occurrenceKey:date+":site-day",
+      status:"present",expectedAt:new Date(date+"T12:00:00Z"),
+      mutationId:crypto.randomUUID(),requireExpectedOnsiteDate:date,
+    })).rejects.toThrow("student not assigned to section");
+    await tx.update(s.enrollments).set({schoolYearId:schoolYear.id})
+      .where(eq(s.enrollments.id,sectionSeat.id));
 
     // Hybrid planning reads the already-configured instructional schedule,
     // current facilitator assignment, and a REAL non-synthetic staff grant.
