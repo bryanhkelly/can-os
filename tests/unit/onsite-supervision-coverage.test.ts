@@ -168,6 +168,23 @@ describe("planned hybrid onsite section supervision",()=>{
     expect(result.plannedAssignments).toBe(0);
     expect(result.blocks.every(block=>block.gaps.includes("facilitator_conflict"))).toBe(true);
   });
+  it("rejects two simultaneous Sections using the same verified room",()=>{
+    const ready={
+      requiresSectionDelegation:true,verifiedSectionDelegation:true,
+      authorizedSupervisionService:true,instructionalDayConfirmed:true,
+      verifiedSafeguardingScreening:true,verifiedSafeguardingTraining:true,
+      roomPlanVerified:true,roomCapacityAdequate:true,namedBackupVerified:true,
+    };
+    const result=summarizeOnsiteSupervision([
+      period({...ready,sectionId:"math",facilitatorPersonId:"primary-1",
+        roomLabel:"Learning Hall A",backupPersonId:"backup-1"}),
+      period({...ready,sectionId:"science",facilitatorPersonId:"primary-2",
+        roomLabel:" learning hall a ",backupPersonId:"backup-2"}),
+    ]);
+    expect(result.plannedAssignments).toBe(0);
+    expect(result.blocks.every(block=>block.gaps.includes("room_schedule_conflict"))).toBe(true);
+    expect(result.hasConfirmedPhysicalCoverage).toBe(false);
+  });
   it("marks malformed or overlapping facilitator plans incomplete",()=>{
     const result=summarizeOnsiteSupervision([
       period({startsAtLocal:"25:00",endsAtLocal:"10:00"}),
