@@ -109,6 +109,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     dueAt: s.assessments.dueAt,
     submissionId: s.submissions.id,
     submissionStatus: s.submissions.status,
+    attemptNumber: s.submissions.attemptNumber,
    }).from(s.assessments)
     .leftJoin(s.submissions, and(
      eq(s.submissions.assessmentId, s.assessments.id),
@@ -121,7 +122,12 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
    const newest = new Map<string, typeof published[number]>();
    for (const row of published) {
     const existing = newest.get(row.assessmentId);
-    if (!existing || (row.submissionId && !existing.submissionId)) newest.set(row.assessmentId, row);
+    // Use the latest attempt. An older submitted response must not hide
+    // a newly assigned revision that still needs the student's attention.
+    if (!existing || (row.submissionId && !existing.submissionId) ||
+        (row.submissionId && existing.submissionId &&
+         (row.attemptNumber ?? 0) > (existing.attemptNumber ?? 0)))
+      newest.set(row.assessmentId, row);
    }
    for (const row of newest.values()) {
     const unsubmitted = !row.submissionId || row.submissionStatus === "assigned";
@@ -218,7 +224,11 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
    expectedAt: s.attendanceEvents.expectedAt,
    excuseId: s.attendanceExcuses.id,
   }).from(s.attendanceEvents)
-   .leftJoin(s.attendanceExcuses, eq(s.attendanceExcuses.attendanceEventId, s.attendanceEvents.id))
+   // Rejected or cancelled excuses are not resolved guardian follow-ups.
+   .leftJoin(s.attendanceExcuses, and(
+    eq(s.attendanceExcuses.attendanceEventId, s.attendanceEvents.id),
+    inArray(s.attendanceExcuses.status, ["submitted", "approved"]),
+   ))
    .where(and(
     eq(s.attendanceEvents.studentProfileId, student.studentProfileId),
     inArray(s.attendanceEvents.siteId,siteIds),
