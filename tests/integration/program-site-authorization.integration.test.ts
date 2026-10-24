@@ -33,6 +33,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
           requireInstitutionalAcademicProgramAuthority,requireChurchHostedOperatingServices,
           getHostProgramSiteAuthorization, listCANOperatingAuthorizationDesk,
         } = await import("@/modules/programs/program-site-authorization.server");
+        const {listDelegatedCANTranscriptPrograms}=await import("@/modules/learning/can-transcript-scope.server");
         const suffix = crypto.randomUUID().slice(0,8);
         const [can, church, other] = await Promise.all([
           tx.insert(s.organizations).values({
@@ -83,6 +84,20 @@ integration("Church-owned Site with independently authorized CAN academic servic
           creditMode:"credit_bearing",
         });
         host.scope.programIds=[launch.programId];
+        // A CAN Organization grant alone does not expose a church's records.
+        // Only an exact institution-owned role/capability on this Program may
+        // unlock transcript reads, and never without a live school agreement.
+        const [canRecordPerson]=await tx.insert(s.people).values({
+          legalFirstName:"CAN",legalLastName:"Academic Registrar",
+        }).returning();
+        const canRegistrar=contextFor("registrar",canRecordPerson!.id,can.id,null);
+        const [recordRole]=await tx.insert(s.roleAssignments).values({
+          personId:canRecordPerson!.id,organizationId:can.id,
+          programId:launch.programId,siteId:null,roleKey:"registrar",
+          capabilities:["academic_records.issue"],
+        }).returning();
+        expect(await listDelegatedCANTranscriptPrograms(host,tx)).toEqual([]);
+        expect(await listDelegatedCANTranscriptPrograms(canRegistrar,tx)).toEqual([]);
         const services=[
           "academic_instruction","academic_records","onsite_supervision",
           "school_of_record","credit_issuance","admissions","curriculum",
@@ -160,6 +175,15 @@ integration("Church-owned Site with independently authorized CAN academic servic
           ["onsite_supervision"])).toBe(authorizationId);
         expect(await requireChurchHostedOperatingServices(tx,launch.programId,
           ["admissions","school_of_record"])).toBe(authorizationId);
+        expect(await listDelegatedCANTranscriptPrograms(canRegistrar,tx))
+          .toEqual([{programId:launch.programId,siteId:site.id}]);
+        // Revoked capability leaves the issuer's real account grant intact,
+        // but removes their church-academic-record projection immediately.
+        await tx.update(s.roleAssignments).set({capabilities:[]})
+          .where(eq(s.roleAssignments.id,recordRole!.id));
+        expect(await listDelegatedCANTranscriptPrograms(canRegistrar,tx)).toEqual([]);
+        await tx.update(s.roleAssignments).set({capabilities:["academic_records.issue"]})
+          .where(eq(s.roleAssignments.id,recordRole!.id));
         // Contracting authority is not a host registrar's CAN membership.
         await expect(requireInstitutionalAcademicProgramAuthority(tx,host,
           launch.programId,["academic_instruction","academic_records"]))
@@ -269,6 +293,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
         await revokeProgramSiteAuthorization(host,{
           authorizationId,reason:"The host church withdrew contractual authorization.",
         });
+        expect(await listDelegatedCANTranscriptPrograms(canRegistrar,tx)).toEqual([]);
         // Session-derived Section scope can remain cached: it is NOT authority
         // after the signed CAN/church academic agreement has been revoked.
         expect((await accessibleClasses(canTeacher as Actor)).map(x=>x.id))
