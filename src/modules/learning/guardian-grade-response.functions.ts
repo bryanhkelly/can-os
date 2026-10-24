@@ -1,11 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, actions, assessments, enrollments, guardianRelationships,
-  programs, sectionTeachers, sections, studentProfiles, submissions,
+  programs, sectionTeachers, sections, studentProfiles, submissions, terms,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -31,6 +32,7 @@ async function guardianActor() {
 
 async function visibleGradedSubmission(actor: Awaited<ReturnType<typeof guardianActor>>,
   submissionId: string, executor: Pick<typeof db, "select"> = db) {
+  const activeProgramMembership=alias(enrollments,"guardian_grade_response_program_membership");
   const [row] = await executor.select({
     submissionId: submissions.id, studentProfileId: studentProfiles.id,
     studentPersonId: studentProfiles.personId,
@@ -40,6 +42,7 @@ async function visibleGradedSubmission(actor: Awaited<ReturnType<typeof guardian
   }).from(submissions)
     .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
     .innerJoin(sections, eq(sections.id, assessments.sectionId))
+    .innerJoin(terms,eq(terms.id,sections.termId))
     .innerJoin(programs, eq(programs.id, sections.programId))
     .innerJoin(studentProfiles, eq(studentProfiles.id, submissions.studentProfileId))
     .innerJoin(guardianRelationships, guardianRelationshipPredicate({
@@ -50,11 +53,21 @@ async function visibleGradedSubmission(actor: Awaited<ReturnType<typeof guardian
     .innerJoin(enrollments, and(
       eq(enrollments.studentProfileId, studentProfiles.id),
       eq(enrollments.sectionId, sections.id),
+      eq(enrollments.programId,sections.programId),
+      eq(enrollments.schoolYearId,terms.schoolYearId),
       eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
+    ))
+    .innerJoin(activeProgramMembership,and(
+      eq(activeProgramMembership.studentProfileId,studentProfiles.id),
+      eq(activeProgramMembership.programId,sections.programId),
+      eq(activeProgramMembership.schoolYearId,terms.schoolYearId),
+      eq(activeProgramMembership.kind,"program"),
+      eq(activeProgramMembership.status,"active"),
     ))
     .where(and(
       eq(submissions.id, submissionId),
       eq(submissions.status, "graded"),
+      eq(sections.active,true),
       inArray(sections.siteId, actor.scope.siteIds ?? []),
       inArray(sections.programId, actor.scope.programIds ?? []),
       inArray(programs.organizationId, actor.scope.organizationIds ?? []),
