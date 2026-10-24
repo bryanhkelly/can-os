@@ -128,12 +128,10 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
     .where(and(
       inArray(assessments.sectionId, sectionIds),
       eq(assessments.status, "published"),
-      or(
-        isNull(submissions.id), // newly published work has no attempt yet
-        eq(submissions.timeliness, "missing"),
-        gte(assessments.dueAt, startOfDay),
-        gte(submissions.gradedAt, startOfDay),
-      ),
+      // Apply recency after selecting the latest attempt. Filtering attempts
+      // here could resurrect an older missing/graded attempt when a newer
+      // revision has already been submitted.
+
     ))
     .orderBy(asc(assessments.dueAt)) : [];
 
@@ -146,7 +144,12 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       latestCoursework.set(row.assessmentId, row);
     }
   }
-  const currentCoursework = [...latestCoursework.values()];
+  const currentCoursework = [...latestCoursework.values()].filter(row =>
+    row.submissionId === null ||
+    row.timeliness === "missing" ||
+    (row.dueAt !== null && row.dueAt >= startOfDay) ||
+    (row.submittedAt !== null && row.submittedAt >= startOfDay)
+  );
 
   const openActions = await db
     .select({
