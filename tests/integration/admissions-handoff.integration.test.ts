@@ -71,7 +71,12 @@ integration("cross-persona admissions through active classes",()=>{
   const {getMyStudentToday}=await import("@/modules/student-experience/student-today.functions");
   const {accessibleClasses,authorizeClass}=await import("@/modules/learning/class-access.server");
   const {getClassWorkspace}=await import("@/modules/learning/class-workspace.functions");
-  const {getGradebookSections,getGradebook}=await import("@/modules/learning/gradebook.functions");
+  const {
+   getGradebookSections,getGradebook,createAssessment,gradeSubmission,
+  }=await import("@/modules/learning/gradebook.functions");
+  const {
+   getAssignments,saveAssignmentResponse,saveAssignmentDraft,
+  }=await import("@/modules/student-experience/assignments.functions");
   const {getTeacherToday}=await import("@/modules/learning/teacher-today.functions");
   const access=await vi.importActual<typeof import("@/modules/identity/passwordless-access.server")>(
    "@/modules/identity/passwordless-access.server");
@@ -554,6 +559,16 @@ integration("cross-persona admissions through active classes",()=>{
     expect(teacherToday.sections.find(row=>row.id===section.id)?.studentCount).toBe(1);
     expect(teacherToday.ungraded.some(row=>row.studentProfileId===profileId &&
       row.assessmentId===pendingReview.id)).toBe(true);
+    // Teacher uses the real assessment command; the published assignment
+    // belongs to the exact class and admitted student from this journey.
+    const firstAssignment=await createAssessment({data:{
+      sectionId:section.id,title:"First learning activity",
+      instructions:"Write three sentences about the first lesson.",
+      curriculumLessonId:"first",pointsPossible:10,
+      dueAt:new Date(Date.now()+7*86400_000).toISOString(),
+      publishNow:true,
+    }});
+    expect(firstAssignment.status).toBe("published");
     state.actor=learner;
     const studentClass=await getClassWorkspace({data:{sectionId:section.id}});
     expect(studentClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
@@ -687,6 +702,30 @@ integration("cross-persona admissions through active classes",()=>{
      .toContain(section.id);
     const signedInClass=await getClassWorkspace({data:{sectionId:section.id}});
     expect(signedInClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
+    // The ACTUAL passwordless-student persona sees the new teacher's
+    // assessment, submits work, and receives feedback from that same teacher.
+    const studentAssignments=await getAssignments();
+    expect(studentAssignments.assignments.find(row=>
+      row.assessmentId===firstAssignment.assessmentId)?.status).toBe("assigned");
+    const response=await saveAssignmentResponse({data:{
+      assessmentId:firstAssignment.assessmentId,
+      text:"My first lesson showed me how to compare expressions.",
+    }});
+    expect(response.submissionId).toBeTruthy();
+    expect((await getAssignments()).assignments.find(row=>
+      row.assessmentId===firstAssignment.assessmentId)?.status).toBe("submitted");
+    state.actor=instructor;
+    const feedback=await gradeSubmission({data:{
+      submissionId:response.submissionId,score:9,
+      feedbackComment:"Good first response. Explain your comparison next time.",
+    }});
+    expect(feedback.submissionId).toBe(response.submissionId);
+    state.actor=verifiedStudent as Actor;
+    const returned=first((await getAssignments()).assignments.filter(row=>
+      row.assessmentId===firstAssignment.assessmentId));
+    expect(returned.status).toBe("graded");
+    expect(Number(returned.score)).toBe(9);
+    expect(returned.feedbackText).toContain("Explain your comparison");
     state.actor=learner;
     // A withdrawn Program must remove learning access even when a stale
     // active Section enrollment was left behind. Restore fixture state after
@@ -701,6 +740,11 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(authorizeClass(learner,section.id)).rejects.toThrow("active class enrollment");
     expect((await accessibleClasses(learner)).map(row=>row.id)).not.toContain(section.id);
     await expect(getMyStudentToday()).rejects.toThrow("active student membership");
+    expect((await getAssignments()).assignments.map(row=>row.assessmentId))
+      .not.toContain(firstAssignment.assessmentId);
+    await expect(saveAssignmentDraft({data:{
+      assessmentId:firstAssignment.assessmentId,text:"Former student editing.",
+    }})).rejects.toThrow("active class enrollment");
     // The former child's class must also vanish from CURRENT teacher rosters
     // without deleting historical assessments or their audit trail.
     state.actor=instructor;
