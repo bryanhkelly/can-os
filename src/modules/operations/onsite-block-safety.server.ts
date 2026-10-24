@@ -47,6 +47,11 @@ export async function verifiedAdultSafetyEvidence(
     reviewedAt:qualificationVerificationEvents.occurredAt,
     evidenceId:qualificationVerificationEvents.evidenceDocumentId,
     docCategory:documents.category,
+    docStorageProvider:documents.storageProvider,
+    docStorageKey:documents.storageKey,
+    docSensitivity:documents.sensitivityTier,
+    docUploader:documents.uploadedByPersonId,
+    docMetadata:documents.metadata,
     docSubjectType:documents.subjectType,
     docSubjectId:documents.subjectId,
     docVerifiedAt:documents.verifiedAt,
@@ -60,14 +65,23 @@ export async function verifiedAdultSafetyEvidence(
     .orderBy(qualificationClaims.id,desc(qualificationVerificationEvents.sequence));
   for(const row of claims){
     if(row.key!==ONSITE_SCREENING && row.key!==ONSITE_TRAINING)continue;
-    const expectedDocumentCategory=row.key===ONSITE_SCREENING
-      ? "onsite_screening_evidence" : "onsite_training_evidence";
-    if(row.decision!=="approve" || row.docCategory!==expectedDocumentCategory ||
+    // The canonical qualification uploader verifies R2 content/signature and
+    // sets documents.verifiedAt; a separate human verification event
+    // approves the Person's claim. uploaded evidence must be exactly the
+    // existing restricted cloudflare_r2 qualification Document for this claim.
+    // documents.verifiedByPersonId may be null for signature-verified uploads;
+    // do not conflate that with an absent independent claim reviewer.
+    if(row.decision!=="approve" || row.docCategory!=="qualification" ||
        !row.evidenceId || !row.reviewedBy ||
        row.reviewedBy===row.personId || !row.reviewedAt ||
        row.docSubjectType!=="person" || row.docSubjectId!==row.personId ||
-       !row.docVerifiedAt || !row.docVerifiedBy ||
-       row.docVerifiedBy===row.personId)continue;
+       row.docUploader!==row.personId ||
+       row.docStorageProvider!=="cloudflare_r2" ||
+       row.docSensitivity!=="restricted" ||
+       !row.docStorageKey.startsWith(`qualifications/${row.personId}/`) ||
+       row.docMetadata.claimId!==row.claimId ||
+       !row.docVerifiedAt || row.docVerifiedAt>new Date() ||
+       (row.docVerifiedBy && row.docVerifiedBy===row.personId))continue;
     const from=new Date(Math.max(
       row.issuedAt?.getTime()??Infinity,
       row.reviewedAt.getTime(),
