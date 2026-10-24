@@ -47,6 +47,45 @@ Keep merge/deployment and production migrations on HOLD.
 ---
 
 
+## P0 same-student passwordless redemption and teacher roster integrity (23 October 2026)
+
+**Source committed to `FullFlow`; no CI or independent runtime
+verification claimed.** The user-requested focus remains the public
+parent → accepted Application → staffed Section → distinct student login →
+real first lesson, not administrative features or GitHub Actions repair.
+
+- Expanded the **rollback-only admissions acceptance** so the registrar's
+  approved student invitation uses the REAL passwordless challenge service
+  with the outgoing email captured (not sent externally). The student's
+  single-use link is actually redeemed, replay is denied, the DB-backed
+  session cookie resolves to the original **student** Person, role,
+  account, grant and host Site, and that same signed-in student opens the
+  assigned published first lesson. An immediate registrar resend does not
+  mint a second challenge inside the passwordless cooldown.
+- On the student's **Today** page, the primary action now opens the first
+  *substantive* published lesson of the first assigned class. A route-only
+  marker is resolved against current classroom content **after normal
+  authorized class access**; empty lesson shells are skipped. It is never
+  a lesson ID supplied to a domain mutation or an access credential.
+- The current teacher class roster **and** gradebook now require a child's
+  active Section enrollment to be backed by their matching, independently
+  active **same-year Program enrollment**. A Program withdrawal removes
+  the child from today's teacher roster and gradebook without erasing
+  historical assessment records. Regression acceptance extends the
+  same-child withdrawal scenario through both teacher read boundaries.
+
+This increment required no new schema or production migration. The
+existing verified-guardian approval and separate student account
+provisioning remain explicit safeguards. Acceptance has been authored,
+but **not executed**; hosted Actions remain deliberately out of scope.
+
+**Next P0 item:** run the same-ID acceptance in an available
+non-GitHub test environment when one is available, and finish any actual
+blocking portal transitions discovered; avoid additional features until
+the student can use their learning session end-to-end.
+
+---
+
 ## P0 enrollment-to-student-login and return-family usability (23 October 2026)
 
 **Code committed; runtime acceptance not yet executed. GitHub Actions is known
