@@ -41,7 +41,7 @@ describe("planned hybrid onsite section supervision",()=>{
     expect(result.blocks[0]).toMatchObject({
       assignedPlan:true,gaps:["room_unconfigured"],
     });
-    expect(result.note).toMatch(/no authoritative room assignment.*onsite presence/i);
+    expect(result.note).toMatch(/not a school-opening or physically supervised-day approval/i);
   });
   it("does not treat a recurring timetable as an instructional duty on a closed or unconfigured day",()=>{
     for(const confirmed of [false]){
@@ -109,9 +109,12 @@ describe("planned hybrid onsite section supervision",()=>{
     const planned=summarizeOnsiteSupervision([period({
       requiresSectionDelegation:true, verifiedSectionDelegation:true,
       authorizedSupervisionService:true, instructionalDayConfirmed:true,
+      verifiedSafeguardingScreening:true,verifiedSafeguardingTraining:true,
+      roomPlanVerified:true,roomLabel:"Classroom A",roomCapacityAdequate:true,
+      backupPersonId:"backup-1",namedBackupVerified:true,
     })]);
     expect(planned.plannedAssignments).toBe(1);
-    expect(planned.blocks[0]?.gaps).toEqual(["room_unconfigured"]);
+    expect(planned.blocks[0]?.gaps).toEqual([]);
     expect(planned.hasConfirmedPhysicalCoverage).toBe(false);
   });
   it("a valid Site grant or contract alone never makes a church/CAN class staffed",()=>{
@@ -127,6 +130,44 @@ describe("planned hybrid onsite section supervision",()=>{
     expect(result.unassignedOrConflicting).toBe(1);
   });
 
+
+  it("blocks a church school plan and affirmative duty until screening, training, room and backup are verified",()=>{
+    const minimum={
+      requiresSectionDelegation:true,verifiedSectionDelegation:true,
+      authorizedSupervisionService:true,instructionalDayConfirmed:true,
+    };
+    const unsafe=summarizeOnsiteSupervision([period(minimum)]);
+    expect(unsafe.plannedAssignments).toBe(0);
+    expect(unsafe.blocks[0]?.gaps).toEqual(expect.arrayContaining([
+      "child_safety_screening_missing","safeguarding_training_missing",
+      "qualified_backup_missing","room_unconfigured",
+    ]));
+    const stillUnsafe=summarizeOnsiteSupervision([period({
+      ...minimum,verifiedSafeguardingScreening:true,verifiedSafeguardingTraining:true,
+      roomPlanVerified:true,roomLabel:"Learning Center",
+      roomCapacityAdequate:false,namedBackupVerified:true,
+      backupPersonId:"qualified-backup",
+    })]);
+    expect(stillUnsafe.blocks[0]?.gaps).toContain("room_capacity_unverified");
+    expect(stillUnsafe.plannedAssignments).toBe(0);
+    expect(stillUnsafe.hasConfirmedPhysicalCoverage).toBe(false);
+  });
+  it("rejects simultaneous standby-backup assignments to a second Section",()=>{
+    const ready={
+      requiresSectionDelegation:true,verifiedSectionDelegation:true,
+      authorizedSupervisionService:true,instructionalDayConfirmed:true,
+      verifiedSafeguardingScreening:true,verifiedSafeguardingTraining:true,
+      roomPlanVerified:true,roomCapacityAdequate:true,namedBackupVerified:true,
+    };
+    const result=summarizeOnsiteSupervision([
+      period({...ready,sectionId:"algebra",facilitatorPersonId:"primary-a",
+        backupPersonId:"same-backup"}),
+      period({...ready,sectionId:"science",periodId:"science",
+        facilitatorPersonId:"primary-b",backupPersonId:"same-backup"}),
+    ]);
+    expect(result.plannedAssignments).toBe(0);
+    expect(result.blocks.every(block=>block.gaps.includes("facilitator_conflict"))).toBe(true);
+  });
   it("marks malformed or overlapping facilitator plans incomplete",()=>{
     const result=summarizeOnsiteSupervision([
       period({startsAtLocal:"25:00",endsAtLocal:"10:00"}),
