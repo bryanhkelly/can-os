@@ -565,6 +565,32 @@ integration("cross-persona admissions through active classes",()=>{
     }});
     expect((await getStudentLearningHandoff({data:{applicationId}})).status)
       .toBe("pending_review");
+    // The child's proposed email must be a DEDICATED learning login.
+    // Existing same-person teacher/guardian membership would cause generic
+    // passwordless redemption to choose the wrong first grant.
+    const sharedEmail=`mixed-student-${suffix}@example.org`;
+    const [sharedAccount]=await tx.insert(s.accessAccounts).values({
+      emailNormalized:sharedEmail,emailVerifiedAt:new Date(),
+    }).returning();
+    await tx.insert(s.accountPersonGrants).values({
+      accountId:sharedAccount!.id,personId:student.personId,
+      role:"teacher",organizationId:org.id,siteId:site.id,
+      active:true,isSynthetic:false,
+    });
+    await consentToStudentLearningAccount({data:{
+      applicationId,studentEmail:sharedEmail,acknowledged:true,
+    }});
+    state.actor=staff;
+    await expect(provisionStudentLearningAccess({data:{
+      applicationId,confirmedIndependentIdentity:true,
+      reviewMethod:"institutional_school_record",
+    }})).rejects.toThrow("student-only account");
+    expect((await getStudentLearningHandoff({data:{applicationId}})).status)
+      .toBe("pending_review");
+    state.actor=family;
+    await consentToStudentLearningAccount({data:{
+      applicationId,studentEmail:email,acknowledged:true,
+    }});
     state.actor=staff;
     state.studentInvite.mockClear();
     await expect(provisionStudentLearningAccess({data:{applicationId}}))
