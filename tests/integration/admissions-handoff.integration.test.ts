@@ -7,7 +7,8 @@ import type { Actor } from "@/modules/identity/actors.server";
 type Transaction=Parameters<Parameters<Database["transaction"]>[0]>[0];
 const state=vi.hoisted(()=>({tx:undefined as Transaction|undefined,actor:undefined as Actor|undefined,
  verify:vi.fn(),sign:vi.fn(()=>"https://storage.example.invalid/signed"),
- studentInvite:vi.fn(async()=>({accepted:true as const})),
+ studentInvite:vi.fn(async(_email:string)=>({accepted:true as const})),
+ studentLink:"",
  failDocumentEvent:false,failStageEvent:false,failInquiryEvent:false}));
 vi.mock("@/modules/enrollment/r2-documents.server",async importOriginal=>{
  const original=await importOriginal<typeof import("@/modules/enrollment/r2-documents.server")>();
@@ -71,6 +72,10 @@ integration("cross-persona admissions through active classes",()=>{
   const {accessibleClasses,authorizeClass}=await import("@/modules/learning/class-access.server");
   const {getClassWorkspace}=await import("@/modules/learning/class-workspace.functions");
   const {getGradebookSections,getGradebook}=await import("@/modules/learning/gradebook.functions");
+  const access=await vi.importActual<typeof import("@/modules/identity/passwordless-access.server")>(
+   "@/modules/identity/passwordless-access.server");
+  const sessionAuth=await vi.importActual<typeof import("@/modules/identity/command-context.server")>(
+   "@/modules/identity/command-context.server");
   const {
    getStudentLearningHandoff,consentToStudentLearningAccount,provisionStudentLearningAccess,
   }=await import("@/modules/enrollment/student-access-handoff.functions");
@@ -81,6 +86,14 @@ integration("cross-persona admissions through active classes",()=>{
   let checked=false;
   try{
    vi.stubEnv("CAN_R2_LIVE_UPLOADS_ENABLED","true");
+   vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER","test-accepted-family-student-login-pepper-over-32-characters");
+   vi.stubEnv("CAN_ACCESS_PUBLIC_ORIGIN","https://app.can-os.com");
+   state.studentLink="";
+   state.studentInvite.mockImplementation((address:string)=>
+    access.requestOneTimeAccess(address,async message=>{
+     expect(message.to).toBe(address);
+     state.studentLink=message.accessUrl;
+    }));
    state.verify.mockReset().mockResolvedValue(undefined);
    await database.transaction(async tx=>{
     state.tx=tx;
@@ -563,6 +576,7 @@ integration("cross-persona admissions through active classes",()=>{
     }})).toMatchObject({status:"approved"});
     expect(state.studentInvite).toHaveBeenCalledOnce();
     expect(state.studentInvite).toHaveBeenCalledWith(email);
+    expect(state.studentLink).toContain("/access/verify#token=");
     const approvalEvents=await tx.select({id:s.domainEvents.id}).from(s.domainEvents)
       .where(eq(s.domainEvents.eventType,"StudentLearningAccessApproved"));
     expect(approvalEvents).toHaveLength(1);
@@ -571,6 +585,9 @@ integration("cross-persona admissions through active classes",()=>{
     expect(await provisionStudentLearningAccess({data:{applicationId}}))
       .toMatchObject({status:"approved"});
     expect(state.studentInvite).toHaveBeenCalledTimes(2);
+    // Registrar retry during cooldown cannot replace the initial student link.
+    const originalLink=state.studentLink;
+    expect(originalLink).toContain("/access/verify#token=");
     expect(await tx.select({id:s.domainEvents.id}).from(s.domainEvents)
       .where(eq(s.domainEvents.eventType,"StudentLearningAccessApproved")))
       .toHaveLength(1);
@@ -586,6 +603,28 @@ integration("cross-persona admissions through active classes",()=>{
     });
     expect((await getStudentLearningHandoff({data:{applicationId}})).status)
       .toBe("approved");
+    // The student's invitation generates a real passwordless challenge,
+    // DB-backed role session and cookie for this exact enrolled Person.
+    const token=new URL(originalLink).hash.slice("#token=".length);
+    const redeemed=await access.redeemOneTimeAccess(token);
+    expect(redeemed.role).toBe("student");
+    expect(redeemed.accountId).toBe(studentAccount.id);
+    await expect(access.redeemOneTimeAccess(token))
+      .rejects.toThrow("Invalid or expired access link");
+    const verifiedStudent=await sessionAuth.getCommandContext(
+     new Request("https://app.can-os.com/student",{
+      headers:{cookie:redeemed.setCookie.split(";")[0]!},
+     }));
+    expect(verifiedStudent).toMatchObject({
+     role:"student",actorPersonId:student.personId,
+     accountId:studentAccount.id,grantId:studentGrant!.id,grantSiteId:site.id,
+    });
+    expect(verifiedStudent.scope.programIds).toContain(program.id);
+    state.actor=verifiedStudent as Actor;
+    expect((await getMyStudentToday()).sections.map(row=>row.sectionId))
+     .toContain(section.id);
+    const signedInClass=await getClassWorkspace({data:{sectionId:section.id}});
+    expect(signedInClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
     state.actor=learner;
     // A withdrawn Program must remove learning access even when a stale
     // active Section enrollment was left behind. Restore fixture state after
@@ -840,7 +879,7 @@ integration("cross-persona admissions through active classes",()=>{
     checked=true;throw rollback;
    });
   }catch(error){if(error!==rollback)throw error;}
-  finally{state.tx=undefined;state.actor=undefined;state.failDocumentEvent=false;state.failStageEvent=false;state.failInquiryEvent=false;state.studentInvite.mockClear();vi.unstubAllEnvs();}
+  finally{state.tx=undefined;state.actor=undefined;state.failDocumentEvent=false;state.failStageEvent=false;state.failInquiryEvent=false;state.studentInvite.mockReset();state.studentLink="";vi.unstubAllEnvs();}
   expect(checked).toBe(true);
   expect(await database.select().from(s.applications).where(eq(s.applications.id,applicationId))).toEqual([]);
   expect(await database.select().from(s.studentProfiles).where(eq(s.studentProfiles.id,profileId))).toEqual([]);
