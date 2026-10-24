@@ -326,7 +326,7 @@ export const insightStatus = pgEnum("insight_status", [
   "dismissed",
 ]);
 
-export const schoolConfigurationStatus = pgEnum("school_configuration_status", ["draft"]);
+export const schoolConfigurationStatus = pgEnum("school_configuration_status", ["draft", "approved", "suspended"]);
 
 export const complianceFrameworkVersionStatus = pgEnum("compliance_framework_version_status", [
   "draft",
