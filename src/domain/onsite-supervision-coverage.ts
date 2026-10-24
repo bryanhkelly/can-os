@@ -20,6 +20,13 @@ export type SupervisionBlockInput = {
   /** Independently verified bounded child-safety credential evidence. */
   verifiedSafeguardingScreening?: boolean;
   verifiedSafeguardingTraining?: boolean;
+  /** Independent verified room and distinct qualified backup, not presence. */
+  roomLabel?: string | null;
+  roomPlanVerified?: boolean;
+  namedBackupVerified?: boolean;
+  roomCapacityAdequate?: boolean;
+  /** Backup is used only for overlap validation; omit it from public responses. */
+  backupPersonId?: string | null;
   /** Only required for independently church-hosted CAN Programs. */
   requiresSectionDelegation?: boolean;
   /** The actual named person's appointment must cover this entire block. */
@@ -62,7 +69,8 @@ export type SupervisionGap =
   "schedule_missing" | "facilitator_missing" | "staff_grant_missing" |
   "facilitator_conflict" | "room_unconfigured" | "calendar_unverified" |
   "section_delegation_missing" | "operating_agreement_missing" |
-  "child_safety_screening_missing" | "safeguarding_training_missing";
+  "child_safety_screening_missing" | "safeguarding_training_missing" |
+  "qualified_backup_missing" | "room_capacity_unverified";
 
 function minutes(input: string | null): number | null {
   if (!input) return null;
@@ -93,12 +101,17 @@ export function summarizeOnsiteSupervision(
     if (row.requiresSectionDelegation && row.verifiedSafeguardingTraining !== true)
       gaps.push("safeguarding_training_missing");
     if (row.overlappingFacilitatorAssignments) gaps.push("facilitator_conflict");
-    // CAN OS currently has no authoritative section-room assignment; never
-    // silently claim that an instructional section has a supervised room.
-    gaps.push("room_unconfigured");
+    // A scheduled adult is not evidence that a suitable room or second
+    // safeguarding-qualified adult will actually be available onsite.
+    if (row.roomPlanVerified !== true) gaps.push("room_unconfigured");
+    if (row.requiresSectionDelegation && row.namedBackupVerified !== true)
+      gaps.push("qualified_backup_missing");
+    if (row.roomPlanVerified && row.roomCapacityAdequate !== true)
+      gaps.push("room_capacity_unverified");
     return {
       ...row, gaps, startMinute:start, endMinute:end,
-      assignedPlan: gaps.every(gap => gap === "room_unconfigured"),
+      assignedPlan: gaps.length === 0 ||
+        (!row.requiresSectionDelegation && gaps.every(gap => gap === "room_unconfigured")),
     };
   });
   for (let i=0;i<blocks.length;i++) {
@@ -116,11 +129,30 @@ export function summarizeOnsiteSupervision(
       }
     }
   }
+  // A standby backup cannot be booked as another Section’s primary or
+  // standby for the same overlapping time period at the same Site.
+  for(let i=0;i<blocks.length;i++){
+    const a=blocks[i]!;
+    if(!a.backupPersonId || a.startMinute===null || a.endMinute===null)continue;
+    for(let j=i+1;j<blocks.length;j++){
+      const b=blocks[j]!;
+      if(a.sectionId===b.sectionId || b.startMinute===null || b.endMinute===null ||
+         !(a.startMinute<b.endMinute && b.startMinute<a.endMinute))continue;
+      if(a.backupPersonId===b.facilitatorPersonId ||
+         (b.backupPersonId && a.backupPersonId===b.backupPersonId) ||
+         (b.backupPersonId && b.backupPersonId===a.facilitatorPersonId)){
+        for(const entry of [a,b]){
+          if(!entry.gaps.includes("facilitator_conflict"))entry.gaps.push("facilitator_conflict");
+          entry.assignedPlan=false;
+        }
+      }
+    }
+  }
   return {
     blocks:blocks.map(({startMinute:_start,endMinute:_end,...item})=>item),
     plannedAssignments:blocks.filter(x=>x.assignedPlan).length,
     unassignedOrConflicting:blocks.filter(x=>!x.assignedPlan).length,
-    roomAssignmentsUnverified:blocks.length,
+    roomAssignmentsUnverified:blocks.filter(x=>!x.roomPlanVerified).length,
     hasConfirmedPhysicalCoverage:false as const,
     note:"This is a STAFFING PLAN, not a school-opening or physically supervised-day approval. Independent church/CAN staff require valid individual screening and safeguarding-training evidence. Approved instructional days and duty responses cannot establish actual onsite presence, backup coverage, room safety, child release or custody.",
   };
