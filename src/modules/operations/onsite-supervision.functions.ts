@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   academicCalendars, academicCalendarDays, accessAccounts, accountPersonGrants,
-  deliveryArrangements, organizations, people, programs, scheduleTemplatePeriods,
+  deliveryArrangements, enrollments, organizations, people, programs, scheduleTemplatePeriods,
   scheduleTemplates, schoolYears, sections, sites, terms,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
@@ -16,6 +16,7 @@ import { coversLocalSupervisionBlock, summarizeOnsiteSupervision, type Supervisi
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { verifiedScheduledSectionFacilitators, scheduledBlockHasNamedFacilitator } from "./section-coverage-verification.server";
 import { verifiedAdultSafetyEvidence, verifiedAdultCoversBlock } from "./onsite-block-safety.server";
+import { fetchRoomPlanEvidence,parseVerifiedRoomPlan,type VerifiedRoomPlan } from "./onsite-block-room-plan.server";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
 const inputSchema=z.object({date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}).strict();
@@ -72,7 +73,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     const templateIds=[...new Set(onsiteSections.map(r=>r.scheduleTemplateId)
       .filter((id):id is string=>!!id))];
     const day=new Date(data.date+"T12:00:00Z").getUTCDay();
-    const [periodRows,arrangements,calendarRows]=await Promise.all([
+    const [periodRows,arrangements,calendarRows,roomEvidence,rosterSizes]=await Promise.all([
       templateIds.length?db.select({
         templateId:scheduleTemplates.id,yearId:scheduleTemplates.schoolYearId,
         programId:scheduleTemplates.programId,siteId:scheduleTemplates.siteId,
@@ -110,6 +111,14 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         .where(and(inArray(academicCalendars.schoolYearId,yearIds),
           eq(academicCalendars.siteId,site.id),eq(academicCalendars.active,true)))
         .orderBy(desc(academicCalendars.version)),
+      fetchRoomPlanEvidence(db,ids),
+      db.select({
+        sectionId:enrollments.sectionId,
+        students:sql<number>`count(distinct ${enrollments.studentProfileId})::int`,
+      }).from(enrollments).where(and(
+        inArray(enrollments.sectionId,ids),
+        eq(enrollments.kind,"section"),eq(enrollments.status,"active"),
+      )).groupBy(enrollments.sectionId),
     ]);
     // Latest active calendar version is authoritative; an absent/closed day
     // cannot confer a scheduled onsite duty from a repeating timetable alone.
@@ -122,9 +131,40 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         (dayRow.dayType!=="special"||(dayRow.minutes??0)>0);
       instructionalByYear.set(dayRow.yearId,instructional);
     }
+    const rosterBySection=new Map(rosterSizes.map(row=>[
+      row.sectionId,Number(row.students),
+    ]));
+    const matchingPlan=new Map<string,VerifiedRoomPlan>();
+    if(!roomEvidence.truncated){
+      const bySection=new Map(onsiteSections.map(section=>[section.id,section]));
+      // Newest independent review wins: never fall back to a superseded plan.
+      const consumed=new Set<string>();
+      for(const doc of roomEvidence.rows){
+        const section=bySection.get(doc.subjectId);
+        if(!section || doc.metadata.date!==data.date ||
+           typeof doc.metadata.periodId!=="string")continue;
+        const period=periodRows.find(row=>row.periodId===doc.metadata.periodId &&
+          row.templateId===section.scheduleTemplateId &&
+          row.yearId===section.schoolYearId &&
+          (row.programId===null||row.programId===section.programId));
+        if(!period)continue;
+        const key=section.id+":"+period.periodId;
+        if(consumed.has(key))continue;
+        consumed.add(key);
+        const parsed=parseVerifiedRoomPlan(doc,{
+          date:data.date,siteId:site.id,programId:section.programId,
+          sectionId:section.id,periodId:period.periodId,
+          timeZone:site.timezone,
+          startsAtLocal:period.starts,endsAtLocal:period.ends,
+        });
+        if(parsed)matchingPlan.set(key,parsed);
+      }
+    }
     const candidates=arrangements.filter(row=>["onsite","hybrid"].includes(row.modality));
-    const peopleIds=[...new Set(candidates.map(row=>row.facilitatorPersonId)
-      .filter((id):id is string=>!!id))];
+    const peopleIds=[...new Set([
+      ...candidates.map(row=>row.facilitatorPersonId),
+      ...[...matchingPlan.values()].map(plan=>plan.backupPersonId),
+    ].filter((id):id is string=>!!id))];
     const [activePeople,staffGrants,adultSafety]=await Promise.all([
       peopleIds.length?db.select({id:people.id,firstName:people.legalFirstName,
         lastName:people.legalLastName,active:people.active})
@@ -148,13 +188,19 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
       row.academicProviderOrganizationId !== site.organizationId)
       .map(row => row.programId));
     const programBySection = new Map(onsiteSections.map(row => [row.id,row.programId]));
-    const namedCandidates = candidates.filter(row => row.facilitatorPersonId &&
-      independent.has(programBySection.get(row.sectionId) ?? ""))
-      .map(row => ({
-        programId: programBySection.get(row.sectionId)!,
-        sectionId:row.sectionId,
-        personId:row.facilitatorPersonId!,
-      }));
+    const namedCandidates = [
+      ...candidates.filter(row => row.facilitatorPersonId &&
+        independent.has(programBySection.get(row.sectionId) ?? ""))
+        .map(row => ({
+          programId: programBySection.get(row.sectionId)!,
+          sectionId:row.sectionId,personId:row.facilitatorPersonId!,
+        })),
+      ...[...matchingPlan.values()].filter(plan=>independent.has(plan.programId))
+        .map(plan=>({
+          programId:plan.programId,sectionId:plan.sectionId,
+          personId:plan.backupPersonId,
+        })),
+    ];
     const verifiedDelegations=await verifiedScheduledSectionFacilitators(db,
       {siteId:site.id,organizationId:site.organizationId},namedCandidates);
     const authorizedContracts = new Map<string, string | null>();
@@ -207,6 +253,25 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
               date:data.date,timeZone:site.timezone,
               startsAtLocal:period?.starts??null,endsAtLocal:period?.ends??null,
             }) : {screening:true,training:true};
+        const approvedRoom=period?matchingPlan.get(section.id+":"+period.periodId):undefined;
+        const roomMatches=!!approvedRoom && !!personId &&
+          approvedRoom.primaryPersonId===personId;
+        const backupId=roomMatches?approvedRoom!.backupPersonId:null;
+        const backupPerson=backupId?peopleById.get(backupId):null;
+        const backupActive=!!backupId && backupId!==personId &&
+          !!backupPerson?.active && staffGrants.some(grant=>
+            grant.personId===backupId && grant.role==="room_facilitator");
+        const backupNamed=!!backupId && !!period && backupActive &&
+          scheduledBlockHasNamedFacilitator(verifiedDelegations,{
+            programId:section.programId,sectionId:section.id,personId:backupId!,
+            date:data.date,timeZone:site.timezone,
+            startsAtLocal:period.starts,endsAtLocal:period.ends,
+          });
+        const backupSafety=backupId && period
+          ? verifiedAdultCoversBlock(adultSafety.get(backupId),{
+              date:data.date,timeZone:site.timezone,
+              startsAtLocal:period.starts,endsAtLocal:period.ends,
+            }) : {screening:false,training:false};
         const namedCurrent=personId && period && requiresSectionDelegation
           ? scheduledBlockHasNamedFacilitator(verifiedDelegations,{
               programId:section.programId,sectionId:section.id,personId,
@@ -223,6 +288,12 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
           verifiedSiteStaffGrant:approved,
           verifiedSafeguardingScreening:safety.screening,
           verifiedSafeguardingTraining:safety.training,
+          roomLabel:roomMatches?approvedRoom!.roomLabel:null,
+          roomPlanVerified:roomMatches,
+          roomCapacityAdequate:roomMatches &&
+            (rosterBySection.get(section.id)??0)<=approvedRoom!.roomCapacity,
+          backupPersonId:backupId,
+          namedBackupVerified:!!backupNamed && backupSafety.screening && backupSafety.training,
           requiresSectionDelegation,
           verifiedSectionDelegation:!!namedCurrent,
           authorizedSupervisionService:!requiresSectionDelegation ||
@@ -240,7 +311,8 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     const projection=summarizeOnsiteSupervision(result);
     // Person IDs are needed for overlap detection, not for the client.
     const blocks=projection.blocks.map(({
-      facilitatorPersonId:assignedPersonId,delegationVersion,agreementVersion,...block
+      facilitatorPersonId:assignedPersonId,backupPersonId:_backupPersonId,
+      delegationVersion,agreementVersion,...block
     })=>({
       ...block,
       // An acknowledgment is valid only for this exact assignment/time
@@ -250,7 +322,8 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         block.endsAtLocal,assignedPersonId,block.verifiedSiteStaffGrant,
         block.verifiedSectionDelegation,block.authorizedSupervisionService,
         block.verifiedSafeguardingScreening,block.verifiedSafeguardingTraining,
-        delegationVersion,agreementVersion,block.assignedPlan,
+        block.roomPlanVerified,block.roomLabel,block.roomCapacityAdequate,
+        block.namedBackupVerified,backupPersonId,delegationVersion,agreementVersion,block.assignedPlan,
       ])).digest("hex"),
       // Derived ONLY from the verified, original site grant and current active
       // instruction plan. Never accept a browser-supplied facilitator ID.
