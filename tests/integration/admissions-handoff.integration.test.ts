@@ -752,6 +752,18 @@ integration("cross-persona admissions through active classes",()=>{
       .some(row=>row.profileId===profileId)).toBe(false);
     expect((await getGradebook({data:{sectionId:section.id}})).students
       .some(row=>row.studentProfileId===profileId)).toBe(false);
+    // An active orphan Section row must not receive newly published work
+    // after the student's institutional Program membership is withdrawn.
+    const withdrawnClasswork=await createAssessment({data:{
+      sectionId:section.id,title:"New work after withdrawal",
+      instructions:"A later lesson exercise.",curriculumLessonId:"first",
+      pointsPossible:10,dueAt:new Date(Date.now()+7*86400_000).toISOString(),
+      publishNow:true,
+    }});
+    expect(await tx.select({id:s.submissions.id}).from(s.submissions).where(and(
+      eq(s.submissions.assessmentId,withdrawnClasswork.assessmentId),
+      eq(s.submissions.studentProfileId,profileId),
+    ))).toHaveLength(0);
     const withdrawnToday=await getTeacherToday();
     expect(withdrawnToday.sections.find(row=>row.id===section.id)?.studentCount).toBe(0);
     expect(withdrawnToday.ungraded.some(row=>row.studentProfileId===profileId)).toBe(false);
