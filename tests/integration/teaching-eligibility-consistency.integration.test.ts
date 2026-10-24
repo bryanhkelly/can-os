@@ -112,7 +112,8 @@ describe("canonical teaching eligibility consumers", () => {
         const actor: Actor = {
           role: "teacher", actorPersonId: teacher.id,
           accountId: account.id, grantId: grant.id, sessionId: crypto.randomUUID(),
-          capabilities: new Set(roleCapabilities.teacher),
+          grantSiteId: site.id,
+          capabilities: new Set(roleCapabilities.teacher ?? []),
           scope: {
             organizationIds: [org.id], siteIds: [site.id], programIds: [program.id],
           },
