@@ -53,7 +53,8 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
   (filter==="todo"&&(!item.status||item.status==="assigned"||item.status==="returned"))||
   (filter==="missing"&&item.timeliness==="missing")||
   (filter==="submitted"&&item.status==="submitted")||
-  (filter==="feedback"&&["graded","returned"].includes(item.status??""))));
+  (filter==="feedback"&&(["graded","returned"].includes(item.status??"") ||
+    Boolean(item.revisionFeedbackText)))));
  const [selection]=useState(()=>assessment??items[0]?.assessmentId);
  const chosen=items.find(item=>item.assessmentId===selection);
  const selected=chosen?.assessmentId??null;
@@ -170,8 +171,14 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
        {criterion.description&&<p className="mt-1 text-muted-foreground">{criterion.description}</p>}
       </li>)}</ul>
      </details>}
-     {chosen.feedbackText&&<div className="mt-4 rounded-lg bg-muted p-4"><p className="font-semibold text-sm">Teacher feedback</p><p className="mt-2 text-sm">{chosen.feedbackText}</p></div>}
+     {chosen.feedbackText&&<div className="mt-4 rounded-lg bg-muted p-4"><p className="font-semibold text-sm">Teacher feedback</p><p className="mt-2 whitespace-pre-wrap text-sm">{chosen.feedbackText}</p></div>}
+     {chosen.revisionFeedbackText&&<div className="mt-4 rounded-lg border p-4" role="status">
+      <p className="font-semibold text-sm">Previous teacher feedback — guidance for your revision</p>
+      <p className="mt-2 whitespace-pre-wrap text-sm">{chosen.revisionFeedbackText}</p>
+     </div>}
      {chosen.submissionId&&["graded","returned"].includes(chosen.status??"")&&<SubmissionAnnotations key={chosen.submissionId} submissionId={chosen.submissionId}/>}
+     {chosen.revisionFeedbackSubmissionId&&<SubmissionAnnotations
+       key={chosen.revisionFeedbackSubmissionId} submissionId={chosen.revisionFeedbackSubmissionId}/>}
      <AssignmentConversation key={`conversation-${chosen.assessmentId}`} assessmentId={chosen.assessmentId}/>
      {chosen.attempts.length>1&&<div className="mt-4 rounded-lg border p-3"><h3 className="font-semibold text-sm">Submission history</h3>{chosen.attempts.map(attempt=><p key={attempt.attempt} className="mt-1 text-xs">Attempt {attempt.attempt} · {attempt.status}{attempt.score!==null?" · "+attempt.score+" points":""}</p>)}</div>}
      {attachments.length>0&&<div className="mt-4 rounded-lg border p-3"><p className="font-semibold text-sm">Attached files</p>{attachments.map(file=><button type="button" key={file.documentId}
