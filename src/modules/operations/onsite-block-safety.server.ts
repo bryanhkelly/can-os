@@ -1,7 +1,9 @@
 import { desc, eq, inArray } from "drizzle-orm";
+import { AuthorizationError } from "@/domain/command-context";
+import { qualificationClaims, qualificationDefinitions } from "@/db/schema";
 import { db } from "@/db/client";
 import {
-  documents, qualificationClaims, qualificationDefinitions,
+  documents,
   qualificationVerificationEvents,
 } from "@/db/schema";
 import { coversLocalSupervisionBlock } from "@/domain/onsite-supervision-coverage";
@@ -101,4 +103,31 @@ export function verifiedAdultCoversBlock(
     screening:covers(evidence?.screening),
     training:covers(evidence?.training),
   };
+}
+
+/**
+ * Affirmative onsite-duty commands recheck under a share lock on the claim
+ * parent rows. Qualification review takes FOR UPDATE on the same rows before
+ * recording a new verification decision, so a concurrent revoke cannot be
+ * skipped between the staff check and commitment of the accepted duty.
+ */
+export async function requireCurrentOnsiteAdultSafety(
+  tx: Pick<typeof db, "select"|"selectDistinctOn">,
+  input:{personId:string;date:string;timeZone:string;
+    startsAtLocal:string|null;endsAtLocal:string|null},
+) {
+  const rows=await tx.select({id:qualificationClaims.id})
+    .from(qualificationClaims)
+    .innerJoin(qualificationDefinitions,
+      eq(qualificationClaims.definitionId,qualificationDefinitions.id))
+    .where(inArray(qualificationClaims.personId,[input.personId]))
+    .for("share");
+  // Neither an absent claim nor a claim with a stale verification can satisfy
+  // this gate. Locking does not imply a credential is actually valid.
+  if(!rows.length)
+    throw new AuthorizationError("independently verified onsite staff screening and training");
+  const evidence=(await verifiedAdultSafetyEvidence(tx,[input.personId])).get(input.personId);
+  const coverage=verifiedAdultCoversBlock(evidence,input);
+  if(!coverage.screening || !coverage.training)
+    throw new AuthorizationError("current verified screening and safeguarding training for entire assigned block");
 }
