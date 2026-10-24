@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -17,6 +18,7 @@ import { readRubric } from "./rubric";
 export const getGuardianAssignments = createServerFn({ method: "GET" })
  .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1) }).parse(value))
  .handler(async ({ data }) => {
+  setResponseHeader("Cache-Control","private, no-store");
   const context = await getCommandContext(getRequest());
   assertCapability(context, "student:related-read");
   if (context.role !== "guardian" || !context.actorPersonId || !context.scope.siteIds?.length) {
@@ -37,13 +39,27 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
   const [profile] = await db.select({ id: s.studentProfiles.id })
    .from(s.studentProfiles).where(eq(s.studentProfiles.personId, data.studentPersonId)).limit(1);
   if (!profile) throw new AuthorizationError("student profile");
+  // A stale Section enrollment after withdrawal cannot authorize the
+  // child's grades. The independent Program enrollment, Section and Term
+  // must agree on student, Program, and school year.
+  const programMembership=alias(s.enrollments,"guardian_academic_program_enrollment");
   const active = await db.select({ sectionId: s.enrollments.sectionId })
    .from(s.enrollments)
    .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+   .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+   .innerJoin(programMembership,and(
+    eq(programMembership.studentProfileId,s.enrollments.studentProfileId),
+    eq(programMembership.programId,s.sections.programId),
+    eq(programMembership.schoolYearId,s.terms.schoolYearId),
+    eq(programMembership.kind,"program"),eq(programMembership.status,"active"),
+   ))
    .where(and(
     eq(s.enrollments.studentProfileId, profile.id),
     eq(s.enrollments.kind, "section"),
     eq(s.enrollments.status, "active"),
+    eq(s.enrollments.programId,s.sections.programId),
+    eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+    eq(s.sections.active,true),
     inArray(s.sections.siteId, context.scope.siteIds),
     inArray(s.sections.programId, context.scope.programIds??[]),
    ));
@@ -100,6 +116,7 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
 
 /** Child picker is derived from guardian relationships, never account-supplied IDs. */
 export const getGuardianStudents = createServerFn({ method: "GET" }).handler(async () => {
+ setResponseHeader("Cache-Control","private, no-store");
  const context = await getCommandContext(getRequest());
  assertCapability(context, "student:related-read");
  if (context.role !== "guardian" || !context.actorPersonId || !context.scope.siteIds?.length)
@@ -119,7 +136,9 @@ export const getGuardianStudents = createServerFn({ method: "GET" }).handler(asy
     guardianPersonId: context.actorPersonId,
     access: "academic",
    }),
-   inArray(s.enrollments.kind, ["program", "school_year", "section"]),
+   // The child picker can include a newly enrolled student before a Section
+   // is placed, but never use a Section-only orphan as proof of school access.
+   eq(s.enrollments.kind, "program"),
    eq(s.enrollments.status, "active"),
    inArray(s.programs.siteId, context.scope.siteIds),
    inArray(s.programs.id, context.scope.programIds??[]),
