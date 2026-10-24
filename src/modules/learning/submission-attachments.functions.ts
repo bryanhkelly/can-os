@@ -99,10 +99,15 @@ type DbSchema = typeof import("@/db/schema");
 type Tx = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
 /** Published synthetic assessment at a scoped site where the student is actively enrolled. */
-async function requireEnrolledAssessment(tx: Tx, s: DbSchema, assessmentId: string, studentId: string, actor: Actor) {
+async function requireEnrolledAssessment(
+  tx: Tx, s: DbSchema, assessmentId: string, studentId: string, actor: Actor,
+  allowClosedForRead=false,
+) {
   const [assessment] = await tx.select({ id: s.assessments.id, sectionId: s.assessments.sectionId, metadata: s.assessments.metadata })
     .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
-    .where(and(eq(s.assessments.id, assessmentId), eq(s.assessments.status, "published"),
+    .where(and(eq(s.assessments.id, assessmentId),
+      allowClosedForRead?inArray(s.assessments.status,["published","closed"])
+        :eq(s.assessments.status,"published"),
       inArray(s.sections.siteId,actor.scope.siteIds??[]),
       inArray(s.sections.programId,actor.scope.programIds??[]))).limit(1);
   if (!assessment) throw new AuthorizationError("published assessment in authorized school and program");
@@ -426,7 +431,7 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
   const assessment=await requireEnrolledAssessment(tx,s,data.assessmentId,studentId,
-    context as Actor);
+    context as Actor,true);
   const [latest]=await tx.select({response:s.submissions.response})
    .from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),
     eq(s.submissions.studentProfileId,studentId)))
