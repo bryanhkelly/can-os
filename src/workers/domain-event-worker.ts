@@ -50,6 +50,8 @@ for (const eventType of [
   EventTypes.EnrollmentActivated,
   EventTypes.ProgramLaunchStarted,
   EventTypes.ProgramActivated,
+  EventTypes.CANAcademicProgramStaffDelegated,
+  EventTypes.CANAcademicProgramStaffRevoked,
   EventTypes.SectionCreditConfigured,
   EventTypes.ActionDeadlineChanged,
   EventTypes.SiteCreated,
