@@ -316,6 +316,8 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
           verifiedSafeguardingScreening:safety.screening,
           verifiedSafeguardingTraining:safety.training,
           roomLabel:roomMatches?approvedRoom!.roomLabel:null,
+          roomEvidenceVersion:roomMatches ? [approvedRoom!.id,
+            approvedRoom!.verifiedAt.toISOString(),approvedRoom!.expiresAt.toISOString()].join(":") : null,
           roomPlanVerified:roomMatches,
           roomCapacityAdequate:roomMatches &&
             (rosterBySection.get(section.id)??0)<=approvedRoom!.roomCapacity,
@@ -340,6 +342,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     // Person IDs are needed for overlap detection, not for the client.
     const blocks=projection.blocks.map(({
       facilitatorPersonId:assignedPersonId,backupPersonId:_backupPersonId,
+      roomEvidenceVersion:_roomEvidenceVersion,
       delegationVersion,agreementVersion,...block
     })=>({
       ...block,
@@ -351,7 +354,8 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         block.verifiedSectionDelegation,block.authorizedSupervisionService,
         block.verifiedSafeguardingScreening,block.verifiedSafeguardingTraining,
         block.roomPlanVerified,block.roomLabel,block.roomCapacityAdequate,
-        block.namedBackupVerified,_backupPersonId,delegationVersion,agreementVersion,block.assignedPlan,
+        block.namedBackupVerified,_backupPersonId,_roomEvidenceVersion,
+        delegationVersion,agreementVersion,block.assignedPlan,
       ])).digest("hex"),
       // Presence is a separate witnessed workflow. Both named adults can
       // check in only against a fully evaluated current plan. This field
