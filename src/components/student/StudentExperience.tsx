@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { FIRST_PUBLISHED_LESSON_ROUTE } from "@/domain/first-class-lesson";
 import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import type { StudentSuccessPriorities } from "@/domain/student-success";
 import { StudentSuccessPriorityPanel } from "./StudentSuccessPriorityPanel";
@@ -23,7 +24,17 @@ export function StudentExperience({ liveData, success, support }: {
  const format=(date:Date|string)=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short"}).format(new Date(date));
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title={`Today, ${displayName}`}
   subtitle="Your schedule, coursework and next steps, all from your school records."
-  actions={<Link to="/student/courses" className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">Open my classes</Link>}>
+  actions={liveData.sections[0]
+    ? <Link to="/classes" search={{
+        section:liveData.sections[0].sectionId,tab:"lessons",
+        lesson:FIRST_PUBLISHED_LESSON_ROUTE,
+      }} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
+        Start my first lesson →
+      </Link>
+    : <Link to="/student/courses"
+        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
+        View my classes
+      </Link>}>
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
    <Link to="/student/courses" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">Classes</p><p className="mt-2 text-3xl font-semibold">{liveData.sections.length}</p></Link>
    <Link to="/student/assignments" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"To do / due soon":"Upcoming assignments"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":upcomingCount}</p></Link>
