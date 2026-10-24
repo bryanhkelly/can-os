@@ -154,13 +154,16 @@ async function requireVerifiedChurchSiteDirector(
  */
 export async function requireCurrentChurchSchoolOpening(
   tx:Reader,programId:string,now=new Date(),
+  options:{allowPendingActivation?:boolean}={},
 ) {
   const school=await schoolIdentity(tx,programId);
   const configuration=await latestConfiguration(tx,programId);
   if(configuration.status!=="approved" ||
     !configuration.approvedAt || !configuration.approvedByPersonId ||
     !configuration.effectiveFrom || configuration.effectiveFrom>now ||
-    configuration.approvedAt>now || school.programStatus!=="active")
+    configuration.approvedAt>now ||
+    (school.programStatus!=="active" &&
+     !(options.allowPendingActivation && school.programStatus==="launching")))
     throw new AuthorizationError("currently approved church school configuration");
   await requireChurchHostedOperatingServices(tx,programId,[
     "school_of_record","academic_instruction","onsite_supervision",
