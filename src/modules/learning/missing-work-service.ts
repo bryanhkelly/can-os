@@ -41,7 +41,13 @@ export async function publishAssessment(
 
     if (!assessment) throw new Error("Assessment not found");
 
-    assertSectionScope(context, assessment.sectionId);
+    if ("role" in context && context.role === "teacher") {
+      const { authorizeClass } = await import("./class-access.server");
+      await authorizeClass(context as import("@/modules/identity/actors.server").Actor,
+        assessment.sectionId,undefined,tx);
+    } else {
+      assertSectionScope(context, assessment.sectionId);
+    }
 
     if (assessment.status === "published") return;
 
@@ -202,7 +208,13 @@ export async function submitAssessment(
 
     if (!current) throw new Error("Submission not found");
 
-    assertSectionScope(context, current.sectionId);
+    if ("role" in context && context.role === "student") {
+      const { authorizeClass } = await import("./class-access.server");
+      await authorizeClass(context as import("@/modules/identity/actors.server").Actor,
+        current.sectionId,undefined,tx);
+    } else {
+      assertSectionScope(context,current.sectionId);
+    }
     if (!context.actorPersonId || current.studentPersonId !== context.actorPersonId) {
       throw new Error("Submission actor must be the enrolled student");
     }
