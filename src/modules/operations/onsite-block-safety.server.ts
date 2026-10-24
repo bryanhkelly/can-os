@@ -46,6 +46,7 @@ export async function verifiedAdultSafetyEvidence(
     reviewedBy:qualificationVerificationEvents.actorPersonId,
     reviewedAt:qualificationVerificationEvents.occurredAt,
     evidenceId:qualificationVerificationEvents.evidenceDocumentId,
+    docCategory:documents.category,
     docSubjectType:documents.subjectType,
     docSubjectId:documents.subjectId,
     docVerifiedAt:documents.verifiedAt,
@@ -59,7 +60,10 @@ export async function verifiedAdultSafetyEvidence(
     .orderBy(qualificationClaims.id,desc(qualificationVerificationEvents.sequence));
   for(const row of claims){
     if(row.key!==ONSITE_SCREENING && row.key!==ONSITE_TRAINING)continue;
-    if(row.decision!=="approve" || !row.evidenceId || !row.reviewedBy ||
+    const expectedDocumentCategory=row.key===ONSITE_SCREENING
+      ? "onsite_screening_evidence" : "onsite_training_evidence";
+    if(row.decision!=="approve" || row.docCategory!==expectedDocumentCategory ||
+       !row.evidenceId || !row.reviewedBy ||
        row.reviewedBy===row.personId || !row.reviewedAt ||
        row.docSubjectType!=="person" || row.docSubjectId!==row.personId ||
        !row.docVerifiedAt || !row.docVerifiedBy ||
