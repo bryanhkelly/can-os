@@ -70,9 +70,11 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   // When a revision draft becomes attempt N+1, the grade/feedback on
   // returned attempt N must stay available while the student rewrites.
   // Never copy the old score into a new ungraded attempt.
-  const returned=history.filter(item=>item.status==="returned" &&
-    (item.attemptNumber??0)<(row.attemptNumber??0))
-    .sort((a,b)=>(b.attemptNumber??0)-(a.attemptNumber??0))[0];
+  const returned=(row.status==="assigned"||row.status==="submitted")
+   ?history.filter(item=>item.status==="returned" &&
+     (item.attemptNumber??0)<(row.attemptNumber??0))
+      .sort((a,b)=>(b.attemptNumber??0)-(a.attemptNumber??0))[0]
+   :undefined;
   return {...row,
   revisionFeedbackText:typeof returned?.feedback?.comment==="string"?returned.feedback.comment:"",
   revisionFeedbackSubmissionId:returned?.submissionId??null,
