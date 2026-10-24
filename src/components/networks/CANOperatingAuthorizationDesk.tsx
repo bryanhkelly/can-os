@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { CANAcademicStaffDelegationPanel } from "./CANAcademicStaffDelegationPanel";
 import {
   listCANOperatingAuthorizationDeskFn, reviewProgramSiteAuthorizationFn,
   revokeProgramSiteAuthorizationFn,
@@ -9,6 +10,7 @@ export function CANOperatingAuthorizationDesk() {
   const [desk,setDesk]=useState<Desk|null>(null);
   const [inputs,setInputs]=useState<Record<string,{evidence:string;from:string;through:string;reason:string}>>({});
   const [busy,setBusy]=useState(false);
+  const [staffProgramId,setStaffProgramId]=useState("");
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   const load=useCallback(async()=>{setDesk(await listCANOperatingAuthorizationDeskFn());},[]);
@@ -81,5 +83,26 @@ export function CANOperatingAuthorizationDesk() {
           </div>}
         </article>;
       })}</div>}
+    {desk&&<div className="mt-6 border-t pt-5">
+      <h3 className="font-serif text-xl">Delegate CAN academic staff to one church Program</h3>
+      <p className="mt-2 text-xs text-muted-foreground">
+        A signed school-services agreement is not a login grant. Select an
+        approved Program to authorize an already verified CAN teacher or
+        academic registrar. Staff remain CAN employees and gain only the named
+        Program and their specifically assigned classes.
+      </p>
+      <label className="mt-3 block text-sm">Church school
+        <select className="mt-1 w-full rounded border bg-background p-2"
+          value={staffProgramId} onChange={e=>setStaffProgramId(e.target.value)}>
+          <option value="">Choose approved CAN–church Program…</option>
+          {desk.authorizations.filter(item=>item.status==="approved")
+            .map(item=><option key={item.id} value={item.programId}>
+              {item.programName} · {item.hostName}
+            </option>)}
+        </select>
+      </label>
+      {staffProgramId&&<CANAcademicStaffDelegationPanel key={staffProgramId}
+        programId={staffProgramId}/>}
+    </div>}
   </section>;
 }
