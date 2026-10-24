@@ -57,6 +57,8 @@ integration("cross-persona admissions through active classes",()=>{
   const {startFamilyApplication}=await import("@/modules/enrollment/enrollment-service");
   const offers=await import("@/modules/enrollment/admissions-offer.functions");
   const {getGuardianAdmissionOffers}=await import("@/modules/enrollment/guardian-admission-offers.functions");
+  const {getGuardianAssignments,getGuardianStudents}=await import("@/modules/learning/guardian-academic-queries.functions");
+  const {getGuardianGradeResponse}=await import("@/modules/learning/guardian-grade-response.functions");
   const {setFamilyRequirement,reviewRequirementDocument,addRequirementReviewNote}=await import("@/modules/enrollment/family-readiness.functions");
   const {getGuardianEnrollmentChecklist}=await import("@/modules/enrollment/guardian-enrollment-checklist.functions");
   const documentFlow=await import("@/modules/enrollment/r2-document-upload.functions");
@@ -759,6 +761,20 @@ integration("cross-persona admissions through active classes",()=>{
     expect(drafting.revisionFeedbackText).toContain("Explain your comparison");
     expect(drafting.revisionFeedbackSubmissionId).toBe(response.submissionId);
     expect(drafting.score).toBeNull();
+    state.actor=family;
+    expect((await getGuardianStudents()).students.map(row=>row.studentPersonId))
+      .toContain(student.personId);
+    const guardianDraft=first((await getGuardianAssignments({data:{
+      studentPersonId:student.personId,
+    }})).assignments.filter(row=>row.assessmentId===firstAssignment.assessmentId));
+    expect(guardianDraft.status).toBe("assigned");
+    expect(guardianDraft.score).toBeNull();
+    expect(guardianDraft.feedback).toBe("");
+    expect(guardianDraft.revisionFeedback).toContain("Explain your comparison");
+    expect(guardianDraft.revisionFeedbackSubmissionId).toBe(response.submissionId);
+    // Guardian sees already released feedback, NEVER the private saved draft.
+    expect("responseText" in guardianDraft).toBe(false);
+    state.actor=verifiedStudent as Actor;
     const revision=await saveAssignmentResponse({data:{
       assessmentId:firstAssignment.assessmentId,
       text:"This revision compares the two expressions by simplifying both sides.",
@@ -784,6 +800,17 @@ integration("cross-persona admissions through active classes",()=>{
     expect(revised.revisionFeedbackSubmissionId).toBeNull();
     expect(revised.attempts.map(a=>a.attempt).sort()).toEqual([1,2]);
     expect(revised.attempts.some(a=>a.attempt===1&&a.status==="returned")).toBe(true);
+    state.actor=family;
+    const guardianGrade=first((await getGuardianAssignments({data:{
+      studentPersonId:student.personId,
+    }})).assignments.filter(row=>row.assessmentId===firstAssignment.assessmentId));
+    expect(guardianGrade.status).toBe("graded");
+    expect(Number(guardianGrade.score)).toBe(10);
+    expect(guardianGrade.feedback).toContain("Excellent revision");
+    expect(guardianGrade.revisionFeedback).toBe("");
+    expect((await getGuardianGradeResponse({data:{
+      submissionId:revision.submissionId,
+    }})).response).toBeNull();
     state.actor=learner;
     // A withdrawn Program must remove learning access even when a stale
     // active Section enrollment was left behind. Restore fixture state after
@@ -795,6 +822,16 @@ integration("cross-persona admissions through active classes",()=>{
     if(!activeProgram)throw new Error("Expected current Program enrollment");
     await tx.update(s.enrollments).set({status:"withdrawn"})
       .where(eq(s.enrollments.id,activeProgram.id));
+    state.actor=family;
+    expect((await getGuardianStudents()).students.map(row=>row.studentPersonId))
+      .not.toContain(student.personId);
+    expect((await getGuardianAssignments({data:{
+      studentPersonId:student.personId,
+    }})).assignments).toEqual([]);
+    await expect(getGuardianGradeResponse({data:{
+      submissionId:revision.submissionId,
+    }})).rejects.toThrow("related graded assignment");
+    state.actor=learner;
     await expect(authorizeClass(learner,section.id)).rejects.toThrow("active class enrollment");
     expect((await accessibleClasses(learner)).map(row=>row.id)).not.toContain(section.id);
     await expect(getMyStudentToday()).rejects.toThrow("active student membership");
