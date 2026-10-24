@@ -31,7 +31,8 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
  if(!account || email.endsWith(".invalid"))return genericResult;
  const memberships=await db.select({role:accountPersonGrants.role}).from(accountPersonGrants)
   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
-  .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),eq(people.active,true)));
+  .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
+   eq(accountPersonGrants.isSynthetic,false),eq(people.active,true)));
  if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role)))return genericResult;
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
@@ -77,7 +78,8 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   if(!account)throw new Error("Account unavailable");
   const grants=await tx.select({id:accountPersonGrants.id,role:accountPersonGrants.role}).from(accountPersonGrants)
    .innerJoin(people,eq(people.id,accountPersonGrants.personId))
-   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),eq(people.active,true)));
+   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
+    eq(accountPersonGrants.isSynthetic,false),eq(people.active,true)));
   const activeGrant=grants.find(g=>Object.hasOwn(roleCapabilities,g.role));
   if(!activeGrant)throw new Error("No supported CAN OS membership");
   const secret=issueOpaqueSecret();
