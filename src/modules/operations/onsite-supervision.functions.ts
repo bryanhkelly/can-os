@@ -135,6 +135,29 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
       row.sectionId,Number(row.students),
     ]));
     const matchingPlan=new Map<string,VerifiedRoomPlan>();
+    // A reviewed physical plan requires an active, independently verified
+    // CAN institutional reviewer, not merely a non-null verifiedAt column.
+    const reviewerIds=[...new Set(roomEvidence.rows.map(row=>row.verifiedByPersonId)
+      .filter((id):id is string=>!!id))];
+    const canProviderIds=[...new Set(onsiteSections.map(row=>row.academicProviderOrganizationId))];
+    const approvedReviewers=reviewerIds.length && canProviderIds.length
+      ? await db.select({
+          personId:accountPersonGrants.personId,
+          organizationId:accountPersonGrants.organizationId,
+        }).from(accountPersonGrants)
+        .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+        .innerJoin(people,eq(people.id,accountPersonGrants.personId))
+        .where(and(
+          inArray(accountPersonGrants.personId,reviewerIds),
+          inArray(accountPersonGrants.organizationId,canProviderIds),
+          eq(accountPersonGrants.role,"can_network_steward"),
+          isNull(accountPersonGrants.siteId),
+          eq(accountPersonGrants.active,true),
+          eq(accountPersonGrants.isSynthetic,false),
+          eq(accessAccounts.disabled,false),eq(people.active,true),
+          sql`${accessAccounts.emailVerifiedAt} is not null`,
+        )) : [];
+    const reviewers=new Set(approvedReviewers.map(r=>r.organizationId+":"+r.personId));
     if(!roomEvidence.truncated){
       const bySection=new Map(onsiteSections.map(section=>[section.id,section]));
       // Newest independent review wins: never fall back to a superseded plan.
@@ -157,7 +180,9 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
           timeZone:site.timezone,
           startsAtLocal:period.starts,endsAtLocal:period.ends,
         });
-        if(parsed)matchingPlan.set(key,parsed);
+        if(parsed && doc.verifiedByPersonId && reviewers.has(
+          section.academicProviderOrganizationId+":"+doc.verifiedByPersonId))
+          matchingPlan.set(key,parsed);
       }
     }
     const candidates=arrangements.filter(row=>["onsite","hybrid"].includes(row.modality));
