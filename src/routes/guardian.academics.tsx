@@ -92,10 +92,15 @@ function GuardianAcademicsPage() {
      <p className="mt-3 text-sm text-muted-foreground">Due: {item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "Not set"}</p>
      {item.score !== null && <p className="mt-2 text-sm font-semibold">Grade: {item.score} / {item.pointsPossible}</p>}
      {item.feedback && <p className="mt-3 rounded-lg bg-muted p-3 text-sm">Teacher feedback: {item.feedback}</p>}
+     {item.revisionFeedback && <p className="mt-3 rounded-lg border p-3 text-sm">
+      Previously released teacher feedback for this revision: {item.revisionFeedback}
+     </p>}
      {assessment&&<>
       <div className="mt-5 whitespace-pre-wrap text-sm leading-7"><h3 className="font-semibold">Assignment instructions</h3><p className="mt-2">{item.instructions||"No additional instructions provided."}</p></div>
       {item.rubric?.length>0&&<WorkspacePanel title="Rubric" className="mt-5"><ul className="space-y-3">{item.rubric.map(criterion=><li key={criterion.id} className="text-sm"><p className="font-semibold">{criterion.label} · {criterion.maxPoints} points</p><p>{criterion.description}</p></li>)}</ul></WorkspacePanel>}
       {item.submissionId&&["graded","returned"].includes(item.status)&&<SubmissionAnnotations key={item.submissionId} submissionId={item.submissionId}/>}
+      {item.revisionFeedbackSubmissionId&&<SubmissionAnnotations key={item.revisionFeedbackSubmissionId}
+       submissionId={item.revisionFeedbackSubmissionId}/>}
       <AssignmentConversation key={`${selected}:${item.assessmentId}`} assessmentId={item.assessmentId} studentPersonId={selected}/>
       {item.submissionId && item.status === "graded" && <GuardianGradeResponse key={item.submissionId} submissionId={item.submissionId}/>} 
      </>}
