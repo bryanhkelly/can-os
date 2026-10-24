@@ -120,13 +120,16 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
       sectionId: assessments.sectionId,
       submittedAt: submissions.submittedAt,
     })
-    .from(submissions)
-    .innerJoin(assessments, eq(submissions.assessmentId, assessments.id))
-    .where(and(
+    .from(assessments)
+    .leftJoin(submissions, and(
+      eq(submissions.assessmentId, assessments.id),
       eq(submissions.studentProfileId, studentProfileId),
+    ))
+    .where(and(
       inArray(assessments.sectionId, sectionIds),
       eq(assessments.status, "published"),
       or(
+        isNull(submissions.id), // newly published work has no attempt yet
         eq(submissions.timeliness, "missing"),
         gte(assessments.dueAt, startOfDay),
         gte(submissions.gradedAt, startOfDay),
@@ -139,7 +142,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
   const latestCoursework = new Map<string, (typeof coursework)[number]>();
   for (const row of coursework) {
     const previous = latestCoursework.get(row.assessmentId);
-    if (!previous || row.attemptNumber > previous.attemptNumber) {
+    if (!previous || (row.attemptNumber ?? 0) > (previous.attemptNumber ?? 0)) {
       latestCoursework.set(row.assessmentId, row);
     }
   }
