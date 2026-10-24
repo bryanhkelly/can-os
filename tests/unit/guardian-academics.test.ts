@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guardianFeedbackReleased, latestGuardianAttempts, guardianAssignmentSummary } from "@/domain/guardian-academics";
+import { guardianFeedbackReleased, latestGuardianAttempts, guardianAssignmentSummary, priorReturnedGuardianFeedback } from "@/domain/guardian-academics";
 
 describe("guardian assignment release policy", () => {
  it("never exposes grades for drafts or submitted work", () => {
@@ -28,6 +28,21 @@ describe("guardian assignment release policy", () => {
    {status:"graded",dueAt:null,score:"92"},
   ],now);
   expect(summary).toEqual({needsAction:2,overdue:2,releasedGrades:2});
+ });
+ it("keeps released prior feedback visible during a revision but never reuses its score",()=>{
+  const history=[
+   {assessmentId:"class-a",attemptNumber:1,submissionStatus:"returned",score:"8",feedback:"Explain reasoning"},
+   {assessmentId:"class-a",attemptNumber:2,submissionStatus:"assigned",score:null,feedback:null},
+   {assessmentId:"class-b",attemptNumber:1,submissionStatus:"returned",score:"7",feedback:"Other class"},
+  ];
+  expect(priorReturnedGuardianFeedback(history,history[1]!)?.feedback).toBe("Explain reasoning");
+  expect(guardianFeedbackReleased(history[1]!.submissionStatus)).toBe(false);
+  expect(priorReturnedGuardianFeedback(history,history[0]!)).toBeUndefined();
+  expect(priorReturnedGuardianFeedback(history,history[2]!)).toBeUndefined();
+  expect(priorReturnedGuardianFeedback([
+   {assessmentId:"class-a",attemptNumber:1,submissionStatus:"submitted"},
+   {assessmentId:"class-a",attemptNumber:2,submissionStatus:"assigned"},
+  ],{assessmentId:"class-a",attemptNumber:2,submissionStatus:"assigned"})).toBeUndefined();
  });
  it("handles assignments with no submissions", () => {
   expect(latestGuardianAttempts([{assessmentId:"a",attemptNumber:null}])).toHaveLength(1);
