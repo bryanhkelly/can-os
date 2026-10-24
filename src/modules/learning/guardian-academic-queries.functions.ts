@@ -5,7 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
-import { guardianFeedbackReleased, latestGuardianAttempts } from "@/domain/guardian-academics";
+import { guardianFeedbackReleased, latestGuardianAttempts, priorReturnedGuardianFeedback } from "@/domain/guardian-academics";
 import { z } from "zod";
 import { readRubric } from "./rubric";
 
@@ -94,6 +94,7 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
    )).orderBy(desc(s.assessments.dueAt));
   return { assignments: latestGuardianAttempts(rows).map(row => {
    const released = guardianFeedbackReleased(row.submissionStatus);
+   const previous=priorReturnedGuardianFeedback(rows,row);
    return {
     assessmentId: row.assessmentId,
     sectionId: row.sectionId,
@@ -110,6 +111,11 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
     score: released ? row.score : null,
     pointsPossible: row.pointsPossible,
     feedback: released && typeof row.feedback?.comment === "string" ? row.feedback.comment : "",
+    // A revision's latest ungraded attempt has no current score. The
+    // guardian may continue seeing teacher feedback already released on the
+    // returned predecessor, not the new private response text or draft.
+    revisionFeedback:previous&&typeof previous.feedback?.comment==="string"?previous.feedback.comment:"",
+    revisionFeedbackSubmissionId:previous?.submissionId??null,
    };
   }) };
  });
