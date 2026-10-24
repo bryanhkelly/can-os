@@ -3,9 +3,13 @@ import { getOnsiteSupervisionPlan } from "@/modules/operations/onsite-supervisio
 import {
   getOnsiteDutyResponses, respondToOnsiteDuty,
 } from "@/modules/operations/onsite-duty-response.functions";
+import {
+  getOnsitePhysicalPresence,reportOnsitePhysicalPresence,witnessOnsiteBlockPresence,
+} from "@/modules/operations/onsite-physical-presence.functions";
 
 type Plan = Awaited<ReturnType<typeof getOnsiteSupervisionPlan>>;
 type Responses = Awaited<ReturnType<typeof getOnsiteDutyResponses>>;
+type Presence = Awaited<ReturnType<typeof getOnsitePhysicalPresence>>;
 
 const labels: Record<string,string> = {
   schedule_missing:"Instructional block has no valid scheduled time",
@@ -29,22 +33,25 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [responses,setResponses]=useState<Responses|null>(null);
+  const [presence,setPresence]=useState<Presence|null>(null);
+  const [presenceBusy,setPresenceBusy]=useState("");
   const [dutyBusy,setDutyBusy]=useState("");
   const [dutyMessage,setDutyMessage]=useState("");
   const [nonce,setNonce]=useState(0);
   useEffect(()=>{
     if (!date) return;
     let active=true;
-    setLoading(true);setPlan(null);setResponses(null);setError("");setDutyMessage("");
+    setLoading(true);setPlan(null);setResponses(null);setPresence(null);setError("");setDutyMessage("");
     void Promise.all([
       getOnsiteSupervisionPlan({data:{date}}),
       getOnsiteDutyResponses({data:{date}}),
-    ]).then(([result,duties])=>{
+      getOnsitePhysicalPresence({data:{date}}),
+    ]).then(([result,duties,onsite])=>{
       if (!active) return;
-      setPlan(result);setResponses(duties);setError("");setLoading(false);
+      setPlan(result);setResponses(duties);setPresence(onsite);setError("");setLoading(false);
     }).catch(()=>{
       if (!active) return;
-      setPlan(null);setResponses(null);setLoading(false);
+      setPlan(null);setResponses(null);setPresence(null);setLoading(false);
       setError("Staffing coverage or duty responses are unavailable. No confirmed coverage is assumed.");
     });
     return ()=>{active=false};
@@ -67,6 +74,23 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
       setError("Duty response could not be saved. Refresh your assignment and contact the site leader.");
     }finally{setDutyBusy("")}
   }
+  async function recordPresence(sectionId:string,periodId:string,action:"report"|"witness"){
+    if(presenceBusy)return;
+    setPresenceBusy(sectionId+":"+periodId);setError("");setDutyMessage("");
+    try{
+      if(action==="report")await reportOnsitePhysicalPresence({data:{
+        date,sectionId,periodId,physicallyPresent:true,
+      }});
+      else await witnessOnsiteBlockPresence({data:{
+        date,sectionId,periodId,witnessedBothAdults:true,
+      }});
+      setPresence(await getOnsitePhysicalPresence({data:{date}}));
+      setDutyMessage(action==="report"
+        ?"Your physical arrival was recorded. The Site director must independently witness both adults."
+        :"Independent Site director witness recorded. This does not confirm student custody or ongoing coverage.");
+    }catch(e){setError(e instanceof Error?e.message:"Unable to record physical presence");}
+    finally{setPresenceBusy("");}
+  }
   return <section className="mt-10" aria-label="Planned onsite supervision">
     <h2 className="font-serif text-2xl">Instructional supervision plan</h2>
     <p className="mt-2 text-sm text-muted-foreground">
@@ -87,6 +111,12 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
         {" "}{responses.coverageExceptions} staffing exceptions.
         A response is not verified physical presence or a completed handoff.
       </p>}
+      {presence&&<p className="mt-2 text-sm">
+        Independently witnessed primary + backup blocks: {
+          presence.blocks.filter(row=>row.witnessedBothAdults).length
+        } of {presence.blocks.length}. Planning and human witness evidence
+        are separate from student custody and full-day supervision.
+      </p>}
       {plan.projectionTruncated&&<p role="alert" className="mt-3 rounded border p-3 text-sm">
         Coverage listing was capped. These counts are incomplete; do not use this plan to certify site staffing.
       </p>}
@@ -105,6 +135,8 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
       <ul className="mt-4 grid gap-3">
         {plan.blocks.slice(0,60).map((block,index)=>{
           const duty=responses?.statuses.find(row=>row.sectionId===block.sectionId&&
+            row.periodId===block.periodId);
+          const onsite=presence?.blocks.find(row=>row.sectionId===block.sectionId &&
             row.periodId===block.periodId);
           return <li
           key={block.sectionId+":"+(block.periodId??"missing")+":"+index}
@@ -128,6 +160,28 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
           {block.gaps.length>0&&<ul className="mt-2 list-inside list-disc text-xs text-muted-foreground">
             {block.gaps.map(gap=><li key={gap}>{labels[gap]??gap}</li>)}
           </ul>}
+          {onsite&&<p className="mt-2 text-xs" role="status">
+            Institutionally authorized opening: {onsite.openingAuthorized?"Yes":"No"}.
+            {" "}Your arrival: {onsite.ownPresenceReported?"Reported":"Not reported"}.
+            {" "}Independent witness of both adults: {onsite.witnessedBothAdults?"Recorded":"Not recorded"}.
+          </p>}
+          {onsite&&block.periodId&&
+            (onsite.canReport&&!onsite.ownPresenceReported ||
+             onsite.canWitness&&!onsite.witnessedBothAdults)&&
+            <div className="mt-2 flex flex-wrap gap-2">
+              {onsite.canReport&&!onsite.ownPresenceReported&&<button type="button"
+                disabled={!!presenceBusy}
+                onClick={()=>void recordPresence(block.sectionId,block.periodId!,"report")}
+                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+                I am physically present in this room
+              </button>}
+              {onsite.canWitness&&!onsite.witnessedBothAdults&&<button type="button"
+                disabled={!!presenceBusy}
+                onClick={()=>void recordPresence(block.sectionId,block.periodId!,"witness")}
+                className="rounded border px-3 py-2 text-xs disabled:opacity-50">
+                I personally witnessed both named adults here
+              </button>}
+            </div>}
           {duty&&<p className="mt-2 text-xs font-semibold" role="status">
             Duty response: {duty.status==="accepted"?"Assigned adult reports availability":
               duty.status==="cannot_cover"?"Coverage gap reported":
