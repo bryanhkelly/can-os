@@ -65,8 +65,18 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
  .orderBy(desc(s.assessments.dueAt));
  const newest=new Map<string,(typeof rows)[number]>();
  for(const row of rows){const existing=newest.get(row.assessmentId);if(!existing||(row.attemptNumber??0)>(existing.attemptNumber??0))newest.set(row.assessmentId,row);}
- return {connected:true,assignments:[...newest.values()].map(row=>({...row,
-  attempts:rows.filter(item=>item.assessmentId===row.assessmentId).map(item=>({attempt:item.attemptNumber??1,status:item.status??"assigned",score:item.score,submittedAt:item.submittedAt?.toISOString()??null,feedback:typeof item.feedback?.comment==="string"?item.feedback.comment:""})),
+ return {connected:true,assignments:[...newest.values()].map(row=>{
+  const history=rows.filter(item=>item.assessmentId===row.assessmentId);
+  // When a revision draft becomes attempt N+1, the grade/feedback on
+  // returned attempt N must stay available while the student rewrites.
+  // Never copy the old score into a new ungraded attempt.
+  const returned=history.filter(item=>item.status==="returned" &&
+    (item.attemptNumber??0)<(row.attemptNumber??0))
+    .sort((a,b)=>(b.attemptNumber??0)-(a.attemptNumber??0))[0];
+  return {...row,
+  revisionFeedbackText:typeof returned?.feedback?.comment==="string"?returned.feedback.comment:"",
+  revisionFeedbackSubmissionId:returned?.submissionId??null,
+  attempts:history.map(item=>({attempt:item.attemptNumber??1,status:item.status??"assigned",score:item.score,submittedAt:item.submittedAt?.toISOString()??null,feedback:typeof item.feedback?.comment==="string"?item.feedback.comment:""})),
   dueAt:row.dueAt?.toISOString()??null,submittedAt:row.submittedAt?.toISOString()??null,
   gradedAt:row.gradedAt?.toISOString()??null,
   metadata:{rubric:typeof row.metadata.rubric==="string"?row.metadata.rubric:"",
@@ -78,7 +88,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   responseText:typeof row.response?.text==="string"?row.response.text:"",
   feedbackText:typeof row.feedback?.comment==="string"?row.feedback.comment:"",
   response:undefined,feedback:undefined,
- }))};
+ };})};
 });
 
 export const saveAssignmentResponse=createServerFn({method:"POST"})
