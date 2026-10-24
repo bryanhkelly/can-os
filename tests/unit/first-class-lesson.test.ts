@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { hasAccessibleFirstLesson,requireAccessibleFirstLesson } from "@/domain/first-class-lesson";
+import { hasAccessibleFirstLesson,isLearnerFacingInstruction,requireAccessibleFirstLesson,FIRST_PUBLISHED_LESSON_ROUTE } from "@/domain/first-class-lesson";
 
 const course=(lesson:Record<string,unknown>)=>({learning:{
  version:1,modules:[{id:"intro",title:"Introduction",lessons:[{
@@ -12,6 +12,15 @@ describe("first student accessible classroom lesson",()=>{
   expect(hasAccessibleFirstLesson({learning:{version:1,modules:[]}})).toBe(false);
   expect(hasAccessibleFirstLesson(course({}))).toBe(false);
   expect(()=>requireAccessibleFirstLesson(course({}))).toThrow("first");
+ });
+ it("resolves the route-only first-lesson shortcut to actual published instruction",()=>{
+  const lessons=[
+   {id:"shell",body:" ",resources:[]},
+   {id:"first-real",body:"Read and explore this topic.",resources:[]},
+  ];
+  expect(lessons.find(isLearnerFacingInstruction)?.id).toBe("first-real");
+  expect(isLearnerFacingInstruction(lessons[0]!)).toBe(false);
+  expect(FIRST_PUBLISHED_LESSON_ROUTE).not.toBe("first-real");
  });
  it("accepts an actual readable lesson or meaningful practice",()=>{
   expect(hasAccessibleFirstLesson(course({body:"Read and explain three causes."}))).toBe(true);
