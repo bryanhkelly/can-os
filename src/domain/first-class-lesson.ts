@@ -1,5 +1,11 @@
 import { readClassContent } from "./class-content";
 
+/** Route-only request to open the student's first eligible published lesson.
+ * Never treat it as a real curricular lesson ID or an access credential.
+ */
+export const FIRST_PUBLISHED_LESSON_ROUTE="__first_published_lesson__";
+
+
 /**
  * "Published" means a version is authorized for release, not that it offers
  * instruction. A class is ready to receive its first student only when the
