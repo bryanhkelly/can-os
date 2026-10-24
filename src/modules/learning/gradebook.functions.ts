@@ -508,14 +508,17 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    const [record]=await tx.select({
     id:s.submissions.id,status:s.submissions.status,
+    assessmentStatus:s.assessments.status,
     assessmentId:s.assessments.id,sectionId:s.sections.id,
     studentProfileId:s.submissions.studentProfileId,attemptNumber:s.submissions.attemptNumber,
     studentPersonId:s.studentProfiles.personId,
-    siteId:s.sections.siteId,programId:s.sections.programId
+    siteId:s.sections.siteId,programId:s.sections.programId,
+    schoolYearId:s.terms.schoolYearId,sectionActive:s.sections.active
    }).from(s.submissions)
     .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.submissions.studentProfileId))
     .innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
     .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+    .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
     .innerJoin(s.sectionTeachers,and(eq(s.sectionTeachers.sectionId,s.sections.id),
      eq(s.sectionTeachers.personId,context.actorPersonId!)))
     .where(eq(s.submissions.id,data.submissionId))
@@ -523,6 +526,27 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
    if(!record)throw new AuthorizationError("graded submission in assigned section");
    await authorizeClass(context as Actor,record.sectionId,undefined,tx);
    if(record.status!=="graded")throw new Error("Only graded work can be returned for revision");
+   // Returning work must grant the student a usable resubmission path.
+   // A closed assessment or withdrawn Program would otherwise leave the
+   // student notified to revise something they cannot submit.
+   if(record.assessmentStatus!=="published" || !record.sectionActive)
+    throw new Error("Reopen the published assessment and active class before returning work");
+   const activeProgramMembership=alias(s.enrollments,"revision_return_program_membership");
+   const [member]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
+    .innerJoin(activeProgramMembership,and(
+      eq(activeProgramMembership.studentProfileId,s.enrollments.studentProfileId),
+      eq(activeProgramMembership.programId,record.programId),
+      eq(activeProgramMembership.schoolYearId,record.schoolYearId),
+      eq(activeProgramMembership.kind,"program"),
+      eq(activeProgramMembership.status,"active"),
+    ))
+    .where(and(eq(s.enrollments.studentProfileId,record.studentProfileId),
+      eq(s.enrollments.sectionId,record.sectionId),
+      eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+      eq(s.enrollments.programId,record.programId),
+      eq(s.enrollments.schoolYearId,record.schoolYearId)))
+    .limit(1);
+   if(!member)throw new Error("Student must have active Program and Section enrollment to revise work");
    const [latest]=await tx.select({id:s.submissions.id})
     .from(s.submissions).where(and(eq(s.submissions.assessmentId,record.assessmentId),
       eq(s.submissions.studentProfileId,record.studentProfileId)))
