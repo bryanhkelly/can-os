@@ -20,6 +20,7 @@ import { fetchRoomPlanEvidence, parseVerifiedRoomPlan } from "./onsite-block-roo
 import { requireCurrentChurchSchoolOpening } from "./school-opening.server";
 
 const presenceType="onsite_staff_presence_reported";
+const dutyType="onsite_instruction_duty_response";
 const witnessType="onsite_block_presence_witnessed";
 const todaySchema=z.object({
   date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -108,6 +109,17 @@ export const reportOnsitePhysicalPresence=createServerFn({method:"POST"})
       const role=room.primaryPersonId===actor.actorPersonId?"primary":
         room.backupPersonId===actor.actorPersonId?"backup":null;
       if(!role)throw new AuthorizationError("exact verified room roster adult");
+      const [cannotCover]=await tx.select({id:actions.id}).from(actions)
+        .where(and(eq(actions.type,dutyType),eq(actions.siteId,site.id),
+          eq(actions.sectionId,block.sectionId),
+          eq(actions.ownerPersonId,actor.actorPersonId!),
+          sql`${actions.metadata}->>'date' = ${data.date}`,
+          sql`${actions.metadata}->>'periodId' = ${data.periodId}`,
+          sql`${actions.metadata}->>'planToken' = ${block.planToken}`,
+          sql`${actions.metadata}->>'response' = 'cannot_cover'`,
+        )).limit(1);
+      if(cannotCover)throw new AuthorizationError(
+        "cannot attest to onsite arrival after an unresolved inability-to-cover report");
       const [prior]=await tx.select({id:actions.id}).from(actions)
         .where(and(eq(actions.type,presenceType),eq(actions.siteId,site.id),
           eq(actions.sectionId,block.sectionId),eq(actions.ownerPersonId,actor.actorPersonId!),
@@ -197,6 +209,16 @@ export const witnessOnsiteBlockPresence=createServerFn({method:"POST"})
         sql`${actions.metadata}->>'planToken' = ${block.planToken}`,
         sql`${actions.metadata}->>'roomEvidenceId' = ${room.id}`))
         .orderBy(desc(actions.createdAt)).limit(20);
+      const [cannotCover]=await tx.select({id:actions.id}).from(actions)
+        .where(and(eq(actions.type,dutyType),eq(actions.siteId,site.id),
+          eq(actions.sectionId,block.sectionId),
+          sql`${actions.metadata}->>'date' = ${data.date}`,
+          sql`${actions.metadata}->>'periodId' = ${data.periodId}`,
+          sql`${actions.metadata}->>'planToken' = ${block.planToken}`,
+          sql`${actions.metadata}->>'response' = 'cannot_cover'`,
+        )).limit(1);
+      if(cannotCover)throw new AuthorizationError(
+        "a reported unresolved staff coverage exception prevents physical coverage witness");
       const primary=reports.find(r=>r.personId===room.primaryPersonId);
       const backup=reports.find(r=>r.personId===room.backupPersonId);
       if(!primary || !backup)
@@ -255,7 +277,7 @@ export const getOnsitePhysicalPresence=createServerFn({method:"GET"})
     const plan=await getOnsiteSupervisionPlan({data:{date:data.date}});
     if(plan.siteId!==site.id || plan.projectionTruncated)
       return {blocks:[],truncated:true,hasWitnessedAllBlocks:false};
-    const [reports,witnesses]=await Promise.all([
+    const [reports,witnesses,exceptions]=await Promise.all([
       db.select({
         sectionId:actions.sectionId,personId:actions.ownerPersonId,
         metadata:actions.metadata,
@@ -267,8 +289,14 @@ export const getOnsitePhysicalPresence=createServerFn({method:"GET"})
       }).from(actions).where(and(eq(actions.siteId,site.id),
         eq(actions.type,witnessType),
         sql`${actions.metadata}->>'date' = ${data.date}`)).limit(501),
+      db.select({sectionId:actions.sectionId,metadata:actions.metadata})
+        .from(actions).where(and(eq(actions.siteId,site.id),
+          eq(actions.type,dutyType),
+          sql`${actions.metadata}->>'date' = ${data.date}`,
+          sql`${actions.metadata}->>'response' = 'cannot_cover'`,
+        )).limit(501),
     ]);
-    const truncated=reports.length>500||witnesses.length>500;
+    const truncated=reports.length>500||witnesses.length>500||exceptions.length>500;
     const blocks=[];
     for(const block of plan.blocks){
       let opening=false;
@@ -277,7 +305,11 @@ export const getOnsitePhysicalPresence=createServerFn({method:"GET"})
         opening=true;
       }catch(error){if(!(error instanceof AuthorizationError))throw error;}
       const current=!!block.assignedPlan && opening && !truncated;
-      const matched=current && witnesses.some(row=>
+      const unresolvedException=exceptions.some(row=>
+        row.sectionId===block.sectionId &&
+        row.metadata.periodId===block.periodId &&
+        row.metadata.planToken===block.planToken);
+      const matched=current && !unresolvedException && witnesses.some(row=>
         row.sectionId===block.sectionId &&
         row.metadata.periodId===block.periodId &&
         row.metadata.planToken===block.planToken);
