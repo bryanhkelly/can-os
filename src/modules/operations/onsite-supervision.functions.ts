@@ -357,8 +357,19 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         assignedPersonId===actor.actorPersonId && block.verifiedSiteStaffGrant &&
         block.instructionalDayConfirmed===true &&
         block.periodId!==null && block.startsAtLocal!==null && block.endsAtLocal!==null,
+      // A qualified adult may acknowledge their own availability while
+      // the site director resolves room/backup evidence. Availability is not
+      // school-opening approval, verified presence, or custody handoff.
+      // Missing adult credentials, authorization, calendar or double-booking
+      // still block an affirmative response.
       canAccept:completeProjection && data.date===today &&
-        assignedPersonId===actor.actorPersonId && block.assignedPlan,
+        assignedPersonId===actor.actorPersonId &&
+        block.instructionalDayConfirmed===true &&
+        block.periodId!==null &&
+        block.gaps.every(gap=>[
+          "room_unconfigured","room_capacity_unverified",
+          "room_schedule_conflict","qualified_backup_missing",
+        ].includes(gap)),
     }));
     return {date:data.date,siteId:site.id,
       projectionTruncated:!completeProjection,...projection,blocks};
