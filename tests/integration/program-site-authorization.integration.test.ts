@@ -64,7 +64,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
           owningOrganizationId:can.id,audience:"partner",title:"Program launch",
           configuration:{requirements:[{key:"staffing",title:"Staffing",blocking:true,owner:"partner"}]},
         });
-        const contextFor=(role:"registrar"|"can_network_steward"|"teacher",personId:string,orgId:string,siteId:string|null):AccessContext=>{
+        const contextFor=(role:"registrar"|"can_network_steward"|"teacher"|"site_staff",personId:string,orgId:string,siteId:string|null):AccessContext=>{
           const grant={id:crypto.randomUUID(),accountId:crypto.randomUUID(),personId,role,
             organizationId:orgId,siteId,active:true};
           return resolveAccessContext({
@@ -85,6 +85,23 @@ integration("Church-owned Site with independently authorized CAN academic servic
           creditMode:"credit_bearing",
         });
         host.scope.programIds=[launch.programId];
+        // This is a deliberately real site-bound staff grant without an
+        // independent local director/Section facilitator appointment.
+        // Neither the public roster endpoint nor a direct write/replay may
+        // treat it as authorized custody of church-hosted students.
+        const [genericPerson]=await tx.insert(s.people).values({
+          legalFirstName:"Generic",legalLastName:"Site Staff",
+        }).returning();
+        const genericStaff=contextFor("site_staff",genericPerson!.id,church.id,site.id);
+        genericStaff.scope.programIds=[launch.programId];
+        const {recordAttendanceRevision}=await import("@/modules/attendance/attendance-service");
+        await expect(recordAttendanceRevision(genericStaff,{
+          studentProfileId:crypto.randomUUID(),programId:launch.programId,
+          siteId:site.id,occurrenceKey:"2026-10-24:site-day",
+          expectedAt:new Date("2026-10-24T12:00:00Z"),
+          status:"present",mutationId:crypto.randomUUID(),
+          requireExpectedOnsiteDate:"2026-10-24",
+        })).rejects.toThrow("independent church attendance requires named local delegation");
         // A CAN Organization grant alone does not expose a church's records.
         // Only an exact institution-owned role/capability on this Program may
         // unlock transcript reads, and never without a live school agreement.
