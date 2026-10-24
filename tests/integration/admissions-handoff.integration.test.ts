@@ -73,6 +73,7 @@ integration("cross-persona admissions through active classes",()=>{
   const {getClassWorkspace}=await import("@/modules/learning/class-workspace.functions");
   const {
    getGradebookSections,getGradebook,createAssessment,gradeSubmission,
+   manageAssessment,returnSubmissionForRevision,
   }=await import("@/modules/learning/gradebook.functions");
   const {
    getAssignments,saveAssignmentResponse,saveAssignmentDraft,
@@ -726,6 +727,58 @@ integration("cross-persona admissions through active classes",()=>{
     expect(returned.status).toBe("graded");
     expect(Number(returned.score)).toBe(9);
     expect(returned.feedbackText).toContain("Explain your comparison");
+
+    // P0 complete feedback loop: teacher returns a real graded attempt,
+    // learner drafts and submits attempt 2, same teacher grades revision.
+    state.actor=instructor;
+    await manageAssessment({data:{assessmentId:firstAssignment.assessmentId,action:"close"}});
+    await expect(returnSubmissionForRevision({data:{
+      submissionId:response.submissionId,
+    }})).rejects.toThrow("Reopen the published assessment");
+    await manageAssessment({data:{assessmentId:firstAssignment.assessmentId,action:"reopen"}});
+    await returnSubmissionForRevision({data:{submissionId:response.submissionId}});
+    await expect(returnSubmissionForRevision({data:{
+      submissionId:response.submissionId,
+    }})).rejects.toThrow("Only graded work");
+    state.actor=verifiedStudent as Actor;
+    const returnedWork=first((await getAssignments()).assignments.filter(row=>
+      row.assessmentId===firstAssignment.assessmentId));
+    expect(returnedWork.status).toBe("returned");
+    expect(returnedWork.feedbackText).toContain("Explain your comparison");
+    await saveAssignmentDraft({data:{
+      assessmentId:firstAssignment.assessmentId,
+      text:"This revision compares the two expressions.",
+    }});
+    const drafting=first((await getAssignments()).assignments.filter(row=>
+      row.assessmentId===firstAssignment.assessmentId));
+    expect(drafting.status).toBe("assigned");
+    expect(drafting.attemptNumber).toBe(2);
+    expect(drafting.revisionFeedbackText).toContain("Explain your comparison");
+    expect(drafting.revisionFeedbackSubmissionId).toBe(response.submissionId);
+    expect(drafting.score).toBeNull();
+    const revision=await saveAssignmentResponse({data:{
+      assessmentId:firstAssignment.assessmentId,
+      text:"This revision compares the two expressions by simplifying both sides.",
+    }});
+    expect(revision.submissionId).not.toBe(response.submissionId);
+    expect(first((await getAssignments()).assignments.filter(row=>
+      row.assessmentId===firstAssignment.assessmentId)).status).toBe("submitted");
+    state.actor=instructor;
+    await expect(returnSubmissionForRevision({data:{
+      submissionId:response.submissionId,
+    }})).rejects.toThrow("Only graded work");
+    await gradeSubmission({data:{
+      submissionId:revision.submissionId,score:10,
+      feedbackComment:"Excellent revision. Comparison is now clearly explained.",
+    }});
+    state.actor=verifiedStudent as Actor;
+    const revised=first((await getAssignments()).assignments.filter(row=>
+      row.assessmentId===firstAssignment.assessmentId));
+    expect(revised.status).toBe("graded");
+    expect(Number(revised.score)).toBe(10);
+    expect(revised.feedbackText).toContain("Excellent revision");
+    expect(revised.attempts.map(a=>a.attempt).sort()).toEqual([1,2]);
+    expect(revised.attempts.some(a=>a.attempt===1&&a.status==="returned")).toBe(true);
     state.actor=learner;
     // A withdrawn Program must remove learning access even when a stale
     // active Section enrollment was left behind. Restore fixture state after
