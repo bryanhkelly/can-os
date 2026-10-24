@@ -12,7 +12,6 @@ import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
 type Reader = Pick<typeof db,"select">;
-const origin = "school_opening_approval";
 /** These are independently reviewed supporting records, not user checkboxes. */
 export const schoolOpeningEvidenceCategories = [
   "school_opening_jurisdiction_authority",
@@ -48,9 +47,10 @@ async function schoolIdentity(tx:Reader,programId:string){
 }
 
 function verifyCANSchoolApprover(actor:AccessContext,institutionId:string) {
-  if(actor.demoFacilitator || actor.scope.organizationIds?.length!==1 ||
+  const originalOrganizations=actor.scope.organizationIds??[];
+  if(actor.demoFacilitator || originalOrganizations.length!==1 ||
      !actor.actorPersonId || actor.grantSiteId!==null ||
-     !actor.scope.organizationIds.includes(institutionId))
+     !originalOrganizations.includes(institutionId))
     throw new AuthorizationError("verified independent CAN school-opening officer");
   assertCANSteward(actor,{id:institutionId,type:"can_network"},"network.agreements.verify");
 }
@@ -109,6 +109,45 @@ async function requireSchoolOpeningEvidence(tx:Reader, school:Awaited<ReturnType
   return latest.map(d=>d.id);
 }
 
+/** Current named Site director remains mandatory even after an opening
+ * decision. Revoked/expired appointments immediately invalidate new onsite
+ * presence records without rewriting historic school approval.
+ */
+async function requireVerifiedChurchSiteDirector(
+  tx:Reader,school:Awaited<ReturnType<typeof schoolIdentity>>,
+  configurationId:string,now:Date,
+){
+  const [director]=await tx.select({id:programResponsibilityAssignments.id})
+        .from(programResponsibilityAssignments)
+        .innerJoin(roleAssignments,eq(roleAssignments.id,
+          programResponsibilityAssignments.responsibleRoleAssignmentId))
+        .innerJoin(accountPersonGrants,and(
+          eq(accountPersonGrants.personId,roleAssignments.personId),
+          eq(accountPersonGrants.organizationId,school.organizationId),
+          eq(accountPersonGrants.siteId,school.siteId),
+          eq(accountPersonGrants.role,"site_leader"),
+        ))
+        .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+        .innerJoin(people,eq(people.id,roleAssignments.personId))
+        .where(and(
+          eq(programResponsibilityAssignments.configurationVersionId,configurationId),
+          eq(programResponsibilityAssignments.responsibilityKey,"site_director"),
+          eq(programResponsibilityAssignments.accountableOrganizationId,school.organizationId),
+          eq(roleAssignments.organizationId,school.organizationId),
+          eq(roleAssignments.siteId,school.siteId),
+          eq(roleAssignments.programId,school.programId),
+          eq(roleAssignments.roleKey,"site_leader"),
+          eq(accountPersonGrants.active,true),
+          eq(accountPersonGrants.isSynthetic,false),
+          eq(accessAccounts.disabled,false),eq(people.active,true),
+          sql`${accessAccounts.emailVerifiedAt} is not null`,
+          sql`${programResponsibilityAssignments.effectiveFrom} <= ${now}`,
+          sql`${programResponsibilityAssignments.effectiveThrough} > ${now}`,
+        )).limit(1);
+      if(!director)throw new AuthorizationError("active independently appointed church site director");
+
+}
+
 /** This does not substitute for a current signed operating agreement, staff
  * fitness, room availability or physical presence. It is a separately
  * recorded institutional approval for ONE canonical Program/configuration.
@@ -127,6 +166,7 @@ export async function requireCurrentChurchSchoolOpening(
     "school_of_record","academic_instruction","onsite_supervision",
   ]);
   await requireSchoolOpeningEvidence(tx,school,now);
+  await requireVerifiedChurchSiteDirector(tx,school,configuration.id,now);
   return {configurationId:configuration.id,version:configuration.version,
     schoolSiteId:school.siteId,hostOrganizationId:school.organizationId};
 }
@@ -154,34 +194,7 @@ export async function decideChurchSchoolOpening(
         "school_of_record","academic_instruction","onsite_supervision",
       ]);
       const evidence=await requireSchoolOpeningEvidence(tx,school,now,actor.actorPersonId!);
-      const [director]=await tx.select({id:programResponsibilityAssignments.id})
-        .from(programResponsibilityAssignments)
-        .innerJoin(roleAssignments,eq(roleAssignments.id,
-          programResponsibilityAssignments.responsibleRoleAssignmentId))
-        .innerJoin(accountPersonGrants,and(
-          eq(accountPersonGrants.personId,roleAssignments.personId),
-          eq(accountPersonGrants.organizationId,school.organizationId),
-          eq(accountPersonGrants.siteId,school.siteId),
-          eq(accountPersonGrants.role,"site_leader"),
-        ))
-        .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
-        .innerJoin(people,eq(people.id,roleAssignments.personId))
-        .where(and(
-          eq(programResponsibilityAssignments.configurationVersionId,configuration.id),
-          eq(programResponsibilityAssignments.responsibilityKey,"site_director"),
-          eq(programResponsibilityAssignments.accountableOrganizationId,school.organizationId),
-          eq(roleAssignments.organizationId,school.organizationId),
-          eq(roleAssignments.siteId,school.siteId),
-          eq(roleAssignments.programId,input.programId),
-          eq(roleAssignments.roleKey,"site_leader"),
-          eq(accountPersonGrants.active,true),
-          eq(accountPersonGrants.isSynthetic,false),
-          eq(accessAccounts.disabled,false),eq(people.active,true),
-          sql`${accessAccounts.emailVerifiedAt} is not null`,
-          sql`${programResponsibilityAssignments.effectiveFrom} <= ${now}`,
-          sql`${programResponsibilityAssignments.effectiveThrough} > ${now}`,
-        )).limit(1);
-      if(!director)throw new AuthorizationError("active independently appointed church site director");
+      await requireVerifiedChurchSiteDirector(tx,school,configuration.id,now);
       await tx.update(schoolConfigurationVersions).set({
         status:"approved",approvedByPersonId:actor.actorPersonId,
         approvedAt:now,effectiveFrom:now,updatedAt:now,
