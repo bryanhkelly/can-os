@@ -52,6 +52,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
  const liveSectionMembership=and(
    eq(s.enrollments.kind,"section"),
    eq(s.enrollments.status,"active"),
+   eq(s.sections.active,true),
    eq(s.enrollments.programId,s.sections.programId),
    eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
    inArray(s.enrollments.sectionId,sectionIds),
