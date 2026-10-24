@@ -78,6 +78,9 @@ integration("cross-persona admissions through active classes",()=>{
   const {
    getAssignments,saveAssignmentResponse,saveAssignmentDraft,
   }=await import("@/modules/student-experience/assignments.functions");
+  const {
+   createSubmissionAttachmentUpload,listSubmissionAttachments,
+  }=await import("@/modules/learning/submission-attachments.functions");
   const {getTeacherToday}=await import("@/modules/learning/teacher-today.functions");
   const access=await vi.importActual<typeof import("@/modules/identity/passwordless-access.server")>(
    "@/modules/identity/passwordless-access.server");
@@ -800,6 +803,13 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(saveAssignmentDraft({data:{
       assessmentId:firstAssignment.assessmentId,text:"Former student editing.",
     }})).rejects.toThrow("active class enrollment");
+    await expect(createSubmissionAttachmentUpload({data:{
+      assessmentId:firstAssignment.assessmentId,
+      fileName:"orphan-section.pdf",contentType:"application/pdf",sizeBytes:1024,
+    }})).rejects.toThrow("active class enrollment");
+    expect((await listSubmissionAttachments({data:{
+      assessmentId:firstAssignment.assessmentId,
+    }})).attachments).toHaveLength(0);
     state.actor=instructor;
     await expect(returnSubmissionForRevision({data:{
       submissionId:revision.submissionId,
