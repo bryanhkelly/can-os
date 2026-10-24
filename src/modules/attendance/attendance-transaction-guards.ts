@@ -113,6 +113,10 @@ export async function assertExpectedOnsiteMarkInTransaction(
         eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
         eq(enrollments.studentProfileId, input.studentProfileId),
         eq(enrollments.sectionId, input.sectionId),
+        // Do not let an otherwise active but mis-keyed Section membership
+        // stand in for attendance at a different Program or school year.
+        eq(enrollments.programId, section.programId),
+        eq(enrollments.schoolYearId, section.schoolYearId),
       )).for("share").limit(1);
     if (!seat) throw new AuthorizationError("student not assigned to section");
     if (role === "teacher") {
