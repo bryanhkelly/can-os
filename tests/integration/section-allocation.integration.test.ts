@@ -12,7 +12,9 @@ describe("section allocation prerequisites", () => {
     const [org] = await db.insert(s.organizations).values({
       type: "christian_school", name: "Prerequisite School", slug: suffix,
     }).returning();
-    const [jurisdiction] = await db.insert(s.jurisdictions).values({ code: suffix, name: "Prerequisites" }).returning();
+    const [jurisdiction] = await db.insert(s.jurisdictions).values({
+      code: suffix, name: "Prerequisites",
+    }).returning();
     const [site] = await db.insert(s.sites).values({
       organizationId: org!.id, name: "Prerequisite Site", slug: suffix,
     }).returning();
@@ -32,7 +34,9 @@ describe("section allocation prerequisites", () => {
     const [person] = await db.insert(s.people).values({
       legalFirstName: "Student", legalLastName: suffix,
     }).returning();
-    const [profile] = await db.insert(s.studentProfiles).values({ personId: person!.id, gradeLevel: "9" }).returning();
+    const [profile] = await db.insert(s.studentProfiles).values({
+      personId: person!.id, gradeLevel: "9",
+    }).returning();
     await db.insert(s.enrollments).values({
       studentProfileId: profile!.id, organizationId: org!.id, programId: program!.id,
       schoolYearId: time.schoolYear.id, kind: "program", status: "active",
@@ -41,30 +45,66 @@ describe("section allocation prerequisites", () => {
       owningOrganizationId: org!.id, code: `${title}-${suffix}`, title, subject: "Science",
     }))).returning();
     const versions = await db.insert(s.courseTemplateVersions).values(courses.map(course => ({
-      courseTemplateId: course.id, version: 1, status:"published" as const,
-      curriculum:{learning:{version:1,modules:[{id:"intro",title:"Introduction",lessons:[{id:"first",title:"Welcome to science",body:"Read the introduction and compare examples.",resources:[]}]}]}},
+      courseTemplateId: course.id, version: 1, status: "published" as const,
+      curriculum: { learning: { version: 1, modules: [{
+        id: "intro", title: "Introduction", lessons: [{
+          id: "first", title: "Welcome to science",
+          body: "Read the introduction and compare examples.", resources: [],
+        }],
+      }] } },
     }))).returning();
     const sections = await db.insert(s.sections).values(versions.map((version, index) => ({
       programId: program!.id, siteId: site!.id, termId: time.term.id,
-      courseTemplateVersionId: version.id, code: `${index}-${suffix}`, title: courses[index]!.title,
+      courseTemplateVersionId: version.id, code: `${index}-${suffix}`,
+      title: courses[index]!.title,
     }))).returning();
     const introductory = sections[0]!;
     const advanced = sections[1]!;
-    // Classroom placement needs a real active teaching assignment and an
-    // independently verified school role, not just a Section shell.
-    const [instructor]=await db.insert(s.people).values({
-      legalFirstName:"Verified",legalLastName:"Instructor",
+    // Placement, launch and instruction all consume these same canonical facts.
+    const [instructor] = await db.insert(s.people).values({
+      legalFirstName: "Verified", legalLastName: "Instructor",
     }).returning();
-    const [account]=await db.insert(s.accessAccounts).values({
-      emailNormalized:`teacher-${suffix}@example.invalid`,
-      emailVerifiedAt:new Date(),
+    const [account] = await db.insert(s.accessAccounts).values({
+      emailNormalized: `teacher-${suffix}@example.invalid`,
+      emailVerifiedAt: new Date(),
     }).returning();
     await db.insert(s.accountPersonGrants).values({
-      accountId:account!.id,personId:instructor!.id,role:"teacher",
-      organizationId:org!.id,siteId:site!.id,
+      accountId: account!.id, personId: instructor!.id, role: "teacher",
+      organizationId: org!.id, siteId: site!.id,
+    });
+    await db.insert(s.roleAssignments).values({
+      personId: instructor!.id, organizationId: org!.id, siteId: site!.id,
+      programId: program!.id, roleKey: "teacher",
     });
     await db.insert(s.sectionTeachers).values({
-      sectionId:advanced.id,personId:instructor!.id,
+      sectionId: advanced.id, personId: instructor!.id,
+    });
+    const qualification = (await db.insert(s.qualificationDefinitions).values({
+      key: `placement-teacher-${suffix}`, kind: "license",
+      title: "Synthetic placement teaching license",
+    }).returning())[0]!;
+    const framework = (await db.insert(s.complianceFrameworks).values({
+      key: `launch-teacher:${program!.id}`,
+      name: "Prerequisite teacher qualifications", authority: "Program registrar",
+    }).returning())[0]!;
+    const policyVersion = (await db.insert(s.complianceFrameworkVersions).values({
+      frameworkId: framework.id, version: "1", status: "published",
+    }).returning())[0]!;
+    await db.insert(s.compliancePolicyRules).values({
+      frameworkVersionId: policyVersion.id, code: "teacher-qualifications",
+      expression: { op: "credential", type: qualification.key },
+    });
+    await db.insert(s.compliancePolicyApplicability).values({
+      frameworkVersionId: policyVersion.id, organizationId: org!.id,
+      siteId: site!.id, programId: program!.id, roleKey: "teacher",
+    });
+    const claim = (await db.insert(s.qualificationClaims).values({
+      personId: instructor!.id, definitionId: qualification.id,
+      issuedAt: new Date("2026-01-01"), expiresAt: new Date("2028-12-31"),
+    }).returning())[0]!;
+    await db.insert(s.qualificationVerificationEvents).values({
+      claimId: claim.id, sequence: 1, decision: "approve",
+      actorPersonId: instructor!.id,
     });
     await replaceSectionRegistrationPolicy(db, {
       sectionId: advanced.id, enrollmentCapacity: 10, prerequisites: [courses[0]!.code],
@@ -80,33 +120,40 @@ describe("section allocation prerequisites", () => {
       studentProfileId: profile!.id, sectionId: advanced.id, source: "prerequisite-test",
       actor: {
         actorPersonId: person!.id, capabilities: new Set<string>(),
-        scope: { organizationIds: [org!.id], siteIds: [site!.id], programIds: [program!.id] },
+        scope: {
+          organizationIds: [org!.id], siteIds: [site!.id], programIds: [program!.id],
+        },
       },
     };
     // A Section teacher link cannot turn disabled, unverified or synthetic
-    // accounts into a "staffed" class for a newly admitted student.
-    await db.update(s.accessAccounts).set({disabled:true}).where(eq(s.accessAccounts.id,account!.id));
+    // accounts into a staffed class for a newly admitted student.
+    await db.update(s.accessAccounts).set({ disabled: true })
+      .where(eq(s.accessAccounts.id, account!.id));
     await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
       .rejects.toThrow("Assign an active teacher");
-    await db.update(s.accessAccounts).set({disabled:false,emailVerifiedAt:null})
-      .where(eq(s.accessAccounts.id,account!.id));
+    await db.update(s.accessAccounts).set({ disabled: false, emailVerifiedAt: null })
+      .where(eq(s.accessAccounts.id, account!.id));
     await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
       .rejects.toThrow("Assign an active teacher");
-    await db.update(s.accessAccounts).set({emailVerifiedAt:new Date()})
-      .where(eq(s.accessAccounts.id,account!.id));
-    await db.update(s.accountPersonGrants).set({isSynthetic:true})
-      .where(eq(s.accountPersonGrants.accountId,account!.id));
+    await db.update(s.accessAccounts).set({ emailVerifiedAt: new Date() })
+      .where(eq(s.accessAccounts.id, account!.id));
+    await db.update(s.accountPersonGrants).set({ isSynthetic: true })
+      .where(eq(s.accountPersonGrants.accountId, account!.id));
     await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
       .rejects.toThrow("Assign an active teacher");
-    await db.update(s.accountPersonGrants).set({isSynthetic:false})
-      .where(eq(s.accountPersonGrants.accountId,account!.id));
+    await db.update(s.accountPersonGrants).set({ isSynthetic: false })
+      .where(eq(s.accountPersonGrants.accountId, account!.id));
     await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
       .rejects.toThrow("Unmet prerequisites");
     expect(await db.select().from(s.enrollments).where(and(
-      eq(s.enrollments.sectionId, advanced.id), eq(s.enrollments.studentProfileId, profile!.id),
+      eq(s.enrollments.sectionId, advanced.id),
+      eq(s.enrollments.studentProfileId, profile!.id),
     ))).toHaveLength(0);
-    await db.update(s.sectionGrades).set({ letterGrade: "Credit" }).where(eq(s.sectionGrades.id, grade!.id));
-    expect(await db.transaction(tx => activateSectionEnrollment(tx, input))).toMatchObject({ created: true });
-    expect(await db.transaction(tx => activateSectionEnrollment(tx, input))).toMatchObject({ created: false });
+    await db.update(s.sectionGrades).set({ letterGrade: "Credit" })
+      .where(eq(s.sectionGrades.id, grade!.id));
+    expect(await db.transaction(tx => activateSectionEnrollment(tx, input)))
+      .toMatchObject({ created: true });
+    expect(await db.transaction(tx => activateSectionEnrollment(tx, input)))
+      .toMatchObject({ created: false });
   });
 });
