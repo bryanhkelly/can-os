@@ -21,6 +21,8 @@ export type SupervisionBlockInput = {
   verifiedSafeguardingScreening?: boolean;
   verifiedSafeguardingTraining?: boolean;
   /** Independent verified room and distinct qualified backup, not presence. */
+  /** Internal room evidence identity invalidates stale witnessed arrivals. */
+  roomEvidenceVersion?: string | null;
   roomLabel?: string | null;
   roomPlanVerified?: boolean;
   namedBackupVerified?: boolean;
