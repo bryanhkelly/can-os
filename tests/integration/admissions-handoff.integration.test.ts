@@ -72,6 +72,7 @@ integration("cross-persona admissions through active classes",()=>{
   const {accessibleClasses,authorizeClass}=await import("@/modules/learning/class-access.server");
   const {getClassWorkspace}=await import("@/modules/learning/class-workspace.functions");
   const {getGradebookSections,getGradebook}=await import("@/modules/learning/gradebook.functions");
+  const {getTeacherToday}=await import("@/modules/learning/teacher-today.functions");
   const access=await vi.importActual<typeof import("@/modules/identity/passwordless-access.server")>(
    "@/modules/identity/passwordless-access.server");
   const sessionAuth=await vi.importActual<typeof import("@/modules/identity/command-context.server")>(
@@ -537,6 +538,22 @@ integration("cross-persona admissions through active classes",()=>{
     const teacherClass=await getClassWorkspace({data:{sectionId:section.id}});
     expect(teacherClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
     expect(teacherClass.roster.some(row=>row.profileId===profileId)).toBe(true);
+    // Exercise today's grading queue with this same enrolled student.
+    const pendingReview=first(await tx.insert(s.assessments).values({
+      sectionId:section.id,title:"First lesson response",
+      status:"published",pointsPossible:"10",
+      instructions:"Write a response to the opening lesson.",
+      createdByPersonId:classTeacher.id,
+    }).returning());
+    await tx.insert(s.submissions).values({
+      assessmentId:pendingReview.id,studentProfileId:profileId,
+      status:"submitted",response:{text:"My first lesson response."},
+      submittedAt:new Date(),
+    });
+    const teacherToday=await getTeacherToday();
+    expect(teacherToday.sections.find(row=>row.id===section.id)?.studentCount).toBe(1);
+    expect(teacherToday.ungraded.some(row=>row.studentProfileId===profileId &&
+      row.assessmentId===pendingReview.id)).toBe(true);
     state.actor=learner;
     const studentClass=await getClassWorkspace({data:{sectionId:section.id}});
     expect(studentClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
@@ -691,10 +708,18 @@ integration("cross-persona admissions through active classes",()=>{
       .some(row=>row.profileId===profileId)).toBe(false);
     expect((await getGradebook({data:{sectionId:section.id}})).students
       .some(row=>row.studentProfileId===profileId)).toBe(false);
+    const withdrawnToday=await getTeacherToday();
+    expect(withdrawnToday.sections.find(row=>row.id===section.id)?.studentCount).toBe(0);
+    expect(withdrawnToday.ungraded.some(row=>row.studentProfileId===profileId)).toBe(false);
+    state.actor=family;
+    expect((await getFamilyHome()).children).toEqual([]);
     state.actor=learner;
     await tx.update(s.enrollments).set({status:"active"})
       .where(eq(s.enrollments.id,activeProgram.id));
     expect((await getMyStudentToday()).sections.map(row=>row.sectionId)).toContain(section.id);
+    state.actor=instructor;
+    expect((await getTeacherToday()).ungraded.some(row=>
+      row.studentProfileId===profileId)).toBe(true);
     const unrelated=act("guardian",outsider.id);
     await expect(authorizeClass(unrelated,section.id,student.personId)).rejects.toThrow();
     state.actor=family;
