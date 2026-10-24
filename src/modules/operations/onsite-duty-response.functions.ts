@@ -13,6 +13,7 @@ import { getOnsiteSupervisionPlan } from "./onsite-supervision.functions";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
 import { requireCurrentSectionFacilitator } from "./site-section-facilitators.server";
+import { requireCurrentOnsiteAdultSafety } from "./onsite-block-safety.server";
 import { writeAudit } from "@/platform/mutation";
 
 const dutyType = "onsite_instruction_duty_response";
@@ -171,6 +172,15 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
         // A Site role and an instructional plan do not themselves delegate
         // authority to accept onsite coverage for a church/CAN Program.
         await requireChurchHostedOperatingServices(tx, block.programId, ["onsite_supervision"]);
+        if (block.requiresSectionDelegation) {
+          if(!actor.actorPersonId)
+            throw new AuthorizationError("verified named onsite duty adult");
+          await requireCurrentOnsiteAdultSafety(tx,{
+            personId:actor.actorPersonId,
+            date:data.date,timeZone:site.timezone,
+            startsAtLocal:block.startsAtLocal,endsAtLocal:block.endsAtLocal,
+          });
+        }
       }
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-duty:"+key}))`);
       const [prior]=await tx.select({id:actions.id,metadata:actions.metadata})
