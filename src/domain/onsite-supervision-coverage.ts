@@ -17,6 +17,9 @@ export type SupervisionBlockInput = {
   facilitatorPersonId: string | null;
   facilitatorName: string | null;
   verifiedSiteStaffGrant: boolean;
+  /** Independently verified bounded child-safety credential evidence. */
+  verifiedSafeguardingScreening?: boolean;
+  verifiedSafeguardingTraining?: boolean;
   /** Only required for independently church-hosted CAN Programs. */
   requiresSectionDelegation?: boolean;
   /** The actual named person's appointment must cover this entire block. */
@@ -58,7 +61,8 @@ export function coversLocalSupervisionBlock(input:{
 export type SupervisionGap =
   "schedule_missing" | "facilitator_missing" | "staff_grant_missing" |
   "facilitator_conflict" | "room_unconfigured" | "calendar_unverified" |
-  "section_delegation_missing" | "operating_agreement_missing";
+  "section_delegation_missing" | "operating_agreement_missing" |
+  "child_safety_screening_missing" | "safeguarding_training_missing";
 
 function minutes(input: string | null): number | null {
   if (!input) return null;
@@ -84,6 +88,10 @@ export function summarizeOnsiteSupervision(
       gaps.push("section_delegation_missing");
     if (row.requiresSectionDelegation && row.authorizedSupervisionService !== true)
       gaps.push("operating_agreement_missing");
+    if (row.requiresSectionDelegation && row.verifiedSafeguardingScreening !== true)
+      gaps.push("child_safety_screening_missing");
+    if (row.requiresSectionDelegation && row.verifiedSafeguardingTraining !== true)
+      gaps.push("safeguarding_training_missing");
     if (row.overlappingFacilitatorAssignments) gaps.push("facilitator_conflict");
     // CAN OS currently has no authoritative section-room assignment; never
     // silently claim that an instructional section has a supervised room.
@@ -114,6 +122,6 @@ export function summarizeOnsiteSupervision(
     unassignedOrConflicting:blocks.filter(x=>!x.assignedPlan).length,
     roomAssignmentsUnverified:blocks.length,
     hasConfirmedPhysicalCoverage:false as const,
-    note:"This is a staffing PLAN from approved instructional days, section schedules and current assignments. A closure or missing calendar entry cannot be treated as scheduled instruction. No authoritative room assignment, onsite presence, child release or custody approval exists in this view.",
+    note:"This is a STAFFING PLAN, not a school-opening or physically supervised-day approval. Independent church/CAN staff require valid individual screening and safeguarding-training evidence. Approved instructional days and duty responses cannot establish actual onsite presence, backup coverage, room safety, child release or custody.",
   };
 }
