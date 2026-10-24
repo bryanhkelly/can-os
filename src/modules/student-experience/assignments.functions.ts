@@ -9,6 +9,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { z } from "zod";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
+import { writtenSubmissionResponse } from "@/domain/submission-response";
 
 
 /** Never accept a browser-selected actor or role for assignment authorization. */
@@ -143,7 +144,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
     return {submissionId:revision.id};
    }
    if(prior){
-    const [submitted]=await tx.update(s.submissions).set({status:"submitted",response:{text},timeliness,submittedAt:now,updatedAt:now}).where(and(eq(s.submissions.id,prior.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
+    const [submitted]=await tx.update(s.submissions) .set({status:"submitted",response:writtenSubmissionResponse(prior.response,text),timeliness,submittedAt:now,updatedAt:now}).where(and(eq(s.submissions.id,prior.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!submitted)throw new Error("Assignment was submitted or changed in another tab");
     await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.submit",resourceType:"submission",resourceId:submitted.id,after:{status:"submitted"},context:{accountId:context.accountId,sessionId:context.sessionId}});
     await emitSubmission(submitted.id);
@@ -255,13 +256,13 @@ export const saveAssignmentDraft=createServerFn({method:"POST"})
     if(draft){await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.draft_revision",resourceType:"submission",resourceId:draft.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});return {saved:true};}
     const [existing]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId),eq(s.submissions.attemptNumber,latest.attemptNumber+1))).limit(1);
     if(!existing||existing.status!=="assigned")throw new Error("Revision already submitted");
-    const [saved]=await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,existing.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
+    const [saved]=await tx.update(s.submissions) .set({response:writtenSubmissionResponse(existing.response,data.text,true),updatedAt:new Date()}).where(and(eq(s.submissions.id,existing.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!saved)throw new Error("Draft already submitted");
     await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:saved.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});
     return {saved:true};
    }
    if(latest){
-    const [saved]=await tx.update(s.submissions).set({response:{text:data.text,draft:true},updatedAt:new Date()}).where(and(eq(s.submissions.id,latest.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
+    const [saved]=await tx.update(s.submissions) .set({response:writtenSubmissionResponse(latest.response,data.text,true),updatedAt:new Date()}).where(and(eq(s.submissions.id,latest.id),eq(s.submissions.status,"assigned"))).returning({id:s.submissions.id});
     if(!saved)throw new Error("Draft already submitted");
     await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.draft_save",resourceType:"submission",resourceId:saved.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});
    }else{
