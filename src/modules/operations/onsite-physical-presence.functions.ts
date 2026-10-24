@@ -13,6 +13,7 @@ import { emitEvent,writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
 import { getOnsiteSupervisionPlan } from "./onsite-supervision.functions";
 import { requireCurrentSectionFacilitator } from "./site-section-facilitators.server";
+import {verifiedScheduledSectionFacilitators,scheduledBlockHasNamedFacilitator} from "./section-coverage-verification.server";
 import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
 import { requireCurrentOnsiteAdultSafety } from "./onsite-block-safety.server";
 import { fetchRoomPlanEvidence, parseVerifiedRoomPlan } from "./onsite-block-room-plan.server";
@@ -168,6 +169,25 @@ export const witnessOnsiteBlockPresence=createServerFn({method:"POST"})
       const room=await currentRoom(tx,site,block,data.date);
       if([room.primaryPersonId,room.backupPersonId].includes(actor.actorPersonId!))
         throw new AuthorizationError("independent Site director must witness staff arrival");
+      // A witness cannot certify stale primary/backup appointments or expired
+      // safety credentials that were valid only when the draft plan was read.
+      const adults=[room.primaryPersonId,room.backupPersonId];
+      const delegates=await verifiedScheduledSectionFacilitators(tx,{
+        siteId:site.id,organizationId:site.organizationId,
+      },adults.map(personId=>({
+        personId,programId:block.programId,sectionId:block.sectionId,
+      })));
+      for(const personId of adults){
+        if(!scheduledBlockHasNamedFacilitator(delegates,{
+          personId,programId:block.programId,sectionId:block.sectionId,
+          date:data.date,timeZone:site.timezone,
+          startsAtLocal:block.startsAtLocal,endsAtLocal:block.endsAtLocal,
+        }))throw new AuthorizationError("current qualified primary and standby staff delegation");
+        await requireCurrentOnsiteAdultSafety(tx,{
+          personId,date:data.date,timeZone:site.timezone,
+          startsAtLocal:block.startsAtLocal,endsAtLocal:block.endsAtLocal,
+        });
+      }
       const reports=await tx.select({
         id:actions.id,personId:actions.ownerPersonId,createdAt:actions.createdAt,
       }).from(actions).where(and(eq(actions.type,presenceType),
