@@ -777,6 +777,8 @@ integration("cross-persona admissions through active classes",()=>{
     expect(revised.status).toBe("graded");
     expect(Number(revised.score)).toBe(10);
     expect(revised.feedbackText).toContain("Excellent revision");
+    expect(revised.revisionFeedbackText).toBe("");
+    expect(revised.revisionFeedbackSubmissionId).toBeNull();
     expect(revised.attempts.map(a=>a.attempt).sort()).toEqual([1,2]);
     expect(revised.attempts.some(a=>a.attempt===1&&a.status==="returned")).toBe(true);
     state.actor=learner;
@@ -798,6 +800,11 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(saveAssignmentDraft({data:{
       assessmentId:firstAssignment.assessmentId,text:"Former student editing.",
     }})).rejects.toThrow("active class enrollment");
+    state.actor=instructor;
+    await expect(returnSubmissionForRevision({data:{
+      submissionId:revision.submissionId,
+    }})).rejects.toThrow("active Program and Section enrollment");
+    state.actor=learner;
     // The former child's class must also vanish from CURRENT teacher rosters
     // without deleting historical assessments or their audit trail.
     state.actor=instructor;
