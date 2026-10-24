@@ -70,7 +70,8 @@ export type SupervisionGap =
   "facilitator_conflict" | "room_unconfigured" | "calendar_unverified" |
   "section_delegation_missing" | "operating_agreement_missing" |
   "child_safety_screening_missing" | "safeguarding_training_missing" |
-  "qualified_backup_missing" | "room_capacity_unverified";
+  "qualified_backup_missing" | "room_capacity_unverified" |
+  "room_schedule_conflict";
 
 function minutes(input: string | null): number | null {
   if (!input) return null;
@@ -138,6 +139,17 @@ export function summarizeOnsiteSupervision(
       const b=blocks[j]!;
       if(a.sectionId===b.sectionId || b.startMinute===null || b.endMinute===null ||
          !(a.startMinute<b.endMinute && b.startMinute<a.endMinute))continue;
+      // Different Sections cannot both claim the same physical room at the
+      // same time. A plan signed for each Section individually is not proof
+      // that their shared space can hold two simultaneous classes.
+      if(a.roomPlanVerified && b.roomPlanVerified && a.roomLabel && b.roomLabel &&
+         a.roomLabel.trim().toLocaleLowerCase()===b.roomLabel.trim().toLocaleLowerCase()){
+        for(const entry of [a,b]){
+          if(!entry.gaps.includes("room_schedule_conflict"))
+            entry.gaps.push("room_schedule_conflict");
+          entry.assignedPlan=false;
+        }
+      }
       if(a.backupPersonId===b.facilitatorPersonId ||
          (b.backupPersonId && a.backupPersonId===b.backupPersonId) ||
          (b.backupPersonId && b.backupPersonId===a.facilitatorPersonId)){
