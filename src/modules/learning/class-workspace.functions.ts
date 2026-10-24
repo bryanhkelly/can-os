@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { buildClassAssessmentEvidence, summarizeClassAssessmentEvidence } from "@/domain/class-assessment-evidence";
 import { z } from "zod";
 import { classResources, readClassContent } from "@/domain/class-content";
@@ -68,11 +69,20 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       )).orderBy(desc(s.submissions.attemptNumber))
       :[];
     const assessmentEvidence=buildClassAssessmentEvidence(assessmentRows,attemptRows);
+    const activeProgramMembership=alias(s.enrollments,"workspace_active_program_enrollment");
     const roster = actor.role === "teacher" ? await db.select({ profileId: s.studentProfiles.id, personId: s.people.id,
       firstName: s.people.legalFirstName, lastName: s.people.legalLastName, preferredName: s.people.preferredName })
       .from(s.enrollments).innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.enrollments.studentProfileId))
       .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
-      .where(and(eq(s.enrollments.sectionId, section.id), eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active")))
+      .innerJoin(activeProgramMembership,and(
+        eq(activeProgramMembership.studentProfileId,s.enrollments.studentProfileId),
+        eq(activeProgramMembership.programId,section.programId),
+        eq(activeProgramMembership.schoolYearId,section.schoolYearId),
+        eq(activeProgramMembership.kind,"program"),eq(activeProgramMembership.status,"active"),
+      ))
+      .where(and(eq(s.enrollments.sectionId, section.id), eq(s.enrollments.kind, "section"),
+        eq(s.enrollments.status, "active"),eq(s.enrollments.programId,section.programId),
+        eq(s.enrollments.schoolYearId,section.schoolYearId)))
       .orderBy(s.people.legalLastName) : [];
     const rosterProgress = roster.length ? await db.select({ profileId: s.lessonProgress.studentProfileId, lessonId: s.lessonProgress.lessonId })
       .from(s.lessonProgress).where(and(eq(s.lessonProgress.sectionId, section.id),
