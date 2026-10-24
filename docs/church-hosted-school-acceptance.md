@@ -386,3 +386,58 @@ with verified training/screening and room location, then separate
 physical check-in. Existing nonchurch/Same-Org models retain their
 previous role behavior, except the generic email-verification hardening.
 No new migration or production action is required by this bite.
+
+## Increment 7 — CAN faculty grading and institutional records, exact staff delegation (2026-10-23)
+
+**Source-committed to `FullFlow`; CI/runtime/DB and browser acceptance not yet established.**
+This closes concrete cross-organization academic access gaps without changing
+`sites.organization_id`, `programs.organization_id`, or issuing host-wide grants.
+
+- Grade finalization and finalized-grade corrections reuse the **same live,
+  exact-Section** `authorizeClass` rule as the teacher classroom. They no
+  longer incorrectly demand church Site membership from an independently
+  assigned CAN teacher. Existing assigned-teacher, verified original CAN
+  identity, current agreement and `academic_instruction` +
+  `academic_records` service checks remain mandatory.
+- The teacher session's delegated Section projection now requires a **current
+  CAN-owned Program-specific `role_assignments` teacher row** as well as an
+  existing Section teacher assignment and current contract. Removing the role
+  stops new delegated Section access without erasing historical instruction.
+  No church Site/Program is appended to the user's ordinary scope.
+- CAN registrars can discover and issue transcripts **only** for a
+  church-owned Site/Program explicitly authorized by an existing CAN-owned,
+  exact-Program registrar role with `academic_records.issue`. This is further
+  constrained to a real original CAN registrar grant, a matching CAN credit
+  issuer, and a currently approved, externally evidence-verified contract
+  containing `school_of_record`, `academic_records` and
+  `credit_issuance`.
+- Transcript queries use **exact Program–Site pairs** instead of unioning
+  the church's IDs into the general authenticated principal. New issuance
+  checks the Program-scoped role and contract inside its own transaction
+  alongside Section/issuer checks; existing historical snapshots are retained
+  unchanged after staff revocation or contract expiry.
+- The CAN steward agreement desk now has a scoped academic-staff management
+  panel. A verified CAN steward may designate/revoke an already existing,
+  active, nonsynthetic, email-verified **CAN-owned original teacher or
+  registrar account** for exactly one independently contracted church
+  Program. A teacher still needs qualified, separately assigned Sections.
+  The action creates **only a Program-scoped `role_assignments` record**,
+  does not provision a login, access another church, set up a legal school,
+  complete credentialing, or authorize a host officer to issue CAN credits.
+  The CAN steward cannot self-delegate. All changes generate transactional
+  audit and registered pass-through DomainEvents. Revocation is available
+  even after the contract ends; no migration is needed for this increment.
+- The rollback-only Program-Site fixture now also contains positive and
+  negative expectations for CAN transcript-role discovery, role/capability
+  withdrawal, grant idempotency, denial to a church actor, verified employee
+  selection, agreement revocation, and post-contract staff revocation.
+
+**Important remaining acceptance gaps:** Real authenticated CAN faculty and
+CAN registrar sessions must exercise teacher Today/class work, grade
+finalization, transcript discovery/issuance, host-denial and revoked-grant
+denial, end-to-end on disposable migrated Neon. Staff role provenance,
+credential requirements, account lifecycle, all official-record query
+surfaces, and outbox reconciliation require further connected tests. School
+opening is still blocked by verified safeguarding and actual supervision
+evidence. CI's unassigned runner failures do not prove these source changes
+work in a browser or database.
