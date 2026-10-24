@@ -323,7 +323,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         block.verifiedSectionDelegation,block.authorizedSupervisionService,
         block.verifiedSafeguardingScreening,block.verifiedSafeguardingTraining,
         block.roomPlanVerified,block.roomLabel,block.roomCapacityAdequate,
-        block.namedBackupVerified,backupPersonId,delegationVersion,agreementVersion,block.assignedPlan,
+        block.namedBackupVerified,_backupPersonId,delegationVersion,agreementVersion,block.assignedPlan,
       ])).digest("hex"),
       // Derived ONLY from the verified, original site grant and current active
       // instruction plan. Never accept a browser-supplied facilitator ID.
