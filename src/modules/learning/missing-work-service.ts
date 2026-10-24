@@ -2,6 +2,8 @@ import { db } from "@/db/client";
 import {
 assessments,
 enrollments,
+sections,
+terms,
 studentProfiles,
 submissions
 } from "@/db/schema";
@@ -13,6 +15,7 @@ type CommandContext,
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { and,eq,lt } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 export async function publishAssessment(
   context: CommandContext,
@@ -27,8 +30,12 @@ export async function publishAssessment(
         sectionId: assessments.sectionId,
         status: assessments.status,
         dueAt: assessments.dueAt,
+        programId:sections.programId,
+        schoolYearId:terms.schoolYearId,
       })
       .from(assessments)
+      .innerJoin(sections,eq(sections.id,assessments.sectionId))
+      .innerJoin(terms,eq(terms.id,sections.termId))
       .where(eq(assessments.id, assessmentId))
       .limit(1);
 
@@ -38,16 +45,22 @@ export async function publishAssessment(
 
     if (assessment.status === "published") return;
 
-    const activeEnrollments = await tx
-      .select({ studentProfileId: enrollments.studentProfileId })
+    const programMembership=alias(enrollments,"legacy_assessment_program_membership");
+    const activeEnrollments=await tx.select({studentProfileId:enrollments.studentProfileId})
       .from(enrollments)
-      .where(
-        and(
-          eq(enrollments.kind, "section"),
-          eq(enrollments.sectionId, assessment.sectionId),
-          eq(enrollments.status, "active"),
-        ),
-      );
+      .innerJoin(programMembership,and(
+        eq(programMembership.studentProfileId,enrollments.studentProfileId),
+        eq(programMembership.programId,assessment.programId),
+        eq(programMembership.schoolYearId,assessment.schoolYearId),
+        eq(programMembership.kind,"program"),
+        eq(programMembership.status,"active"),
+      ))
+      .where(and(
+        eq(enrollments.kind,"section"),eq(enrollments.status,"active"),
+        eq(enrollments.sectionId,assessment.sectionId),
+        eq(enrollments.programId,assessment.programId),
+        eq(enrollments.schoolYearId,assessment.schoolYearId),
+      ));
 
     await tx
       .update(assessments)
@@ -193,6 +206,28 @@ export async function submitAssessment(
     if (!context.actorPersonId || current.studentPersonId !== context.actorPersonId) {
       throw new Error("Submission actor must be the enrolled student");
     }
+    const [section]=await tx.select({programId:sections.programId,
+      schoolYearId:terms.schoolYearId})
+      .from(sections).innerJoin(terms,eq(terms.id,sections.termId))
+      .where(eq(sections.id,current.sectionId)).limit(1);
+    if(!section)throw new Error("Active instructional Section not found");
+    const programMembership=alias(enrollments,"legacy_submission_program_membership");
+    const [authorized]=await tx.select({id:enrollments.id})
+      .from(enrollments)
+      .innerJoin(programMembership,and(
+        eq(programMembership.studentProfileId,enrollments.studentProfileId),
+        eq(programMembership.kind,"program"),eq(programMembership.status,"active"),
+        eq(programMembership.programId,section.programId),
+        eq(programMembership.schoolYearId,section.schoolYearId),
+      ))
+      .where(and(
+        eq(enrollments.studentProfileId,current.studentProfileId),
+        eq(enrollments.kind,"section"),eq(enrollments.status,"active"),
+        eq(enrollments.sectionId,current.sectionId),
+        eq(enrollments.programId,section.programId),
+        eq(enrollments.schoolYearId,section.schoolYearId),
+      )).limit(1);
+    if(!authorized)throw new Error("Student does not have current Program and Section enrollment");
 
     if (current.status !== "assigned") {
       throw new Error("Submission has already been submitted or graded");
