@@ -78,8 +78,9 @@ export async function verifiedAdultSafetyEvidence(
        row.docUploader!==row.personId ||
        row.docStorageProvider!=="cloudflare_r2" ||
        row.docSensitivity!=="restricted" ||
+       typeof row.docStorageKey!=="string" ||
        !row.docStorageKey.startsWith(`qualifications/${row.personId}/`) ||
-       row.docMetadata.claimId!==row.claimId ||
+       row.docMetadata?.claimId!==row.claimId ||
        !row.docVerifiedAt || row.docVerifiedAt>new Date() ||
        (row.docVerifiedBy && row.docVerifiedBy===row.personId))continue;
     const from=new Date(Math.max(
