@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { CANAcademicStaffDelegationPanel } from "./CANAcademicStaffDelegationPanel";
+import { SchoolOpeningReviewPanel } from "@/components/operations/SchoolOpeningReviewPanel";
 import {
   listCANOperatingAuthorizationDeskFn, reviewProgramSiteAuthorizationFn,
   revokeProgramSiteAuthorizationFn,
@@ -101,8 +102,10 @@ export function CANOperatingAuthorizationDesk() {
             </option>)}
         </select>
       </label>
-      {staffProgramId&&<CANAcademicStaffDelegationPanel key={staffProgramId}
-        programId={staffProgramId}/>}
+      {staffProgramId&&<>
+        <SchoolOpeningReviewPanel key={"opening:"+staffProgramId} programId={staffProgramId}/>
+        <CANAcademicStaffDelegationPanel key={staffProgramId} programId={staffProgramId}/>
+      </>}
     </div>}
   </section>;
 }
