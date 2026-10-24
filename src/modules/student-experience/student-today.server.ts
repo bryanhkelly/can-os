@@ -106,6 +106,7 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
   const coursework = sectionIds.length ? await db
     .select({
       submissionId: submissions.id,
+      attemptNumber: submissions.attemptNumber,
       assessmentId: assessments.id,
       assessmentTitle: assessments.title,
       instructions: assessments.instructions,
@@ -133,6 +134,17 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
     ))
     .orderBy(asc(assessments.dueAt)) : [];
 
+  // A returned assessment may have several attempts. Student Today shows only
+  // the latest attempt; older feedback remains available in assignment history.
+  const latestCoursework = new Map<string, (typeof coursework)[number]>();
+  for (const row of coursework) {
+    const previous = latestCoursework.get(row.assessmentId);
+    if (!previous || row.attemptNumber > previous.attemptNumber) {
+      latestCoursework.set(row.assessmentId, row);
+    }
+  }
+  const currentCoursework = [...latestCoursework.values()];
+
   const openActions = await db
     .select({
       id: actions.id,
@@ -159,9 +171,9 @@ export async function getStudentToday(studentProfileId: string, at = new Date(),
     dayEndUtc: endOfDay,
     sections: activeSections,
     events,
-    coursework,
+    coursework: currentCoursework,
     openActions,
-    recoveryCandidates: coursework.filter(row =>
+    recoveryCandidates: currentCoursework.filter(row =>
       row.timeliness === "missing" ||
       (row.score !== null && row.pointsPossible !== null &&
        Number(row.pointsPossible) > 0 &&
