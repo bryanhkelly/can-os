@@ -582,6 +582,20 @@ integration("cross-persona admissions through active classes",()=>{
       role:"teacher",organizationId:org.id,siteId:site.id,
       active:true,isSynthetic:false,
     });
+    // Synthetic fixtures with otherwise supported roles must not get a
+    // genuine email challenge. The demo-code path remains separate.
+    const [syntheticAccount]=await tx.insert(s.accessAccounts).values({
+      emailNormalized:`synthetic-student-${suffix}@example.org`,
+    }).returning();
+    await tx.insert(s.accountPersonGrants).values({
+      accountId:syntheticAccount!.id,personId:student.personId,
+      role:"student",organizationId:org.id,siteId:site.id,
+      active:true,isSynthetic:true,
+    });
+    const syntheticMail=vi.fn();
+    await access.requestOneTimeAccess(
+      `synthetic-student-${suffix}@example.org`,syntheticMail);
+    expect(syntheticMail).not.toHaveBeenCalled();
     await consentToStudentLearningAccount({data:{
       applicationId,studentEmail:sharedEmail,acknowledged:true,
     }});
