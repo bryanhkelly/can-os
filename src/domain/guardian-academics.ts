@@ -14,6 +14,22 @@ export function latestGuardianAttempts<T extends { assessmentId: string; attempt
  return [...latest.values()];
 }
 
+/** Once an attempted revision is saved, its own status is ungraded; only
+ * earlier teacher-RELEASED feedback is shown as revision guidance.
+ * Never project old scores as the student's current grade.
+ */
+export function priorReturnedGuardianFeedback<T extends {
+ assessmentId: string; attemptNumber: number | null;
+ submissionStatus: string | null;
+}>(rows: readonly T[], latest: T): T | undefined {
+ if(latest.submissionStatus!=="assigned"&&latest.submissionStatus!=="submitted")
+  return undefined;
+ return rows.filter(row=>row.assessmentId===latest.assessmentId &&
+  row.submissionStatus==="returned" &&
+  (row.attemptNumber??0)<(latest.attemptNumber??0))
+  .sort((a,b)=>(b.attemptNumber??0)-(a.attemptNumber??0))[0];
+}
+
 /** A returned attempt may need revision, but is not the same as never submitted. */
 export function guardianAssignmentSummary(
  assignments: readonly {status:string;dueAt:string|null;score:string|null}[],
