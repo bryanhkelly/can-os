@@ -135,6 +135,14 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
   const permittedIds = activePrograms.map(p => p.id);
   if (!permittedIds.length) return { roster: [], coverage, programsAtSite };
 
+  // A child is expected at an independently church-hosted CAN school
+  // only after placement in a real instructional Section. A Program-only
+  // admission is not a safe, supervised classroom placement.
+  const independentPrograms=new Set<string>();
+  for(const program of activePrograms){
+    if(await requiresIndependentChurchLocalDelegation(db,program.id))
+      independentPrograms.add(program.id);
+  }
   // A facilitator may read ONLY children currently assigned to a Section
   // with an effective named appointment—not the entire Program roster.
   const sectionFilter = new Set<string>();
@@ -202,6 +210,9 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
     sectionTitle: string | null; siteId: string; sectionId: string | null;
   }>();
   for (const row of programRoster) {
+    // Keep planning and enrollment lists separate from the live school's
+    // physical attendance roster until this child has a real Section.
+    if(independentPrograms.has(row.programId))continue;
     if (!row.programId || !expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
     const host = activePrograms.find(p => p.id === row.programId)!;
     byKey.set(row.programId + ":" + row.studentProfileId, {
