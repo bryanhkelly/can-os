@@ -47,7 +47,9 @@ async function guardianStudents(s: Schema, guardianPersonId: string, siteIds: st
   .where(and(
    inArray(s.enrollments.studentProfileId, unique.map(row => row.studentProfileId)),
    eq(s.enrollments.status, "active"),
-   inArray(s.enrollments.kind, ["program", "school_year", "section"]),
+   // A stale Section or SchoolYear enrollment must not make a withdrawn
+   // child appear to be actively enrolled in the family's school summary.
+   eq(s.enrollments.kind, "program"),
    inArray(s.programs.siteId, siteIds),
    inArray(s.programs.id,programIds),
   ));
@@ -69,6 +71,7 @@ async function activeSectionIds(s: Schema, studentProfileId: string, siteIds: st
  if(!validYears.size)return [];
  const rows=await db.select({
   sectionId:s.sections.id,programId:s.sections.programId,
+  enrollmentProgramId:s.enrollments.programId,
   yearId:s.enrollments.schoolYearId,termYearId:s.terms.schoolYearId,
  }).from(s.enrollments)
   .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
@@ -80,7 +83,9 @@ async function activeSectionIds(s: Schema, studentProfileId: string, siteIds: st
     inArray(s.sections.siteId,siteIds),
     inArray(s.sections.programId,programIds),
   ));
- const matching=[...new Set(rows.filter(row=>row.yearId===row.termYearId&&
+ const matching=[...new Set(rows.filter(row=>
+   row.enrollmentProgramId===row.programId &&
+   row.yearId===row.termYearId &&
    validYears.has(`${row.programId}:${row.yearId}`)).map(row=>row.sectionId))];
  const ready=await staffedPublishedSectionIds(matching,db);
  return matching.filter(id=>ready.has(id));
