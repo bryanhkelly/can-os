@@ -251,7 +251,9 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
       // reporting inability to cover after their separate delegation expires.
       if (actor.role === "room_facilitator" &&
           !candidates.some(row => row.sectionId === section.id &&
-            row.facilitatorPersonId === actor.actorPersonId)) continue;
+            row.facilitatorPersonId === actor.actorPersonId) &&
+          ![...matchingPlan.values()].some(row=>row.sectionId===section.id &&
+            row.backupPersonId===actor.actorPersonId)) continue;
       const templates=periodRows.filter(row=>
         row.templateId===section.scheduleTemplateId &&
         row.yearId===section.schoolYearId &&
@@ -351,6 +353,14 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         block.roomPlanVerified,block.roomLabel,block.roomCapacityAdequate,
         block.namedBackupVerified,_backupPersonId,delegationVersion,agreementVersion,block.assignedPlan,
       ])).digest("hex"),
+      // Presence is a separate witnessed workflow. Both named adults can
+      // check in only against a fully evaluated current plan. This field
+      // does NOT itself assert that either adult is physically present.
+      canCheckIn:completeProjection && data.date===today &&
+        block.requiresSectionDelegation &&
+        (assignedPersonId===actor.actorPersonId ||
+         _backupPersonId===actor.actorPersonId) &&
+        block.assignedPlan,
       // Derived ONLY from the verified, original site grant and current active
       // instruction plan. Never accept a browser-supplied facilitator ID.
       canRespond:completeProjection && data.date===today &&
