@@ -19,7 +19,7 @@ const labels: Record<string,string> = {
   room_capacity_unverified:"Room occupancy limit is missing or exceeded by the active Section roster",
   child_safety_screening_missing:"No independently verified, unexpired child-safety screening covering the entire block",
   safeguarding_training_missing:"No independently verified, unexpired safeguarding training covering the entire block",
-  qualified_backup_missing:"No separately named, qualified and available backup adult for this block",
+  qualified_backup_missing:"No separately named backup with current staff appointment, screening and safeguarding training for this block",
 };
 
 /** Read-only staffing plan. This is NOT a live duty check-in or room sign-off. */
