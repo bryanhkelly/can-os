@@ -509,10 +509,16 @@ disposable-DB tests also remain incomplete.
 
 ## Increment 9 — reviewed school opening and witnessed onsite adult arrival (2026-10-23)
 
-**Committed source only on `FullFlow`, untested; requires unexecuted migrations
-`0044_school_configuration_operating_approval.sql` and
-`0045_onsite_safety_qualification_definitions.sql`.** No changes to production
-Neon and no GitHub Actions troubleshooting were performed.
+**Source committed on `FullFlow`, end-to-end still untested.** On 2026-10-24,
+migrations `0043_student_access_consents.sql`,
+`0044_school_configuration_operating_approval.sql`, and
+`0045_onsite_safety_qualification_definitions.sql` were successfully applied
+as one transaction to the NONPRODUCTION Neon `can-os` branch
+`fullflow-e2e-20261022` (`br-proud-pine-arfju8h2`). The migration ledger,
+new student access consent table/indexes, school-opening enum and both onsite
+credential definitions were independently queried afterward. A preflight
+recovery branch `fullflow-pre-0043-0045-20261024` was preserved.
+Production was not migrated; GitHub Actions and browser tests remain deferred.
 
 - The canonical `school_configuration_status` now distinguishes
   `draft`, `approved`, and `suspended`. Only a real original CAN network
