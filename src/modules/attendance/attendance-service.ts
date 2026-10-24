@@ -575,6 +575,15 @@ export async function recordAttendanceRevision(
   // time-bounded Program responsibility INSIDE this write transaction, even
   // for replayed mutation IDs. The same lock serializes appointment/revocation.
   const siteActor = context as AccessContext;
+  // Defense in depth: prohibit a generic site_staff grant at independently
+  // church-hosted CAN schools. A staff member needs the named site director
+  // or Section facilitator role. Check BEFORE idempotent mutation replay.
+  if(onsite && siteActor.role==="site_staff"){
+    const {requiresIndependentChurchLocalDelegation}=await import(
+      "@/modules/operations/site-local-delegation.server");
+    if(await requiresIndependentChurchLocalDelegation(tx,input.programId))
+      throw new AuthorizationError("independent church attendance requires named local delegation");
+  }
   if (onsite && (siteActor.role === "site_leader" || siteActor.role === "room_facilitator")) {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:" + input.programId}))`);
     const { requireCurrentSiteLocalDelegate,
