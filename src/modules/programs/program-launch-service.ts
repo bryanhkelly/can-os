@@ -427,6 +427,18 @@ export async function activateProgram(
       if(!handoff?.recipientPersonId)throw new Error("Select a named receiving site operator before opening");
       await assertOpeningOperator(program,handoff.recipientPersonId,tx);
     }
+    // Operating agreement and staffed academic Sections alone are not legal
+    // permission to open an independent church-hosted CAN school for minors.
+    // The institution must separately authorize the most recent school
+    // configuration using independently verified safety/legal/facility evidence.
+    // Same-organization and non-church Programs keep their existing path.
+    if(crossOrganizationChurch && program.deliveryModel.onsite){
+      const {requireCurrentChurchSchoolOpening}=await import(
+        "@/modules/operations/school-opening.server");
+      await requireCurrentChurchSchoolOpening(tx,programId,new Date(),{
+        allowPendingActivation:true,
+      });
+    }
     const activatedAt = new Date();
 
     await tx
