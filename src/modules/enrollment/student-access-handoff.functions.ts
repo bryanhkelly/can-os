@@ -201,10 +201,20 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
      .for("update").limit(1);
    if(account?.disabled)throw new AuthorizationError("student account disabled");
    if(account){
-     const grants=await tx.select({personId:accountPersonGrants.personId})
-       .from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id));
+     const grants=await tx.select({
+       personId:accountPersonGrants.personId,
+       role:accountPersonGrants.role,
+       isSynthetic:accountPersonGrants.isSynthetic,
+     }).from(accountPersonGrants).where(eq(accountPersonGrants.accountId,account.id));
      if(grants.some(g=>g.personId!==app.studentPersonId))
       throw new AuthorizationError("student email is already bound to a different identity");
+     // The passwordless email challenge chooses an active role from its
+     // account. Do not create a student invitation on a teacher, guardian or
+     // demo account: it could sign the child into another persona instead of
+     // the independently consented learning account. Multiple same-child
+     // student memberships across authorized Sites are still supported.
+     if(grants.some(g=>g.role!=="student"||g.isSynthetic))
+      throw new AuthorizationError("student email requires a separate, real student-only account");
    }else {
      [account]=await tx.insert(accessAccounts).values({emailNormalized:normalized})
        .returning({id:accessAccounts.id,disabled:accessAccounts.disabled});
