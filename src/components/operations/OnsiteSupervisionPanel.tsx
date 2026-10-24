@@ -15,7 +15,11 @@ const labels: Record<string,string> = {
   section_delegation_missing:"Assigned adult lacks a current, time-valid appointment to this exact Section",
   operating_agreement_missing:"CAN–church onsite supervision agreement is not currently authorized",
   facilitator_conflict:"Facilitator is assigned to overlapping instructional blocks",
-  room_unconfigured:"Physical room / duty location is not recorded in CAN OS",
+  room_unconfigured:"No current independently reviewed room/coverage document for this exact block",
+  room_capacity_unverified:"Room occupancy limit is missing or exceeded by the active Section roster",
+  child_safety_screening_missing:"No independently verified, unexpired child-safety screening covering the entire block",
+  safeguarding_training_missing:"No independently verified, unexpired safeguarding training covering the entire block",
+  qualified_backup_missing:"No separately named, qualified and available backup adult for this block",
 };
 
 /** Read-only staffing plan. This is NOT a live duty check-in or room sign-off. */
@@ -114,6 +118,9 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
               ? "Assigned facilitator: "+block.facilitatorName
               : "Facilitator assignment not verified"}
           </p>
+          {block.roomLabel&&block.roomPlanVerified&&
+            <p className="mt-1 text-xs">Reviewed planned room: {block.roomLabel}.
+              This is not an inspection or physical check-in.</p>}
           <p className="mt-1 text-xs">
             {block.assignedPlan?"Staff assignment planned; onsite check-in not verified":"Needs staff assignment review"}
           </p>
