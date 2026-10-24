@@ -118,12 +118,17 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
     return {
       siteId:site.id,date:data.date,
       statuses,
-      // Do not count a closed/unconfigured school day as a missed staffing
-      // acknowledgment. Those blocks remain visible as schedule warnings.
+      // A still-unresolved room or backup plan must not hide an otherwise
+      // legitimate adult availability response from the site's work queue.
+      // Only real instructional blocks with named authorized adults count;
+      // they are not physical-coverage confirmations.
       unacknowledged:statuses.filter((row,index)=>
         (row.status==="not_reported" || row.status==="stale_after_delegation") &&
         plan.blocks[index]?.instructionalDayConfirmed===true &&
-        plan.blocks[index]?.assignedPlan===true).length,
+        plan.blocks[index]?.periodId!==null &&
+        plan.blocks[index]?.verifiedSiteStaffGrant===true &&
+        plan.blocks[index]?.verifiedSectionDelegation===true &&
+        plan.blocks[index]?.authorizedSupervisionService===true).length,
       coverageExceptions:statuses.filter(row=>row.status==="cannot_cover" ||
         row.status==="stale_after_delegation").length,
       truncated:truncated||plan.projectionTruncated,
