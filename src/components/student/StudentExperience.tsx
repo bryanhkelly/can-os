@@ -57,13 +57,13 @@ export function StudentExperience({ liveData, success, support }: {
   </WorkspacePanel>}
   <div className="mt-10 grid gap-8 lg:grid-cols-2">
    <section>
-    <h2 className="font-serif text-3xl">Recent submitted coursework</h2>
+    <h2 className="font-serif text-3xl">Coursework</h2>
     <div className="mt-4 space-y-3">{liveData.coursework.map(item=><article key={item.assessmentId} className="rounded-xl border bg-card p-4">
-     <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold"><Link to="/student/assignments" search={{assessment:item.assessmentId}} className="hover:underline">{item.assessmentTitle}</Link></h3><p className="mt-1 text-sm text-muted-foreground">{item.instructions??"Review course instructions"}</p></div><StatusBadge tone={item.timeliness==="missing"?"attention":"neutral"}>{item.timeliness==="missing"?"Missing":item.status}</StatusBadge></div>
+     <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold"><Link to="/student/assignments" search={{assessment:item.assessmentId}} className="hover:underline">{item.assessmentTitle}</Link></h3><p className="mt-1 text-sm text-muted-foreground">{item.instructions??"Review course instructions"}</p></div><StatusBadge tone={item.timeliness==="missing"?"attention":"neutral"}>{item.timeliness==="missing"?"Missing":item.status??"Not started"}</StatusBadge></div>
      <p className="mt-3 text-xs text-muted-foreground">{item.dueAt?"Due "+format(item.dueAt):"No due date"}</p>
      <Link to="/student/assignments" search={{assessment:item.assessmentId}} className="mt-3 inline-block text-sm font-semibold underline">Open assignment →</Link>
     </article>)}
-    {!liveData.coursework.length&&<p className="rounded-xl border p-4 text-sm text-muted-foreground">No recent submission updates. See Your next learning steps for published assignments that may still need attention.</p>}</div>
+    {!liveData.coursework.length&&<p className="rounded-xl border p-4 text-sm text-muted-foreground">No published coursework in your current classes.</p>}</div>
    </section>
    <section>
     <h2 className="font-serif text-3xl">Schedule</h2>
