@@ -1,4 +1,6 @@
-import { assertCapability,assertProgramScope,assertSiteScope,AuthorizationError } from "@/domain/command-context";
+import { assertCapability,AuthorizationError } from "@/domain/command-context";
+import { authorizeClass,accessibleClasses } from "@/modules/learning/class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { createAssessment,gradeSubmission,manageAssessment,returnSubmissionForRevision } from "@/modules/learning/gradebook.functions";
 import { emitEvent,writeAudit } from "@/platform/mutation";
@@ -24,16 +26,9 @@ async function studentActor(){
 async function teacherActor(sectionId?:string){
  const context=await getCommandContext(getRequest());
  if(context.role!=="teacher"||!context.actorPersonId)throw new AuthorizationError("teacher assignment access");
- if(!context.scope.siteIds?.length)throw new AuthorizationError("teacher site membership");
- const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- if(sectionId){
-  const [section]=await db.select({siteId:schema.sections.siteId,programId:schema.sections.programId})
-   .from(schema.sectionTeachers).innerJoin(schema.sections,eq(schema.sections.id,schema.sectionTeachers.sectionId))
-   .where(and(eq(schema.sectionTeachers.personId,context.actorPersonId),eq(schema.sectionTeachers.sectionId,sectionId))).limit(1);
-  if(!section)throw new AuthorizationError("assigned teacher");
-  assertSiteScope(context,section.siteId);
-  assertProgramScope(context,section.programId);
- }
+ if(!context.scope.siteIds?.length&&!context.scope.sectionIds?.length)
+  throw new AuthorizationError("assigned teacher Site or named Section");
+ if(sectionId)await authorizeClass(context as Actor,sectionId);
  return context;
 }
 async function teacherForSubmission(submissionId:string){
@@ -50,10 +45,9 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
  if(!process.env.DATABASE_URL)return {connected:false,assignments:[]};
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const enrollmentRows=await db.select({sectionId:s.enrollments.sectionId})
- .from(s.enrollments).innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
- .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.status,"active"),eq(s.enrollments.kind,"section"),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[])));
- const ids=enrollmentRows.map(e=>e.sectionId).filter((id):id is string=>id!==null);
+ // The class directory already requires BOTH live same-year Program and
+ // Section enrollments. Withdrawn learners must not see submitted feedback.
+ const ids=[...new Set((await accessibleClasses(context as Actor)).map(row=>row.id))];
  if(!ids.length)return {connected:true,assignments:[]};
  const rows=await db.select({
   assessmentId:s.assessments.id,sectionId:s.assessments.sectionId,
@@ -103,9 +97,10 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    // Serialize this student/assessment across draft and final submission requests, 
    // including when no submission row exists to lock yet.
    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);
-   const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(
-    eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
-   if(!enrollment)throw new Error("Student is not enrolled");
+   // Only the same current student + Program + Section + year can submit.
+   // Check under the write transaction rather than trusting page state.
+   const authorized=await authorizeClass(context as Actor,assessment.sectionId,undefined,tx);
+   if(authorized.studentProfileId!==studentId)throw new AuthorizationError("student assignment identity");
    const priorRows=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
    const prior=priorRows[0];
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
@@ -202,6 +197,14 @@ export const getSyntheticAssignmentHistory=createServerFn({method:"GET"})
   const {context,studentId}=await studentActor();
   if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const [assessment]=await db.select({sectionId:s.assessments.sectionId})
+   .from(s.assessments)
+   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+   .where(and(eq(s.assessments.id,data.assessmentId),
+     inArray(s.sections.siteId,context.scope.siteIds!),
+     inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
+  if(!assessment)throw new AuthorizationError("class assignment history");
+  await authorizeClass(context as Actor,assessment.sectionId);
   const rows=await db.select({attempt:s.submissions.attemptNumber,status:s.submissions.status,
    submittedAt:s.submissions.submittedAt,score:s.submissions.score,
    response:s.submissions.response,feedback:s.submissions.feedback})
@@ -231,9 +234,8 @@ export const saveAssignmentDraft=createServerFn({method:"POST"})
    // Serialize this student/assessment across draft and final submission requests, 
    // including when no submission row exists to lock yet.
    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);
-   const [enrollment]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
-    .where(and(eq(s.enrollments.studentProfileId,studentId),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.enrollments.status,"active"))).limit(1);
-   if(!enrollment)throw new Error("Student not enrolled");
+   const authorized=await authorizeClass(context as Actor,assessment.sectionId,undefined,tx);
+   if(authorized.studentProfileId!==studentId)throw new AuthorizationError("student assignment identity");
    const [latest]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
    if(latest && !["assigned","returned"].includes(latest.status))throw new Error("Submitted work cannot be overwritten");
    if(latest?.status==="returned"){
