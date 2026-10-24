@@ -1,5 +1,44 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 supervised-day roster and canonical Section attendance (24 October 2026)
+
+**Committed code and test cases; runtime verification pending. GitHub
+Actions intentionally excluded.** Closed a church-hosted school privacy and
+physical attendance entitlement gap: a generic `site_staff` account with
+a Site grant was able to enumerate a CAN-operated church roster and
+submit/replay attendance without a named local role. The shared roster
+provider now excludes independent church-hosted Programs for generic
+staff; the canonical append-only attendance write transaction independently
+denies that role **before** idempotent replay. Ordinary schools retain their
+legacy site-staff attendance workflow.
+
+A student who merely has a Program enrollment at a church-hosted CAN
+school is no longer projected as **expected onsite** until actively placed
+in an instructional Section. The server's locked canonical attendance guard
+also requires a Section for that school type, including registrar and
+site-leader attendance entries, before an observation can be recorded.
+When a Section ID is supplied, the student's active Section seat must
+match the **actual Section's Program and Term school year**, not just its
+UUID. This prohibits false physical presence claims via stale or
+mis-keyed memberships, while preserving ordinary Program-level attendance
+behavior at non-church-hosted schools.
+
+Rollback-only integration acceptance now checks a church-owned Program's
+generic staff direct write denial and an ordinary school's wrong-year
+Section attendance denial. The existing historical attendance/absence,
+correction, guardians and supervised-day workflows remain in place.
+These new tests were authored but **not executed**. No production writes,
+deployment, additional migration, or GitHub Actions repair.
+
+**Remaining P0:** execute the complete same-child supervised day with
+original identities and witnesses on isolated storage/DB, including staff
+qualifications, full session coverage, arrival/pickup custody, and
+reconciliation. Historical school-day observations must never be treated as
+verified physical presence, custody release, or legal campus opening.
+
+---
+
+
 ## P0 guardian academic membership and returned-feedback parity (24 October 2026)
 
 **Source committed; execution not verified. No GitHub Actions work.**
