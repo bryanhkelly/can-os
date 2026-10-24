@@ -146,6 +146,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   .innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
   .where(and(
    inArray(s.assessments.sectionId, sectionIds),
+   eq(s.sections.active, true),
    inArray(s.assessments.status, ["published", "closed"]),
    lt(s.assessments.dueAt, now),
   ));
