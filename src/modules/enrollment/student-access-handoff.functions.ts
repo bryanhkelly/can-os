@@ -86,6 +86,11 @@ export const consentToStudentLearningAccount=createServerFn({method:"POST"})
    throw new AuthorizationError("real verified guardian");
   assertCapability(actor,"enrollment.apply");
   const studentEmail=normalizeAccessEmail(data.studentEmail);
+  // The real passwordless issuer deliberately never sends to .invalid.
+  // Refuse an undeliverable testing address BEFORE recording guardian consent,
+  // instead of approving an enrollment handoff whose link cannot be sent.
+  if(studentEmail.endsWith(".invalid"))
+   throw new Error("Provide a deliverable student email to receive the learning sign-in link");
   await db.transaction(async tx=>{
    const app=await eligibleStudent(tx,data.applicationId);
    if(!actor.scope.programIds?.includes(app.programId)||
