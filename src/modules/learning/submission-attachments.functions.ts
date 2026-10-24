@@ -188,7 +188,7 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
     const { context, studentId, studentPersonId } = await studentActor();
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async (tx) => {
-      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context.scope.siteIds!,context.scope.programIds??[]);
+      const assessment = await requireEnrolledAssessment(tx, s, data.assessmentId, studentId, context as Actor);
       // Serialize with draft/submit writes for this student+assessment.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);
       const [document] = await tx.select({ id: s.documents.id,storageKey:s.documents.storageKey,mimeType:s.documents.mimeType,metadata:s.documents.metadata,verifiedAt:s.documents.verifiedAt,expiresAt:s.documents.expiresAt }).from(s.documents).where(and(
