@@ -308,6 +308,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
         });
       }
     }
+    const completeProjection=!(projectionTruncated||roomEvidence.truncated);
     const projection=summarizeOnsiteSupervision(result);
     // Person IDs are needed for overlap detection, not for the client.
     const blocks=projection.blocks.map(({
@@ -327,13 +328,13 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
       ])).digest("hex"),
       // Derived ONLY from the verified, original site grant and current active
       // instruction plan. Never accept a browser-supplied facilitator ID.
-      canRespond:!projectionTruncated && data.date===today &&
+      canRespond:completeProjection && data.date===today &&
         assignedPersonId===actor.actorPersonId && block.verifiedSiteStaffGrant &&
         block.instructionalDayConfirmed===true &&
         block.periodId!==null && block.startsAtLocal!==null && block.endsAtLocal!==null,
-      canAccept:!projectionTruncated && data.date===today &&
+      canAccept:completeProjection && data.date===today &&
         assignedPersonId===actor.actorPersonId && block.assignedPlan,
     }));
-    return {date:data.date,siteId:site.id,projectionTruncated,
-      ...projection,blocks};
+    return {date:data.date,siteId:site.id,
+      projectionTruncated:!completeProjection,...projection,blocks};
   });
