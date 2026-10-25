@@ -219,7 +219,7 @@ export async function accessibleClasses(actor: Actor) {
     lastName: s.people.legalLastName,
   }).from(s.sections)
     .innerJoin(s.enrollments, and(
-      eq(s.enrollments.sectionId, sectionId),
+      eq(s.enrollments.sectionId, s.sections.id),
       eq(s.enrollments.kind, "section"),
       eq(s.enrollments.status, "active"),
     ))
