@@ -5,6 +5,7 @@ import {
   programs, programResponsibilityAssignments, roleAssignments,
   schoolConfigurationVersions, sites,
 } from "@/db/schema";
+import { schoolOpeningDecisionSchema, type SchoolOpeningDecision } from "@/domain/school-opening-decision";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
@@ -177,13 +178,10 @@ export async function requireCurrentChurchSchoolOpening(
 }
 
 export async function decideChurchSchoolOpening(
-  actor:AccessContext,input:{
-    programId:string;decision:"approve"|"suspend";reason:string;
-  },
+  actor:AccessContext,input:SchoolOpeningDecision,
 ) {
-  const reason=input.reason.trim();
-  if(reason.length<10 || reason.length>500)
-    throw new Error("School opening decision requires a 10–500 character reason");
+  input=schoolOpeningDecisionSchema.parse(input);
+  const reason=input.reason;
   return db.transaction(async tx=>{
     const [locked]=await tx.select({id:programs.id}).from(programs)
       .where(eq(programs.id,input.programId)).for("update").limit(1);
@@ -191,6 +189,10 @@ export async function decideChurchSchoolOpening(
     const school=await schoolIdentity(tx,input.programId);
     verifyCANSchoolApprover(actor,school.institutionId);
     const configuration=await latestConfiguration(tx,input.programId);
+    // The Program lock serializes opening decisions; never silently retarget
+    // a review of an older configuration to the latest draft.
+    if(configuration.id!==input.configurationId || configuration.version!==input.expectedVersion)
+      throw new Error("School configuration changed. Reload the review before recording a decision.");
     const now=new Date();
     if(input.decision==="approve"){
       if(configuration.status!=="draft")
@@ -239,7 +241,7 @@ export async function decideChurchSchoolOpening(
       eventType:"ChurchSchoolOpeningSuspended",aggregateType:"school_configuration_version",
       aggregateId:configuration.id,actorPersonId:actor.actorPersonId,
       organizationId:school.institutionId,siteId:school.siteId,
-      programId:input.programId,payload:{reason},
+      programId:input.programId,payload:{reason,version:configuration.version},
     });
     return {configurationId:configuration.id,status:"suspended" as const};
   });

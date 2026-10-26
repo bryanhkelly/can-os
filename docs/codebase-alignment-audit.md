@@ -56,7 +56,7 @@ reload the workspace to discard mounted state and caches.
 | Agreement desk and opening review | Evidence selection and reviewed-version decisions | Future evidence picker/review shell; retain independent domain authorization. Medium/high. |
 | Guided school journey and operational snapshot | Evidence-backed status and next actions | Future structured domain projections; aggregate activity counts must not become release approval. Medium/high. |
 
-## Current bite: site staffing client lifecycle
+## Completed bite: site staffing client lifecycle
 
 - Reuse the root QueryClient and existing QueryState.
 - Key every read by Program and read-model identity. Do not retain another
@@ -75,8 +75,8 @@ reload the workspace to discard mounted state and caches.
 
 ## Ordered continuation and risk
 
-1. Shared site staffing reads/mutations and query retry UI (current bite).
-2. Evidence selection and version-bound review decisions.
+1. Shared site staffing reads/mutations and query retry UI (completed).
+2. School-opening version binding (completed); evidence selection is next.
 3. Shared appointment/date UI after inclusive/exclusive and Site-timezone
    semantics are resolved; no cosmetic schema rename.
 4. Domain-evaluated journey evidence and authorized next actions.
@@ -113,3 +113,36 @@ been exhaustively audited. Preserve this distinction when extending the report.
 The shared appointment input types are inferred from their existing owning Zod
 schemas. No validation rules, server authorization, database fields or routes
 were renamed or replaced.
+
+## School-opening review version binding
+
+Baseline for this bite: FullFlow `ee20d250d9fc5d3765669a55c7cbe3d029600a94`.
+
+The opening panel previously sent only Program, decision and reason, while the
+service selected the latest configuration. A review of version 1 could therefore
+act on a newer draft. The canonical `schoolOpeningDecisionSchema` now requires
+the reviewed configuration ID and expected version at both the transport and
+direct command boundaries. The existing Program lock is acquired before the
+current configuration is compared; mismatches produce no decision writes,
+audit records or domain events. Both approval and suspension are version-bound.
+
+Current reviewer authorization, agreement, document verification and director
+checks remain in their owning services. Suspension still does not require a
+valid agreement or current evidence. This change does not introduce a new
+approval engine or an evidence-selection UI. Matching configuration identity
+is not proof that a reviewer inspected every document; evidence presentation
+and document snapshot/version binding remain separate follow-up work.
+
+The panel submits the displayed configuration, ignores disposed read responses,
+and requires an explicit reload after a stale decision. Reload clears the old
+reason so it cannot be reused silently for the replacement configuration. A
+saved decision remains visibly saved if the subsequent read fails. Requests
+from old clients without review identity fail closed and require a reload.
+
+Executed validation: 6 unit files / 35 tests passed, including 18 new decision
+and panel regressions; production client/server build, 86-route contracts and
+mutation hygiene passed. Full typechecking retained 47 baseline errors with
+no new diagnostic messages after accounting for changed source line numbers.
+Service tests use mocked database and request boundaries; they do not prove a
+separate-connection race or live persistence. Live Neon and authenticated
+browser acceptance remain unverified.
