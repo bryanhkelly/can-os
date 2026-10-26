@@ -140,7 +140,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           <div className="mt-4 flex flex-wrap gap-2">
             {years.filter(year => canIssueAnotherOffer(x.stage, x.outstandingRequirements, x.offers, year.id,new Date(),x.disposition)).map(year => <button key={year.id} disabled={busy !== null} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(x.id, () => issueAdmissionOffer({ data: { applicationId: x.id, schoolYearId: year.id } }))}>Registrar: Issue offer · {year.name}</button>)}
             {latest?.status === "issued" && <p className="text-xs text-muted-foreground">Waiting for guardian response in the guardian enrollment-offers workspace.</p>}
-            {latest?.status === "accepted" && !activated && <p role="status" className="text-xs">Accepted offer ready. Select a staffed class below to activate enrollment and placement together.</p>}}
+            {latest?.status === "accepted" && !activated && <p role="status" className="text-xs">Accepted offer ready. Select a staffed class below to activate enrollment and placement together.</p>}
           </div>
           {x.offers.filter(offer=>offer.status==="issued").map(offer=><OfferWithdrawal key={offer.id} offerId={offer.id}/>)}
           {(x.enrollments.length > 0 || latest?.status === "accepted") &&

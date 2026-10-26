@@ -26,7 +26,7 @@ function PublicEnrichment() {
         {item.firstMeeting && item.meetingTimezone && <p className="mt-1 text-sm text-muted-foreground">
           First session: {new Intl.DateTimeFormat("en-US",{dateStyle:"medium",
             timeStyle:"short",timeZone:item.meetingTimezone}).format(new Date(item.firstMeeting))}
-        </p>
+        </p>}
         <p className="mt-3 text-sm">
           {new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(
             (item.packages.length ? Math.min(...item.packages.map(p=>p.priceCents)) :

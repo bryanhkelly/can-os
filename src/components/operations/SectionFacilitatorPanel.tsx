@@ -17,8 +17,9 @@ export function SectionFacilitatorPanel({ programId }: { programId: string }) {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const reload = useCallback(async () => setData(
-    await getSectionFacilitatorPlanning({ data: { programId } }), [programId]);
+  const reload = useCallback(async () => {
+    setData(await getSectionFacilitatorPlanning({ data: { programId } }));
+  }, [programId]);
   useEffect(() => { void reload().catch(error => setError(
     error instanceof Error ? error.message : "Cannot load Section staffing"));
   }, [reload]);
