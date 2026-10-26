@@ -318,6 +318,12 @@ integration("Church-owned Site with independently authorized CAN academic servic
           "@/modules/enrollment/instructional-section-readiness.server");
         const {verifiedTeacherSectionIds}=await import(
           "@/modules/enrollment/verified-section-teachers.server");
+        const {enablePublishedPolicyInRollback}=await import("./helpers/published-policy");
+        await enablePublishedPolicyInRollback(tx);
+        const {createTeachingQualificationFixture}=await import("./helpers/teaching-qualification");
+        await createTeachingQualificationFixture(tx,{
+          sectionId:section!.id,personId:canPerson.id,verifierPersonId:verifierPerson.id,
+        });
         expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(true);
         await tx.update(s.accountPersonGrants).set({active:false})
           .where(eq(s.accountPersonGrants.id,canGrant.id));

@@ -66,6 +66,14 @@ describe("section allocation prerequisites", () => {
     await db.insert(s.sectionTeachers).values({
       sectionId:advanced.id,personId:instructor!.id,
     });
+    await db.insert(s.roleAssignments).values({
+      personId:instructor!.id,organizationId:org!.id,siteId:site!.id,
+      programId:program!.id,roleKey:"teacher",
+    });
+    const {createTeachingQualificationFixture}=await import("./helpers/teaching-qualification");
+    await createTeachingQualificationFixture(db,{
+      sectionId:advanced.id,personId:instructor!.id,verifierPersonId:person!.id,
+    });
     await replaceSectionRegistrationPolicy(db, {
       sectionId: advanced.id, enrollmentCapacity: 10, prerequisites: [courses[0]!.code],
       addDropEndsOn: time.term.endsOn, withdrawalEndsOn: time.term.endsOn,

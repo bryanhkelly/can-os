@@ -341,3 +341,41 @@ identity/delegation suite passed 24 checks after extraction. Production build,
 86-route contracts and mutation hygiene passed. Full typecheck retains the same
 47 baseline diagnostics. Qualification service tests use mocked DB boundaries;
 live Neon and authenticated browser acceptance remain unverified.
+
+
+## Placement adopts full-term teaching eligibility
+
+Baseline: FullFlow `d9809d65fcb8a10edb83e8fdfc077570220b2891`.
+
+verifiedTeacherSectionIds now enumerates active Section assignments and calls the
+canonical staffing evaluator with instructional_window and requireAssignment:true.
+It returns a Section only when at least one assigned instructor passes. Duplicate
+pairs are evaluated once per call; a successful teacher ends evaluation for that
+Section. Results are not cached between preview and command. The same supplied
+executor/transaction is passed into every eligibility check. Infrastructure or
+canonical scope failures propagate instead of being presented as a successful
+empty readiness result.
+
+The existing registrar preview, transactional allocation and family instructional
+readiness consumers now include qualification coverage through this adapter.
+Contract, published-content, capacity, student scope and registration-window gates
+remain separate and unchanged. The placement denial explains the full-term
+qualification requirement. This is a stricter gate: accounts and assignments
+without published qualification policy/evidence no longer count as staffed.
+
+Added explicit synthetic policy/claim fixtures to admissions-handoff, allocation
+and CAN/church acceptance. Admissions acceptance now withdraws a credential and
+expects both preview and placement to deny before independently reapproving it.
+These fixture updates are source changes, not claims of executed live acceptance.
+
+Validation: 3 focused unit files / 28 tests passed. The expanded disposable local
+PGlite PostgreSQL suite passed 28 checks, including real latest-review selection,
+revocation/reapproval, missing published policy, mid-term expiry, missing assignment
+and identity/delegation failures. Production build, 86-route contracts and mutation
+hygiene passed. Full typecheck retains 47 baseline diagnostics. Live Neon, separate
+connection concurrency and authenticated browser acceptance remain unverified.
+
+Next: classroom access and its directory must adopt the shared current-time
+evaluator while preserving session scope, exact Section relationships and
+institutional agreements. Cross-flow acceptance remains required before declaring
+teaching eligibility fully reconciled.

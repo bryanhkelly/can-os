@@ -490,6 +490,17 @@ integration("cross-persona admissions through active classes",()=>{
       organizationId:org.id,siteId:site.id,
     });
     await tx.insert(s.sectionTeachers).values({sectionId:section.id,personId:classTeacher.id});
+    await tx.insert(s.roleAssignments).values({
+      personId:classTeacher.id,organizationId:org.id,siteId:site.id,
+      programId:program.id,roleKey:"teacher",
+    });
+    const {enablePublishedPolicyInRollback}=await import("./helpers/published-policy");
+    await enablePublishedPolicyInRollback(tx);
+    const {createTeachingQualificationFixture}=await import("./helpers/teaching-qualification");
+    const teacherQualification=await createTeachingQualificationFixture(tx,{
+      sectionId:section.id,personId:classTeacher.id,verifierPersonId:registrar.id,
+    });
+
     // The family-to-class preview and actual placement must agree on
     // verified sign-in status, not merely the existence of a staff row.
     await tx.update(s.accessAccounts).set({disabled:true})
@@ -504,6 +515,17 @@ integration("cross-persona admissions through active classes",()=>{
       .toEqual(expect.arrayContaining([expect.objectContaining({
         id:section.id,staffed:true,curriculumReady:true,readyForPlacement:true,
       })]));
+    // Current account access cannot compensate for withdrawn qualification evidence.
+    await tx.insert(s.qualificationVerificationEvents).values({
+      claimId:teacherQualification.claimId,sequence:2,decision:"revoke",actorPersonId:registrar.id,
+    });
+    expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
+      .toEqual(expect.arrayContaining([expect.objectContaining({id:section.id,staffed:false,readyForPlacement:false})]));
+    await expect(placeEnrolledStudent({data:{applicationId,sectionId:section.id}}))
+      .rejects.toThrow("qualifications covering the instructional term");
+    await tx.insert(s.qualificationVerificationEvents).values({
+      claimId:teacherQualification.claimId,sequence:3,decision:"approve",actorPersonId:registrar.id,
+    });
     await placeEnrolledStudent({data:{applicationId,sectionId:section.id}});
     expect(await placeEnrolledStudent({data:{applicationId,sectionId:section.id}})).toMatchObject({created:false});
     // Once the single-seat Section is occupied, the registrar must not

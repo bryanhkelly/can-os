@@ -1,3 +1,4 @@
+import type { TeachingEligibilityReader } from "@/modules/staffing/teaching-eligibility.server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { courseTemplateVersions, programs, sections } from "@/db/schema";
@@ -14,7 +15,7 @@ import { requireChurchHostedOperatingServices } from "@/modules/programs/program
  */
 export async function staffedPublishedSectionIds(
   ids:readonly string[],
-  executor:Pick<typeof db,"select">=db,
+  executor:TeachingEligibilityReader=db,
 ):Promise<Set<string>> {
   if(!ids.length)return new Set();
   const teacherSections=await verifiedTeacherSectionIds(ids,executor);
