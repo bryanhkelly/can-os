@@ -419,3 +419,54 @@ export async function listCANOperatingAuthorizationDesk(actor: AccessContext) {
     .orderBy(desc(programSiteAuthorizations.requestedAt)).limit(100);
   return { authorizations: requests };
 }
+
+
+/** Minimal metadata for the independent reviewer of one pending request.
+ * Selection is advisory; the approval command revalidates evidence and parties.
+ * This read grants no document download or storage access.
+ */
+export async function listOperatingAgreementEvidence(
+  actor: AccessContext, input: { authorizationId: string; effectiveThrough: Date },
+) {
+  const at = new Date();
+  if (!Number.isFinite(input.effectiveThrough.getTime()) || input.effectiveThrough <= at)
+    throw new Error("Choose a future exclusive end date for the agreement");
+  const [request] = await db.select().from(programSiteAuthorizations)
+    .where(eq(programSiteAuthorizations.id, input.authorizationId)).limit(1);
+  if (!request) throw new AuthorizationError("existing authorization request");
+  const identity = await loadOperatingIdentity(db, request.programId);
+  assertIndependentCANReviewer(actor, identity);
+  if (identity.siteId !== request.siteId ||
+      identity.hostOrganizationId !== request.hostOrganizationId ||
+      identity.institutionOrganizationId !== request.institutionOrganizationId ||
+      actor.actorPersonId === request.requestedByPersonId)
+    throw new AuthorizationError("independent reviewer of unchanged Program-Site parties");
+  if (request.status !== "requested")
+    throw new Error("Evidence selection requires a pending authorization request");
+  const rows = await db.select({
+    id: documents.id, fileName: documents.fileName,
+    subjectType: documents.subjectType, subjectId: documents.subjectId,
+    category: documents.category, verifiedAt: documents.verifiedAt,
+    verifiedByPersonId: documents.verifiedByPersonId,
+    expiresAt: documents.expiresAt, metadata: documents.metadata,
+  }).from(documents).where(and(
+    eq(documents.subjectType, "program"),
+    eq(documents.subjectId, identity.programId),
+    eq(documents.category, "program_site_operating_agreement"),
+  )).orderBy(desc(documents.createdAt), desc(documents.id)).limit(101);
+  const candidates = rows.slice(0, 100).flatMap(doc => {
+    try {
+      assertOperatingAgreementEvidence(doc, identity, request.services,
+        request.requestedByPersonId, actor.actorPersonId!, input.effectiveThrough, at);
+      return [{
+        id: doc.id, fileName: doc.fileName,
+        verifiedAt: doc.verifiedAt!.toISOString(),
+        expiresAt: doc.expiresAt?.toISOString() ?? null,
+      }];
+    } catch (error) {
+      if (!(error instanceof AuthorizationError)) throw error;
+      return [];
+    }
+  });
+  return { candidates, truncated: rows.length > 100 };
+}

@@ -73,3 +73,19 @@ export const listCANOperatingAuthorizationDeskFn = createServerFn({ method:"GET"
     ]);
     return listCANOperatingAuthorizationDesk(await getCommandContext(getRequest()));
   });
+
+
+export const listOperatingAgreementEvidenceFn = createServerFn({ method: "GET" })
+  .validator((value: unknown) => z.object({
+    authorizationId: uuid,
+    effectiveThrough: z.string().datetime({ offset: true }),
+  }).strict().parse(value))
+  .handler(async ({ data }) => {
+    const [{ getCommandContext }, { listOperatingAgreementEvidence }] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./program-site-authorization.server"),
+    ]);
+    return listOperatingAgreementEvidence(await getCommandContext(getRequest()), {
+      ...data, effectiveThrough: new Date(data.effectiveThrough),
+    });
+  });

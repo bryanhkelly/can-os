@@ -146,3 +146,38 @@ no new diagnostic messages after accounting for changed source line numbers.
 Service tests use mocked database and request boundaries; they do not prove a
 separate-connection race or live persistence. Live Neon and authenticated
 browser acceptance remain unverified.
+
+
+## Reusable agreement evidence selection
+
+Baseline: FullFlow `0d7b929cd3fdad6207d15ce0820d27bc14983154`.
+
+The CAN operating authorization desk now uses a shared `EvidencePicker` for
+filename selection, verification/expiry presentation, and loading/error/empty
+states through `QueryState`. Its domain adapter supplies authorized candidates
+for one pending request and exclusive end date. Changing the end date clears
+the selection; query keys separate request and date, and unavailable or
+refreshing results clear prior selections.
+
+The owning Program authorization service resolves canonical contracting parties,
+checks the independent CAN reviewer, and rejects changed parties or reviewed
+requests before reading document metadata. It reuses
+`assertOperatingAgreementEvidence` for requested services, third-party verification,
+signatures and coverage through the selected end. Only ID, filename, verification
+date and expiry leave the service. No private bytes, storage keys, unrestricted
+search or download authority are added. The scan covers the latest 100 Program
+agreement documents and explicitly reports truncation. Final approval still
+revalidates evidence in its existing transaction.
+
+This is the first consumer of the reusable evidence presentation component.
+Opening-review evidence presentation remains a next adoption opportunity; each
+domain must supply its own authorized projection. Document snapshot/version
+binding and authenticated document preview are not implemented by this bite.
+Existing UTC date boundaries remain unchanged.
+
+Validation: 4 unit files / 26 tests passed, including scoped service denials,
+minimal projection, eligibility filtering, bounded results, shared presentation
+and request/date cache isolation. Production client/server build, 86-route
+contracts and mutation hygiene passed. Full typecheck retains the 47 baseline
+errors with no new diagnostics. Tests mock database boundaries or render UI
+without a browser; live Neon and authenticated browser acceptance are unverified.

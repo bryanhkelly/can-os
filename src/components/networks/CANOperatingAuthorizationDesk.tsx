@@ -1,3 +1,4 @@
+import { OperatingAgreementEvidencePicker } from "./OperatingAgreementEvidencePicker";
 import { useCallback, useEffect, useState } from "react";
 import { CANAcademicStaffDelegationPanel } from "./CANAcademicStaffDelegationPanel";
 import { SchoolOpeningReviewPanel } from "@/components/operations/SchoolOpeningReviewPanel";
@@ -17,7 +18,7 @@ export function CANOperatingAuthorizationDesk() {
   const load=useCallback(async()=>{setDesk(await listCANOperatingAuthorizationDeskFn());},[]);
   useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:"Unable to load operating authorizations"));},[load]);
   const update=(id:string,key:"evidence"|"from"|"through"|"reason",value:string)=>
-    setInputs(rows=>({...rows,[id]:{evidence:"",from:"",through:"",reason:"",...rows[id],[key]:value}}));
+    setInputs(rows=>({...rows,[id]:{evidence:"",from:"",through:"",reason:"",...rows[id],[key]:value,...(key==="through"?{evidence:""}:{})}}));
   async function decide(id:string,decision:"approved"|"denied"|"revoked") {
     const value=inputs[id]??{evidence:"",from:"",through:"",reason:""};
     setBusy(true);setNotice("");setError("");
@@ -54,10 +55,11 @@ export function CANOperatingAuthorizationDesk() {
           <p className="mt-1 text-xs">{item.status} · Version {item.version} · {item.services.join(", ")}</p>
           {(item.status==="requested"||item.status==="approved")&&<div className="mt-3 grid gap-2 sm:grid-cols-2">
             {item.status==="requested"&&<>
-              <label className="text-xs sm:col-span-2">Independently verified two-party agreement document ID
-                <input className="mt-1 w-full rounded border bg-background p-2" value={value.evidence}
-                  onChange={e=>update(item.id,"evidence",e.target.value)}/>
-              </label>
+              <div className="sm:col-span-2">
+                <OperatingAgreementEvidencePicker key={item.id} authorizationId={item.id}
+                  through={value.through} value={value.evidence} disabled={busy}
+                  onChange={id=>update(item.id,"evidence",id)}/>
+              </div>
               <label className="text-xs">Effective from
                 <input type="date" className="mt-1 w-full rounded border bg-background p-2" value={value.from}
                   onChange={e=>update(item.id,"from",e.target.value)}/>
