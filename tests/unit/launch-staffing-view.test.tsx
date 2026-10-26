@@ -109,3 +109,7 @@ describe("launch staffing presentation", () => {
     expect(html).toContain("Publish policy revision");
   });
 });
+
+// Child staffing panels have their own query and authorization tests.
+vi.mock("@/components/operations/LocalSiteDelegationPanel",()=>({LocalSiteDelegationPanel:()=>null}));
+vi.mock("@/components/operations/SectionFacilitatorPanel",()=>({SectionFacilitatorPanel:()=>null}));

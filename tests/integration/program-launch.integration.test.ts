@@ -325,14 +325,27 @@ integration("GF3 host / program launch", () => {
         {personId:delegatedTeacher.id,organizationId:canOrg.id,
           programId:launch.programId,roleKey:"teacher"},
       ]);
+      for (const person of [launchTeacher,networkWideTeacher,delegatedTeacher]) {
+        const [account]=await db.insert(schema.accessAccounts).values({
+          emailNormalized:"launch-provider-"+person.id+"@example.com",emailVerifiedAt:new Date(),
+        }).returning();
+        await db.insert(schema.accountPersonGrants).values({
+          accountId:account.id,personId:person.id,organizationId:canOrg.id,
+          siteId:null,role:"teacher",active:true,isSynthetic:false,
+        });
+      }
       const teacherChoices=await launchAcademics.getLaunchAcademicSetup({data:{programId:launch.programId}});
       const visibleTeacherIds=teacherChoices.teachingStaff.map(teacher=>teacher.personId);
       expect(visibleTeacherIds).not.toContain(networkWideTeacher.id);
+      expect(visibleTeacherIds).not.toContain(launchTeacher.id);
       expect(visibleTeacherIds).toContain(delegatedTeacher.id);
       const candidateIds=teacherChoices.sections.flatMap(section=>section.candidates.map(candidate=>candidate.personId));
       expect(candidateIds).not.toContain(networkWideTeacher.id);
       expect(candidateIds).toContain(delegatedTeacher.id);
 
+      // A host role must not count as CAN instruction, even with a CAN account.
+      await db.update(schema.roleAssignments).set({organizationId:canOrg.id})
+        .where(eq(schema.roleAssignments.personId,launchTeacher.id));
       const [claim] = await db.insert(schema.qualificationClaims).values({
         personId: launchTeacher.id, definitionId: qualification.id,
         issuedAt: new Date("2027-01-01"), expiresAt: new Date("2028-01-01"),

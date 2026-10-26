@@ -105,6 +105,18 @@ integration("registrar staffing to launch handoff", () => {
         const receiverGrant=first(await tx.insert(s.accountPersonGrants).values({
           accountId:receiverAccount.id,personId:receiver.id,organizationId:org.id,siteId:site.id,role:"registrar",
         }).returning());
+        // Use the same usable teacher identity required by placement.
+        for (const person of [teacher, coTeacher, outsider]) {
+          const account=first(await tx.insert(s.accessAccounts).values({
+            emailNormalized:"launch-teacher-"+person.id+"@example.com",
+            emailVerifiedAt:new Date(),
+          }).returning());
+          await tx.insert(s.accountPersonGrants).values({
+            accountId:account.id,personId:person.id,organizationId:org.id,
+            siteId:person.id===outsider.id?otherSite.id:site.id,
+            role:"teacher",active:true,isSynthetic:false,
+          });
+        }
         teacherId = teacher.id;
         await tx.insert(s.memberships).values([teacher, registrar, coTeacher, outsider].map(person => ({
           organizationId: org.id, personId: person.id,
@@ -225,7 +237,7 @@ integration("registrar staffing to launch handoff", () => {
         await expect(launch.assignLaunchTeacher({ data: assignment })).rejects.toThrow("policy not configured");
         await tx.update(s.complianceFrameworkVersions).set({ status: "published" }).where(eq(s.complianceFrameworkVersions.id, published.versionId));
         await expect(launch.assignLaunchTeacher({ data: assignment })).rejects.toThrow("No current verified credential");
-        await expect(launch.assignLaunchTeacher({ data: { ...assignment, teacherPersonId: outsider.id } })).rejects.toThrow("Teacher role");
+        await expect(launch.assignLaunchTeacher({ data: { ...assignment, teacherPersonId: outsider.id } })).rejects.toThrow("provider-owned teacher role");
 
         async function verifiedClaim(personId: string, definitionId = definition.id, issuedAt = "2027-01-01T00:00:00.000Z") {
           act("teacher", personId);
@@ -319,6 +331,18 @@ integration("registrar staffing to launch handoff", () => {
         state.actor = registrarActor;
         expect(await launch.assignLaunchTeacher({ data: assignment })).toEqual({ created: true });
         expect(await launch.assignLaunchTeacher({ data: assignment })).toEqual({ created: false });
+        const {verifiedTeacherSectionIds}=await import("@/modules/enrollment/verified-section-teachers.server");
+        const [teacherAccess]=await tx.select({accountId:s.accountPersonGrants.accountId})
+          .from(s.accountPersonGrants).where(eq(s.accountPersonGrants.personId,teacher.id)).limit(1);
+        if(!teacherAccess)throw new Error("Missing verified teacher account");
+        expect(await verifiedTeacherSectionIds([section.sectionId],tx)).toContain(section.sectionId);
+        await tx.update(s.accessAccounts).set({disabled:true}).where(eq(s.accessAccounts.id,teacherAccess.accountId));
+        expect((await evaluateLaunchTeacher(section.sectionId,teacher.id,tx)).eligible).toBe(false);
+        expect(await verifiedTeacherSectionIds([section.sectionId],tx)).not.toContain(section.sectionId);
+        await tx.update(s.accessAccounts).set({disabled:false}).where(eq(s.accessAccounts.id,teacherAccess.accountId));
+        expect((await evaluateLaunchTeacher(section.sectionId,teacher.id,tx)).eligible).toBe(true);
+        expect(await verifiedTeacherSectionIds([section.sectionId],tx)).toContain(section.sectionId);
+
         expect((await accessibleClasses(teacherActor)).map(row => row.id)).toEqual([section.sectionId]);
         expect((await authorizeClass(teacherActor, section.sectionId)).section.id).toBe(section.sectionId);
         const otherActor = act("teacher", outsider.id);
@@ -588,7 +612,7 @@ integration("registrar staffing to launch handoff", () => {
         expect(credentialAudits.filter(row=>row.action==="qualification.verification.decided")).toHaveLength(13);
         const { replaceSectionTeacher } = await import("@/modules/programs/section-lifecycle-service");
         await expect(replaceSectionTeacher(registrarActor, { sectionId: section.sectionId,
-          oldPersonId: teacher.id, newPersonId: outsider.id, reason: "Synthetic replacement denial" })).rejects.toThrow("Teacher role");
+          oldPersonId: teacher.id, newPersonId: outsider.id, reason: "Synthetic replacement denial" })).rejects.toThrow("provider-owned teacher role");
         await replaceSectionTeacher(registrarActor, { sectionId: section.sectionId,
           oldPersonId: teacher.id, newPersonId: coTeacher.id, reason: "Synthetic approved replacement" });
         expect((await accessibleClasses(teacherActor)).map(row => row.id)).toEqual([secondSection.sectionId]);

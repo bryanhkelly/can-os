@@ -246,6 +246,13 @@ integration("FullFlow: one school, same high-school program through curriculum a
         const teacher = first(await tx.insert(s.people).values({
           legalFirstName: "FullFlow", legalLastName: "Algebra Instructor",
         }).returning());
+        const teacherAccount=first(await tx.insert(s.accessAccounts).values({
+          emailNormalized:"fullflow-teacher-"+teacher.id+"@example.com",emailVerifiedAt:new Date(),
+        }).returning());
+        await tx.insert(s.accountPersonGrants).values({
+          accountId:teacherAccount.id,personId:teacher.id,organizationId:school.id,
+          siteId:site.id,role:"teacher",active:true,isSynthetic:false,
+        });
         await tx.insert(s.roleAssignments).values({
           personId: teacher.id, organizationId: school.id, siteId: site.id,
           programId, roleKey: "teacher",

@@ -1,3 +1,4 @@
+import { verifiedTeacherAccountPredicate } from "@/modules/identity/teaching-eligibility.server";
 import { and, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import {
@@ -14,12 +15,8 @@ import { evaluateQualificationCoverage, instructionalWindow, type CoveragePolicy
 
 type Reader = Pick<Database, "select" | "selectDistinctOn">;
 
-/**
- * The host may nominate existing teachers in its own organization. An
- * independent CAN academic provider may expose ONLY teachers explicitly
- * delegated to this host Program; a network-wide teacher role alone must not
- * leak a provider's personnel directory or authorize cross-tenant instruction.
- * Keep both the launch picker and assignment check on this same predicate.
+/** Provider-owned role and verified account authority shared by the launch
+ * picker and assignment evaluation. Qualification coverage is checked separately.
  */
 export function launchTeacherRolePredicate(scope: {
   organizationId: string; providerId: string; programId: string; siteId: string;
@@ -27,12 +24,16 @@ export function launchTeacherRolePredicate(scope: {
   return and(
     eq(roleAssignments.roleKey,"teacher"),
     or(isNull(roleAssignments.siteId),eq(roleAssignments.siteId,scope.siteId)),
-    or(
-      and(eq(roleAssignments.organizationId,scope.organizationId),
-        or(isNull(roleAssignments.programId),eq(roleAssignments.programId,scope.programId))),
-      and(eq(roleAssignments.organizationId,scope.providerId),
-        eq(roleAssignments.programId,scope.programId)),
-    ),
+    eq(roleAssignments.organizationId,scope.providerId),
+    scope.organizationId===scope.providerId
+      ? or(isNull(roleAssignments.programId),eq(roleAssignments.programId,scope.programId))
+      : eq(roleAssignments.programId,scope.programId),
+    verifiedTeacherAccountPredicate({
+      personId:roleAssignments.personId,
+      hostOrganizationId:scope.organizationId,
+      providerOrganizationId:scope.providerId,
+      siteId:scope.siteId,
+    }),
   );
 }
 
@@ -69,7 +70,7 @@ export async function evaluateLaunchTeacher(sectionId: string, personId: string,
       programId:section.programId,siteId:section.siteId,
     }),
   )).orderBy(roleAssignments.id).limit(1);
-  if (!role) return { eligible: false, reasons: ["Teacher role is not granted for this program and site."],
+  if (!role) return { eligible: false, reasons: ["A provider-owned teacher role and active verified account are required for this program and site."],
     policyRuleIds: [], claimIds: [], verificationEventIds: [], roleAssignmentId: null, window: section.window };
 
   const policies = await executor.select({

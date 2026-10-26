@@ -264,3 +264,42 @@ Next priority: reconcile PR #175 and FullFlow into one canonical teaching
 eligibility decision, adopting it incrementally in launch, placement and classroom
 authorization with explicit term/current horizons. Connected A/B acceptance and CI
 diagnosis precede further Golden Flow step-catalog work.
+
+
+## Teacher identity reconciliation, first bounded bite
+
+Baseline: FullFlow `38019c24dbec9c49efcc37b0b83ee90b087eeccb`.
+Compared PR #175 at `250746e2b4f996e66b25ce5d39b535a03216ea01`, specifically
+its staffing teaching-eligibility service. No PR merge or second competing
+eligibility service was introduced.
+
+The existing identity module now owns one verifiedTeacherAccountPredicate used
+by both launch teacher selection/evaluation and enrollment's verified-teacher
+projection. It checks active Person, active nonsynthetic teacher grant, enabled
+email-verified account and original academic-provider Organization. Site-scoped
+grants remain valid when the host operates academics; external providers require
+an Organization-wide account grant. Launch roles now belong to the academic
+provider and require exact Program delegation when the provider differs from the
+host. This adopts the provider-role/account rules identified in PR #175 while
+preserving FullFlow's existing live delegation rechecks.
+
+Launch full-term qualification checks remain in place. Placement qualifications,
+current-vs-term horizons, contractual composition and classroom adoption are NOT
+consolidated by this bite. The canonical evaluateTeachingEligibility work remains
+open; this shared account prerequisite must be reused there, not copied.
+
+Updated launch-staffing, program-launch and full-flow acceptance fixtures to use
+verified teacher accounts. Program-launch explicitly rejects a host-only role
+before granting provider authority. Launch-staffing includes an account-disable
+regression asserting agreement with placement. The older launch-view unit test
+needed isolated mocks for its newer child staffing panels; those panels already
+have separate tests.
+
+Validation: 3 unit files / 19 tests passed; 24 checks executed against disposable
+local PGlite PostgreSQL, including cross-person correlation, provider/host/site
+scope, disabled/unverified accounts, inactive/synthetic grants and delegation
+revocation. The PGlite harness is local test infrastructure, not a new application
+dependency or a live Neon acceptance result. Production build, 86-route contracts
+and mutation hygiene passed. Full typecheck retains the same 47 diagnostics.
+Updated live integration scenarios and authenticated browser acceptance remain
+unverified; no configured disposable Neon database was used.
