@@ -64,7 +64,7 @@ function mount(){
 const review={
   programId:"11111111-1111-4111-8111-111111111111",
   configurationId:"22222222-2222-4222-8222-222222222222",
-  version:1,status:"draft",evidenceReady:true,evidenceRequired:["facility"],approvedAt:null,
+  evidence:[],evidenceIssue:null,version:1,status:"draft",evidenceReady:true,evidenceRequired:["facility"],approvedAt:null,
 };
 beforeEach(()=>{
   vi.clearAllMocks();state.slots=[];state.cursor=0;state.effects=[];
@@ -127,4 +127,19 @@ describe("version-bound school-opening review",()=>{
     await Promise.resolve();await Promise.resolve();
     expect(findButton("Approve independently")).toBeUndefined();
   });
+});
+
+it("renders shared evidence details and hides them on a failed reload",async()=>{
+  state.read.mockResolvedValue({...review,evidence:[{
+    id:"doc",category:"school_opening_facility_approval",fileName:"Facility review.pdf",
+    verifiedAt:"2026-10-20T00:00:00.000Z",expiresAt:"2027-10-20T00:00:00.000Z",
+  }]});
+  await loaded();
+  const html=renderToStaticMarkup(render());
+  expect(html).toContain("Facility review.pdf");expect(html).toContain("Expires:");
+  expect(html).toContain("facility approval");
+  state.read.mockRejectedValueOnce(new Error("Read unavailable"));
+  findButton("Reload review")?.props.onClick?.();
+  await vi.waitFor(()=>expect(renderToStaticMarkup(render())).toContain("Read unavailable"));
+  expect(renderToStaticMarkup(render())).not.toContain("Facility review.pdf");
 });

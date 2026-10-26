@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
 import type { SchoolOpeningDecision } from "@/domain/school-opening-decision";
 import {
-  decideChurchSchoolOpening, schoolOpeningEvidenceCategories,
+  decideChurchSchoolOpening, readChurchSchoolOpening, schoolOpeningEvidenceCategories,
 } from "@/modules/operations/school-opening.server";
 import { decideChurchSchoolOpeningFn } from "@/modules/operations/school-opening.functions";
 
@@ -14,6 +14,7 @@ const state=vi.hoisted(()=>({
 }));
 vi.mock("@/db/client",()=>({db:{
   transaction:(callback:(tx:unknown)=>unknown)=>state.transaction(callback),
+  select:(...args:unknown[])=>tx.select(),
 }}));
 vi.mock("@/platform/mutation",()=>({writeAudit:state.audit,emitEvent:state.event}));
 vi.mock("@/modules/programs/program-site-authorization.server",()=>({
@@ -85,7 +86,7 @@ function arrange(config=configuration()){
 function addValidEvidence(){
   state.rows.push(
     schoolOpeningEvidenceCategories.map((category,index)=>({
-      id:"document-"+index,category,verifiedAt:new Date(Date.now()-60_000),
+      id:"document-"+index,fileName:"Evidence "+index+".pdf",category,verifiedAt:new Date(Date.now()-60_000),
       verifiedByPersonId:ids.verifier,uploadedByPersonId:"different-uploader",
       expiresAt:new Date(Date.now()+86_400_000),
       metadata:{siteId:ids.site,organizationId:ids.church,
@@ -168,5 +169,51 @@ describe("school opening decision binds the reviewed configuration",()=>{
   ])("rejects an unbound or malformed transport request before opening a transaction: %j",async invalid=>{
     await expect(decideChurchSchoolOpeningFn({data:{...command,...invalid}})).rejects.toThrow();
     expect(state.transaction).not.toHaveBeenCalled();expectNoDecision();
+  });
+});
+
+
+describe("school opening authorized evidence projection",()=>{
+  function arrangeRead(){
+    arrange();state.rows.shift();addValidEvidence();
+  }
+  it("returns only current verified metadata and preserves document IDs in commands",async()=>{
+    arrangeRead();
+    const model=await readChurchSchoolOpening(actor,ids.program);
+    expect(model.evidenceReady).toBe(true);
+    expect(model.evidenceIssue).toBeNull();
+    expect(model.evidence).toHaveLength(5);
+    expect(Object.keys(model.evidence[0]!).sort()).toEqual(
+      ["category","expiresAt","fileName","id","verifiedAt"]);
+    expect(model.evidence[0]?.fileName).toBe("Evidence 0.pdf");
+  });
+  it("does not advertise readiness when the reviewer verified the evidence",async()=>{
+    arrangeRead();
+    (state.rows[3]![0] as Record<string,unknown>).verifiedByPersonId=ids.reviewer;
+    const model=await readChurchSchoolOpening(actor,ids.program);
+    expect(model.evidenceReady).toBe(false);
+    expect(model.evidence).toEqual([]);
+    expect(model.evidenceIssue).toContain("independently verified");
+  });
+  it("does not fall back to older evidence when the newest category record is unverified",async()=>{
+    arrangeRead();
+    state.rows[3]!.unshift({...state.rows[3]![0] as object,id:"replacement",verifiedAt:null});
+    const model=await readChurchSchoolOpening(actor,ids.program);
+    expect(model.evidence).toEqual([]);expect(model.evidenceReady).toBe(false);
+  });
+  it("retains valid evidence metadata when the separate agreement gate fails",async()=>{
+    arrangeRead();
+    const {AuthorizationError}=await import("@/domain/command-context");
+    state.contract.mockRejectedValueOnce(new AuthorizationError("current agreement"));
+    const model=await readChurchSchoolOpening(actor,ids.program);
+    expect(model.evidence).toHaveLength(5);
+    expect(model.evidenceReady).toBe(false);
+    expect(model.evidenceIssue).toBeNull();
+  });
+  it("rejects another institution before reading evidence",async()=>{
+    arrangeRead();
+    await expect(readChurchSchoolOpening({...actor,scope:{organizationIds:["other"]}},ids.program))
+      .rejects.toThrow();
+    expect(state.rows).toHaveLength(4);
   });
 });

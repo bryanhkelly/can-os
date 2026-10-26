@@ -1,3 +1,4 @@
+import { EvidenceDetails } from "@/components/evidence/EvidenceDetails";
 import {useCallback,useEffect,useRef,useState} from "react";
 import { QueryState } from "@/components/workspace";
 import {
@@ -77,6 +78,17 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
         {" · "}{opening.evidenceReady?"Evidence/contract currently valid":"Current evidence or contract incomplete"}</p>
       <p className="mt-2 text-xs text-muted-foreground">
         Required reviewed categories: {opening.evidenceRequired.join(", ")}
+      </p>
+      {opening.evidenceIssue&&<p role="alert" className="mt-2">{opening.evidenceIssue}</p>}
+      <ul className="mt-3 space-y-3">
+        {opening.evidence.map(document=><li key={document.id} className="rounded border p-3">
+          <p className="font-medium">{document.category.replace("school_opening_","").replaceAll("_"," ")}</p>
+          <EvidenceDetails evidence={document}/>
+        </li>)}
+      </ul>
+      <p className="mt-2 text-xs text-muted-foreground">
+        These are the latest independently verified records for each required category.
+        Approval rechecks current evidence; this list does not provide document preview.
       </p>
       <label className="mt-3 block">Reason for decision
         <input className="mt-1 block w-full rounded border bg-background p-2"

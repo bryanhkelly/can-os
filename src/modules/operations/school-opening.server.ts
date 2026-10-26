@@ -107,7 +107,10 @@ async function requireSchoolOpeningEvidence(tx:Reader, school:Awaited<ReturnType
   const recognized=new Set(verified.map(person=>person.personId));
   if(!verifiers.every(id=>recognized.has(id)))
     throw new AuthorizationError("independent active CAN school-opening evidence verifier");
-  return latest.map(d=>d.id);
+  return latest.map(d=>({
+    id:d.id,category:d.category,fileName:d.fileName,
+    verifiedAt:d.verifiedAt!.toISOString(),expiresAt:d.expiresAt!.toISOString(),
+  }));
 }
 
 /** Current named Site director remains mandatory even after an opening
@@ -200,7 +203,7 @@ export async function decideChurchSchoolOpening(
       await requireChurchHostedOperatingServices(tx,input.programId,[
         "school_of_record","academic_instruction","onsite_supervision",
       ]);
-      const evidence=await requireSchoolOpeningEvidence(tx,school,now,actor.actorPersonId!);
+      const evidence=(await requireSchoolOpeningEvidence(tx,school,now,actor.actorPersonId!)).map(doc=>doc.id);
       await requireVerifiedChurchSiteDirector(tx,school,configuration.id,now);
       await tx.update(schoolConfigurationVersions).set({
         status:"approved",approvedByPersonId:actor.actorPersonId,
@@ -252,8 +255,16 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
   verifyCANSchoolApprover(actor,school.institutionId);
   const config=await latestConfiguration(db,programId);
   let evidenceReady=false;
+  let evidence:Awaited<ReturnType<typeof requireSchoolOpeningEvidence>>=[];
+  let evidenceIssue:string|null=null;
   try{
-    await requireSchoolOpeningEvidence(db,school,new Date());
+    evidence=await requireSchoolOpeningEvidence(db,school,new Date(),actor.actorPersonId!);
+  }catch(error){
+    if(!(error instanceof AuthorizationError))throw error;
+    evidenceIssue="Required evidence is missing, expired, incomplete, or not independently verified by an active CAN officer.";
+  }
+  try{
+    if(evidenceIssue)throw new AuthorizationError("current school opening evidence");
     await requireChurchHostedOperatingServices(db,programId,[
       "school_of_record","academic_instruction","onsite_supervision",
     ]);
@@ -263,7 +274,7 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
   }
   return {
     programId,siteId:school.siteId,configurationId:config.id,version:config.version,
-    status:config.status,evidenceReady,
+    status:config.status,evidenceReady,evidence,evidenceIssue,
     evidenceRequired:[...schoolOpeningEvidenceCategories],
     approvedAt:config.approvedAt?.toISOString()??null,
   };

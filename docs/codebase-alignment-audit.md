@@ -181,3 +181,30 @@ and request/date cache isolation. Production client/server build, 86-route
 contracts and mutation hygiene passed. Full typecheck retains the 47 baseline
 errors with no new diagnostics. Tests mock database boundaries or render UI
 without a browser; live Neon and authenticated browser acceptance are unverified.
+
+
+## Shared opening evidence presentation
+
+Baseline: FullFlow `9ec22d9b775ce2c26bc441410a332a66ba4787e8`.
+
+`EvidenceDetails` now presents filenames, verification timestamps and expiry in
+both the agreement picker and school-opening review. Opening evidence is read-only:
+the owning service requires the newest record in each category, rather than a
+reviewer selecting an older document. Its authorized read returns only ID,
+category, filename and dates after the existing evidence/verifier checks pass.
+The projection is all-or-nothing when any category is invalid; a valid evidence
+set remains visible if the separate service-agreement check fails. Private
+storage information, verifier identity and document metadata are not returned.
+
+The read now applies the same reviewer/verifier independence rule as approval.
+Decision audit/event payloads still contain evidence IDs. Existing final checks,
+configuration binding and emergency suspension behavior remain unchanged. The
+shared component grants no document preview and introduces no selection or new
+workflow engine. Evidence snapshots and document preview remain future work.
+
+Validation: 3 focused unit files / 28 tests passed, covering read scope,
+reviewer independence, newest-record enforcement, minimal projection, separate
+contract failure and stale UI cleanup, alongside existing decision regressions.
+Production build, route contracts and mutation hygiene passed. Full typecheck
+retains the 47 existing diagnostics. Live database and authenticated browser
+acceptance remain unverified.

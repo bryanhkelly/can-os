@@ -1,12 +1,8 @@
+import { EvidenceDetails, type EvidenceSummary } from "./EvidenceDetails";
 import { useId } from "react";
 import { QueryState } from "@/components/workspace/query-state";
 
-export type EvidenceOption = {
-  id: string;
-  fileName: string;
-  verifiedAt: string;
-  expiresAt: string | null;
-};
+export type EvidenceOption = EvidenceSummary;
 
 /** Presentation only. Owning services supply authorized, eligible metadata. */
 export function EvidencePicker({
@@ -33,10 +29,7 @@ export function EvidencePicker({
         </option>)}
       </select>
       {!candidates.length && <p className="mt-2" role="status">{emptyMessage}</p>}
-      {selected && <p className="mt-2" role="status">
-        Verified: {selected.verifiedAt} · {selected.expiresAt
-          ? "Expires: " + selected.expiresAt : "No recorded expiry"}
-      </p>}
+      {selected && <EvidenceDetails evidence={selected}/>}
       {truncated && <p className="mt-2" role="status">
         Only the latest 100 documents were checked. Older evidence may not appear.
       </p>}
