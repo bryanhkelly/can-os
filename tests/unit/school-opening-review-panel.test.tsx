@@ -64,7 +64,11 @@ function mount(){
 const review={
   programId:"11111111-1111-4111-8111-111111111111",
   configurationId:"22222222-2222-4222-8222-222222222222",
-  evidence:[],evidenceIssue:null,version:1,status:"draft",evidenceReady:true,evidenceRequired:["facility"],approvedAt:null,
+  approvalReady:true,prerequisites:[
+    {id:"evidence",title:"Independent opening evidence",satisfied:true,detail:"Evidence is current."},
+    {id:"agreement",title:"CAN–church service agreement",satisfied:true,detail:"Agreement is current."},
+    {id:"director",title:"Church Site director",satisfied:true,detail:"Director is appointed."},
+  ],evidence:[],evidenceIssue:null,version:1,status:"draft",evidenceReady:true,evidenceRequired:["facility"],approvedAt:null,
 };
 beforeEach(()=>{
   vi.clearAllMocks();state.slots=[];state.cursor=0;state.effects=[];
@@ -142,4 +146,25 @@ it("renders shared evidence details and hides them on a failed reload",async()=>
   findButton("Reload review")?.props.onClick?.();
   await vi.waitFor(()=>expect(renderToStaticMarkup(render())).toContain("Read unavailable"));
   expect(renderToStaticMarkup(render())).not.toContain("Facility review.pdf");
+});
+
+it("blocks approval for a missing director even when evidence and contract are valid",async()=>{
+  state.read.mockResolvedValue({...review,approvalReady:false,prerequisites:review.prerequisites.map(
+    item=>item.id==="director"?{...item,satisfied:false,detail:"Appoint a current verified director."}:item)});
+  await loaded();reason("Independently reviewed the opening evidence.");
+  expect(findButton("Approve independently")?.props.disabled).toBe(true);
+  const html=renderToStaticMarkup(render());
+  expect(html).toContain("Church Site director");expect(html).toContain("Needs attention");
+  expect(html).toContain("Appoint a current verified director.");
+});
+it("keeps emergency suspension available when prerequisites are blocked",async()=>{
+  state.read.mockResolvedValue({...review,status:"approved",approvalReady:false,
+    prerequisites:review.prerequisites.map(item=>({...item,satisfied:false}))});
+  mount();
+  await vi.waitFor(()=>expect(findButton("Suspend school")).toBeDefined());
+  reason("Suspend while current operating prerequisites are unavailable.");
+  expect(findButton("Suspend school")?.props.disabled).toBe(false);
+  findButton("Suspend school")?.props.onClick?.();
+  await vi.waitFor(()=>expect(state.decide).toHaveBeenCalledOnce());
+  expect(state.decide.mock.calls[0]?.[0].data.decision).toBe("suspend");
 });

@@ -254,25 +254,47 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
   const school=await schoolIdentity(db,programId);
   verifyCANSchoolApprover(actor,school.institutionId);
   const config=await latestConfiguration(db,programId);
-  let evidenceReady=false;
+  const now=new Date();
+  let agreementReady=false;
+  let directorReady=false;
   let evidence:Awaited<ReturnType<typeof requireSchoolOpeningEvidence>>=[];
   let evidenceIssue:string|null=null;
   try{
-    evidence=await requireSchoolOpeningEvidence(db,school,new Date(),actor.actorPersonId!);
+    evidence=await requireSchoolOpeningEvidence(db,school,now,actor.actorPersonId!);
   }catch(error){
     if(!(error instanceof AuthorizationError))throw error;
     evidenceIssue="Required evidence is missing, expired, incomplete, or not independently verified by an active CAN officer.";
   }
   try{
-    if(evidenceIssue)throw new AuthorizationError("current school opening evidence");
     await requireChurchHostedOperatingServices(db,programId,[
       "school_of_record","academic_instruction","onsite_supervision",
     ]);
-    evidenceReady=true;
+    agreementReady=true;
   }catch(error){
     if(!(error instanceof AuthorizationError))throw error;
   }
+  try{
+    await requireVerifiedChurchSiteDirector(db,school,config.id,now);
+    directorReady=true;
+  }catch(error){
+    if(!(error instanceof AuthorizationError))throw error;
+  }
+  const prerequisites=[
+    {id:"evidence",title:"Independent opening evidence",satisfied:evidenceIssue===null,
+      detail:evidenceIssue??"All required categories have current independently verified evidence."},
+    {id:"agreement",title:"CAN–church service agreement",satisfied:agreementReady,
+      detail:agreementReady?"Current agreement covers the required school services."
+        :"A current independently verified agreement must cover instruction, school of record and onsite supervision."},
+    {id:"director",title:"Church Site director",satisfied:directorReady,
+      detail:directorReady?"A current verified director is appointed to this configuration."
+        :"Appoint a current verified church Site director to this configuration in Site staffing."},
+  ];
+  const prerequisitesReady=prerequisites.every(item=>item.satisfied);
+  // Retain the existing evidence/contract projection; approval additionally
+  // requires a draft and the same current director check as the command.
+  const evidenceReady=evidenceIssue===null&&agreementReady;
   return {
+    approvalReady:config.status==="draft"&&prerequisitesReady,prerequisites,
     programId,siteId:school.siteId,configurationId:config.id,version:config.version,
     status:config.status,evidenceReady,evidence,evidenceIssue,
     evidenceRequired:[...schoolOpeningEvidenceCategories],

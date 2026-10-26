@@ -1,3 +1,4 @@
+import { PrerequisiteChecklist } from "@/components/workspace/prerequisite-checklist";
 import { EvidenceDetails } from "@/components/evidence/EvidenceDetails";
 import {useCallback,useEffect,useRef,useState} from "react";
 import { QueryState } from "@/components/workspace";
@@ -75,11 +76,11 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
       error={readError||undefined} onRetry={reload} retrying={busy||loading}>
     {opening&&<>
       <p className="mt-2">Configuration v{opening.version} · {opening.status}
-        {" · "}{opening.evidenceReady?"Evidence/contract currently valid":"Current evidence or contract incomplete"}</p>
+        {" · "}{opening.prerequisites.every(item=>item.satisfied)?"Current prerequisites met":"Opening prerequisites need attention"}</p>
       <p className="mt-2 text-xs text-muted-foreground">
         Required reviewed categories: {opening.evidenceRequired.join(", ")}
       </p>
-      {opening.evidenceIssue&&<p role="alert" className="mt-2">{opening.evidenceIssue}</p>}
+      <PrerequisiteChecklist label="School opening prerequisites" items={opening.prerequisites}/>
       <ul className="mt-3 space-y-3">
         {opening.evidence.map(document=><li key={document.id} className="rounded border p-3">
           <p className="font-medium">{document.category.replace("school_opening_","").replaceAll("_"," ")}</p>
@@ -97,7 +98,7 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
       </label>
       <div className="mt-2 flex gap-2">
         {opening.status==="draft"&&<button type="button"
-          disabled={busy||loading||reason.trim().length<10||!opening.evidenceReady}
+          disabled={busy||loading||reason.trim().length<10||!opening.approvalReady}
           onClick={()=>void decide("approve")}
           className="rounded border px-3 py-2 disabled:opacity-50">
           Approve independently reviewed opening

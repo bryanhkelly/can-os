@@ -217,3 +217,52 @@ describe("school opening authorized evidence projection",()=>{
     expect(state.rows).toHaveLength(4);
   });
 });
+
+
+describe("opening prerequisites match command gates",()=>{
+  function arrangeRead(status="draft"){
+    arrange(configuration(status));state.rows.shift();addValidEvidence();
+  }
+  it("allows only a draft with all three current prerequisites",async()=>{
+    arrangeRead();
+    const model=await readChurchSchoolOpening(actor,ids.program);
+    expect(model.approvalReady).toBe(true);
+    expect(model.prerequisites.map(item=>[item.id,item.satisfied])).toEqual([
+      ["evidence",true],["agreement",true],["director",true],
+    ]);
+    expectNoDecision();
+  });
+  it("blocks approval when the director is absent while retaining evidence/contract status",async()=>{
+    arrangeRead();state.rows[5]=[];
+    const model=await readChurchSchoolOpening(actor,ids.program);
+    expect(model.evidenceReady).toBe(true);expect(model.approvalReady).toBe(false);
+    expect(model.prerequisites.find(item=>item.id==="director")).toMatchObject({
+      satisfied:false,detail:expect.stringContaining("Appoint"),
+    });
+    arrange();addValidEvidence();state.rows[6]=[];
+    await expect(decideChurchSchoolOpening(actor,command)).rejects.toThrow("church site director");
+    expectNoDecision();
+  });
+  it("reports all blockers even when evidence fails first",async()=>{
+    arrangeRead();
+    // Missing documents stop evidence validation before its verifier query.
+    state.rows.splice(3,3,[],[]);
+    const {AuthorizationError}=await import("@/domain/command-context");
+    state.contract.mockRejectedValueOnce(new AuthorizationError("current agreement"));
+    const model=await readChurchSchoolOpening(actor,ids.program);
+    expect(model.prerequisites.map(item=>item.satisfied)).toEqual([false,false,false]);
+    expect(model.approvalReady).toBe(false);
+    expect(state.contract).toHaveBeenCalledOnce();
+    expect(state.rows).toEqual([]);
+  });
+  it.each(["approved","suspended"])("does not offer another approval for %s",async status=>{
+    arrangeRead(status);
+    const model=await readChurchSchoolOpening(actor,ids.program);
+    expect(model.prerequisites.every(item=>item.satisfied)).toBe(true);
+    expect(model.approvalReady).toBe(false);
+  });
+  it("propagates infrastructure failures instead of mislabeling them as unmet policy",async()=>{
+    arrangeRead();state.contract.mockRejectedValueOnce(new Error("Database unavailable"));
+    await expect(readChurchSchoolOpening(actor,ids.program)).rejects.toThrow("Database unavailable");
+  });
+});

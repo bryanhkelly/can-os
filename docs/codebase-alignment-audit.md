@@ -76,7 +76,7 @@ reload the workspace to discard mounted state and caches.
 ## Ordered continuation and risk
 
 1. Shared site staffing reads/mutations and query retry UI (completed).
-2. School-opening version binding (completed); evidence selection is next.
+2. School-opening version binding, agreement evidence selection and shared evidence details (completed). Opening prerequisite visibility is the current bite.
 3. Shared appointment/date UI after inclusive/exclusive and Site-timezone
    semantics are resolved; no cosmetic schema rename.
 4. Domain-evaluated journey evidence and authorized next actions.
@@ -207,4 +207,31 @@ reviewer independence, newest-record enforcement, minimal projection, separate
 contract failure and stale UI cleanup, alongside existing decision regressions.
 Production build, route contracts and mutation hygiene passed. Full typecheck
 retains the 47 existing diagnostics. Live database and authenticated browser
+acceptance remain unverified.
+
+
+## Opening prerequisites and reusable checklist
+
+Baseline: FullFlow `6e5b320cf2c028490daa7c3e103f4df6c991adfe`.
+
+The opening read previously checked evidence and service authorization, but the
+approval command also required a current verified Site director for the reviewed
+configuration. The read now evaluates all three using the existing owning helpers,
+returns separate prerequisite results, and offers approval only for a draft with
+all checks satisfied. Policy failures are reported independently so one missing
+prerequisite does not hide another. Infrastructure failures still fail the read.
+The original evidenceReady field retains its evidence/contract meaning.
+
+A small presentation-only PrerequisiteChecklist composes the existing StatusBadge
+and shows server-provided titles, results and next-step explanations. School opening
+is its first consumer. It computes no permissions, writes no state and adds no
+workflow engine. The existing command rechecks everything before approval;
+emergency suspension remains independent of current readiness. No DB schema,
+route, staff appointment or audit/event behavior changed.
+
+Validation: 3 unit files / 36 tests passed, including missing-director read/command
+agreement, independent blockers, draft-only approval, infrastructure errors and
+UI suspension availability. Production build, route contracts (86/86) and mutation
+hygiene passed. Full typecheck retains the 47 baseline diagnostics. Database calls
+are mocked in these unit tests; live persistence and authenticated browser
 acceptance remain unverified.
