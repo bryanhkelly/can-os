@@ -34,6 +34,8 @@ Required support-case collaboration: [Counselors, academic coaches, tutors, spec
 
 Pre-onsite child safety: [Site Student Safeguarding and Welfare](./site-student-safeguarding-and-welfare.md) (onsite staff reporting, mandatory external reporting, urgent safety response, confidentiality and CAN/site roles).
 
+Incremental source alignment: [Domain vocabulary, naming and reuse audit](./codebase-alignment-audit.md).
+
 ## Active cumulative FullFlow development
 
 - [FullFlow progression, evidence, and explicit acceptance blockers](./full-flow-progress.md).

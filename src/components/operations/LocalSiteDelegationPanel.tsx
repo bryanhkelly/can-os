@@ -1,61 +1,72 @@
-import { useCallback, useEffect, useState } from "react";
-import { changeLocalSiteDelegation, getLocalSiteDelegations } from "@/modules/operations/site-local-delegation.functions";
+import { useState } from "react";
+import { useIsFetching, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QueryState } from "@/components/workspace";
+import { changeLocalSiteDelegation, type LocalSiteDelegationInput } from "@/modules/operations/site-local-delegation.functions";
+import {
+  localSiteDelegationsQuery, siteStaffingKeys, siteStaffingMutationOptions, refreshSiteStaffing,
+} from "@/modules/operations/site-staffing.queries";
 import { localResponsibilityRoles, type LocalResponsibility } from "@/domain/site-local-delegation-policy";
 
-type Snapshot = Awaited<ReturnType<typeof getLocalSiteDelegations>>;
 const assignments = [
   { key: "site_director", title: "Local Site director",
     explanation: "A named Site leader responsible for reviewing onsite attendance snapshots—not custody release, regulatory clearance or academic credits." },
 ] as const;
 
 export function LocalSiteDelegationPanel({ programId }: { programId: string }) {
-  const [data, setData] = useState<Snapshot | null>(null);
+  return <LocalSiteDelegationForm key={programId} programId={programId}/>;
+}
+
+function LocalSiteDelegationForm({ programId }: { programId: string }) {
+  const client = useQueryClient();
+  const query = useQuery(localSiteDelegationsQuery(programId));
+  const data = query.data;
   const [selections, setSelections] = useState<Partial<Record<LocalResponsibility, string>>>({});
   const [expirations, setExpirations] = useState<Partial<Record<LocalResponsibility, string>>>({});
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-
-  const reload = useCallback(async () => {
-    const next = await getLocalSiteDelegations({ data: { programId } });
-    setData(next);
-  }, [programId]);
-
-  useEffect(() => {
-    let active = true;
-    void getLocalSiteDelegations({ data: { programId } }).then(next => {
-      if (active) setData(next);
-    }).catch(error => {
-      if (active) setError(error instanceof Error ? error.message : "Unable to read delegations");
+  const [validationError, setValidationError] = useState("");
+  const mutation = useMutation(siteStaffingMutationOptions(client, programId,
+    (input: LocalSiteDelegationInput) =>
+      changeLocalSiteDelegation({ data: input })));
+  const pending = useIsMutating({ mutationKey: siteStaffingKeys.program(programId) });
+  const fetching = useIsFetching({ queryKey: siteStaffingKeys.program(programId) });
+  const busy = pending > 0 || fetching > 0;
+  function retry() {
+    if (client.isMutating({ mutationKey: siteStaffingKeys.program(programId) })) return;
+    mutation.reset();
+    void refreshSiteStaffing(client, programId).catch(() => {
+      // Each failed read remains an error in QueryState and can be retried again.
     });
-    return () => { active = false; };
-  }, [programId]);
+  }
+  const error = validationError || (mutation.isError
+    ? mutation.error instanceof Error ? mutation.error.message : "Unable to update delegation."
+    : "");
+  const notice = mutation.data ? mutation.variables?.action === "appoint"
+    ? "Local staff responsibility recorded with an expiry. School opening and safeguarding still require independent verification."
+    : "Local responsibility revoked. New affirmative actions must fail the effective assignment check."
+    : "";
 
   async function change(key: LocalResponsibility, action: "appoint" | "revoke") {
-    if (!data) return;
+    if (!data || query.isError ||
+        client.isFetching({ queryKey: siteStaffingKeys.program(programId) }) ||
+        client.isMutating({ mutationKey: siteStaffingKeys.program(programId) })) return;
     const current = data.responsibilities.find(row => row.key === key);
     const personId = selections[key];
     const through = expirations[key];
     if (action === "appoint" && (!personId || !through)) {
-      setError("Choose an existing, verified Site staff member and a delegation end date.");
+      setValidationError("Choose an existing, verified Site staff member and a delegation end date.");
       return;
     }
-    setBusy(true); setError(""); setNotice("");
+    setValidationError("");
     try {
-      await changeLocalSiteDelegation({ data: {
+      await mutation.mutateAsync({
         programId, responsibility: key, action,
         expectedAssignmentId: current?.id ?? null,
         ...(action === "appoint" && personId && through ? {
           personId, validThrough: new Date(through + "T23:59:59Z").toISOString(),
         } : {}),
-      } });
-      await reload();
-      setNotice(action === "appoint"
-        ? "Local staff responsibility recorded with an expiry. School opening and safeguarding still require independent verification."
-        : "Local responsibility revoked. New affirmative actions must fail the effective assignment check.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to update delegation.");
-    } finally { setBusy(false); }
+      });
+    } catch {
+      // useMutation exposes command errors; successful saves retain refresh warnings.
+    }
   }
 
   return <section aria-label="Local school responsibilities" className="mt-7 rounded-xl border bg-card p-5">
@@ -69,8 +80,14 @@ export function LocalSiteDelegationPanel({ programId }: { programId: string }) {
     </p>
     {error && <p role="alert" className="mt-3 rounded border p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-3 rounded border p-3 text-sm">{notice}</p>}
-    {!data ? <p className="mt-4 text-sm">Loading Site staff assignments…</p> :
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+    {mutation.data?.refreshWarning && <p role="alert" className="mt-3 rounded border p-3 text-sm">
+      {mutation.data.refreshWarning}
+      <button type="button" onClick={retry} disabled={busy} className="ml-3 underline disabled:opacity-50">Refresh staffing</button>
+    </p>}
+    <QueryState loading={query.isPending ? "Loading Site staff assignments…" : undefined}
+      error={query.isError ? query.error.message : undefined}
+      onRetry={retry} retrying={busy}>
+    {data && <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {!data.hasConfiguration && <p role="status" className="rounded border p-4 text-sm lg:col-span-2">
           No local school operating configuration exists yet. The first authorized
           appointment will create a <strong>draft planning configuration</strong>,
@@ -95,7 +112,7 @@ export function LocalSiteDelegationPanel({ programId }: { programId: string }) {
             </p>
             <label className="mt-4 block text-sm">
               Verified Site staff
-              <select value={selections[item.key] ?? ""}
+              <select disabled={busy} value={selections[item.key] ?? ""}
                 onChange={e => setSelections(old => ({ ...old, [item.key]: e.target.value }))}
                 className="mt-1 w-full rounded border bg-background p-2">
                 <option value="">Choose staff member</option>
@@ -106,7 +123,7 @@ export function LocalSiteDelegationPanel({ programId }: { programId: string }) {
             </label>
             <label className="mt-3 block text-sm">
               Responsibility expires
-              <input type="date" value={expirations[item.key] ?? ""}
+              <input type="date" disabled={busy} value={expirations[item.key] ?? ""}
                 onChange={e => setExpirations(old => ({ ...old, [item.key]: e.target.value }))}
                 min={new Date().toISOString().slice(0, 10)}
                 max={new Date(Date.now() + 89 * 86400_000).toISOString().slice(0, 10)}
@@ -131,6 +148,7 @@ export function LocalSiteDelegationPanel({ programId }: { programId: string }) {
           </div>;
         })}
       </div>}
+    </QueryState>
     <p className="mt-4 text-xs text-muted-foreground">
       Responsibility appointments are planning/accountability records, not proof
       of completed safeguarding, physical attendance, child release, or campus opening.

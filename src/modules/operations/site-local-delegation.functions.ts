@@ -22,6 +22,8 @@ const setInput = scopeInput.extend({
   }
 });
 
+export type LocalSiteDelegationInput = z.infer<typeof setInput>;
+
 /** Host registrar's planning roster: no pupils, protected school data or roster of other Sites. */
 export const getLocalSiteDelegations = createServerFn({ method: "GET" })
   .validator((value: unknown) => scopeInput.parse(value))

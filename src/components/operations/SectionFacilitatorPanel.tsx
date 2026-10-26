@@ -1,43 +1,52 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useIsFetching, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QueryState } from "@/components/workspace";
+import { updateSectionFacilitator, type SectionFacilitatorInput } from "@/modules/operations/site-section-facilitators.functions";
 import {
-  getSectionFacilitatorPlanning, updateSectionFacilitator,
-} from "@/modules/operations/site-section-facilitators.functions";
+  sectionFacilitatorsQuery, siteStaffingKeys, siteStaffingMutationOptions, refreshSiteStaffing,
+} from "@/modules/operations/site-staffing.queries";
 
-type Plan = Awaited<ReturnType<typeof getSectionFacilitatorPlanning>>;
-
-/**
- * Separate local adults can cover separate Sections (or a Section can
- * have backups). The instructional timetable and physical coverage remain
- * independently verified, never inferred from this appointment form.
- */
+/** Local appointments remain separate from verified qualifications and coverage. */
 export function SectionFacilitatorPanel({ programId }: { programId: string }) {
-  const [data, setData] = useState<Plan | null>(null);
+  return <SectionFacilitatorForm key={programId} programId={programId}/>;
+}
+
+function SectionFacilitatorForm({ programId }: { programId: string }) {
+  const client = useQueryClient();
+  const query = useQuery(sectionFacilitatorsQuery(programId));
+  const data = query.data;
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [expires, setExpires] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const reload = useCallback(async () => {
-    setData(await getSectionFacilitatorPlanning({ data: { programId } }));
-  }, [programId]);
-  useEffect(() => { void reload().catch(error => setError(
-    error instanceof Error ? error.message : "Cannot load Section staffing"));
-  }, [reload]);
+  const mutation = useMutation(siteStaffingMutationOptions(client, programId,
+    (input: SectionFacilitatorInput) =>
+      updateSectionFacilitator({ data: input })));
+  const pending = useIsMutating({ mutationKey: siteStaffingKeys.program(programId) });
+  const fetching = useIsFetching({ queryKey: siteStaffingKeys.program(programId) });
+  const busy = pending > 0 || fetching > 0;
+  function retry() {
+    if (client.isMutating({ mutationKey: siteStaffingKeys.program(programId) })) return;
+    mutation.reset();
+    void refreshSiteStaffing(client, programId).catch(() => {
+      // Each failed read remains an error in QueryState and can be retried again.
+    });
+  }
+  const error = mutation.isError
+    ? mutation.error instanceof Error ? mutation.error.message : "Unable to change staffing assignment."
+    : "";
+  const notice = mutation.data ? mutation.variables?.action === "appoint"
+    ? "Named Section responsibility recorded. It does not certify staff screening, scheduled coverage, or school opening."
+    : "Section appointment revoked. New roster and attendance access requires an effective assignment."
+    : "";
 
-  async function change(input: {
-    sectionId: string; personId: string; action: "appoint" | "revoke";
-    expectedAssignmentId: string | null; validThrough?: string;
-  }) {
-    setBusy(input.sectionId + ":" + input.personId); setError(""); setNotice("");
+  async function change(input: SectionFacilitatorInput) {
+    if (!data || query.isError ||
+        client.isFetching({ queryKey: siteStaffingKeys.program(programId) }) ||
+        client.isMutating({ mutationKey: siteStaffingKeys.program(programId) })) return;
     try {
-      await updateSectionFacilitator({ data: input });
-      await reload();
-      setNotice(input.action === "appoint"
-        ? "Named Section responsibility recorded. It does not certify staff screening, scheduled coverage, or school opening."
-        : "Section appointment revoked. New roster and attendance access requires an effective assignment.");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to change staffing assignment.");
-    } finally { setBusy(""); }
+      await mutation.mutateAsync(input);
+    } catch {
+      // The mutation state renders the server error without retrying the command.
+    }
   }
 
   return <section className="mt-7 rounded-xl border bg-card p-5" aria-label="Section facilitator assignments">
@@ -50,8 +59,14 @@ export function SectionFacilitatorPanel({ programId }: { programId: string }) {
     </p>
     {error && <p role="alert" className="mt-3 rounded border p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-3 rounded border p-3 text-sm">{notice}</p>}
-    {!data ? <p className="mt-4 text-sm">Loading class staffing…</p> :
-      !data.hasConfiguration ? <p role="status" className="mt-4 rounded border p-3 text-sm">
+    {mutation.data?.refreshWarning && <p role="alert" className="mt-3 rounded border p-3 text-sm">
+      {mutation.data.refreshWarning}
+      <button type="button" onClick={retry} disabled={busy} className="ml-3 underline disabled:opacity-50">Refresh staffing</button>
+    </p>}
+    <QueryState loading={query.isPending ? "Loading class staffing…" : undefined}
+      error={query.isError ? query.error.message : undefined}
+      onRetry={retry} retrying={busy}>
+    {data && (!data.hasConfiguration ? <p role="status" className="mt-4 rounded border p-3 text-sm">
         Appoint your local Site director first to establish a draft school-operations
         configuration. A draft does not authorize student attendance or school opening.
       </p> : <>
@@ -76,7 +91,7 @@ export function SectionFacilitatorPanel({ programId }: { programId: string }) {
               {current.filter(effective).map(a =>
                 <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 text-sm">
                   <span>{a.name} · through {new Date(a.effectiveThrough!).toLocaleDateString()}</span>
-                  <button type="button" disabled={!!busy}
+                  <button type="button" disabled={busy}
                     onClick={() => void change({
                       sectionId:section.id, personId:a.personId,
                       action:"revoke", expectedAssignmentId:a.id,
@@ -90,7 +105,7 @@ export function SectionFacilitatorPanel({ programId }: { programId: string }) {
             </ul>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-sm">Verified local facilitator
-                <select value={personId}
+                <select disabled={busy} value={personId}
                   onChange={e => setSelected(old => ({ ...old, [key]: e.target.value }))}
                   className="mt-1 w-full rounded border bg-background p-2">
                   <option value="">Choose a person</option>
@@ -101,14 +116,14 @@ export function SectionFacilitatorPanel({ programId }: { programId: string }) {
                 </select>
               </label>
               <label className="text-sm">Appointment ends
-                <input type="date" value={through}
+                <input type="date" disabled={busy} value={through}
                   min={new Date().toISOString().slice(0,10)}
                   max={new Date(Date.now()+89*86400_000).toISOString().slice(0,10)}
                   onChange={e => setExpires(old => ({ ...old, [key]: e.target.value }))}
                   className="mt-1 w-full rounded border bg-background p-2"/>
               </label>
             </div>
-            <button type="button" disabled={!!busy || !personId || !through}
+            <button type="button" disabled={busy || !personId || !through}
               onClick={() => void change({
                 sectionId:section.id, personId, action:"appoint",
                 expectedAssignmentId: existing?.id ?? null,
@@ -123,7 +138,8 @@ export function SectionFacilitatorPanel({ programId }: { programId: string }) {
           No active email-verified facilitators belong to this exact church Site.
           Use your authorized staff invite workflow first.
         </p>}
-      </>}
+      </>)}
+    </QueryState>
     <p className="mt-4 text-xs text-muted-foreground">
       Site director accountability remains separately appointed. A named Section
       relationship cannot approve CAN academics, create student enrollment,
