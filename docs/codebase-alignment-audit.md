@@ -303,3 +303,41 @@ dependency or a live Neon acceptance result. Production build, 86-route contract
 and mutation hygiene passed. Full typecheck retains the same 47 diagnostics.
 Updated live integration scenarios and authenticated browser acceptance remain
 unverified; no configured disposable Neon database was used.
+
+
+## Canonical teaching evaluator and explicit qualification horizons
+
+Baseline: FullFlow `590137cd746a782c7dc59e14e6627acc9f877838`.
+
+Moved the existing role/account, qualification-policy and latest verification
+queries from launch-staffing into staffing/teaching-eligibility.server.ts. Launch
+now delegates to evaluateTeachingEligibility with explicit instructional_window,
+requireAssignment:false and requireSite:true. Launch delivery coverage, claim
+locks, mutations, audit/events and caller authorization remain in their owners.
+The identity module contains shared account/delegation primitives, not another
+complete eligibility decision. Existing launch imports remain compatible through
+thin adapters/re-exports; there is one qualification evaluation implementation.
+
+The shared service requires an explicit horizon and assignment choice. A full
+instructional window checks continuous qualification coverage. Current checks use
+the supplied actual time, with an exclusive one-millisecond end; they do not clamp
+to an old term date and thereby accept credentials expired today. This intentionally
+differs from PR #175's nearest-instructional-point rule. Unsupported horizons or
+invalid times fail rather than choosing an implicit policy. Current-time evaluation
+is a prerequisite only, not permission for preparation or historic records access.
+
+The shared evaluator also supports matching site-less canonical contexts, rejects
+inactive Sections and can require a current teacher assignment. Launch retains its
+mandatory Site. Identity and qualification results include both instructional and
+evaluated windows. Service-agreement checks remain separate and unchanged.
+
+Placement and classroom access are NOT yet wired to this evaluator. Their next
+bites must update affected fixtures and test revocation, missing policy, expiry,
+term boundaries and model-specific authorization before claiming convergence.
+This commit does not merge PR #175 or resolve all eligibility discrepancies.
+
+Validation: 3 focused unit files / 29 tests passed. The disposable local PostgreSQL
+identity/delegation suite passed 24 checks after extraction. Production build,
+86-route contracts and mutation hygiene passed. Full typecheck retains the same
+47 baseline diagnostics. Qualification service tests use mocked DB boundaries;
+live Neon and authenticated browser acceptance remain unverified.
