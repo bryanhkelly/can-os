@@ -5,6 +5,7 @@ import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { requireActor, assertSiteGranted, assertProgramGranted, type Actor } from "@/modules/identity/actors.server";
 import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
 import { requireCurrentTeacherProgramDelegation } from "@/modules/identity/teaching-eligibility.server";
+import { requireTeachingEligibility } from "@/modules/staffing/teaching-eligibility.server";
 export type ClassTransaction = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
 /** Church owns its Site, CAN owns academics. A church staff grant must
@@ -83,9 +84,9 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
     assertProgramGranted(actor, section.programId);
   }
   if (actor.role === "teacher") {
-    const [assigned] = await query.select({ id: s.sectionTeachers.id }).from(s.sectionTeachers)
-      .where(and(eq(s.sectionTeachers.sectionId, sectionId), eq(s.sectionTeachers.personId, actor.actorPersonId))).limit(1);
-    if (!assigned) throw new AuthorizationError("assigned teacher");
+    await requireTeachingEligibility(sectionId, actor.actorPersonId, query, {
+      horizon: "current", requireAssignment: true,
+    });
     return { section, studentProfileId: null, studentPersonId: null };
   }
   const personId = actor.role === "student" ? actor.actorPersonId : studentPersonId;
@@ -176,6 +177,14 @@ export async function accessibleClasses(actor: Actor) {
           if(!(error instanceof AuthorizationError))throw error;
           continue;
         }
+      }
+      try {
+        await requireTeachingEligibility(row.id, actor.actorPersonId, db, {
+          horizon: "current", requireAssignment: true,
+        });
+      } catch (error) {
+        if (!(error instanceof AuthorizationError)) throw error;
+        continue;
       }
       available.push({
         id:row.id,title:row.title,code:row.code,

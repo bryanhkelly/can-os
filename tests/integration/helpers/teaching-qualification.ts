@@ -7,7 +7,7 @@ import { teachingStaffingContext } from "@/modules/staffing/teaching-eligibility
  */
 export async function createTeachingQualificationFixture(
   executor:Pick<Database,"select"|"selectDistinctOn"|"insert">,
-  input:{sectionId:string;personId:string;verifierPersonId:string},
+  input:{sectionId:string;personId:string;verifierPersonId:string;issuedAt?:Date},
 ){
   const section=await teachingStaffingContext(input.sectionId,executor);
   const suffix=crypto.randomUUID();
@@ -30,7 +30,7 @@ export async function createTeachingQualificationFixture(
   });
   const [claim]=await executor.insert(s.qualificationClaims).values({
     personId:input.personId,definitionId:definition!.id,
-    issuedAt:section.window.from,expiresAt:section.window.through,
+    issuedAt:input.issuedAt??section.window.from,expiresAt:section.window.through,
   }).returning();
   await executor.insert(s.qualificationVerificationEvents).values({
     claimId:claim!.id,sequence:1,decision:"approve",actorPersonId:input.verifierPersonId,

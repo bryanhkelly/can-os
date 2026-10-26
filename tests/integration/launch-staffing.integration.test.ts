@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import { roleCapabilities, type AccessContext } from "@/domain/access-context";
@@ -40,6 +40,8 @@ function first<T>(rows: T[]): T {
 }
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
 integration("registrar staffing to launch handoff", () => {
+  beforeEach(()=>{vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2027-08-01T12:00:00Z"));});
+  afterEach(()=>vi.useRealTimers());
   it("publishes requirements, enforces reviewed term-wide eligibility, exposes teacher classes and gates opening", async () => {
     vi.stubEnv("CAN_R2_QUALIFICATION_UPLOADS_ENABLED","true");
     const { db: database } = await vi.importActual<{ db: Database }>("@/db/client");
@@ -376,6 +378,8 @@ integration("registrar staffing to launch handoff", () => {
           .where(eq(s.deliveryArrangements.sectionId, secondSection.sectionId));
         await credentials.decideQualification({ data: { personId: teacher.id, programId: program.id,
           claimId: claim.id, decision: "revoke", expectedSequence: 2, reason: "Synthetic revocation check" } });
+        await expect(authorizeClass(teacherActor,section.sectionId)).rejects.toThrow();
+        expect(await accessibleClasses(teacherActor)).toEqual([]);
         await expect(activateProgram(registrarActor, program.id)).rejects.toThrow("No current verified credential");
         await expect(launch.assignLaunchTeacher({ data: assignment })).rejects.toThrow("No current verified credential");
         await verifiedClaim(teacher.id);

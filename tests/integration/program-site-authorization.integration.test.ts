@@ -321,8 +321,9 @@ integration("Church-owned Site with independently authorized CAN academic servic
         const {enablePublishedPolicyInRollback}=await import("./helpers/published-policy");
         await enablePublishedPolicyInRollback(tx);
         const {createTeachingQualificationFixture}=await import("./helpers/teaching-qualification");
-        await createTeachingQualificationFixture(tx,{
+        const teachingQualification=await createTeachingQualificationFixture(tx,{
           sectionId:section!.id,personId:canPerson.id,verifierPersonId:verifierPerson.id,
+          issuedAt:new Date(Date.now()-86_400_000),
         });
         expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(true);
         await tx.update(s.accountPersonGrants).set({active:false})
@@ -346,6 +347,19 @@ integration("Church-owned Site with independently authorized CAN academic servic
           .toEqual([section!.id]);
         expect((await accessibleClasses(localTeacher as Actor)).map(x=>x.id))
           .not.toContain(section!.id);
+        // A retained assignment and signed agreement cannot preserve a revoked credential.
+        await tx.insert(s.qualificationVerificationEvents).values({
+          claimId:teachingQualification.claimId,sequence:2,decision:"revoke",
+          actorPersonId:verifierPerson.id,
+        });
+        expect(await staffedPublishedSectionIds([section!.id],tx)).toEqual(new Set());
+        await expect(authorizeClass(canTeacher as Actor,section!.id)).rejects.toThrow();
+        expect(await accessibleClasses(canTeacher as Actor)).toEqual([]);
+        await tx.insert(s.qualificationVerificationEvents).values({
+          claimId:teachingQualification.claimId,sequence:3,decision:"approve",
+          actorPersonId:verifierPerson.id,
+        });
+        expect((await authorizeClass(canTeacher as Actor,section!.id)).section.id).toBe(section!.id);
         // Revoke ONLY the Program delegation. Keep the contract, verified
         // CAN account and historical Section assignment intact. Even an older
         // authenticated context must immediately lose this teaching access.

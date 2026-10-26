@@ -379,3 +379,44 @@ Next: classroom access and its directory must adopt the shared current-time
 evaluator while preserving session scope, exact Section relationships and
 institutional agreements. Cross-flow acceptance remains required before declaring
 teaching eligibility fully reconciled.
+
+## Classroom eligibility and connected academic service check
+
+Baseline: FullFlow `c2d05e5f60094367ce21a2c33d9c5a2bcd164021`.
+
+Direct teacher class access and the teacher class directory now call the canonical
+staffing eligibility service with `current` and `requireAssignment:true`.
+Direct access uses the caller's transaction. Authorization failures remove a
+directory entry; infrastructure failures propagate. Existing Site/Program scope,
+exact provider delegation and independently verified CAN/church agreements still
+apply. Student and guardian authorization is unchanged.
+
+This completes the planned consumer wiring: launch and placement evaluate the
+instructional window; classroom access evaluates the actual current time.
+It does not create a new component, workflow engine or eligibility policy.
+
+Validation on October 26, 2026:
+- 36 focused unit tests passed, including eight classroom adapter regressions.
+- A disposable reduced-schema PGlite SQL harness passed 36 checks: the prior
+  28 identity/qualification checks plus eight connected scenarios. Each connected
+  scenario executed the real assignment command, launch staffing readiness,
+  published instructional readiness, transactional student placement, teacher and
+  student class authorization, then revoked a credential, disabled the account,
+  removed delegation or removed the assignment. Both same-organization schooling
+  and independent church/CAN delivery were exercised. Subsequent readiness,
+  placement retry and teacher class access denied; the existing enrollment
+  remained. Placement audit and domain-event rows were checked.
+- The local harness uses real services and agreement checks, but a reduced schema
+  without the production migration constraints. It is exploratory local evidence,
+  not the repository's migrated-database acceptance suite.
+- Production build, 86-route contracts and mutation hygiene passed.
+- Typecheck retains 47 baseline diagnostics, with no new diagnostics.
+- Updated launch, church/CAN and admissions fixtures for current qualification
+  validity; added credential-revocation classroom assertions. These three
+  integration suites loaded but skipped because DATABASE_URL was absent.
+  Their database execution is unverified.
+
+Next priority: run the connected journey against a disposable fully migrated
+database and authenticated browser, then fix only observed blockers. Separate
+connection revocation races and the full six-stage Golden Flow are still
+unverified. Do not treat shared eligibility wiring as completion of those flows.

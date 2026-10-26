@@ -499,6 +499,7 @@ integration("cross-persona admissions through active classes",()=>{
     const {createTeachingQualificationFixture}=await import("./helpers/teaching-qualification");
     const teacherQualification=await createTeachingQualificationFixture(tx,{
       sectionId:section.id,personId:classTeacher.id,verifierPersonId:registrar.id,
+      issuedAt:new Date(Date.now()-86_400_000),
     });
 
     // The family-to-class preview and actual placement must agree on
