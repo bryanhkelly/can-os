@@ -76,7 +76,7 @@ reload the workspace to discard mounted state and caches.
 ## Ordered continuation and risk
 
 1. Shared site staffing reads/mutations and query retry UI (completed).
-2. School-opening version binding, agreement evidence selection and shared evidence details (completed). Opening prerequisite visibility is the current bite.
+2. School-opening version binding, agreement evidence selection and shared evidence details (completed). Opening prerequisite visibility is also completed. Teaching-eligibility reconciliation now takes priority over further journey UI.
 3. Shared appointment/date UI after inclusive/exclusive and Site-timezone
    semantics are resolved; no cosmetic schema rename.
 4. Domain-evaluated journey evidence and authorized next actions.
@@ -235,3 +235,32 @@ UI suspension availability. Production build, route contracts (86/86) and mutati
 hygiene passed. Full typecheck retains the 47 baseline diagnostics. Database calls
 are mocked in these unit tests; live persistence and authenticated browser
 acceptance remain unverified.
+
+
+## Preserve evidence selection through background refresh
+
+Baseline: FullFlow `0c95c186bdb6ea6e67c6470b81ec5d200ae7972c`.
+
+The earlier agreement picker incorrectly treated fetching/error states as an empty
+eligible-document result. The component now preserves reviewer selection during
+background refresh, failure and retry. A settled successful response that excludes
+the document clears it; changing request/end-date scope or making the date invalid
+also clears it. Cached metadata remains visible but selection is disabled while
+refreshing. Read errors retain the selected ID and show the existing retry UI.
+Final server approval still revalidates all evidence eligibility rules.
+
+This supersedes the earlier audit statement that refreshing/unavailable results
+clear prior selections. It does not introduce a second selection store or alter
+query scoping, document access, date boundaries or approval commands.
+
+Validation: 3 unit files / 13 tests passed. New lifecycle tests drive the actual
+component effect against real QueryObserver pending, success, error and retry
+transitions, using a lightweight hook harness. Existing SSR tests cover scoped
+cached metadata. These are not mounted browser acceptance tests. Production
+build, 86-route contracts and mutation hygiene passed; full typecheck retains
+47 baseline diagnostics. Authenticated browser acceptance remains unverified.
+
+Next priority: reconcile PR #175 and FullFlow into one canonical teaching
+eligibility decision, adopting it incrementally in launch, placement and classroom
+authorization with explicit term/current horizons. Connected A/B acceptance and CI
+diagnosis precede further Golden Flow step-catalog work.

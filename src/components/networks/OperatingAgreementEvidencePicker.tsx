@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { EvidencePicker } from "@/components/evidence/EvidencePicker";
 import { listOperatingAgreementEvidenceFn } from "@/modules/programs/program-site-authorization.functions";
@@ -19,19 +19,32 @@ export function OperatingAgreementEvidencePicker({
     }),
     enabled, retry: false, gcTime: 0,
   });
-  const candidates = enabled && !query.isError && !query.isFetching
-    ? query.data?.candidates ?? [] : [];
+  const scope = authorizationId + ":" + effectiveThrough;
+  const previousScope = useRef(scope);
+  const candidates = enabled ? query.data?.candidates ?? [] : [];
   useEffect(() => {
-    if (value && !candidates.some(candidate => candidate.id === value)) onChange("");
-  }, [value, candidates, onChange]);
+    const changedScope = previousScope.current !== scope;
+    previousScope.current = scope;
+    // Pending/error states do not establish that a saved selection is invalid.
+    // Only settled successful data for this scope may remove an eligible ID.
+    if (value && (changedScope || !enabled ||
+      (query.isSuccess && !query.isFetching && !query.isPlaceholderData &&
+        !candidates.some(candidate => candidate.id === value)))) onChange("");
+  }, [value, candidates, onChange, scope, enabled,
+    query.isSuccess, query.isFetching, query.isPlaceholderData]);
   if (!enabled) return <p className="text-xs">
     Choose a future exclusive end date to find evidence covering the agreement period.
   </p>;
-  return <EvidencePicker label="Independently verified two-party agreement"
-    candidates={candidates} value={value} onChange={onChange} disabled={disabled}
-    loading={query.isPending || query.isFetching}
+  return <>
+    {query.isFetching && !query.isPending && <p className="text-xs" role="status">
+      Refreshing eligible evidence…
+    </p>}
+    <EvidencePicker label="Independently verified two-party agreement"
+    candidates={candidates} value={value} onChange={onChange} disabled={disabled || query.isFetching}
+    loading={query.isPending}
     error={query.isError ? "Unable to load eligible agreement evidence." : undefined}
     onRetry={() => { void query.refetch(); }}
     emptyMessage="No eligible evidence covers this period. The agreement must be verified by someone other than the requester or reviewer."
-    truncated={query.data?.truncated}/>;
+    truncated={query.data?.truncated}/>
+  </>;
 }
