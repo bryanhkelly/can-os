@@ -5,13 +5,16 @@ import {
   sectionTeachers,
 } from "@/db/schema";
 
+import { programTeacherDelegationPredicate } from "@/modules/identity/teaching-eligibility.server";
+
 /**
  * The same teacher-identity rule must power the registrar's class-placement
  * preview and the transactional enrollment command. A Section assignment
  * alone does not mean a teacher can sign in and teach that class.
  *
  * When academics are provided by a different Organization, ONLY an original
- * academic-provider-wide teacher grant may satisfy instructor staffing.
+ * academic-provider-wide teacher grant plus exact current Program delegation
+ * may satisfy instructor staffing.
  * Church-local roles do not become CAN academic instruction assignments.
  * When the host is also the academic provider, its site-scoped teacher
  * grant remains valid. No provider grant becomes church-wide Site access.
@@ -46,6 +49,15 @@ export async function verifiedTeacherSectionIds(
       eq(accountPersonGrants.role, "teacher"),
       eq(accessAccounts.disabled, false),
       isNotNull(accessAccounts.emailVerifiedAt),
+      // External providers also need the exact current Program delegation.
+      or(
+        eq(programs.academicProviderOrganizationId, programs.organizationId),
+        programTeacherDelegationPredicate({
+          personId: sectionTeachers.personId,
+          providerOrganizationId: programs.academicProviderOrganizationId,
+          programId: programs.id, siteId: sections.siteId,
+        }),
+      ),
       or(
         and(
           // Where the host does NOT operate academics, a host teacher grant

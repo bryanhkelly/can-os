@@ -4,6 +4,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { requireActor, assertSiteGranted, assertProgramGranted, type Actor } from "@/modules/identity/actors.server";
 import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
+import { requireCurrentTeacherProgramDelegation } from "@/modules/identity/teaching-eligibility.server";
 export type ClassTransaction = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
 /** Church owns its Site, CAN owns academics. A church staff grant must
@@ -59,6 +60,11 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
     actor.scope.sectionIds?.includes(section.id)===true;
   const churchCANProgram=actor.role==="teacher" &&
     await isIndependentChurchAcademicProgram(query,section.programId);
+  if(institutionalSection){
+    await requireCurrentTeacherProgramDelegation(query,{
+      personId:actor.actorPersonId,programId:section.programId,siteId:section.siteId,
+    });
+  }
   if(churchCANProgram){
     // Church staff may supervise children, but must NOT grade or teach
     // institution-owned CAN classes on a host-local grant. The teacher must
@@ -160,6 +166,9 @@ export async function accessibleClasses(actor: Actor) {
       }else if(!delegated.includes(row.id))continue;
       if(independent || !hostLocal){
         try{
+          await requireCurrentTeacherProgramDelegation(db,{
+            personId:actor.actorPersonId,programId:row.programId,siteId:row.siteId,
+          });
           await requireInstitutionalAcademicProgramAuthority(db,actor,row.programId,[
             "academic_instruction","curriculum",
           ]);

@@ -310,6 +310,12 @@ integration("Church-owned Site with independently authorized CAN academic servic
           {sectionId:section!.id,personId:localPerson.id},
           {sectionId:section!.id,personId:canPerson.id},
         ]);
+        const teacherDelegation=await delegateCANAcademicProgramStaff(steward,{
+          programId:launch.programId,personId:canPerson.id,role:"teacher",
+          reason:"CAN delegates instruction for this exact contracted Program.",
+        });
+        const {staffedPublishedSectionIds}=await import(
+          "@/modules/enrollment/instructional-section-readiness.server");
         const {verifiedTeacherSectionIds}=await import(
           "@/modules/enrollment/verified-section-teachers.server");
         expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(true);
@@ -334,6 +340,24 @@ integration("Church-owned Site with independently authorized CAN academic servic
           .toEqual([section!.id]);
         expect((await accessibleClasses(localTeacher as Actor)).map(x=>x.id))
           .not.toContain(section!.id);
+        // Revoke ONLY the Program delegation. Keep the contract, verified
+        // CAN account and historical Section assignment intact. Even an older
+        // authenticated context must immediately lose this teaching access.
+        expect((await staffedPublishedSectionIds([section!.id],tx)).has(section!.id)).toBe(true);
+        await revokeCANAcademicProgramStaff(steward,{
+          roleAssignmentId:teacherDelegation.roleAssignmentId,
+          reason:"CAN withdraws this instructor from the contracted Program.",
+        });
+        expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(false);
+        expect((await staffedPublishedSectionIds([section!.id],tx)).has(section!.id)).toBe(false);
+        await expect(authorizeClass(canTeacher as Actor,section!.id))
+          .rejects.toThrow("current provider-owned teacher Program delegation");
+        expect(await accessibleClasses(canTeacher as Actor)).toEqual([]);
+        // Restore through the canonical command for the remaining agreement tests.
+        await delegateCANAcademicProgramStaff(steward,{
+          programId:launch.programId,personId:canPerson.id,role:"teacher",
+          reason:"CAN restores instruction for the remaining acceptance checks.",
+        });
         const [original] = await tx.select({
           organizationId:s.programs.organizationId,
           status:s.programs.status,
