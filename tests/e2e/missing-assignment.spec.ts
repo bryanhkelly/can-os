@@ -8,21 +8,15 @@
  * (secret hashed with CAN_ACCESS_TOKEN_PEPPER) injected as the session cookie —
  * there is no app backdoor.
  */
-import {
-  expect,
-  test,
-  type Browser,
-  type BrowserContext,
-  type Page,
-} from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
 import {
-  accessSessionCookie,
   createGf1Fixture,
   destroyGf1Fixture,
   type Gf1Fixture,
   type Sql,
 } from "./fixture";
+import { openAuthenticatedPage } from "./helpers/authenticated-persona";
 import { DATABASE_URL, TEST_JOB_SECRET, baseURL } from "./env";
 
 let sql: Sql;
@@ -42,32 +36,6 @@ async function getSubmission(): Promise<SubmissionRow> {
   const row = rows[0];
   if (!row) throw new Error("Fixture submission row is missing");
   return row;
-}
-
-/** Signs in a browser context by injecting the app session cookie. */
-async function signIn(context: BrowserContext, secret: string): Promise<void> {
-  // __Host- cookie: must be Secure, Path=/, and set without a Domain attribute.
-  // Chromium accepts Secure cookies on http://localhost (a trustworthy origin).
-  await context.addCookies([
-    {
-      name: accessSessionCookie,
-      value: secret,
-      url: baseURL,
-      path: "/",
-      httpOnly: true,
-      secure: true,
-      sameSite: "Lax",
-    },
-  ]);
-}
-
-async function newSignedInPage(
-  browser: Browser,
-  secret: string,
-): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ baseURL });
-  await signIn(context, secret);
-  return { context, page: await context.newPage() };
 }
 
 test.beforeAll(async () => {
@@ -127,7 +95,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
       .toBeGreaterThanOrEqual(1);
   });
 
-  const guardian = await newSignedInPage(browser, fixture.guardianSecret);
+  const guardian = await openAuthenticatedPage(browser, fixture.guardianSecret);
   try {
     await test.step("guardian sees the same missing assignment in academic progress", async () => {
       await guardian.page.goto("/guardian/academics");
@@ -141,7 +109,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     await guardian.context.close();
   }
 
-  const specialist = await newSignedInPage(browser, fixture.specialistSecret);
+  const specialist = await openAuthenticatedPage(browser, fixture.specialistSecret);
   try {
     await test.step("specialist caseload receives the intervention insight", async () => {
       await specialist.page.goto("/coach");
@@ -157,7 +125,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     await specialist.context.close();
   }
 
-  const teacher = await newSignedInPage(browser, fixture.teacherSecret);
+  const teacher = await openAuthenticatedPage(browser, fixture.teacherSecret);
   try {
     await test.step("teacher sees the missing work in the queue", async () => {
       await teacher.page.goto("/teacher/missing-work");
@@ -172,7 +140,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     await teacher.context.close();
   }
 
-  const student = await newSignedInPage(browser, fixture.studentSecret);
+  const student = await openAuthenticatedPage(browser, fixture.studentSecret);
   try {
     await test.step("student submits the assignment late via the UI", async () => {
       await student.page.goto("/student/assignments");
@@ -206,7 +174,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
   }
 
   await test.step("teacher grades the late submission in the real gradebook UI", async () => {
-    const teacherGradebook = await newSignedInPage(browser, fixture.teacherSecret);
+    const teacherGradebook = await openAuthenticatedPage(browser, fixture.teacherSecret);
     try {
       await teacherGradebook.page.goto("/teacher/gradebook");
       await expect(
@@ -264,7 +232,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     expect(actions.has("submission.grade") || actions.has("assignment.grade")).toBe(true);
   });
 
-  const guardianAgain = await newSignedInPage(browser, fixture.guardianSecret);
+  const guardianAgain = await openAuthenticatedPage(browser, fixture.guardianSecret);
   try {
     await test.step("guardian sees the posted grade and feedback from canonical data", async () => {
       await guardianAgain.page.goto("/guardian/academics");
@@ -276,7 +244,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     await guardianAgain.context.close();
   }
 
-  const studentAgain = await newSignedInPage(browser, fixture.studentSecret);
+  const studentAgain = await openAuthenticatedPage(browser, fixture.studentSecret);
   try {
     await test.step("student sees the posted grade and feedback", async () => {
       await studentAgain.page.goto("/student/assignments");

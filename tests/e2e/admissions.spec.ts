@@ -1,8 +1,9 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
-import { accessSessionCookie, type Sql } from "./fixture";
+import { type Sql } from "./fixture";
 import { createAdmissionsFixture, retireAdmissionsFixture, type AdmissionsFixture } from "./admissions-fixture";
-import { DATABASE_URL, baseURL } from "./env";
+import { openAuthenticatedPage } from "./helpers/authenticated-persona";
+import { DATABASE_URL } from "./env";
 
 let sql: Sql;
 let fixture: AdmissionsFixture;
@@ -16,13 +17,6 @@ test.afterAll(async () => {
   if (fixture) await retireAdmissionsFixture(sql, fixture);
 });
 
-async function signedIn(browser: Browser, secret: string) {
-  const context = await browser.newContext({ baseURL });
-  await context.addCookies([{ name: accessSessionCookie, value: secret, domain: "localhost", path: "/",
-    httpOnly: true, secure: true, sameSite: "Lax" }]);
-  return { context, page: await context.newPage() };
-}
-
 async function signForm(page: Page, corrected = false) {
   await page.getByLabel("Family contact plan (required)").fill(corrected ? "Call after 4pm." : "Call in the morning.");
   await page.getByLabel("Typed full name (electronic signature)").fill("Synthetic Managing Guardian");
@@ -32,9 +26,9 @@ async function signForm(page: Page, corrected = false) {
 }
 
 test("GF2: guardian correction and registrar review through accepted offer, active enrollment and class access", async ({ browser }) => {
-  const guardian = await signedIn(browser, fixture.guardianSecret);
-  const registrar = await signedIn(browser, fixture.teacherSecret);
-  const student = await signedIn(browser, fixture.studentSecret);
+  const guardian = await openAuthenticatedPage(browser, fixture.guardianSecret);
+  const registrar = await openAuthenticatedPage(browser, fixture.teacherSecret);
+  const student = await openAuthenticatedPage(browser, fixture.studentSecret);
   const selected = `siteId=${fixture.siteId}&programId=${fixture.programId}&application=${fixture.applicationId}`;
   try {
     await guardian.page.goto(`/guardian/admission-offers?application=${fixture.applicationId}`);
