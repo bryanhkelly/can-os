@@ -135,6 +135,14 @@ The tested readiness flow uses the
 existing configured application Journey; it does not introduce a second
 hard-coded workflow engine or automatically configure approved school forms.
 
+**2026-10-28 status reconciliation:** the GF1/GF2 browser specs and fixtures
+were realigned to the current UI (program+section enrollments, teacher
+eligibility/delivery stack, first lesson, executable guardian permissions) and
+are repaired and wired, but they were **not re-executed** in the 2026-10-28
+review environment. The browser acceptance described above remains historical
+evidence from its original runs; a fresh live run is required before claiming
+current GF2 browser acceptance.
+
 ---
 
 ## GF3 — Host / Program Launch
@@ -552,13 +560,19 @@ A Playwright golden-flow test covers GF1 end to end (assignment becomes missing 
 Prerequisites:
 
 - Run `npm ci` for the committed dependencies and `npx playwright install chromium` for the browser.
-- Set `DATABASE_URL` to a **disposable Neon branch** (never production). The test inserts and deletes its own synthetic rows, but it is not isolated against real data.
+- Point `TEST_DATABASE_URL` and `DATABASE_URL` at the same **disposable Neon branch** (never production). The test inserts and deletes its own synthetic rows, but it is not isolated against real data.
+- Set `CAN_TEST_DB_WRITES_ENABLED=true`, `APP_ENV=test`, `NODE_ENV=test`, and `CAN_APPLICATION_DB_HOST` to the distinct application database hostname used for the endpoint-identity check.
 
 Run:
 
 ```powershell
-$env:DATABASE_URL = "<disposable Neon connection>"
-npm run test:e2e
+$env:TEST_DATABASE_URL = "<disposable Neon connection>"
+$env:DATABASE_URL = $env:TEST_DATABASE_URL
+$env:CAN_TEST_DB_WRITES_ENABLED = "true"
+$env:APP_ENV = "test"
+$env:NODE_ENV = "test"
+$env:CAN_APPLICATION_DB_HOST = "<distinct application database hostname>"
+npm run test:e2e -- tests/e2e/missing-assignment.spec.ts
 ```
 
 Playwright starts `npm run dev` itself (reusing an existing server on port 3000) with `CAN_ACCESS_TOKEN_PEPPER`, `CAN_JOB_SECRET`, and `CAN_DEMO_WRITES_ENABLED=true` set to test values; override any of them via the environment. The test signs in by inserting real session rows (secret hashed with the pepper) and injecting the session cookie — there is no app backdoor. Reports land in `playwright-report/` (git-ignored).
@@ -673,8 +687,10 @@ Conversation durability, Agent Runtime tool calling, identical authorization for
 
 `tests/integration/agent-conversation.integration.test.ts` covers the flow against a disposable Neon database: evidence-grounded answers, the watch-confirmation flow producing a durable subscription that then delivers (the A1 → A2 loop), approval-gate enforcement (including cross-person approval attempts), and safe refusals that leak nothing.
 
+There is no dedicated runner alias for this file. Run it as part of the isolated integration suite, targeting the file directly with the required environment (`TEST_DATABASE_URL` on a disposable Neon branch, `CAN_TEST_DB_WRITES_ENABLED=true`; see `scripts/run-integration-tests.mjs` safeguards):
+
 ```sh
-node scripts/run-integration-tests.mjs agent-conversation
+npm run test:integration -- tests/integration/agent-conversation.integration.test.ts
 ```
 
 The runtime lives in `src/platform/agent/` (planner, tools, runtime); the session-authenticated boundary is `src/modules/conversation/ask-can.functions.ts`; the UI is `src/routes/ask.tsx` with watch management at `src/routes/guardian.watching.tsx`. The planner is deterministic by design for v1 — an LLM planner can replace it behind the same `planTurn` contract without touching execution, authorization, or audit.
@@ -706,8 +722,10 @@ Subscription lifecycle, event-driven delivery over the outbox, delivery-time aut
 
 `tests/integration/subscription-delivery.integration.test.ts` covers the flow end to end against a disposable Neon database: delivery to authorized subscribers, suppression of unauthorized ones, idempotent reprocessing, reminder gating on current canonical state, revocation-safe delivery, outbox backoff/escalation, and lease reclaim.
 
+There is no dedicated runner alias for this file. Run it as part of the isolated integration suite, targeting the file directly:
+
 ```sh
-node scripts/run-integration-tests.mjs subscription-delivery
+npm run test:integration -- tests/integration/subscription-delivery.integration.test.ts
 ```
 
 Requires `TEST_DATABASE_URL` and `CAN_TEST_DB_WRITES_ENABLED=true` in `.env.local` (see scripts/run-integration-tests.mjs safeguards). The subscriptions schema lives in `src/db/schema/subscriptions.ts` (migration `drizzle/0011_charming_logan.sql`); the matcher, reminder processor, and per-event-type policies live in `src/platform/subscriptions/`.

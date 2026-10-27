@@ -3,6 +3,9 @@
 **Status: in development; NOT accepted.** Working branch: `FullFlow`, draft PR #172.
 This is an additional operating model, not a substitute for the canonical six-stage K–8 extension FullFlow gate.
 
+**Status check (2026-10-28, FullFlow HEAD `94a194c`):** Golden Flow B remains **HOLD**.
+The GF-B onsite/church-hosted typecheck diagnostics are now closed (workspace typecheck reports 0 diagnostics) without runtime authorization changes; this is a static-check improvement only. Safeguarding intake and custody/pickup workflows are still missing product surface, not just tests, and site-director real-session browser proof remains missing. No live acceptance was executed in this review.
+
 ## Product boundary
 
 A legally independent church owns its Organization and physical Site. CAN supplies authorized academic
