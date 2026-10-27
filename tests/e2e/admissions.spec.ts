@@ -83,16 +83,9 @@ test("GF2: guardian correction and registrar review through accepted offer, acti
     await guardian.page.getByRole("button", { name: "Accept", exact: true }).click();
     await expect(guardian.page.getByText("Your acceptance is recorded. Admissions must activate enrollment before classes become available.")).toBeVisible();
     await registrar.page.reload();
-    await registrar.page.getByRole("button", { name: "Registrar: Activate enrollment", exact: true }).click();
-    await expect(registrar.page.getByText("Enrollment active", { exact: false })).toBeVisible();
-    await expectVisibleAfterReload(
-      guardian.page,
-      guardian.page.getByText("Enrollment is active. Admissions will arrange your classes next."),
-    );
-
-    await registrar.page.getByRole("button", { name: "Choose courses", exact: true }).click();
+    // Activation and placement are one canonical action on the accepted offer.
     await registrar.page.getByLabel("Available section").selectOption(fixture.sectionId);
-    await registrar.page.getByRole("button", { name: "Assign student", exact: true }).click();
+    await registrar.page.getByRole("button", { name: "Activate enrollment and assign class", exact: true }).click();
     await expect(registrar.page.getByText("Assigned: E2E Logic II", { exact: true })).toBeVisible();
     await expectVisibleAfterReload(
       guardian.page,
@@ -103,7 +96,7 @@ test("GF2: guardian correction and registrar review through accepted offer, acti
     await expectProtectedPageDenied(student.page, `/admissions?${selected}`, {
       denial: student.page.getByRole("alert"),
       message: "registrar",
-      protectedContent: ["Registrar: Activate enrollment"],
+      protectedContent: ["Registrar: Issue offer"],
     });
 
     const applications = await sql.query("select household_id, student_profile_id, stage from applications where id = $1", [fixture.applicationId]);

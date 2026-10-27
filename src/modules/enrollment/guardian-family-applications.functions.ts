@@ -25,7 +25,7 @@ async function signedInFamilyApplicant() {
     .from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
   if (!account?.emailVerifiedAt)
     throw new AuthorizationError("verified family email sign-in required");
-  return actor;
+  return { ...actor, actorPersonId: actor.actorPersonId };
 }
 
 const uuid = z.string().uuid();

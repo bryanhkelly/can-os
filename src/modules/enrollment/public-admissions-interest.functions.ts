@@ -10,11 +10,13 @@ import { emitEvent, writeAudit } from "@/platform/mutation";
 
 async function requireAdmissionsIntakeReader() {
   const actor = await getCommandContext(getRequest());
+  const programIds = actor.scope.programIds;
+  const organizationIds = actor.scope.organizationIds;
   if (actor.role !== "registrar" || !actor.actorPersonId ||
-    !actor.scope.programIds?.length || !actor.scope.organizationIds?.length)
+    !programIds?.length || !organizationIds?.length)
     throw new AuthorizationError("admissions intake registrar");
   assertCapability(actor, "enrollment.decide");
-  return actor;
+  return { ...actor, scope: { ...actor.scope, programIds, organizationIds } };
 }
 
 /**
