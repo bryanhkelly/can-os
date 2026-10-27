@@ -53,6 +53,19 @@ export interface Gf1Fixture {
   teacherGrantId: string;
   guardianGrantId: string;
   specialistGrantId: string;
+  /** Non-synthetic provider-wide teacher grant required by teaching eligibility. */
+  teacherProviderGrantId: string;
+  /** Provider-owned Program teacher delegation required by teaching eligibility. */
+  teacherRoleAssignmentId: string;
+  complianceFrameworkId: string;
+  complianceFrameworkVersionId: string;
+  policyRuleId: string;
+  policyApplicabilityId: string;
+  qualificationDefinitionId: string;
+  qualificationClaimId: string;
+  qualificationVerificationEventId: string;
+  /** Active delivery arrangement covering the whole instructional window. */
+  deliveryArrangementId: string;
   /** Raw session secrets — the browser only ever sees these, never the hashes. */
   studentSecret: string;
   teacherSecret: string;
@@ -228,6 +241,19 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
       [fixture.sectionId, fixture.teacherPersonId],
     );
 
+    // Canonical enrollments: an active Program membership (section_id NULL)
+    // AND the active Section membership. Class access requires both.
+    await sql.query(
+      `insert into enrollments (
+         student_profile_id, kind, status, organization_id, program_id, section_id, school_year_id, metadata
+       ) values ($1, 'program', 'active', $2, $3, null, $4, '{}'::jsonb)`,
+      [
+        fixture.studentProfileId,
+        fixture.hostOrgId,
+        fixture.programId,
+        fixture.schoolYearId,
+      ],
+    );
     await sql.query(
       `insert into enrollments (
          student_profile_id, kind, status, organization_id, program_id, section_id, school_year_id, metadata
@@ -287,6 +313,88 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
     fixture.guardianGrantId = await grantFor(fixture.guardianAccountId, fixture.guardianPersonId, "guardian");
     fixture.specialistGrantId = await grantFor(fixture.specialistAccountId, fixture.specialistPersonId, "specialist");
 
+    // Canonical teaching-eligibility stack (mirrors
+    // scripts/seeds/synthetic-profiles-compliance.sql plus the role-assignment
+    // pattern in algebra1-classroom.spec.ts). requireTeachingEligibility needs:
+    // a provider-owned Program teacher role assignment, a NON-synthetic
+    // provider-wide teacher grant on a verified account, a published compliance
+    // policy the teacher's verified qualification satisfies across the whole
+    // instructional window, and active delivery coverage for that window.
+    fixture.teacherRoleAssignmentId = await insertFixtureId(
+      sql,
+      `insert into role_assignments (person_id, organization_id, site_id, program_id, role_key, capabilities)
+       values ($1, $2, $3, $4, 'teacher', '["academic_instruction","curriculum"]'::jsonb) returning id`,
+      [fixture.teacherPersonId, fixture.canOrgId, fixture.siteId, fixture.programId],
+    );
+    fixture.teacherProviderGrantId = await insertFixtureId(
+      sql,
+      `insert into account_person_grants (account_id, person_id, role, organization_id, site_id, active, is_synthetic)
+       values ($1, $2, 'teacher', $3, null, true, false) returning id`,
+      [fixture.teacherAccountId, fixture.teacherPersonId, fixture.canOrgId],
+    );
+
+    fixture.qualificationDefinitionId = await insertFixtureId(
+      sql,
+      `insert into qualification_definitions (key, kind, title)
+       values ($1, 'license', 'E2E Teaching License') returning id`,
+      [`e2e-teaching-license-${suffix}`],
+    );
+    fixture.qualificationClaimId = await insertFixtureId(
+      sql,
+      `insert into qualification_claims (person_id, definition_id, issuer_name, jurisdiction_id, issued_at, expires_at, details)
+       values ($1, $2, 'E2E Synthetic Issuer', $3, null, null, '{"synthetic":true}'::jsonb) returning id`,
+      [fixture.teacherPersonId, fixture.qualificationDefinitionId, fixture.jurisdictionId],
+    );
+    fixture.qualificationVerificationEventId = await insertFixtureId(
+      sql,
+      `insert into qualification_verification_events (claim_id, sequence, decision, actor_person_id)
+       values ($1, 1, 'approve', $2) returning id`,
+      [fixture.qualificationClaimId, fixture.teacherPersonId],
+    );
+
+    fixture.complianceFrameworkId = await insertFixtureId(
+      sql,
+      `insert into compliance_frameworks (key, name, authority)
+       values ($1, 'E2E Staff Readiness', 'CAN E2E Only') returning id`,
+      [`e2e-staff-readiness-${suffix}`],
+    );
+    fixture.complianceFrameworkVersionId = await insertFixtureId(
+      sql,
+      `insert into compliance_framework_versions (framework_id, version, status)
+       values ($1, '1', 'published') returning id`,
+      [fixture.complianceFrameworkId],
+    );
+    fixture.policyRuleId = await insertFixtureId(
+      sql,
+      `insert into compliance_policy_rules (framework_version_id, code, description, expression, evidence_policy)
+       values ($1, 'E2E-LICENSE', 'E2E teaching license for synthetic browser runs', $2::jsonb, '{}'::jsonb) returning id`,
+      [
+        fixture.complianceFrameworkVersionId,
+        JSON.stringify({ op: "credential", type: `e2e-teaching-license-${suffix}` }),
+      ],
+    );
+    fixture.policyApplicabilityId = await insertFixtureId(
+      sql,
+      `insert into compliance_policy_applicability (
+         framework_version_id, organization_id, site_id, program_id, jurisdiction_id, role_key
+       ) values ($1, null, null, null, null, 'teacher') returning id`,
+      [fixture.complianceFrameworkVersionId],
+    );
+
+    fixture.deliveryArrangementId = await insertFixtureId(
+      sql,
+      `insert into delivery_arrangements (
+         section_id, academic_provider_organization_id, instructor_person_id,
+         modality, status, effective_from, effective_through, metadata
+       ) values ($1, $2, $3, 'hybrid', 'active', '2026-08-01', '2027-06-30', $4::jsonb) returning id`,
+      [
+        fixture.sectionId,
+        fixture.canOrgId,
+        fixture.teacherPersonId,
+        JSON.stringify({ synthetic: true, fixture: "gf1-e2e" }),
+      ],
+    );
+
     // Sessions use the same helper as independently provisioned browser personas.
     const sessionFor = async (accountId: string, grantId: string) =>
       createAccessSession(sql, { accountId, activeGrantId: grantId, expiresAt: sessionExpiresAt });
@@ -328,7 +436,8 @@ export async function destroyGf1Fixture(
     ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId, fixture.specialistAccountId].map(
       (id) => one(`delete from access_sessions where account_id = $1`, id),
     ),
-    ...[fixture.studentGrantId, fixture.teacherGrantId, fixture.guardianGrantId, fixture.specialistGrantId].map(
+    ...[fixture.studentGrantId, fixture.teacherGrantId, fixture.guardianGrantId, fixture.specialistGrantId,
+      fixture.teacherProviderGrantId].map(
       (id) => one(`delete from account_person_grants where id = $1`, id),
     ),
     ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId, fixture.specialistAccountId].map(
@@ -338,7 +447,10 @@ export async function destroyGf1Fixture(
     one(`delete from submissions where id = $1`, fixture.submissionId),
     one(`delete from assessments where id = $1`, fixture.assessmentId),
     one(`delete from section_teachers where section_id = $1`, fixture.sectionId),
-    one(`delete from enrollments where section_id = $1`, fixture.sectionId),
+    // Both the Program (section_id NULL) and Section memberships belong to
+    // this profile; deleting by section alone would leak the Program row.
+    one(`delete from enrollments where student_profile_id = $1`, fixture.studentProfileId),
+    one(`delete from delivery_arrangements where id = $1`, fixture.deliveryArrangementId),
     one(`delete from sections where id = $1`, fixture.sectionId),
     one(`delete from course_template_versions where id = $1`, fixture.courseTemplateVersionId),
     one(`delete from course_templates where id = $1`, fixture.courseTemplateId),
@@ -352,6 +464,15 @@ export async function destroyGf1Fixture(
         : undefined,
     ],
     one(`delete from student_profiles where id = $1`, fixture.studentProfileId),
+    // Teaching-eligibility graph, children before parents.
+    one(`delete from qualification_verification_events where id = $1`, fixture.qualificationVerificationEventId),
+    one(`delete from qualification_claims where id = $1`, fixture.qualificationClaimId),
+    one(`delete from compliance_policy_applicability where id = $1`, fixture.policyApplicabilityId),
+    one(`delete from compliance_policy_rules where id = $1`, fixture.policyRuleId),
+    one(`delete from compliance_framework_versions where id = $1`, fixture.complianceFrameworkVersionId),
+    one(`delete from compliance_frameworks where id = $1`, fixture.complianceFrameworkId),
+    one(`delete from qualification_definitions where id = $1`, fixture.qualificationDefinitionId),
+    one(`delete from role_assignments where id = $1`, fixture.teacherRoleAssignmentId),
     ...[fixture.teacherPersonId, fixture.studentPersonId, fixture.guardianPersonId, fixture.specialistPersonId].map(
       (id) => one(`delete from people where id = $1`, id),
     ),

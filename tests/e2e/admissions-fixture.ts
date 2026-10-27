@@ -10,6 +10,11 @@ export async function createAdmissionsFixture(sql: Sql): Promise<AdmissionsFixtu
       process.env.CAN_TEST_DB_WRITES_ENABLED !== "true" ||
       !process.env.TEST_DATABASE_URL || process.env.DATABASE_URL !== process.env.TEST_DATABASE_URL)
     throw new Error("Admissions browser fixtures require the guarded disposable database runner.");
+  // The base GF1 graph already carries the canonical teacher-eligibility and
+  // delivery stack verifiedTeacherSectionIds requires (provider role
+  // assignment, non-synthetic provider grant, published qualification policy,
+  // verified claim, active delivery arrangement); destroyGf1Fixture owns its
+  // cleanup.
   const base = await createGf1Fixture(sql);
   const f: AdmissionsFixture = { ...base, applicationId: randomUUID(), householdId: randomUUID(),
     definitionId: randomUUID(), journeyId: randomUUID(), requirementId: randomUUID() };
@@ -20,6 +25,36 @@ export async function createAdmissionsFixture(sql: Sql): Promise<AdmissionsFixtu
     await sql.transaction([
       sql.query("delete from enrollments where student_profile_id = $1", [f.studentProfileId]),
       sql.query("delete from submissions where id = $1", [f.submissionId]),
+      // Offer response and activation require a canonically verified,
+      // enrollment-managing guardian relationship (assertGuardian and the
+      // guardian offer inbox both refuse unverified relationships).
+      sql.query(`update guardian_relationships set can_manage_enrollment = true,
+        metadata = '{"synthetic":true,"fixture":"gf1-e2e","verification":"verified"}'::jsonb
+        where guardian_person_id = $1 and student_person_id = $2`,
+      [f.guardianPersonId, f.studentPersonId]),
+      // Placement refuses a published course version without a learner-facing
+      // first lesson (requireAccessibleFirstLesson). Give the inherited version
+      // one minimal synthetic lesson; the row itself is owned and removed by
+      // the GF1 fixture lifecycle.
+      sql.query(`update course_template_versions set curriculum = $2::jsonb
+        where id = $1 and status = 'published'`,
+      [f.courseTemplateVersionId, JSON.stringify({
+        learning: {
+          version: 1,
+          syllabus: "Synthetic browser acceptance only.",
+          modules: [{
+            id: "e2e-module-1",
+            title: "E2E Module 1",
+            lessons: [{
+              id: "e2e-lesson-1",
+              title: "E2E First Lesson",
+              body: "Synthetic first lesson for browser acceptance placement.",
+              resources: [],
+            }],
+          }],
+          resources: [],
+        },
+      })]),
       sql.query("update account_person_grants set role = 'registrar' where id = $1", [f.teacherGrantId]),
       sql.query("insert into households (id, display_name) values ($1, $2)", [f.householdId, `Browser family ${f.suffix}`]),
       sql.query(`insert into household_memberships (household_id, person_id, relationship_label)
