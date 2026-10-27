@@ -35,7 +35,8 @@ async function schoolIdentity(tx:Reader,programId:string){
     .innerJoin(organizations,eq(organizations.id,programs.organizationId))
     .innerJoin(sites,eq(sites.id,programs.siteId))
     .where(eq(programs.id,programId)).limit(1);
-  if(!school?.siteId || school.type!=="church" || !school.delivery.onsite ||
+  const siteId=school?.siteId;
+  if(!school || !siteId || school.type!=="church" || !school.delivery.onsite ||
     school.institutionId===school.organizationId ||
     school.siteOwner!==school.organizationId ||
     (school.hostId && school.hostId!==school.organizationId))
@@ -44,7 +45,7 @@ async function schoolIdentity(tx:Reader,programId:string){
     .from(organizations).where(eq(organizations.id,school.institutionId)).limit(1);
   if(can?.type!=="can_network")
     throw new AuthorizationError("existing CAN academic institution");
-  return school;
+  return {...school,siteId};
 }
 
 function verifyCANSchoolApprover(actor:AccessContext,institutionId:string) {
