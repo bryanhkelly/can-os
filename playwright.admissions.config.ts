@@ -4,7 +4,7 @@ import { DATABASE_URL, TEST_ACCESS_TOKEN_PEPPER, baseURL } from "./tests/e2e/env
 if (!DATABASE_URL || DATABASE_URL !== process.env.TEST_DATABASE_URL ||
     process.env.CAN_TEST_DB_WRITES_ENABLED !== "true" || process.env.APP_ENV !== "test" ||
     process.env.NODE_ENV !== "test" || baseURL !== "http://localhost:3187")
-  throw new Error("Use node scripts\\run-admissions-e2e.mjs with an isolated disposable test database.");
+  throw new Error("Use node scripts/run-admissions-e2e.mjs with an isolated disposable test database.");
 const testHost = new URL(DATABASE_URL).hostname.replace(/-pooler(?=\.)/, "").toLowerCase();
 const applicationHost = process.env.CAN_APPLICATION_DB_HOST?.replace(/-pooler(?=\.)/, "").toLowerCase();
 if (!applicationHost || testHost === applicationHost)

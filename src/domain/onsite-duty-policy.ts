@@ -8,6 +8,13 @@ export type DutyAssignmentCandidate = {
   canRespond:boolean;
   canAccept:boolean;
   planToken:string;
+  /** Independently church-hosted blocks additionally require current named
+   * facilitator safety evidence before an affirmative response. */
+  requiresSectionDelegation?:boolean;
+  /** Server-computed scheduled block times; both are non-null whenever
+   * canRespond is true. */
+  startsAtLocal:string|null;
+  endsAtLocal:string|null;
 };
 export function selectAuthorizedOnsiteDuty(
   input:{
