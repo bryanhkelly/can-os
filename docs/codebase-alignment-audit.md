@@ -475,3 +475,28 @@ still has its prior 43 failures. Connected database tests were not executed in
 this environment, so the new placement behavior remains database-unverified.
 Next Golden Flow gate: rerun the migrated FullFlow service suite on this change,
 then implement the persistent multi-persona browser journey.
+
+## Reusable authenticated browser personas
+
+Baseline: FullFlow `844b13c6f11d98a5b9a6fe3f6a31492a159ca427`.
+
+GF1, admissions and the Algebra I classroom suite previously implemented session
+secrets, hashed session insertion and browser cookie setup separately. They now
+share `tests/e2e/helpers/authenticated-persona.ts`. The helper creates opaque
+32-byte secrets, persists only their peppered hashes in `access_sessions`, and
+opens isolated browser contexts with the normal host-only Secure, HTTP-only,
+SameSite=Lax session cookie. URL-based cookie setup preserves the `__Host-`
+contract without a Domain attribute, including suite-specific localhost origins.
+
+This is test infrastructure only: application commands, authorization, schema,
+routes and production behavior are unchanged. It removes duplicated setup needed
+by Golden Flow browser journeys; it does not itself execute or accept those
+journeys.
+
+Validation: 2 focused unit files / 9 tests passed, covering secret uniqueness,
+hash-only persistence, isolated personas and cookie protections. Production
+build, 86-route contracts and mutation hygiene passed. Full typecheck retains
+47 baseline diagnostics, with none in the changed files. Route fixture coverage
+still fails for the known unseeded `/family/join`, `/guardian/apply` and
+`/site-website` routes. Live Neon integration and authenticated multi-persona
+browser acceptance were not run, so FullFlow/GoldenFlow remains unaccepted.
