@@ -20,19 +20,33 @@ const pendingTags = [
   "0038_public_interest_conversion",
 ];
 
+// Staged migrations reviewed for the dedicated branch after the 0032-0038
+// batch landed. The committed journal prefix from idx 39 must match this
+// exact order; any other staged entry makes the journal unrecognized.
+const stagedTags = [
+  "0039_program_site_authorizations",
+  "0040_site_local_content",
+  "0041_pending_guardian_access_defaults",
+  "0042_public_family_start_requests",
+  "0043_student_access_consents",
+  "0044_school_configuration_operating_approval",
+  "0045_onsite_safety_qualification_definitions",
+];
+
 export function assessFullFlowMigrationReadiness(input) {
   const { project, branch, applied, lastTimestamp, journal, types, columns, tables,
     authorizationColumns = [], authorizationIndexes = [], authorizationConstraints = [],
-    localCopyColumns = [], localCopyIndexes = [], localCopyConstraints = [] } = input;
+    localCopyColumns = [], localCopyIndexes = [], localCopyConstraints = [],
+    guardianDefaults = [], familyStartColumns = [], familyStartIndexes = [],
+    consentColumns = [], consentIndexes = [], safetyQualificationKeys = [] } = input;
   const issues = [];
   // A previously reviewed 0032-0038 sequence is already applied on the
-  // dedicated branch. Before applying 0039, verify that exact committed base
-  // and that the new operating-authorization table is not partially present.
-  const includes0039 = [40,41].includes(journal.entries.length) &&
-    journal.entries[39]?.tag === "0039_program_site_authorizations";
-  const includes0040 = journal.entries.length === 41 &&
-    journal.entries[40]?.tag === "0040_site_local_content";
-  if (includes0039 && (journal.entries.length === 40 || includes0040)) {
+  // dedicated branch. Before applying each staged migration, verify that exact
+  // committed base and that no staged artifact is partially present.
+  const stagedEntries = journal.entries.slice(39);
+  const includes0039 = stagedEntries.length >= 1 && stagedEntries.length <= stagedTags.length &&
+    stagedEntries.every((entry, idx) => entry.tag === stagedTags[idx]);
+  if (includes0039) {
     const found = new Set(tables.map(row => row.table_name));
     const enumValues = new Set(types.map(row => row.typname + "." + row.enumlabel));
     const cols = new Map(columns.map(row => [row.table_name + "." + row.column_name, row]));
@@ -46,21 +60,38 @@ export function assessFullFlowMigrationReadiness(input) {
         cols.get("programs.credit_issuing_organization_id")?.is_nullable !== "YES" ||
         !["activity_seasons.metadata", "activity_registrations.metadata"].every(name => cols.has(name)))
       issues.push("0032-0038 database prerequisites do not match the reviewed FullFlow state");
-    const pre0039 = applied === 39 &&
-      String(lastTimestamp) === String(journal.entries[38].when) &&
-      !found.has("program_site_authorizations") &&
-      !found.has("site_local_content_versions");
-    const post0039 = applied === 40 &&
-      String(lastTimestamp) === String(journal.entries[39].when) &&
-      found.has("program_site_authorizations") &&
-      !found.has("site_local_content_versions");
-    const post0040 = includes0040 && applied === 41 &&
-      String(lastTimestamp) === String(journal.entries[40].when) &&
-      found.has("program_site_authorizations") &&
-      found.has("site_local_content_versions");
-    if (!pre0039 && !post0039 && !post0040)
-      issues.push("0039/0040 migration ledger/table state is inconsistent or unexpected");
-    if (post0039 || post0040) {
+    const when = idx => String(journal.entries[idx]?.when);
+    const hasAll = (...names) => names.every(name => found.has(name));
+    const lacksAll = (...names) => names.every(name => !found.has(name));
+    const pre0039 = applied === 39 && String(lastTimestamp) === when(38) &&
+      lacksAll("program_site_authorizations", "site_local_content_versions",
+        "public_family_start_requests", "student_access_consents");
+    const post0039 = applied === 40 && String(lastTimestamp) === when(39) &&
+      hasAll("program_site_authorizations") &&
+      lacksAll("site_local_content_versions", "public_family_start_requests", "student_access_consents");
+    const post0040 = applied === 41 && String(lastTimestamp) === when(40) &&
+      hasAll("program_site_authorizations", "site_local_content_versions") &&
+      lacksAll("public_family_start_requests", "student_access_consents");
+    const post0041 = applied === 42 && String(lastTimestamp) === when(41) &&
+      hasAll("program_site_authorizations", "site_local_content_versions") &&
+      lacksAll("public_family_start_requests", "student_access_consents");
+    const post0042 = applied === 43 && String(lastTimestamp) === when(42) &&
+      hasAll("program_site_authorizations", "site_local_content_versions", "public_family_start_requests") &&
+      !found.has("student_access_consents");
+    const post0043 = applied === 44 && String(lastTimestamp) === when(43) &&
+      hasAll("program_site_authorizations", "site_local_content_versions",
+        "public_family_start_requests", "student_access_consents");
+    const post0044 = applied === 45 && String(lastTimestamp) === when(44) &&
+      hasAll("program_site_authorizations", "site_local_content_versions",
+        "public_family_start_requests", "student_access_consents");
+    const post0045 = applied === 46 && String(lastTimestamp) === when(45) &&
+      hasAll("program_site_authorizations", "site_local_content_versions",
+        "public_family_start_requests", "student_access_consents");
+    const stage = pre0039 ? 39 : post0039 ? 40 : post0040 ? 41 : post0041 ? 42 :
+      post0042 ? 43 : post0043 ? 44 : post0044 ? 45 : post0045 ? 46 : 0;
+    if (!stage)
+      issues.push("0039-0045 migration ledger/table state is inconsistent or unexpected");
+    if (stage >= 40) {
       const actualColumns = new Set(authorizationColumns.map(row => row.column_name));
       const requiredColumns = [
         "id", "program_id", "site_id", "host_organization_id",
@@ -86,7 +117,7 @@ export function assessFullFlowMigrationReadiness(input) {
         if (!actualConstraints.has(name)) issues.push("0039 authorization constraint missing: " + name);
       }
     }
-    if (post0040) {
+    if (stage >= 41) {
       const columns = new Set(localCopyColumns.map(row => row.column_name));
       for (const name of [
         "id", "site_id", "revision", "status", "content", "flagged_fields",
@@ -106,9 +137,73 @@ export function assessFullFlowMigrationReadiness(input) {
         if (!constraints.has(name)) issues.push("0040 Site-local content constraint missing: " + name);
       }
     }
-    const pendingMigrations = pre0039
-      ? ["0039_program_site_authorizations", ...(includes0040 ? ["0040_site_local_content"] : [])]
-      : post0039 && includes0040 ? ["0040_site_local_content"] : [];
+    // 0041 flips pending-guardian capability defaults to false; they must not
+    // already be false before 0041 and must be false once it has been applied.
+    const guardianDefaultColumns = ["can_view_academics", "can_manage_enrollment",
+      "can_submit_attendance_excuse"];
+    const defaults = new Map(guardianDefaults.map(row => [row.column_name, String(row.column_default)]));
+    if (stage >= 42) {
+      for (const name of guardianDefaultColumns) {
+        if (defaults.get(name) !== "false")
+          issues.push("0041 guardian access default not applied: " + name);
+      }
+    } else if (stage) {
+      for (const name of guardianDefaultColumns) {
+        if (defaults.get(name) === "false")
+          issues.push("0041 guardian access default present before its migration: " + name);
+      }
+    }
+    if (stage >= 43) {
+      const actual = new Set(familyStartColumns.map(row => row.column_name));
+      for (const name of [
+        "id", "site_id", "program_id", "email_normalized", "adult_first_name",
+        "adult_last_name", "token_hash", "expires_at", "consumed_at", "created_at",
+      ]) {
+        if (!actual.has(name)) issues.push("0042 family start request column missing: " + name);
+      }
+      const indexes = new Set(familyStartIndexes.map(row => row.indexname));
+      for (const name of ["public_family_starts_token_uq", "public_family_starts_expiry_idx",
+        "public_family_starts_school_idx"]) {
+        if (!indexes.has(name)) issues.push("0042 family start request index missing: " + name);
+      }
+    }
+    if (stage >= 44) {
+      const actual = new Set(consentColumns.map(row => row.column_name));
+      for (const name of [
+        "id", "application_id", "student_profile_id", "guardian_person_id",
+        "program_id", "site_id", "student_email", "consent_statement",
+        "signed_at", "reviewed_by_person_id", "reviewed_at", "status",
+        "created_at", "updated_at",
+      ]) {
+        if (!actual.has(name)) issues.push("0043 student access consent column missing: " + name);
+      }
+      const indexes = new Set(consentIndexes.map(row => row.indexname));
+      for (const name of ["student_access_consent_application_uq", "student_access_consent_reviewer_idx"]) {
+        if (!indexes.has(name)) issues.push("0043 student access consent index missing: " + name);
+      }
+    }
+    const operatingEnums = ["school_configuration_status.approved", "school_configuration_status.suspended"];
+    if (stage >= 45) {
+      for (const name of operatingEnums) {
+        if (!enumValues.has(name)) issues.push("0044 operating-approval enum value missing: " + name);
+      }
+    } else if (stage) {
+      for (const name of operatingEnums) {
+        if (enumValues.has(name)) issues.push("0044 operating-approval enum value present before its migration: " + name);
+      }
+    }
+    const seededSafetyKeys = new Set(safetyQualificationKeys.map(row => row.key));
+    if (stage === 46) {
+      for (const key of ["onsite_child_safety_screening", "onsite_safeguarding_training"]) {
+        if (!seededSafetyKeys.has(key)) issues.push("0045 onsite safety qualification definition missing: " + key);
+      }
+    } else if (stage) {
+      for (const key of seededSafetyKeys) {
+        issues.push("0045 onsite safety qualification definition present before its migration: " + key);
+      }
+    }
+    const stagedPending = stagedEntries.map(entry => entry.tag);
+    const pendingMigrations = stage ? stagedPending.slice(stage - 39) : [];
     return {
       ready: issues.length === 0, issues, appliedMigrations: applied,
       pendingMigrations,
@@ -148,25 +243,27 @@ async function main() {
   const url = process.env.TEST_DATABASE_URL;
   await verifyFullFlowNeonBranch(url);
   const journal = JSON.parse(readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url),"utf8"));
-  if (![39,40,41].includes(journal.entries.length))
+  if (journal.entries.length < 39 || journal.entries.length > 39 + stagedTags.length)
     throw new Error("Unexpected migration journal length; re-review the pending migration set");
   const query = neon(url);
   const [[identity],[ledger],types,columns,tables,
     authorizationColumns,authorizationIndexes,authorizationConstraints,
-    localCopyColumns,localCopyIndexes,localCopyConstraints] = await Promise.all([
+    localCopyColumns,localCopyIndexes,localCopyConstraints,
+    guardianDefaults,familyStartColumns,familyStartIndexes,
+    consentColumns,consentIndexes,safetyQualificationKeys] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
                  current_setting('neon.branch_id', true) AS branch`,
     query`SELECT count(*)::int AS applied, max(created_at) AS last_timestamp FROM drizzle.__drizzle_migrations`,
     query`SELECT t.typname, e.enumlabel FROM pg_type t
           JOIN pg_enum e ON e.enumtypid=t.oid
-          WHERE t.typname IN ('program_type','activity_season_status')`,
+          WHERE t.typname IN ('program_type','activity_season_status','school_configuration_status')`,
     query`SELECT table_name, column_name, is_nullable FROM information_schema.columns
           WHERE table_schema='public' AND
            ((table_name='programs' AND column_name='credit_issuing_organization_id') OR
             (table_name IN ('activity_seasons','activity_registrations') AND column_name='metadata'))`,
     query`SELECT table_name FROM information_schema.tables
           WHERE table_schema='public' AND
-          table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations','site_local_content_versions')`,
+          table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations','site_local_content_versions','public_family_start_requests','student_access_consents')`,
     query`SELECT column_name FROM information_schema.columns
       WHERE table_schema='public' AND table_name='program_site_authorizations'`,
     query`SELECT indexname FROM pg_indexes
@@ -181,11 +278,26 @@ async function main() {
     query`SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid
       JOIN pg_namespace n ON n.oid=t.relnamespace
       WHERE n.nspname='public' AND t.relname='site_local_content_versions'`,
+    query`SELECT column_name, column_default FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='guardian_relationships' AND
+      column_name IN ('can_view_academics','can_manage_enrollment','can_submit_attendance_excuse')`,
+    query`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='public_family_start_requests'`,
+    query`SELECT indexname FROM pg_indexes
+      WHERE schemaname='public' AND tablename='public_family_start_requests'`,
+    query`SELECT column_name FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='student_access_consents'`,
+    query`SELECT indexname FROM pg_indexes
+      WHERE schemaname='public' AND tablename='student_access_consents'`,
+    query`SELECT key FROM "public"."qualification_definitions"
+      WHERE key IN ('onsite_child_safety_screening','onsite_safeguarding_training')`,
   ]);
   const review = assessFullFlowMigrationReadiness({
     ...identity, ...ledger, journal, types, columns, tables,
     authorizationColumns, authorizationIndexes, authorizationConstraints,
     localCopyColumns, localCopyIndexes, localCopyConstraints,
+    guardianDefaults, familyStartColumns, familyStartIndexes,
+    consentColumns, consentIndexes, safetyQualificationKeys,
   });
   process.stdout.write(JSON.stringify(review,null,2)+"\n");
   if (!review.ready) process.exitCode = 1;
