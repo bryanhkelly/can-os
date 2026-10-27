@@ -46,8 +46,8 @@ if (databaseConfigured && (process.env.CAN_TEST_DB_WRITES_ENABLED !== "true" ||
 }
 const integration = databaseConfigured ? describe : describe.skip;
 
-integration("FullFlow: one school, same high-school program through curriculum adoption", () => {
-  it("creates its site/program, adopts a separately published course and provisions that exact program section", async () => {
+integration("FullFlow: one school and Program across the six-stage academic journey", () => {
+  it("connects launch, curriculum, verified family enrollment, learning, grading and operations", async () => {
     const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
     const s = await import("@/db/schema");
     const launch = await import("@/modules/programs/launch.functions");
@@ -327,7 +327,7 @@ integration("FullFlow: one school, same high-school program through curriculum a
         // The family enters the VERY SAME newly activated Program, not an
         // unrelated pre-seeded admissions demo. Offer, consent and placement
         // use the existing canonical school and guardian commands.
-        const admission = await import("@/modules/enrollment/enrollment-service");
+        const familyApplications = await import("@/modules/enrollment/guardian-family-applications.functions");
         const familyReadiness = await import("@/modules/enrollment/family-readiness.functions");
         const familyForms = await import("@/modules/enrollment/enrollment-form.functions");
         const familyChecklist = await import("@/modules/enrollment/guardian-enrollment-checklist.functions");
@@ -339,10 +339,17 @@ integration("FullFlow: one school, same high-school program through curriculum a
         const outsider = first(await tx.insert(s.people).values({
           legalFirstName: "Unauthorized", legalLastName: "Guardian",
         }).returning());
+        const guardianAccount=first(await tx.insert(s.accessAccounts).values({
+          emailNormalized:"fullflow-guardian-"+suffix+"@example.test",emailVerifiedAt:new Date(),
+        }).returning());
+        const guardianGrant=first(await tx.insert(s.accountPersonGrants).values({
+          accountId:guardianAccount.id,personId:guardian.id,role:"guardian",
+          organizationId:school.id,siteId:site.id,active:true,isSynthetic:false,
+        }).returning());
         const guardianActor: AccessContext = {
           ...context(guardian.id, school.id, [site.id], [programId]),
           role: "guardian", capabilities: new Set(roleCapabilities.guardian),
-          accountId: crypto.randomUUID(), grantId: crypto.randomUUID(),
+          accountId: guardianAccount.id, grantId: guardianGrant.id,grantSiteId:site.id,
         };
         const unrelatedActor: AccessContext = {...guardianActor,actorPersonId: outsider.id};
         const applicationDefinitionKey = `fullflow-enrollment-${suffix}`;
@@ -362,24 +369,61 @@ integration("FullFlow: one school, same high-school program through curriculum a
               }},
           ]},
         });
-        const application = await admission.startFamilyApplication(guardianActor,{
-          programId, idempotencyKey: `fullflow-application-${suffix}`,
-          journeyDefinitionKey: applicationDefinitionKey,
-          student: {legalFirstName: "FullFlow",legalLastName: "Learner",
-            gradeLevel: "9"},
-        });
+        const applicationProgram=first(await tx.select().from(s.programs).where(eq(s.programs.id,programId)));
+        await tx.update(s.programs).set({metadata:{
+          ...applicationProgram.metadata,enrollmentJourneyDefinitionKey:applicationDefinitionKey,
+        }}).where(eq(s.programs.id,programId));
+        state.actor=guardianActor;
+        const familyApplicationInput={programId,requestId:crypto.randomUUID(),
+          studentFirstName:"FullFlow",studentLastName:"Learner",gradeLevel:"9"};
+        const application=await familyApplications.startGuardianFamilyApplication({data:familyApplicationInput});
+        expect(await familyApplications.startGuardianFamilyApplication({data:familyApplicationInput}))
+          .toEqual(application);
         const applicationRow = first(await tx.select().from(s.applications)
           .where(eq(s.applications.id,application.applicationId)));
         expect(applicationRow.programId).toBe(programId);
         const profile = first(await tx.select().from(s.studentProfiles)
-          .where(eq(s.studentProfiles.id,application.studentProfileId)));
+          .where(eq(s.studentProfiles.id,applicationRow.studentProfileId)));
         expect(await tx.select().from(s.guardianRelationships).where(and(
           eq(s.guardianRelationships.guardianPersonId,guardian.id),
           eq(s.guardianRelationships.studentPersonId,profile.personId),
         ))).toHaveLength(1);
 
+
+        // Self-asserted parenthood cannot authorize enrollment forms. Exercise
+        // the real independent registrar verification before the family proceeds.
+        state.actor = guardianActor;
+        await expect(familyChecklist.getGuardianEnrollmentChecklist({
+          data:{applicationId:application.applicationId},
+        })).rejects.toThrow("independently verified managing guardian relationship");
+        const {verifyAdmissionsGuardianRelationship}=await import(
+          "@/modules/enrollment/admissions-intake.functions");
+        const guardianVerification={
+          applicationId:application.applicationId,method:"verified_school_record" as const,
+          evidenceNote:"Synthetic school record independently checked for this acceptance family.",
+        };
+        await expect(verifyAdmissionsGuardianRelationship({data:guardianVerification}))
+          .rejects.toThrow("admissions registrar");
+        state.actor = context(schoolOperator.id, school.id, [site.id], [programId]);
+        await verifyAdmissionsGuardianRelationship({data:guardianVerification});
+        await verifyAdmissionsGuardianRelationship({data:guardianVerification});
+        const relationship=first(await tx.select().from(s.guardianRelationships).where(and(
+          eq(s.guardianRelationships.guardianPersonId,guardian.id),
+          eq(s.guardianRelationships.studentPersonId,profile.personId),
+        )));
+        expect(relationship.metadata).toMatchObject({
+          verification:"verified",verifiedBy:schoolOperator.id,
+        });
+        expect(await tx.select().from(s.auditEvents).where(and(
+          eq(s.auditEvents.resourceId,relationship.id),
+          eq(s.auditEvents.action,"admissions.guardian_relationship.verify"),
+        ))).toHaveLength(1);
+
+        const applicationJourney=first(await tx.select().from(s.journeys).where(and(
+          eq(s.journeys.participantType,"application"),eq(s.journeys.participantId,application.applicationId),
+        )));
         const familyRequirements = await tx.select().from(s.journeyRequirements)
-          .where(eq(s.journeyRequirements.journeyId,application.journeyId));
+          .where(eq(s.journeyRequirements.journeyId,applicationJourney.id));
         const review = first(familyRequirements.filter(x=>x.key==="school-review"));
         const form = first(familyRequirements.filter(x=>x.key==="school-consent"));
         state.actor = context(schoolOperator.id, school.id, [site.id], [programId]);
@@ -810,7 +854,7 @@ integration("FullFlow: one school, same high-school program through curriculum a
         state.actor = guardianActor;
         const notices = await import("@/modules/communication/notification-center.functions");
         const gradeNotice = (await notices.getNotifications()).find(
-          note=>note.type==="grade_posted"&&note.href?.includes("guardian/academics"));
+          note=>note.id===guardianGradeNotice[0]!.id);
         expect(gradeNotice?.href).toContain(encodeURIComponent(assessment.assessmentId));
         const parentProgress = await guardianQueries.getGuardianAssignments({data:{
           studentPersonId: profile.personId,
@@ -868,6 +912,8 @@ integration("FullFlow: one school, same high-school program through curriculum a
           eq(s.notifications.resourceId,responseRequest.actionId),
         ));
         expect(parentNotice).toBeTruthy();
+        const firstResponse=first(await tx.select().from(s.actions)
+          .where(eq(s.actions.id,responseRequest.actionId)));
         // Network retries must not send a second guardian resolution or create
         // another action. A resolved record is immutable for this transition.
         await schoolActions.updateOperationsAction({data:{
@@ -878,6 +924,32 @@ integration("FullFlow: one school, same high-school program through curriculum a
           eq(s.notifications.type,"guardian_grade_follow_up_resolved"),
           eq(s.notifications.resourceId,responseRequest.actionId),
         ))).toHaveLength(1);
+
+        await expect(schoolActions.updateOperationsAction({data:{
+          id:responseRequest.actionId,status:"resolved",resolutionNote:"A different answer on a closed response.",
+        }})).rejects.toThrow("Action is closed");
+        await expect(schoolActions.updateOperationsAction({data:{
+          id:responseRequest.actionId,status:"in_progress",
+        }})).rejects.toThrow("Action is closed");
+        state.actor={...state.actor!,scope:{...state.actor!.scope,programIds:[]}};
+        await expect(schoolActions.updateOperationsAction({data:{
+          id:responseRequest.actionId,status:"resolved",resolutionNote,
+        }})).rejects.toThrow("action program scope");
+        state.actor=context(schoolOperator.id,school.id,[site.id],[programId]);
+        const resolvedResponse=first(await tx.select().from(s.actions)
+          .where(eq(s.actions.id,responseRequest.actionId)));
+        expect(resolvedResponse.resolvedAt).toEqual(firstResponse.resolvedAt);
+        expect(resolvedResponse.updatedAt).toEqual(firstResponse.updatedAt);
+        expect(resolvedResponse.resolutionNote).toBe(resolutionNote);
+        expect(await tx.select().from(s.domainEvents).where(and(
+          eq(s.domainEvents.aggregateId,responseRequest.actionId),
+          eq(s.domainEvents.eventType,"ActionResolved"),
+        ))).toHaveLength(1);
+        expect(await tx.select().from(s.auditEvents).where(and(
+          eq(s.auditEvents.resourceId,responseRequest.actionId),
+          eq(s.auditEvents.action,"action.status.change"),
+        ))).toHaveLength(1);
+
         const snapshotApi = await import("@/modules/operations/command-center.functions");
         const live = await snapshotApi.getLiveFullFlowOperations({data:{
           siteId:site.id,programId,
@@ -905,8 +977,7 @@ integration("FullFlow: one school, same high-school program through curriculum a
         await tx.update(s.guardianRelationships).set({canViewAcademics:true})
           .where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
         const resolvedNotice=(await notices.getNotifications()).find(
-          item=>item.type==="guardian_grade_follow_up_resolved"&&
-            item.href?.includes("guardian/academics"));
+          item=>item.id===parentNotice!.id);
         expect(resolvedNotice?.href).toContain(encodeURIComponent(profile.personId));
         state.actor = {...context(publisherPerson.id,publisherOrg.id,
           [publisherSite.id],[publisherProgram.id])};

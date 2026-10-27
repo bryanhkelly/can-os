@@ -420,3 +420,31 @@ Next priority: run the connected journey against a disposable fully migrated
 database and authenticated browser, then fix only observed blockers. Separate
 connection revocation races and the full six-stage Golden Flow are still
 unverified. Do not treat shared eligibility wiring as completion of those flows.
+
+## Migrated FullFlow service journey executed
+
+Baseline: FullFlow `773b94c212274f6e02c5e5dae7a94c13037ebe4f`.
+
+The actual guarded FullFlow suite passed both tests on the dedicated migrated
+Neon branch (46 migrations verified). The school test traverses all six stages;
+the second test verifies independent church/CAN operating authority. These are
+rollback-isolated service tests with mocked command contexts, not browser proof.
+
+Fixed the observed guardian-response retry defect in the existing operations
+command: an authorized identical trimmed resolution succeeds without another write.
+Changed answers, reopening, cancelled Actions and domain-owned referrals remain
+rejected. Current Program scope is checked before recognizing a retry. No new
+component or parallel workflow was added.
+
+The connected test now calls the guardian-facing application endpoint with an
+actual verified-account fixture, then the independent registrar verification
+command. It tests pending-relationship denial and one-time verification audit.
+Two notification assertions now locate the persisted notification ID because the
+API projection does not expose a type field.
+
+Validation: 2 migrated-database integration tests and 17 focused unit tests passed.
+The connected test checks one resolution audit/event/notification and unchanged
+timestamps after retry, plus changed-answer/reopening/revoked-scope denials.
+Production build, route contracts (86) and mutation hygiene passed; typecheck retains the same
+47 baseline diagnostics. Authenticated multi-role browser acceptance remains
+the next priority. No production mutation or migration was performed.

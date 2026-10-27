@@ -81,6 +81,10 @@ export const updateOperationsAction=createServerFn({method:"POST"})
     return {saved:true};
    }
    if(academic)await assertAcademicActionAuthority(tx,actor,record);
+   // An identical resolution retry is a no-op after current scope/domain
+   // authorization. Never rewrite a closed answer or repeat its evidence.
+   if(record.status==="resolved"&&data.status==="resolved"&&
+      record.resolutionNote===data.resolutionNote?.trim())return {saved:true};
    if(record.status==="cancelled"||record.status==="resolved")throw new Error("Action is closed");
    if(record.status===data.status)return {saved:true};
    const now=new Date();
