@@ -366,7 +366,7 @@
     "/guardian/watching": {
       "persona": "guardian",
       "seeds": [
-        "new-experiences-v1.sql"
+        "gf1-assignments-v2.sql"
       ],
       "recordCounts": {
         "guardian_relationships": 1
@@ -1217,6 +1217,80 @@
         "attendance_events",
         "actions",
         "audit_events"
+      ]
+    },
+    "/family/join": {
+      "persona": "public",
+      "seeds": [
+        "public-family-admissions-v1.sql"
+      ],
+      "recordCounts": {
+        "public_family_start_requests": 1,
+        "site_publications": 1,
+        "program_publications": 1
+      },
+      "interactions": [
+        "redeem the documented synthetic single-use email token for a published Site and active Program",
+        "replay the same token and verify single-use denial",
+        "deny expired and unknown tokens with an indistinguishable authorization error"
+      ],
+      "downstreamRecords": [
+        "access_accounts",
+        "people",
+        "account_person_grants",
+        "access_sessions",
+        "domainEvents:PublicFamilyStartVerified",
+        "auditEvents:family.public_start.verify"
+      ]
+    },
+    "/guardian/apply": {
+      "persona": "guardian",
+      "seeds": [
+        "public-family-admissions-v1.sql",
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "applications": 1,
+        "households": 1
+      },
+      "interactions": [
+        "submit a canonical family application as a verified-email guardian in scope",
+        "retry the same requestId and receive the same application idempotently",
+        "resume the pending application from the guardian workspace"
+      ],
+      "downstreamRecords": [
+        "applications",
+        "journeys",
+        "student_profiles",
+        "people",
+        "guardian_relationships",
+        "domain_events",
+        "audit_events"
+      ]
+    },
+    "/site-website": {
+      "persona": "site_website_editor",
+      "seeds": [
+        "site-website-editor-v1.sql"
+      ],
+      "recordCounts": {
+        "site_publications": 1,
+        "site_local_content_versions": 1,
+        "role_assignments": 1,
+        "memberships": 1
+      },
+      "interactions": [
+        "preview the public-safe Site draft with approved program listings",
+        "publish church-owned local content as a new revision",
+        "restore a previously published revision",
+        "deny an account without a matching Site website editor role assignment"
+      ],
+      "downstreamRecords": [
+        "site_local_content_versions",
+        "actions",
+        "audit_events",
+        "domain_events"
       ]
     },
     "/sites/$siteId/publish": {

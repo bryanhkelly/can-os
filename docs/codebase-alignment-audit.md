@@ -500,3 +500,89 @@ build, 86-route contracts and mutation hygiene passed. Full typecheck retains
 still fails for the known unseeded `/family/join`, `/guardian/apply` and
 `/site-website` routes. Live Neon integration and authenticated multi-persona
 browser acceptance were not run, so FullFlow/GoldenFlow remains unaccepted.
+
+## Scoped browser persona teardown
+
+Baseline: FullFlow `b983d6f2cecd95c54bbccbf15d4ca012e2124bdf`.
+
+`withAuthenticatedPage` and named-group `withAuthenticatedPages` now scope the
+existing authenticated browser helper to a callback. They close every browser
+context created for the scope after success or callback failure, and close
+already-opened contexts if a later context setup fails. GF1, admissions and the
+Algebra I classroom suite use these scopes instead of repeating `try/finally`
+cleanup. Admissions retains its three simultaneously open, independently
+authorized personas.
+
+This changes test resource lifecycle only. Session hashing, cookie protections,
+application commands, routes, authorization and production behavior are unchanged.
+It does not execute or accept a browser journey.
+
+Validation: 2 focused unit files / 14 tests passed, including successful teardown,
+callback-failure teardown, named groups and partial-setup failure. Production
+build, 86-route contracts and mutation hygiene passed. Full typecheck retains
+47 baseline diagnostics, with none in the changed files. Route fixture coverage
+still fails for `/family/join`, `/guardian/apply` and `/site-website`. Live Neon
+and authenticated browser execution remain unverified, so GoldenFlow acceptance
+is unchanged.
+
+## Composable GoldenFlow fixtures and assertions
+
+Baseline: FullFlow `b983d6f2cecd95c54bbccbf15d4ca012e2124bdf`.
+
+`tests/e2e/helpers/canonical-fixture.ts` now owns the repeated canonical
+Organization/Site/Program/Section inserts and verified-account/synthetic-grant
+creation used by browser fixtures. Program creation keeps host, academic
+provider and credit issuer explicit. GF1 and the Algebra I curriculum-adopter
+setup use these primitives; their existing owners still delete only the IDs
+they created, in foreign-key-safe order, including partially built fixtures.
+No universal fixture framework or production seed path was introduced.
+
+`evidence-assertions.ts` centralizes asynchronous notification evidence,
+exact-once domain events for authorized actors, logical audit-action groups and
+exact active enrollment kinds. `golden-flow-assertions.ts` adds real-reload
+persistence checks and negative-authorization checks that require the canonical
+denial while excluding protected response content. Admissions,
+missing-assignment and Algebra I use these helpers without moving flow-specific
+business rules into generic abstractions.
+
+## Complete route fixture declarations
+
+Real idempotent SQL contracts now cover `/family/join`, `/guardian/apply` and
+`/site-website`. The public-family seed contains published Site/Program rows,
+a documented synthetic single-use token hash and a verified guardian persona.
+The website seed contains a synthetic Site-scoped editor, membership, explicit
+role assignment, publications and published church-owned local content. All
+identities use `.invalid` addresses and the existing synthetic UUID namespace.
+The manifest records interactions and downstream canonical records; no route
+was exempted and no parallel UI workflow was added.
+
+Route fixture validation is static only: 75 page routes are declared and
+`unseededRoutes` is empty. The SQL was parsed and checked against the canonical
+schema, but was not applied to a database. Token redemption requires the
+documented test pepper. No live migration, seed or production mutation ran.
+
+## Provider-bound instructional coverage and aligned placement
+
+Instructional delivery coverage now includes the arrangement's academic
+provider and counts only arrangements bound to the Program's current provider.
+Launch reuses an existing active arrangement only when that provider matches;
+a new arrangement otherwise follows the existing insert, event and audit path.
+Direct arrangement creation and activation reject stale or mismatched providers
+after the existing capability and scope checks. Reservation, authorization,
+site-lock and evidence-writer behavior is unchanged.
+
+Placement now matches launch multi-instructor policy: a Section needs full-window
+coverage and every assigned teacher must independently satisfy instructional-
+window eligibility. An eligible covering primary can no longer make a Section
+placement-ready when a secondary assignee is ineligible, and coverage still
+cannot be combined with another instructor's qualifications. The existing
+integration scenario was updated for that contract but was not executed without
+a disposable database.
+
+Validation: 11 focused unit files / 78 tests passed. Production build, 86-route
+contracts, 75-route fixture coverage and mutation hygiene passed. Full typecheck
+retains 47 baseline diagnostics with none in changed files. The complete unit
+run has 206 passing files / 1,199 passing tests and 11 failing files / 41
+failures in unrelated existing suites. Live Neon integration and authenticated
+browser acceptance were not run, so these checks do not constitute GoldenFlow
+acceptance.
