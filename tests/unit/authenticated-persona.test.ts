@@ -5,6 +5,8 @@ import {
   createAccessSession,
   newSessionSecret,
   openAuthenticatedPage,
+  withAuthenticatedPage,
+  withAuthenticatedPages,
 } from "../e2e/helpers/authenticated-persona";
 import { TEST_ACCESS_TOKEN_PEPPER, baseURL } from "../e2e/env";
 import type { Sql } from "../e2e/fixture";
@@ -83,5 +85,114 @@ describe("authenticated browser persona primitives", () => {
       secure: true,
       sameSite: "Lax",
     })]);
+  });
+
+  it("closes a new context when its cookie or page setup fails", async () => {
+    const context = {
+      addCookies: vi.fn().mockRejectedValue(new Error("cookie rejected")),
+      newPage: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const browser = {
+      newContext: vi.fn().mockResolvedValue(context as unknown as BrowserContext),
+    };
+
+    await expect(openAuthenticatedPage(
+      browser as unknown as Browser,
+      "opaque-secret",
+    )).rejects.toThrow("cookie rejected");
+    expect(context.close).toHaveBeenCalledTimes(1);
+    expect(context.newPage).not.toHaveBeenCalled();
+  });
+
+  it("closes a scoped persona after the callback succeeds", async () => {
+    const page = { id: "page" } as unknown as Page;
+    const context = {
+      addCookies: vi.fn().mockResolvedValue(undefined),
+      newPage: vi.fn().mockResolvedValue(page),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const browser = {
+      newContext: vi.fn().mockResolvedValue(context as unknown as BrowserContext),
+    };
+
+    const result = await withAuthenticatedPage(
+      browser as unknown as Browser,
+      "opaque-secret",
+      async () => "completed",
+    );
+
+    expect(result).toBe("completed");
+    expect(context.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes a scoped persona when the callback fails", async () => {
+    const context = {
+      addCookies: vi.fn().mockResolvedValue(undefined),
+      newPage: vi.fn().mockResolvedValue({} as Page),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const browser = {
+      newContext: vi.fn().mockResolvedValue(context as unknown as BrowserContext),
+    };
+    const failure = new Error("assertion failed");
+
+    await expect(withAuthenticatedPage(
+      browser as unknown as Browser,
+      "opaque-secret",
+      async () => { throw failure; },
+    )).rejects.toBe(failure);
+    expect(context.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns named personas and closes every context after the group scope", async () => {
+    const guardianContext = {
+      addCookies: vi.fn().mockResolvedValue(undefined),
+      newPage: vi.fn().mockResolvedValue({ id: "guardian" } as unknown as Page),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const registrarContext = {
+      addCookies: vi.fn().mockResolvedValue(undefined),
+      newPage: vi.fn().mockResolvedValue({ id: "registrar" } as unknown as Page),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const browser = {
+      newContext: vi.fn()
+        .mockResolvedValueOnce(guardianContext as unknown as BrowserContext)
+        .mockResolvedValueOnce(registrarContext as unknown as BrowserContext),
+    };
+
+    const personas = await withAuthenticatedPages(
+      browser as unknown as Browser,
+      { guardian: "guardian-secret", registrar: "registrar-secret" },
+      async opened => opened,
+    );
+
+    expect(personas.guardian.page).toEqual({ id: "guardian" });
+    expect(personas.registrar.page).toEqual({ id: "registrar" });
+    expect(guardianContext.close).toHaveBeenCalledTimes(1);
+    expect(registrarContext.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes already-opened personas when a later context setup fails", async () => {
+    const guardianContext = {
+      addCookies: vi.fn().mockResolvedValue(undefined),
+      newPage: vi.fn().mockResolvedValue({} as Page),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const browser = {
+      newContext: vi.fn()
+        .mockResolvedValueOnce(guardianContext as unknown as BrowserContext)
+        .mockRejectedValueOnce(new Error("browser unavailable")),
+    };
+    const run = vi.fn();
+
+    await expect(withAuthenticatedPages(
+      browser as unknown as Browser,
+      { guardian: "guardian-secret", registrar: "registrar-secret" },
+      run,
+    )).rejects.toThrow("browser unavailable");
+    expect(run).not.toHaveBeenCalled();
+    expect(guardianContext.close).toHaveBeenCalledTimes(1);
   });
 });

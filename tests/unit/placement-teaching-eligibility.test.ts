@@ -17,9 +17,11 @@ beforeEach(()=>{
     from(){return this;},innerJoin(){return this;},where(){return this;},
     async orderBy(){return state.rows;},
   }));
-  state.coverage.mockImplementation(async(sectionId:string)=>({
-    coveredInstructorIds:new Set(state.rows.filter(row=>row.sectionId===sectionId).map(row=>row.personId)),
-  }));
+  state.coverage.mockImplementation(async(sectionId:string)=>{
+    const coveredInstructorIds=new Set(
+      state.rows.filter(row=>row.sectionId===sectionId).map(row=>row.personId));
+    return {covered:coveredInstructorIds.size>0,coveredInstructorIds};
+  });
   state.evaluate.mockResolvedValue({eligible:true});
 });
 describe("placement uses the canonical full-term teacher decision",()=>{
@@ -35,25 +37,39 @@ describe("placement uses the canonical full-term teacher decision",()=>{
     expect(await verifiedTeacherSectionIds(["a"],executor)).toEqual(new Set());
   });
   it("blocks a qualified teacher whose delivery arrangement was withdrawn",async()=>{
-    state.coverage.mockResolvedValue({coveredInstructorIds:new Set()});
+    state.coverage.mockResolvedValue({covered:false,coveredInstructorIds:new Set()});
     expect(await verifiedTeacherSectionIds(["a"],executor)).toEqual(new Set());
     expect(state.evaluate).not.toHaveBeenCalled();
   });
+  it("verifies a section only when every assigned teacher is eligible",async()=>{
+    state.rows=[{sectionId:"a",personId:"primary"},{sectionId:"a",personId:"secondary"}];
+    expect(await verifiedTeacherSectionIds(["a"],executor)).toEqual(new Set(["a"]));
+    expect(state.evaluate).toHaveBeenCalledTimes(2);
+  });
+  it("denies a section with an eligible covering primary but an ineligible secondary",async()=>{
+    state.rows=[{sectionId:"a",personId:"primary"},{sectionId:"a",personId:"secondary"}];
+    state.evaluate.mockResolvedValueOnce({eligible:true}).mockResolvedValueOnce({eligible:false});
+    expect(await verifiedTeacherSectionIds(["a"],executor)).toEqual(new Set());
+    expect(state.evaluate).toHaveBeenCalledTimes(2);
+  });
   it("does not combine one instructor's coverage with another instructor's eligibility",async()=>{
     state.rows=[{sectionId:"a",personId:"covered"},{sectionId:"a",personId:"qualified"}];
-    state.coverage.mockResolvedValue({coveredInstructorIds:new Set(["covered"])});
-    state.evaluate.mockResolvedValueOnce({eligible:false});
+    state.coverage.mockResolvedValue({covered:true,coveredInstructorIds:new Set(["covered"])});
+    state.evaluate.mockResolvedValueOnce({eligible:true}).mockResolvedValueOnce({eligible:false});
     expect(await verifiedTeacherSectionIds(["a"],executor)).toEqual(new Set());
-    expect(state.evaluate).toHaveBeenCalledExactlyOnceWith("a","covered",executor,{
+    expect(state.evaluate).toHaveBeenNthCalledWith(1,"a","covered",executor,{
+      horizon:"instructional_window",requireAssignment:true,
+    });
+    expect(state.evaluate).toHaveBeenNthCalledWith(2,"a","qualified",executor,{
       horizon:"instructional_window",requireAssignment:true,
     });
   });
-  it("tries another covered teacher after denial and stops after a qualified one",async()=>{
+  it("stops evaluating a section's teachers after the first denial",async()=>{
     state.rows=[{sectionId:"a",personId:"unqualified"},{sectionId:"a",personId:"qualified"},
       {sectionId:"a",personId:"unneeded"}];
-    state.evaluate.mockResolvedValueOnce({eligible:false}).mockResolvedValueOnce({eligible:true});
-    expect(await verifiedTeacherSectionIds(["a"],executor)).toEqual(new Set(["a"]));
-    expect(state.evaluate).toHaveBeenCalledTimes(2);
+    state.evaluate.mockResolvedValueOnce({eligible:false});
+    expect(await verifiedTeacherSectionIds(["a"],executor)).toEqual(new Set());
+    expect(state.evaluate).toHaveBeenCalledTimes(1);
   });
   it("deduplicates assignment pairs without sharing eligibility across Sections",async()=>{
     state.rows=[{sectionId:"a",personId:"teacher"},{sectionId:"a",personId:"teacher"},

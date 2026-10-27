@@ -25,7 +25,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
       await realDb.transaction(async tx => {
         state.tx = tx;
         const s = await import("@/db/schema");
-        const { eq } = await import("drizzle-orm");
+        const { and, eq } = await import("drizzle-orm");
         const { startProgramLaunch } = await import("@/modules/programs/program-launch-service");
         const {
           requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
@@ -306,10 +306,12 @@ integration("Church-owned Site with independently authorized CAN academic servic
             organizationId:can.id,siteId:null,
           }).returning().then(x=>x[0]!),
         ]);
-        await tx.insert(s.sectionTeachers).values([
-          {sectionId:section!.id,personId:localPerson.id},
+        // Placement verification requires EVERY assigned teacher to be
+        // eligible; the host-local facilitator is assigned only later, for
+        // the class-access denial checks.
+        await tx.insert(s.sectionTeachers).values(
           {sectionId:section!.id,personId:canPerson.id},
-        ]);
+        );
         await tx.insert(s.deliveryArrangements).values({
           sectionId:section!.id,academicProviderOrganizationId:can.id,
           instructorPersonId:canPerson.id,modality:"onsite",status:"active",
@@ -332,8 +334,8 @@ integration("Church-owned Site with independently authorized CAN academic servic
         expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(true);
         await tx.update(s.accountPersonGrants).set({active:false})
           .where(eq(s.accountPersonGrants.id,canGrant.id));
-        // Even with an active host local teacher assignment, no CAN teacher
-        // means enrollment cannot claim an actually staffed academic class.
+        // Without an eligible CAN provider teacher, enrollment cannot claim
+        // an actually staffed academic class.
         expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(false);
         await tx.update(s.accountPersonGrants).set({active:true})
           .where(eq(s.accountPersonGrants.id,canGrant.id));
@@ -349,8 +351,19 @@ integration("Church-owned Site with independently authorized CAN academic servic
           .toBe(section!.id);
         expect((await accessibleClasses(canTeacher as Actor)).map(x=>x.id))
           .toEqual([section!.id]);
+        // A host-local Section assignment alone never grants access to a
+        // CAN-provided class, and an ineligible local assignee must not
+        // combine with the CAN instructor's coverage for placement.
+        await tx.insert(s.sectionTeachers).values(
+          {sectionId:section!.id,personId:localPerson.id},
+        );
         expect((await accessibleClasses(localTeacher as Actor)).map(x=>x.id))
           .not.toContain(section!.id);
+        expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(false);
+        await tx.delete(s.sectionTeachers).where(and(
+          eq(s.sectionTeachers.sectionId,section!.id),
+          eq(s.sectionTeachers.personId,localPerson.id),
+        ));
         // A retained assignment and signed agreement cannot preserve a revoked credential.
         await tx.insert(s.qualificationVerificationEvents).values({
           claimId:teachingQualification.claimId,sequence:2,decision:"revoke",
