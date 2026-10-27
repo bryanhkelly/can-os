@@ -2,7 +2,15 @@ import { expect, test, type Page } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
 import { type Sql } from "./fixture";
 import { createAdmissionsFixture, retireAdmissionsFixture, type AdmissionsFixture } from "./admissions-fixture";
-import { openAuthenticatedPage } from "./helpers/authenticated-persona";
+import { withAuthenticatedPages } from "./helpers/authenticated-persona";
+import {
+  expectActiveEnrollmentKinds,
+  expectDomainEventsOnceForActors,
+} from "./helpers/evidence-assertions";
+import {
+  expectProtectedPageDenied,
+  expectVisibleAfterReload,
+} from "./helpers/golden-flow-assertions";
 import { DATABASE_URL } from "./env";
 
 let sql: Sql;
@@ -26,11 +34,12 @@ async function signForm(page: Page, corrected = false) {
 }
 
 test("GF2: guardian correction and registrar review through accepted offer, active enrollment and class access", async ({ browser }) => {
-  const guardian = await openAuthenticatedPage(browser, fixture.guardianSecret);
-  const registrar = await openAuthenticatedPage(browser, fixture.teacherSecret);
-  const student = await openAuthenticatedPage(browser, fixture.studentSecret);
   const selected = `siteId=${fixture.siteId}&programId=${fixture.programId}&application=${fixture.applicationId}`;
-  try {
+  await withAuthenticatedPages(browser, {
+    guardian: fixture.guardianSecret,
+    registrar: fixture.teacherSecret,
+    student: fixture.studentSecret,
+  }, async ({ guardian, registrar, student }) => {
     await guardian.page.goto(`/guardian/admission-offers?application=${fixture.applicationId}`);
     await expect(guardian.page.getByText("School form version: synthetic-browser-v1")).toBeVisible();
     await signForm(guardian.page);
@@ -42,8 +51,10 @@ test("GF2: guardian correction and registrar review through accepted offer, acti
     await registrar.page.getByRole("button", { name: "Record form review", exact: true }).click();
     await expect(registrar.page.getByText("Registrar decision: rejected", { exact: true })).toBeVisible();
 
-    await guardian.page.reload();
-    await expect(guardian.page.getByText("Registrar instructions: Please provide your afternoon contact plan.")).toBeVisible();
+    await expectVisibleAfterReload(
+      guardian.page,
+      guardian.page.getByText("Registrar instructions: Please provide your afternoon contact plan."),
+    );
     await signForm(guardian.page, true);
     await registrar.page.reload();
     await registrar.page.getByLabel("Form decision").selectOption("accepted");
@@ -55,8 +66,10 @@ test("GF2: guardian correction and registrar review through accepted offer, acti
     await registrar.page.goto(`/admissions/intake?${selected}`);
     await registrar.page.getByRole("button", { name: "Waitlist", exact: true }).click();
     await expect(registrar.page.getByRole("button", { name: "Restore to review", exact: true })).toBeVisible();
-    await guardian.page.reload();
-    await expect(guardian.page.getByText("Application waitlisted. Contact admissions about availability and next steps.")).toBeVisible();
+    await expectVisibleAfterReload(
+      guardian.page,
+      guardian.page.getByText("Application waitlisted. Contact admissions about availability and next steps."),
+    );
     await registrar.page.getByRole("link", { name: "Review this application's offers and enrollment", exact: false }).click();
     await expect(registrar.page.getByRole("button", { name: /Registrar: Issue offer/ })).toHaveCount(0);
     await registrar.page.getByRole("link", { name: "Manage admissions decisions and waitlist", exact: false }).click();
@@ -72,19 +85,26 @@ test("GF2: guardian correction and registrar review through accepted offer, acti
     await registrar.page.reload();
     await registrar.page.getByRole("button", { name: "Registrar: Activate enrollment", exact: true }).click();
     await expect(registrar.page.getByText("Enrollment active", { exact: false })).toBeVisible();
-    await guardian.page.reload();
-    await expect(guardian.page.getByText("Enrollment is active. Admissions will arrange your classes next.")).toBeVisible();
+    await expectVisibleAfterReload(
+      guardian.page,
+      guardian.page.getByText("Enrollment is active. Admissions will arrange your classes next."),
+    );
 
     await registrar.page.getByRole("button", { name: "Choose courses", exact: true }).click();
     await registrar.page.getByLabel("Available section").selectOption(fixture.sectionId);
     await registrar.page.getByRole("button", { name: "Assign student", exact: true }).click();
     await expect(registrar.page.getByText("Assigned: E2E Logic II", { exact: true })).toBeVisible();
-    await guardian.page.reload();
-    await expect(guardian.page.getByText("Enrollment is active and classes are assigned.", { exact: true })).toBeVisible();
+    await expectVisibleAfterReload(
+      guardian.page,
+      guardian.page.getByText("Enrollment is active and classes are assigned.", { exact: true }),
+    );
     await student.page.goto("/student/courses");
     await expect(student.page.getByText("E2E Logic II", { exact: true }).first()).toBeVisible();
-    await student.page.goto(`/admissions?${selected}`);
-    await expect(student.page.getByRole("alert")).toContainText("registrar");
+    await expectProtectedPageDenied(student.page, `/admissions?${selected}`, {
+      denial: student.page.getByRole("alert"),
+      message: "registrar",
+      protectedContent: ["Registrar: Activate enrollment"],
+    });
 
     const applications = await sql.query("select household_id, student_profile_id, stage from applications where id = $1", [fixture.applicationId]);
     expect(applications).toEqual([{ household_id: fixture.householdId, student_profile_id: fixture.studentProfileId, stage: "accepted" }]);
@@ -96,13 +116,13 @@ test("GF2: guardian correction and registrar review through accepted offer, acti
     const evidence = requirement.evidence as Array<{ kind: string }>;
     expect(evidence.filter(entry => entry.kind === "enrollment_form_submission")).toHaveLength(2);
     expect(evidence.filter(entry => entry.kind === "enrollment_form_review")).toHaveLength(2);
-    const enrollments = await sql.query("select kind from enrollments where student_profile_id = $1 and status = 'active' order by kind", [fixture.studentProfileId]);
-    expect(enrollments).toEqual([{ kind: "program" }, { kind: "section" }]);
-    const events = await sql.query("select event_type from domain_events where actor_person_id = any($1::uuid[])",
-      [[fixture.guardianPersonId, fixture.teacherPersonId]]);
-    for (const type of ["AdmissionOfferIssued", "AdmissionOfferAccepted", "EnrollmentActivated"])
-      expect(events.filter(event => event.event_type === type)).toHaveLength(1);
-  } finally {
-    await Promise.all([guardian.context.close(), registrar.context.close(), student.context.close()]);
-  }
+    await expectActiveEnrollmentKinds(sql, {
+      studentProfileId: fixture.studentProfileId,
+      kinds: ["program", "section"],
+    });
+    await expectDomainEventsOnceForActors(sql, {
+      actorPersonIds: [fixture.guardianPersonId, fixture.teacherPersonId],
+      eventTypes: ["AdmissionOfferIssued", "AdmissionOfferAccepted", "EnrollmentActivated"],
+    });
+  });
 });

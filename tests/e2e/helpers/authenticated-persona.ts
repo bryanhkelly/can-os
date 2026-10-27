@@ -54,14 +54,65 @@ export async function openAuthenticatedPage(
   origin: string = baseURL,
 ): Promise<AuthenticatedPage> {
   const context = await browser.newContext({ baseURL: origin });
-  await context.addCookies([{
-    name: accessSessionCookie,
-    value: secret,
-    url: origin,
-    path: "/",
-    httpOnly: true,
-    secure: true,
-    sameSite: "Lax",
-  }]);
-  return { context, page: await context.newPage() };
+  try {
+    await context.addCookies([{
+      name: accessSessionCookie,
+      value: secret,
+      url: origin,
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "Lax",
+    }]);
+    return { context, page: await context.newPage() };
+  } catch (error) {
+    await context.close().catch(() => undefined);
+    throw error;
+  }
+}
+
+type AuthenticatedPersonas<Secrets extends Record<string, string>> = {
+  [Name in keyof Secrets]: AuthenticatedPage;
+};
+
+/**
+ * Open named personas for one scope and always close every context that was
+ * created, including when a later setup or the callback fails.
+ */
+export async function withAuthenticatedPages<
+  const Secrets extends Record<string, string>,
+  Result,
+>(
+  browser: Browser,
+  secrets: Secrets,
+  run: (personas: AuthenticatedPersonas<Secrets>) => Promise<Result>,
+  origin: string = baseURL,
+): Promise<Result> {
+  const opened: AuthenticatedPage[] = [];
+  try {
+    for (const secret of Object.values(secrets)) {
+      opened.push(await openAuthenticatedPage(browser, secret, origin));
+    }
+    const personas = Object.fromEntries(
+      Object.keys(secrets).map((name, index) => [name, opened[index]]),
+    ) as AuthenticatedPersonas<Secrets>;
+    return await run(personas);
+  } finally {
+    await Promise.all(opened.map(({ context }) => context.close()));
+  }
+}
+
+/** Open one persona for a callback and guarantee browser-context teardown. */
+export async function withAuthenticatedPage<Result>(
+  browser: Browser,
+  secret: string,
+  run: (persona: AuthenticatedPage) => Promise<Result>,
+  origin: string = baseURL,
+): Promise<Result> {
+  return withAuthenticatedPages(
+    browser,
+    { persona: secret },
+    async ({ persona }) => run(persona),
+    origin,
+  );
 }
