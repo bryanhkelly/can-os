@@ -11,12 +11,8 @@
  * academic-time.ts, academics.ts, identity.ts, access.ts, work.ts).
  */
 import type { NeonQueryFunction } from "@neondatabase/serverless";
-import { randomBytes, randomUUID } from "node:crypto";
-import {
-  accessSessionCookie,
-  hashAccessSecret,
-} from "../../src/domain/access-tokens";
-import { TEST_ACCESS_TOKEN_PEPPER } from "./env";
+import { randomUUID } from "node:crypto";
+import { createAccessSession } from "./helpers/authenticated-persona";
 
 export type Sql = NeonQueryFunction<false, false>;
 
@@ -54,11 +50,6 @@ export interface Gf1Fixture {
   guardianSecret: string;
   specialistSecret: string;
   assessmentTitle: string;
-}
-
-/** Opaque session secret; 43 base64url chars satisfies /^[A-Za-z0-9_-]{40,}$/. */
-function newSessionSecret(): string {
-  return randomBytes(32).toString("base64url");
 }
 
 async function insertId(
@@ -324,22 +315,9 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
     fixture.guardianGrantId = await grantFor(fixture.guardianAccountId, fixture.guardianPersonId, "guardian");
     fixture.specialistGrantId = await grantFor(fixture.specialistAccountId, fixture.specialistPersonId, "specialist");
 
-    // Sessions: only the SHA-256 hash of secret+pepper is stored, exactly like
-    // the real verify-challenge flow in src/modules/identity.
-    const sessionFor = async (accountId: string, grantId: string) => {
-      const secret = newSessionSecret();
-      await sql.query(
-        `insert into access_sessions (account_id, secret_hash, active_grant_id, expires_at)
-         values ($1, $2, $3, $4)`,
-        [
-          accountId,
-          hashAccessSecret(secret, TEST_ACCESS_TOKEN_PEPPER),
-          grantId,
-          sessionExpiresAt.toISOString(),
-        ],
-      );
-      return secret;
-    };
+    // Sessions use the same helper as independently provisioned browser personas.
+    const sessionFor = async (accountId: string, grantId: string) =>
+      createAccessSession(sql, { accountId, activeGrantId: grantId, expiresAt: sessionExpiresAt });
     fixture.studentSecret = await sessionFor(fixture.studentAccountId, fixture.studentGrantId);
     fixture.teacherSecret = await sessionFor(fixture.teacherAccountId, fixture.teacherGrantId);
     fixture.guardianSecret = await sessionFor(fixture.guardianAccountId, fixture.guardianGrantId);
@@ -419,5 +397,3 @@ export async function destroyGf1Fixture(
     await sql.query(text, params);
   }
 }
-
-export { accessSessionCookie };
