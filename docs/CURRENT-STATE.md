@@ -553,8 +553,8 @@ deployment or live storage acceptance.
   production build, mutation hygiene, route inventory (**69 routes / 0 issues**)
   and scoped/new-file whitespace checks. Browser and separate-connection race
   acceptance remain open.
-- No schema migration, production grants, production mutation or deployment
-  was performed. Receipt is post-opening acknowledgment, not a new
+- No schema migration, production grants, persistent production mutation or
+  deployment was performed. Receipt is post-opening acknowledgment, not a new
   readiness gate or legal approval. Revoked-recipient recovery/escalation,
   external delivery verification, full evidence-review acceptance and the
   broader site-director daily-operations workflow remain outstanding.
