@@ -7,12 +7,19 @@ const pending = [
   "0036_program_publications", "0037_public_admissions_interests",
   "0038_public_interest_conversion",
 ];
+// Committed journal timestamps for 0032-0038 (drizzle/meta/_journal.json).
+// Drizzle's migrator stores these as __drizzle_migrations.created_at, so the
+// ledger max(created_at) after applying 0038 must equal 1792728000000.
+const pendingWhen = [
+  1792704000000, 1792710000000, 1792713600000, 1792717200000,
+  1792720800000, 1792724400000, 1792728000000,
+];
 
 function reviewedState() {
   const entries = Array.from({ length: 32 }, (_, idx) =>
     ({ idx, tag: "historical-" + idx, when: idx === 31 ? 1792700000000 : idx }));
   entries.push(...pending.map((tag, n) => ({
-    idx: 32+n, tag, when: 1792704000000+n*3600000,
+    idx: 32+n, tag, when: pendingWhen[n],
   })));
   return {
     project: "sweet-hall-62441909", branch: "br-proud-pine-arfju8h2",
@@ -242,5 +249,182 @@ describe("FullFlow 0040 staged migration readiness (read-only)", () => {
     expect(assessFullFlowMigrationReadiness({
       ...premature,tables:[...premature.tables,{table_name:"site_local_content_versions"}],
     }).ready).toBe(false);
+  });
+});
+
+describe("FullFlow 0041-0045 staged migration readiness (read-only)", () => {
+  const authCols = [
+    "id","program_id","site_id","host_organization_id","institution_organization_id",
+    "version","status","services","requested_by_person_id","requested_at",
+    "evidence_document_id","effective_from","effective_through","reviewed_by_person_id",
+    "reviewed_at","review_reason","revoked_by_person_id","revoked_at",
+    "revocation_reason","created_at","updated_at",
+  ];
+  const guardianCols = ["can_view_academics","can_manage_enrollment","can_submit_attendance_excuse"];
+  // Committed journal timestamps for 0039-0045 (drizzle/meta/_journal.json).
+  const stagedEntries = [
+    {idx:39,tag:"0039_program_site_authorizations",when:1792731600000},
+    {idx:40,tag:"0040_site_local_content",when:1792735200000},
+    {idx:41,tag:"0041_pending_guardian_access_defaults",when:1792738800000},
+    {idx:42,tag:"0042_public_family_start_requests",when:1792742400000},
+    {idx:43,tag:"0043_student_access_consents",when:1792746000000},
+    {idx:44,tag:"0044_school_configuration_operating_approval",when:1792749600000},
+    {idx:45,tag:"0045_onsite_safety_qualification_definitions",when:1792753200000},
+  ];
+  function stateThrough0040() {
+    const base = reviewedState();
+    base.journal.entries.push(...stagedEntries);
+    return {
+      ...base, applied:41, lastTimestamp:"1792735200000",
+      types:[...base.types,
+        {typname:"program_type",enumlabel:"summer_program"},
+        {typname:"program_type",enumlabel:"after_school_enrichment"},
+        {typname:"activity_season_status",enumlabel:"draft"},
+      ],
+      columns:[
+        {table_name:"programs",column_name:"credit_issuing_organization_id",is_nullable:"YES"},
+        {table_name:"activity_seasons",column_name:"metadata",is_nullable:"NO"},
+        {table_name:"activity_registrations",column_name:"metadata",is_nullable:"NO"},
+      ],
+      tables:["site_publications","program_publications","public_admissions_interests",
+        "program_site_authorizations","site_local_content_versions"].map(table_name=>({table_name})),
+      authorizationColumns:authCols.map(column_name=>({column_name})),
+      authorizationIndexes:["program_site_authorization_version_uq",
+        "program_site_authorization_current_uq"].map(indexname=>({indexname})),
+      authorizationConstraints:[
+        "program_site_authorization_status_ck","program_site_authorization_review_ck",
+        "program_site_authorization_revoked_ck","program_site_authorization_distinct_review_ck",
+        "program_site_authorization_services_ck",
+      ].map(conname=>({conname})),
+      localCopyColumns:[
+        "id","site_id","revision","status","content","flagged_fields",
+        "created_by_person_id","restored_from_revision","created_at",
+      ].map(column_name=>({column_name})),
+      localCopyIndexes:["site_local_content_site_revision_uq",
+        "site_local_content_site_status_idx"].map(indexname=>({indexname})),
+      localCopyConstraints:[
+        "site_local_content_positive_revision_ck","site_local_content_status_ck",
+        "site_local_content_document_ck","site_local_content_flagged_ck",
+      ].map(conname=>({conname})),
+      // 0041 not yet applied: pending-guardian capabilities still default true.
+      guardianDefaults:guardianCols.map(column_name=>({column_name,column_default:"true"})),
+    };
+  }
+  function stateThrough0041() {
+    const state = stateThrough0040();
+    return {...state, applied:42, lastTimestamp:"1792738800000",
+      guardianDefaults:guardianCols.map(column_name=>({column_name,column_default:"false"}))};
+  }
+  function stateThrough0042() {
+    const state = stateThrough0041();
+    return {...state, applied:43, lastTimestamp:"1792742400000",
+      tables:[...state.tables,{table_name:"public_family_start_requests"}],
+      familyStartColumns:[
+        "id","site_id","program_id","email_normalized","adult_first_name",
+        "adult_last_name","token_hash","expires_at","consumed_at","created_at",
+      ].map(column_name=>({column_name})),
+      familyStartIndexes:["public_family_starts_token_uq","public_family_starts_expiry_idx",
+        "public_family_starts_school_idx"].map(indexname=>({indexname}))};
+  }
+  function stateThrough0043() {
+    const state = stateThrough0042();
+    return {...state, applied:44, lastTimestamp:"1792746000000",
+      tables:[...state.tables,{table_name:"student_access_consents"}],
+      consentColumns:[
+        "id","application_id","student_profile_id","guardian_person_id",
+        "program_id","site_id","student_email","consent_statement",
+        "signed_at","reviewed_by_person_id","reviewed_at","status",
+        "created_at","updated_at",
+      ].map(column_name=>({column_name})),
+      consentIndexes:["student_access_consent_application_uq",
+        "student_access_consent_reviewer_idx"].map(indexname=>({indexname}))};
+  }
+  function stateThrough0044() {
+    const state = stateThrough0043();
+    return {...state, applied:45, lastTimestamp:"1792749600000",
+      types:[...state.types,
+        {typname:"school_configuration_status",enumlabel:"approved"},
+        {typname:"school_configuration_status",enumlabel:"suspended"}]};
+  }
+  function stateThrough0045() {
+    const state = stateThrough0044();
+    return {...state, applied:46, lastTimestamp:"1792753200000",
+      safetyQualificationKeys:["onsite_child_safety_screening","onsite_safeguarding_training"]
+        .map(key=>({key}))};
+  }
+  it("permits staged 0041 through 0045 application on the dedicated branch", () => {
+    expect(assessFullFlowMigrationReadiness(stateThrough0040())).toMatchObject({
+      ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
+      pendingMigrations:["0041_pending_guardian_access_defaults","0042_public_family_start_requests",
+        "0043_student_access_consents","0044_school_configuration_operating_approval",
+        "0045_onsite_safety_qualification_definitions"],
+    });
+    expect(assessFullFlowMigrationReadiness(stateThrough0041())).toMatchObject({
+      ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
+      pendingMigrations:["0042_public_family_start_requests","0043_student_access_consents",
+        "0044_school_configuration_operating_approval","0045_onsite_safety_qualification_definitions"],
+    });
+    expect(assessFullFlowMigrationReadiness(stateThrough0042())).toMatchObject({
+      ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
+      pendingMigrations:["0043_student_access_consents","0044_school_configuration_operating_approval",
+        "0045_onsite_safety_qualification_definitions"],
+    });
+    expect(assessFullFlowMigrationReadiness(stateThrough0043())).toMatchObject({
+      ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
+      pendingMigrations:["0044_school_configuration_operating_approval",
+        "0045_onsite_safety_qualification_definitions"],
+    });
+    expect(assessFullFlowMigrationReadiness(stateThrough0044())).toMatchObject({
+      ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
+      pendingMigrations:["0045_onsite_safety_qualification_definitions"],
+    });
+    expect(assessFullFlowMigrationReadiness(stateThrough0045())).toMatchObject({
+      ready:true,status:"UP_TO_DATE",pendingMigrations:[],
+    });
+  });
+  it("rejects partial 0041-0045 drift, premature artifacts and wrong branch", () => {
+    const through0041 = stateThrough0041();
+    const through0042 = stateThrough0042();
+    const through0043 = stateThrough0043();
+    const through0044 = stateThrough0044();
+    const through0045 = stateThrough0045();
+    for (const changed of [
+      // 0041 recorded in the ledger but defaults never flipped
+      {...through0041, guardianDefaults:through0041.guardianDefaults
+        .map(x=>({...x,column_default:"true"}))},
+      {...through0042, familyStartColumns:through0042.familyStartColumns
+        .filter(x=>x.column_name!=="token_hash")},
+      {...through0042, familyStartIndexes:through0042.familyStartIndexes
+        .filter(x=>x.indexname!=="public_family_starts_token_uq")},
+      {...through0043, consentColumns:through0043.consentColumns
+        .filter(x=>x.column_name!=="consent_statement")},
+      {...through0043, consentIndexes:through0043.consentIndexes
+        .filter(x=>x.indexname!=="student_access_consent_application_uq")},
+      {...through0044, types:through0044.types.filter(x=>x.enumlabel!=="suspended")},
+      {...through0045, safetyQualificationKeys:through0045.safetyQualificationKeys
+        .filter(x=>x.key!=="onsite_safeguarding_training")},
+      {...through0045, lastTimestamp:"1792749600000"},
+      {...through0045, applied:45},
+      {...through0045, branch:"br-restless-sea-ar9ooo55"},
+      {...through0045, branch:"br-bitter-feather-ar0u63x7"},
+    ]) {
+      expect(assessFullFlowMigrationReadiness(changed).ready).toBe(false);
+    }
+    const early = stateThrough0040();
+    for (const premature of [
+      // 0041 defaults flipped before the migration ran
+      {...early, guardianDefaults:early.guardianDefaults
+        .map(x=>({...x,column_default:"false"}))},
+      // 0042/0043 tables created before their migrations ran
+      {...early, tables:[...early.tables,{table_name:"public_family_start_requests"}]},
+      {...through0042, tables:[...through0042.tables,{table_name:"student_access_consents"}]},
+      // 0044 enum values present before the migration ran
+      {...through0043, types:[...through0043.types,
+        {typname:"school_configuration_status",enumlabel:"approved"}]},
+      // 0045 catalog rows seeded before the migration ran
+      {...through0044, safetyQualificationKeys:[{key:"onsite_child_safety_screening"}]},
+    ]) {
+      expect(assessFullFlowMigrationReadiness(premature).ready).toBe(false);
+    }
   });
 });
