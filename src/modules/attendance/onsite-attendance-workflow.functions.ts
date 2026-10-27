@@ -75,7 +75,8 @@ function siteDayStart(date: string, timeZone: string): Date {
 }
 
 async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, selectedId?: string) {
-  const rows = await db.select({
+  // The inner join on sites guarantees a non-null site for every row.
+  const rows = (await db.select({
     id: programs.id, name: programs.name, organizationId: programs.organizationId,
     siteId: programs.siteId, deliveryModel: programs.deliveryModel,
     timezone: sites.timezone,
@@ -86,7 +87,8 @@ async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, se
       inArray(programs.siteId, actor.scope.siteIds!),
       ...(isOnsiteAttendanceRole(actor.role) ? [eq(programs.siteId, actor.grantSiteId!)] : []),
       ...(selectedId ? [eq(programs.id, selectedId)] : []),
-    ));
+    ))).filter((row): row is Omit<typeof row, "siteId"> & { siteId: string } =>
+      row.siteId !== null);
   const onsite = rows.filter(p => p.deliveryModel.onsite === true);
   // An independently hosted CAN school has explicit director and named
   // Section facilitator appointments, NOT a site_staff-wide roster role.
@@ -212,8 +214,8 @@ async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
   for (const row of programRoster) {
     // Keep planning and enrollment lists separate from the live school's
     // physical attendance roster until this child has a real Section.
-    if(independentPrograms.has(row.programId))continue;
-    if (!row.programId || !expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
+    if (!row.programId || independentPrograms.has(row.programId) ||
+        !expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
     const host = activePrograms.find(p => p.id === row.programId)!;
     byKey.set(row.programId + ":" + row.studentProfileId, {
       studentProfileId: row.studentProfileId, programId: row.programId,
