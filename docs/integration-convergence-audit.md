@@ -89,9 +89,12 @@ executed by the Neon SQL migration session.
 Postgres-reported `neon.project_id` and `neon.branch_id` against the approved
 FullFlow IDs before executing any integration fixture. The guarded
 `db:migrate:fullflow` command performs the same online branch verification
-before invoking the existing Drizzle migrator; admissions, academic-intervention,
-and curriculum-browser GitHub workflows now call this wrapper rather than
-running `db:migrate` directly. The admissions browser runner and all three
+before invoking the existing Drizzle migrator. **Correction (2026-10-28):**
+the independent admissions, academic-intervention, and curriculum-browser
+GitHub workflows run plain `npm run db:migrate` against their own isolated
+Neon targets; the `db:migrate:fullflow` wrapper remains intentionally
+isolated to the FullFlow branch and is not wired into those workflows.
+The admissions browser runner and all three
 Playwright entry configurations also require branch identity verification.
 Unit regressions assert these security gates are present.
 **No migration execution, green CI or browser acceptance is claimed.**

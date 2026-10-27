@@ -557,9 +557,20 @@ The manifest records interactions and downstream canonical records; no route
 was exempted and no parallel UI workflow was added.
 
 Route fixture validation is static only: 75 page routes are declared and
-`unseededRoutes` is empty. The SQL was parsed and checked against the canonical
-schema, but was not applied to a database. Token redemption requires the
-documented test pepper. No live migration, seed or production mutation ran.
+`unseededRoutes` is empty. **Correction (2026-10-28):** the checker performs
+static manifest/file checks only (declared seeds exist and referenced fixture
+files are present); it does **not** parse the SQL or check it against the
+canonical schema, and the SQL was not applied to a database. Token redemption
+requires the documented test pepper. No live migration, seed or production
+mutation ran.
+
+Seed executability follow-up (2026-10-28): the declared seed chain
+(`student-s1-s4`, `identity-demo-accounts`, `new-experiences-v1`,
+`valor-curriculum-marketplace`) was made executable against the current schema
+and validated locally in disposable PGlite by the coder. There is **no
+committed CI seed executor** applying the manifest chain, and
+`valor-algebra1-week01-upgrade.sql` remains an orphan/non-manifest fixture
+with stale identities and missing pilot prerequisites — not executable.
 
 ## Provider-bound instructional coverage and aligned placement
 
