@@ -73,6 +73,7 @@ export async function assignLaunchInstructor(
   const [existing] = await tx.select({ id: deliveryArrangements.id }).from(deliveryArrangements).where(and(
     eq(deliveryArrangements.sectionId, section.id),
     eq(deliveryArrangements.instructorPersonId, input.teacherPersonId),
+    eq(deliveryArrangements.academicProviderOrganizationId, section.providerId),
     eq(deliveryArrangements.status, "active"),
     or(isNull(deliveryArrangements.effectiveFrom), lte(deliveryArrangements.effectiveFrom, section.window.from)),
     or(isNull(deliveryArrangements.effectiveThrough), gte(deliveryArrangements.effectiveThrough, section.window.through)),

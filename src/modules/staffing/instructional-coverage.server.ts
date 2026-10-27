@@ -14,6 +14,7 @@ export async function evaluateInstructionalCoverage(
   const section = await teachingStaffingContext(sectionId, executor);
   const arrangements = await executor.select({
     instructorPersonId: deliveryArrangements.instructorPersonId,
+    academicProviderOrganizationId: deliveryArrangements.academicProviderOrganizationId,
     effectiveFrom: deliveryArrangements.effectiveFrom,
     effectiveThrough: deliveryArrangements.effectiveThrough,
   }).from(deliveryArrangements).where(and(
@@ -25,6 +26,7 @@ export async function evaluateInstructionalCoverage(
   const assignedTeacherIds = [...new Set(teachers.map(teacher => teacher.personId))];
   const coveredInstructorIds = coveringInstructorIds(
     section.window,
+    section.providerId,
     assignedTeacherIds,
     arrangements,
   );
