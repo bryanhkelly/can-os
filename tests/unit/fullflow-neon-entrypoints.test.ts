@@ -29,6 +29,13 @@ describe("FullFlow Neon branch isolation", () => {
     }
   });
 
+  it("runs the authenticated admissions browser journey after Neon integration", () => {
+    const workflow = readFileSync(".github/workflows/admissions-integration.yml", "utf8");
+    expect(workflow.indexOf("run: npm run test:integration:admissions"))
+      .toBeLessThan(workflow.indexOf("run: npm run test:e2e:admissions"));
+    expect(workflow).toContain("name: admissions-browser-failure");
+  });
+
   it("uses a database-attested branch check before the dedicated FullFlow migration wrapper", () => {
     const wrapper = readFileSync("scripts/migrate-fullflow-neon.mjs", "utf8");
     expect(wrapper).toContain("verifyFullFlowNeonBranch(testUrl)");

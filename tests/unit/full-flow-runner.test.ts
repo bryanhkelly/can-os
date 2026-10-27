@@ -16,8 +16,10 @@ describe("isolated FullFlow acceptance runner", () => {
   it("selects the continuous FullFlow integration suite, not denomination onboarding", () => {
     const source = readFileSync(script, "utf8");
     expect(source).toContain(
-      'mode === "network-onboarding" ? ["tests/integration/network-onboarding.integration.test.ts", "tests/integration/network-affiliations.integration.test.ts"] : mode === "full-flow" ? ["tests/integration/full-flow.integration.test.ts"]',
+      'mode === "full-flow" ? ["tests/integration/full-flow.integration.test.ts", "tests/integration/program-site-authorization.integration.test.ts"]',
     );
+    expect(source).toContain("tests/integration/full-flow.integration.test.ts");
+    expect(source).toContain("tests/integration/program-site-authorization.integration.test.ts");
   });
 
   it("requires a database-attested Neon branch before launching any connected fixture", () => {

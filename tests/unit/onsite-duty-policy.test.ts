@@ -7,6 +7,7 @@ import {
 const block:DutyAssignmentCandidate={
   sectionId:"section-a",periodId:"period-morning",programId:"program-a",
   canRespond:true,canAccept:true,planToken:"current-plan-fingerprint",
+  requiresSectionDelegation:false,startsAtLocal:"08:30",endsAtLocal:"09:30",
 };
 const input={
   siteMatches:true,projectionTruncated:false,scopedProgramIds:["program-a"],

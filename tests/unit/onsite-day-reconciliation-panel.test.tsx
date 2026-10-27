@@ -31,7 +31,9 @@ describe("site day attendance reconciliation panel",()=>{
     expect(html).toContain("Student Two");
     expect(html).toContain("no onsite attendance observation recorded");
     expect(html).toContain("Missing marks remain unrecorded");
-    expect(html).toContain("Review is an attendance snapshot attestation");
+    expect(html).toContain("Attendance review is not ready: 1 unresolved attendance or configuration issues");
+    expect(html).toContain("Review-ready means only that every scheduled student-program entry has a recorded attendance mark");
+    expect(html).toContain("does not close official attendance");
     expect(html).not.toContain("Attendance automatically closed");
     expect(html).not.toContain("Student Two — absent");
   });

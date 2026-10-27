@@ -11,7 +11,7 @@ describe("first student accessible classroom lesson",()=>{
   expect(hasAccessibleFirstLesson({})).toBe(false);
   expect(hasAccessibleFirstLesson({learning:{version:1,modules:[]}})).toBe(false);
   expect(hasAccessibleFirstLesson(course({}))).toBe(false);
-  expect(()=>requireAccessibleFirstLesson(course({}))).toThrow("first");
+  expect(()=>requireAccessibleFirstLesson(course({}))).toThrow("Publish at least one student-accessible instructional lesson before placing students into this class");
  });
  it("resolves the route-only first-lesson shortcut to actual published instruction",()=>{
   const lessons=[
