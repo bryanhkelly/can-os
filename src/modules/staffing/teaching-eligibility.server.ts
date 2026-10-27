@@ -77,7 +77,8 @@ export async function evaluateTeachingEligibility(sectionId: string, personId: s
   if(!section.active)return denied("Section is not active.");
   if(options.requireAssignment){
     const [assignment]=await executor.select({id:sectionTeachers.id}).from(sectionTeachers)
-      .where(and(eq(sectionTeachers.sectionId,sectionId),eq(sectionTeachers.personId,personId))).limit(1);
+      .where(and(eq(sectionTeachers.sectionId,sectionId),eq(sectionTeachers.personId,personId),
+        eq(sectionTeachers.role,"teacher"))).limit(1);
     if(!assignment)return denied("No assigned teacher relationship exists for this Section.");
   }
 

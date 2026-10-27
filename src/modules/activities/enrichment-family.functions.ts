@@ -36,7 +36,6 @@ export const getEnrichmentFamily = createServerFn({ method: "GET" }).handler(asy
     seasonId: s.activityRegistrations.activitySeasonId,
     studentProfileId: s.activityRegistrations.studentProfileId,
     status: s.activityRegistrations.status,
-    metadata: s.activityRegistrations.metadata,
     offeringName: s.activities.name,
     seasonName: s.activitySeasons.name,
     startsOn: s.activitySeasons.startsOn, endsOn: s.activitySeasons.endsOn,

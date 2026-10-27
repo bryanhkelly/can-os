@@ -53,6 +53,7 @@ export async function scheduleExtendedSessions(
   if (actor.role !== "registrar" || !actor.actorPersonId)
     throw new AuthorizationError("extended-learning registrar");
   assertCapability(actor, "program.launch.start");
+  const actorPersonId = actor.actorPersonId;
   const location = input.location.trim();
   if (location.length < 2 || location.length > 120)
     throw new Error("Enter a site room or location (2–120 characters)");
@@ -126,7 +127,7 @@ export async function scheduleExtendedSessions(
         },
         // This draft is intentionally participant-restricted in the general calendar.
         // Planning API lists it for other scoped registrars.
-        participants: [{ personId: actor.actorPersonId, role: "owner" }],
+        participants: [{ personId: actorPersonId, role: "owner" }],
         createdByPersonId: actor.actorPersonId,
       });
       if (!projection.created) {
