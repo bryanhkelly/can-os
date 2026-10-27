@@ -56,6 +56,12 @@ vi.mock("@/modules/enrollment/admissions-program-directory.functions",()=>({list
 vi.mock("@/modules/enrollment/admissions-offer.functions",()=>({
   getAdmissionOfferOptions:vi.fn(),issueAdmissionOffer:vi.fn(),activateOfferedEnrollment:vi.fn(),withdrawIssuedAdmissionOffer:vi.fn(),
 }));
+vi.mock("@/modules/enrollment/student-access-handoff.functions",()=>({
+  consentToStudentLearningAccount:vi.fn(),getStudentLearningHandoff:vi.fn(),provisionStudentLearningAccess:vi.fn(),
+}));
+vi.mock("@/modules/enrollment/public-admissions-interest.functions",()=>({
+  listPublicAdmissionsInterests:vi.fn(),setPublicAdmissionsInterestStatus:vi.fn(),
+}));
 vi.mock("@/modules/enrollment/r2-document-upload.functions",()=>({
   beginEnrollmentDocumentUpload:vi.fn(),finishEnrollmentDocumentUpload:vi.fn(),
   getEnrollmentDocumentDownload:vi.fn(),getEnrollmentDocumentUploadAvailability:vi.fn(),
@@ -209,7 +215,7 @@ describe("application contextual navigation",()=>{
 
   it("keeps the selected Admissions intake application when resolving an offer exception",()=>{
     state.search={application:"application"};
-    successful({programs:[],existingStudents:[],records:[
+    successful({programs:[],existingStudents:[],publicInterests:[],records:[
       {id:"application",studentFirst:"Selected",studentLast:"Applicant",programId:"program",siteId:"school",
         programName:"Academy",stage:"eligibility",disposition:"waitlisted",updatedAt:"2030-01-01"},
       {id:"other",studentFirst:"Unrelated",studentLast:"Applicant",programId:"program",
@@ -224,7 +230,7 @@ describe("application contextual navigation",()=>{
 
   it("offers existing students only from the selected intake program without replacing new-student intake",()=>{
     state.search={programId:"program"};
-    successful({programs:[{id:"program",name:"Academy",siteId:"school"}],records:[],existingStudents:[
+    successful({programs:[{id:"program",name:"Academy",siteId:"school"}],records:[],publicInterests:[],existingStudents:[
       {programId:"program",studentProfileId:"existing",guardianPersonId:"guardian",householdId:"household",
         studentFirstName:"Existing",studentLastName:"Learner",guardianFirstName:"Managing",guardianLastName:"Guardian"},
       {programId:"program",studentProfileId:"unlinked",guardianPersonId:"unlinked-guardian",householdId:null,
@@ -323,8 +329,8 @@ describe("application contextual navigation",()=>{
   it("opens only the enrollment application linked from a document review notice",()=>{
     state.search={student:"child",application:"selected"};
     successful([
-      {applicationId:"selected",studentName:"Jordan",program:"Selected enrollment",blockers:[],offers:[]},
-      {applicationId:"other",studentName:"Casey",program:"Unrelated enrollment",blockers:[],offers:[]},
+      {applicationId:"selected",studentName:"Jordan",program:"Selected enrollment",applicationStage:"application",blockers:[],offers:[]},
+      {applicationId:"other",studentName:"Casey",program:"Unrelated enrollment",applicationStage:"application",blockers:[],offers:[]},
     ]);
     const html=render(Offers);
     expect(html).toContain("Selected enrollment");
@@ -379,7 +385,7 @@ describe("application contextual navigation",()=>{
       offers:[{...row.offers[0],status:"accepted"}]}]});
     const accepted=render(Admissions);
     expect(accepted).not.toContain("Withdraw offer");
-    expect(accepted).toMatch(/<button disabled=""[^>]*>Registrar: Activate enrollment<\/button>/);
+    expect(accepted).toContain("Accepted offer ready. Select a staffed class below to activate enrollment and placement together.");
   });
 
   it("does not replace an unavailable group permission request with another",()=>{

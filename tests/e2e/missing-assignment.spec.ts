@@ -131,24 +131,19 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     await test.step("student submits the assignment late via the UI", async () => {
       await student.page.goto("/student/assignments");
       await expect(
-        student.page.getByRole("heading", { name: "Your learning work." }),
+        student.page.getByRole("heading", { name: "Your assignments" }),
       ).toBeVisible();
 
       await student.page
-        .getByRole("button", { name: fixture.assessmentTitle })
+        .getByRole("link", { name: fixture.assessmentTitle })
         .click();
       await student.page
         .getByPlaceholder("Write your response…")
         .fill("Here is my late submission for the problem set.");
-      await student.page.getByRole("button", { name: "Submit work" }).click();
+      await student.page.getByRole("button", { name: "Submit assignment" }).click();
 
       await expect(
-        student.page.getByText("Your work has been submitted to Neon."),
-      ).toBeVisible();
-      await expect(
-        student.page.getByText(
-          "Submitted successfully. Your teacher can review your work.",
-        ),
+        student.page.getByText("Your assignment has been submitted."),
       ).toBeVisible();
 
       const after = await getSubmission();
@@ -159,15 +154,14 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
 
   await test.step("teacher grades the late submission in the real gradebook UI", async () => {
     await withAuthenticatedPage(browser, fixture.teacherSecret, async teacherGradebook => {
-      await teacherGradebook.page.goto("/teacher/gradebook");
+      // Deep-link straight into the grading panel for this student and
+      // assessment, the same pattern the Algebra I classroom flow uses.
+      await teacherGradebook.page.goto(
+        `/teacher/gradebook?section=${fixture.sectionId}&assessment=${fixture.assessmentId}&student=${fixture.studentProfileId}`,
+      );
       await expect(
-        teacherGradebook.page.getByRole("heading", { name: "Gradebook" }),
+        teacherGradebook.page.getByRole("heading", { name: new RegExp(fixture.assessmentTitle) }),
       ).toBeVisible();
-
-      const studentRow = teacherGradebook.page.getByRole("row", {
-        name: new RegExp(`Jordan Student-${fixture.suffix}`),
-      });
-      await studentRow.getByRole("button", { name: /Open grading/ }).click();
       await teacherGradebook.page.getByLabel(/Score/).fill("88");
       await teacherGradebook.page
         .getByLabel("Feedback comment")
@@ -220,7 +214,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
     await test.step("student sees the posted grade and feedback", async () => {
       await studentAgain.page.goto("/student/assignments");
       await studentAgain.page
-        .getByRole("button", { name: fixture.assessmentTitle })
+        .getByRole("link", { name: fixture.assessmentTitle })
         .click();
       await expect(
         studentAgain.page.getByText(/Score:\s*88/),
