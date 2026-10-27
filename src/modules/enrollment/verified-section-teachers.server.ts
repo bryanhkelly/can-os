@@ -22,7 +22,7 @@ export async function verifiedTeacherSectionIds(
     sectionId:sectionTeachers.sectionId,personId:sectionTeachers.personId,
   }).from(sectionTeachers)
     .innerJoin(sections,eq(sections.id,sectionTeachers.sectionId))
-    .where(and(inArray(sections.id,ids),eq(sections.active,true)))
+    .where(and(inArray(sections.id,ids),eq(sections.active,true),eq(sectionTeachers.role,"teacher")))
     .orderBy(sectionTeachers.sectionId,sectionTeachers.personId);
   const coverageBySection=new Map<string,Awaited<ReturnType<typeof evaluateInstructionalCoverage>>>();
   for(const sectionId of new Set(assignments.map(assignment=>assignment.sectionId))){

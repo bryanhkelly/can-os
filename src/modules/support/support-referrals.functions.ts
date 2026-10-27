@@ -11,7 +11,7 @@ const stages = ["submitted","accepted","plan_created","in_service","review","clo
 type Stage = typeof stages[number];
 const categories = ["academic","attendance","learning","personal","planning"] as const;
 const areas = ["academic","learning","counselor","planning"] as const;
-const destination: Record<string, typeof areas[number]> = { academic:"academic", attendance:"academic", learning:"learning", personal:"counselor", planning:"planning" };
+const destination: Record<typeof categories[number], typeof areas[number]> = { academic:"academic", attendance:"academic", learning:"learning", personal:"counselor", planning:"planning" };
 const stagePriority = (x: Stage) => stages.indexOf(x);
 function safeNote(input: string, max = 1500) { const s = input.trim(); if (s.length < 3 || s.length > max) throw new Error(`Notes must be 3-${max} characters`); return s; }
 async function context() { const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]); return { db, s }; }
