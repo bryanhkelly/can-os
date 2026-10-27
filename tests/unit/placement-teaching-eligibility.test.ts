@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 import { verifiedTeacherSectionIds } from "@/modules/enrollment/verified-section-teachers.server";
 import type { TeachingEligibilityReader } from "@/modules/staffing/teaching-eligibility.server";
 const state=vi.hoisted(()=>({
   rows:[] as Array<{sectionId:string;personId:string}>,evaluate:vi.fn(),coverage:vi.fn(),select:vi.fn(),
+  whereClauses:[] as unknown[],
 }));
 vi.mock("@/db/client",()=>({db:{}}));
 vi.mock("@/modules/staffing/teaching-eligibility.server",()=>({evaluateTeachingEligibility:state.evaluate}));
@@ -12,9 +15,11 @@ const executor={
 } as unknown as TeachingEligibilityReader;
 beforeEach(()=>{
   vi.clearAllMocks();
+  state.whereClauses=[];
   state.rows=[{sectionId:"a",personId:"teacher"}];
   state.select.mockImplementation(()=>({
-    from(){return this;},innerJoin(){return this;},where(){return this;},
+    from(){return this;},innerJoin(){return this;},
+    where(predicate:unknown){state.whereClauses.push(predicate);return this;},
     async orderBy(){return state.rows;},
   }));
   state.coverage.mockImplementation(async(sectionId:string)=>{
@@ -31,6 +36,14 @@ describe("placement uses the canonical full-term teacher decision",()=>{
     expect(state.evaluate).toHaveBeenCalledExactlyOnceWith("a","teacher",executor,{
       horizon:"instructional_window",requireAssignment:true,
     });
+  });
+  it("reads only teacher-role assignment rows while keeping active-section scoping",async()=>{
+    expect(await verifiedTeacherSectionIds(["a"],executor)).toEqual(new Set(["a"]));
+    const query=new PgDialect().sqlToQuery(state.whereClauses[0] as SQL);
+    expect(query.sql).toContain('"section_teachers"."role"');
+    expect(query.sql).toContain('"sections"."active"');
+    expect(query.params).toContain("teacher");
+    expect(query.params).toContain("a");
   });
   it("does not turn denied qualification/identity decisions into staffed Sections",async()=>{
     state.evaluate.mockResolvedValue({eligible:false});

@@ -15,6 +15,22 @@ vi.mock("@/modules/attendance/onsite-attendance-workflow.functions", () => ({
 vi.mock("@/components/shell/WorkspaceSession",()=>({useWorkspaceSession:()=>({
   session:null,error:null,
 })}));
+vi.mock("@/modules/profiles/qualifications.functions",()=>({
+  beginQualificationUpload:vi.fn(),decideQualification:vi.fn(),finishQualificationUpload:vi.fn(),
+  getQualificationEvidence:vi.fn(),getQualifications:vi.fn(),
+}));
+vi.mock("@/modules/operations/onsite-supervision.functions",()=>({
+  getOnsiteSupervisionPlan:vi.fn(),
+}));
+vi.mock("@/modules/operations/onsite-duty-response.functions",()=>({
+  getOnsiteDutyResponses:vi.fn(),respondToOnsiteDuty:vi.fn(),
+}));
+vi.mock("@/modules/operations/onsite-physical-presence.functions",()=>({
+  getOnsitePhysicalPresence:vi.fn(),reportOnsitePhysicalPresence:vi.fn(),witnessOnsiteBlockPresence:vi.fn(),
+}));
+vi.mock("@/modules/operations/onsite-day-review.functions",()=>({
+  attestOnsiteDayReview:vi.fn(),getOnsiteDayReview:vi.fn(),
+}));
 
 describe("Hybrid Site daily facilitator workspace",()=>{
   it("links only site-day and no grades, counseling or generic case consoles",()=>{
