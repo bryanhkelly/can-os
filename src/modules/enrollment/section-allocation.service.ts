@@ -52,7 +52,7 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
  // not a Section shell whose assigned teacher has no current school access.
  const staffed=await verifiedTeacherSectionIds([sectionId],tx);
  if(!staffed.has(sectionId))
-  throw new Error("Assign an active teacher with verified school access and qualifications covering the instructional term before placing a student in this class");
+  throw new Error("Assign an active teacher with verified school access, qualifications and delivery coverage for the instructional term before placing a student in this class");
  await requireChurchHostedOperatingServices(tx,section.programId,["academic_instruction","curriculum","school_of_record"]);
  if(!actor.scope.programIds?.includes(section.programId)||
   !actor.scope.organizationIds?.includes(section.organizationId)||

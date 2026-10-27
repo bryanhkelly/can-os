@@ -9,6 +9,7 @@ import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 import {
   evaluateTeachingEligibility, teachingStaffingContext, type TeachingEligibilityReader,
 } from "./teaching-eligibility.server";
+import { evaluateInstructionalCoverage } from "./instructional-coverage.server";
 
 export { teachingRolePredicate as launchTeacherRolePredicate } from "./teaching-eligibility.server";
 type Reader=TeachingEligibilityReader;
@@ -26,21 +27,13 @@ export function evaluateLaunchTeacher(sectionId:string,personId:string,executor:
 
 export async function evaluateLaunchStaffing(sectionId: string, executor: Reader = db) {
   const section = await launchStaffingContext(sectionId, executor);
-  const arrangements = await executor.select({
-    id: deliveryArrangements.id, instructorId: deliveryArrangements.instructorPersonId,
-    from: deliveryArrangements.effectiveFrom, through: deliveryArrangements.effectiveThrough,
-  }).from(deliveryArrangements).where(and(eq(deliveryArrangements.sectionId, sectionId), eq(deliveryArrangements.status, "active")));
-  const teachers = await executor.select({ personId: sectionTeachers.personId }).from(sectionTeachers)
-    .where(eq(sectionTeachers.sectionId, sectionId));
+  const coverage = await evaluateInstructionalCoverage(sectionId, executor);
   const reasons: string[] = [];
   const instructors: {personId: string; policyRuleIds: string[]; verificationEventIds: string[]}[] = [];
-  if (!arrangements.some(arrangement => arrangement.instructorId &&
-    teachers.some(teacher => teacher.personId === arrangement.instructorId) &&
-    (!arrangement.from || arrangement.from <= section.window.from) &&
-    (!arrangement.through || arrangement.through >= section.window.through))) {
+  if (!coverage.covered) {
     reasons.push("No assigned instructor delivery arrangement covers the full instructional window.");
   }
-  for (const personId of new Set(teachers.map(teacher => teacher.personId))) {
+  for (const personId of coverage.assignedTeacherIds) {
     const result = await evaluateLaunchTeacher(sectionId, personId, executor);
     if (!result.eligible) reasons.push(...result.reasons);
     instructors.push({personId,policyRuleIds:result.policyRuleIds,verificationEventIds:result.verificationEventIds});

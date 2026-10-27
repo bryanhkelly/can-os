@@ -448,3 +448,30 @@ timestamps after retry, plus changed-answer/reopening/revoked-scope denials.
 Production build, route contracts (86) and mutation hygiene passed; typecheck retains the same
 47 baseline diagnostics. Authenticated multi-role browser acceptance remains
 the next priority. No production mutation or migration was performed.
+
+## Shared instructional coverage for launch and placement
+
+Baseline: FullFlow `b6a0fc56d32cc98e6849bfb0a37ee76ea51a579e`.
+
+Launch readiness previously checked active instructor delivery arrangements
+while placement checked only teacher identity and qualifications. The canonical
+`evaluateInstructionalCoverage` decision now identifies assigned instructors
+whose active arrangements cover the full instructional window. Launch consumes
+it directly; placement evaluates eligibility only for those same covered
+instructors. One instructor's coverage cannot be combined with another
+instructor's qualifications to make a Section ready.
+
+The pure `coveringInstructorIds` policy is shared separately from its database
+reader. No new UI, workflow, schema or parallel readiness model was introduced.
+The overwritten FullFlow acceptance contract was restored and its current
+evidence updated.
+
+Validation: 38 focused unit tests passed, including exact-window, late-start,
+early-end, wrong-instructor, withdrawn-coverage and per-instructor regressions.
+Connected placement fixtures now require delivery coverage and check denial
+after withdrawal. Production build, 86 route contracts and mutation hygiene
+passed; typecheck retains the same 47 baseline diagnostics. The full unit suite
+still has its prior 43 failures. Connected database tests were not executed in
+this environment, so the new placement behavior remains database-unverified.
+Next Golden Flow gate: rerun the migrated FullFlow service suite on this change,
+then implement the persistent multi-persona browser journey.

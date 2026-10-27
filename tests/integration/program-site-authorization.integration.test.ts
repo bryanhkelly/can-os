@@ -310,6 +310,10 @@ integration("Church-owned Site with independently authorized CAN academic servic
           {sectionId:section!.id,personId:localPerson.id},
           {sectionId:section!.id,personId:canPerson.id},
         ]);
+        await tx.insert(s.deliveryArrangements).values({
+          sectionId:section!.id,academicProviderOrganizationId:can.id,
+          instructorPersonId:canPerson.id,modality:"onsite",status:"active",
+        });
         const teacherDelegation=await delegateCANAcademicProgramStaff(steward,{
           programId:launch.programId,personId:canPerson.id,role:"teacher",
           reason:"CAN delegates instruction for this exact contracted Program.",

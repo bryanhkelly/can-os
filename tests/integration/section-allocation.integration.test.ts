@@ -70,6 +70,10 @@ describe("section allocation prerequisites", () => {
       personId:instructor!.id,organizationId:org!.id,siteId:site!.id,
       programId:program!.id,roleKey:"teacher",
     });
+    const [delivery]=await db.insert(s.deliveryArrangements).values({
+      sectionId:advanced.id,academicProviderOrganizationId:org!.id,
+      instructorPersonId:instructor!.id,modality:"onsite",status:"active",
+    }).returning();
     const {createTeachingQualificationFixture}=await import("./helpers/teaching-qualification");
     await createTeachingQualificationFixture(db,{
       sectionId:advanced.id,personId:instructor!.id,verifierPersonId:person!.id,
@@ -108,6 +112,14 @@ describe("section allocation prerequisites", () => {
       .rejects.toThrow("Assign an active teacher");
     await db.update(s.accountPersonGrants).set({isSynthetic:false})
       .where(eq(s.accountPersonGrants.accountId,account!.id));
+    // Qualification and assignment alone are insufficient when instructional
+    // delivery has been withdrawn. Restore the same arrangement afterward.
+    await db.update(s.deliveryArrangements).set({status:"completed"})
+      .where(eq(s.deliveryArrangements.id,delivery!.id));
+    await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
+      .rejects.toThrow("delivery coverage");
+    await db.update(s.deliveryArrangements).set({status:"active"})
+      .where(eq(s.deliveryArrangements.id,delivery!.id));
     await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
       .rejects.toThrow("Unmet prerequisites");
     expect(await db.select().from(s.enrollments).where(and(

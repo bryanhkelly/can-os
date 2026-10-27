@@ -1,5 +1,26 @@
 # FullFlow — one integrated school-network-to-classroom progression
 
+## P0 shared instructional coverage and restored acceptance contract (27 October 2026)
+
+**Source implemented; focused checks executed, connected database acceptance
+pending.** Restored the canonical six-stage acceptance contract and reconciled
+its current evidence with the prior connected run. Launch and placement now
+share one instructional-coverage decision: the same assigned instructor must
+have an active full-term delivery arrangement and current teaching eligibility.
+Placement can no longer treat a qualified but uncovered teacher as staffed, or
+combine one teacher's coverage with another teacher's qualifications.
+
+Focused validation: 38 unit tests passed; production build, 86 route contracts
+and mutation hygiene passed. Typecheck retains 47 existing diagnostics and the
+full unit suite retains 43 existing failures. The new connected placement
+regression is authored but not executed against Neon. Current result remains
+**HOLD**. Next P0: rerun the migrated FullFlow service suite, then prove the
+same six stages with persistent registrar/publisher/teacher/guardian/student
+browser sessions and reloads. No new UI component, schema, production mutation
+or deployment was introduced.
+
+---
+
 ## P0 supervised-day roster and canonical Section attendance (24 October 2026)
 
 **Committed code and test cases; runtime verification pending. GitHub
