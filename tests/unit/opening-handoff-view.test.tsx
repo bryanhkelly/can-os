@@ -71,7 +71,7 @@ describe("opening handoff presentation",()=>{
     expect(html).not.toContain("Acknowledge receipt");
   });
   function renderLaunch(operators:{personId:string;firstName:string;lastName:string}[]){
-    state.data={authError:"",options:{organizations:[],sites:[],jurisdictions:[]},launches:{launches:[{
+    state.data={authError:"",extendedPlanning:null,options:{organizations:[],academicProviderOrganizations:[],creditIssuingOrganizations:[],sites:[],jurisdictions:[]},launches:{launches:[{
       id:"program",name:"Academy",siteId:"site",status:"ready",type:"full_school",
       journey:{id:"journey",status:"ready"},requirements:[],openingOperators:operators,
     }]}};

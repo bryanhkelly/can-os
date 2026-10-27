@@ -3,21 +3,21 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { evaluateLaunchTeacher, launchTeacherRolePredicate } from "@/modules/staffing/launch-staffing.server";
 
-const state=vi.hoisted(()=>({rows:[] as unknown[][],select:vi.fn(),claims:vi.fn()}));
+const state=vi.hoisted(()=>({rows:[] as unknown[][],select:vi.fn(),claims:vi.fn(),whereClauses:[] as unknown[]}));
 vi.mock("@/db/client",()=>({db:{
   select:()=>state.select(),selectDistinctOn:()=>state.claims(),
 }}));
 vi.mock("@/platform/mutation",()=>({writeAudit:vi.fn(),emitEvent:vi.fn(),notify:vi.fn()}));
 const chain=()=>({
   from(){return this;},innerJoin(){return this;},leftJoin(){return this;},
-  where(){return this;},orderBy(){return this;},
+  where(predicate:unknown){state.whereClauses.push(predicate);return this;},orderBy(){return this;},
   async limit(){return state.rows.shift()??[];},
   then(resolve:(value:unknown[])=>unknown,reject:(error:unknown)=>unknown){
     return Promise.resolve(state.rows.shift()??[]).then(resolve,reject);
   },
 });
 beforeEach(()=>{
-  vi.clearAllMocks();state.select.mockImplementation(chain);state.claims.mockImplementation(chain);
+  vi.clearAllMocks();state.whereClauses=[];state.select.mockImplementation(chain);state.claims.mockImplementation(chain);
   state.rows=[[{
     id:"section",programId:"program",siteId:"site",active:true,
     organizationId:"church",providerId:"can",programSiteId:"site",
@@ -107,6 +107,18 @@ describe("explicit teaching qualification horizons",()=>{
     });
     expect(result.eligible).toBe(false);expect(result.reasons[0]).toContain("assigned teacher");
     expect(state.claims).not.toHaveBeenCalled();
+  });
+  it("limits the required assignment read to teacher-role rows",async()=>{
+    const result=await evaluateTeachingEligibility("section","teacher",db,{
+      horizon:"current",requireAssignment:true,now:new Date("2030-03-01"),
+    });
+    expect(result.eligible).toBe(false);
+    expect(result.reasons[0]).toContain("assigned teacher");
+    const query=new PgDialect().sqlToQuery(state.whereClauses[1] as SQL);
+    expect(query.sql).toContain('"section_teachers"."section_id"');
+    expect(query.sql).toContain('"section_teachers"."person_id"');
+    expect(query.sql).toContain('"section_teachers"."role"');
+    expect(query.params).toEqual(["section","teacher","teacher"]);
   });
   it("accepts an explicitly required matching assignment before evaluating qualifications",async()=>{
     evidence();state.rows.splice(1,0,[{id:"assignment"}]);
