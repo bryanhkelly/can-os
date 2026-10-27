@@ -22,7 +22,7 @@ export async function evaluateInstructionalCoverage(
     eq(deliveryArrangements.status, "active"),
   ));
   const teachers = await executor.select({ personId: sectionTeachers.personId }).from(sectionTeachers)
-    .where(eq(sectionTeachers.sectionId, sectionId));
+    .where(and(eq(sectionTeachers.sectionId, sectionId), eq(sectionTeachers.role, "teacher")));
   const assignedTeacherIds = [...new Set(teachers.map(teacher => teacher.personId))];
   const coveredInstructorIds = coveringInstructorIds(
     section.window,

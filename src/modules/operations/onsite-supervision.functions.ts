@@ -21,11 +21,31 @@ import { requireChurchHostedOperatingServices } from "@/modules/programs/program
 
 const inputSchema=z.object({date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}).strict();
 
+type SupervisionSummary=ReturnType<typeof summarizeOnsiteSupervision>;
+/** A planned instructional block as exposed to staff. Internal person IDs and
+ * raw evidence identities are removed; the server-computed plan fingerprint
+ * and the current actor's permissions are added. Every code path of
+ * getOnsiteSupervisionPlan returns this same block shape. */
+export type OnsiteSupervisionPlanBlock=Omit<SupervisionSummary["blocks"][number],
+  "facilitatorPersonId"|"backupPersonId"|"roomEvidenceVersion"|
+  "delegationVersion"|"agreementVersion">&{
+  planToken:string;
+  canCheckIn:boolean;
+  canRespond:boolean;
+  canAccept:boolean;
+};
+export type OnsiteSupervisionPlan=Omit<SupervisionSummary,"blocks">&{
+  date:string;
+  siteId:string;
+  projectionTruncated:boolean;
+  blocks:OnsiteSupervisionPlanBlock[];
+};
+
 /** A staff-safe read of planned instruction coverage at ONE original grant site.
  * Names here are assigned adults, not student/counselor/custody information. */
 export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
   .validator((input:unknown)=>inputSchema.parse(input))
-  .handler(async ({data})=>{
+  .handler(async ({data}):Promise<OnsiteSupervisionPlan>=>{
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCommandContext(getRequest());
     assertOnsiteAttendanceScope(actor);
@@ -66,7 +86,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     const onsiteSections=sectionsAtSite.slice(0,250);
     if(!onsiteSections.length){
       return {date:data.date,siteId:site.id,projectionTruncated,
-        ...summarizeOnsiteSupervision([])};
+        ...summarizeOnsiteSupervision([]),blocks:[]};
     }
     const ids=onsiteSections.map(row=>row.id);
     const yearIds=[...new Set(onsiteSections.map(row=>row.schoolYearId))];
@@ -361,7 +381,7 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
       // check in only against a fully evaluated current plan. This field
       // does NOT itself assert that either adult is physically present.
       canCheckIn:completeProjection && data.date===today &&
-        block.requiresSectionDelegation &&
+        block.requiresSectionDelegation===true &&
         (assignedPersonId===actor.actorPersonId ||
          _backupPersonId===actor.actorPersonId) &&
         block.assignedPlan,
