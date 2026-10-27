@@ -285,9 +285,12 @@ export async function getActiveDeliveryArrangement(
       effectiveThrough: deliveryArrangements.effectiveThrough,
     })
     .from(deliveryArrangements)
+    .innerJoin(sections, eq(sections.id, deliveryArrangements.sectionId))
+    .innerJoin(programs, eq(programs.id, sections.programId))
     .where(and(
       eq(deliveryArrangements.sectionId, sectionId),
       eq(deliveryArrangements.status, "active"),
+      eq(deliveryArrangements.academicProviderOrganizationId, programs.academicProviderOrganizationId),
       or(isNull(deliveryArrangements.effectiveFrom), lte(deliveryArrangements.effectiveFrom, at)),
       or(isNull(deliveryArrangements.effectiveThrough), gt(deliveryArrangements.effectiveThrough, at)),
     ))

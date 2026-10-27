@@ -586,3 +586,21 @@ run has 206 passing files / 1,199 passing tests and 11 failing files / 41
 failures in unrelated existing suites. Live Neon integration and authenticated
 browser acceptance were not run, so these checks do not constitute GoldenFlow
 acceptance.
+
+## Executable website fixture and provider-scoped generic lookup
+
+Follow-up to FullFlow `e0f5c0b3ad8dad0378d8bcb21d79ccd80b6c94c8`.
+
+The website-editor seed now builds its complete local-content object with
+`jsonb_build_object` before insertion, rather than casting only the final
+concatenated string fragment. The generic `getActiveDeliveryArrangement` read
+now joins the Section's Program and excludes active arrangements whose provider
+no longer matches the Program's current academic provider. A rollback-isolated
+integration assertion covers stale-provider exclusion, but was not executed
+without `DATABASE_URL`.
+
+Validation: 6 focused unit files / 51 tests passed. Production build, 75-route
+fixture coverage, 86-route contracts and mutation hygiene passed. Full
+typecheck retains 47 baseline diagnostics with none in changed files. No live
+database seed, migration, production mutation or authenticated browser journey
+was run.

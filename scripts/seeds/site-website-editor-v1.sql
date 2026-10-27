@@ -65,11 +65,13 @@ INSERT INTO site_local_content_versions
 (id, site_id, revision, status, content, flagged_fields, created_by_person_id)
 VALUES ('fd000000-0000-4000-8000-000000000014','f1000000-0000-4000-8000-000000000003',
  1,'published',
- '{"welcomeMessage":"Welcome from the Synthetic Bay church family. We are glad you stopped by.",'
- ||'"localDescription":"Synthetic Bay Campus is hosted by our demonstration church community. Families gather here through the week for worship, friendship and learning support.",'
- ||'"denomination":"Synthetic Demonstration Fellowship (fictional)",'
- ||'"statementOfFaith":"We believe in God the Father, in Jesus Christ His Son, and in the Holy Spirit. This synthetic statement exists only to exercise the website editor fixture and describes no real congregation.",'
- ||'"spiritualFormation":"Our community meets for prayer, Scripture reading and service projects. Children join age-appropriate gatherings alongside their parents."}'::jsonb,
+ jsonb_build_object(
+  'welcomeMessage','Welcome from the Synthetic Bay church family. We are glad you stopped by.',
+  'localDescription','Synthetic Bay Campus is hosted by our demonstration church community. Families gather here through the week for worship, friendship and learning support.',
+  'denomination','Synthetic Demonstration Fellowship (fictional)',
+  'statementOfFaith','We believe in God the Father, in Jesus Christ His Son, and in the Holy Spirit. This synthetic statement exists only to exercise the website editor fixture and describes no real congregation.',
+  'spiritualFormation','Our community meets for prayer, Scripture reading and service projects. Children join age-appropriate gatherings alongside their parents.'
+ ),
  '[]'::jsonb,'fd000000-0000-4000-8000-000000000010')
 ON CONFLICT DO NOTHING;
 
