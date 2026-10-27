@@ -366,7 +366,7 @@
     "/guardian/watching": {
       "persona": "guardian",
       "seeds": [
-        "gf1-assignments-v2.sql"
+        "new-experiences-v1.sql"
       ],
       "recordCounts": {
         "guardian_relationships": 1
