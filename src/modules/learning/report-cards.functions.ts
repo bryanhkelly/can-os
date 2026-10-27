@@ -978,7 +978,8 @@ export const issueTranscript = createServerFn({ method: "POST" })
       // transaction. A stale search result is never an academic credential.
       const currentDelegated=await listDelegatedCANTranscriptPrograms(context,tx);
       for(const section of sourceSections){
-        const local=context.scope.siteIds?.includes(section.siteId) &&
+        const local=section.siteId!==null &&
+          context.scope.siteIds?.includes(section.siteId) &&
           context.scope.programIds?.includes(section.programId);
         const cross=currentDelegated.some(pair=>pair.programId===section.programId &&
           pair.siteId===section.siteId);
