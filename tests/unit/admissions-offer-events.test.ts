@@ -17,6 +17,13 @@ vi.mock("@/db/client", () => ({ db: { transaction } }));
 vi.mock("@/modules/_demo/demo-write-gate", () => ({
   assertSyntheticMutation: vi.fn(),
 }));
+// These command tests exercise admissions state, evidence and authorization
+// ordering. Church-hosted contract selection is covered separately by focused
+// unit and disposable-database integration suites; a null result models an
+// ordinary non-church Program here without consuming mocked query rows.
+vi.mock("@/modules/programs/program-site-authorization.server", () => ({
+  requireChurchHostedOperatingServices: vi.fn().mockResolvedValue(null),
+}));
 
 function rows(data: unknown[]) {
   const result = Promise.resolve(data);

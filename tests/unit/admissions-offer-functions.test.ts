@@ -133,6 +133,13 @@ describe("canonical admission offer server functions", () => {
     select.mockReturnValueOnce(rows([offer])).mockReturnValueOnce(rows([application]));
     await expect(activateOfferedEnrollment({ data: { offerId: "offer" } }))
       .resolves.toEqual({ enrollmentId: "enrollment" });
-    expect(activate).toHaveBeenCalledWith(registrar, "offer");
+    expect(activate).toHaveBeenCalledWith(registrar, "offer", undefined);
+  });
+
+  it("passes the optional sectionId through to activation", async () => {
+    select.mockReturnValueOnce(rows([offer])).mockReturnValueOnce(rows([application]));
+    await expect(activateOfferedEnrollment({ data: { offerId: "offer", sectionId: "section" } }))
+      .resolves.toEqual({ enrollmentId: "enrollment" });
+    expect(activate).toHaveBeenCalledWith(registrar, "offer", "section");
   });
 });
