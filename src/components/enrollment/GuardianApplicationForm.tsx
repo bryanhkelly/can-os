@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,11 @@ export function GuardianApplicationForm({ programs, households, requestedProgram
   const feedbackRef = useRef<HTMLParagraphElement>(null);
   const requested = programs.find(item => item.id === requestedProgramId);
   const [programId, setProgramId] = useState(requested?.id ?? programs[0]?.id ?? "");
+  useEffect(() => {
+    if (requestedProgramId && programs.some(program => program.id === requestedProgramId)) {
+      setProgramId(requestedProgramId);
+    }
+  }, [requestedProgramId, programs]);
   const [householdId, setHouseholdId] = useState(households[0]?.id ?? "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
