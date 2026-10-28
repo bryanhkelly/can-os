@@ -249,3 +249,35 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-up { animation: can-fade-up 420ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+
+/* Student Home: original CSS landscape; no external asset or layout shift. */
+.student-day-hero {
+  background: #17365b;
+}
+.student-day-hero-landscape {
+  background:
+    linear-gradient(90deg, rgba(9, 25, 48, .84) 0%, rgba(13, 37, 66, .64) 48%, rgba(22, 49, 77, .08) 100%),
+    radial-gradient(ellipse at 78% 32%, rgba(255, 211, 153, .88) 0%, rgba(250, 176, 126, .58) 17%, transparent 43%),
+    linear-gradient(175deg, #638fa9 0%, #c9a0a0 46%, #e7bd91 61%, #1e4a62 100%);
+}
+.student-day-hero-landscape::before,
+.student-day-hero-landscape::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.student-day-hero-landscape::before {
+  background: #31556c;
+  clip-path: polygon(0 88%, 12% 70%, 25% 83%, 41% 54%, 53% 72%, 67% 42%, 82% 73%, 100% 51%, 100% 100%, 0 100%);
+  opacity: .75;
+}
+.student-day-hero-landscape::after {
+  background: #142e46;
+  clip-path: polygon(0 100%, 0 94%, 17% 78%, 30% 91%, 46% 68%, 59% 88%, 75% 64%, 88% 86%, 100% 73%, 100% 100%);
+  opacity: .7;
+}
+@media (prefers-reduced-motion: reduce) {
+  .student-day-hero a { transition: none; }
+}
