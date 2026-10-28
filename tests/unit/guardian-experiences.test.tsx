@@ -16,7 +16,8 @@ vi.mock("@tanstack/react-router", () => ({
     state.routeOptions = options;
     return { options, useLoaderData: () => null, useSearch: () => ({}) };
   },
-  useSearch: () => ({}),\n  useRouter: () => ({ invalidate: vi.fn() }),
+  useSearch: () => ({}),
+  useRouter: () => ({ invalidate: vi.fn() }),
   Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => <a href={to} {...props}>{children}</a>,
 }));
 vi.mock("@/modules/student-experience/school-experiences.functions", () => ({

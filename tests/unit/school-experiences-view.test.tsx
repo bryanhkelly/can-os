@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 import { LiveSchoolExperiences } from "@/components/student/LiveSchoolExperiences";
 
 vi.mock("@tanstack/react-router", () => ({
-  useSearch: () => ({}),\n  useRouter: () => ({ invalidate: vi.fn() }),
+  useSearch: () => ({}),
+  useRouter: () => ({ invalidate: vi.fn() }),
   Link:({to,search,children,...props}:{to:string;search:Record<string,string>;children:ReactNode})=>
     <a href={to+"?"+new URLSearchParams(search)} {...props}>{children}</a>,
 }));
