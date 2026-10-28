@@ -156,3 +156,9 @@ Each slice should include changed files, real routes, reused components, service
 - Full unit suite after the latest `FullFlow` parity sync: **1,312 tests passed, 5 failed**, with three additional suite import failures. Remaining failures are in unchanged Drizzle snapshot metadata, event-registry, route-mock, and workflow-script areas; they are recorded here, not repaired as part of this design increment.
 - Typecheck and production build: **passed** after syncing `FullFlow` commit `3cad8775`.
 - Browser screenshots, visual regression, integration tests, and Golden Flow browser runs were **not executed**. No visual or end-to-end acceptance is claimed.
+
+## 10. Design-system infrastructure and GF22 application-entry increment
+
+The follow-up infrastructure increment adds Storybook, local interaction and axe checks, Chromatic configuration, ESLint semantic-color governance, duplicate shared-export checks, controlled institution/site brand tokens, all three workflow shells, and the real `/guardian/apply` Guided Setup adoption. The canonical loader, bounded application command, request payload, independent verification gates, and router invalidation remain unchanged.
+
+The production component and Storybook contracts are documented in `docs/design-system.md`. Current evidence: typecheck, application build, Storybook build, 26 Storybook browser tests, and 35 focused regression tests pass; the full unit suite adds seven passing design tests and retains the same inherited failures. Chromatic upload and guarded Golden Flow browser acceptance remain unexecuted pending a project token and an explicitly approved disposable Neon branch respectively. Broad migration remains paused pending that acceptance evidence.

@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { EmptyState } from "./empty-state";
+import { WorkspaceNotice } from "./notice";
 
 export interface QueryStateProps {
   loading?: React.ReactNode;
@@ -21,15 +22,13 @@ function QueryState({ loading, error, isEmpty, empty, children, onRetry, retryin
     );
   }
   if (error) {
-    return (
-      <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">
-        {error}
-        {onRetry && <button type="button" onClick={onRetry} disabled={retrying}
-          className="ml-3 underline disabled:opacity-50">
-          {retrying ? "Retrying…" : "Retry"}
-        </button>}
-      </p>
-    );
+    return <WorkspaceNotice tone="danger" className="mt-8">
+      <span>{error}</span>
+      {onRetry && <button type="button" onClick={onRetry} disabled={retrying}
+        className="ml-auto shrink-0 font-semibold underline underline-offset-4 disabled:opacity-50">
+        {retrying ? "Retrying…" : "Retry"}
+      </button>}
+    </WorkspaceNotice>;
   }
   if (isEmpty) {
     return <>{empty ?? <EmptyState title="Nothing to show yet." />}</>;
