@@ -1,3 +1,4 @@
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { ArrowUpRight, ClipboardList, School, ShieldCheck } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 import type { listLaunches } from "@/modules/programs/launch.functions";
@@ -83,6 +84,7 @@ function OperationsPage(){
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · School operations</p>
   <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
   <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Review actions and launch readiness for an authorized school and program.</p>
+  <WorkflowIntro eyebrow="Institutional oversight" title="See what needs a decision." description="One view of authorized school operations, launch readiness and exceptions. Operational actions remain subject to their existing permissions." actions={<><Link to="/operations/launch" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">School launches</Link><Link to="/operations/workflows" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Workflows</Link></>} />
   <div className="mt-6 flex flex-wrap gap-4 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
    <label className="text-sm">School
     <select aria-label="Filter operations by school" value={selected.siteId??""} onChange={event=>selectScope(event.target.value||undefined)} className="ml-2 rounded border bg-background p-2">
