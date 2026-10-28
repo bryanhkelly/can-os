@@ -5,6 +5,7 @@ import { credentialStatusFromDecision,decideCredentialReview,type VerificationDe
 import { reviewerCanVerify } from "@/domain/reviewer-authorization";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { desc,eq } from "drizzle-orm";
+import { EventTypes } from "@/domain/event-types";
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** Database-backed authorization: caller scope alone is never sufficient. */
@@ -57,7 +58,7 @@ export async function reviewQualification(
      evidenceDocumentId:evidenceId,reason:input.reason??null,
    }).returning({id:qualificationVerificationEvents.id});
    if(!event) throw new Error("Verification event insertion failed");
-   await emitEvent(tx,{eventType:"QualificationVerificationDecided",aggregateType:"QualificationClaim",aggregateId:claim.id,actorPersonId:context.actorPersonId!,payload:{verificationEventId:event.id,decision:input.decision}});
+   await emitEvent(tx,{eventType:EventTypes.QualificationVerificationDecided,aggregateType:"QualificationClaim",aggregateId:claim.id,actorPersonId:context.actorPersonId!,payload:{verificationEventId:event.id,decision:input.decision}});
    await writeAudit(tx,context,{action:"qualification.verification.decided",entityType:"QualificationClaim",entityId:claim.id,before:{status:current},after:{status:decision.status,verificationEventId:event.id}});
    return {claimId:claim.id,verificationEventId:event.id,status:decision.status};
  };

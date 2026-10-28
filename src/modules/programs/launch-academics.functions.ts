@@ -148,7 +148,7 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
      teacherPersonId:data.teacherPersonId});
    }
    if(created){
-    await emitEvent(tx, {eventType:"SectionProvisioned",
+    await emitEvent(tx, {eventType:EventTypes.SectionProvisioned,
      aggregateType:"section",aggregateId:existing.id,actorPersonId:actor.actorPersonId,
      payload:{organizationId:program.organizationId,siteId:program.siteId,
       programId:program.id,termId:data.termId}});
@@ -208,7 +208,7 @@ export const publishLaunchTeacherPolicy=createServerFn({method:"POST"})
     expression:{op:"all",rules:keys.map(type=>({op:"credential",type}))}});
    await tx.insert(compliancePolicyApplicability).values({frameworkVersionId:version.id,
     organizationId:program.organizationId,siteId:program.siteId,programId:program.id,roleKey:"teacher"});
-   await emitEvent(tx,{eventType:"TeacherQualificationPolicyPublished",aggregateType:"compliance_framework_version",
+   await emitEvent(tx,{eventType:EventTypes.TeacherQualificationPolicyPublished,aggregateType:"compliance_framework_version",
     aggregateId:version.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,
     siteId:program.siteId,programId:program.id,payload:{qualificationKeys:keys}});
    await writeAudit(tx,actor,{action:"launch.teacher_policy.publish",entityType:"compliance_framework_version",

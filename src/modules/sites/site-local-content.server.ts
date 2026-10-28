@@ -9,6 +9,7 @@ import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 
+import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db, "select">;
 
 /** Read ONLY the latest locally published content for the live website. */
@@ -126,8 +127,8 @@ export async function publishPartnerLocalContent(actor: AccessContext, input: {
     });
     await emitEvent(tx, {
       eventType: decision.status === "published"
-        ? "SiteLocalWebsiteContentPublished"
-        : "SiteLocalWebsiteContentReviewRequested",
+        ? EventTypes.SiteLocalWebsiteContentPublished
+        : EventTypes.SiteLocalWebsiteContentReviewRequested,
       aggregateType: "site_local_content_version", aggregateId: created.id,
       actorPersonId: actor.actorPersonId,
       organizationId: site.organizationId, siteId: site.id,

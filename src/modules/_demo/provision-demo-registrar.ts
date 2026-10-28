@@ -8,6 +8,7 @@ import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from 
 import { listDemoSourceGrants } from "@/modules/identity/demo-facilitator.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 export const demoRegistrar = {
   personId: "f7000000-0000-4000-8000-000000000001",
   accountId: "f7000000-0000-4000-8000-000000000002",
@@ -140,7 +141,7 @@ async function provisionScopedRegistrar(
         context: { method: "operator_bootstrap", synthetic: true },
       });
       await emitEvent(tx, {
-        eventType: "DemoRegistrarProvisioned", aggregateType: "person", aggregateId: fixture.personId,
+        eventType: EventTypes.DemoRegistrarProvisioned, aggregateType: "person", aggregateId: fixture.personId,
         ...scope, payload: { changes, roleAssignmentId: role.id, synthetic: true },
       });
     }
@@ -200,7 +201,7 @@ export async function provisionDemoSchoolAccess(database: Pick<Database, "transa
         context: { method: "operator_bootstrap", synthetic: true },
       });
       await emitEvent(tx, {
-        eventType: "DemoFacilitatorProvisioned", aggregateType: "account",
+        eventType: EventTypes.DemoFacilitatorProvisioned, aggregateType: "account",
         aggregateId: LOCAL_DEMO_ADMIN.accountId, ...scope,
         payload: { grantIds: changedGrants, synthetic: true },
       });

@@ -8,6 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { and,eq,inArray,isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
 const checkpointStatus = z.discriminatedUnion("checkpoint", [
   z.object({ checkpoint: z.literal("departure"), status: z.enum(["boarded", "absent"]) }),
@@ -121,7 +122,7 @@ export const recordCanonicalFieldTripCheckpoint = createServerFn({ method: "POST
           status: data.status, checkpoint: data.checkpoint },
       });
       await emitEvent(tx, {
-        eventType: "FieldTripAttendanceRecorded", aggregateType: "field_trip_attendance",
+        eventType: EventTypes.FieldTripAttendanceRecorded, aggregateType: "field_trip_attendance",
         aggregateId: record.id, actorPersonId: actor.actorPersonId,
         payload: { fieldTripId: trip.id, studentProfileId: participant.studentProfileId,
           status: data.status, checkpoint: data.checkpoint },

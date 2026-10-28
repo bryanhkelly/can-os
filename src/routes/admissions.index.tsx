@@ -69,7 +69,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       eyebrow="CAN OS · Admissions"
       title="Admissions command center"
       subtitle="Registrar workspace: issue offers and activate accepted enrollments. Guardians respond from their own authenticated offer inbox."
-      actions={<div className="flex flex-wrap gap-2"><Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg bg-foreground px-3 py-2 text-sm text-background">New inquiry</Link><Link to="/admissions/transcripts" search={{query:""}} className="rounded-lg border px-3 py-2 text-sm">Official transcripts</Link></div>}
+      actions={<div className="flex flex-wrap gap-2"><Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg bg-foreground px-3 py-2 text-sm text-background">New inquiry</Link><Link to="/admissions/transcripts" search={{query:""}} className="rounded-lg border px-3 py-2 text-sm">Official transcripts</Link><Link to="/admissions/capacity" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg border px-3 py-2 text-sm">Program capacity</Link></div>}
     >
       {error && <p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
       {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}

@@ -10,6 +10,7 @@ import type { Actor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type PublisherProgram = { id:string; organizationId:string; siteId:string|null };
 
@@ -122,7 +123,7 @@ export async function createPublisherPack(actor:Actor,input:{
     await writeAudit(tx,actor,{action:"curriculum.pack.create",entityType:"curriculum_pack",
       entityId:pack.id,scope:{organizationId:program.organizationId,programId:program.id},
       after:{name:input.name,slug:input.slug,visibility:input.visibility,licenseCode:input.licenseCode}});
-    await emitEvent(tx,{eventType:"CurriculumPublisherPackCreated",aggregateType:"curriculum_pack",
+    await emitEvent(tx,{eventType:EventTypes.CurriculumPublisherPackCreated,aggregateType:"curriculum_pack",
       aggregateId:pack.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,programId:program.id});
     return {packId:pack.id,versionId:draft.id,created:true};
   });
@@ -155,7 +156,7 @@ export async function createPublisherPackDraft(actor:Actor,input:{
     await writeAudit(tx,actor,{action:"curriculum.pack.draft.create",entityType:"curriculum_pack_version",
       entityId:draft.id,scope:{organizationId:program.organizationId,programId:program.id},
       after:{sourceVersionId:published.id,version:releases[0]!.version+1}});
-    await emitEvent(tx,{eventType:"CurriculumPublisherPackDraftCreated",aggregateType:"curriculum_pack_version",
+    await emitEvent(tx,{eventType:EventTypes.CurriculumPublisherPackDraftCreated,aggregateType:"curriculum_pack_version",
       aggregateId:draft.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,programId:program.id});
     return {versionId:draft.id,created:true};
   });
@@ -192,7 +193,7 @@ export async function savePublisherPackDraft(actor:Actor,input:{
     await writeAudit(tx,actor,{action:"curriculum.pack.draft.save",entityType:"curriculum_pack_version",
       entityId:version.id,scope:{organizationId:program.organizationId,programId:program.id},
       before:{courseVersionIds:previousIds},after:{courseVersionIds:input.courseVersionIds}});
-    await emitEvent(tx,{eventType:"CurriculumPublisherPackDraftSaved",aggregateType:"curriculum_pack_version",
+    await emitEvent(tx,{eventType:EventTypes.CurriculumPublisherPackDraftSaved,aggregateType:"curriculum_pack_version",
       aggregateId:version.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,programId:program.id});
     return {revision:packCompositionRevision(version.id,input.courseVersionIds),changed:true};
   });
@@ -225,7 +226,7 @@ export async function publishPublisherPack(actor:Actor,input:{
     await writeAudit(tx,actor,{action:"curriculum.pack.publish",entityType:"curriculum_pack_version",
       entityId:version.id,scope:{organizationId:program.organizationId,programId:program.id},
       before:{status:"draft"},after:{status:"published",courseVersionIds:ids,reason:input.reason}});
-    await emitEvent(tx,{eventType:"CurriculumPublisherPackPublished",aggregateType:"curriculum_pack_version",
+    await emitEvent(tx,{eventType:EventTypes.CurriculumPublisherPackPublished,aggregateType:"curriculum_pack_version",
       aggregateId:version.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,programId:program.id,
       payload:{packId:version.packId,courseVersionIds:ids}});
     return {versionId:version.id,created:true};

@@ -117,7 +117,8 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  }
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student learning" title="Your assignments"
   subtitle="Read instructions, save your response, submit work and follow through on feedback."
-  breadcrumbs={<><Link to="/student" className="underline">Student Today</Link><span>/</span><Link to="/student/courses" search={{section}} className="underline">{section?"Class":"My classes"}</Link><span>/</span><span>Assignments</span></>}>
+  breadcrumbs={<><Link to="/student" className="underline">Student Today</Link><span>/</span><Link to="/student/courses" search={{section}} className="underline">{section?"Class":"My classes"}</Link><span>/</span><span>Assignments</span></>}
+  actions={<Link to="/calendar-export" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Export deadlines (.ics)</Link>}>
   {!connected&&<p role="status" className="mt-5 rounded-xl border p-4 text-sm">School records are currently unavailable.</p>}
   {error&&<p role="alert" className="mt-5 rounded-xl border p-4 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-xl border p-4 text-sm">{notice}</p>}

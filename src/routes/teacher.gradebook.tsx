@@ -13,6 +13,7 @@ import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
 import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
+import { SectionGradeFinalization } from "@/components/learning/SectionGradeFinalization";
 
 export const Route = createFileRoute("/teacher/gradebook")({
  validateSearch:(search:Record<string,unknown>):{section?:string;assessment?:string;student?:string;lesson?:string;kind?:string}=>({
@@ -476,6 +477,7 @@ function TeacherGradebookPage() {
      </table>
     </div>}
     {gradebook.assessments.length > 0 &&     <p className="mt-2 text-xs text-muted-foreground">Tip: use arrow keys to move across the grid and Enter to open submitted work for review.</p>}
+    <SectionGradeFinalization sectionId={gradebook.section.id}/>
    </>}
  </WorkspaceShell>;
 }

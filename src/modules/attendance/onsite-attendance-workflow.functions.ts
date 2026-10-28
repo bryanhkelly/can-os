@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  attendanceEvents, attendanceExcuses, enrollments, guardianRelationships,
+  attendanceEvents, attendanceExcuses, documents, enrollments, guardianRelationships,
   people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -530,6 +530,7 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
     const base = db.select({
       excuseId: attendanceExcuses.id,
       attendanceEventId: attendanceExcuses.attendanceEventId,
+      documentIds: attendanceExcuses.documentIds,
       studentProfileId: attendanceEvents.studentProfileId,
       programId: attendanceEvents.programId,
       occurrenceKey: attendanceEvents.occurrenceKey,
@@ -571,6 +572,14 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
     ));
     const effective = new Map(effectiveAttendanceEvents(events).map(r =>
       [[r.studentProfileId, r.programId, r.occurrenceKey].join(":"), r]));
+    // Only verified documents are surfaced to reviewers; the download itself
+    // re-checks scope, verification and object-key policy server-side.
+    const attachmentIds = [...new Set(rows.flatMap(r => r.documentIds))];
+    const attachmentRows = attachmentIds.length ? await db.select({
+      id: documents.id, fileName: documents.fileName,
+    }).from(documents).where(and(
+      inArray(documents.id, attachmentIds), isNotNull(documents.verifiedAt))) : [];
+    const attachmentNameById = new Map(attachmentRows.map(row => [row.id, row.fileName]));
     return { excuses: rows.map(r => {
       const current = effective.get([r.studentProfileId, r.programId, r.occurrenceKey].join(":"));
       return {
@@ -579,6 +588,9 @@ export const listExpectedPendingExcuses = createServerFn({ method: "GET" })
         studentName: r.preferredName ?? r.legalFirstName + " " + r.legalLastName,
         expectedAt: r.expectedAt.toISOString(), eventStatus: current?.status ?? r.eventStatus,
         reason: r.reason, submittedAt: r.submittedAt.toISOString(),
+        attachments: r.documentIds
+          .filter(id => attachmentNameById.has(id))
+          .map(id => ({ documentId: id, fileName: attachmentNameById.get(id)! })),
         canReview: current?.id === r.attendanceEventId &&
           (current?.status === "absent" || current?.status === "tardy"),
         canClose: actor.role === "registrar" && !!current && current.id !== r.attendanceEventId,

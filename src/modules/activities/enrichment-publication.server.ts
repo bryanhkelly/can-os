@@ -13,6 +13,7 @@ import { listExtendedSessionStaff } from "./extended-learning-sessions.server";
 import { assertVerifiedExtendedSeasonOpening, unavailableExtendedSeasonApprovals } from "./registration-policy";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 /**
  * Explicit publishing of a REGISTRATION offer, not regulatory certification.
  * Reuses existing active-Program, site-grant, session and activity records.
@@ -169,7 +170,7 @@ export async function publishExtendedSeason(
           priceCents:item.priceCents, sessionIds:item.sessionIds })) },
     });
     await emitEvent(tx, {
-      eventType: "ExtendedLearningRegistrationPublished",
+      eventType: EventTypes.ExtendedLearningRegistrationPublished,
       aggregateType: "activity_season", aggregateId: season.id,
       actorPersonId: actor.actorPersonId, ...scope,
       payload: { permissionVersion: input.permissionVersion, sessionCount: calendar.length },

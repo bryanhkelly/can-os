@@ -7,6 +7,7 @@ import { assertCapability, assertOrganizationScope, assertSiteScope } from "@/do
 import { publicSiteHost, suggestedSitePublicSlugs } from "@/domain/public-site-address";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type SiteIdentity = { id: string; organizationId: string; slug: string };
 type SiteDraft = { slug: string; host: string; status: "draft" | "published"; created: boolean };
@@ -60,7 +61,7 @@ async function ensureReservation(
       after: { host, status: "draft", source },
     });
     await emitEvent(tx, {
-      eventType: "SitePublicAddressReserved",
+      eventType: EventTypes.SitePublicAddressReserved,
       aggregateType: "site", aggregateId: site.id,
       actorPersonId: actor.actorPersonId,
       organizationId: site.organizationId, siteId: site.id,

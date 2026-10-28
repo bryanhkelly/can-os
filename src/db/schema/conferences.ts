@@ -8,6 +8,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createdAt, id, updatedAt } from "./common";
 import {
   conferenceBookingStatus,
@@ -94,7 +95,11 @@ export const conferenceBookings = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    uniqueIndex("conference_slot_booking_uq").on(table.conferenceSlotId),
+    // One live booking per slot; cancelled bookings release the slot for a
+    // new family to book.
+    uniqueIndex("conference_slot_booking_uq").on(table.conferenceSlotId).where(
+      sql`status != 'cancelled'`,
+    ),
     index("conference_booking_student_idx").on(table.studentProfileId),
     index("conference_booking_guardian_idx").on(table.guardianPersonId),
   ],

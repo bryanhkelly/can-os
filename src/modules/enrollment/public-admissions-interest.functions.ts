@@ -8,6 +8,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 async function requireAdmissionsIntakeReader() {
   const actor = await getCommandContext(getRequest());
   const programIds = actor.scope.programIds;
@@ -101,7 +102,7 @@ export const setPublicAdmissionsInterestStatus = createServerFn({ method: "POST"
         after: { status: data.status },
       });
       await emitEvent(tx, {
-        eventType: "PublicAdmissionsInterestStatusChanged",
+        eventType: EventTypes.PublicAdmissionsInterestStatusChanged,
         aggregateType: "public_admissions_interest",
         aggregateId: current.id,
         actorPersonId: actor.actorPersonId,

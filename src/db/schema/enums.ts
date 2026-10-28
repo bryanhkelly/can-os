@@ -273,6 +273,7 @@ export const conferenceBookingStatus = pgEnum("conference_booking_status", [
   "booked",
   "held",
   "no_show",
+  "cancelled",
 ]);
 
 export const fieldTripStatus = pgEnum("field_trip_status", [

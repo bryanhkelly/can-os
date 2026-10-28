@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {getGuardianStudents} from "@/modules/learning/guardian-academic-queries.functions";
 import { Link, useRouter } from "@tanstack/react-router";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
-import { bookOfficeHour, rescheduleOfficeHour } from "@/modules/student-experience/school-experiences.functions";
+import { bookOfficeHour, cancelOfficeHour, rescheduleOfficeHour } from "@/modules/student-experience/school-experiences.functions";
 import { readNotification } from "@/modules/communication/notification-center.functions";
 
 type Data={
@@ -74,7 +74,7 @@ export function LiveSchoolExperiences({data}:{data:Data}) {
         </select>
        </label>
        <button type="button" disabled={busy||!replacementSlots[booking.id]} className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>perform(()=>rescheduleOfficeHour({data:{bookingId:booking.id,newSlotId:replacementSlots[booking.id]}}),"Appointment rescheduled.")}>Save new time</button>
-       <button type="button" disabled aria-label="Cancel appointment (coming soon)" title="Cancellation will be available after the booking lifecycle is connected" className="ml-2 mt-2 rounded border px-3 py-2 text-xs font-semibold opacity-50 cursor-not-allowed">Cancel appointment · Coming soon</button>
+       <button type="button" disabled={busy} aria-label="Cancel appointment" className="ml-2 mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={()=>{if(!window.confirm("Cancel this appointment? The slot will open for another family."))return;void perform(()=>cancelOfficeHour({data:{bookingId:booking.id}}),"Appointment cancelled.");}}>Cancel appointment</button>
       </div>)}
      </div>}
      <p className="text-xs text-muted-foreground">Book an available teacher office-hour appointment.</p>

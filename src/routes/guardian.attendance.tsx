@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { listGuardianEffectiveAbsences, submitEffectiveAttendanceExcuse } from "@/modules/attendance/onsite-attendance-workflow.functions";
 import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachmentCounts } from "@/modules/learning/submission-attachments.functions";
+import { attachmentAccept, attachmentMimeForFileName } from "@/modules/learning/attachment-mimes";
 
-const excuseAttachmentAccept = ".pdf,.png,.jpg,.jpeg";
-const excuseMimes: Record<string, string> = { pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", txt: "text/plain", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", md: "text/markdown" };
-const excuseAttachmentMime = (name: string) => excuseMimes[name.split(".").pop()?.toLowerCase() ?? ""] ?? null;
+// Shared with the server-side excuse attachment validation (attachment-mimes).
+const excuseAttachmentAccept = attachmentAccept;
+const excuseAttachmentMime = attachmentMimeForFileName;
 
 export const Route = createFileRoute("/guardian/attendance")({
  validateSearch:(search:Record<string,unknown>):{student?:string;attendance?:string}=>({
@@ -56,6 +57,7 @@ function GuardianAttendancePage() {
   const submit = async (absence: Absence) => {
     setBusy(absence.attendanceEventId);
     setNotice("");
+    setError("");
     try {
       await submitEffectiveAttendanceExcuse({
         data: { attendanceEventId: absence.attendanceEventId, reason: reasons[absence.attendanceEventId] ?? "" },
@@ -63,7 +65,7 @@ function GuardianAttendancePage() {
       setNotice(`Excuse submitted for ${absence.studentName}. You can attach a supporting document below.`);
       await load();
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Unable to submit excuse");
+      setError(cause instanceof Error ? cause.message : "Unable to submit excuse");
     } finally {
       setBusy("");
     }
@@ -74,9 +76,10 @@ function GuardianAttendancePage() {
     if (!file) return;
     setBusy(`${absence.attendanceEventId}:attach`);
     setNotice("");
+    setError("");
     try {
       const contentType = excuseAttachmentMime(file.name);
-      if (!contentType) throw new Error("Unsupported file type. Use PDF, DOCX, TXT, PNG, JPG or MD.");
+      if (!contentType) throw new Error("Unsupported file type. Use PDF, PNG or JPG.");
       if (file.size < 16 || file.size > 10 * 1024 * 1024) throw new Error("Document must be 16 bytes to 10 MB");
       const upload = await createExcuseAttachmentUpload({
         data: { attendanceEventId: absence.attendanceEventId, fileName: file.name, contentType, sizeBytes: file.size },
@@ -88,7 +91,7 @@ function GuardianAttendancePage() {
       setExcuseFiles(current => ({ ...current, [absence.attendanceEventId]: null }));
       setDocCounts(current => ({ ...current, [absence.attendanceEventId]: (current[absence.attendanceEventId] ?? 0) + 1 }));
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Unable to attach document");
+      setError(cause instanceof Error ? cause.message : "Unable to attach document");
     } finally {
       setBusy("");
     }
@@ -144,7 +147,7 @@ function GuardianAttendancePage() {
               {absence.excuse.status === "submitted" && <div className="mt-2">
                 <p className="text-sm text-muted-foreground">Waiting for the school to review.</p>
                 <label className="mt-3 block text-sm font-semibold">
-                  Supporting document <span className="font-normal text-muted-foreground">(optional · PDF, DOCX, TXT, PNG, JPG or MD · up to 10 MB)</span>
+                  Supporting document <span className="font-normal text-muted-foreground">(optional · PDF, PNG or JPG · up to 10 MB)</span>
                   <input
                     key={`${absence.attendanceEventId}:${docCounts[absence.attendanceEventId] ?? 0}`}
                     type="file"

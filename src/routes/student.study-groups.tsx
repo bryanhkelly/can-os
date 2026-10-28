@@ -53,7 +53,6 @@ function StudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadStudyGroups>
  },[enabled,search.group,search.session,groups]);
  async function refresh(id?:string){if(id)setDetail(await getStudyGroupDetail({data:{groupId:id}}));await router.invalidate();}
  async function action(cb:()=>Promise<unknown>,id?:string){try{setNotice("Saving...");await cb();await refresh(id);setNotice("Saved");}catch(e){setNotice(e instanceof Error?e.message:"Action failed");}}
- if(!enabled)return <main className="mx-auto max-w-6xl space-y-6 px-6 py-10"><h1 className="font-serif text-4xl">Study Groups</h1><p role="status" className="rounded-lg border p-4">Study Groups are turned off for this deployment. Set CAN_DEMO_WRITES_ENABLED to a value other than false to restore this first-development workflow. No group or moderation records have been loaded.</p></main>;
  return <main className="mx-auto max-w-6xl space-y-6 px-6 py-10">
  <header><h1 className="font-serif text-4xl">Study Groups</h1><p className="mt-2 text-muted-foreground">Learn together across classes and interests. Membership is facilitator-approved.</p>{!writesEnabled&&<p role="status" className="mt-2 text-sm text-muted-foreground">You may join approved groups, participate in their moderated discussions, and report concerning content. Session RSVPs remain unavailable until the session workflow is released.</p>}</header>
  {notice&&<p role="status" className="rounded-lg border p-3">{notice}</p>}

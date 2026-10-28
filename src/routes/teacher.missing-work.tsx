@@ -30,7 +30,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
       eyebrow="CAN OS · Teacher"
       title="Missing work"
       subtitle="Overdue work for actively enrolled students in the classes you teach, within your authorized school and program."
-      actions={<p className="mt-2 text-xs"><Link to="/teacher/notices" className="underline">Teacher notifications →</Link></p>}
+      actions={<p className="mt-2 text-xs"><Link to="/notifications" className="underline">Teacher notifications →</Link></p>}
     >
       {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
       {!connected && <p role="status" className="mt-4 rounded-xl border p-4">Neon is not connected. The queue cannot load.</p>}

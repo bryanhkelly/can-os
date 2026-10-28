@@ -13,6 +13,7 @@ import { getSectionRegistrationPolicy } from "@/modules/learning/section-registr
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray,sql } from "drizzle-orm";
 
+import { EventTypes } from "@/domain/event-types";
 export type EnrollmentTransaction=Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type SectionPlacementInput={
  studentProfileId:string;sectionId:string;actor:CommandContext;source:string;
@@ -155,7 +156,7 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
    resourceType:"section",resourceId:sectionId,
   })));
  }
- await emitEvent(tx, {eventType:"SectionEnrollmentActivated",
+ await emitEvent(tx, {eventType:EventTypes.SectionEnrollmentActivated,
   aggregateType:"enrollment",aggregateId:enrolled.id,actorPersonId:actor.actorPersonId,
   payload:{studentProfileId,sectionId,programId:section.programId,
    applicationId:input.applicationId??null,requestId:input.requestId??null}});

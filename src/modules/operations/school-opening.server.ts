@@ -12,6 +12,7 @@ import { assertCANSteward } from "@/domain/network-agreement-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
+import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db,"select">;
 /** These are independently reviewed supporting records, not user checkboxes. */
 export const schoolOpeningEvidenceCategories = [
@@ -218,7 +219,7 @@ export async function decideChurchSchoolOpening(
         after:{version:configuration.version,status:"approved",reason,evidence},
       });
       await emitEvent(tx,{
-        eventType:"ChurchSchoolOpeningApproved",aggregateType:"school_configuration_version",
+        eventType:EventTypes.ChurchSchoolOpeningApproved,aggregateType:"school_configuration_version",
         aggregateId:configuration.id,actorPersonId:actor.actorPersonId,
         organizationId:school.institutionId,siteId:school.siteId,programId:input.programId,
         payload:{version:configuration.version,evidence},
@@ -242,7 +243,7 @@ export async function decideChurchSchoolOpening(
       before:{status:"approved"},after:{status:"suspended",reason},
     });
     await emitEvent(tx,{
-      eventType:"ChurchSchoolOpeningSuspended",aggregateType:"school_configuration_version",
+      eventType:EventTypes.ChurchSchoolOpeningSuspended,aggregateType:"school_configuration_version",
       aggregateId:configuration.id,actorPersonId:actor.actorPersonId,
       organizationId:school.institutionId,siteId:school.siteId,
       programId:input.programId,payload:{reason,version:configuration.version},

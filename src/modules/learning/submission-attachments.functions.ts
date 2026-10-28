@@ -12,40 +12,21 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import {
+  MAX_ATTACHMENT_BYTES,
+  validateAttachmentUpload,
+} from "./attachment-mimes";
 
 /**
  * Assignment-submission and attendance-excuse attachments on the existing R2 +
  * documents infrastructure. Domain authorization and key policy stay here;
  * signing and bounded object verification are shared storage infrastructure.
+ * The extension/MIME allowlist lives in attachment-mimes so the client file
+ * pickers and this server validation cannot drift apart.
  */
-
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-
-const attachmentMimeByExtension: Record<string, string> = {
-  pdf: "application/pdf",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-};
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const learningKeyPattern = /^learning\/(assignment|excuse)\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i;
-
-function validateAttachmentUpload(fileName: string, contentType: string, sizeBytes: number): void {
-  if (fileName.length < 1 || fileName.length > 150 || /[\\/\x00-\x1f]/.test(fileName)) {
-    throw new Error("Invalid file name");
-  }
-  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
-  if (!attachmentMimeByExtension[extension]) {
-    throw new Error("Only verified PDF, PNG and JPEG attachments are supported");
-  }
-  if (attachmentMimeByExtension[extension] !== contentType) {
-    throw new Error("File content type does not match its extension");
-  }
-  if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 16 || sizeBytes > MAX_ATTACHMENT_BYTES) {
-    throw new Error("Attachments must be 16 bytes to 10 MB");
-  }
-}
 
 function newAttachmentKey(kind: "assignment" | "excuse", scopeId: string): string {
   if (!uuidPattern.test(scopeId)) throw new Error("Invalid attachment scope");
@@ -452,14 +433,77 @@ export const getSubmissionAttachmentDownload=createServerFn({method:"POST"})
   });
  });
 
-/** Only the uploading guardian can fetch a verified file on a current child's excuse. */
+/** Verified staff reviewer (teacher on the section, or registrar) for excuse documents. */
+async function excuseReviewActor() {
+  const context = await getCommandContext(getRequest());
+  assertCapability(context, "attendance.excuse.review");
+  if (!["teacher", "registrar"].includes(context.role) || !context.actorPersonId ||
+    !context.scope.siteIds?.length || !context.scope.programIds?.length ||
+    !context.scope.organizationIds?.length) {
+    throw new AuthorizationError("attendance excuse review grant");
+  }
+  return context;
+}
+
+/**
+ * The uploading guardian can fetch a verified file on a current child's
+ * excuse; staff with attendance.excuse.review authority over the excuse's
+ * site/program (teachers additionally need the section assignment) can fetch
+ * it for review. Reviewer downloads are audited.
+ */
 export const getExcuseAttachmentDownload=createServerFn({method:"POST"})
  .validator((value:unknown)=>z.object({
   attendanceEventId:z.string().uuid(),documentId:z.string().uuid()
  }).parse(value))
  .handler(async({data})=>{
-  const context=await guardianActor();
+  const session=await getCommandContext(getRequest());
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  if(session.role!=="guardian"){
+  const context=await excuseReviewActor();
+  return db.transaction(async tx=>{
+  const [event]=await tx.select({
+   siteId:s.attendanceEvents.siteId,programId:s.attendanceEvents.programId,
+   sectionId:s.attendanceEvents.sectionId,
+  }).from(s.attendanceEvents).where(eq(s.attendanceEvents.id,data.attendanceEventId)).limit(1);
+  if(!event||!event.siteId||!context.scope.siteIds!.includes(event.siteId)||
+    !context.scope.programIds!.includes(event.programId))
+    throw new AuthorizationError("excuse review site and program scope");
+  const [host]=await tx.select({organizationId:s.programs.organizationId}).from(s.programs)
+    .where(eq(s.programs.id,event.programId)).limit(1);
+  if(!host||!context.scope.organizationIds!.includes(host.organizationId))
+    throw new AuthorizationError("excuse review organization scope");
+  if(context.role==="teacher"){
+   const [assignment]=event.sectionId?await tx.select({id:s.sectionTeachers.id}).from(s.sectionTeachers)
+    .where(and(eq(s.sectionTeachers.sectionId,event.sectionId),
+     eq(s.sectionTeachers.personId,context.actorPersonId!))).limit(1):[];
+   if(!assignment)throw new AuthorizationError("teacher excuse section assignment");
+  }
+  const excuses=await tx.select({documentIds:s.attendanceExcuses.documentIds})
+    .from(s.attendanceExcuses)
+    .where(eq(s.attendanceExcuses.attendanceEventId,data.attendanceEventId));
+  if(!excuses.some(excuse=>excuse.documentIds.includes(data.documentId)))
+    throw new AuthorizationError("document not attached to an excuse for this attendance record");
+  const [document]=await tx.select({
+   storageKey:s.documents.storageKey,verifiedAt:s.documents.verifiedAt
+  }).from(s.documents).where(and(eq(s.documents.id,data.documentId),
+    verifiedPrivateDocumentPredicate({
+     subjectType:"attendance_event",subjectId:data.attendanceEventId,category:"attendance_excuse",
+    }))).limit(1);
+  if(!document?.verifiedAt||!document.storageKey.startsWith(`learning/excuse/${data.attendanceEventId}/`))
+    throw new AuthorizationError("verified excuse document scope");
+  await writeAudit(tx, {
+    actorPersonId: context.actorPersonId,
+    action: "attendance.excuse.document.review_download",
+    resourceType: "document",
+    resourceId: data.documentId,
+    scope: { siteId: event.siteId, programId: event.programId },
+    after: { attendanceEventId: data.attendanceEventId },
+    context: { accountId: context.accountId, sessionId: context.sessionId },
+  });
+  return {downloadUrl:signLearningObject("GET",document.storageKey,undefined,60),expiresInSeconds:60};
+  });
+  }
+  const context=await guardianActor();
   return db.transaction(async tx=>{
   await requireGuardianEvent(tx,s,data.attendanceEventId,context.actorPersonId!,
     context.scope.programIds??[]);

@@ -10,6 +10,7 @@ import { and,asc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
 import { permissionCanBeSigned,publishedTripPermission } from "./permission-policy";
 
+import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
 
 /** A guardian can only see invited children at currently granted schools. */
@@ -151,7 +152,7 @@ export const signGuardianFieldTripPermission = createServerFn({ method: "POST" }
           permissionVersion: policy.version },
       });
       await emitEvent(tx, {
-        eventType: "FieldTripPermissionSigned", aggregateType: "field_trip_participant",
+        eventType: EventTypes.FieldTripPermissionSigned, aggregateType: "field_trip_participant",
         aggregateId: participant.id, actorPersonId: actor.actorPersonId,
         payload: { fieldTripId: trip.id, studentProfileId: participant.studentProfileId,
           consentRecordId: consent.id },

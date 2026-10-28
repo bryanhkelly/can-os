@@ -14,6 +14,7 @@ import { planSitePublicationTransition, type SitePublicationAction } from "@/dom
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
+import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db, "select">;
 
 /**
@@ -151,7 +152,7 @@ export async function reserveSitePublicAddress(
       after: { host: publicSiteHost(slug), status: "draft" },
     });
     await emitEvent(tx, {
-      eventType: "SitePublicAddressReserved", aggregateType: "site", aggregateId: site.id,
+      eventType: EventTypes.SitePublicAddressReserved, aggregateType: "site", aggregateId: site.id,
       actorPersonId: actor.actorPersonId, organizationId: site.organizationId,
       siteId: site.id, payload: { slug, status: "draft" },
     });
@@ -223,7 +224,7 @@ export async function changeSitePublication(
         eligibleOfferingCount: input.action === "publish" ? eligibleCount : null },
     });
     await emitEvent(tx, {
-      eventType: input.action === "publish" ? "SitePublished" : "SiteUnpublished",
+      eventType: input.action === "publish" ? EventTypes.SitePublished : EventTypes.SiteUnpublished,
       aggregateType: "site", aggregateId: site.id, actorPersonId: actor.actorPersonId,
       ...scope,
       payload: { slug: current.slug, status: decision.status,

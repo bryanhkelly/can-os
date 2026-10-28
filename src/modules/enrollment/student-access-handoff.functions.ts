@@ -15,6 +15,7 @@ import { staffedPublishedSectionIds } from "./instructional-section-readiness.se
 import { requestOneTimeAccess } from "@/modules/identity/passwordless-access.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 const uuid=z.string().uuid();
 const consentInput=z.object({
  applicationId:uuid,studentEmail:z.string().trim().email().max(254),
@@ -247,7 +248,7 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
      // Only the first independently reviewed authorization emits the
      // institutional approval event. Passwordless resend is not a new
      // decision and must not duplicate official approval history.
-     await emitEvent(tx,{eventType:"StudentLearningAccessApproved",
+     await emitEvent(tx,{eventType:EventTypes.StudentLearningAccessApproved,
        aggregateType:"student_access_consent",aggregateId:consent.id,
        actorPersonId:actor.actorPersonId,organizationId:app.organizationId,
        siteId:app.siteId!,programId:app.programId,

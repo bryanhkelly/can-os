@@ -13,6 +13,7 @@ import {
 } from "@/domain/program-site-operating-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db, "select">;
 
 /** Resolve all contracting parties from actual canonical Program, Site and Org rows. */
@@ -101,7 +102,7 @@ export async function requestProgramSiteAuthorization(
       after: { status: "requested", services, institutionOrganizationId: identity.institutionOrganizationId },
     });
     await emitEvent(tx, {
-      eventType: "ProgramSiteAuthorizationRequested", aggregateType: "program_site_authorization",
+      eventType: EventTypes.ProgramSiteAuthorizationRequested, aggregateType: "program_site_authorization",
       aggregateId: created.id, actorPersonId: actor.actorPersonId,
       organizationId: identity.hostOrganizationId, siteId: identity.siteId, programId: identity.programId,
       payload: { institutionOrganizationId: identity.institutionOrganizationId, services },
@@ -180,7 +181,7 @@ export async function reviewProgramSiteAuthorization(
     });
     await emitEvent(tx, {
       eventType: input.decision === "approved"
-        ? "ProgramSiteAuthorizationApproved" : "ProgramSiteAuthorizationDenied",
+        ? EventTypes.ProgramSiteAuthorizationApproved : EventTypes.ProgramSiteAuthorizationDenied,
       aggregateType: "program_site_authorization", aggregateId: request.id,
       actorPersonId: actor.actorPersonId,
       organizationId: identity.institutionOrganizationId,
@@ -231,7 +232,7 @@ export async function revokeProgramSiteAuthorization(
       before: { status: "approved" }, after: { status: "revoked", reason },
     });
     await emitEvent(tx, {
-      eventType: "ProgramSiteAuthorizationRevoked",
+      eventType: EventTypes.ProgramSiteAuthorizationRevoked,
       aggregateType: "program_site_authorization", aggregateId: record.id,
       actorPersonId: actor.actorPersonId,
       organizationId: identity.hostOrganizationId,
