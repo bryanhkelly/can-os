@@ -87,6 +87,22 @@ describe("authorized notification destinations",()=>{
     state.rows.study_groups=[{id:"group",facilitator:"actor"}];
     expect((await getNotifications())[0]?.href).toBe("/groups?group=group");
   });
+  it("deep-links a guardian course approval review to its workspace",async()=>{
+    notification("action","request","course_registration_guardian_review");
+    expect((await getNotifications())[0]?.href).toBe("/guardian/course-approvals");
+  });
+  it("deep-links a field trip permission request to its workspace",async()=>{
+    notification("field_trip","trip","field_trip_permission_requested");
+    expect((await getNotifications())[0]?.href).toBe("/guardian/field-trips");
+  });
+  it("withholds guardian approval destinations from other roles",async()=>{
+    state.role="teacher";
+    notification("action","request","course_registration_guardian_review");
+    expect((await getNotifications())[0]?.href).toBeNull();
+    state.role="student";
+    notification("field_trip","trip","field_trip_permission_requested");
+    expect((await getNotifications())[0]?.href).toBeNull();
+  });
   it("opens a group for a currently enrolled invited classmate",async()=>{
     state.role="student";
     notification("study_group","group","study_group_invitation");
