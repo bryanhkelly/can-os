@@ -17,7 +17,7 @@ export const workspaceLinks:Record<string,{title:string;path:string}[]>={
  paraeducator:[{title:"My profile",path:"/profiles"}],
  network_admin:[{title:"Network operations",path:"/network"},{title:"Operations",path:"/operations"}],
  can_network_steward:[{title:"Network contracts",path:"/network-steward"}],
- student:[{title:"Today",path:"/student"},{title:"Learn",path:"/student/courses"},{title:"My School",path:"/student/experiences"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"},{title:"Support",path:"/student/support"}],
+ student:[{title:"Today",path:"/student"},{title:"Learn",path:"/student/courses"},{title:"My School",path:"/student/my-school"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"},{title:"Support",path:"/student/support"}],
  guardian:[{title:"Home",path:"/guardian"},{title:"Children",path:"/guardian/academics"},{title:"School",path:"/guardian/experiences"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
  teacher:[{title:"Today",path:"/teacher"},{title:"Classes",path:"/classes"},{title:"Students",path:"/staff/students"},{title:"Gradebook",path:"/teacher/gradebook"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
  registrar:[{title:"Operations",path:"/operations"},{title:"Admissions",path:"/admissions"},{title:"Students",path:"/staff/students"},{title:"Sites",path:"/sites"},{title:"School years",path:"/operations/school-years"},{title:"Curriculum",path:"/operations/curriculum"},{title:"Administration",path:"/admin"}],
