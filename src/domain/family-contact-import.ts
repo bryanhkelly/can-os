@@ -36,10 +36,15 @@ export function parseFamilyContacts(input:string, existingEmails:readonly string
   const contacts:FamilyContact[]=[];const issues:FamilyContactIssue[]=[];
   let duplicates=0;
   const lines=input.replace(/^\uFEFF/,"").split(/\r?\n/);
+  const header=lines[0]?.trim().toLowerCase().replace(/\s/g,"") ?? "";
+  const separateNames=header==="firstname,lastname,email" || header==="first_name,last_name,email";
   lines.forEach((raw,index)=>{
     const line=raw.trim();if(!line)return;
-    if(index===0&&/^(name|first\s*name|email)\s*,/i.test(line))return;
-    const contact=parseContact(line);
+    if(index===0&&(separateNames||/^(name|first\s*name|email)\s*,/i.test(line)))return;
+    const columns=separateNames?csvFields(line):[];
+    const contact=separateNames
+      ? parseContact(`${columns[0]??""} ${columns[1]??""},${columns[2]??""}${columns[3]?","+columns[3]:""}`)
+      : parseContact(line);
     if(!contact){issues.push({line:index+1,raw,reason:"Missing or invalid email address"});return;}
     if(seen.has(contact.email)){duplicates++;issues.push({line:index+1,raw,reason:"Duplicate email",suggested:contact});return;}
     seen.add(contact.email);contacts.push(contact);
