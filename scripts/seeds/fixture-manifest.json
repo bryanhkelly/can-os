@@ -744,11 +744,15 @@
       },
       "interactions": [
         "grade submission with rubric",
-        "create assessment"
+        "create assessment",
+        "finalize section grades for a grading period",
+        "correct a finalized grade with a recorded reason"
       ],
       "downstreamRecords": [
         "submissions (graded)",
-        "domainEvents:GradePosted"
+        "domainEvents:GradePosted",
+        "sectionGrades (finalized)",
+        "auditEvents:report_card.section_grade.finalize"
       ]
     },
     "/teacher/missing-work": {
@@ -1307,6 +1311,29 @@
         "site_publications",
         "program_publications",
         "audit_events"
+      ]
+    },
+    "/guardian/experiences": {
+      "persona": "guardian",
+      "seeds": [
+        "student-calendar-comms-office-hours.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "conference_series": 1,
+        "conference_slots": 1,
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "book a teacher office-hour slot",
+        "reschedule an appointment",
+        "cancel an appointment"
+      ],
+      "downstreamRecords": [
+        "conference_bookings",
+        "audit_events",
+        "domainEvents:ConferenceBooked",
+        "domainEvents:ConferenceCancelled"
       ]
     }
   }
