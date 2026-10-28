@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { ArrowUpRight, BookOpen, CalendarDays, Mail, Sparkles } from "lucide-react";
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
 import { WorkspaceShell, EmptyState, QueryState, StatCard, PersonMark, StatusBadge } from "@/components/workspace";
 import { prioritizeFamilyNeeds, familyActionWorkspaceLink } from "@/domain/family-needs";
@@ -57,14 +58,27 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
   </div>}
  >
   <QueryState loading={loading ? "Loading your family…" : ""} error={error}>
-   <div className="mt-7 grid gap-3 sm:grid-cols-3">
+   <section aria-label="Family overview" className="relative overflow-hidden rounded-3xl border border-border/70 bg-card px-6 py-8 shadow-sm sm:px-9 sm:py-10">
+    <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-accent opacity-70 blur-3xl" />
+    <div className="relative max-w-2xl">
+     <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-primary"><Sparkles className="size-4" /> Your family, connected</p>
+     <h2 className="mt-3 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">Every school day, together.</h2>
+     <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">Follow your children’s progress, respond to what needs you, and stay connected with your school.</p>
+     <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
+      <Link to="/guardian/academics" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"><BookOpen className="size-4" /> View academics <ArrowUpRight className="size-4" /></Link>
+      <Link to="/messages" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><Mail className="size-4" /> Family inbox</Link>
+      <Link to="/guardian/attendance" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><CalendarDays className="size-4" /> Attendance</Link>
+     </div>
+    </div>
+   </section>
+   <div className="mt-6 grid gap-3 sm:grid-cols-3">
     <StatCard label="Your children" value={children.length}/>
     <StatCard label="Needs your attention" value={needs.length}/>
     <StatCard label="Missing assignments" value={children.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
    <section aria-label="Needs you" className="mt-10">
     <div className="flex items-baseline justify-between gap-3">
-     <h2 className="text-lg font-semibold">Needs you</h2>
+     <h2 className="font-serif text-2xl font-semibold tracking-tight">Needs you</h2>
      {needs.length > 0 && <span className="rounded-full border px-3 py-1 text-xs">{needs.length} open</span>}
     </div>
     {needs.length === 0 && <EmptyState className="mt-4 bg-card" title="You are all caught up. Nothing needs your attention right now." />}
@@ -92,7 +106,7 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
    </section>
 
    <section aria-label="Your children" className="mt-12">
-    <h2 className="text-lg font-semibold">Your children</h2>
+    <h2 className="font-serif text-2xl font-semibold tracking-tight">Your children</h2>
     {children.length === 0 && <div className="mt-4 rounded-xl border bg-card p-5">
      <p className="font-semibold">Waiting for your first child to be enrolled?</p>
      <p className="mt-2 text-sm text-muted-foreground">Your school must connect a verified guardian relationship before your child appears here. You can review any pending admission offer or enrollment checklist without an active class assignment.</p>
@@ -136,7 +150,7 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
    </section>
 
    <section aria-label="Family shortcuts" className="mt-12">
-    <h2 className="text-lg font-semibold">Family</h2>
+    <h2 className="font-serif text-2xl font-semibold tracking-tight">Family resources</h2>
     <div className="mt-4 flex flex-wrap gap-3 text-sm">
      <Link to="/ask" className="rounded-full border px-4 py-2 hover:bg-muted">Ask CAN</Link>
      <Link to="/guardian/experiences" className="rounded-full border px-4 py-2 hover:bg-muted">School calendar &amp; teacher conferences</Link>
