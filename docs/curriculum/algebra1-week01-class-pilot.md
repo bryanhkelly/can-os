@@ -39,7 +39,7 @@ This week does **not** satisfy a full-year mathematics requirement. California s
 
 Continue Week 2 on equations, formulas, quantitative relationships and review in another immutable course and pack release. Follow with 36-week scope/sequence, summative tests, review of alignment coverage and credit governance. Do not silently repoint live sections without a progress migration and a school authorization step.
 
-**Deployment artifact:** `scripts/seeds/valor-algebra1-week01-upgrade.sql` uses guarded, atomic transactions and targets only the existing synthetic ValorSchool Algebra I class. It must not be run on any live/student school organization.
+**Deployment artifact:** The orphaned `scripts/seeds/valor-algebra1-week01-upgrade.sql` fixture (stale identities, not in the fixture manifest, referenced by no script or test) has been removed. The activation path is documented in `valor-algebra1-week01-activation-acceptance.md`; nothing here may be run on any live/student school organization.
 
 ## Bite 2: Structured lesson delivery and a 36-week blueprint
 

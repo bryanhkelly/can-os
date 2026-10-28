@@ -18,7 +18,7 @@ Local validation at this snapshot:
 - `node scripts/check-route-fixture-coverage.mjs`: **75/75** fixture declarations, 0 unseeded; explicitly **STATIC_ONLY** (static manifest/file checks, not SQL execution or browser acceptance).
 - `node scripts/check-mutation-hygiene.mjs`: passed.
 - `node scripts/check-platform-route-contracts.mjs --check`: **86/86 routes, 0 issues**.
-- `npm run db:generate`: no schema changes; clean tree after restoring `drizzle/meta/0045_snapshot.json` parity and adding a parity guard. The migration review gate is re-baselined through journal 0045, and Drizzle tip snapshot parity is guarded.
+- `npm run db:generate`: no schema changes; clean tree after restoring `drizzle/meta/0045_snapshot.json` parity and adding a parity guard. The migration review gate is re-baselined through journal 0046, and Drizzle tip snapshot parity is guarded.
 
 Patches included at this snapshot:
 
@@ -37,7 +37,7 @@ Remaining acceptance gaps (explicit; unchanged by this addendum):
 - Launch Studio/site-director real-session browser proof remains missing.
 - Most scenarios beyond GF1/GF2/curriculum slices lack dedicated workflows and browser/reload proof.
 - GF-A3 human-approved action is unimplemented.
-- `valor-algebra1-week01-upgrade.sql` remains an orphan/non-manifest fixture with stale identities and missing pilot prerequisites; do not present it as executable.
+- `valor-algebra1-week01-upgrade.sql` (orphan/non-manifest fixture with stale identities) has been removed; it was never executable and is no longer in the tree.
 - No CI seed executor currently applies the manifest seed chain.
 
 ## Integrated source baseline
