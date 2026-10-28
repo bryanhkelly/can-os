@@ -1,3 +1,4 @@
+import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useState } from "react";
 import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
@@ -218,8 +219,8 @@ function LaunchWizardPage() {
   }
 
   return (
-    <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Host / program launch"
-      subtitle="Launch programs on an Organization → Site → Program foundation, with recorded readiness and explicit blocking requirements."
+    <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Open Your School"
+      subtitle="Set up your school, invite families, publish your school page, and see exactly what remains before opening."
       breadcrumbs={<><Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
       actions={<Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Connected workflows</Link>}>
         <WorkflowIntro eyebrow="School launch · Readiness" title="Build a school with confidence." description="Coordinate the host site, academic provider and program launch. Recorded progress is not permission to open: blocking requirements and approvals remain authoritative." />
@@ -231,11 +232,13 @@ function LaunchWizardPage() {
             className="underline">Open Site Today to review the named operator handoff →</Link>:"Opening is recorded."}
         </p>}
 
+        <OneHourSchoolLaunch launches={launches.launches} selectedProgramId={selection.programId}/>
+
         <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         <div className="mt-8 grid gap-6">
           {extendedPlanning ? <ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId} /> : <p role="status" className="rounded-lg border p-3 text-sm">Extended-learning planning is unavailable. Verify database migrations 0032–0033; school launches remain accessible.</p>}
-          <details className="rounded-xl border bg-card p-5">
-            <summary className="cursor-pointer text-lg font-semibold">Start a new program launch</summary>
+          <details id="new-school-launch" className="rounded-xl border bg-card p-5" open={launches.launches.length===0}>
+            <summary className="cursor-pointer text-lg font-semibold">Launch a school · School Basics</summary>
             {created && <div role="status" className="mt-4 rounded-lg border p-3 text-sm">
               <p>Launch started. Program <code>{created.programId}</code> with Launch Journey{" "}
                 <code>{created.journeyId}</code> is now in the checklist below.</p>
