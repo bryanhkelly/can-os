@@ -10,19 +10,19 @@ const AskCanConversation=lazy(()=>import("@/components/conversation/AskCanConver
 
 export const workspaceHome:Record<string,string>={site_website_editor:"/site-website",room_facilitator:"/site/day",site_staff:"/site/day",site_leader:"/site/day",paraeducator:"/profiles",student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor",network_admin:"/network",can_network_steward:"/network-steward"};
 export const workspaceLinks:Record<string,{title:string;path:string}[]>={
- site_website_editor:[{title:"Site website",path:"/site-website"}],
- room_facilitator:[{title:"Onsite day",path:"/site/day"}],
- site_staff:[{title:"Onsite day",path:"/site/day"}],
- site_leader:[{title:"Onsite day",path:"/site/day"}],
+ site_website_editor:[{title:"Website",path:"/site-website"}],
+ room_facilitator:[{title:"Today",path:"/site/day"},{title:"Attendance",path:"/staff/attendance"},{title:"Roster",path:"/site/day"}],
+ site_staff:[{title:"Today",path:"/site/day"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
+ site_leader:[{title:"Today",path:"/site/day"},{title:"Students",path:"/staff/students"},{title:"Staff",path:"/staff/teachers"},{title:"Schedule",path:"/calendar"},{title:"Attendance",path:"/staff/attendance"},{title:"Community",path:"/site-website"},{title:"Operations",path:"/operations"}],
  paraeducator:[{title:"My profile",path:"/profiles"}],
- network_admin:[{title:"Network locations",path:"/network"}],
+ network_admin:[{title:"Network operations",path:"/network"},{title:"Operations",path:"/operations"}],
  can_network_steward:[{title:"Network contracts",path:"/network-steward"}],
- student:[{title:"Today",path:"/student"},{title:"Assignments",path:"/student/assignments"},{title:"My classes",path:"/student/courses"},{title:"Study groups",path:"/student/study-groups"},{title:"Support",path:"/student/support"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- guardian:[{title:"Family",path:"/guardian"},{title:"Enrichment",path:"/guardian/enrichment"},{title:"Classes",path:"/classes"},{title:"Academics",path:"/guardian/academics"},{title:"Attendance",path:"/guardian/attendance"},{title:"Offers",path:"/guardian/admission-offers"},{title:"Course approvals",path:"/guardian/course-approvals"},{title:"Field trips",path:"/guardian/field-trips"},{title:"Messages",path:"/messages"}],
- teacher:[{title:"Today",path:"/teacher"},{title:"Classes",path:"/classes"},{title:"Gradebook",path:"/teacher/gradebook"},{title:"Students",path:"/staff/students"},{title:"Teachers",path:"/staff/teachers"},{title:"Study groups",path:"/teacher/study-groups"},{title:"Referrals",path:"/student/support"},{title:"Missing work",path:"/teacher/missing-work"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- registrar:[{title:"Operations",path:"/operations"},{title:"Admissions",path:"/admissions"},{title:"Sites",path:"/sites"},{title:"Students",path:"/staff/students"},{title:"School years",path:"/operations/school-years"},{title:"Curriculum",path:"/operations/curriculum"},{title:"Administration",path:"/admin"}],
- specialist:[{title:"Caseload",path:"/coach"},{title:"Referrals & services",path:"/support"},{title:"Students",path:"/staff/students"},{title:"Insights",path:"/operations/insights"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- counselor:[{title:"Counselor caseload",path:"/counselor"},{title:"Referrals & services",path:"/support"},{title:"Students",path:"/staff/students"},{title:"Insights",path:"/operations/insights"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}]
+ student:[{title:"Today",path:"/student"},{title:"Learn",path:"/student/courses"},{title:"My School",path:"/student/experiences"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"},{title:"Support",path:"/student/support"}],
+ guardian:[{title:"Home",path:"/guardian"},{title:"Children",path:"/guardian/academics"},{title:"School",path:"/guardian/experiences"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
+ teacher:[{title:"Today",path:"/teacher"},{title:"Classes",path:"/classes"},{title:"Students",path:"/staff/students"},{title:"Gradebook",path:"/teacher/gradebook"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
+ registrar:[{title:"Operations",path:"/operations"},{title:"Admissions",path:"/admissions"},{title:"Students",path:"/staff/students"},{title:"Sites",path:"/sites"},{title:"School years",path:"/operations/school-years"},{title:"Curriculum",path:"/operations/curriculum"},{title:"Administration",path:"/admin"}],
+ specialist:[{title:"Caseload",path:"/coach"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
+ counselor:[{title:"Caseload",path:"/counselor"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}]
 };
 export function SidebarLinks({links,activePath}:{links:{title:string;path:string}[];activePath?:string}){
  return <nav aria-label="CAN OS primary navigation" className="flex-1 space-y-1 overflow-y-auto p-3">
