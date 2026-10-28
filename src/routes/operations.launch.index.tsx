@@ -1,3 +1,4 @@
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useState } from "react";
 import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
@@ -221,6 +222,7 @@ function LaunchWizardPage() {
       subtitle="Launch programs on an Organization → Site → Program foundation, with recorded readiness and explicit blocking requirements."
       breadcrumbs={<><Link to="/operations" search={{siteId:selection.siteId,programId:selection.programId}} className="underline">Operations</Link><span>/</span><span>Program launches</span></>}
       actions={<Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Connected workflows</Link>}>
+        <WorkflowIntro eyebrow="School launch · Readiness" title="Build a school with confidence." description="Coordinate the host site, academic provider and program launch. Recorded progress is not permission to open: blocking requirements and approvals remain authoritative." />
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>
         )}
