@@ -1,3 +1,4 @@
+import { WorkspaceShell, StatCard, StatusBadge } from "@/components/workspace";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
@@ -101,14 +102,9 @@ function GuardianAttendancePage() {
   const needsExcuse = absences.filter(absence => !absence.excuse &&
     (absence.status === "absent" || absence.status === "tardy"));
 
-  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">CAN OS · Attendance</p>
-      <h1 className="mt-2 font-serif text-4xl">Attendance & excuses</h1>
-      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-        Review recent absences for your students and submit an excuse for the school to review.{student?" Showing the selected child.":""}
-      </p>
-      <WorkflowIntro eyebrow="Family · Attendance" title="Stay informed about every school day." description="Review attendance records, submit explanations and attach supporting documents for authorized school review. Submitted excuses do not automatically change the recorded attendance." />
+  return <WorkspaceShell width="wide" eyebrow="CAN OS · Family" title="Attendance & excuses"
+    subtitle="Review recent attendance cases and submit explanations for authorized school review. Submitted excuses do not automatically change attendance."
+    breadcrumbs={<><Link to="/guardian" search={{student}} className="underline">Family home</Link><span>/</span><span>Attendance</span></>}>
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
       {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
       {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance…</p>}
@@ -116,9 +112,9 @@ function GuardianAttendancePage() {
         {attendance&&<Link to="/guardian/attendance" search={{student}} className="mt-4 inline-block text-sm underline">View all attendance for this child</Link>}
         {attendance&&!absences.some(item=>item.relatedAttendanceEventIds.includes(attendance))&&<p role="alert" className="mt-4 rounded-xl border p-4">This attendance record is unavailable in the current view.</p>}
         <div className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Attendance summary">
-          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Recent attendance cases</p><p className="mt-1 text-2xl font-semibold">{absences.length}</p></div>
-          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Needs an excuse</p><p className="mt-1 text-2xl font-semibold">{needsExcuse.length}</p></div>
-          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Excuses submitted</p><p className="mt-1 text-2xl font-semibold">{absences.filter(absence => absence.excuse).length}</p></div>
+          <StatCard label="Recent attendance cases" value={absences.length}/>
+          <StatCard label="Needs an excuse" value={needsExcuse.length}/>
+          <StatCard label="Excuses submitted" value={absences.filter(absence => absence.excuse).length}/>
         </div>
         {absences.length === 0 && <p className="mt-8 text-sm">No recent absence or tardy cases were found for your students.</p>}
         {absences.length > 0 && <div className="mt-8 grid gap-4">
@@ -128,9 +124,7 @@ function GuardianAttendancePage() {
                 <h2 className="text-lg font-semibold">{absence.studentName}</h2>
                 <p className="text-xs text-muted-foreground">{new Date(absence.expectedAt).toLocaleDateString()}</p>
               </div>
-              <span className="rounded-full border px-3 py-1 text-xs capitalize">
-                {absence.excuse ? `Excuse ${absence.excuse.status}` : absence.status}
-              </span>
+              <StatusBadge tone={absence.excuse ? "info" : absence.status === "present" ? "success" : "attention"}>{absence.excuse ? `Excuse ${absence.excuse.status}` : absence.status}</StatusBadge>
             </div>
             {absence.status === "present" && <p className="mt-3 text-xs text-muted-foreground">The school corrected this attendance case to present. No excuse is required.</p>}
             {absence.historicalExcuses.length > 0 && <div className="mt-3 space-y-2" aria-label="Earlier excuse history">
@@ -188,6 +182,5 @@ function GuardianAttendancePage() {
           </section>)}
         </div>}
       </>}
-    </div>
-  </main>;
+  </WorkspaceShell>;
 }
