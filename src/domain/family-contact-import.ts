@@ -19,12 +19,12 @@ function csvFields(line:string):string[] {
 function parseContact(line:string):FamilyContact|null {
   const angle=line.match(/^(.+?)\s*<([^<>]+)>$/);
   let name="";let email="";let phone:string|undefined;
-  if(angle){name=angle[1].trim();email=angle[2].trim();}
+  if(angle){name=(angle[1]??"").trim();email=(angle[2]??"").trim();}
   else {
     const fields=csvFields(line);
-    if(fields.length===1){email=fields[0];}
-    else if(fields.length===2){name=fields[0];email=fields[1];}
-    else {name=fields[0];email=fields[1];phone=fields[2]||undefined;}
+    if(fields.length===1){email=fields[0]??"";}
+    else if(fields.length===2){name=fields[0]??"";email=fields[1]??"";}
+    else {name=fields[0]??"";email=fields[1]??"";phone=fields[2]||undefined;}
   }
   email=email.toLowerCase();
   if(!emailPattern.test(email))return null;

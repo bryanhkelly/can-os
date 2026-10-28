@@ -18,7 +18,7 @@ function MySchoolPage() {
   const outcome = Route.useLoaderData();
   const { session } = useWorkspaceSession();
   if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Student" title="My School" outcome={outcome} />;
-  const schoolNames = session?.sites.map(site => site.name) ?? [];
+  const schoolNames = session?.authenticated ? session.sites.map(site => site.name) : [];
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title="My School"
     subtitle="Your local school community, announcements, events and opportunities to connect.">
     <section className="border-b pb-7">
