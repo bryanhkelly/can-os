@@ -184,6 +184,19 @@ function LaunchWizardPage() {
     }
   }
 
+  function applySchoolModelPreset(model:"elementary"|"middle"|"high"|"k12"|"micro"|"hybrid") {
+    const presets={
+      elementary:{type:"church_hosted_academy",min:"K",max:"5",days:"5",async:false},
+      middle:{type:"church_hosted_academy",min:"6",max:"8",days:"5",async:false},
+      high:{type:"church_hosted_academy",min:"9",max:"12",days:"5",async:false},
+      k12:{type:"full_school",min:"K",max:"12",days:"5",async:false},
+      micro:{type:"microschool",min:"K",max:"8",days:"4",async:true},
+      hybrid:{type:"hybrid_program",min:"6",max:"12",days:"2",async:true},
+    } as const;
+    const choice=presets[model];
+    setType(choice.type);setGradeMin(choice.min);setGradeMax(choice.max);
+    setOnsite(true);setOnsiteDaysPerWeek(choice.days);setAsynchronous(choice.async);setLiveOnline(false);
+  }
   function applyNinthGradeHybridPreset(){
     // Explicit form proposal only. No accreditation, staffing, credit issuer,
     // timetable, attendance or regulatory readiness is silently accepted.
@@ -274,16 +287,34 @@ function LaunchWizardPage() {
                 No local Site was selected, so this Program launch has no Site website draft.
               </p>}
             </div>}
-            <div className="mt-4 rounded-lg border p-4">
-              <p className="font-semibold text-sm">Suggested school-in-a-box starting point</p>
-              <p className="mt-2 text-sm text-muted-foreground">Grade 9 hybrid extension: two on-site days and asynchronous instruction on the remaining days. This only pre-fills the proposal; your school must verify its staffing, calendar, academic provider and legal credit issuer before opening.</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={applyNinthGradeHybridPreset}>Grade 9 hybrid</button>
-                <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => applyExtendedLearningPreset("summer_program")}>Summer academic program</button>
-                <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => applyExtendedLearningPreset("summer_enrichment")}>Summer camp / enrichment</button>
-                <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => applyExtendedLearningPreset("after_school_enrichment")}>After-school enrichment</button>
+            <section className="mt-4 rounded-xl border bg-card p-5" aria-label="Recommended school models">
+              <h3 className="font-serif text-xl font-semibold">Choose your school model</h3>
+              <p className="mt-2 text-sm text-muted-foreground">Start with a recommended proposal, then customize the details below. Selecting a model does not save or approve your school, staffing, or academic program.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {([
+                  ["elementary","Elementary School","K–5 · five onsite days"],
+                  ["middle","Middle School","6–8 · five onsite days"],
+                  ["high","High School","9–12 · five onsite days"],
+                  ["k12","K–12 School","K–12 · five onsite days"],
+                  ["micro","Microschool","K–8 · four onsite days + independent study"],
+                  ["hybrid","Hybrid School","6–12 · two onsite days + independent study"],
+                ] as const).map(([key,label,detail])=><button key={key} type="button"
+                  onClick={()=>applySchoolModelPreset(key)}
+                  className="min-h-24 rounded-xl border p-4 text-left hover:border-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">
+                  <span className="block font-semibold">{label}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">{detail}</span>
+                  <span className="mt-2 block text-xs font-semibold text-primary">Use recommended setup</span>
+                </button>)}
               </div>
-            </div>
+              <details className="mt-4 rounded-lg border p-3"><summary className="cursor-pointer text-sm font-semibold">Additional program options</summary>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={applyNinthGradeHybridPreset}>Grade 9 extension</button>
+                  <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={()=>applyExtendedLearningPreset("summer_program")}>Summer academic</button>
+                  <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={()=>applyExtendedLearningPreset("summer_enrichment")}>Summer enrichment</button>
+                  <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={()=>applyExtendedLearningPreset("after_school_enrichment")}>After-school enrichment</button>
+                </div>
+              </details>
+            </section>
             <form className="mt-4 space-y-5" onSubmit={submitLaunch}>
               <fieldset>
                 <legend className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
