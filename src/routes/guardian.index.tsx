@@ -68,9 +68,9 @@ export function FamilyHomeView({children,needs,loading,error,action,student}:{
      <h2 className="mt-3 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">Every school day, together.</h2>
      <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">Follow your children’s progress, respond to what needs you, and stay connected with your school.</p>
      <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
-      <Link to="/guardian/academics" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"><BookOpen className="size-4" /> View academics <ArrowUpRight className="size-4" /></Link>
+      <Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"><BookOpen className="size-4" /> View academics <ArrowUpRight className="size-4" /></Link>
       <Link to="/messages" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><Mail className="size-4" /> Family inbox</Link>
-      <Link to="/guardian/attendance" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><CalendarDays className="size-4" /> Attendance</Link>
+      <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><CalendarDays className="size-4" /> Attendance</Link>
      </div>
     </div>
    </section>
