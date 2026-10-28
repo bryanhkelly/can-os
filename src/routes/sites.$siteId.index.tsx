@@ -1,4 +1,6 @@
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowUpRight, CalendarDays, ClipboardCheck, Globe2 } from "lucide-react";
 import { getSiteToday } from "@/modules/operations/site-today.functions";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
@@ -30,6 +32,7 @@ function SiteTodayPage() {
       <Link className="rounded-lg border px-3 py-2 text-sm" to="/operations"
         search={{siteId:undefined,programId:undefined}}>All operations →</Link>
     </div>}>
+    <WorkflowIntro eyebrow="Site operations" title="A clear view of your school day." description="Review readiness, outstanding work and the schedule from your authorized site records." actions={<><Link to="/readiness" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"><ClipboardCheck className="size-4" /> School readiness <ArrowUpRight className="size-4" /></Link><Link to="/site/day" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><CalendarDays className="size-4" /> Onsite day</Link><Link to="/sites/$siteId/publish" params={{siteId:data.site.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><Globe2 className="size-4" /> Public website</Link></>} />
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([
         ["Operations", "/operations"], ["Launch", "/operations/launch"],
@@ -45,7 +48,7 @@ function SiteTodayPage() {
         ["Attendance recorded", data.attendance.count ? String(data.attendance.count) : "No records", data.attendance.note],
         ["Present records", data.attendance.count ? String(data.attendance.present) : "—", "Today’s recorded attendance observations"],
         ["Open actions", String(data.actions.length), "Scoped outstanding site actions"],
-      ].map(([label, value, note]) => <section key={label} className="rounded-xl border bg-card p-4">
+      ].map(([label, value, note]) => <section key={label} className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="mt-2 font-serif text-3xl">{value}</p>
         <p className="mt-2 text-xs text-muted-foreground">{note}</p>

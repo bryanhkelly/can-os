@@ -1,3 +1,5 @@
+import { WorkspaceShell, StatCard, StatusBadge } from "@/components/workspace";
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { OnsiteSupervisionPanel } from "@/components/operations/OnsiteSupervisionPanel";
@@ -79,17 +81,14 @@ export function SiteDayPage() {
     } finally { setBusy(""); }
   }
 
-  return <main className="mx-auto max-w-5xl px-5 py-10">
-    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Hybrid site</p>
-    <h1 className="mt-2 font-serif text-4xl">Onsite day</h1>
-    <p className="mt-3 text-sm text-muted-foreground">
-      {context?.siteName ?? "Your assigned site"} · staff-observed attendance only.
-      Online lesson activity cannot mark a learner present or absent.
-    </p>
-    <p className="mt-2 text-xs text-muted-foreground">
-      Arrival marks are not student release or checkout authorization. Contact your designated site lead
-      for unexpected absences, emergencies or custody concerns.
-    </p>
+  return <WorkspaceShell width="wide" eyebrow="CAN OS · Onsite school" title={context?.siteName ?? "Site Today"}
+    subtitle="Supervise the scheduled school day and record staff-observed attendance. Learning activity is not physical presence.">
+    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+      <span>{date || "Loading school date"}</span>
+      {context && <span>{context.timeZone}</span>}
+      <span>Attendance does not authorize student release.</span>
+    </div>
+    <WorkflowIntro eyebrow="Site supervision · Attendance" title="A clear record of the onsite day." description="Record staff-observed attendance for your assigned site. Online learning activity is not proof of physical presence, and arrival marks do not authorize student release." />
     {context && <label className="mt-6 block max-w-sm text-sm font-semibold">
       School-local attendance date
       <input type="date" value={date} max={context.date}
@@ -114,18 +113,21 @@ export function SiteDayPage() {
           One or more onsite calendars or schedules are incomplete. No presence is inferred
           from missing configuration; ask the school registrar to correct the schedule.
         </p>}
-      <div className="mt-6 grid grid-cols-3 gap-3 text-sm" aria-label="Onsite day summary">
-        <div className="rounded border p-3">Expected program roster entries
-          <strong className="mt-1 block text-2xl">{roster.students.length}</strong></div>
-        <div className="rounded border p-3">Staff-marked entries
-          <strong className="mt-1 block text-2xl">
-            {roster.students.filter(student => !["unmarked","expected"].includes(student.status)).length}
-          </strong></div>
-        <div className="rounded border p-3">Unrecorded entries
-          <strong className="mt-1 block text-2xl">
-            {roster.students.filter(student => ["unmarked","expected"].includes(student.status)).length}
-          </strong></div>
-      </div>
+      <section aria-label="Onsite day summary" className="mt-8">
+        <h2 className="font-serif text-2xl font-semibold">Who's here</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Counts are student-program roster entries, not unique students. Only staff observations count as recorded attendance.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <StatCard label="Expected roster entries" value={roster.students.length}/>
+          <StatCard label="Staff-marked entries" value={roster.students.filter(student=>!["unmarked","expected"].includes(student.status)).length}/>
+          <StatCard label="Needs attendance mark" value={roster.students.filter(student=>["unmarked","expected"].includes(student.status)).length}/>
+        </div>
+      </section>
+      {roster.students.some(student=>["unmarked","expected"].includes(student.status))&&
+        <section aria-label="Needs attention" className="mt-7 border-l-4 border-amber-500 bg-muted/40 px-5 py-4">
+          <h2 className="font-semibold">Needs attention</h2>
+          <p className="mt-1 text-sm">Some expected roster entries have no staff-observed mark. Review the roster below; do not infer absence from an unmarked record.</p>
+        </section>}
+      <h2 className="mt-8 font-serif text-2xl font-semibold">Expected roster and attendance</h2>
       {!roster.students.length && <p className="mt-6 text-sm">
         No verified scheduled onsite students for this date under your current site grant.
         This is not evidence that students were absent.
@@ -139,7 +141,7 @@ export function SiteDayPage() {
                 <p className="text-xs text-muted-foreground">
                   {student.programName} · {student.sectionTitle ?? "Program roster"}
                 </p></div>
-              <span className="rounded-full border px-3 py-1 text-xs capitalize">{student.status}</span>
+              <StatusBadge tone={student.status==="present"?"success":student.status==="absent"?"attention":"neutral"}>{student.status.replaceAll("_"," ")}</StatusBadge>
             </div>
             {student.attendanceEventId && <label className="mt-3 block text-xs">
               Correction reason (required)
@@ -164,5 +166,5 @@ export function SiteDayPage() {
     </>}
     {roster && <OnsiteDayReconciliationPanel date={date} roster={roster} />}
     {context && date && <OnsiteSupervisionPanel date={date} />}
-  </main>;
+  </WorkspaceShell>;
 }

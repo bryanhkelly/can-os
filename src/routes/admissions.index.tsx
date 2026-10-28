@@ -1,3 +1,5 @@
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
+import { ArrowUpRight } from "lucide-react";
 import { listEnrollmentPlacements, placeEnrolledStudent } from "@/modules/enrollment/course-placement.functions";
 import {StudentLearningAccessHandoff} from "@/components/enrollment/StudentLearningAccessHandoff";
 import { useEffect, useState } from "react";
@@ -71,9 +73,10 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
       subtitle="Registrar workspace: issue offers and activate accepted enrollments. Guardians respond from their own authenticated offer inbox."
       actions={<div className="flex flex-wrap gap-2"><Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg bg-foreground px-3 py-2 text-sm text-background">New inquiry</Link><Link to="/admissions/transcripts" search={{query:""}} className="rounded-lg border px-3 py-2 text-sm">Official transcripts</Link><Link to="/admissions/capacity" search={{siteId:selected.siteId,programId:selected.programId}} className="rounded-lg border px-3 py-2 text-sm">Program capacity</Link></div>}
     >
+      <WorkflowIntro eyebrow="Admissions & enrollment" title="A thoughtful path from inquiry to enrollment." description="Track each family's progress, review decisions, and hand accepted offers into authorized enrollment. Guardian verification remains independent." actions={<Link to="/admissions/intake" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Open intake <ArrowUpRight className="size-4" /></Link>} />
       {error && <p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
       {notice && <p role="status" className="mt-4 rounded-xl border p-3">{notice}</p>}
-      <div className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4">
+      <div className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
         <label className="text-sm">School
           <select aria-label="Admissions school" className="ml-2 rounded border bg-background p-2"
            value={selected.siteId??""} onChange={event=>openScope(event.target.value||undefined)}>

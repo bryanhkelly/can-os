@@ -1,4 +1,6 @@
 import { Link } from "@tanstack/react-router";
+import { ArrowUpRight, BookOpen, CalendarDays } from "lucide-react";
+import { DailyCanvas, selectDailyCanvasContent, type DailyCanvasContent } from "./DailyCanvas";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { FIRST_PUBLISHED_LESSON_ROUTE } from "@/domain/first-class-lesson";
@@ -23,21 +25,17 @@ export function StudentExperience({ liveData, success, support }: {
  const otherOpenActions=liveData.openActions.filter(action => !support?.tasks.some(task=>task.id===action.id));
  const format=(date:Date|string)=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short"}).format(new Date(date));
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title={`Today, ${displayName}`}
-  subtitle="Your schedule, coursework and next steps, all from your school records."
-  actions={liveData.sections[0]
-    ? <Link to="/classes" search={{
-        section:liveData.sections[0].sectionId,tab:"lessons",
-        lesson:FIRST_PUBLISHED_LESSON_ROUTE,
-      }} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
-        Start my first lesson →
-      </Link>
-    : <Link to="/student/courses"
-        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
-        View my classes
-      </Link>}>
-  <div className="mt-7 grid gap-3 sm:grid-cols-3">
-   <Link to="/student/courses" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">Classes</p><p className="mt-2 text-3xl font-semibold">{liveData.sections.length}</p></Link>
-   <Link to="/student/assignments" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"To do / due soon":"Upcoming assignments"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":upcomingCount}</p></Link>
+  subtitle="Your schedule, coursework and next steps, all from your school records.">
+  <DailyCanvas audience="student" content={selectDailyCanvasContent([
+    { id: "student-default", audience: "student", priority: "default", headline: "Make today count.", supportingCopy: "A fresh start, a clear next step, and everything you need to keep learning.", campaignLabel: "Your learning day" },
+  ] satisfies DailyCanvasContent[], "student", new Date())}
+   operationalSummary={<span>{liveData.sections.length} classes · {summaryUnavailable ? "Assignments updating" : `${upcomingCount} assignments to do or due soon`}</span>}
+   primaryAction={liveData.sections[0] ? <Link to="/classes" search={{section:liveData.sections[0].sectionId,tab:"lessons",lesson:FIRST_PUBLISHED_LESSON_ROUTE}} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Start learning <ArrowUpRight className="size-4" /></Link> : <Link to="/student/courses" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900">View my classes <ArrowUpRight className="size-4" /></Link>}
+   secondaryAction={<Link to="/student/assignments" className="inline-flex min-h-11 items-center rounded-xl border border-white/70 px-5 py-3 text-sm font-semibold text-white">Assignments</Link>}
+  />
+  <div className="mt-6 grid gap-3 sm:grid-cols-3">
+   <Link to="/student/courses" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="flex items-center gap-2 text-sm text-muted-foreground"><BookOpen className="size-4" /> Classes</p><p className="mt-2 text-3xl font-semibold">{liveData.sections.length}</p></Link>
+   <Link to="/student/assignments" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="flex items-center gap-2 text-sm text-muted-foreground"><CalendarDays className="size-4" /> {success?"To do / due soon":"Upcoming assignments"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":upcomingCount}</p></Link>
    <Link to="/student/assignments" search={{filter:success?"todo":"missing"}} className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"Overdue / missing work":"Missing work"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":overdueCount}</p></Link>
   </div>
   <nav aria-label="Student workspace" className="mt-6 flex flex-wrap gap-2 text-sm">

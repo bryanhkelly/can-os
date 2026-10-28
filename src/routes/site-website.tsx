@@ -1,3 +1,5 @@
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
+import { Eye, Globe2, LockKeyhole, PencilLine } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { emptySiteLocalContent, siteLocalContentLimits, type SiteLocalContent } from "@/domain/site-local-content";
@@ -24,8 +26,9 @@ function PartnerSiteWebsitePage() {
     eyebrow="CAN OS · Church partner website"
     title={data.siteName + " · church website"}
     subtitle={data.organizationName + " · edit local content, review CAN-approved school listings"}>
-    <section className="mt-6 rounded-xl border bg-card p-5">
-      <h2 className="text-xl font-semibold">Your proposed Site address</h2>
+    <WorkflowIntro eyebrow="Your community, your voice" title="Make your school feel local." description="Shape your church's welcome and community story while CAN maintains authoritative school programs, academic claims, and admissions information." actions={<div className="grid gap-3 sm:grid-cols-2"><div className="rounded-2xl border border-border/70 bg-background/90 p-4"><p className="flex items-center gap-2 text-sm font-semibold"><PencilLine className="size-4 text-primary" /> Church-owned content</p><p className="mt-2 text-sm leading-6 text-muted-foreground">Edit and publish local descriptions and theological content without routine CAN approval.</p></div><div className="rounded-2xl border border-border/70 bg-background/90 p-4"><p className="flex items-center gap-2 text-sm font-semibold"><LockKeyhole className="size-4 text-primary" /> CAN institutional content</p><p className="mt-2 text-sm leading-6 text-muted-foreground">Academic listings, launch status, and regulated claims remain controlled by CAN.</p></div></div>} />
+    <section className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+      <h2 className="flex items-center gap-2 font-serif text-2xl font-semibold"><Globe2 className="size-5 text-primary" /> Your proposed Site address</h2>
       {data.host ? <>
         <p className="mt-3 font-mono text-sm">{data.host}</p>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -45,8 +48,8 @@ function PartnerSiteWebsitePage() {
       </p>
     </section>
     {data.host && <LocalWebsiteCopyEditor data={data} />}
-    <section aria-labelledby="partner-preview-title" className="mt-6 rounded-xl border bg-card p-5">
-      <h2 id="partner-preview-title" className="text-xl font-semibold">
+    <section aria-labelledby="partner-preview-title" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+      <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" />
         Private website preview
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">

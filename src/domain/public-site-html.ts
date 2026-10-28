@@ -137,21 +137,21 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
 <title>${school} | Programs</title>
 <meta name="description" content="Explore programs offered through ${school}."/>
 <style>
-:root{font-family:ui-sans-serif,system-ui,sans-serif;color:#1d2939;background:#f7f8fa}
-*{box-sizing:border-box}body{margin:0}header,main,footer{max-width:1024px;margin:auto;padding:0 24px}
-header{padding-top:28px;padding-bottom:24px;border-bottom:1px solid #dce2e8}
+:root{font-family:ui-sans-serif,system-ui,sans-serif;color:#193047;background:#f6f8fa;line-height:1.5}
+*{box-sizing:border-box}body{margin:0}header,main,footer{max-width:1160px;margin:auto;padding-left:clamp(20px,5vw,64px);padding-right:clamp(20px,5vw,64px)}
+header{padding-top:24px;padding-bottom:22px;border-bottom:1px solid #dce2e8;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
 .brand{font-size:.75rem;letter-spacing:.13em;text-transform:uppercase;font-weight:700;color:#475467}
-h1{font-size:clamp(2.2rem,6vw,4rem);letter-spacing:-.04em;margin:18px 0 8px;line-height:1.1}
+h1{font-family:Georgia,serif;font-size:clamp(2.8rem,6vw,5.3rem);letter-spacing:-.055em;margin:18px 0 14px;line-height:1.07;max-width:850px}
 h2{font-size:1.55rem;margin:0 0 10px}.intro{color:#475467;max-width:700px;line-height:1.6}
-main{padding-top:42px;padding-bottom:64px}
+main{padding-top:48px;padding-bottom:80px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:28px}
-.card{border:1px solid #dce2e8;border-radius:14px;padding:24px;background:white}
+.card{border:1px solid #dce2e8;border-radius:20px;padding:clamp(20px,3vw,30px);background:white;box-shadow:0 8px 28px rgba(22,43,66,.045)}
 .card h3{font-size:1.28rem;line-height:1.3;margin:12px 0}
 .tag{font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;color:#475467;font-weight:700}
 .season,.availability{font-size:.9rem;color:#475467;line-height:1.5}
 .price{font-weight:700;font-size:1.16rem;margin-top:20px}
 .empty{padding:28px;border:1px solid #dce2e8;border-radius:14px;background:white}
-.church-section{border:1px solid #dce2e8;border-radius:14px;padding:24px;background:#fff;margin-bottom:36px}
+.church-section{border:1px solid #dce2e8;border-radius:20px;padding:clamp(22px,4vw,40px);background:#fff;margin-bottom:48px}
 .local-field{margin-top:18px}.local-field h3{font-size:1rem;margin:0 0 6px}
 .local-field p{white-space:pre-line;overflow-wrap:anywhere;color:#475467;line-height:1.6;margin:0}
 footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-size:.82rem;color:#667085}
@@ -159,7 +159,15 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .inquiry-form label{display:grid;gap:5px;font-size:.82rem;color:#475467}
 .inquiry-form input:not([type=checkbox]),.inquiry-form textarea{width:100%;padding:10px;border:1px solid #bcc6d2;border-radius:8px;font:inherit}
 .inquiry-form .consent{display:flex;align-items:start;gap:8px;line-height:1.4}
-.inquiry-form button{background:#1d2939;color:white;border:none;border-radius:8px;padding:12px;font-weight:700;cursor:pointer}
+.inquiry-form button{background:#173c60;color:white;border:none;border-radius:10px;padding:14px;font-weight:700;cursor:pointer;min-height:44px}
+.inquiry-form button:hover{background:#245b88}
+:focus-visible{outline:3px solid #e7a84e;outline-offset:3px}
+.public-hero{position:relative;isolation:isolate;overflow:hidden;border-radius:28px;background:linear-gradient(100deg,rgba(9,32,55,.9),rgba(14,51,78,.58)),radial-gradient(ellipse at 85% 35%,#e5ac7b,transparent 55%),linear-gradient(160deg,#5f879b,#203b60);padding:clamp(30px,6vw,70px);color:white;margin-bottom:52px}
+.public-hero h1{color:white}.public-hero .intro{color:#edf3f8;max-width:670px}
+.public-hero::after{content:"";position:absolute;inset:0;z-index:-1;background:#153b55;opacity:.45;clip-path:polygon(0 100%,0 89%,18% 75%,30% 88%,51% 55%,65% 80%,81% 49%,100% 76%,100% 100%)}
+.public-hero .tag{color:#e7d7bd}
+@media(max-width:600px){.grid{grid-template-columns:1fr}.public-hero{border-radius:18px}.card{padding:20px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 .bot-field{display:none}
 </style>
 </head>

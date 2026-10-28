@@ -6,6 +6,7 @@ This directory separates **current specifications** from **historical implementa
 
 - **Development instructions:** `../AGENTS.md` and `../.github/copilot-instructions.md`.
 - **Design invariants:** [architecture](./architecture.md), [domain model](./domain-model.md), [golden flows](./golden-flows.md), and [prototype migration](./prototype-migration.md).
+- **Production design-system source of truth:** [coded components, Storybook, accessibility, branding, and visual regression](./design-system.md).
 - **Current implementation snapshot:** [CURRENT-STATE.md](./CURRENT-STATE.md). Refresh its commit and evidence whenever relying on it for a decision.
 - **Canonical ownership maps:** [capability matrix](./platform-capability-matrix.md), [integration map](./platform-integration-map.md), and machine-readable [route contracts](./platform-route-contracts.json).
 - **Specialist design and operations:** [Ask CAN](./ask-can-agent-platform.md), [identity and access](./identity-and-demo-access.md), [Neon development](./neon-development.md), [field/medical/safety gates](./school-operations-security-gates.md), [R2 documents](./cloudflare-r2-enrollment.md), [school launch](./school-launch-studio-site-workspace.md), [school lifecycle](./school-operations-lifecycle.md), [qualification ADR](./adr-profile-compliance-scale.md), and [capacity model](./educational-capacity-model.md).

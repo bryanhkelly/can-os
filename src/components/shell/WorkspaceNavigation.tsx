@@ -1,6 +1,6 @@
 import {Link,useLocation,useNavigate} from "@tanstack/react-router";
 import {lazy,Suspense,useEffect,useState,type ReactNode} from "react";
-import {Bell,MessageCircle,Search,Menu,Home,BookOpen,Users,CalendarDays,ClipboardList,Settings,MessagesSquare,LifeBuoy} from "lucide-react";
+import {Bell,MessageCircle,Search,Menu,ChevronDown,UserRound,Home,BookOpen,Users,CalendarDays,ClipboardList,Settings,MessagesSquare,LifeBuoy} from "lucide-react";
 import {openPaletteEvent} from "@/lib/workspace-search";
 import {ContextTray} from "@/components/workspace";
 import {useWorkspaceSession} from "./WorkspaceSession";
@@ -10,19 +10,19 @@ const AskCanConversation=lazy(()=>import("@/components/conversation/AskCanConver
 
 export const workspaceHome:Record<string,string>={site_website_editor:"/site-website",room_facilitator:"/site/day",site_staff:"/site/day",site_leader:"/site/day",paraeducator:"/profiles",student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor",network_admin:"/network",can_network_steward:"/network-steward"};
 export const workspaceLinks:Record<string,{title:string;path:string}[]>={
- site_website_editor:[{title:"Site website",path:"/site-website"}],
- room_facilitator:[{title:"Onsite day",path:"/site/day"}],
- site_staff:[{title:"Onsite day",path:"/site/day"}],
- site_leader:[{title:"Onsite day",path:"/site/day"}],
+ site_website_editor:[{title:"Website",path:"/site-website"}],
+ room_facilitator:[{title:"Today",path:"/site/day"},{title:"Attendance",path:"/staff/attendance"},{title:"Roster",path:"/site/day"}],
+ site_staff:[{title:"Today",path:"/site/day"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
+ site_leader:[{title:"Today",path:"/site/day"},{title:"Students",path:"/staff/students"},{title:"Staff",path:"/staff/teachers"},{title:"Schedule",path:"/calendar"},{title:"Attendance",path:"/staff/attendance"},{title:"Community",path:"/site-website"},{title:"Operations",path:"/operations"}],
  paraeducator:[{title:"My profile",path:"/profiles"}],
- network_admin:[{title:"Network locations",path:"/network"}],
+ network_admin:[{title:"Network operations",path:"/network"},{title:"Operations",path:"/operations"}],
  can_network_steward:[{title:"Network contracts",path:"/network-steward"}],
- student:[{title:"Today",path:"/student"},{title:"Assignments",path:"/student/assignments"},{title:"My classes",path:"/student/courses"},{title:"Study groups",path:"/student/study-groups"},{title:"Support",path:"/student/support"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- guardian:[{title:"Family",path:"/guardian"},{title:"Enrichment",path:"/guardian/enrichment"},{title:"Classes",path:"/classes"},{title:"Academics",path:"/guardian/academics"},{title:"Attendance",path:"/guardian/attendance"},{title:"Offers",path:"/guardian/admission-offers"},{title:"Course approvals",path:"/guardian/course-approvals"},{title:"Field trips",path:"/guardian/field-trips"},{title:"Messages",path:"/messages"}],
- teacher:[{title:"Today",path:"/teacher"},{title:"Classes",path:"/classes"},{title:"Gradebook",path:"/teacher/gradebook"},{title:"Students",path:"/staff/students"},{title:"Teachers",path:"/staff/teachers"},{title:"Study groups",path:"/teacher/study-groups"},{title:"Referrals",path:"/student/support"},{title:"Missing work",path:"/teacher/missing-work"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- registrar:[{title:"Operations",path:"/operations"},{title:"Admissions",path:"/admissions"},{title:"Sites",path:"/sites"},{title:"Students",path:"/staff/students"},{title:"School years",path:"/operations/school-years"},{title:"Curriculum",path:"/operations/curriculum"},{title:"Administration",path:"/admin"}],
- specialist:[{title:"Caseload",path:"/coach"},{title:"Referrals & services",path:"/support"},{title:"Students",path:"/staff/students"},{title:"Insights",path:"/operations/insights"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- counselor:[{title:"Counselor caseload",path:"/counselor"},{title:"Referrals & services",path:"/support"},{title:"Students",path:"/staff/students"},{title:"Insights",path:"/operations/insights"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}]
+ student:[{title:"Today",path:"/student"},{title:"Learn",path:"/student/courses"},{title:"My School",path:"/student/my-school"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"},{title:"Support",path:"/student/support"}],
+ guardian:[{title:"Home",path:"/guardian"},{title:"Children",path:"/guardian/academics"},{title:"School",path:"/guardian/experiences"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
+ teacher:[{title:"Today",path:"/teacher"},{title:"Classes",path:"/classes"},{title:"Students",path:"/staff/students"},{title:"Gradebook",path:"/teacher/gradebook"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
+ registrar:[{title:"Operations",path:"/operations"},{title:"Admissions",path:"/admissions"},{title:"Students",path:"/staff/students"},{title:"Sites",path:"/sites"},{title:"School years",path:"/operations/school-years"},{title:"Curriculum",path:"/operations/curriculum"},{title:"Administration",path:"/admin"}],
+ specialist:[{title:"Caseload",path:"/coach"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
+ counselor:[{title:"Caseload",path:"/counselor"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}]
 };
 export function SidebarLinks({links,activePath}:{links:{title:string;path:string}[];activePath?:string}){
  return <nav aria-label="CAN OS primary navigation" className="flex-1 space-y-1 overflow-y-auto p-3">
@@ -45,7 +45,11 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const [changing,setChanging]=useState(false);
  const [tray,setTray]=useState<"notifications"|"ask"|null>(null);
  const [menuOpen,setMenuOpen]=useState(false);
- useEffect(()=>{setTray(null);setMenuOpen(false)},[location.pathname]);
+ const [switcherOpen,setSwitcherOpen]=useState(false);
+ const [switcherQuery,setSwitcherQuery]=useState("");
+ const [switcherMode,setSwitcherMode]=useState<"workspace"|"view-as">("workspace");
+ const [accountOpen,setAccountOpen]=useState(false);
+ useEffect(()=>{setTray(null);setMenuOpen(false);setSwitcherOpen(false);setAccountOpen(false)},[location.pathname]);
  const authenticated=session?.authenticated?session:null;
  const grants=authenticated?.grants??[];
  const current=grants.find(g=>g.id===authenticated?.activeGrantId);
@@ -82,33 +86,31 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  <div className="min-w-0"><header aria-label="Workspace top bar" className="sticky top-0 z-30 border-b bg-card px-4 py-3 sm:px-6">
   <div className="flex min-w-0 flex-wrap items-center gap-3">
    {current&&<button type="button" aria-label={menuOpen?"Close workspace navigation":"Open workspace navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(value=>!value)} className="rounded-lg border p-2 lg:hidden"><Menu className="size-4"/></button>}
-   <Link to={current?(workspaceHome[current.role]??"/"):"/"} className="mr-auto font-serif text-xl font-semibold">CAN OS</Link>
-   {current&&<button type="button" aria-label="Search workspace" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))} className="rounded-lg border px-3 py-2 text-xs"><Search className="mr-1 inline size-3"/>Search</button>}
-   {current?.role==="registrar"&&Boolean(authenticated?.sites.length)&&<label className="text-xs text-muted-foreground">School
-    <select aria-label="Open school operations" value="" className="ml-2 max-w-48 rounded-lg border bg-background p-2" onChange={event=>{if(event.target.value)void navigate({to:"/operations",search:{siteId:event.target.value}});}}>
-     <option value="">Choose school…</option>
-     {authenticated?.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
-    </select>
-   </label>}
-   {current?.role!=="registrar"&&current&&Boolean(authenticated?.sites.length)&&<span className="text-xs text-muted-foreground" title="Schools in this active membership">{authenticated?.sites.map(site=>site.name).join(", ")}</span>}
-   {current?.role==="registrar"&&Boolean(authenticated?.programs.length)&&<label className="text-xs text-muted-foreground">Program
-    <select aria-label="Open program" value="" className="ml-2 max-w-48 rounded-lg border bg-background p-2" onChange={event=>{if(event.target.value)void navigate({to:"/operations/launch/$programId",params:{programId:event.target.value},search:{siteId:undefined,programId:undefined}});}}>
-     <option value="">Choose program…</option>
-     {authenticated?.programs.map(program=><option key={program.id} value={program.id}>{program.name}</option>)}
-    </select>
-   </label>}
-   {current&&<><button type="button" onClick={()=>setTray("notifications")} aria-haspopup="dialog" className="rounded-lg border px-3 py-2 text-xs font-semibold"><Bell className="mr-1 inline size-3" aria-hidden="true"/>Notifications</button>
-    <button type="button" onClick={()=>setTray("ask")} aria-haspopup="dialog" className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background"><MessageCircle className="mr-1 inline size-3" aria-hidden="true"/>Ask CAN</button></>}
-   {authenticated&&<label className="text-xs text-muted-foreground">{authenticated.demoFacilitator?"Demo user":"Workspace"}
-    <select aria-label={authenticated.demoFacilitator?"Demo user":"Active membership"} disabled={changing} value={authenticated.activeGrantId} onChange={event=>{void changeSession(()=>switchGrant(event.target.value));}} className="ml-2 max-w-64 rounded-lg border bg-background p-2">
-     {grants.map(g=><option key={g.id} value={g.id}>{g.firstName} {g.lastName} · {g.role}</option>)}
-    </select>
-   </label>}
-   {authenticated?<button type="button" disabled={changing} onClick={()=>void changeSession(signOut)} className="text-xs font-semibold">Sign out</button>:session&&<Link to="/access" className="text-xs font-semibold">Sign in</Link>}
+   {current?<button type="button" disabled={changing} aria-haspopup="dialog" aria-expanded={switcherOpen} onClick={()=>setSwitcherOpen(true)} className="mr-auto flex min-w-0 max-w-[min(65vw,22rem)] items-center gap-2 rounded-xl border border-border/70 bg-background px-3 py-2 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+    <span className="shrink-0 font-serif text-lg font-semibold">CAN OS</span><span className="min-w-0 border-l pl-2"><span className="block text-xs font-semibold capitalize">{current.role.replaceAll("_"," ")}</span><span className="block truncate text-xs text-muted-foreground">{authenticated?.sites.length===1?authenticated.sites[0].name:authenticated?.sites.length?authenticated.sites.length+" schools":"Your workspace"}</span></span><ChevronDown className="size-4 shrink-0" aria-hidden="true"/>
+   </button>:<Link to="/" className="mr-auto font-serif text-xl font-semibold">CAN OS</Link>}
+   {current&&<button type="button" aria-label="Search or ask CAN" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))} className="rounded-lg border px-3 py-2 text-xs"><Search className="mr-1 inline size-3"/> <span className="hidden sm:inline">Search or ask CAN</span><span className="sm:hidden">Search</span></button>}
+   {current&&<button type="button" onClick={()=>setTray("ask")} aria-label="Ask CAN" aria-haspopup="dialog" className="rounded-lg border p-2 text-xs"><MessageCircle className="size-4" aria-hidden="true"/></button>}
+   {current&&<button type="button" onClick={()=>setTray("notifications")} aria-label="Notifications" aria-haspopup="dialog" className="rounded-lg border p-2"><Bell className="size-4" aria-hidden="true"/></button>}
+   {authenticated?<button type="button" aria-label="Account menu" aria-haspopup="dialog" aria-expanded={accountOpen} onClick={()=>setAccountOpen(true)} className="rounded-full border bg-muted p-2"><UserRound className="size-4" aria-hidden="true"/></button>:session&&<Link to="/access" className="text-xs font-semibold">Sign in</Link>}
    {(error||sessionError)&&<p role="alert" className="w-full rounded-lg border border-amber-500 p-3 text-sm">{error||sessionError}</p>}
    {authenticated?.demoFacilitator&&<p role="status" className="w-full rounded-lg border border-amber-500 p-2 text-xs">Demo admin session: acting as {current?.firstName} {current?.lastName} ({current?.role}). Changes affect shared synthetic data. User switches are audited.</p>}
   </div>
  </header>{children}</div></div>
+ {authenticated&&<><ContextTray title="Workspace switcher" open={switcherOpen} onClose={()=>setSwitcherOpen(false)}>
+  <div className="mb-5 rounded-2xl bg-muted/50 p-4"><p className="font-serif text-2xl font-semibold">{current?.firstName} {current?.lastName}</p><p className="mt-1 text-sm text-muted-foreground capitalize">{current?.role.replaceAll("_"," ")} · {authenticated.sites.length===1?authenticated.sites[0].name:authenticated.sites.length+" schools"}</p></div>
+  <div className="mb-4 grid grid-cols-2 rounded-xl bg-muted p-1" role="group" aria-label="Switcher mode">
+   <button type="button" aria-pressed={switcherMode==="workspace"} onClick={()=>{setSwitcherMode("workspace");setSwitcherQuery("");}} className={"min-h-11 rounded-lg px-3 text-sm font-semibold "+(switcherMode==="workspace"?"bg-background shadow-sm":"text-muted-foreground")}>Switch workspace</button>
+   <button type="button" disabled={!authenticated.demoFacilitator} aria-pressed={switcherMode==="view-as"} onClick={()=>{setSwitcherMode("view-as");setSwitcherQuery("");}} className={"min-h-11 rounded-lg px-3 text-sm font-semibold "+(switcherMode==="view-as"?"bg-background shadow-sm":"text-muted-foreground")}>View As</button>
+  </div>
+  {!authenticated.demoFacilitator&&<p className="mb-4 text-xs text-muted-foreground">View As requires an authorized review session.</p>}
+  <label htmlFor="workspace-switcher-search" className="mb-2 block text-sm font-medium">Search {switcherMode==="workspace"?"workspaces":"review identities"}</label>
+  <input id="workspace-switcher-search" type="search" autoComplete="off" value={switcherQuery} onChange={event=>setSwitcherQuery(event.target.value)} placeholder="Search people, roles, or schools…" className="mb-5 min-h-11 w-full rounded-xl border bg-background px-4 text-sm focus-visible:outline-2 focus-visible:outline-ring"/>
+  <div className="space-y-2">{grants.filter(g=>(switcherMode==="view-as"?authenticated.demoFacilitator:true)&&`${g.firstName} ${g.lastName} ${g.role} ${authenticated.sites.map(site=>site.name).join(" ")}`.toLowerCase().includes(switcherQuery.trim().toLowerCase())).map(g=><button key={g.id} type="button" disabled={changing} aria-current={g.id===authenticated.activeGrantId?"true":undefined} onClick={()=>{if(g.id===authenticated.activeGrantId){setSwitcherOpen(false);return;}void changeSession(()=>switchGrant(g.id));}} className="flex min-h-20 w-full flex-col justify-center rounded-xl border bg-card px-4 py-3 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"><span className="text-sm font-semibold capitalize">{g.role.replaceAll("_"," ")}</span><span className="mt-1 text-xs text-muted-foreground">{g.firstName} {g.lastName}{g.id===authenticated.activeGrantId?" · Active":""}</span></button>)}</div>
+  {switcherMode==="view-as"&&<p role="status" className="mt-5 rounded-xl border border-amber-500 p-3 text-sm">Review identities are limited to this demo session. Changes affect synthetic data and are audited.</p>}
+ </ContextTray><ContextTray title="Account" open={accountOpen} onClose={()=>setAccountOpen(false)}>
+  <div className="space-y-2 text-sm"><Link to="/profiles" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">My profile</Link><Link to="/account/sessions" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">Account sessions</Link><button type="button" onClick={()=>{setAccountOpen(false);setSwitcherOpen(true)}} className="block w-full rounded-lg p-3 text-left hover:bg-muted">Switch workspace</button>{current?.role==="student"&&<Link to="/student/settings" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">Account settings</Link>}<button type="button" disabled={changing} onClick={()=>void changeSession(signOut)} className="block w-full rounded-lg p-3 text-left font-semibold hover:bg-muted">Sign out</button></div>
+ </ContextTray></>}
  {current&&<><ContextTray title="Workspace navigation" open={menuOpen} onClose={()=>setMenuOpen(false)}>
   <p className="mb-3 text-sm font-semibold">{current.firstName} {current.lastName} · {current.role}</p>
   <SidebarLinks links={links} activePath={activePath}/><Link to="/profiles" className="mt-3 block border-t p-3 text-sm underline">My profile</Link><Link to="/account/sessions" className="block p-3 text-sm underline">Account sessions</Link>

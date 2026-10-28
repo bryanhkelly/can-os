@@ -1,3 +1,5 @@
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
+import { ArrowUpRight } from "lucide-react";
 import {useEffect,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {createAdmissionsInquiry,listAdmissionsExistingStudents,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
@@ -66,6 +68,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  return <WorkspaceShell eyebrow="CAN OS · Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
   actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
+  <WorkflowIntro eyebrow="Verified admissions workflow" title="Every applicant, a clear next step." description="Start with a family inquiry, review identity and eligibility, then record decisions in the canonical admissions workflow. A public inquiry never proves guardianship." actions={<a href="#new-inquiry" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">New inquiry <ArrowUpRight className="size-4" /></a>} />
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <PublicInterestInbox items={data.publicInterests.filter(row =>
