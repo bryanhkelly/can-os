@@ -1,3 +1,4 @@
+import { Eye, Globe2, LockKeyhole, PencilLine } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { emptySiteLocalContent, siteLocalContentLimits, type SiteLocalContent } from "@/domain/site-local-content";
@@ -24,8 +25,26 @@ function PartnerSiteWebsitePage() {
     eyebrow="CAN OS · Church partner website"
     title={data.siteName + " · church website"}
     subtitle={data.organizationName + " · edit local content, review CAN-approved school listings"}>
-    <section className="mt-6 rounded-xl border bg-card p-5">
-      <h2 className="text-xl font-semibold">Your proposed Site address</h2>
+    <section aria-label="Website publishing responsibilities" className="relative mt-3 overflow-hidden rounded-3xl border border-border/70 bg-card px-6 py-8 shadow-sm sm:px-9 sm:py-10">
+      <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-64 rounded-full bg-accent opacity-75 blur-3xl" />
+      <div className="relative">
+        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-primary"><Globe2 className="size-4" /> Your community, your voice</p>
+        <h2 className="mt-3 max-w-2xl font-serif text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">Make your school feel local.</h2>
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">Shape your church's welcome and community story while CAN maintains authoritative school programs, academic claims, and admissions information.</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-border/70 bg-background/90 p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold"><PencilLine className="size-4 text-primary" /> Church-owned content</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Edit and publish local descriptions and theological content without routine CAN approval.</p>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-background/90 p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold"><LockKeyhole className="size-4 text-primary" /> CAN institutional content</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Academic listings, launch status, and regulated claims remain controlled by CAN.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+      <h2 className="flex items-center gap-2 font-serif text-2xl font-semibold"><Globe2 className="size-5 text-primary" /> Your proposed Site address</h2>
       {data.host ? <>
         <p className="mt-3 font-mono text-sm">{data.host}</p>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -45,8 +64,8 @@ function PartnerSiteWebsitePage() {
       </p>
     </section>
     {data.host && <LocalWebsiteCopyEditor data={data} />}
-    <section aria-labelledby="partner-preview-title" className="mt-6 rounded-xl border bg-card p-5">
-      <h2 id="partner-preview-title" className="text-xl font-semibold">
+    <section aria-labelledby="partner-preview-title" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+      <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" />
         Private website preview
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
