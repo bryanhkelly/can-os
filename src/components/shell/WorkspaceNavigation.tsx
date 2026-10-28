@@ -46,6 +46,8 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const [tray,setTray]=useState<"notifications"|"ask"|null>(null);
  const [menuOpen,setMenuOpen]=useState(false);
  const [switcherOpen,setSwitcherOpen]=useState(false);
+ const [switcherQuery,setSwitcherQuery]=useState("");
+ const [switcherMode,setSwitcherMode]=useState<"workspace"|"view-as">("workspace");
  const [accountOpen,setAccountOpen]=useState(false);
  useEffect(()=>{setTray(null);setMenuOpen(false);setSwitcherOpen(false);setAccountOpen(false)},[location.pathname]);
  const authenticated=session?.authenticated?session:null;
@@ -95,10 +97,17 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
    {authenticated?.demoFacilitator&&<p role="status" className="w-full rounded-lg border border-amber-500 p-2 text-xs">Demo admin session: acting as {current?.firstName} {current?.lastName} ({current?.role}). Changes affect shared synthetic data. User switches are audited.</p>}
   </div>
  </header>{children}</div></div>
- {authenticated&&<><ContextTray title="Switch workspace" open={switcherOpen} onClose={()=>setSwitcherOpen(false)}>
-  <p className="mb-4 text-sm text-muted-foreground">Choose one of your available workspaces. School and program filters remain within each workspace.</p>
-  <div className="space-y-2">{grants.map(g=><button key={g.id} type="button" disabled={changing} aria-current={g.id===authenticated.activeGrantId?"true":undefined} onClick={()=>{if(g.id===authenticated.activeGrantId){setSwitcherOpen(false);return;}void changeSession(()=>switchGrant(g.id));}} className="flex min-h-16 w-full flex-col justify-center rounded-xl border bg-card px-4 py-3 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"><span className="text-sm font-semibold capitalize">{g.role.replaceAll("_"," ")}</span><span className="text-xs text-muted-foreground">{g.firstName} {g.lastName}{g.id===authenticated.activeGrantId?" · Current":""}</span></button>)}</div>
-  {authenticated.demoFacilitator&&<p role="status" className="mt-5 rounded-xl border border-amber-500 p-3 text-sm">Demo review session: selections may represent other synthetic users. Changes are audited.</p>}
+ {authenticated&&<><ContextTray title="Workspace switcher" open={switcherOpen} onClose={()=>setSwitcherOpen(false)}>
+  <div className="mb-5 rounded-2xl bg-muted/50 p-4"><p className="font-serif text-2xl font-semibold">{current?.firstName} {current?.lastName}</p><p className="mt-1 text-sm text-muted-foreground capitalize">{current?.role.replaceAll("_"," ")} · {authenticated.sites.length===1?authenticated.sites[0].name:authenticated.sites.length+" schools"}</p></div>
+  <div className="mb-4 grid grid-cols-2 rounded-xl bg-muted p-1" role="group" aria-label="Switcher mode">
+   <button type="button" aria-pressed={switcherMode==="workspace"} onClick={()=>{setSwitcherMode("workspace");setSwitcherQuery("");}} className={"min-h-11 rounded-lg px-3 text-sm font-semibold "+(switcherMode==="workspace"?"bg-background shadow-sm":"text-muted-foreground")}>Switch workspace</button>
+   <button type="button" disabled={!authenticated.demoFacilitator} aria-pressed={switcherMode==="view-as"} onClick={()=>{setSwitcherMode("view-as");setSwitcherQuery("");}} className={"min-h-11 rounded-lg px-3 text-sm font-semibold "+(switcherMode==="view-as"?"bg-background shadow-sm":"text-muted-foreground")}>View As</button>
+  </div>
+  {!authenticated.demoFacilitator&&<p className="mb-4 text-xs text-muted-foreground">View As requires an authorized review session.</p>}
+  <label htmlFor="workspace-switcher-search" className="mb-2 block text-sm font-medium">Search {switcherMode==="workspace"?"workspaces":"review identities"}</label>
+  <input id="workspace-switcher-search" type="search" autoComplete="off" value={switcherQuery} onChange={event=>setSwitcherQuery(event.target.value)} placeholder="Search people or roles…" className="mb-5 min-h-11 w-full rounded-xl border bg-background px-4 text-sm focus-visible:outline-2 focus-visible:outline-ring"/>
+  <div className="space-y-2">{grants.filter(g=>(switcherMode==="view-as"?authenticated.demoFacilitator:!authenticated.demoFacilitator||g.firstName===current?.firstName&&g.lastName===current?.lastName)&&`${g.firstName} ${g.lastName} ${g.role}`.toLowerCase().includes(switcherQuery.trim().toLowerCase())).map(g=><button key={g.id} type="button" disabled={changing} aria-current={g.id===authenticated.activeGrantId?"true":undefined} onClick={()=>{if(g.id===authenticated.activeGrantId){setSwitcherOpen(false);return;}void changeSession(()=>switchGrant(g.id));}} className="flex min-h-20 w-full flex-col justify-center rounded-xl border bg-card px-4 py-3 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"><span className="text-sm font-semibold capitalize">{g.role.replaceAll("_"," ")}</span><span className="mt-1 text-xs text-muted-foreground">{g.firstName} {g.lastName}{g.id===authenticated.activeGrantId?" · Active":""}</span></button>)}</div>
+  {switcherMode==="view-as"&&<p role="status" className="mt-5 rounded-xl border border-amber-500 p-3 text-sm">Review identities are limited to this demo session. Changes affect synthetic data and are audited.</p>}
  </ContextTray><ContextTray title="Account" open={accountOpen} onClose={()=>setAccountOpen(false)}>
   <div className="space-y-2 text-sm"><Link to="/profiles" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">My profile</Link><Link to="/account/sessions" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">Account sessions</Link><button type="button" onClick={()=>{setAccountOpen(false);setSwitcherOpen(true)}} className="block w-full rounded-lg p-3 text-left hover:bg-muted">Switch workspace</button>{current?.role==="student"&&<Link to="/student/settings" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">Account settings</Link>}<button type="button" disabled={changing} onClick={()=>void changeSession(signOut)} className="block w-full rounded-lg p-3 text-left font-semibold hover:bg-muted">Sign out</button></div>
  </ContextTray></>}
