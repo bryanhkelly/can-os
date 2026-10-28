@@ -197,7 +197,7 @@ export async function createTerm(
       action: "term.create", entityType: "term", entityId: term.id, scope, after: { ...input },
     });
     await emitEvent(tx, {
-      eventType: "TermCreated", aggregateType: "term", aggregateId: term.id,
+      eventType: EventTypes.TermCreated, aggregateType: "term", aggregateId: term.id,
       actorPersonId: context.actorPersonId, ...scope, payload: { schoolYearId: year.id },
     });
     return term.id;
@@ -273,7 +273,7 @@ export async function createGradingPeriod(
       },
     });
     await emitEvent(tx, {
-      eventType: "GradingPeriodCreated", aggregateType: "grading_period", aggregateId: period.id,
+      eventType: EventTypes.GradingPeriodCreated, aggregateType: "grading_period", aggregateId: period.id,
       actorPersonId: context.actorPersonId, ...scope, payload: { termId: input.termId },
     });
     return period.id;
