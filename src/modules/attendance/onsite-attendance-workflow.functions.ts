@@ -1,289 +1,470 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, type SQL, sql } from "drizzle-orm";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { and, desc, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  academicCalendars,
-  attendanceEvents,
-  attendanceExcuses,
-  deliveryArrangements,
-  documents,
-  enrollments,
-  guardianRelationships,
-  instructionalDays,
-  memberships,
-  people,
-  programRegistrations,
-  programs,
-  roleAssignments,
-  sections,
-  sectionTeachers,
-  sites,
-  studentProfiles,
+  attendanceEvents, attendanceExcuses, documents, enrollments, guardianRelationships,
+  people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
 } from "@/db/schema";
-import { requireCapability } from "@/modules/identity/functions";
-import { AuthorizationError } from "@/modules/identity/command-context";
-import { assertRecordWriteAllowed } from "@/platform/governance/record-governance";
-import {
-  listEffectiveAttendanceEvents,
-  type EffectiveAttendanceEvent,
-} from "@/modules/attendance/effective-events";
-import {
-  closeObsoleteAttendanceExcuse,
-  markOnsiteAttendance,
-  reviewAttendanceExcuse,
-  submitAttendanceExcuse,
-} from "@/modules/attendance/workflow-service";
+import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
+import { requireCurrentSiteLocalDelegate, requiresIndependentChurchLocalDelegation } from "@/modules/operations/site-local-delegation.server";
+import { activeFacilitatorSectionIds, requireCurrentSectionFacilitator } from "@/modules/operations/site-section-facilitators.server";
+import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
+import { siteDate } from "@/domain/expected-attendance";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { loadExpectedAttendanceCoverage } from "./expected-attendance-queries";
+import { closeObsoleteAttendanceExcuse, recordAttendanceRevision, submitAttendanceExcuse, reviewAttendanceExcuse } from "./attendance-service";
 
-type Ctx = Awaited<ReturnType<typeof requireCapability>>;
 const uuid = z.string().uuid();
+const dateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
+  const date = new Date(value + "T12:00:00.000Z");
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}, "Invalid school date");
+const occurrence = (date: string) => date + ":site-day";
 
-/** Staff attendance requires the explicit workflow capability. */
 async function staff(capability: string) {
-  const actor = await requireCapability(capability);
-  if (!actor.actorPersonId) throw new AuthorizationError("staff attendance actor");
+  setResponseHeader("Cache-Control", "private, no-store");
+  const actor = await getCommandContext(getRequest());
+  if (isOnsiteAttendanceRole(actor.role)) {
+    // Onsite staff may ONLY read expected rosters and record attendance;
+    // guardian excuse review and academic/registrar actions remain barred.
+    if (capability !== "attendance.write")
+      throw new AuthorizationError("onsite staff cannot review attendance excuses");
+    assertOnsiteAttendanceScope(actor);
+  } else {
+    assertCapability(actor, capability);
+    if (!["registrar", "teacher"].includes(actor.role))
+      throw new AuthorizationError("verified attendance staff role");
+  }
+  if (!actor.actorPersonId || !actor.scope.programIds?.length ||
+      !actor.scope.siteIds?.length || !actor.scope.organizationIds?.length)
+    throw new AuthorizationError("verified attendance staff grant");
   return actor;
 }
 async function guardian() {
-  const actor = await requireCapability("attendance.excuse.submit");
-  if (actor.role !== "guardian" || !actor.actorPersonId)
-    throw new AuthorizationError("guardian attendance access");
+  setResponseHeader("Cache-Control", "private, no-store");
+  const actor = await getCommandContext(getRequest());
+  assertCapability(actor, "attendance.excuse.submit");
+  if (actor.role !== "guardian" || !actor.actorPersonId ||
+      !actor.scope.programIds?.length || !actor.scope.siteIds?.length)
+    throw new AuthorizationError("verified guardian attendance grant");
   return actor;
 }
 
-/** Canonical onsite expectation: an active program enrollment whose program is onsite. */
-async function expectedProgramEnrollments(date: string, siteIds: string[], programIds: string[]) {
-  const onsitePrograms = await db.select({
-    id: programs.id, name: programs.name, siteId: programs.siteId, organizationId: programs.organizationId,
-  }).from(programs).where(and(
-    inArray(programs.id, programIds), inArray(programs.siteId, siteIds),
-    sql<boolean>"coalesce((" + programs.deliveryModel + ">>'onsite')::boolean, true)",
-  ));
-  if (!onsitePrograms.length) return [];
-  const onsiteProgramIds = onsitePrograms.map(program => program.id);
-  const programEnrollments = await db.select({
-    id: enrollments.id, studentProfileId: enrollments.studentProfileId,
-    programId: enrollments.programId, startsOn: enrollments.startsOn, endsOn: enrollments.endsOn,
-  }).from(enrollments).where(and(
-    eq(enrollments.kind, "program"), eq(enrollments.status, "active"),
-    inArray(enrollments.programId, onsiteProgramIds),
-    lte(enrollments.startsOn, date),
-    sql<boolean>"(" + enrollments.endsOn + " is null or " + enrollments.endsOn + " >= " + date + ")",
-  ));
-  const sectionsByProgram = new Map<string, string[]>();
-  for (const program of onsitePrograms) {
-    const sectionRows = await db.select({ id: sections.id }).from(sections)
-      .where(and(eq(sections.programId, program.id),
-        eq(sections.siteId, program.siteId), eq(sections.active, true)));
-    sectionsByProgram.set(program.id, sectionRows.map(row => row.id));
+/** Convert midnight in the school's zone into an absolute instant (DST-safe). */
+function siteDayStart(date: string, timeZone: string): Date {
+  const target = Date.parse(date + "T00:00:00.000Z");
+  const format = new Intl.DateTimeFormat("en-US", {
+    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  });
+  let instant = target;
+  for (let i = 0; i < 4; i++) {
+    const wall = Object.fromEntries(format.formatToParts(new Date(instant))
+      .filter(p => p.type !== "literal").map(p => [p.type, p.value]));
+    const actual = Date.UTC(Number(wall.year), Number(wall.month) - 1, Number(wall.day),
+      Number(wall.hour), Number(wall.minute));
+    const delta = target - actual;
+    if (!delta) break;
+    instant += delta;
   }
-  return programEnrollments.map(enrollment => ({
-    ...enrollment,
-    program: onsitePrograms.find(program => program.id === enrollment.programId)!,
-    sectionIds: sectionsByProgram.get(enrollment.programId) ?? [],
-  }));
+  return new Date(instant);
 }
 
-/** Programs with instructional time configured for the date (calendar + day types). */
-async function instructionalProgramsForDate(date: string, siteIds: string[], programIds: string[]) {
-  const year = date.slice(0, 4);
-  const calendarRows = await db.select({
-    id: academicCalendars.id, programId: academicCalendars.programId,
-  }).from(academicCalendars).where(and(
-    inArray(academicCalendars.programId, programIds),
-    inArray(academicCalendars.siteId, siteIds),
-    lte(academicCalendars.startsOn, `${year}-01-01`),
-    gte(academicCalendars.endsOn, `${year}-12-31`),
-  ));
-  if (!calendarRows.length) return new Map<string, { status: string; dayType: string | null }>();
-  const dayRows = await db.select({
-    calendarId: instructionalDays.calendarId, date: instructionalDays.date,
-    dayType: instructionalDays.dayType,
-  }).from(instructionalDays).where(and(
-    inArray(instructionalDays.calendarId, calendarRows.map(row => row.id)),
-    eq(instructionalDays.date, date),
-  ));
-  const dayByCalendar = new Map(dayRows.map(row => [row.calendarId, row]));
-  return new Map(calendarRows.map(row => [row.programId, {
-    status: dayByCalendar.has(row.id) ? "scheduled" : "unscheduled",
-    dayType: dayByCalendar.get(row.id)?.dayType ?? null,
-  }]));
+async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, selectedId?: string) {
+  // The inner join on sites guarantees a non-null site for every row.
+  const rows = (await db.select({
+    id: programs.id, name: programs.name, organizationId: programs.organizationId,
+    siteId: programs.siteId, deliveryModel: programs.deliveryModel,
+    timezone: sites.timezone,
+  }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
+    .where(and(
+      inArray(programs.id, actor.scope.programIds!),
+      inArray(programs.organizationId, actor.scope.organizationIds!),
+      inArray(programs.siteId, actor.scope.siteIds!),
+      ...(isOnsiteAttendanceRole(actor.role) ? [eq(programs.siteId, actor.grantSiteId!)] : []),
+      ...(selectedId ? [eq(programs.id, selectedId)] : []),
+    ))).filter((row): row is Omit<typeof row, "siteId"> & { siteId: string } =>
+      row.siteId !== null);
+  const onsite = rows.filter(p => p.deliveryModel.onsite === true);
+  // An independently hosted CAN school has explicit director and named
+  // Section facilitator appointments, NOT a site_staff-wide roster role.
+  // A generic staff grant must never reveal the church's children or enable
+  // the attendance command, including an offline mutation replay.
+  if(actor.role==="site_staff"){
+    const permitted=[];
+    for(const program of onsite){
+      if(!await requiresIndependentChurchLocalDelegation(db,program.id))
+        permitted.push(program);
+    }
+    return permitted;
+  }
+  // Verified role/site membership alone no longer exposes the whole church's
+  // pupil roster. Named director/facilitator delegation is Program-scoped.
+  if (actor.role !== "site_leader" && actor.role !== "room_facilitator")
+    return onsite;
+  const delegated = [];
+  for (const program of onsite) {
+    try {
+      if (actor.role === "site_leader") {
+        await requireCurrentSiteLocalDelegate(db, actor, program.id, "site_director");
+      } else if (await requiresIndependentChurchLocalDelegation(db, program.id)) {
+        const sections = await activeFacilitatorSectionIds(db, actor, program.id);
+        if (!sections.length) continue;
+      }
+      delegated.push(program);
+    } catch (error) {
+      if (!(error instanceof AuthorizationError)) throw error;
+    }
+  }
+  return delegated;
 }
 
-/** Whether a student is expected on site: program expectation intersected with enrollment window. */
-async function resolveExpectedRoster(date: string, actor: Ctx, studentId?: string) {
-  const siteIds = actor.scope.siteIds ?? [];
-  const programIds = actor.scope.programIds ?? [];
-  if (!siteIds.length || !programIds.length) return { students: [], programs: [] };
-  const programEnrollments = await expectedProgramEnrollments(date, siteIds, programIds);
-  const students = studentId
-    ? programEnrollments.filter(enrollment => enrollment.studentProfileId === studentId)
-    : programEnrollments;
-  return { students, programs: [...new Map(programEnrollments.map(e => [e.programId, e.program])).values()] };
+/** One server-authorized program/student/date entitlement, used for reads and writes. */
+async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
+  date: string, programId?: string, studentId?: string) {
+  const programsAtSite = await scopedOnsitePrograms(actor, programId);
+  const expectedIds = new Map<string, Set<string>>();
+  const coverage = await loadExpectedAttendanceCoverage(programsAtSite, [], new Date(), 1,
+    { date, studentIds: expectedIds });
+  const activePrograms = programsAtSite.filter(p => siteDate(new Date(), p.timezone) >= date);
+
+  // A registrar can manage a program roster. A teacher can only mark a
+  // student in an active section they are actually assigned to teach.
+  const permittedIds = activePrograms.map(p => p.id);
+  if (!permittedIds.length) return { roster: [], coverage, programsAtSite };
+
+  // A child is expected at an independently church-hosted CAN school
+  // only after placement in a real instructional Section. A Program-only
+  // admission is not a safe, supervised classroom placement.
+  const independentPrograms=new Set<string>();
+  for(const program of activePrograms){
+    if(await requiresIndependentChurchLocalDelegation(db,program.id))
+      independentPrograms.add(program.id);
+  }
+  // A facilitator may read ONLY children currently assigned to a Section
+  // with an effective named appointment—not the entire Program roster.
+  const sectionFilter = new Set<string>();
+  if (actor.role === "room_facilitator") {
+    for (const program of activePrograms) {
+      if (await requiresIndependentChurchLocalDelegation(db, program.id)) {
+        for (const id of await activeFacilitatorSectionIds(db, actor, program.id))
+          sectionFilter.add(id);
+      } else {
+        // Existing non-independent sites continue using established staff grants.
+        const rows = await db.select({ id: sections.id }).from(sections)
+          .where(and(eq(sections.programId, program.id),
+            eq(sections.siteId, program.siteId), eq(sections.active, true)));
+        for (const row of rows) sectionFilter.add(row.id);
+      }
+    }
+  }
+  const programRoster = (actor.role === "registrar" ||
+    actor.role === "site_leader" || actor.role === "site_staff") ? await db.select({
+    studentProfileId: enrollments.studentProfileId, programId: enrollments.programId,
+    preferredName: people.preferredName, firstName: people.legalFirstName,
+    lastName: people.legalLastName,
+  }).from(enrollments)
+    .innerJoin(studentProfiles, eq(studentProfiles.id, enrollments.studentProfileId))
+    .innerJoin(people, eq(people.id, studentProfiles.personId))
+    .where(and(eq(enrollments.kind, "program"), eq(enrollments.status, "active"),
+      inArray(enrollments.programId, permittedIds),
+      ...(studentId ? [eq(enrollments.studentProfileId, studentId)] : []))) : [];
+
+  // A stale Section enrollment does not establish physical attendance
+  // eligibility after its Program enrollment or school year is withdrawn.
+  const activeProgramEnrollment=alias(enrollments,"onsite_current_program_enrollment");
+  const sectionsAtSite = await db.select({
+    studentProfileId: enrollments.studentProfileId, programId: sections.programId,
+    siteId: sections.siteId, sectionId: sections.id, sectionTitle: sections.title,
+    preferredName: people.preferredName, firstName: people.legalFirstName,
+    lastName: people.legalLastName,
+  }).from(enrollments)
+    .innerJoin(sections, eq(sections.id, enrollments.sectionId))
+    .innerJoin(terms, eq(terms.id, sections.termId))
+    .innerJoin(activeProgramEnrollment,and(
+      eq(activeProgramEnrollment.studentProfileId,enrollments.studentProfileId),
+      eq(activeProgramEnrollment.programId,sections.programId),
+      eq(activeProgramEnrollment.schoolYearId,terms.schoolYearId),
+      eq(activeProgramEnrollment.kind,"program"),
+      eq(activeProgramEnrollment.status,"active"),
+    ))
+    .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
+    .innerJoin(studentProfiles, eq(studentProfiles.id, enrollments.studentProfileId))
+    .innerJoin(people, eq(people.id, studentProfiles.personId))
+    .leftJoin(sectionTeachers, eq(sectionTeachers.sectionId, sections.id))
+    .where(and(eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
+      eq(enrollments.programId,sections.programId),
+      eq(enrollments.schoolYearId,terms.schoolYearId),
+      eq(sections.active, true), eq(schoolYears.status, "active"),
+      lte(schoolYears.startsOn, date), gte(schoolYears.endsOn, date),
+      inArray(sections.programId, permittedIds),
+      inArray(sections.siteId, actor.scope.siteIds!),
+      ...(actor.role === "room_facilitator" ? [inArray(sections.id, [...sectionFilter])] : []),
+      ...(actor.role === "teacher" ? [eq(sectionTeachers.personId, actor.actorPersonId!)] :
+        []),
+      ...(studentId ? [eq(enrollments.studentProfileId, studentId)] : [])));
+  const byKey = new Map<string, {
+    studentProfileId: string; programId: string; studentName: string;
+    sectionTitle: string | null; siteId: string; sectionId: string | null;
+  }>();
+  for (const row of programRoster) {
+    // Keep planning and enrollment lists separate from the live school's
+    // physical attendance roster until this child has a real Section.
+    if (!row.programId || independentPrograms.has(row.programId) ||
+        !expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
+    const host = activePrograms.find(p => p.id === row.programId)!;
+    byKey.set(row.programId + ":" + row.studentProfileId, {
+      studentProfileId: row.studentProfileId, programId: row.programId,
+      studentName: row.preferredName ?? (row.firstName + " " + row.lastName),
+      sectionTitle: null, siteId: host.siteId!, sectionId: null,
+    });
+  }
+  for (const row of sectionsAtSite) {
+    if (!expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
+    const host = activePrograms.find(p => p.id === row.programId);
+    if (!host || host.siteId !== row.siteId) continue;
+    const key = row.programId + ":" + row.studentProfileId;
+    const old = byKey.get(key);
+    byKey.set(key, {
+      studentProfileId: row.studentProfileId, programId: row.programId,
+      studentName: row.preferredName ?? (row.firstName + " " + row.lastName),
+      sectionTitle: old?.sectionTitle ?? row.sectionTitle,
+      siteId: row.siteId!, sectionId: old?.sectionId ?? row.sectionId,
+    });
+  }
+  return { roster: [...byKey.values()], coverage, programsAtSite };
 }
 
-/**
- * Staff day view: the expected onsite roster with the current effective mark
- * for each student (correction chains collapsed) plus program configuration
- * warnings when calendar/scheduling prerequisites are missing.
- */
+/** Localized date and verified site identity for room facilitators. */
 export const getOnsiteStaffDayContext = createServerFn({ method: "GET" })
-  .validator((value: unknown) => z.object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), studentProfileId: uuid.optional(),
-  }).parse(value))
-  .handler(async ({ data }) => {
-    const actor = await staff("attendance.record");
-    const { students, programs: onsitePrograms } = await resolveExpectedRoster(data.date, actor, data.studentProfileId);
-    if (!students.length) return { programs: [], students: [] };
-    const profileIds = [...new Set(students.map(e => e.studentProfileId))];
-    const [profileRows, effectiveEvents, instructional] = await Promise.all([
-      db.select({
-        id: studentProfiles.id, personId: studentProfiles.personId,
-        firstName: people.preferredName, legalFirstName: people.legalFirstName, legalLastName: people.legalLastName,
-      }).from(studentProfiles)
-        .innerJoin(people, eq(people.id, studentProfiles.personId))
-        .where(inArray(studentProfiles.id, profileIds)),
-      listEffectiveAttendanceEvents({ studentProfileIds: profileIds, date: data.date }),
-      instructionalProgramsForDate(data.date, actor.scope.siteIds ?? [], actor.scope.programIds ?? []),
-    ]);
-    const eventByStudent = new Map(effectiveEvents.map(event => [event.studentProfileId, event]));
+  .handler(async () => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    const actor = await getCommandContext(getRequest());
+    assertOnsiteAttendanceScope(actor);
+    const [site] = await db.select({
+      id: sites.id, name: sites.name, timezone: sites.timezone,
+      organizationId: sites.organizationId,
+    }).from(sites).where(eq(sites.id, actor.grantSiteId!)).limit(1);
+    if (!site || !actor.scope.organizationIds?.includes(site.organizationId))
+      throw new AuthorizationError("site day organization and site match");
     return {
-      programs: onsitePrograms.map(program => ({
-        id: program.id, name: program.name,
-        configuration: instructional.has(program.id)
-          ? (instructional.get(program.id)!.dayType === "instructional" ? "configured" : "not_instructional")
-          : "missing_calendar",
-        missingCalendarDates: instructional.has(program.id) ? 0 : 1,
-      })),
-      students: students.map(enrollment => {
-        const profile = profileRows.find(row => row.id === enrollment.studentProfileId);
-        const event = eventByStudent.get(enrollment.studentProfileId);
-        return {
-          studentProfileId: enrollment.studentProfileId,
-          programId: enrollment.programId,
-          studentName: profile ? (profile.firstName ?? `${profile.legalFirstName} ${profile.legalLastName}`) : "Student",
-          programName: enrollment.program.name,
-          sectionTitle: null as string | null,
-          status: event?.status ?? "unmarked",
-          attendanceEventId: event?.id ?? null,
-        };
-      }),
+      siteId: site.id, siteName: site.name, timeZone: site.timezone,
+      date: siteDate(new Date(), site.timezone),
+      note: "Staff-recorded onsite attendance. Online activity does not establish physical presence or departure.",
     };
   });
 
-export const listExpectedOnsiteRoster = getOnsiteStaffDayContext;
-
-/**
- * Record or correct a day's attendance mark. The mutation is idempotent on
- * mutationId and optimistic-locked on expectedPreviousEventId so offline
- * queues cannot silently overwrite a newer school record.
- */
-export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
+export const listExpectedOnsiteRoster = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({
-    studentProfileId: uuid, programId: uuid,
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    status: z.enum(["present", "absent", "tardy"]),
-    mutationId: uuid, note: z.string().max(2000).default(""),
-    expectedPreviousEventId: uuid.nullish(),
+    date: dateField, programId: uuid.optional(),
   }).parse(value))
   .handler(async ({ data }) => {
-    const actor = await staff("attendance.record");
-    const [program] = await db.select({
-      id: programs.id, siteId: programs.siteId, organizationId: programs.organizationId,
-    }).from(programs).where(eq(programs.id, data.programId)).limit(1);
-    if (!program || !program.siteId || !actor.scope.siteIds?.includes(program.siteId) ||
-      !actor.scope.programIds?.includes(program.id) ||
-      !actor.scope.organizationIds?.includes(program.organizationId))
-      throw new AuthorizationError("onsite attendance program scope");
-    const [enrollment] = await db.select({ id: enrollments.id }).from(enrollments).where(and(
-      eq(enrollments.studentProfileId, data.studentProfileId),
-      eq(enrollments.programId, data.programId),
-      eq(enrollments.kind, "program"), eq(enrollments.status, "active"),
-    )).limit(1);
-    if (!enrollment) throw new Error("Student is not actively enrolled in this program");
-    const replay = await db.select({
-      id: attendanceEvents.id,
-      occurrenceKey: attendanceEvents.occurrenceKey,
-      sectionId: attendanceEvents.sectionId,
-      status: attendanceEvents.status,
-      recordedAt: attendanceEvents.recordedAt,
+    const actor = await staff("attendance.write");
+    const { roster, coverage, programsAtSite } = await resolveExpectedRoster(actor,
+      data.date, data.programId);
+    const rosterIds = [...new Set(roster.map(r => r.studentProfileId))];
+    const events = rosterIds.length ? await db.select({
+      id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
+      programId: attendanceEvents.programId, occurrenceKey: attendanceEvents.occurrenceKey,
+      status: attendanceEvents.status, recordedAt: attendanceEvents.recordedAt,
     }).from(attendanceEvents).where(and(
-      eq(attendanceEvents.studentProfileId, data.studentProfileId),
-      eq(attendanceEvents.programId, data.programId),
-      eq(attendanceEvents.occurrenceKey, data.date),
-    ));
-    const [current] = effectiveAttendanceEvents(replay);
-    if (current && data.expectedPreviousEventId !== undefined &&
-      data.expectedPreviousEventId !== (current?.id ?? null))
-      throw new Error("Attendance conflict: a newer school record exists. Refresh before correcting");
-    const result = await markOnsiteAttendance(actor, {
-      studentProfileId: data.studentProfileId,
-      programId: data.programId,
-      siteId: program.siteId,
+      inArray(attendanceEvents.programId, programsAtSite.map(p => p.id)),
+      inArray(attendanceEvents.studentProfileId, rosterIds),
+      eq(attendanceEvents.occurrenceKey, occurrence(data.date)))) : [];
+    const effective = new Map(effectiveAttendanceEvents(events)
+      .map(e => [e.programId + ":" + e.studentProfileId, e]));
+    return {
       date: data.date,
-      status: data.status,
-      note: data.note || undefined,
-      mutationId: data.mutationId,
-    });
-    return { attendanceEventId: result.attendanceEventId, status: data.status };
+      programs: programsAtSite.map(p => ({
+        id: p.id, name: p.name, configuration: coverage.get(p.id)?.configuration ?? "not_onsite",
+        expectedDays: coverage.get(p.id)?.expectedDays ?? 0,
+        missingCalendarDates: coverage.get(p.id)?.daysWithoutCalendarConfiguration ?? 0,
+      })),
+      students: roster.map(r => {
+        const record = effective.get(r.programId + ":" + r.studentProfileId);
+        return {
+          studentProfileId: r.studentProfileId, programId: r.programId,
+          programName: programsAtSite.find(p => p.id === r.programId)!.name,
+          studentName: r.studentName, sectionTitle: r.sectionTitle,
+          occurrenceKey: occurrence(data.date),
+          attendanceEventId: record?.id ?? null,
+          status: record?.status ?? "unmarked",
+        };
+      }).sort((a, b) => a.studentName.localeCompare(b.studentName) ||
+        a.programName.localeCompare(b.programName)),
+    };
   });
 
-/** Collapse a correction chain to the latest effective event per occurrence. */
-function effectiveAttendanceEvents<T extends { id: string; recordedAt: Date }>(events: T[]): T[] {
-  const latest = new Map<string, T>();
-  for (const event of [...events].sort((a, b) => a.recordedAt.getTime() - b.recordedAt.getTime())) {
-    latest.set("latest", event);
-  }
-  return [...latest.values()];
-}
+export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    date: dateField, studentProfileId: uuid, programId: uuid,
+    status: z.enum(["present", "absent", "tardy"]),
+    mutationId: uuid, expectedPreviousEventId: uuid.nullable().optional(),
+    note: z.string().max(2000).optional(),
+  }).parse(value))
+  .handler(async ({ data }) => {
+    const actor = await staff("attendance.write");
+    const [program] = await scopedOnsitePrograms(actor, data.programId);
+    if (!program) throw new AuthorizationError("attendance program scope");
+    if (data.date > siteDate(new Date(), program.timezone))
+      throw new Error("Future attendance dates cannot be marked");
 
-/** Guardian read model: the student's effective absences with excuse state. */
+    // A previously committed offline mutation can be retried safely without
+    // requiring a student to retain enrollment after the original mark.
+    const [replay] = await db.select({
+      id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
+      programId: attendanceEvents.programId, status: attendanceEvents.status,
+      occurrenceKey: attendanceEvents.occurrenceKey, sectionId: attendanceEvents.sectionId,
+    }).from(attendanceEvents).where(
+      eq(attendanceEvents.sourceKey, "manual-revision:" + data.mutationId)).limit(1);
+    if (replay) {
+      if (replay.studentProfileId !== data.studentProfileId ||
+        replay.programId !== data.programId || replay.occurrenceKey !== occurrence(data.date) ||
+        replay.status !== data.status)
+        throw new Error("Attendance mutation ID was already used for different input");
+      if (isOnsiteAttendanceRole(actor.role)) {
+        assertOnsiteAttendanceScope(actor, program.siteId);
+        if (actor.role === "room_facilitator" &&
+            await requiresIndependentChurchLocalDelegation(db, program.id)) {
+          if (!replay.sectionId) throw new AuthorizationError("replay requires a named Section");
+          await requireCurrentSectionFacilitator(db, actor, program.id, replay.sectionId);
+        }
+      }
+      if (actor.role === "teacher") {
+        if (!replay.sectionId) throw new AuthorizationError("teacher attendance replay section");
+        const [assignment] = await db.select({ id: sectionTeachers.id })
+          .from(sectionTeachers).where(and(
+            eq(sectionTeachers.sectionId, replay.sectionId),
+            eq(sectionTeachers.personId, actor.actorPersonId!))).limit(1);
+        if (!assignment) throw new AuthorizationError("teacher attendance replay assignment");
+      }
+      return { attendanceEventId: replay.id };
+    }
+
+    if (isOnsiteAttendanceRole(actor.role)) {
+      assertOnsiteAttendanceScope(actor, program.siteId);
+      // Permit bounded staff-attested corrections for a missed onsite day;
+      // never permit unrestricted backdating or future attendance.
+      const earliest = siteDate(new Date(Date.now() - 30 * 86400_000), program.timezone);
+      if (data.date < earliest || data.date > siteDate(new Date(), program.timezone))
+        throw new AuthorizationError("onsite staff attendance limited to recent school-local days");
+      if (data.expectedPreviousEventId === undefined)
+        throw new AuthorizationError("onsite correction requires prior-record acknowledgement");
+      if (data.expectedPreviousEventId && (data.note?.trim().length ?? 0) < 10)
+        throw new Error("Explain any onsite attendance correction (10 characters minimum)");
+    }
+    const { roster } = await resolveExpectedRoster(actor, data.date, data.programId,
+      data.studentProfileId);
+    const eligible = roster.find(r => r.programId === data.programId &&
+      r.studentProfileId === data.studentProfileId);
+    if (!eligible) throw new AuthorizationError(
+      "No authorized scheduled onsite enrollment for this student/program/date");
+    const attendanceEventId = await recordAttendanceRevision(actor, {
+      studentProfileId: eligible.studentProfileId,
+      programId: eligible.programId, siteId: eligible.siteId,
+      sectionId: eligible.sectionId ?? undefined,
+      occurrenceKey: occurrence(data.date), status: data.status,
+      expectedAt: siteDayStart(data.date, program.timezone),
+      mutationId: data.mutationId, note: data.note,
+      expectedPreviousEventId: data.expectedPreviousEventId,
+      requireExpectedOnsiteDate: data.date,
+    });
+    return { attendanceEventId };
+  });
+
+/**
+ * Guardian read model: pick the latest correction for each entire occurrence,
+ * not the old absent-event subset. Keep an excuse attached to its original
+ * event and expose a new excuse control only for the latest absent/tardy mark.
+ */
 export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
-  .validator((value: unknown) => z.object({ studentProfileId: uuid }).parse(value))
+  .validator((value: unknown) => z.object({
+    studentPersonId: uuid.optional(),
+  }).parse(value ?? {}))
   .handler(async ({ data }) => {
     const actor = await guardian();
-    const [profile] = await db.select({ personId: studentProfiles.personId })
-      .from(studentProfiles).where(eq(studentProfiles.id, data.studentProfileId)).limit(1);
-    const [relation] = profile ? await db.select({ id: guardianRelationships.id })
-      .from(guardianRelationships).where(and(
-        eq(guardianRelationships.guardianPersonId, actor.actorPersonId!),
-        eq(guardianRelationships.studentPersonId, profile.personId),
-        eq(guardianRelationships.canViewAcademics, true))).limit(1) : [];
-    if (!relation) throw new AuthorizationError("guardian cannot view this student");
-    const rows = await db.select({
-      id: attendanceEvents.id, status: attendanceEvents.status,
-      occurrenceKey: attendanceEvents.occurrenceKey, expectedAt: attendanceEvents.expectedAt,
-      recordedAt: attendanceEvents.recordedAt,
-      programId: attendanceEvents.programId, programName: programs.name,
-    }).from(attendanceEvents)
-      .innerJoin(programs, eq(programs.id, attendanceEvents.programId))
-      .where(and(
-        eq(attendanceEvents.studentProfileId, data.studentProfileId),
-        inArray(attendanceEvents.status, ["absent", "tardy"]),
-        inArray(attendanceEvents.programId, actor.scope.programIds ?? []),
-      )).orderBy(desc(attendanceEvents.recordedAt)).limit(100);
-    const effective = new Set(effectiveAttendanceEvents(rows).map(row => row.id));
-    const excuseRows = rows.length ? await db.select({
+    const relationships = await db.select({
+      studentPersonId: guardianRelationships.studentPersonId,
+      preferredName: people.preferredName, firstName: people.legalFirstName,
+      lastName: people.legalLastName,
+    }).from(guardianRelationships)
+      .innerJoin(people, eq(people.id, guardianRelationships.studentPersonId))
+      .where(and(eq(guardianRelationships.guardianPersonId, actor.actorPersonId!),
+        eq(guardianRelationships.canViewAcademics, true),
+        ...(data.studentPersonId ?
+          [eq(guardianRelationships.studentPersonId, data.studentPersonId)] : [])));
+    if (!relationships.length) return { absences: [] };
+    const profiles = await db.select({
+      id: studentProfiles.id, personId: studentProfiles.personId,
+    }).from(studentProfiles).where(
+      inArray(studentProfiles.personId, relationships.map(r => r.studentPersonId)));
+    if (!profiles.length) return { absences: [] };
+
+    const cutoff = new Date(Date.now() - 45 * 86400000);
+    const records = await db.select({
+      id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
+      programId: attendanceEvents.programId, siteId: attendanceEvents.siteId,
+      occurrenceKey: attendanceEvents.occurrenceKey, status: attendanceEvents.status,
+      expectedAt: attendanceEvents.expectedAt, recordedAt: attendanceEvents.recordedAt,
+    }).from(attendanceEvents).where(and(
+      inArray(attendanceEvents.studentProfileId, profiles.map(p => p.id)),
+      inArray(attendanceEvents.programId, actor.scope.programIds!),
+      inArray(attendanceEvents.siteId, actor.scope.siteIds!),
+      gte(attendanceEvents.expectedAt, cutoff),
+      lte(attendanceEvents.expectedAt, new Date())));
+    if (!records.length) return { absences: [] };
+    const facts = effectiveAttendanceEvents(records);
+    const allByOccurrence = new Map<string, typeof records>();
+    for (const row of records) {
+      const key = [row.studentProfileId, row.programId, row.occurrenceKey].join(":");
+      const history = allByOccurrence.get(key) ?? [];
+      history.push(row);
+      allByOccurrence.set(key, history);
+    }
+    const excuses = await db.select({
       id: attendanceExcuses.id, attendanceEventId: attendanceExcuses.attendanceEventId,
       status: attendanceExcuses.status, reason: attendanceExcuses.reason,
-      reviewNote: attendanceExcuses.reviewNote,
-      reviewedAt: attendanceExcuses.reviewedAt,
+      reviewNote: attendanceExcuses.reviewNote, reviewedAt: attendanceExcuses.reviewedAt,
+      createdAt: attendanceExcuses.createdAt,
     }).from(attendanceExcuses).where(
-      inArray(attendanceExcuses.attendanceEventId, rows.map(row => row.id))) : [];
-    const excuseByEvent = new Map(excuseRows.map(row => [row.attendanceEventId, row]));
+      inArray(attendanceExcuses.attendanceEventId, records.map(r => r.id)))
+      .orderBy(desc(attendanceExcuses.createdAt));
+
+    const profileToPerson = new Map(profiles.map(p => [p.id, p.personId]));
+    const nameByPerson = new Map(relationships.map(r => [r.studentPersonId,
+      r.preferredName ?? (r.firstName + " " + r.lastName)]));
     return {
-      absences: rows
-        .filter(row => effective.has(row.id))
-        .map(row => {
-          const excuse = excuseByEvent.get(row.id);
+      absences: facts.filter(f => {
+        const key = [f.studentProfileId, f.programId, f.occurrenceKey].join(":");
+        return allByOccurrence.get(key)?.some(r => r.status === "absent" ||
+          r.status === "tardy") ?? false;
+      }).sort((a, b) => b.expectedAt.getTime() - a.expectedAt.getTime())
+        .slice(0, 50).map(f => {
+          const key = [f.studentProfileId, f.programId, f.occurrenceKey].join(":");
+          const history = allByOccurrence.get(key) ?? [];
+          const earliest = [...history].sort((a, b) =>
+            a.recordedAt.getTime() - b.recordedAt.getTime())[0]!;
+          // A later absence after an approved excuse is a NEW case: do not
+          // mask it behind the historical approval for the earlier mark.
+          const excuse = excuses.find(e => e.attendanceEventId === f.id) ??
+            (f.status === "excused" ? excuses.find(e => e.status === "approved" &&
+              history.some(r => r.id === e.attendanceEventId)) : undefined);
+          const eventId = excuse?.attendanceEventId ?? f.id;
           return {
-            attendanceEventId: row.id, status: row.status,
-            date: row.occurrenceKey, expectedAt: row.expectedAt?.toISOString() ?? null,
-            programName: row.programName,
-            history: rows
-              .filter(other => other.occurrenceKey === row.occurrenceKey)
-              .map(other => ({
-                status: other.status, recordedAt: other.recordedAt.toISOString(),
+            attendanceEventId: eventId,
+            relatedAttendanceEventIds: history.map(row => row.id),
+            studentPersonId: profileToPerson.get(f.studentProfileId) ?? "",
+            studentName: nameByPerson.get(profileToPerson.get(f.studentProfileId) ?? "") ?? "Student",
+            expectedAt: f.expectedAt.toISOString(),
+            status: f.status, originalStatus: earliest.status,
+            historicalExcuses: excuses.filter(row => history.some(event => event.id === row.attendanceEventId) &&
+              row.id !== excuse?.id).map(row => ({
+                excuseId: row.id, attendanceEventId: row.attendanceEventId, status: row.status,
+                reason: row.reason, reviewNote: row.reviewNote,
                 reviewedAt: row.reviewedAt?.toISOString() ?? null,
               })),
             excuse: excuse ? {
@@ -336,6 +517,7 @@ export const submitEffectiveAttendanceExcuse = createServerFn({ method: "POST" }
     const excuseId = await submitAttendanceExcuse(actor, data);
     return { excuseId };
   });
+
 
 /**
  * Read and review the same current correction chain as a guardian sees.

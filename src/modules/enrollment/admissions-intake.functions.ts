@@ -7,6 +7,7 @@ import { assertPublicInterestConversion } from "@/domain/public-interest-convers
 import { applicationGuardianContact } from "@/domain/application-guardian-contact";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { EventTypes } from "@/domain/event-types";
 import { assertRecordWriteAllowed } from "@/modules/_demo/record-write-gate";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
@@ -339,14 +340,14 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
         contactReviewConfirmed:true,guardianRelationshipVerification:"pending"},
     });
     await emitEvent(tx,{
-      eventType:"PublicAdmissionsInterestConverted",
+      eventType:EventTypes.PublicAdmissionsInterestConverted,
       aggregateType:"public_admissions_interest",aggregateId:interestToConvert.id,
       actorPersonId:actor.actorPersonId,
       organizationId:program.organizationId,siteId:program.siteId,programId:data.programId,
       payload:{applicationId:application!.id,status:"converted"},
     });
    }
-   await emitEvent(tx,{eventType:"AdmissionsInquiryCreated",aggregateType:"application",
+   await emitEvent(tx,{eventType:EventTypes.AdmissionsInquiryCreated,aggregateType:"application",
     aggregateId:application!.id,actorPersonId:actor.actorPersonId,
     payload:{programId:data.programId,studentProfileId,existingStudent:!!data.existingStudent,
      createdHousehold:data.existingStudent?.createHousehold===true}});
@@ -435,7 +436,7 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
    await tx.update(applications).set({stage:next,metadata:nextMetadata,
     decidedAt:["decline","withdraw"].includes(data.decision)?new Date():app.decidedAt,
     decisionNote:data.note||app.decisionNote,updatedAt:new Date()}).where(eq(applications.id,app.id));
-   await emitEvent(tx,{eventType:"AdmissionsStageChanged",aggregateType:"application",
+   await emitEvent(tx,{eventType:EventTypes.AdmissionsStageChanged,aggregateType:"application",
     aggregateId:app.id,actorPersonId:actor.actorPersonId,
     payload:{programId:app.programId,from:app.stage,to:next,decision:data.decision}});
    await writeAudit(tx,actor,{
