@@ -1,3 +1,4 @@
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { OnsiteSupervisionPanel } from "@/components/operations/OnsiteSupervisionPanel";
@@ -90,6 +91,7 @@ export function SiteDayPage() {
       Arrival marks are not student release or checkout authorization. Contact your designated site lead
       for unexpected absences, emergencies or custody concerns.
     </p>
+    <WorkflowIntro eyebrow="Site supervision · Attendance" title="A clear record of the onsite day." description="Record staff-observed attendance for your assigned site. Online learning activity is not proof of physical presence, and arrival marks do not authorize student release." />
     {context && <label className="mt-6 block max-w-sm text-sm font-semibold">
       School-local attendance date
       <input type="date" value={date} max={context.date}
@@ -114,7 +116,7 @@ export function SiteDayPage() {
           One or more onsite calendars or schedules are incomplete. No presence is inferred
           from missing configuration; ask the school registrar to correct the schedule.
         </p>}
-      <div className="mt-6 grid grid-cols-3 gap-3 text-sm" aria-label="Onsite day summary">
+      <div className="mt-6 grid gap-3 text-sm sm:grid-cols-3" aria-label="Onsite day summary">
         <div className="rounded border p-3">Expected program roster entries
           <strong className="mt-1 block text-2xl">{roster.students.length}</strong></div>
         <div className="rounded border p-3">Staff-marked entries
