@@ -142,8 +142,7 @@ function AdminConsolePage() {
         <section aria<WorkflowIntro eyebrow="Identity & access" title="The right people. The right access." description="Manage staff invitations and grants within your authorized school scope. Invitations do not automatically send an access email." actions={<><a href="#invite-staff" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"><UserRoundPlus className="size-4" /> Invite staff</a><a href="#access-accounts" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><KeyRound className="size-4" /> Review access</a></>} />or && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
         {notice && <p className="mt-8 rounded-lg border bg-muted p-4 text-sm" role="status">{notice}</p>}
 
-        <section className="mt-8 rounded-xl border bg-card p-5">
-          <h2 className="text-lg font-semibold">Invite staff</h2>
+        <section id="invite-staff" className="mt-8 rounded-2xl border border-border/70 bg-card p-6 shadow-sm"><h2 className="font-serif text-2xl font-semibold">Invite staff</h2>
           <p className="mt-1 text-sm text-muted-foreground">Create a person, access account, and grant in one step. This does not send email.</p>
            <p className="mt-1 text-xs text-muted-foreground">Onsite safeguarding roles are site-bound and currently have report-only authorization groundwork, not a live reporting channel. Use existing approved external reporting and emergency procedures.</p>
           <Form {...form}>
@@ -207,8 +206,7 @@ function AdminConsolePage() {
           </Form>
         </section>
 
-        <section className="mt-8 rounded-xl border bg-card p-5">
-          <h2 className="text-lg font-semibold">Access accounts</h2>
+        <section id="access-accounts" className="mt-8 rounded-2xl border border-border/70 bg-card p-6 shadow-sm"><h2 className="font-serif text-2xl font-semibold">Access accounts</h2>
           <p className="mt-1 text-sm text-muted-foreground">Toggle individual grants to activate or deactivate access.</p>
           {accounts.length === 0 && <p className="mt-4 text-sm">No access accounts found in your organization scope.</p>}
           {accounts.length > 0 && <div className="mt-4 overflow-x-auto">
