@@ -28,27 +28,28 @@ if (process.argv.includes("--preflight")) {
   process.exit(0);
 }
 
-// Only FullFlow needs the exact dedicated branch ID. Independent Golden Flow
-// acceptance suites retain their own disposable database targets and guards.
-if (mode === "full-flow") {
+// Flow A and Journey C share the existing dedicated, non-production FullFlow
+// Neon database. Both must verify the actual branch identity before writing;
+// a caller-supplied TEST_DATABASE_URL label is never sufficient.
+const requiresFullFlowDatabase = mode === "full-flow" || mode === "journey-c";
+if (requiresFullFlowDatabase) {
   const branchCheck = spawnSync(process.execPath, ["scripts/verify-fullflow-neon-branch.mjs"], {
     stdio: "inherit", env: process.env,
   });
   if (branchCheck.error) throw branchCheck.error;
-  if (branchCheck.status !== 0) fail("FullFlow dedicated Neon branch identity check failed.");
+  if (branchCheck.status !== 0) fail("FullFlow/Journey C dedicated Neon branch identity check failed.");
 }
 
-// URL-only preflight remains an offline safety check. On actual FullFlow test
-// execution, additionally prove the isolated database matches committed schema.
-// A URL isolation preflight is necessary but not sufficient: connected FullFlow
-// fixtures must see the exact migration ledger and persisted session/learning schema.
-if (mode === "full-flow") {
+// URL-only preflight remains an offline safety check. On actual Flow A or
+// Journey C execution, also prove the shared FullFlow DB matches committed
+// schema. Preflight alone does NOT check database identity or schema.
+if (requiresFullFlowDatabase) {
   const schema = spawnSync(process.execPath, ["scripts/verify-fullflow-schema.mjs"], {
     stdio: "inherit",
     env: process.env,
   });
   if (schema.error) throw schema.error;
-  if (schema.status !== 0) fail("FullFlow isolated database schema check failed.");
+  if (schema.status !== 0) fail("FullFlow/Journey C isolated database schema check failed.");
 }
 
 const targeted = mode === "demo-registrar" || mode === "curriculum-journey" || mode === "curriculum-authoring" || mode === "attendance-handoff" || mode === "study-groups" || mode === "study-group-lifecycle" || mode === "admissions-offers" || mode === "academic-intervention" || mode === "class-participation" || mode === "delivery-history" || mode === "qualification-readiness" || mode === "capacity-expiry" || mode === "launch-staffing" || mode === "network-onboarding" || mode === "full-flow" || mode === "journey-c";

@@ -1,6 +1,6 @@
 # Journey toolkit — reusable components for golden-flow acceptance
 
-Status: authored and statically verified (typecheck, route-contract, mutation-hygiene, fixture-coverage checks pass; unit suite parity with baseline). **Not executed** against a disposable database in the authoring environment — no database runner is available there. No journey is counted as passed until `npm run test:integration:journey-c` completes on an isolated Neon branch.
+Status: authored and statically verified (typecheck, route-contract, mutation-hygiene, fixture-coverage checks pass; unit suite parity with baseline). **Not yet executed** against Neon. Journey C now targets the **existing, dedicated, non-production FullFlow database branch** (`fullflow-e2e-20261022`, ID `br-proud-pine-arfju8h2`), not a new branch. No journey is counted as passed until `npm run test:integration:journey-c` completes there.
 
 ## Purpose
 
@@ -66,14 +66,16 @@ This is **service-level integration coverage**: actors are hand-constructed `Acc
 ## Running
 
 ```bash
-# Requires the standard isolated-database guard environment
-# (CAN_TEST_DB_WRITES_ENABLED=true, APP_ENV=test, TEST_DATABASE_URL=... on a disposable branch)
-npm run test:integration:journey-c
-# Preflight (offline isolation check only):
+# Use the EXISTING FullFlow test branch's connection string, not production.
+# TEST_DATABASE_URL, CAN_APPLICATION_DB_HOST and other env vars must be
+# supplied by the trusted test environment (never commit credentials).
+CAN_TEST_DB_WRITES_ENABLED=true APP_ENV=test npm run test:integration:journey-c
+
+# URL-only preflight, not proof of Neon identity/schema or a passing journey:
 node scripts/run-integration-tests.mjs journey-c --preflight
 ```
 
-Journey C is an independent golden-flow suite: it uses the shared isolated-test-database guard but not the FullFlow dedicated-branch identity check.
+Journey C is a separate golden-flow test suite **sharing the FullFlow Neon test database**. The runner checks the isolated endpoint, then invokes the same database-reported project/branch identity check and migration/schema verification as Flow A before executing any tests. It refuses production, other test databases, or drifted FullFlow schemas. Journey C remains rollback-isolated and must not be described as passing until actually executed.
 
 ## Adding journeys D–K
 
