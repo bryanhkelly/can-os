@@ -9,15 +9,29 @@
  *   accepts the scheduled supervision duty → attendance is recorded
  *   (present / absent, idempotent replay) → the absent child's guardian is
  *   notified and submits an excuse → the school reviews and approves it →
- *   the arriving child visits the health office, is sent home (guardian
- *   notified, discharge recorded) and is later cleared to return → a safety
- *   incident is filed, amended, reviewed, the guardian notified and the case
- *   closed → the site leader reconciles and attests the day.
+ *   the present child is mildly injured at recess; the incident is filed,
+ *   amended, reviewed by the assigned reviewer, the guardian notified and
+ *   the case closed → later the same child visits the health office, is
+ *   sent home (guardian notified, checkout recorded) and is cleared to
+ *   return → the site leader reconciles and attests the day.
  *
  * Cross-role denials (unrelated guardian, onsite-role excuse review,
- * non-medical health read, unauthorized incident read, registrar day-review
- * attestation, premature incident closure) prove the day was safe, not just
- * recorded. Everything rolls back; no synthetic school day persists.
+ * non-medical health read, unauthorized incident read, reviewer-identity
+ * mismatch, registrar day-review attestation, premature incident closure)
+ * prove the day was safe, not just recorded. Everything rolls back; no
+ * synthetic school day persists.
+ *
+ * KNOWN GAP — verified custody release: CAN OS currently has no
+ * pickup-authorization entity or command. The supervision plan, duty
+ * response and day-review surfaces each explicitly disclaim child custody
+ * and release ("not ... child custody, or an accepted handoff",
+ * "not custody, supervision or statutory closure"). The strongest
+ * release-adjacent evidence that exists is the health-office checkout
+ * (`checkedOutAt` on a sent-home visit plus the guardian notification),
+ * asserted below. The blocked custody leg is tracked by the skipped test
+ * at the end of this suite; Journey C must not be called a complete safe
+ * school day until a verified-pickup capability lands and is exercised here
+ * with an unauthorized-pickup denial.
  */
 import { expect, it } from "vitest";
 import { eq } from "drizzle-orm";
@@ -29,6 +43,7 @@ import {
   expectJourneyDomainEvent,
   expectJourneyNotification,
   first,
+  getRealDb,
   impersonating,
   integration,
   journeyDatabaseGuard,
@@ -60,8 +75,8 @@ const incidentCapabilities = [
   "incident.read",
 ] as const;
 
-integration("Journey C: a complete, safe school day (GF4 + GF34 + GF35)", () => {
-  it("runs arrival, supervision, attendance, an excused exception, health send-home, an incident and day reconciliation on one school", async () => {
+integration("Journey C: a safe school day (GF4 + GF34 + GF35; custody release blocked)", () => {
+  it("runs arrival, supervision, attendance, an excused exception, an incident, health send-home and day reconciliation on one school", async () => {
     const { siteDate } = await import("@/domain/expected-attendance");
     const attendance = await import("@/modules/attendance/onsite-attendance-workflow.functions");
     const supervision = await import("@/modules/operations/onsite-supervision.functions");
@@ -127,6 +142,7 @@ integration("Journey C: a complete, safe school day (GF4 + GF34 + GF35)", () => 
         sectionId: school.section.id,
         periodId: block!.periodId!,
         response: "accepted",
+        confirmed: true as const,
       } });
       expect(accepted.created).toBe(true);
       // An identical retry against the same plan is a no-op, and a
@@ -136,13 +152,15 @@ integration("Journey C: a complete, safe school day (GF4 + GF34 + GF35)", () => 
         sectionId: school.section.id,
         periodId: block!.periodId!,
         response: "accepted",
+        confirmed: true as const,
       } })).toMatchObject({ created: false });
       await expectJourneyDenied(duty.respondToOnsiteDuty({ data: {
         date: day,
         sectionId: school.section.id,
         periodId: block!.periodId!,
         response: "cannot_cover",
-        reason: "Illness coverage conflict reported for acceptance testing.",
+        reason: "unavailable" as const,
+        confirmed: true as const,
       } }), "duty already answered");
 
       // ── 3. Attendance is recorded (arrival + absence) ───────────────────
@@ -227,7 +245,87 @@ integration("Journey C: a complete, safe school day (GF4 + GF34 + GF35)", () => 
       expect(first(resolved.absences.filter(
         a => a.studentPersonId === familyB.studentPersonId)).status).toBe("excused");
 
-      // ── 5. Health office visit, authorized pickup, return clearance ──────
+      // ── 5. Safety incident on a child who was actually present ──────────
+      // Avery attended morning recess; Bailey was absent all day, so the
+      // incident names Avery — an absent child cannot be injured onsite.
+      const reporter = serviceContext(school.siteLeader, incidentCapabilities,
+        `journey-c-incident-${suffix}`);
+      const incidentId = await incidents.fileIncident(reporter, {
+        incidentNumber: `INC-${suffix}`,
+        type: "student_injury",
+        severity: "moderate",
+        occurredAt: new Date(),
+        siteId: school.site.id,
+        programId: school.program.id,
+        locationText: "Playground",
+        summary: "Student scraped a knee during morning recess.",
+        immediateActions: "First aid provided; guardian contacted by phone.",
+        people: [{ personId: familyA.studentPersonId, role: "subject" }],
+      });
+      await incidents.amendIncident(reporter, {
+        incidentId,
+        field: "locationText",
+        value: "Playground north fence",
+        reason: "Witness clarified the exact location.",
+      });
+      const reviewId = await incidents.assignIncidentReview(reporter, {
+        incidentId,
+        reviewerPersonId: school.operator.person.id,
+        level: "site",
+      });
+      // Closure is blocked while an assigned review is pending.
+      await expectJourneyDenied(incidents.closeIncident(reporter, {
+        incidentId,
+        closureNote: "Premature closure attempt.",
+      }), "reviews must be complete");
+      // Only the assigned reviewer may complete the review — the filing site
+      // leader cannot self-close a review assigned to the registrar.
+      await expectJourneyDenied(incidents.completeIncidentReview(reporter, {
+        reviewId,
+        decision: "reviewed",
+        notes: "Attempted by the filer, not the assigned reviewer.",
+      }), "Only the assigned reviewer may complete this review");
+      const reviewerContext = serviceContext(
+        { ...school.operator, actor: school.operatorScoped },
+        ["incident.review.complete"],
+        `journey-c-review-${suffix}`);
+      await incidents.completeIncidentReview(reviewerContext, {
+        reviewId,
+        decision: "reviewed",
+        notes: "Site review complete; no further follow-up required.",
+      });
+      await incidents.queueIncidentNotification(reporter, {
+        incidentId,
+        recipientPersonId: familyA.guardian.person.id,
+        recipientType: "guardian",
+        recipientLabel: "Family guardian",
+        channel: "in_app",
+        purpose: "Guardian injury notification",
+      });
+      await incidents.closeIncident(reporter, {
+        incidentId,
+        closureNote: "Reviewed and guardian notified.",
+      });
+      const incidentCase = await incidents.getIncidentCase(reporter, incidentId);
+      expect(incidentCase.incident.status).toBe("closed");
+      expect(incidentCase.amendments).toHaveLength(1);
+      expect(incidentCase.reviews).toHaveLength(1);
+      expect(incidentCase.notifications).toHaveLength(1);
+      await expectJourneyDomainEvent(journey.tx, {
+        aggregateId: incidentId,
+        eventType: "IncidentClosed",
+      });
+
+      // Restricted incident reads are not implied by teaching authority.
+      await expectJourneyDenied(
+        incidents.getIncidentCase(serviceContext(school.teacher, [], `journey-c-${suffix}`),
+          incidentId));
+
+      // ── 6. Health office visit, recorded checkout, return clearance ──────
+      // Later the same day Avery feels ill, is sent home and is cleared to
+      // return. The checkout row is the strongest release-adjacent evidence
+      // the platform records today — it is NOT verified custody release (see
+      // the known gap in this file's header).
       const nurse = await createPersona(journey.tx, {
         key: "nurse", role: "site_staff", organizationId: school.school.id,
         siteId: school.site.id, firstName: "Journey", lastName: "Nurse",
@@ -270,6 +368,13 @@ integration("Journey C: a complete, safe school day (GF4 + GF34 + GF35)", () => 
         notes: "Guardian collected Avery from the health office.",
       });
       expect(visit.returnClearanceId).toBeTruthy();
+      // Durable checkout evidence: the named health officer, the sent-home
+      // disposition and the checkout timestamp persisted on the visit row.
+      const visitRow = first(await journey.tx.select().from(s.healthOfficeVisits)
+        .where(eq(s.healthOfficeVisits.id, visit.visitId)));
+      expect(visitRow.sentHome).toBe(true);
+      expect(visitRow.checkedOutAt).toBeTruthy();
+      expect(visitRow.handledByPersonId).toBe(nurse.person.id);
       await expectJourneyNotification(journey.tx, {
         recipientPersonId: familyA.guardian.person.id,
         type: "student_sent_home_ill",
@@ -288,69 +393,6 @@ integration("Journey C: a complete, safe school day (GF4 + GF34 + GF35)", () => 
         aggregateId: visit.returnClearanceId!,
         eventType: "ReturnToSchoolCleared",
       });
-
-      // ── 6. Safety incident lifecycle ─────────────────────────────────────
-      const reporter = serviceContext(school.siteLeader, incidentCapabilities,
-        `journey-c-incident-${suffix}`);
-      const incidentId = await incidents.fileIncident(reporter, {
-        incidentNumber: `INC-${suffix}`,
-        type: "student_injury",
-        severity: "moderate",
-        occurredAt: new Date(),
-        siteId: school.site.id,
-        programId: school.program.id,
-        locationText: "Playground",
-        summary: "Student scraped a knee during recess.",
-        immediateActions: "First aid provided; guardian contacted by phone.",
-        people: [{ personId: familyB.studentPersonId, role: "subject" }],
-      });
-      await incidents.amendIncident(reporter, {
-        incidentId,
-        field: "locationText",
-        value: "Playground north fence",
-        reason: "Witness clarified the exact location.",
-      });
-      const reviewId = await incidents.assignIncidentReview(reporter, {
-        incidentId,
-        reviewerPersonId: school.operator.person.id,
-        level: "site",
-      });
-      // Closure is blocked while an assigned review is pending.
-      await expectJourneyDenied(incidents.closeIncident(reporter, {
-        incidentId,
-        closureNote: "Premature closure attempt.",
-      }), "reviews must be complete");
-      await incidents.completeIncidentReview(reporter, {
-        reviewId,
-        decision: "reviewed",
-        notes: "Site review complete; no further follow-up required.",
-      });
-      await incidents.queueIncidentNotification(reporter, {
-        incidentId,
-        recipientPersonId: familyB.guardian.person.id,
-        recipientType: "guardian",
-        recipientLabel: "Family guardian",
-        channel: "in_app",
-        purpose: "Guardian injury notification",
-      });
-      await incidents.closeIncident(reporter, {
-        incidentId,
-        closureNote: "Reviewed and guardian notified.",
-      });
-      const incidentCase = await incidents.getIncidentCase(reporter, incidentId);
-      expect(incidentCase.incident.status).toBe("closed");
-      expect(incidentCase.amendments).toHaveLength(1);
-      expect(incidentCase.reviews).toHaveLength(1);
-      expect(incidentCase.notifications).toHaveLength(1);
-      await expectJourneyDomainEvent(journey.tx, {
-        aggregateId: incidentId,
-        eventType: "IncidentClosed",
-      });
-
-      // Restricted incident reads are not implied by teaching authority.
-      await expectJourneyDenied(
-        incidents.getIncidentCase(serviceContext(school.teacher, [], `journey-c-${suffix}`),
-          incidentId));
 
       // ── 7. The day is reconciled and attested ────────────────────────────
       journey.setActor(school.operatorScoped);
@@ -398,8 +440,10 @@ integration("Journey C: a complete, safe school day (GF4 + GF34 + GF35)", () => 
       };
     });
 
-    // Rollback isolation: no synthetic school-day fact persisted.
-    const { db: realDb } = await import("@/db/client");
+    // Rollback isolation: no synthetic school-day fact persisted. These
+    // checks run after the transaction has ended, so they must use the real
+    // client — the mocked one refuses access outside the journey transaction.
+    const realDb = await getRealDb();
     expect(await realDb.select({ id: s.programs.id }).from(s.programs)
       .where(eq(s.programs.id, result.programId))).toHaveLength(0);
     expect(await realDb.select({ id: s.attendanceEvents.id }).from(s.attendanceEvents)
@@ -407,4 +451,17 @@ integration("Journey C: a complete, safe school day (GF4 + GF34 + GF35)", () => 
     expect(await realDb.select({ id: s.incidents.id }).from(s.incidents)
       .where(eq(s.incidents.id, result.incidentId))).toHaveLength(0);
   }, 120_000);
+
+  // BLOCKED — verified custody release. CAN OS has no pickup-authorization
+  // entity, release command or pickup roster today; the supervision plan,
+  // duty response, physical-presence and day-review surfaces all explicitly
+  // disclaim child custody and release. When a verified-pickup capability
+  // lands, this leg must exercise it: authorized adult verified against the
+  // family's release authority → handoff/release evidence recorded → an
+  // unauthorized adult's pickup attempt denied → the day review reflects the
+  // release. Until then Journey C certifies attendance, health and incident
+  // handling only — not a complete, safe school day.
+  it.skip("verifies authorized child pickup and denies unauthorized release", async () => {
+    // Intentionally unimplemented: no production capability exists to test.
+  });
 });
