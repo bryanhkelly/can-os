@@ -1,3 +1,4 @@
+import { FamilyInviteImporter } from "@/components/operations/FamilyInviteImporter";
 import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useState } from "react";
@@ -246,6 +247,8 @@ function LaunchWizardPage() {
         </p>}
 
         <OneHourSchoolLaunch launches={launches.launches} selectedProgramId={selection.programId}/>
+
+        {launches.launches.length>0&&<FamilyInviteImporter schoolName={launches.launches.find(item=>item.id===selection.programId)?.name??launches.launches[0].name}/>}
 
         <details className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Advanced · Launch portfolio and detailed records</summary>
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
