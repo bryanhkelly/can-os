@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { OpeningHandoffs } from "@/components/operations/OpeningHandoffs";
-import { Route } from "@/routes/operations.launch";
+import { Route } from "@/routes/operations.launch.index";
 import type { getSiteToday } from "@/modules/operations/site-today.functions";
 
 const state=vi.hoisted(()=>({data:null as unknown}));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { filterCalendarItems } from "@/domain/calendar-view";
-import { prioritizeFamilyNeeds } from "@/domain/family-needs";
+import { prioritizeFamilyNeeds, familyActionWorkspaceLink } from "@/domain/family-needs";
 import { launchReadiness } from "@/domain/launch-readiness";
 
 describe("calendar view filters", () => {
@@ -40,6 +40,24 @@ describe("family needs priority", () => {
       { id: "earlier", kind: "action", dueAt: "2030-05-02" }, { id: "another", kind: "action" },
     ];
     expect(prioritizeFamilyNeeds(items, now).map(item => item.id)).toEqual(["earlier", "later", "undated", "another"]);
+  });
+});
+
+describe("family action workspace links", () => {
+  it("maps a known action type to its owning workspace with the action preserved", () => {
+    expect(familyActionWorkspaceLink({ kind: "action", id: "consent-1", type: "study_group_consent" }))
+      .toBe("/guardian/group-permissions?action=consent-1");
+    expect(familyActionWorkspaceLink({ kind: "action", id: "request-1", type: "course_registration_request" }))
+      .toBe("/guardian/course-approvals");
+  });
+  it("falls back to the generic action detail page for unknown action types", () => {
+    expect(familyActionWorkspaceLink({ kind: "action", id: "other 1", type: "support_referral" }))
+      .toBe("/actions/other%201");
+  });
+  it("renders no link for non-action needs or actions without an id", () => {
+    expect(familyActionWorkspaceLink({ kind: "excuse", id: "absence-1", type: "attendance_excuse" })).toBeNull();
+    expect(familyActionWorkspaceLink({ kind: "notification", id: "notice-1", type: "update" })).toBeNull();
+    expect(familyActionWorkspaceLink({ kind: "action", type: "study_group_consent" })).toBeNull();
   });
 });
 
