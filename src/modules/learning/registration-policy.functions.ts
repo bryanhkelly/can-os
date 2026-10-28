@@ -8,6 +8,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and,asc,eq,inArray,sql } from "drizzle-orm";
 import { z } from "zod";
 import { getSectionRegistrationPolicy,replaceSectionRegistrationPolicy } from "./section-registration-policy-service";
+import { EventTypes } from "@/domain/event-types";
 const uuid=z.string().uuid(),date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 async function registrar(){
  const actor=await getCommandContext(getRequest());
@@ -90,7 +91,7 @@ export const updateCoursePolicy=createServerFn({method:"POST"})
     guardianApprovalRequired:data.policy.guardianApprovalRequired,
    });
    const after=await getSectionRegistrationPolicy(section.id,tx);
-   await emitEvent(tx,{eventType:"CourseRegistrationPolicyChanged",
+   await emitEvent(tx,{eventType:EventTypes.CourseRegistrationPolicyChanged,
     aggregateType:"section",aggregateId:section.id,actorPersonId:actor.actorPersonId,
     payload:{programId:section.programId,siteId:section.siteId}});
    await writeAudit(tx,actor,{

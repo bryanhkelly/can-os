@@ -12,6 +12,7 @@ import { requireChurchHostedOperatingServices } from "@/modules/programs/program
 import { requiresIndependentChurchLocalDelegation } from "./site-local-delegation.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db, "select">;
 
 async function hostSection(tx: Reader, sectionId: string) {
@@ -85,7 +86,7 @@ export async function changeSectionFacilitator(actor: AccessContext, input: {
         before: { personId: input.personId }, after: { effectiveThrough: now.toISOString() },
       });
       await emitEvent(tx, {
-        eventType: "SectionFacilitatorRevoked", aggregateType: "program_responsibility_assignment",
+        eventType: EventTypes.SectionFacilitatorRevoked, aggregateType: "program_responsibility_assignment",
         aggregateId: prior.id, actorPersonId: actor.actorPersonId,
         organizationId: section.organizationId, siteId: section.siteId,
         programId: section.programId, sectionId: section.id,
@@ -144,7 +145,7 @@ export async function changeSectionFacilitator(actor: AccessContext, input: {
         effectiveFrom: now.toISOString(), effectiveThrough: through.toISOString() },
     });
     await emitEvent(tx, {
-      eventType: "SectionFacilitatorAppointed", aggregateType: "program_responsibility_assignment",
+      eventType: EventTypes.SectionFacilitatorAppointed, aggregateType: "program_responsibility_assignment",
       aggregateId: id, actorPersonId: actor.actorPersonId,
       organizationId: section.organizationId, siteId: section.siteId,
       programId: section.programId, sectionId: section.id,

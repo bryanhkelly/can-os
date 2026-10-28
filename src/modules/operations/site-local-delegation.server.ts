@@ -13,6 +13,7 @@ import {
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db, "select">;
 
 async function loadHostProgram(tx: Reader, programId: string) {
@@ -163,7 +164,7 @@ export async function setSiteLocalDelegation(actor: AccessContext, input: {
         after: { responsibility: key, effectiveThrough: now.toISOString() },
       });
       await emitEvent(tx, {
-        eventType: "LocalSiteResponsibilityRevoked", aggregateType: "program_responsibility_assignment",
+        eventType: EventTypes.LocalSiteResponsibilityRevoked, aggregateType: "program_responsibility_assignment",
         aggregateId: current.id, actorPersonId: actor.actorPersonId,
         organizationId: host.organizationId, siteId: host.siteId, programId: host.id,
         payload: { responsibility: key },
@@ -224,7 +225,7 @@ export async function setSiteLocalDelegation(actor: AccessContext, input: {
         schoolConfigurationVersion: config.version },
     });
     await emitEvent(tx, {
-      eventType: "LocalSiteResponsibilityAppointed", aggregateType: "program_responsibility_assignment",
+      eventType: EventTypes.LocalSiteResponsibilityAppointed, aggregateType: "program_responsibility_assignment",
       aggregateId: assignmentId, actorPersonId: actor.actorPersonId,
       organizationId: host.organizationId, siteId: host.siteId, programId: host.id,
       payload: { responsibility: key, personId: input.personId, expiresAt: expires.toISOString() },
