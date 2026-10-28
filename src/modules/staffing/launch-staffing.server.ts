@@ -11,6 +11,7 @@ import {
 } from "./teaching-eligibility.server";
 import { evaluateInstructionalCoverage } from "./instructional-coverage.server";
 
+import { EventTypes } from "@/domain/event-types";
 export { teachingRolePredicate as launchTeacherRolePredicate } from "./teaching-eligibility.server";
 type Reader=TeachingEligibilityReader;
 
@@ -105,7 +106,7 @@ export async function assignLaunchInstructor(
     resourceType: "section", resourceId: section.id,
   });
   await emitEvent(tx, {
-    eventType: "DeliveryArrangementActivated", aggregateType: "delivery_arrangement",
+    eventType: EventTypes.DeliveryArrangementActivated, aggregateType: "delivery_arrangement",
     aggregateId: arrangement.id, actorPersonId: context.actorPersonId,
     organizationId: section.organizationId, siteId: section.siteId, programId: section.programId,
     sectionId: section.id, payload: { instructorPersonId: input.teacherPersonId, eligibilityEvaluationIds:evaluations.map(row=>row.id) },

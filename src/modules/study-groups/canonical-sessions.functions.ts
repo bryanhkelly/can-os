@@ -11,6 +11,7 @@ import { z } from "zod";
 import { assertGroupScope,eligibleStudent,facilitatedGroup } from "./canonical-membership.server";
 import { notifyMembers,reviseGroupSessionForActor } from "./canonical-sessions.server";
 
+import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
 const time = z.string().datetime({ offset: true });
 
@@ -76,7 +77,7 @@ export const createCanonicalGroupSession = createServerFn({ method: "POST" })
         after: { startsAt: times.start.toISOString(), endsAt: times.end.toISOString(), calendarEventId },
       });
       await emitEvent(tx, {
-        eventType: "StudyGroupSessionCreated", aggregateType: "study_group_session",
+        eventType: EventTypes.StudyGroupSessionCreated, aggregateType: "study_group_session",
         aggregateId: session.id, actorPersonId: actor.actorPersonId,
         payload: { groupId: group.id, calendarEventId },
       });

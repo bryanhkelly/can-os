@@ -71,3 +71,13 @@ export const rescheduleOfficeHour=createServerFn({method:"POST"})
   await rescheduleConferenceBooking(actor,{bookingId:data.bookingId,newSlotId:data.newSlotId});
   return {saved:true};
  });
+
+/** Cancel a guardian-owned booking, freeing the slot for another family. */
+export const cancelOfficeHour=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({bookingId:z.string().uuid()}).parse(value))
+ .handler(async({data})=>{
+  const actor=await requireActor(["guardian"]);
+  const {cancelConferenceBooking}=await import("@/modules/conferences/conference-service");
+  await cancelConferenceBooking(actor,{bookingId:data.bookingId});
+  return {cancelled:true};
+ });
