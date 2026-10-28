@@ -324,11 +324,14 @@ export async function launchJourneySchool(
     decision: "approve",
     actorPersonId: operator.person.id,
   });
+  // Dynamic journey dates must not inherit stale fixed 2027 cutoffs. Keep
+  // the original FullFlow fixture defaults for callers without a date override.
+  const registrationWindowEndsOn = input.time?.termEndsOn ?? input.time?.endsOn;
   await tx.insert(s.sectionRegistrationPolicies).values({
     sectionId: section.id,
     enrollmentCapacity: 24,
-    addDropEndsOn: "2027-10-01",
-    withdrawalEndsOn: "2027-12-01",
+    addDropEndsOn: registrationWindowEndsOn ?? "2027-10-01",
+    withdrawalEndsOn: registrationWindowEndsOn ?? "2027-12-01",
   });
 
   // Site leader doubles as the scheduled onsite facilitator so supervision
