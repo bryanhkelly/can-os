@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { KeyRound, ShieldCheck, UserRoundPlus } from "lucide-react";
 import { z } from "zod";
 import {
   inviteStaffMember,
@@ -137,6 +138,18 @@ function AdminConsolePage() {
       subtitle="Invite staff, manage access accounts, and browse the people directory for your organizations."
     >
       <QueryState loading={loading ? "Loading admin console…" : ""} error={authError}>
+        <section aria-label="Access management overview" className="relative mt-3 overflow-hidden rounded-3xl border border-border/70 bg-card px-6 py-8 shadow-sm sm:px-9 sm:py-10">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-64 rounded-full bg-accent opacity-75 blur-3xl" />
+          <div className="relative">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-primary"><ShieldCheck className="size-4" /> Identity &amp; access</p>
+            <h2 className="mt-3 max-w-2xl font-serif text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">The right people. The right access.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">Manage staff invitations and grants within your authorized school scope. Invitations do not automatically send an access email.</p>
+            <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
+              <a href="#invite-staff" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"><UserRoundPlus className="size-4" /> Invite staff</a>
+              <a href="#access-accounts" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><KeyRound className="size-4" /> Review access</a>
+            </div>
+          </div>
+        </section>
         {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
         {notice && <p className="mt-8 rounded-lg border bg-muted p-4 text-sm" role="status">{notice}</p>}
 
