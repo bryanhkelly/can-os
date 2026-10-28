@@ -6,6 +6,8 @@ import {
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import type { CommandContext } from "@/domain/command-context";
+import "@/platform/subscriptions/policies";
+import { getSubscriptionPolicy } from "@/platform/subscriptions/policy";
 import { getNotificationPreferences } from "@/platform/subscriptions/preferences";
 
 /**
@@ -57,11 +59,18 @@ export const createWatch: Extract<AgentTool, { readOnly: false }> = {
 
   async execute(context, args, tx) {
     const studentProfileId = String(args.studentProfileId ?? "");
-    const student = await assertStudentAccess(context, studentProfileId);
 
     const eventTypes = Array.isArray(args.eventTypes)
       ? args.eventTypes.map(String)
       : ["AssignmentBecameMissing"];
+    if (!eventTypes.length) throw new Error("A watch needs at least one event type");
+    const unsupported = eventTypes.filter((eventType) => !getSubscriptionPolicy(eventType));
+    if (unsupported.length) {
+      throw new Error(`Unsupported watch event type(s): ${unsupported.join(", ")}`);
+    }
+
+    const student = await assertStudentAccess(context, studentProfileId);
+
     const reminderHours =
       typeof args.remindAfterHours === "number" && args.remindAfterHours > 0
         ? Math.min(Math.round(args.remindAfterHours), 24 * 30)

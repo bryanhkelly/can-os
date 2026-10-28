@@ -19,6 +19,7 @@ import {
   handleGradePostedEvent,
   handleSubmissionReceivedEvent,
 } from "@/modules/learning/academic-event-handler";
+import { handleNotificationPolicyEvent } from "@/platform/notifications/policy-handler";
 import { processEventSubscriptions } from "@/platform/subscriptions";
 
 export type DomainEventHandler = (eventId: string) => Promise<void>;
@@ -34,9 +35,12 @@ registerDomainEventHandler(EventTypes.AssessmentPublished, handleAcademicPassThr
 registerDomainEventHandler(EventTypes.AssignmentBecameMissing, handleAcademicInterventionEvent);
 registerDomainEventHandler(EventTypes.SubmissionReceived, handleSubmissionReceivedEvent);
 registerDomainEventHandler(EventTypes.GradePosted, handleGradePostedEvent);
-registerDomainEventHandler(EventTypes.CommunicationMessageSent, handleAcademicPassThroughEvent);
+registerDomainEventHandler(EventTypes.CommunicationMessageSent, handleNotificationPolicyEvent);
+registerDomainEventHandler(EventTypes.ClassAnnouncementPublished, handleNotificationPolicyEvent);
+registerDomainEventHandler(EventTypes.AdmissionsStageChanged, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.ActionCreated, handleAcademicPassThroughEvent);
 registerDomainEventHandler(EventTypes.ActionResolved, handleAcademicPassThroughEvent);
+registerDomainEventHandler(EventTypes.InsightCreated, handleAcademicPassThroughEvent);
 
 // Lifecycle facts already have transactional evidence. Pass through to shared
 // subscriptions and complete the outbox; delivery depends on registered consumers.
@@ -69,7 +73,6 @@ for (const eventType of [
   EventTypes.AttendanceExcuseApproved,
   EventTypes.AttendanceExcuseRejected,
   EventTypes.LessonCompletionChanged,
-  EventTypes.ClassAnnouncementPublished,
   EventTypes.SubmissionAnnotated,
   EventTypes.ProfilePhotoChanged,
   EventTypes.SupportReferralAdvanced,
@@ -80,6 +83,140 @@ for (const eventType of [
   EventTypes.CourseDiscussionMessagePosted,
   EventTypes.CourseDiscussionLockChanged,
   EventTypes.CourseDiscussionMessageModerated,
+  EventTypes.AdmissionOfferRevoked,
+  EventTypes.JourneyRequirementCompleted,
+  EventTypes.JourneyRequirementStatusChanged,
+  EventTypes.JourneyReady,
+  EventTypes.CurriculumCourseCreated,
+  EventTypes.CurriculumDraftCreated,
+  EventTypes.CurriculumDraftSaved,
+  EventTypes.CurriculumPublished,
+  EventTypes.TranscriptIssued,
+  EventTypes.StudentLearningGoalReviewed,
+  EventTypes.EnrollmentDocumentSubmitted,
+  EventTypes.EnrollmentDocumentReviewed,
+  EventTypes.EnrollmentFormSigned,
+  EventTypes.EnrollmentFormReviewed,
+  EventTypes.NetworkAgreementVerified,
+  EventTypes.NetworkAdministratorProvisioned,
+  EventTypes.SiteAffiliationRequested,
+  EventTypes.SiteAffiliationApproved,
+  EventTypes.SiteAffiliationRejected,
+  EventTypes.SiteAffiliationRevoked,
+  EventTypes.CalendarEventCreated,
+  EventTypes.CalendarEventUpdated,
+  EventTypes.CalendarEventRescheduled,
+  EventTypes.CalendarEventCancelled,
+  EventTypes.AttendanceExcuseWithdrawn,
+  EventTypes.IncidentFiled,
+  EventTypes.IncidentAmended,
+  EventTypes.IncidentReviewCompleted,
+  EventTypes.IncidentNotificationQueued,
+  EventTypes.IncidentClosed,
+  EventTypes.HealthComplianceUpdated,
+  EventTypes.MedicationAdministered,
+  EventTypes.StudentSentHomeIll,
+  EventTypes.ReturnToSchoolCleared,
+  EventTypes.FieldTripProposed,
+  EventTypes.FieldTripApproved,
+  EventTypes.FieldTripStudentInvited,
+  EventTypes.FieldTripPermissionSigned,
+  EventTypes.FieldTripAttendanceRecorded,
+  EventTypes.FieldTripChaperoneAssigned,
+  EventTypes.FieldTripIncidentLinked,
+  EventTypes.ActivityCreated,
+  EventTypes.ActivitySeasonCreated,
+  EventTypes.ActivityRegistrationCreated,
+  EventTypes.ActivityRegistrationWithdrawn,
+  EventTypes.ActivityEligibilityChecked,
+  EventTypes.ConferenceSeriesCreated,
+  EventTypes.ConferenceReminderQueued,
+  EventTypes.ConferenceBooked,
+  EventTypes.ConferenceRescheduled,
+  EventTypes.ConferenceCancelled,
+  EventTypes.ConferenceHeld,
+  EventTypes.ConferenceNoShowRecorded,
+  EventTypes.InstructionalCapacityReserved,
+  EventTypes.InstructionalCapacityReleased,
+  EventTypes.InstructorCapacityReplaced,
+  EventTypes.DeliveryArrangementCreated,
+  EventTypes.DeliveryArrangementActivated,
+  EventTypes.GradingPeriodCreated,
+  EventTypes.TermCreated,
+  EventTypes.AdmissionsInquiryCreated,
+  EventTypes.PublicAdmissionsInterestReceived,
+  EventTypes.PublicAdmissionsInterestStatusChanged,
+  EventTypes.PublicAdmissionsInterestConverted,
+  EventTypes.PublicFamilyStartRequested,
+  EventTypes.PublicFamilyStartVerified,
+  EventTypes.StudentLearningAccessApproved,
+  EventTypes.SectionProvisioned,
+  EventTypes.SectionScheduleChanged,
+  EventTypes.SectionClosed,
+  EventTypes.SectionReopened,
+  EventTypes.SectionTeacherReplaced,
+  EventTypes.SectionEnrollmentChanged,
+  EventTypes.SectionEnrollmentActivated,
+  EventTypes.SectionEnrollmentDropped,
+  EventTypes.SectionEnrollmentWithdrawn,
+  EventTypes.SectionStudentTransferred,
+  EventTypes.SectionWaitlistAdded,
+  EventTypes.SectionWaitlistResolved,
+  EventTypes.SectionWaitlistPromoted,
+  EventTypes.SectionWaitlistSeatOffered,
+  EventTypes.SectionWaitlistOfferExpired,
+  EventTypes.SectionFacilitatorAppointed,
+  EventTypes.SectionFacilitatorRevoked,
+  EventTypes.CourseRegistrationRequested,
+  EventTypes.CourseRegistrationDecided,
+  EventTypes.CourseRegistrationGuardianDecision,
+  EventTypes.CourseRegistrationPolicyChanged,
+  EventTypes.CurriculumCartridgeValidated,
+  EventTypes.CurriculumSupplementAdded,
+  EventTypes.CurriculumSupplementChanged,
+  EventTypes.CurriculumPackInstalled,
+  EventTypes.CurriculumPackAdopted,
+  EventTypes.CurriculumPublisherPackCreated,
+  EventTypes.CurriculumPublisherPackDraftCreated,
+  EventTypes.CurriculumPublisherPackDraftSaved,
+  EventTypes.CurriculumPublisherPackPublished,
+  EventTypes.OneRosterCsvValidated,
+  EventTypes.OneRosterRosterExported,
+  EventTypes.AcademicProgramMarketingPublished,
+  EventTypes.AcademicProgramMarketingUnpublished,
+  EventTypes.ProgramSiteAuthorizationRequested,
+  EventTypes.ProgramSiteAuthorizationApproved,
+  EventTypes.ProgramSiteAuthorizationDenied,
+  EventTypes.ProgramSiteAuthorizationRevoked,
+  EventTypes.ProgramOpeningHandoffCreated,
+  EventTypes.ProgramOpeningHandoffTransferred,
+  EventTypes.ProgramOpeningHandoffAcknowledged,
+  EventTypes.TeacherQualificationPolicyPublished,
+  EventTypes.TeacherQualificationPolicyRevised,
+  EventTypes.LocalSiteResponsibilityAppointed,
+  EventTypes.LocalSiteResponsibilityRevoked,
+  EventTypes.SitePublicAddressReserved,
+  EventTypes.SitePublished,
+  EventTypes.SiteUnpublished,
+  EventTypes.SiteLocalWebsiteContentPublished,
+  EventTypes.SiteLocalWebsiteContentReviewRequested,
+  EventTypes.QualificationDefinitionCreated,
+  EventTypes.QualificationClaimCreated,
+  EventTypes.QualificationVerificationDecided,
+  EventTypes.EnrichmentChildProfileCreated,
+  EventTypes.ExtendedLearningRegistrationPublished,
+  EventTypes.StudyGroupCreated,
+  EventTypes.StudyGroupMembershipRequested,
+  EventTypes.StudyGroupMembershipDecided,
+  EventTypes.StudyGroupGuardianConsentDecided,
+  EventTypes.StudyGroupPostCreated,
+  EventTypes.StudyGroupPostReported,
+  EventTypes.StudyGroupReportResolved,
+  EventTypes.StudyGroupSessionCreated,
+  EventTypes.StudyGroupSessionRescheduled,
+  EventTypes.StudyGroupSessionCancelled,
+  EventTypes.DemoRegistrarProvisioned,
+  EventTypes.DemoFacilitatorProvisioned,
 ] as const) {
   registerDomainEventHandler(eventType, handleAcademicPassThroughEvent);
 }
@@ -237,6 +374,8 @@ export async function processPendingDomainEvents(limit = 100): Promise<number> {
 export type OutboxHealth = {
   /** Events terminally failed; each has an escalation Action. */
   failed: number;
+  /** Events waiting for a worker claim. */
+  pending: number;
   /** Pending events whose type has no registered handler — observable, not silently parked. */
   pendingUnhandled: number;
   /** Events currently leased by a worker. */
@@ -255,8 +394,9 @@ export async function getOutboxHealth(): Promise<OutboxHealth> {
     return Number(row?.count ?? 0);
   };
 
-  const [failed, pendingUnhandled, processing] = await Promise.all([
+  const [failed, pending, pendingUnhandled, processing] = await Promise.all([
     countWhere(eq(domainEvents.status, "failed")),
+    countWhere(eq(domainEvents.status, "pending")),
     countWhere(
       and(
         eq(domainEvents.status, "pending"),
@@ -268,5 +408,5 @@ export async function getOutboxHealth(): Promise<OutboxHealth> {
     countWhere(eq(domainEvents.status, "processing")),
   ]);
 
-  return { failed, pendingUnhandled, processing };
+  return { failed, pending, pendingUnhandled, processing };
 }

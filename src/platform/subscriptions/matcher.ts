@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
+  auditEvents,
   domainEvents,
   conversationMessages,
   subscriptionEventReceipts,
@@ -169,18 +170,35 @@ export async function setSubscriptionStatus(
   personId: string,
   status: "active" | "paused" | "revoked",
 ): Promise<boolean> {
-  const rows = await db
-    .update(subscriptions)
-    .set({ status, updatedAt: new Date() })
-    .where(
-      and(
-        eq(subscriptions.id, subscriptionId),
-        eq(subscriptions.subscriberPersonId, personId),
-        inArray(subscriptions.status, ["active", "paused"]),
-      ),
-    )
-    .returning({ id: subscriptions.id });
-  return rows.length > 0;
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ id: subscriptions.id, status: subscriptions.status })
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.id, subscriptionId),
+          eq(subscriptions.subscriberPersonId, personId),
+          inArray(subscriptions.status, ["active", "paused"]),
+        ),
+      )
+      .limit(1);
+    if (!current) return false;
+
+    await tx
+      .update(subscriptions)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(subscriptions.id, current.id));
+
+    await tx.insert(auditEvents).values({
+      actorPersonId: personId,
+      action: "subscription.status_changed",
+      resourceType: "subscription",
+      resourceId: current.id,
+      before: { status: current.status },
+      after: { status },
+    });
+    return true;
+  });
 }
 
 /**
