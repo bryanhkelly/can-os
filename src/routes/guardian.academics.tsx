@@ -3,7 +3,7 @@ import {resolveGuardianChild} from "@/domain/guardian-child-context";
 import { useEffect, useState } from "react";
 import { getGuardianAssignments, getGuardianStudents } from "@/modules/learning/guardian-academic-queries.functions";
 import { guardianAssignmentSummary } from "@/domain/guardian-academics";
-import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, StatusBadge, StatCard } from "@/components/workspace";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
 import { GuardianGradeResponse } from "@/components/learning/GuardianGradeResponse";
@@ -63,7 +63,7 @@ function GuardianAcademicsPage() {
 
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Guardian" title="Academic progress"
   subtitle="Review class assignments, instructions and released teacher feedback for your connected children."
-  breadcrumbs={<><Link to="/guardian" className="underline">Family home</Link><span>/</span><span>Academics</span></>}
+  breadcrumbs={<><Link to="/guardian" search={{student:selected||student}} className="underline">Family home</Link><span>/</span><span>Academics</span></>}
   actions={<Link to="/classes" className="rounded-lg border px-4 py-2 text-sm">Family classes</Link>}>
    {students.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
     Student
@@ -78,10 +78,10 @@ function GuardianAcademicsPage() {
    {!loading && !loadingStudents && !error && students.length > 0 && assignments.length === 0 && <p className="mt-8 text-sm">No published assignments found.</p>}
    {(section||assessment)&&<Link to="/guardian/academics" search={{student:selected||student}} className="mt-4 inline-block text-sm underline">All assignments for this child</Link>}
    {!loading&&!loadingStudents&&!error&&selected&&(section||assessment)&&!visible.length&&<p role="alert" className="mt-5 rounded-xl border p-4">This assignment or class is unavailable in this child's authorized academic view.</p>}
-   {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid grid-cols-3 gap-3" aria-label="Assignment summary">
-    <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Needs action</p><p className="mt-1 text-2xl font-semibold">{summary.needsAction}</p></div>
-    <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Overdue</p><p className="mt-1 text-2xl font-semibold">{summary.overdue}</p></div>
-    <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Grades released</p><p className="mt-1 text-2xl font-semibold">{summary.releasedGrades}</p></div>
+   {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-3" aria-label="Assignment summary">
+    <StatCard label="Needs action" value={summary.needsAction}/>
+    <StatCard label="Overdue" value={summary.overdue}/>
+    <StatCard label="Grades released" value={summary.releasedGrades}/>
    </div>}
    {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid gap-4">
     {visible.map(item => <section key={item.assessmentId} className="rounded-xl border bg-card p-5">
