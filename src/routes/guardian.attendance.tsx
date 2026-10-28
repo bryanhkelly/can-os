@@ -1,3 +1,4 @@
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { listGuardianEffectiveAbsences, submitEffectiveAttendanceExcuse } from "@/modules/attendance/onsite-attendance-workflow.functions";
@@ -107,13 +108,14 @@ function GuardianAttendancePage() {
       <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
         Review recent absences for your students and submit an excuse for the school to review.{student?" Showing the selected child.":""}
       </p>
+      <WorkflowIntro eyebrow="Family · Attendance" title="Stay informed about every school day." description="Review attendance records, submit explanations and attach supporting documents for authorized school review. Submitted excuses do not automatically change the recorded attendance." />
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
       {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
       {loading && !error && <p role="status" className="mt-8 text-sm">Loading attendance…</p>}
       {!loading && !error && <>
         {attendance&&<Link to="/guardian/attendance" search={{student}} className="mt-4 inline-block text-sm underline">View all attendance for this child</Link>}
         {attendance&&!absences.some(item=>item.relatedAttendanceEventIds.includes(attendance))&&<p role="alert" className="mt-4 rounded-xl border p-4">This attendance record is unavailable in the current view.</p>}
-        <div className="mt-6 grid grid-cols-3 gap-3" aria-label="Attendance summary">
+        <div className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Attendance summary">
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Recent attendance cases</p><p className="mt-1 text-2xl font-semibold">{absences.length}</p></div>
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Needs an excuse</p><p className="mt-1 text-2xl font-semibold">{needsExcuse.length}</p></div>
           <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Excuses submitted</p><p className="mt-1 text-2xl font-semibold">{absences.filter(absence => absence.excuse).length}</p></div>
