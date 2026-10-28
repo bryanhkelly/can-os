@@ -25,7 +25,7 @@ export function OutboxHealthPanel() {
       if (request === requestSequence.current) setHealth(current);
     } catch (cause) {
       if (request === requestSequence.current) setReadError(
-        cause instanceof Error ? cause.message : "Unable to load outbox health.")
+        cause instanceof Error ? cause.message : "Unable to load outbox health.");
     } finally {
       if (request === requestSequence.current) setLoading(false);
     }
@@ -61,4 +61,3 @@ export function OutboxHealthPanel() {
     </QueryState>
   </section>;
 }
-
