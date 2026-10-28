@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 describe("FullFlow Neon branch isolation", () => {
   it("pins both FullFlow and Journey C to the dedicated database before test execution", () => {
     const source = readFileSync("scripts/run-integration-tests.mjs", "utf8");
-    expect(source).toContain('const requiresFullFlowDatabase = mode === "full-flow" || mode === "journey-c";');\n    expect(source).toContain('if (requiresFullFlowDatabase) {\n  const branchCheck');\n    expect(source).toContain('if (requiresFullFlowDatabase) {\n  const schema');
+    expect(source).toContain('const requiresFullFlowDatabase = mode === "full-flow" || mode === "journey-c";');
+    expect(source).toContain('if (requiresFullFlowDatabase) {\n  const branchCheck');
+    expect(source).toContain('if (requiresFullFlowDatabase) {\n  const schema');
     expect(source.indexOf('scripts/verify-fullflow-neon-branch.mjs'))
       .toBeLessThan(source.indexOf('node_modules/vitest/vitest.mjs'));
     expect(readFileSync("scripts/verify-fullflow-schema.mjs", "utf8"))

@@ -15,7 +15,8 @@ describe("canonical workspace navigation",()=>{
  });
  it("does not expose another role's navigation destinations",()=>{
   const paths=(role:string)=>workspaceLinks[role].map(item=>item.path);
-  expect(paths("student")).toContain("/student/courses");\n  expect(paths("student")).toContain("/student/my-school");
+  expect(paths("student")).toContain("/student/courses");
+  expect(paths("student")).toContain("/student/my-school");
   expect(paths("student")).not.toContain("/admissions");
   expect(paths("guardian")).toContain("/guardian/academics");
   expect(paths("guardian")).not.toContain("/student/assignments");
@@ -36,7 +37,8 @@ describe("canonical workspace navigation",()=>{
   const router=createRouter({routeTree:root,history:createMemoryHistory({initialEntries:["/"]})});
   await router.load();
   const markup=renderToStaticMarkup(createElement(RouterProvider,{router}));
-  const selected=markup.match(/<a[^>]*aria-current="page"[^>]*>/)?.[0];\n  expect(selected).toContain('href="/student/my-school"');
+  const selected=markup.match(/<a[^>]*aria-current="page"[^>]*>/)?.[0];
+  expect(selected).toContain('href="/student/my-school"');
   expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
   expect(markup).not.toContain('href="/counselor"');
  });

@@ -36,7 +36,10 @@ describe("Hybrid Site daily facilitator workspace",()=>{
   it("links only site-day and no grades, counseling or generic case consoles",()=>{
     for(const role of ["room_facilitator","site_staff","site_leader"]){
       expect(workspaceHome[role]).toBe("/site/day");
-      const destinations=workspaceLinks[role].map(item=>item.path);\n      expect(destinations).toContain("/site/day");\n      for(const forbidden of ["/teacher/gradebook","/counselor","/support","/admissions","/admin"])\n        expect(destinations).not.toContain(forbidden);
+      const destinations=workspaceLinks[role].map(item=>item.path);
+      expect(destinations).toContain("/site/day");
+      for(const forbidden of ["/teacher/gradebook","/counselor","/support","/admissions","/admin"])
+        expect(destinations).not.toContain(forbidden);
     }
     expect(workspaceLinks.paraeducator).toEqual([{title:"My profile",path:"/profiles"}]);
   });
