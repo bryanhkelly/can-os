@@ -25,6 +25,18 @@ export async function createAdmissionsFixture(sql: Sql): Promise<AdmissionsFixtu
     await sql.transaction([
       sql.query("delete from enrollments where student_profile_id = $1", [f.studentProfileId]),
       sql.query("delete from submissions where id = $1", [f.submissionId]),
+      // This journey authors its first assignment through the teacher UI. Do
+      // not satisfy the learning handoff with GF1's pre-created classwork.
+      sql.query("delete from assessments where id = $1", [f.assessmentId]),
+      // The student must receive access only after guardian consent and the
+      // registrar's independent approval. Reuse the canonical account/person,
+      // but remove GF1's pre-authorized grant and session until that handoff.
+      sql.query("delete from access_sessions where account_id = $1", [f.studentAccountId]),
+      sql.query("delete from account_person_grants where id = $1", [f.studentGrantId]),
+      sql.query("update access_accounts set email_normalized = $2 where id = $1",
+        [f.studentAccountId, `e2e-student-${f.suffix}@example.test`]),
+      sql.query("update people set email = $2 where id = $1",
+        [f.studentPersonId, `e2e-student-${f.suffix}@example.test`]),
       // Offer response and activation require a canonically verified,
       // enrollment-managing guardian relationship (assertGuardian and the
       // guardian offer inbox both refuse unverified relationships).

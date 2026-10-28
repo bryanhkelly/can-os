@@ -9,11 +9,14 @@ const testHost = new URL(DATABASE_URL).hostname.replace(/-pooler(?=\.)/, "").toL
 const applicationHost = process.env.CAN_APPLICATION_DB_HOST?.replace(/-pooler(?=\.)/, "").toLowerCase();
 if (!applicationHost || testHost === applicationHost)
   throw new Error("Browser acceptance requires a different disposable database endpoint from the application.");
+const accessMailOutboxDir = process.env.CAN_ACCESS_MAIL_OUTBOX_DIR;
+if (!accessMailOutboxDir)
+  throw new Error("Browser acceptance requires an isolated local access-mail outbox.");
 
 export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: "admissions.spec.ts",
-  timeout: 180_000,
+  timeout: 300_000,
   expect: { timeout: 20_000 },
   workers: 1,
   retries: 0,
@@ -26,6 +29,8 @@ export default defineConfig({
     timeout: 180_000,
     env: {
       DATABASE_URL, CAN_ACCESS_TOKEN_PEPPER: TEST_ACCESS_TOKEN_PEPPER,
+      CAN_ACCESS_PUBLIC_ORIGIN: "https://app.can-os.test",
+      CAN_ACCESS_MAIL_OUTBOX_DIR: accessMailOutboxDir,
       APP_ENV: "test", NODE_ENV: "test", CAN_DEMO_WRITES_ENABLED: "true",
       CAN_R2_LIVE_UPLOADS_ENABLED: "false", CAN_R2_DEMO_UPLOADS_ENABLED: "false",
     },

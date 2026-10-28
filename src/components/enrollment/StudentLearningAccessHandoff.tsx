@@ -22,9 +22,11 @@ export function StudentLearningAccessHandoff({
  const [reviewMethod,setReviewMethod]=useState<"institutional_school_record"|"verified_in_person">("institutional_school_record");
  useEffect(()=>{
   let live=true;
-  // Switching between children must not retain another child's email or
-  // previous approval status while a new handoff request is in flight.
-  setStatus("loading");setEmail("");setError("");
+  // Switching between children must not retain another child's email, review
+  // confirmation or approval status while a new handoff request is in flight.
+  setStatus("loading");setEmail("");setError("");setNotice("");
+  setIndependentReviewConfirmed(false);
+  setReviewMethod("institutional_school_record");
   void getStudentLearningHandoff({data:{applicationId}})
    .then(result=>{
     if(!live)return;
