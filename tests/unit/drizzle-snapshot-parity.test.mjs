@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 /**
@@ -70,4 +71,13 @@ describe("Drizzle journal/snapshot metadata parity", () => {
     // journal's snapshot version ("Run drizzle-kit up").
     expect(snapshot.version).toBe(tip.version);
   });
+  it("preserves the exact historical SQL bytes applied as migration 0046", () => {
+    // FullFlow Neon recorded this immutable checksum at migration application.
+    // 0046 uses CRLF, and the active-status predicate is part of the applied
+    // SQL, not interchangeable with a new WHERE clause for provenance.
+    const sql = readFileSync("drizzle/0046_conference_booking_cancellation.sql");
+    const digest = createHash("sha256").update(sql).digest("hex");
+    expect(digest).toBe("5605d21f25c65df9fe36ccab2aff23cb22d3a51cab1a8b6f70771a315491e7f9");
+  });
+
 });
