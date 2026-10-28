@@ -77,6 +77,16 @@ export const journeyDatabaseGuard = () => {
 
 export const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
+/**
+ * The real database client, independent of the transaction mock. Post-rollback
+ * residue checks must use this: the mocked `@/db/client` getter throws once the
+ * journey transaction has ended.
+ */
+export async function getRealDb(): Promise<Database> {
+  const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+  return realDb;
+}
+
 export function first<T>(rows: readonly T[]): T {
   const row = rows[0];
   if (!row) throw new Error("Expected a persistent journey record");
@@ -93,7 +103,7 @@ const rollbackSentinel = new Error("rollback-journey");
 export async function runRollbackJourney<T>(
   run: (journey: JourneyTools) => Promise<T>,
 ): Promise<T> {
-  const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+  const realDb = await getRealDb();
   let result!: T;
   let completed = false;
   try {
