@@ -706,6 +706,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/student.my-school.tsx",
+      "route": "/student/my-school",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "Student school community and upcoming conferences; student-only route-level authorization requires issued-session browser verification",
+      "readBoundary": "getSchoolExperiences uses a verified actor with scoped Sites, Programs and recipient notices; underlying service also permits guardian, teacher, and registrar roles, so student-only routing remains to verify",
+      "writeBoundary": "Read-only route; office-hour actions are delegated to guardian-authorized conference commands"
+    },
+    {
       "file": "src/routes/student.notifications.tsx",
       "route": "/student/notifications",
       "owner": "student-experience",
