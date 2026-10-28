@@ -33,6 +33,16 @@ export function FamilyInviteImporter({schoolName}:{schoolName:string}) {
       <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{parsed.duplicates}</strong>Duplicates removed</p>
       <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{parsed.issues.length-parsed.duplicates}</strong>Need attention</p>
     </div>
+    {parsed.contacts.length>0&&<details className="mt-4 rounded-lg border p-3">
+      <summary className="cursor-pointer text-sm font-semibold">Review {parsed.contacts.length} valid recipients</summary>
+      <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto" aria-label="Validated family contacts">
+        {parsed.contacts.map(contact=><li key={contact.email} className="break-words border-b pb-2 text-sm">
+          <span className="font-medium">{[contact.firstName,contact.lastName].filter(Boolean).join(" ")||"Name not supplied"}</span>
+          <span className="ml-2 text-muted-foreground">{contact.email}</span>
+        </li>)}
+      </ul>
+      <p className="mt-2 text-xs text-muted-foreground">These contacts are only in this unsaved preparation screen. No invitations have been created or sent.</p>
+    </details>}
     {parsed.issues.length>0&&<details className="mt-4 rounded-lg border p-3" open><summary className="cursor-pointer text-sm font-semibold">Review skipped rows</summary>
       <ul className="mt-3 space-y-2">{parsed.issues.map(issue=><li key={issue.line} className="break-words text-sm">Line {issue.line}: {issue.reason} — {issue.raw}</li>)}</ul>
       <p className="mt-2 text-xs text-muted-foreground">Correct these entries in the paste area or CSV and review again. Valid contacts are retained.</p>
