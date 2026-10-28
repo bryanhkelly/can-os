@@ -10,6 +10,7 @@ import {
   evaluateTeachingEligibility, teachingStaffingContext, type TeachingEligibilityReader,
 } from "./teaching-eligibility.server";
 import { evaluateInstructionalCoverage } from "./instructional-coverage.server";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
 import { EventTypes } from "@/domain/event-types";
 export { teachingRolePredicate as launchTeacherRolePredicate } from "./teaching-eligibility.server";
@@ -68,6 +69,12 @@ export async function assignLaunchInstructor(
   }
   if (section.siteId !== initial.siteId) throw new Error("Section site changed; reload launch setup before assigning");
   if (!section.active) throw new Error("Cannot assign an instructor to an inactive section");
+  // Host launch scope permits planning, but a new academic relationship also
+  // requires the live contracted instruction and curriculum services. Recheck
+  // inside this transaction so expiry/revocation cannot race the assignment.
+  await requireChurchHostedOperatingServices(tx, section.programId, [
+    "academic_instruction", "curriculum",
+  ]);
   await lockLaunchTeacherClaims(tx, [input.teacherPersonId]);
   const eligibility = await evaluateLaunchTeacher(input.sectionId, input.teacherPersonId, tx);
   if (!eligibility.eligible) throw new Error("Instructor is not eligible: " + eligibility.reasons.join(" "));

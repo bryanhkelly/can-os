@@ -24,7 +24,21 @@ import { requireActor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { listLaunchTeacherPolicies,teacherPolicyPublisherCapability } from "./teacher-policy.server";
 import { listLaunchEligibleCourses, assertLaunchEligibleCourse } from "./launch-curriculum-eligibility.server";
+import { requireChurchHostedOperatingServices } from "./program-site-authorization.server";
 const uuid=z.string().uuid();
+
+const instructionalServices=["academic_instruction","curriculum"] as const;
+const creditServices=["school_of_record","academic_records","credit_issuance"] as const;
+
+async function currentServices(programId:string,services:readonly ("academic_instruction"|"curriculum"|"school_of_record"|"academic_records"|"credit_issuance")[]){
+ try{
+  await requireChurchHostedOperatingServices(db,programId,services);
+  return true;
+ }catch(error){
+  if(!(error instanceof AuthorizationError))throw error;
+  return false;
+ }
+}
 
 async function setupContext(programId:string){
  const actor=await requireActor(["registrar"],"program.launch.start");
@@ -44,6 +58,11 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
  .validator((v:unknown)=>z.object({programId:uuid}).parse(v))
  .handler(async({data})=>{
   const {actor,program}=await setupContext(data.programId);
+  const [teacherAssignment,creditConfiguration]=await Promise.all([
+   currentServices(program.id,instructionalServices),
+   currentServices(program.id,creditServices),
+  ]);
+  const academicAuthority={teacherAssignment,creditConfiguration};
   const canAuthorCatalog=await canAuthorQualificationCatalog(actor,program);
   const teacherPolicies=await listLaunchTeacherPolicies(program.id);
   // Both initial publication and revisions require the same explicit,
@@ -105,7 +124,7 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
   }));
   return {program,years,terms:termRows,catalog,teachingStaff,sections:sectionSnapshots,
    qualificationCatalog,policyPublished:Boolean(publishedPolicy),canAuthorCatalog,teacherPolicies,
-   canPublishTeacherPolicy,canReviseTeacherPolicy};
+   canPublishTeacherPolicy,canReviseTeacherPolicy,academicAuthority};
  });
 
 export const provisionLaunchSection=createServerFn({method:"POST"})
@@ -129,6 +148,8 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
   return db.transaction(async tx=>{
    await lockAttendanceConfigurationAtSite(tx,program.siteId!);
    await assertLaunchEligibleCourse(program, data.courseTemplateVersionId, tx);
+   if(data.credits!==undefined)
+    await requireChurchHostedOperatingServices(tx,program.id,creditServices);
    const [created]=await tx.insert(sections).values({
     programId:program.id,siteId:program.siteId,termId:data.termId,
     courseTemplateVersionId:data.courseTemplateVersionId,
@@ -235,6 +256,9 @@ export const setLaunchSectionCredits=createServerFn({method:"POST"})
        .from(sections).where(eq(sections.id,data.sectionId)).for("update").limit(1);
      if(!section||section.programId!==program.id||section.siteId!==program.siteId)
        throw new AuthorizationError("authorized school section");
+     // Recording issuer-bearing credit is a new academic act, including an
+     // idempotent retry. It must not continue after contract expiry/revocation.
+     await requireChurchHostedOperatingServices(tx,program.id,creditServices);
      const current=verifiedSectionCreditUnits(section.metadata);
      if(current===data.credits)return {changed:false as const,credits:current};
      const [finalGrade]=await tx.select({id:sectionGrades.id}).from(sectionGrades)

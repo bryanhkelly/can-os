@@ -308,14 +308,8 @@ integration("Church-owned Site with independently authorized CAN academic servic
         ]);
         // Placement verification requires EVERY assigned teacher to be
         // eligible; the host-local facilitator is assigned only later, for
-        // the class-access denial checks.
-        await tx.insert(s.sectionTeachers).values(
-          {sectionId:section!.id,personId:canPerson.id},
-        );
-        await tx.insert(s.deliveryArrangements).values({
-          sectionId:section!.id,academicProviderOrganizationId:can.id,
-          instructorPersonId:canPerson.id,modality:"onsite",status:"active",
-        });
+        // the class-access denial checks. The CAN instructor is assigned below
+        // through the real launch command after delegation and qualification.
         const teacherDelegation=await delegateCANAcademicProgramStaff(steward,{
           programId:launch.programId,personId:canPerson.id,role:"teacher",
           reason:"CAN delegates instruction for this exact contracted Program.",
@@ -331,6 +325,13 @@ integration("Church-owned Site with independently authorized CAN academic servic
           sectionId:section!.id,personId:canPerson.id,verifierPersonId:verifierPerson.id,
           issuedAt:new Date(Date.now()-86_400_000),
         });
+        const {assignLaunchInstructor}=await import("@/modules/staffing/launch-staffing.server");
+        await expect(assignLaunchInstructor(tx,host,{
+          programId:launch.programId,sectionId:section!.id,teacherPersonId:canPerson.id,
+        })).resolves.toEqual({created:true});
+        await expect(assignLaunchInstructor(tx,host,{
+          programId:launch.programId,sectionId:section!.id,teacherPersonId:canPerson.id,
+        })).resolves.toEqual({created:false});
         expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(true);
         await tx.update(s.accountPersonGrants).set({active:false})
           .where(eq(s.accountPersonGrants.id,canGrant.id));
@@ -351,6 +352,28 @@ integration("Church-owned Site with independently authorized CAN academic servic
           .toBe(section!.id);
         expect((await accessibleClasses(canTeacher as Actor)).map(x=>x.id))
           .toEqual([section!.id]);
+        const [otherSection]=await tx.insert(s.sections).values({
+          programId:launch.programId,siteId:site.id,termId:time.term.id,
+          courseTemplateVersionId:curriculum!.id,code:"other-"+suffix,
+          title:"Another CAN Class",
+        }).returning();
+        await expect(authorizeClass(canTeacher as Actor,otherSection!.id))
+          .rejects.toThrow("CAN academic provider teacher assigned to exact Section");
+        // Expiry denies every new delegated academic act even when the original
+        // account, named delegation, Section assignment and credentials remain.
+        // Restoring the fixture's clock window does not rewrite any history.
+        await tx.update(s.programSiteAuthorizations).set({
+          effectiveThrough:new Date(Date.now()-1000),
+        }).where(eq(s.programSiteAuthorizations.id,authorizationId));
+        expect(await listDelegatedCANTranscriptPrograms(staffActor,tx)).toEqual([]);
+        expect(await accessibleClasses(canTeacher as Actor)).toEqual([]);
+        await expect(authorizeClass(canTeacher as Actor,section!.id)).rejects.toThrow();
+        await expect(assignLaunchInstructor(tx,host,{
+          programId:launch.programId,sectionId:section!.id,teacherPersonId:canPerson.id,
+        })).rejects.toThrow("current independently verified CAN-church operating authority");
+        await tx.update(s.programSiteAuthorizations).set({effectiveThrough:through})
+          .where(eq(s.programSiteAuthorizations.id,authorizationId));
+        expect((await authorizeClass(canTeacher as Actor,section!.id)).section.id).toBe(section!.id);
         // A host-local Section assignment alone never grants access to a
         // CAN-provided class, and an ineligible local assignee must not
         // combine with the CAN instructor's coverage for placement.
@@ -422,6 +445,15 @@ integration("Church-owned Site with independently authorized CAN academic servic
           .not.toContain(section!.id);
         await expect(authorizeClass(canTeacher as Actor,section!.id))
           .rejects.toThrow();
+        await expect(assignLaunchInstructor(tx,host,{
+          programId:launch.programId,sectionId:section!.id,teacherPersonId:canPerson.id,
+        })).rejects.toThrow("current independently verified CAN-church operating authority");
+        const historicalAssignment=await tx.select({id:s.sectionTeachers.id})
+          .from(s.sectionTeachers).where(and(
+            eq(s.sectionTeachers.sectionId,section!.id),
+            eq(s.sectionTeachers.personId,canPerson.id),
+          ));
+        expect(historicalAssignment).toHaveLength(1);
         await expect(requireCurrentProgramSiteAuthorization(tx,launch.programId,[
           "academic_instruction",
         ])).rejects.toThrow();

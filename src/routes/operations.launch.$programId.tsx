@@ -59,6 +59,12 @@ function Setup({data}:{data:Snapshot}){
    </div>)}
   </div>
   <ProgramSiteAuthorizationPanel programId={data.program.id}/>
+  {(!data.academicAuthority.teacherAssignment||!data.academicAuthority.creditConfiguration)&&
+   <p role="status" className="mt-4 rounded-lg border border-warning/40 p-4 text-sm">
+    Current academic authority is incomplete. Existing assignments, credits and official records remain visible,
+    but new instructor assignments or issuer-bearing credit changes are disabled until the required CAN–church
+    agreement services are current. Planning and revocation remain available.
+   </p>}
   {data.program.deliveryModel.onsite&&
     data.program.academicProviderOrganizationId!==data.program.organizationId&&
     <SchoolOpeningEvidencePanel programId={data.program.id}/>}
@@ -128,16 +134,16 @@ function Setup({data}:{data:Snapshot}){
     </div>}
     <label className="text-sm">Class code<input value={code} required onChange={e=>setCode(e.target.value)} placeholder="BIO-101-A" className="mt-1 block w-full rounded border bg-background p-2"/></label>
     <label className="text-sm">Class title<input value={title} required onChange={e=>setTitle(e.target.value)} placeholder="Biology I" className="mt-1 block w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm sm:col-span-2">Instructor (optional)<select value={teacherId} onChange={e=>setTeacherId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
+    <label className="text-sm sm:col-span-2">Instructor (optional)<select value={teacherId} disabled={!data.academicAuthority.teacherAssignment} onChange={e=>setTeacherId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50">
      <option value="">Assign later</option>{data.teachingStaff.map(t=><option value={t.personId} key={t.personId}>{t.first} {t.last}</option>)}
     </select></label>
     <label className="text-sm sm:col-span-2">Course credit units
      <input aria-label="Credit units for new section" type="number" min="0.01" max="10" step="0.01"
-      value={courseCredits} onChange={e=>setCourseCredits(e.target.value)} placeholder="E.g. 0.50 or 1.00"
-      className="mt-1 block w-full rounded border bg-background p-2"/>
+      value={courseCredits} disabled={!data.academicAuthority.creditConfiguration} onChange={e=>setCourseCredits(e.target.value)} placeholder="E.g. 0.50 or 1.00"
+      className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50"/>
      <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units are shown as Not recorded on transcripts and must be resolved separately for graduation decisions.</span>
     </label>
-    <button type="submit" disabled={busy||!termId||!versionId} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create section</button>
+    <button type="submit" disabled={busy||!termId||!versionId||(Boolean(teacherId)&&!data.academicAuthority.teacherAssignment)||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create section</button>
    </form>
   </section>
   <div className="mt-6 rounded-lg border p-4 text-sm">
@@ -148,7 +154,7 @@ function Setup({data}:{data:Snapshot}){
   <section className="mt-8 space-y-3">
    <h2 className="font-serif text-2xl">Teaching assignments</h2>
    {data.sections.map(section=><SectionRow key={section.id+":"+String(section.creditUnits)} section={section}
-    staff={data.teachingStaff} busy={busy}
+    staff={data.teachingStaff} busy={busy} authority={data.academicAuthority}
     saveCredits={(credits,reason)=>run(()=>setLaunchSectionCredits({data:{
      programId:data.program.id,sectionId:section.id,credits,reason}}),"Academic credit units recorded.")}
     assign={(personId)=>run(()=>assignLaunchTeacher({data:{
@@ -169,8 +175,9 @@ function Setup({data}:{data:Snapshot}){
   <SectionLifecycleWorkspace programId={data.program.id} staff={data.teachingStaff}/>
  </WorkspaceShell>;
 }
-function SectionRow({section,staff,busy,assign,saveCredits}:{
+function SectionRow({section,staff,busy,authority,assign,saveCredits}:{
  section:Snapshot["sections"][number],staff:Snapshot["teachingStaff"],busy:boolean,
+ authority:Snapshot["academicAuthority"],
  assign:(personId:string)=>Promise<void>,
  saveCredits:(credits:number,reason:string)=>Promise<void>
 }){
@@ -187,16 +194,16 @@ function SectionRow({section,staff,busy,assign,saveCredits}:{
     e.preventDefault();void saveCredits(Number(credits),creditReason);
    }}>
     <label className="text-xs">Recorded credit units
-     <input type="number" min="0.01" max="10" step="0.01" required value={credits}
-      onChange={e=>setCredits(e.target.value)} className="mt-1 w-full rounded border bg-background p-2"/>
+     <input type="number" min="0.01" max="10" step="0.01" required value={credits} disabled={!authority.creditConfiguration}
+      onChange={e=>setCredits(e.target.value)} className="mt-1 w-full rounded border bg-background p-2 disabled:opacity-50"/>
     </label>
     <label className="text-xs">Reason for academic credit decision
-     <input value={creditReason} minLength={5} maxLength={500} required
+     <input value={creditReason} minLength={5} maxLength={500} required disabled={!authority.creditConfiguration}
       onChange={e=>setCreditReason(e.target.value)}
       placeholder="Reviewed against this program's course credit requirements"
-      className="mt-1 w-full rounded border bg-background p-2"/>
+      className="mt-1 w-full rounded border bg-background p-2 disabled:opacity-50"/>
     </label>
-    <button type="submit" disabled={busy||!credits||creditReason.trim().length<5}
+    <button type="submit" disabled={busy||!authority.creditConfiguration||!credits||creditReason.trim().length<5}
       className="rounded border px-3 py-2 text-xs disabled:opacity-50">Record credits</button>
    </form>
    <p className="mt-2 text-xs text-muted-foreground">The school sets actual credit units. Changes are audited and locked after finalized grades.</p>
@@ -213,11 +220,11 @@ function SectionRow({section,staff,busy,assign,saveCredits}:{
     </span>)}
   </div>
   <div className="mt-3 flex flex-wrap items-end gap-2">
-   <label className="min-w-48 flex-1 text-xs">Assign instructor<select className="mt-1 block w-full rounded border bg-background p-2" value={personId} onChange={e=>setPersonId(e.target.value)}>
+   <label className="min-w-48 flex-1 text-xs">Assign instructor<select className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50" value={personId} disabled={!authority.teacherAssignment} onChange={e=>setPersonId(e.target.value)}>
     <option value="">Choose teacher</option>{staff.filter(t=>!section.teachers.some(a=>a.personId===t.personId))
       .map(t=><option key={t.personId} value={t.personId}>{t.first} {t.last}</option>)}
    </select></label>
-   <button type="button" disabled={busy||!section.active||!personId||!candidate?.eligible} onClick={()=>assign(personId)}
+   <button type="button" disabled={busy||!authority.teacherAssignment||!section.active||!personId||!candidate?.eligible} onClick={()=>assign(personId)}
     className="rounded border px-3 py-2 text-sm disabled:opacity-50">Add instructor</button>
   </div>
   {candidate&&<div className="mt-3 text-sm" role="status">

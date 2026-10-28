@@ -296,7 +296,7 @@ function TeacherGradebookPage() {
    {loading && <p className="mt-8 text-sm" role="status">Loading gradebook…</p>}
    {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
    {notice && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">{notice}</p>}
-   {!loading && !error && sections.length === 0 && <p className="mt-8 text-sm">No sections are assigned to your account.</p>}
+   {!loading && !error && sections.length === 0 && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">No currently authorized teaching sections. A delegation, assignment, qualification or school agreement may be missing, revoked or expired. Historical grades and issued transcripts are unchanged; contact your school administrator if you believe access should continue.</p>}
 
    {!loading && !error && gradebook?.connected && gradebook.section && <>
     <div className="mt-6 grid gap-3 sm:grid-cols-3">

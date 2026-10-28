@@ -26,6 +26,7 @@ const snapshot: Snapshot = {
   years: [], terms: [], catalog: [], teachingStaff: [{ personId: "teacher", first: "Alex", last: "Teacher" }],
   qualificationCatalog: [{ key: "license", title: "Teaching license" }], policyPublished: false,canAuthorCatalog:false,canPublishTeacherPolicy:true,
   teacherPolicies: [], canReviseTeacherPolicy: false,
+  academicAuthority: { teacherAssignment: true, creditConfiguration: true },
   sections: [{
     id: "section", title: "Science", code: "SCI", termId: "term", active: true, teachers: [],
     candidates: [{ personId: "teacher", eligible: false, reasons: ["Qualification policy not configured."],
@@ -107,6 +108,14 @@ describe("launch staffing presentation", () => {
     expect(html).toContain("Earlier policy history will be preserved");
     expect(html).toContain("opening is blocked");
     expect(html).toContain("Publish policy revision");
+  });
+  it("keeps planning and history visible while disabling new delegated academic acts",()=>{
+    const html=render({...snapshot,academicAuthority:{teacherAssignment:false,creditConfiguration:false}});
+    expect(html).toContain("Current academic authority is incomplete");
+    expect(html).toContain("Existing assignments, credits and official records remain visible");
+    expect(html).toContain("Planning and revocation remain available");
+    expect(html).toContain('aria-label="Credit units for new section"');
+    expect(html).toContain('disabled=""');
   });
 });
 

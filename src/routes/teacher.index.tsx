@@ -71,7 +71,7 @@ function TeacherTodayPage() {
 
     <section className="mt-10">
      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">My sections</p>
-     {data.sections.length === 0 && <EmptyState className="mt-4" title="No sections are assigned to you yet." />}
+     {data.sections.length === 0 && <EmptyState className="mt-4" title="No currently authorized teaching sections." description="A named delegation, Section assignment, required qualification or school agreement may be missing, revoked or expired. Contact your school administrator. Historical grades and issued transcripts are unchanged." />}
      <div className="mt-4 grid gap-3 sm:grid-cols-2">
       {data.sections.map(section => <article key={section.id} className="rounded-xl border bg-card p-5">
        <h2 className="font-semibold"><Link to="/classes" search={{section:section.id}} className="hover:underline">{section.title}</Link></h2>
