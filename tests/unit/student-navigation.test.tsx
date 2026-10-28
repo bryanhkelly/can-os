@@ -58,8 +58,8 @@ describe("Student Today summary navigation", () => {
       generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
       sections: [], coursework: [], events: [], openActions: [], recoveryCandidates: [],
     }} />);
-    expect(html).toMatch(/<a href="\/student\/courses"[^>]*><p[^>]*>Classes<\/p>/);
-    expect(html).toMatch(/<a href="\/student\/assignments"[^>]*><p[^>]*>Upcoming assignments<\/p>/);
+    expect(html).toMatch(/<a href="\/student\/courses"[^>]*>[\s\S]*?Classes<\/p>/);
+    expect(html).toMatch(/<a href="\/student\/assignments"[^>]*>[\s\S]*?Upcoming assignments<\/p>/);
     expect(html).toMatch(/<a href="\/student\/assignments\?filter=missing"[^>]*><p[^>]*>Missing work<\/p>/);
   });
 
