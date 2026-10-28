@@ -156,7 +156,7 @@ export const getQualifications = createServerFn({ method: "GET" })
         return { ...claim, issuedAt: claim.issuedAt?.toISOString() ?? null, expiresAt: claim.expiresAt?.toISOString() ?? null,
           status: credentialStatusFromDecision(latest?.decision), sequence: latest?.sequence ?? 0,
           hasEvidence: Boolean(latest?.documentId),
-          history: events.map(({ documentId, ...event }) => ({ ...event, occurredAt: event.occurredAt.toISOString() })) });
+          history: events.map(({ documentId, ...event }) => ({ ...event, occurredAt: event.occurredAt.toISOString() })) };
       }),
     };
   });
