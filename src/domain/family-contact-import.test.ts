@@ -18,6 +18,10 @@ describe("family contact import",()=>{
     expect(result.contacts.map(c=>c.email)).toEqual(["new@example.com"]);
     expect(result.duplicates).toBe(2);
   });
+  it("supports first and last name columns in church CSV exports",()=>{
+    const result=parseFamilyContacts("First Name,Last Name,Email,Phone\nJane,Doe,jane@example.com,555-0100");
+    expect(result.contacts).toEqual([{firstName:"Jane",lastName:"Doe",email:"jane@example.com",phone:"555-0100"}]);
+  });
   it("ignores blank rows and basic CSV headers",()=>{
     const result=parseFamilyContacts("Name,Email\n\nJohn Doe,john@example.com");
     expect(result.contacts).toHaveLength(1);
