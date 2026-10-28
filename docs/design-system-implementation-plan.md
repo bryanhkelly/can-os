@@ -153,6 +153,6 @@ Each slice should include changed files, real routes, reused components, service
 - Focused design, Action authorization/navigation, and workspace-shell suite: **35 tests passed** across four files.
 - Route contract check: **91 source routes, 91 recorded, 0 issues**.
 - Core computed contrast pairs: primary button **4.88:1**, primary text **15.70:1**, secondary text on canvas **5.81:1**, and secondary text on card **6.18:1**.
-- Full unit suite: **1,309 tests passed, 8 failed**, with three additional suite import failures. The remaining failures are in unchanged conference cancellation, Drizzle snapshot metadata, event-registry, route-mock, and workflow-script areas; they are recorded here, not repaired as part of this design increment.
-- Typecheck and production build remain blocked by the unchanged `LiveSchoolExperiences.tsx` import of the missing `cancelOfficeHour` export. No new TypeScript error was reported after route generation.
+- Full unit suite after the latest `FullFlow` parity sync: **1,312 tests passed, 5 failed**, with three additional suite import failures. Remaining failures are in unchanged Drizzle snapshot metadata, event-registry, route-mock, and workflow-script areas; they are recorded here, not repaired as part of this design increment.
+- Typecheck and production build: **passed** after syncing `FullFlow` commit `3cad8775`.
 - Browser screenshots, visual regression, integration tests, and Golden Flow browser runs were **not executed**. No visual or end-to-end acceptance is claimed.
