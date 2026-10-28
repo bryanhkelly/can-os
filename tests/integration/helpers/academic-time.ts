@@ -24,6 +24,8 @@ export async function createAcademicTimeFixture(input: {
 
   const startsOn = input.startsOn ?? "2027-08-16";
   const endsOn = input.endsOn ?? "2028-06-02";
+  const schoolYearLabel = `${startsOn.slice(0, 4)}–${endsOn.slice(0, 4)}`;
+  const schoolYearKey = `${startsOn.slice(0, 4)}-${endsOn.slice(0, 4)}`;
 
   const [gradeScale] = await db
     .insert(schema.gradeScales)
@@ -50,8 +52,8 @@ export async function createAcademicTimeFixture(input: {
       organizationId: input.organizationId,
       programId: input.programId,
       siteId: input.siteId,
-      key: `2027-2028-${input.suffix}`,
-      name: "2027–2028",
+      key: `${schoolYearKey}-${input.suffix}`,
+      name: schoolYearLabel,
       status: "active",
       startsOn,
       endsOn,
@@ -80,7 +82,7 @@ export async function createAcademicTimeFixture(input: {
       name: "Quarter 1",
       sequence: 1,
       startsOn,
-      endsOn: "2027-10-15",
+      endsOn: input.termEndsOn ?? "2027-10-15",
     })
     .returning();
 
