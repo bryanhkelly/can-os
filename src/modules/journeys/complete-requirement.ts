@@ -16,6 +16,11 @@ export async function completeJourneyRequirement(
   context: CommandContext,
   requirementId: string,
   evidence: Record<string, unknown>[] = [],
+  options: {
+    allowedCurrentStatuses?: ReadonlyArray<
+      "needs_you" | "needs_can" | "waiting_third_party" | "blocked" | "complete"
+    >;
+  } = {},
 ): Promise<"in_progress" | "ready"> {
   assertCapability(context, "journey.requirement.complete");
 
@@ -53,6 +58,13 @@ export async function completeJourneyRequirement(
         throw new Error("Cannot change requirements after Journey activation");
       }
       return "ready";
+    }
+    if (
+      current.requirementStatus !== "complete" &&
+      options.allowedCurrentStatuses &&
+      !options.allowedCurrentStatuses.includes(current.requirementStatus)
+    ) {
+      throw new Error("This requirement must be completed through its current owner's workflow.");
     }
 
     const completedAt = new Date();

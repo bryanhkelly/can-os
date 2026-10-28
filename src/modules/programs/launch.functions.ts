@@ -150,11 +150,13 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
         status: s.programs.status,
         organizationId: s.programs.organizationId,
         siteId: s.programs.siteId,
+        siteTimezone: s.sites.timezone,
         publicSiteSlug: s.sitePublications.slug,
         publicSiteStatus: s.sitePublications.status,
         createdAt: s.programs.createdAt,
       })
       .from(s.programs)
+      .leftJoin(s.sites, eq(s.sites.id, s.programs.siteId))
       .leftJoin(s.sitePublications, eq(s.sitePublications.siteId, s.programs.siteId))
       .where(
         and(
@@ -209,19 +211,21 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
 );
 
 /**
- * Complete one launch requirement. The registrar role holds the centralized
- * "journey.requirement.complete" capability; the shared journeys module performs
- * the status transition, ready-flip, and audit/domain events in one transaction.
+ * Record a school-owned launch requirement. The shared command rechecks the
+ * locked requirement's current owner so a registrar cannot complete CAN or
+ * third-party work through this launch endpoint.
  */
 export const completeLaunchRequirement = createServerFn({ method: "POST" })
   .validator((data: unknown) =>
-    z.object({ journeyRequirementId: uuid }).parse(data),
+    z.object({ journeyRequirementId: uuid, confirmed: z.literal(true) }).strict().parse(data),
   )
   .handler(async ({ data }) => {
     const context = await registrarContext("journey.requirement.complete");
     const journeyStatus = await completeJourneyRequirement(
       context,
       data.journeyRequirementId,
+      [{ fact: "school_owned_requirement_confirmed" }],
+      { allowedCurrentStatuses: ["needs_you"] },
     );
     return { journeyRequirementId: data.journeyRequirementId, journeyStatus };
   });

@@ -9,24 +9,13 @@ import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
 import { ExtendedLearningSeasonPlanner } from "@/components/operations/ExtendedLearningSeasonPlanner";
 import { listExtendedSeasonPlanning } from "@/modules/activities/extended-learning.functions";
 import {
-  activateLaunch,
-  completeLaunchRequirement,
   listLaunches,
   listLaunchOptions,
   startLaunch,
   createLaunchSite,
-  scheduleLaunchOrientation,
 } from "@/modules/programs/launch.functions";
 
 const grades = ["TK", "K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
-
-const requirementStatusLabels: Record<string, string> = {
-  needs_you: "Needs you",
-  needs_can: "Needs CAN",
-  waiting_third_party: "Waiting on third party",
-  blocked: "Blocked",
-  complete: "Complete",
-};
 
 export const Route = createFileRoute("/operations/launch/")({
   loader: async () => {
@@ -67,9 +56,6 @@ function LaunchWizardPage() {
       created: boolean;
     } | null;
   } | null>(null);
-  const [openingRecipients,setOpeningRecipients]=useState<Record<string,string>>({});
-  const [opened,setOpened]=useState<{siteId:string|null;name:string}|null>(null);
-
   const [type, setType] = useState<(typeof programTypes)[number]>("church_hosted_academy");
   const [summerCreditBearing, setSummerCreditBearing] = useState(false);
   const creditMode = type === "summer_program" && summerCreditBearing ? "credit_bearing" : isExtendedLearningType(type) ? "non_credit" : "credit_bearing";
@@ -90,21 +76,6 @@ function LaunchWizardPage() {
   const [createdSiteDraft,setCreatedSiteDraft]=useState<{siteId:string;host:string}|null>(null);
   const [newSiteSlug,setNewSiteSlug]=useState("");
   const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
-  const [orientationFor,setOrientationFor]=useState("");
-  const [orientationStart,setOrientationStart]=useState("");
-  const [orientationEnd,setOrientationEnd]=useState("");
-  const [orientationTitle,setOrientationTitle]=useState("Student and family orientation");
-  async function addOrientation(programId:string){
-    setBusy(true);setError("");
-    try {
-      if(!orientationStart||!orientationEnd)throw new Error("Choose orientation start and end times");
-      await scheduleLaunchOrientation({data:{programId,title:orientationTitle,
-        startsAt:new Date(orientationStart).toISOString(),
-        endsAt:new Date(orientationEnd).toISOString(),timezone:"America/Los_Angeles"}});
-      setOrientationFor("");await router.invalidate();
-    } catch(e){setError(e instanceof Error?e.message:"Unable to schedule orientation");}
-    finally{setBusy(false);}
-  }
   async function addSite(){
     if(!hostOrganizationId)return;
     setBusy(true);setError("");
@@ -150,36 +121,12 @@ function LaunchWizardPage() {
       });
       setCreated({...result,programType:type});
       await router.invalidate();
+      await router.navigate({
+        to: "/operations/launch",
+        search: { programId: result.programId, siteId: result.publicSiteDraft?.siteId },
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to start launch");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function completeRequirement(journeyRequirementId: string) {
-    setBusy(true);
-    setError("");
-    try {
-      await completeLaunchRequirement({ data: { journeyRequirementId } });
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to complete requirement");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function activate(programId: string) {
-    setBusy(true);
-    setError("");
-    try {
-      await activateLaunch({ data: { programId,recipientPersonId:openingRecipients[programId]||undefined } });
-      const launch=launches?.launches.find(item=>item.id===programId);
-      if(launch)setOpened({siteId:launch.siteId,name:launch.name});
-      await router.invalidate();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to activate program");
     } finally {
       setBusy(false);
     }
@@ -239,16 +186,14 @@ function LaunchWizardPage() {
       actions={<Link to="/operations/workflows" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Connected workflows</Link>}>
         <WorkflowIntro eyebrow="School launch · Readiness" title="Build a school with confidence." description="Coordinate the host site, academic provider and program launch. Recorded progress is not permission to open: blocking requirements and approvals remain authoritative." />
         {error && (
-          <p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>
+          <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
-        {opened&&<p role="status" className="mt-4 rounded-lg border p-4 text-sm">
-          {opened.name} is active. {opened.siteId?<Link to="/sites/$siteId" params={{siteId:opened.siteId}}
-            className="underline">Open Site Today to review the named operator handoff →</Link>:"Opening is recorded."}
-        </p>}
-
         <OneHourSchoolLaunch launches={launches.launches} selectedProgramId={selection.programId}/>
 
-        {launches.launches.length>0&&<FamilyInviteImporter schoolName={launches.launches.find(item=>item.id===selection.programId)?.name??launches.launches[0]?.name??"Your school"}/>}
+        {launches.launches.length>0&&<details className="mt-5 rounded-xl border bg-card p-5">
+          <summary className="cursor-pointer text-sm font-semibold">Optional · Family outreach preparation</summary>
+          <FamilyInviteImporter schoolName={launches.launches.find(item=>item.id===selection.programId)?.name??launches.launches[0]?.name??"Your school"}/>
+        </details>}
 
         <details className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Advanced · Launch portfolio and detailed records</summary>
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
@@ -503,112 +448,6 @@ function LaunchWizardPage() {
             </form>
           </details>
 
-          <section>
-            <h2 className="font-serif text-2xl">Launches in progress</h2>
-            <div className="mt-4 space-y-3">
-              {launches.launches.filter(launch=>(!selection.siteId||launch.siteId===selection.siteId)&&(!selection.programId||launch.id===selection.programId)).map((launch) => {
-                const blockingIncomplete = launch.requirements.filter(
-                  (requirement) => requirement.blocking && requirement.status !== "complete",
-                );
-                const activatable = !!launch.journey && blockingIncomplete.length === 0;
-                return (
-                  <article key={launch.id} className="rounded-xl border bg-card p-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="font-semibold">{launch.name}</h3>
-                      <span className="text-xs uppercase text-muted-foreground">{launch.status}</span>
-                    </div>
-                    <nav className="mt-3 flex flex-wrap gap-4 text-xs font-semibold" aria-label={launch.name+" launch next actions"}>
-                      <Link to="/operations/launch/$programId" params={{programId:launch.id}}
-                        search={{siteId:launch.siteId??undefined,programId:undefined}}
-                        className="underline">Configure classes and instructors →</Link>
-                      {!isExtendedLearningType(launch.type)&&<Link to="/admissions/intake"
-                        search={{siteId:launch.siteId??undefined,programId:launch.id}}
-                        className="underline">Start family intake →</Link>}
-                    </nav>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {programTypeLabels[launch.type] ?? launch.type}
-                      {launch.journey ? ` · Journey: ${launch.journey.status}` : " · No launch journey"}
-                    </p>
-                    <ul className="mt-3 space-y-2">
-                      {launch.requirements.map((requirement) => (
-                        <li key={requirement.id} className="flex items-center justify-between gap-3 rounded-lg border p-2 text-sm">
-                          <span>
-                            {requirement.title}
-                            {requirement.blocking && (
-                              <span className="ml-2 rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase">
-                                Blocking
-                              </span>
-                            )}
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              {requirementStatusLabels[requirement.status] ?? requirement.status}
-                            </span>
-                          </span>
-                          {requirement.status !== "complete" && (
-                            <button
-                              type="button"
-                              className="rounded border px-3 py-1 text-xs disabled:opacity-50"
-                              disabled={busy}
-                              onClick={() => completeRequirement(requirement.id)}
-                            >
-                              Complete
-                            </button>
-                          )}
-                        </li>
-                      ))}
-                      {!launch.requirements.length && (
-                        <li className="text-xs text-muted-foreground">No launch requirements configured.</li>
-                      )}
-                    </ul>
-                    <div className="mt-4 rounded-lg border p-3">
-                      <button type="button" onClick={()=>setOrientationFor(orientationFor===launch.id?"":launch.id)}
-                        className="text-xs font-semibold underline">Schedule family orientation</button>
-                      {orientationFor===launch.id && <div className="mt-3 grid gap-2">
-                        <label className="text-xs">Title<input className={inputClass} value={orientationTitle} onChange={e=>setOrientationTitle(e.target.value)}/></label>
-                        <label className="text-xs">Start<input type="datetime-local" className={inputClass} value={orientationStart} onChange={e=>setOrientationStart(e.target.value)}/></label>
-                        <label className="text-xs">End<input type="datetime-local" className={inputClass} value={orientationEnd} onChange={e=>setOrientationEnd(e.target.value)}/></label>
-                        <p className="text-xs text-muted-foreground">Times are entered in your local browser timezone and saved with an explicit offset.</p>
-                        <button type="button" disabled={busy||!orientationStart||!orientationEnd}
-                          onClick={()=>addOrientation(launch.id)} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Save orientation</button>
-                      </div>}
-                    </div>
-                    <div className="mt-4">
-                      {launch.siteId&&<label className="mb-3 block text-sm">Receiving site operator (required)
-                        <select aria-label={"Receiving site operator for "+launch.name} value={openingRecipients[launch.id]??""}
-                          onChange={event=>setOpeningRecipients(current=>({...current,[launch.id]:event.target.value}))}
-                          className={selectClass}>
-                          <option value="">Select the named receiving operator</option>
-                          {launch.openingOperators.map(operator=><option key={operator.personId} value={operator.personId}>
-                            {operator.firstName} {operator.lastName}
-                          </option>)}
-                        </select>
-                        <span className="mt-2 block text-xs text-muted-foreground">Only the selected active site registrar/operator can acknowledge receipt after opening. This does not waive readiness checks.</span>
-                        {!launch.openingOperators.length&&<span role="alert" className="mt-2 block text-xs">No active site registrar/operator is available. An existing authorized site grant is required.</span>}
-                      </label>}
-                      <button
-                        type="button"
-                        className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                        disabled={busy || !activatable || Boolean(launch.siteId&&!openingRecipients[launch.id])}
-                        onClick={() => activate(launch.id)}
-                      >
-                        Activate
-                      </button>
-                      {!activatable && launch.journey && (
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {blockingIncomplete.length} blocking requirement
-                          {blockingIncomplete.length === 1 ? "" : "s"} remaining before activation.
-                        </p>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-              {!launches.launches.length && (
-                <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
-                  No launches in progress for your organizations. Start one with the form.
-                </p>
-              )}
-            </div>
-          </section>
         </div>
     </WorkspaceShell>
   );

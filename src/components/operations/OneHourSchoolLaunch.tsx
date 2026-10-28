@@ -1,63 +1,304 @@
-import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Link, useRouter } from "@tanstack/react-router";
 import { StatusBadge } from "@/components/workspace";
-import type { listLaunches } from "@/modules/programs/launch.functions";
+import {
+  buildLaunchGuidance,
+  launchOwnershipLabel,
+  type LaunchGuidanceTask,
+} from "@/domain/launch-guidance";
+import { isExtendedLearningType } from "@/domain/program-offerings";
+import {
+  activateLaunch,
+  completeLaunchRequirement,
+  scheduleLaunchOrientation,
+  type listLaunches,
+} from "@/modules/programs/launch.functions";
 
 type Launch = Awaited<ReturnType<typeof listLaunches>>["launches"][number];
 
-const steps = [
-  { title:"School Basics", description:"Confirm the school and church partnership.", path:"/operations/launch", key:"basics" },
-  { title:"School Model", description:"Choose a starting model; customize the actual program settings.", path:"/operations/launch", key:"model" },
-  { title:"Academic Program", description:"Set up the school year, classes, and approved instruction.", path:"/operations/launch/$programId", key:"academics" },
-  { title:"School Day", description:"Plan the calendar, rooms, and supervised daily schedule.", path:"/calendar", key:"day" },
-  { title:"Team", description:"Assign people and complete independent staff verification.", path:"/operations/launch/$programId", key:"team" },
-  { title:"Family Outreach", description:"Prepare family communications and invitations.", path:"/messages", key:"outreach" },
-  { title:"Public School Page", description:"Preview and publish your church's school page.", path:"/sites/$siteId/publish", key:"website" },
-  { title:"Applications", description:"Prepare the family's application and admissions journey.", path:"/admissions/intake", key:"applications" },
-  { title:"Readiness Review", description:"Resolve the actual launch requirements and opening decisions.", path:"/operations/launch", key:"readiness" },
-  { title:"Launch Summary", description:"Review what's configured and what still blocks opening.", path:"/operations/launch", key:"summary" },
-] as const;
+function taskTone(task: LaunchGuidanceTask): "success" | "attention" | "neutral" {
+  if (task.state === "complete") return "success";
+  if (task.state === "needs_you" || task.state === "blocked") return "attention";
+  return "neutral";
+}
 
-export function OneHourSchoolLaunch({ launches, selectedProgramId }:{ launches:Launch[]; selectedProgramId?:string }) {
-  const launch=launches.find(item=>item.id===selectedProgramId)??launches[0];
-  if(!launch)return <section className="mt-8 rounded-2xl border bg-card p-6" aria-label="Launch your school">
+function TaskDestination({ launch, task }: { launch: Launch; task: LaunchGuidanceTask }) {
+  if (task.action === "academics" || task.action === "review") {
+    return <Link to="/operations/launch/$programId" params={{ programId: launch.id }}
+      search={{ siteId: launch.siteId ?? undefined, programId: undefined }}
+      className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">
+      Open guided setup
+    </Link>;
+  }
+  if (task.action === "admissions") {
+    return <Link to="/admissions/intake" search={{ siteId: launch.siteId ?? undefined, programId: launch.id }}
+      className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">
+      Open family intake
+    </Link>;
+  }
+  return null;
+}
+
+function SchoolOwnedCompletion({ task, busy, complete }: {
+  task: LaunchGuidanceTask;
+  busy: boolean;
+  complete: (requirementId: string) => Promise<void>;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+  if (!task.requirementId || task.state !== "needs_you") return null;
+  return <details className="mt-4 rounded-xl border bg-background p-4">
+    <summary className="cursor-pointer text-sm font-semibold">Record this school-owned requirement</summary>
+    <p className="mt-3 text-sm text-muted-foreground">
+      Use this only after the actual work is complete. This cannot complete CAN or third-party work,
+      approve evidence, or authorize opening.
+    </p>
+    <label className="mt-3 flex items-start gap-2 text-sm">
+      <input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
+      I confirm the school-owned work is complete and accurately represented.
+    </label>
+    <button type="button" disabled={busy || !confirmed} onClick={() => void complete(task.requirementId!)}
+      className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+      Save school completion
+    </button>
+  </details>;
+}
+
+function localDateTime(date: Date) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function OrientationTask({ launch, busy, save }: {
+  launch: Launch;
+  busy: boolean;
+  save: (input: { title: string; startsAt: string; endsAt: string; timezone: string }) => Promise<void>;
+}) {
+  const [title, setTitle] = useState("Student and family orientation");
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
+  const timezone = launch.siteTimezone ?? "America/Los_Angeles";
+  function useRecommendation() {
+    const start = new Date();
+    start.setDate(start.getDate() + 7);
+    start.setHours(18, 0, 0, 0);
+    const end = new Date(start.getTime() + 45 * 60_000);
+    setStartsAt(localDateTime(start));
+    setEndsAt(localDateTime(end));
+  }
+  return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
+    event.preventDefault();
+    if (!startsAt || !endsAt) return;
+    void save({
+      title,
+      startsAt: new Date(startsAt).toISOString(),
+      endsAt: new Date(endsAt).toISOString(),
+      timezone,
+    });
+  }}>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm font-semibold">Schedule the canonical orientation event</p>
+      <button type="button" onClick={useRecommendation} className="text-sm font-semibold underline">
+        Use a suggested 45-minute time
+      </button>
+    </div>
+    <p className="mt-2 text-xs text-muted-foreground">
+      The suggestion only fills this form. Saving uses the existing orientation command and the Site timezone ({timezone}).
+    </p>
+    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <label className="text-sm sm:col-span-2">Title
+        <input required value={title} onChange={event => setTitle(event.target.value)}
+          className="mt-1 block w-full rounded-lg border bg-card p-2" />
+      </label>
+      <label className="text-sm">Start
+        <input aria-label="Orientation start" required type="datetime-local" value={startsAt}
+          onChange={event => setStartsAt(event.target.value)} className="mt-1 block w-full rounded-lg border bg-card p-2" />
+      </label>
+      <label className="text-sm">End
+        <input aria-label="Orientation end" required type="datetime-local" value={endsAt}
+          onChange={event => setEndsAt(event.target.value)} className="mt-1 block w-full rounded-lg border bg-card p-2" />
+      </label>
+    </div>
+    <button type="submit" disabled={busy || !startsAt || !endsAt}
+      className="mt-4 min-h-11 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+      Save orientation
+    </button>
+  </form>;
+}
+
+function OpeningTask({ launch, busy, open }: {
+  launch: Launch;
+  busy: boolean;
+  open: (recipientPersonId?: string) => Promise<void>;
+}) {
+  const [recipient, setRecipient] = useState("");
+  return <div className="mt-4 rounded-xl border border-warning/40 bg-background p-4">
+    {launch.siteId && <label className="block text-sm">Receiving site operator (required)
+      <select aria-label={`Receiving site operator for ${launch.name}`} value={recipient}
+        onChange={event => setRecipient(event.target.value)}
+        className="mt-1 block w-full rounded-lg border bg-card p-2 text-sm">
+        <option value="">Select the named receiving operator</option>
+        {launch.openingOperators.map(operator => <option key={operator.personId} value={operator.personId}>
+          {operator.firstName} {operator.lastName}
+        </option>)}
+      </select>
+      <span className="mt-2 block text-xs text-muted-foreground">
+        Only the selected active site registrar/operator can acknowledge receipt after opening.
+        This does not waive readiness checks.
+      </span>
+      {!launch.openingOperators.length && <span role="alert" className="mt-2 block text-xs">
+        No active site registrar/operator is available. An existing authorized site grant is required.
+      </span>}
+    </label>}
+    <button type="button" disabled={busy || Boolean(launch.siteId && !recipient)}
+      onClick={() => void open(recipient || undefined)}
+      className="mt-4 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+      Activate
+    </button>
+    <p className="mt-2 text-xs text-muted-foreground">
+      Activation is not self-certified: the server rechecks the ready Journey and all current opening authority.
+    </p>
+  </div>;
+}
+
+export function OneHourSchoolLaunch({ launches, selectedProgramId }: {
+  launches: Launch[];
+  selectedProgramId?: string;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [opened, setOpened] = useState<{ name: string; siteId: string | null } | null>(null);
+  const launch = launches.find(item => item.id === selectedProgramId) ?? launches[0];
+  if (!launch) return <section className="mt-8 rounded-2xl border bg-card p-6" aria-label="Launch your school">
     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">School launch</p>
-    <h2 className="mt-2 font-serif text-3xl">Let's open your school</h2>
-    <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Start with a school name, church, and location. CAN will create the existing school launch record and guide you through the remaining setup. Nothing is authorized to open merely by starting.</p>
-    <a href="#new-school-launch" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground">Launch a school</a>
+    <h2 className="mt-2 font-serif text-3xl">Let&apos;s open your school</h2>
+    <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+      Start with a school name, church, and location. CAN will create the school Program and Launch Journey,
+      then guide you through the remaining setup. Starting a launch never authorizes opening.
+    </p>
+    <a href="#new-school-launch" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground">
+      Launch a school
+    </a>
   </section>;
-  const pending=launch.requirements.filter(requirement=>requirement.status!=="complete");
-  const blocking=pending.filter(requirement=>requirement.blocking);
-  const isActive=launch.status==="active";
-  const urlFor=(key:string,path:string)=>{
-    if(key==="website"&&!launch.siteId)return "/operations/launch";
-    if(path==="/operations/launch/$programId")return `/operations/launch/${encodeURIComponent(launch.id)}`;
-    if(path==="/sites/$siteId/publish")return `/sites/${encodeURIComponent(launch.siteId!)}/publish`;
-    if(path==="/operations/launch")return `/operations/launch?programId=${encodeURIComponent(launch.id)}`;
-    if(path==="/admissions/intake")return `/admissions/intake?programId=${encodeURIComponent(launch.id)}`;
-    return path;
-  };
+
+  const guidance = buildLaunchGuidance(launch);
+  const next = guidance.nextTask;
+  async function run(operation: () => Promise<unknown>) {
+    setBusy(true);
+    setError("");
+    try {
+      await operation();
+      await router.invalidate();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to save launch progress");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function complete(requirementId: string) {
+    await run(() => completeLaunchRequirement({ data: { journeyRequirementId: requirementId, confirmed: true } }));
+  }
+  async function saveOrientation(input: { title: string; startsAt: string; endsAt: string; timezone: string }) {
+    await run(() => scheduleLaunchOrientation({ data: { programId: launch!.id, ...input } }));
+  }
+  async function open(recipientPersonId?: string) {
+    await run(async () => {
+      await activateLaunch({ data: { programId: launch!.id, recipientPersonId } });
+      setOpened({ name: launch!.name, siteId: launch!.siteId });
+    });
+  }
+
   return <section className="mt-8 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Guided school launch">
     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Guided school launch</p>
     <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-      <div><h2 className="font-serif text-3xl">Let's open your school</h2><p className="mt-2 text-lg font-semibold">{launch.name}</p></div>
-      <StatusBadge tone={isActive?"success":"attention"}>{isActive?"Active program":"Configured does not mean authorized to open"}</StatusBadge>
+      <div>
+        <h2 className="font-serif text-3xl">Continue {launch.name}</h2>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          Progress is saved to this Program and its Launch Journey after each recorded action.
+          Return to this launch on another session or device; no browser checklist determines readiness.
+        </p>
+      </div>
+      <StatusBadge tone={guidance.pendingBlocking.length ? "attention" : "neutral"}>
+        {guidance.pendingBlocking.length
+          ? `${guidance.pendingBlocking.length} blocking ${guidance.pendingBlocking.length === 1 ? "task" : "tasks"}`
+          : guidance.ready ? "Journey ready" : "Review launch record"}
+      </StatusBadge>
     </div>
-    <p className="mt-3 text-sm text-muted-foreground">{blocking.length} recorded blocking requirements · {pending.length} outstanding requirements. These are canonical launch records, not client-completed checkboxes.</p>
-    <div className="mt-5 flex flex-wrap gap-3">
-      <Link to="/operations/launch/$programId" params={{programId:launch.id}} className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">Continue setup</Link>
-      {launch.siteId&&<Link to="/sites/$siteId/publish" params={{siteId:launch.siteId}} className="inline-flex min-h-11 items-center rounded-xl border px-5 py-2 text-sm font-semibold">Preview school</Link>}
-    </div>
-    <ol className="mt-7 grid gap-3 sm:grid-cols-2">
-      {steps.map((step,index)=><li key={step.key} className="rounded-xl border p-4">
-        <div className="flex items-start justify-between gap-2"><h3 className="font-semibold">{index+1}. {step.title}</h3><StatusBadge tone="neutral">Review setup</StatusBadge></div>
-        <p className="mt-2 text-sm text-muted-foreground">{step.description}</p>
-        <a href={urlFor(step.key,step.path)} className="mt-3 inline-block text-sm font-semibold underline">Open this step</a>
-      </li>)}
-    </ol>
-    <div className="mt-7 rounded-xl border border-warning/40 p-5">
-      <h3 className="font-semibold">Before students arrive</h3>
-      {pending.length?<ul className="mt-3 space-y-2">{pending.map(requirement=><li key={requirement.id} className="flex items-start gap-2 text-sm"><span aria-hidden="true">{requirement.blocking?"●":"○"}</span><span>{requirement.title} · {requirement.blocking?"Blocking opening":requirement.status.replaceAll("_"," ")}</span></li>)}</ul>:<p className="mt-2 text-sm">No outstanding requirements in this launch checklist. Verify the independent opening decision before welcoming students.</p>}
-      <Link to="/operations/launch" search={{siteId:launch.siteId??undefined,programId:launch.id}} className="mt-4 inline-block text-sm font-semibold underline">Review opening requirements</Link>
-    </div>
+    {launches.length > 1 && <label className="mt-4 block max-w-md text-sm">Resume a school launch
+      <select value={launch.id} onChange={event => {
+        const selected = launches.find(item => item.id === event.target.value);
+        void router.navigate({
+          to: "/operations/launch",
+          search: { programId: event.target.value, siteId: selected?.siteId ?? undefined },
+        });
+      }} className="mt-1 block w-full rounded-lg border bg-background p-2">
+        {launches.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+      </select>
+    </label>}
+    {error && <p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
+    {opened && <p role="status" className="mt-4 rounded-lg border p-4 text-sm">
+      {opened.name} is active. {opened.siteId
+        ? <Link to="/sites/$siteId" params={{ siteId: opened.siteId }} className="underline">
+          Open Site Today to review the named operator handoff →
+        </Link>
+        : "Opening is recorded."}
+    </p>}
+
+    {next ? <article className="mt-6 rounded-2xl border-2 border-primary/30 p-5" aria-label="Next launch task">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Next up</p>
+          <h3 className="mt-1 font-serif text-2xl">{next.title}</h3>
+        </div>
+        <StatusBadge tone={taskTone(next)}>{launchOwnershipLabel(next.state)}</StatusBadge>
+      </div>
+      <p className="mt-3 text-sm text-muted-foreground">{next.description}</p>
+      {next.state === "needs_can" && <p className="mt-3 text-sm">
+        CAN owns this work. Your school cannot mark it complete from this screen.
+      </p>}
+      {next.state === "waiting_third_party" && <p className="mt-3 text-sm">
+        This depends on someone outside your school and CAN. Recorded waiting is not approval.
+      </p>}
+      <div className="mt-4"><TaskDestination launch={launch} task={next} /></div>
+      <SchoolOwnedCompletion key={next.id} task={next} busy={busy} complete={complete} />
+      {next.action === "orientation" && next.state === "needs_you" &&
+        <OrientationTask launch={launch} busy={busy} save={saveOrientation} />}
+      {next.action === "opening" && next.state === "needs_you" &&
+        <OpeningTask key={launch.id} launch={launch} busy={busy} open={open} />}
+    </article> : <p role="status" className="mt-6 rounded-xl border p-4 text-sm">
+      No further task is derived from the saved Launch Journey. Review the canonical record rather than assuming opening is approved.
+    </p>}
+
+    <details className="mt-5 rounded-xl border bg-background p-4">
+      <summary className="cursor-pointer text-sm font-semibold">View the full saved launch path</summary>
+      <ol className="mt-4 space-y-3">
+        {guidance.tasks.map((task, index) => <li key={task.id} className="flex items-start justify-between gap-3 rounded-lg border p-3">
+          <div>
+            <p className="text-sm font-semibold">{index + 1}. {task.title}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {task.blocking && task.state !== "complete" ? "Blocking opening · " : ""}{task.description}
+            </p>
+          </div>
+          <StatusBadge tone={taskTone(task)}>{launchOwnershipLabel(task.state)}</StatusBadge>
+        </li>)}
+      </ol>
+    </details>
+
+    {guidance.optionalSetupAvailable && <details className="mt-4 rounded-xl border bg-background p-4">
+      <summary className="cursor-pointer text-sm font-semibold">Optional · Website, outreach and family intake</summary>
+      <p className="mt-3 text-sm text-muted-foreground">
+        These tools do not replace opening requirements. A public website is not required for registrar-assisted intake.
+      </p>
+      <nav aria-label="Optional launch setup" className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
+        {launch.siteId && <Link to="/sites/$siteId/publish" params={{ siteId: launch.siteId }} className="underline">
+          Review private school website
+        </Link>}
+        {!isExtendedLearningType(launch.type) && <Link to="/admissions/intake"
+          search={{ siteId: launch.siteId ?? undefined, programId: launch.id }} className="underline">
+          Prepare family intake
+        </Link>}
+        <Link to="/messages" className="underline">Prepare family outreach</Link>
+      </nav>
+    </details>}
   </section>;
 }

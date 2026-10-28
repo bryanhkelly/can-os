@@ -61,6 +61,17 @@ describe("Journey completion transactions", () => {
     await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("registrar review workflow");
     expect(update).not.toHaveBeenCalled();
   });
+  it.each(["needs_can", "waiting_third_party"] as const)(
+    "does not let a school-owned launch completion take over a %s requirement",
+    async requirementStatus => {
+      select.mockReturnValueOnce(query([{ ...current, requirementStatus }]));
+      await expect(completeJourneyRequirement(context, "requirement", [], {
+        allowedCurrentStatuses: ["needs_you"],
+      })).rejects.toThrow("current owner's workflow");
+      expect(update).not.toHaveBeenCalled();
+      expect(insert).not.toHaveBeenCalled();
+    },
+  );
   it("locks the Journey and writes events and audit for both transitions", async () => {
     const locked = query([current]);
     select.mockReturnValueOnce(locked).mockReturnValueOnce(query([]));
