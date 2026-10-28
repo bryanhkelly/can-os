@@ -37,7 +37,7 @@ export function parseFamilyContacts(input:string, existingEmails:readonly string
   let duplicates=0;
   const lines=input.replace(/^\uFEFF/,"").split(/\r?\n/);
   const header=lines[0]?.trim().toLowerCase().replace(/\s/g,"") ?? "";
-  const separateNames=header==="firstname,lastname,email" || header==="first_name,last_name,email";
+  const separateNames=/^(?:firstname|first_name),(?:lastname|last_name),email(?:,phone)?$/.test(header);
   lines.forEach((raw,index)=>{
     const line=raw.trim();if(!line)return;
     if(index===0&&(separateNames||/^(name|first\s*name|email)\s*,/i.test(line)))return;
