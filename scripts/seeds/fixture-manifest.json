@@ -628,6 +628,21 @@
         "conference_slot_registrations"
       ]
     },
+    "/student/my-school": {
+      "persona": "student",
+      "seeds": [
+        "student-calendar-comms-office-hours.sql"
+      ],
+      "recordCounts": {
+        "conference_series": 1,
+        "conference_slots": 1
+      },
+      "interactions": [
+        "view school announcements and upcoming local events",
+        "navigate to the school calendar, classes and study groups"
+      ],
+      "downstreamRecords": []
+    },
     "/student/notifications": {
       "fixtureRequired": false,
       "persona": "authenticated",
