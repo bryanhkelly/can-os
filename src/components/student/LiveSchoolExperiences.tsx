@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearch } from "@tanstack/react-router";
 import {getGuardianStudents} from "@/modules/learning/guardian-academic-queries.functions";
 import { Link, useRouter } from "@tanstack/react-router";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
@@ -15,11 +16,12 @@ type Data={
 };
 export function LiveSchoolExperiences({data}:{data:Data}) {
  const router=useRouter();
+ const familySearch=useSearch({strict:false}) as {student?:string};
  const [busy,setBusy]=useState(false);
  const [children,setChildren]=useState<{studentPersonId:string;firstName:string;lastName:string}[]>([]);
  const [selectedChild,setSelectedChild]=useState("");
  const [replacementSlots,setReplacementSlots]=useState<Record<string,string>>({});
- useEffect(()=>{if(data.viewerRole!=="guardian")return;let active=true;getGuardianStudents().then(result=>{if(active){setChildren(result.students);setSelectedChild(result.students[0]?.studentPersonId??"");}}).catch(()=>{});return()=>{active=false};},[data.viewerRole]);
+ useEffect(()=>{if(data.viewerRole!=="guardian")return;let active=true;getGuardianStudents().then(result=>{if(active){setChildren(result.students);setSelectedChild(result.students.find(child=>child.studentPersonId===familySearch.student)?.studentPersonId??result.students[0]?.studentPersonId??"");}}).catch(()=>{});return()=>{active=false};},[data.viewerRole,familySearch.student]);
  const [message,setMessage]=useState("");
  const [error,setError]=useState("");
  async function perform(operation:()=>Promise<unknown>,success:string) {
