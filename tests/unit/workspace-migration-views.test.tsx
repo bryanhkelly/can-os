@@ -130,6 +130,21 @@ describe("family and student profiles", () => {
     expect(html).toContain('href="/guardian/report-cards?student=child-person"');
     expect(html).not.toContain("student=child-profile");
   });
+  const consentNeed: ComponentProps<typeof FamilyHomeView>["needs"][number] = {
+    id: "consent-1", kind: "action", type: "study_group_consent", title: "Study group permission: Reading circle",
+    detail: "Review a student's group request.", href: "/guardian?action=consent-1",
+    priority: "normal", dueAt: null, createdAt: "2030-01-01T00:00:00.000Z",
+  };
+  it("links a selected action to its owning workspace instead of dead-ending", () => {
+    const html = renderToStaticMarkup(<FamilyHomeView children={[]} needs={[consentNeed]} loading={false} error="" action="consent-1"/>);
+    expect(html).toContain('href="/guardian/group-permissions?action=consent-1"');
+    expect(html).toContain("Open the owning workspace");
+  });
+  it("falls back to the action detail page for a selected action without a known workspace", () => {
+    const html = renderToStaticMarkup(<FamilyHomeView children={[]} loading={false} error="" action="other-1"
+      needs={[{ ...consentNeed, id: "other-1", type: "unknown_follow_up", href: "/guardian?action=other-1" }]}/>);
+    expect(html).toContain('href="/actions/other-1"');
+  });
   const profile: ComponentProps<typeof Student360View>["profile"] = {
     viewerRole: "registrar",
     identity: { personId: "student-person", name: "Jordan Sample", gradeLevel: "9" }, guardians: [],
