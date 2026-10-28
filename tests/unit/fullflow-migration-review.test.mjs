@@ -252,7 +252,7 @@ describe("FullFlow 0040 staged migration readiness (read-only)", () => {
   });
 });
 
-describe("FullFlow 0041-0045 staged migration readiness (read-only)", () => {
+describe("FullFlow 0041-0046 staged migration readiness (read-only)", () => {
   const authCols = [
     "id","program_id","site_id","host_organization_id","institution_organization_id",
     "version","status","services","requested_by_person_id","requested_at",
@@ -261,7 +261,7 @@ describe("FullFlow 0041-0045 staged migration readiness (read-only)", () => {
     "revocation_reason","created_at","updated_at",
   ];
   const guardianCols = ["can_view_academics","can_manage_enrollment","can_submit_attendance_excuse"];
-  // Committed journal timestamps for 0039-0045 (drizzle/meta/_journal.json).
+  // Committed journal timestamps for 0039-0046 (drizzle/meta/_journal.json).
   const stagedEntries = [
     {idx:39,tag:"0039_program_site_authorizations",when:1792731600000},
     {idx:40,tag:"0040_site_local_content",when:1792735200000},
@@ -270,6 +270,7 @@ describe("FullFlow 0041-0045 staged migration readiness (read-only)", () => {
     {idx:43,tag:"0043_student_access_consents",when:1792746000000},
     {idx:44,tag:"0044_school_configuration_operating_approval",when:1792749600000},
     {idx:45,tag:"0045_onsite_safety_qualification_definitions",when:1792753200000},
+    {idx:46,tag:"0046_conference_booking_cancellation",when:1793154285012},
   ];
   function stateThrough0040() {
     const base = reviewedState();
@@ -352,42 +353,61 @@ describe("FullFlow 0041-0045 staged migration readiness (read-only)", () => {
       safetyQualificationKeys:["onsite_child_safety_screening","onsite_safeguarding_training"]
         .map(key=>({key}))};
   }
-  it("permits staged 0041 through 0045 application on the dedicated branch", () => {
+  function stateThrough0046() {
+    const state = stateThrough0045();
+    return {...state, applied:47, lastTimestamp:"1793154285012",
+      types:[...state.types,
+        {typname:"conference_booking_status",enumlabel:"cancelled"}],
+      conferenceBookingIndexes:[{
+        indexname:"conference_slot_booking_uq",
+        indexdef:"CREATE UNIQUE INDEX conference_slot_booking_uq ON public.conference_bookings USING btree (conference_slot_id) WHERE (status <> 'cancelled'::conference_booking_status)",
+      }]};
+  }
+  it("permits staged 0041 through 0046 application on the dedicated branch", () => {
     expect(assessFullFlowMigrationReadiness(stateThrough0040())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
       pendingMigrations:["0041_pending_guardian_access_defaults","0042_public_family_start_requests",
         "0043_student_access_consents","0044_school_configuration_operating_approval",
-        "0045_onsite_safety_qualification_definitions"],
+        "0045_onsite_safety_qualification_definitions","0046_conference_booking_cancellation"],
     });
     expect(assessFullFlowMigrationReadiness(stateThrough0041())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
       pendingMigrations:["0042_public_family_start_requests","0043_student_access_consents",
-        "0044_school_configuration_operating_approval","0045_onsite_safety_qualification_definitions"],
+        "0044_school_configuration_operating_approval","0045_onsite_safety_qualification_definitions",
+        "0046_conference_booking_cancellation"],
     });
     expect(assessFullFlowMigrationReadiness(stateThrough0042())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
       pendingMigrations:["0043_student_access_consents","0044_school_configuration_operating_approval",
-        "0045_onsite_safety_qualification_definitions"],
+        "0045_onsite_safety_qualification_definitions","0046_conference_booking_cancellation"],
     });
     expect(assessFullFlowMigrationReadiness(stateThrough0043())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
       pendingMigrations:["0044_school_configuration_operating_approval",
-        "0045_onsite_safety_qualification_definitions"],
+        "0045_onsite_safety_qualification_definitions","0046_conference_booking_cancellation"],
     });
     expect(assessFullFlowMigrationReadiness(stateThrough0044())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
-      pendingMigrations:["0045_onsite_safety_qualification_definitions"],
+      pendingMigrations:["0045_onsite_safety_qualification_definitions",
+        "0046_conference_booking_cancellation"],
     });
+    // Journal at 0046 with the ledger applied only through 0045: stage 46,
+    // 0046 still pending.
     expect(assessFullFlowMigrationReadiness(stateThrough0045())).toMatchObject({
+      ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
+      pendingMigrations:["0046_conference_booking_cancellation"],
+    });
+    expect(assessFullFlowMigrationReadiness(stateThrough0046())).toMatchObject({
       ready:true,status:"UP_TO_DATE",pendingMigrations:[],
     });
   });
-  it("rejects partial 0041-0045 drift, premature artifacts and wrong branch", () => {
+  it("rejects partial 0041-0046 drift, premature artifacts and wrong branch", () => {
     const through0041 = stateThrough0041();
     const through0042 = stateThrough0042();
     const through0043 = stateThrough0043();
     const through0044 = stateThrough0044();
     const through0045 = stateThrough0045();
+    const through0046 = stateThrough0046();
     for (const changed of [
       // 0041 recorded in the ledger but defaults never flipped
       {...through0041, guardianDefaults:through0041.guardianDefaults
@@ -405,8 +425,20 @@ describe("FullFlow 0041-0045 staged migration readiness (read-only)", () => {
         .filter(x=>x.key!=="onsite_safeguarding_training")},
       {...through0045, lastTimestamp:"1792749600000"},
       {...through0045, applied:45},
+      // 0046 recorded in the ledger but its invariants are missing
+      {...through0046, types:through0046.types.filter(x=>x.enumlabel!=="cancelled")},
+      {...through0046, conferenceBookingIndexes:[]},
+      // 0046 index recreated without its partial WHERE predicate
+      {...through0046, conferenceBookingIndexes:[{
+        indexname:"conference_slot_booking_uq",
+        indexdef:"CREATE UNIQUE INDEX conference_slot_booking_uq ON public.conference_bookings USING btree (conference_slot_id)",
+      }]},
+      {...through0046, lastTimestamp:"1792753200000"},
+      {...through0046, applied:46},
       {...through0045, branch:"br-restless-sea-ar9ooo55"},
       {...through0045, branch:"br-bitter-feather-ar0u63x7"},
+      {...through0046, branch:"br-restless-sea-ar9ooo55"},
+      {...through0046, branch:"br-bitter-feather-ar0u63x7"},
     ]) {
       expect(assessFullFlowMigrationReadiness(changed).ready).toBe(false);
     }
@@ -423,6 +455,9 @@ describe("FullFlow 0041-0045 staged migration readiness (read-only)", () => {
         {typname:"school_configuration_status",enumlabel:"approved"}]},
       // 0045 catalog rows seeded before the migration ran
       {...through0044, safetyQualificationKeys:[{key:"onsite_child_safety_screening"}]},
+      // 0046 enum value present before the migration ran
+      {...through0045, types:[...through0045.types,
+        {typname:"conference_booking_status",enumlabel:"cancelled"}]},
     ]) {
       expect(assessFullFlowMigrationReadiness(premature).ready).toBe(false);
     }

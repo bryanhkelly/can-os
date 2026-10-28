@@ -31,6 +31,7 @@ const stagedTags = [
   "0043_student_access_consents",
   "0044_school_configuration_operating_approval",
   "0045_onsite_safety_qualification_definitions",
+  "0046_conference_booking_cancellation",
 ];
 
 export function assessFullFlowMigrationReadiness(input) {
@@ -38,7 +39,8 @@ export function assessFullFlowMigrationReadiness(input) {
     authorizationColumns = [], authorizationIndexes = [], authorizationConstraints = [],
     localCopyColumns = [], localCopyIndexes = [], localCopyConstraints = [],
     guardianDefaults = [], familyStartColumns = [], familyStartIndexes = [],
-    consentColumns = [], consentIndexes = [], safetyQualificationKeys = [] } = input;
+    consentColumns = [], consentIndexes = [], safetyQualificationKeys = [],
+    conferenceBookingIndexes = [] } = input;
   const issues = [];
   // A previously reviewed 0032-0038 sequence is already applied on the
   // dedicated branch. Before applying each staged migration, verify that exact
@@ -87,10 +89,14 @@ export function assessFullFlowMigrationReadiness(input) {
     const post0045 = applied === 46 && String(lastTimestamp) === when(45) &&
       hasAll("program_site_authorizations", "site_local_content_versions",
         "public_family_start_requests", "student_access_consents");
+    const post0046 = applied === 47 && String(lastTimestamp) === when(46) &&
+      hasAll("program_site_authorizations", "site_local_content_versions",
+        "public_family_start_requests", "student_access_consents");
     const stage = pre0039 ? 39 : post0039 ? 40 : post0040 ? 41 : post0041 ? 42 :
-      post0042 ? 43 : post0043 ? 44 : post0044 ? 45 : post0045 ? 46 : 0;
+      post0042 ? 43 : post0043 ? 44 : post0044 ? 45 : post0045 ? 46 :
+      post0046 ? 47 : 0;
     if (!stage)
-      issues.push("0039-0045 migration ledger/table state is inconsistent or unexpected");
+      issues.push("0039-0046 migration ledger/table state is inconsistent or unexpected");
     if (stage >= 40) {
       const actualColumns = new Set(authorizationColumns.map(row => row.column_name));
       const requiredColumns = [
@@ -193,7 +199,7 @@ export function assessFullFlowMigrationReadiness(input) {
       }
     }
     const seededSafetyKeys = new Set(safetyQualificationKeys.map(row => row.key));
-    if (stage === 46) {
+    if (stage >= 46) {
       for (const key of ["onsite_child_safety_screening", "onsite_safeguarding_training"]) {
         if (!seededSafetyKeys.has(key)) issues.push("0045 onsite safety qualification definition missing: " + key);
       }
@@ -201,6 +207,19 @@ export function assessFullFlowMigrationReadiness(input) {
       for (const key of seededSafetyKeys) {
         issues.push("0045 onsite safety qualification definition present before its migration: " + key);
       }
+    }
+    // 0046 adds conference_booking_status.cancelled and recreates
+    // conference_slot_booking_uq as a partial unique index that excludes
+    // cancelled bookings; the enum value must not exist before stage 47.
+    if (stage >= 47) {
+      if (!enumValues.has("conference_booking_status.cancelled"))
+        issues.push("0046 conference booking cancellation enum value missing");
+      const slotIndex = conferenceBookingIndexes.find(row => row.indexname === "conference_slot_booking_uq");
+      if (!slotIndex || !String(slotIndex.indexdef ?? "").includes("WHERE"))
+        issues.push("0046 partial unique index missing: conference_slot_booking_uq");
+    } else if (stage) {
+      if (enumValues.has("conference_booking_status.cancelled"))
+        issues.push("0046 conference booking cancellation enum value present before its migration");
     }
     const stagedPending = stagedEntries.map(entry => entry.tag);
     const pendingMigrations = stage ? stagedPending.slice(stage - 39) : [];
@@ -250,13 +269,13 @@ async function main() {
     authorizationColumns,authorizationIndexes,authorizationConstraints,
     localCopyColumns,localCopyIndexes,localCopyConstraints,
     guardianDefaults,familyStartColumns,familyStartIndexes,
-    consentColumns,consentIndexes,safetyQualificationKeys] = await Promise.all([
+    consentColumns,consentIndexes,safetyQualificationKeys,conferenceBookingIndexes] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
                  current_setting('neon.branch_id', true) AS branch`,
     query`SELECT count(*)::int AS applied, max(created_at) AS last_timestamp FROM drizzle.__drizzle_migrations`,
     query`SELECT t.typname, e.enumlabel FROM pg_type t
           JOIN pg_enum e ON e.enumtypid=t.oid
-          WHERE t.typname IN ('program_type','activity_season_status','school_configuration_status')`,
+          WHERE t.typname IN ('program_type','activity_season_status','school_configuration_status','conference_booking_status')`,
     query`SELECT table_name, column_name, is_nullable FROM information_schema.columns
           WHERE table_schema='public' AND
            ((table_name='programs' AND column_name='credit_issuing_organization_id') OR
@@ -291,13 +310,16 @@ async function main() {
       WHERE schemaname='public' AND tablename='student_access_consents'`,
     query`SELECT key FROM "public"."qualification_definitions"
       WHERE key IN ('onsite_child_safety_screening','onsite_safeguarding_training')`,
+    query`SELECT indexname, indexdef FROM pg_indexes
+      WHERE schemaname='public' AND tablename='conference_bookings' AND
+      indexname='conference_slot_booking_uq'`,
   ]);
   const review = assessFullFlowMigrationReadiness({
     ...identity, ...ledger, journal, types, columns, tables,
     authorizationColumns, authorizationIndexes, authorizationConstraints,
     localCopyColumns, localCopyIndexes, localCopyConstraints,
     guardianDefaults, familyStartColumns, familyStartIndexes,
-    consentColumns, consentIndexes, safetyQualificationKeys,
+    consentColumns, consentIndexes, safetyQualificationKeys, conferenceBookingIndexes,
   });
   process.stdout.write(JSON.stringify(review,null,2)+"\n");
   if (!review.ready) process.exitCode = 1;
