@@ -10,6 +10,7 @@ import {
 assertCapability,
 assertProgramScope,
 assertSiteScope,
+AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
@@ -22,6 +23,12 @@ const amendableFields = new Set([
   "summary",
   "immediateActions",
 ]);
+
+function assertOrdinaryIncident(type: string, classification: string): void {
+  if (type === "safeguarding_concern" || classification === "safeguarding_restricted") {
+    throw new AuthorizationError("use the assigned safeguarding case workflow");
+  }
+}
 
 export async function fileIncident(
   context: CommandContext,
@@ -43,6 +50,7 @@ export async function fileIncident(
   },
 ): Promise<string> {
   assertCapability(context, "incident.file");
+  assertOrdinaryIncident(input.type, "legal_restricted");
   assertSiteScope(context, input.siteId);
   assertProgramScope(context, input.programId);
   if (!context.actorPersonId) throw new Error("Incident reporter is required");
@@ -139,6 +147,7 @@ export async function amendIncident(
       .limit(1);
 
     if (!current) throw new Error("Incident not found");
+    assertOrdinaryIncident(current.type, current.classification);
     assertSiteScope(context, current.siteId);
     assertProgramScope(context, current.programId);
 
@@ -212,6 +221,7 @@ export async function assignIncidentReview(
       .limit(1);
 
     if (!incident) throw new Error("Incident not found");
+    assertOrdinaryIncident(incident.type, incident.classification);
     assertSiteScope(context, incident.siteId);
     assertProgramScope(context, incident.programId);
 
@@ -249,6 +259,8 @@ export async function completeIncidentReview(
         incidentId: incidents.id,
         siteId: incidents.siteId,
         programId: incidents.programId,
+        type: incidents.type,
+        classification: incidents.classification,
       })
       .from(incidentReviews)
       .innerJoin(incidents, eq(incidents.id, incidentReviews.incidentId))
@@ -256,6 +268,7 @@ export async function completeIncidentReview(
       .limit(1);
 
     if (!record) throw new Error("Incident review not found");
+    assertOrdinaryIncident(record.type, record.classification);
     if (context.actorPersonId !== record.reviewerPersonId) {
       throw new Error("Only the assigned reviewer may complete this review");
     }
@@ -324,6 +337,7 @@ export async function queueIncidentNotification(
       .limit(1);
 
     if (!incident) throw new Error("Incident not found");
+    assertOrdinaryIncident(incident.type, incident.classification);
     assertSiteScope(context, incident.siteId);
     assertProgramScope(context, incident.programId);
 
@@ -376,6 +390,7 @@ export async function closeIncident(
       .limit(1);
 
     if (!incident) throw new Error("Incident not found");
+    assertOrdinaryIncident(incident.type, incident.classification);
     assertSiteScope(context, incident.siteId);
     assertProgramScope(context, incident.programId);
 
@@ -450,6 +465,7 @@ export async function getIncidentCase(
       .limit(1);
 
     if (!incident) throw new Error("Incident not found");
+    assertOrdinaryIncident(incident.type, incident.classification);
     assertSiteScope(context, incident.siteId);
     assertProgramScope(context, incident.programId);
 

@@ -1,6 +1,6 @@
 # CAN OS — site safeguarding, welfare and urgent child-protection concerns
 
-**Status:** Required product + operational safety contract; not a functioning reporting service. **Do not deploy the existing generic incident API as a compliant child-protection workflow.**  
+**Status:** Required product + operational safety contract, with an unaccepted restricted reporting vertical slice now in source. Database migration, jurisdiction-specific legal review, isolated integration tests and browser acceptance remain pending. **Do not deploy the generic incident API or this slice as a certified compliant child-protection service.**
 **Priority:** P0 safety architecture and jurisdictional reporting policy **before onboarding onsite minors**; P1 implementation alongside hybrid-site staff roles and multidisciplinary support.  
 **Accountability:** CAN is the school of record in the intended model; local church or partner personnel may be the first adult to observe a concern. Formal institutional reporting and local contractual responsibility must be specified by state and partner, **without transferring or delaying any individual's legal reporting duties**.  
 **Branch:** `FullFlow`, draft PR #172; no merge or production migration without authorization.
@@ -67,22 +67,23 @@ If safeguarding case work creates a need for tutoring, an agreed safety accommod
 - Current support referrals route to counselors/specialists by site; the system has not implemented case-level confidentiality or restricted disclosure for sensitive allegations.
 - No approved state/territory-specific reporting policy engine, 24/7 safeguarding roster, safety-centric onsite intake, agency-report confirmation, incident legal hold/retention or real multisite browser acceptance. Do not claim the current incident lifecycle completes any of these.
 
-## First code slice (contract only — not yet connected)
+## Foundational contracts and site-bound first observers
 
-- `src/domain/safeguarding-intake-policy.ts`: strict schema for onsite observation, uncertain/multiple concern categories, immediate-danger question and factual narrative. It rejects client-supplied staff roles, agency report confirmations, legal findings and automatic guardian-notification claims.
-- `safeguardingIntakeGuidance` returns **display-only** advice that favors real-world emergency help and direct external-reporting guidance where relevant. It **cannot** file a report, determine legal reporting thresholds, dispatch outside notifications, notify CAN leadership or close a concern.
-- `tests/unit/safeguarding-intake-policy.test.ts` covers suspected abuse/neglect, possible substance-related emergency, uncertain observation, duplicate categories and rejected unsafe self-certifications.
-- **No site staff UI, reporting endpoint, approval policy, external agency integration or signed-off jurisdiction rule has been added.** The generic existing `incidents` and ordinary support services are unchanged.
+- `src/domain/safeguarding-intake-policy.ts` provides the strict observation schema and display-only guidance. It rejects caller-supplied roles, legal findings, agency-report confirmations and automatic guardian-notification claims.
+- `room_facilitator`, `site_staff`, `site_leader` and `paraeducator` identities have submit-only capability without incident reading, confidential case management, teacher, registrar or counseling powers. Their verified session and original single-site grant must pass `assertOnsiteSafeguardingSubmissionScope`.
+- `evaluateSafeguardingSiteCoverage` remains a structural launch-review helper; it does not verify qualifications, legal approval, dispatch or operational acceptance.
 
-## Next code bite: site-bound first observers and launch coverage
+## Restricted reporting vertical slice (October 28, 2026 — unaccepted)
 
-Committed to `FullFlow`:
+- `/safeguarding` gives onsite reporters an easy-to-find intake and own-receipt view. Assigned `safeguarding_responder` / `safeguarding_lead` memberships receive a separate case view. Neither view queries or creates ordinary student-support referrals.
+- `safeguarding-service.ts` files a canonical restricted `Incident` plus `safeguarding_concerns` facts. It uses transactional `AuditEvent`, `DomainEvent`, outbox and non-narrative in-app notifications; intake, evidence and external-report retries are idempotent.
+- Durable site policy and named primary/deputy/CAN fallback configuration points are in `safeguarding_site_policies` and `safeguarding_site_responders`. Activation means operational review by an authorized manager only, never legal approval.
+- Urgent reports route to all three named responsibilities. Other reports route to the primary and can be escalated. Acknowledgment uses the assigned responder's own `incident_notifications` handoff; it is not external reporting or emergency dispatch.
+- Full case reads and response mutations require capability + restricted resource + organization/site/program scope + an active named assignment in `safeguarding_case_assignments`. Sensitive list/detail reads are audited. The generic incident service explicitly rejects safeguarding-specific records.
+- Existing `incident_evidence` preserves restricted evidence references. Append-only `safeguarding_external_reports` separately records an actor's attempted, submitted or agency-acknowledged outside action; the original reporter may record an independent action without receiving downstream case access.
+- No allegation narrative is copied into canonical notifications, support referrals, ordinary Actions, guardian views or Student Success.
 
-- `room_facilitator`, `site_staff`, `site_leader` and `paraeducator` identities have safeguarding-concern submit-only capability (still **no operational filing endpoint**), without incident reading, confidential case management, teacher, registrar or counseling powers. Their verified session + original site-bound grant must pass `assertOnsiteSafeguardingSubmissionScope`. **Separately**, room facilitators, site staff and site leaders now have a narrowly scoped `onsite.attendance.record` capability for the pre-existing school attendance ledger; this is not safeguarding access and does not permit checkout, excuse review, or student release. Paraeducators do not have this attendance capability by default.
-- The registrar staff invite code accepts these roles **only with an explicit site**, and the admin UI labels the site as required and warns that **no safeguarding intake endpoint is live**. This does not authorize a person to perform regulated safeguarding work; training/background checks, approved delegation and reporting obligations remain separate.
-- `evaluateSafeguardingSiteCoverage` checks for *documented* primary and distinct backup site responders, named CAN school-of-record lead, approved local reporting procedure, direct external and emergency instructions, after-hours/offline fallback, case-restricted access and recently confirmed roster. This is a **pure structural validation foundation**; there is no durable roster, verified professional qualification, legally signed-off rule, dispatch, launch blocker UI or real response flow yet.
-- `site-safeguarding-access.test.ts` and `safeguarding-site-coverage.test.ts` cover improper privilege access, sibling sites, organization-wide observer grants, stale rosters and missing emergency escalation.
-- **Next implementation must** persist named active responders and approved procedure versions under tightly scoped school-site authorization, add case-level permissions and a safe restricted intake path with fallback. Do **not** wire `safeguarding.concern.submit` to generic `fileIncident` or imply the action performs statutory outside-agency reporting. Consult counsel and trained safeguarding personnel first.
+This slice still has no generated migration, jurisdiction-specific legal sign-off, automated overdue-escalation scheduler, external agency integration, evidence upload flow, protective-plan/closure lifecycle, real multi-session browser acceptance or isolated database integration result. Those are explicit release gaps, not implied capabilities.
 
 ## P0 safeguards before wiring production functionality
 

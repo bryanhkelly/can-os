@@ -1,6 +1,6 @@
 import {Link,useLocation,useNavigate} from "@tanstack/react-router";
 import {lazy,Suspense,useEffect,useState,type ReactNode} from "react";
-import {Bell,MessageCircle,Search,Menu,ChevronDown,UserRound,Home,BookOpen,Users,CalendarDays,ClipboardList,Settings,MessagesSquare,LifeBuoy} from "lucide-react";
+import {Bell,MessageCircle,Search,Menu,ChevronDown,UserRound,Home,BookOpen,Users,CalendarDays,ClipboardList,Settings,MessagesSquare,LifeBuoy,ShieldAlert} from "lucide-react";
 import {openPaletteEvent} from "@/lib/workspace-search";
 import {ContextTray} from "@/components/workspace";
 import {useWorkspaceSession} from "./WorkspaceSession";
@@ -8,13 +8,15 @@ import {useWorkspaceSession} from "./WorkspaceSession";
 const NotificationTray=lazy(()=>import("./NotificationTray").then(module=>({default:module.NotificationTray})));
 const AskCanConversation=lazy(()=>import("@/components/conversation/AskCanConversation").then(module=>({default:module.AskCanConversation})));
 
-export const workspaceHome:Record<string,string>={site_website_editor:"/site-website",room_facilitator:"/site/day",site_staff:"/site/day",site_leader:"/site/day",paraeducator:"/profiles",student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor",network_admin:"/network",can_network_steward:"/network-steward"};
+export const workspaceHome:Record<string,string>={site_website_editor:"/site-website",room_facilitator:"/site/day",site_staff:"/site/day",site_leader:"/site/day",paraeducator:"/profiles",safeguarding_responder:"/safeguarding",safeguarding_lead:"/safeguarding",student:"/student",guardian:"/guardian",teacher:"/teacher",registrar:"/operations",specialist:"/coach",counselor:"/counselor",network_admin:"/network",can_network_steward:"/network-steward"};
 export const workspaceLinks:Record<string,{title:string;path:string}[]>={
  site_website_editor:[{title:"Website",path:"/site-website"}],
- room_facilitator:[{title:"Today",path:"/site/day"},{title:"Attendance",path:"/staff/attendance"},{title:"Roster",path:"/site/day"}],
- site_staff:[{title:"Today",path:"/site/day"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
- site_leader:[{title:"Today",path:"/site/day"},{title:"Students",path:"/staff/students"},{title:"Staff",path:"/staff/teachers"},{title:"Schedule",path:"/calendar"},{title:"Attendance",path:"/staff/attendance"},{title:"Community",path:"/site-website"},{title:"Operations",path:"/operations"}],
- paraeducator:[{title:"My profile",path:"/profiles"}],
+ room_facilitator:[{title:"Report a safety concern",path:"/safeguarding"},{title:"Today",path:"/site/day"},{title:"Attendance",path:"/staff/attendance"},{title:"Roster",path:"/site/day"}],
+ site_staff:[{title:"Report a safety concern",path:"/safeguarding"},{title:"Today",path:"/site/day"},{title:"Students",path:"/staff/students"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"}],
+ site_leader:[{title:"Report a safety concern",path:"/safeguarding"},{title:"Today",path:"/site/day"},{title:"Students",path:"/staff/students"},{title:"Staff",path:"/staff/teachers"},{title:"Schedule",path:"/calendar"},{title:"Attendance",path:"/staff/attendance"},{title:"Community",path:"/site-website"},{title:"Operations",path:"/operations"}],
+ paraeducator:[{title:"Report a safety concern",path:"/safeguarding"},{title:"My profile",path:"/profiles"}],
+ safeguarding_responder:[{title:"Assigned safeguarding",path:"/safeguarding"}],
+ safeguarding_lead:[{title:"Assigned safeguarding",path:"/safeguarding"}],
  network_admin:[{title:"Network operations",path:"/network"},{title:"Operations",path:"/operations"}],
  can_network_steward:[{title:"Network contracts",path:"/network-steward"}],
  student:[{title:"Today",path:"/student"},{title:"Learn",path:"/student/courses"},{title:"My School",path:"/student/my-school"},{title:"Calendar",path:"/calendar"},{title:"Messages",path:"/messages"},{title:"Support",path:"/student/support"}],
@@ -27,7 +29,7 @@ export const workspaceLinks:Record<string,{title:string;path:string}[]>={
 export function SidebarLinks({links,activePath}:{links:{title:string;path:string}[];activePath?:string}){
  return <nav aria-label="CAN OS primary navigation" className="flex-1 space-y-1 overflow-y-auto p-3">
   {links.map(item=>{
-   const Icon=item.path.includes("calendar")?CalendarDays:item.path.includes("messages")?MessagesSquare:
+   const Icon=item.path.includes("safeguarding")?ShieldAlert:item.path.includes("calendar")?CalendarDays:item.path.includes("messages")?MessagesSquare:
     item.path.includes("students")||item.path.includes("teachers")?Users:item.path.includes("class")||item.path.includes("courses")?BookOpen:
     item.path.includes("support")||item.path.includes("coach")||item.path.includes("counselor")?LifeBuoy:
     item.path.includes("assignments")||item.path.includes("gradebook")?ClipboardList:Home;

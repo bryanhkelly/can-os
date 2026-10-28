@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 export const Route = createFileRoute("/admin")({ component: AdminConsolePage });
 
-const roles = ["teacher", "registrar", "specialist", "counselor", "room_facilitator", "site_staff", "site_leader", "paraeducator"] as const;
+const roles = ["teacher", "registrar", "specialist", "counselor", "room_facilitator", "site_staff", "site_leader", "paraeducator", "safeguarding_responder", "safeguarding_lead"] as const;
 
 const inviteSchema = z.object({
   email: z.string().trim().email(),
@@ -145,7 +145,7 @@ function AdminConsolePage() {
 
         <section id="invite-staff" className="mt-8 rounded-2xl border border-border/70 bg-card p-6 shadow-sm"><h2 className="font-serif text-2xl font-semibold">Invite staff</h2>
           <p className="mt-1 text-sm text-muted-foreground">Create a person, access account, and grant in one step. This does not send email.</p>
-           <p className="mt-1 text-xs text-muted-foreground">Onsite safeguarding roles are site-bound and currently have report-only authorization groundwork, not a live reporting channel. Use existing approved external reporting and emergency procedures.</p>
+           <p className="mt-1 text-xs text-muted-foreground">Onsite safeguarding roles are site-bound. Restricted intake is implemented but has not completed legal review or operational acceptance; continue to use approved external reporting and emergency procedures.</p>
           <Form {...form}>
             <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={form.handleSubmit(submitInvite)}>
               <FormField control={form.control} name="email" render={({ field }) => (

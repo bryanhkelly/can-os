@@ -5,7 +5,7 @@ import { recordAudit, requireActor, type Actor } from "@/modules/identity/actors
 import { AuthorizationError } from "@/domain/command-context";
 import { assertSafeguardingStaffInviteSite } from "@/domain/site-safeguarding-access";
 // The staff-invite flow must not grant student or guardian identities.
-const assignableRoles = ["teacher", "registrar", "specialist", "counselor", "room_facilitator", "site_staff", "site_leader", "paraeducator"] as const;
+const assignableRoles = ["teacher", "registrar", "specialist", "counselor", "room_facilitator", "site_staff", "site_leader", "paraeducator", "safeguarding_responder", "safeguarding_lead"] as const;
 
 /** Every admin function requires the registrar role, admin.manage, and a non-empty organization scope. */
 async function requireRegistrar(): Promise<Actor & { organizationIds: string[]; grantSiteId: string | null }> {

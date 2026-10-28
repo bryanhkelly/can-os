@@ -14,6 +14,7 @@ export * from "./journey-definitions";
 export * from "./calendar";
 export * from "./governance";
 export * from "./incidents";
+export * from "./safeguarding";
 export * from "./health";
 export * from "./field-trips";
 export * from "./activities";

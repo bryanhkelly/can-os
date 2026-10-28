@@ -562,6 +562,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/safeguarding.tsx",
+      "route": "/safeguarding",
+      "owner": "safeguarding",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/site-website.tsx",
       "route": "/site-website",
       "owner": "sites",

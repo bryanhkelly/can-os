@@ -27,6 +27,15 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    inArray(s.actions.programId,context.scope.programIds??[]),
    inArray(s.actions.organizationId,context.scope.organizationIds??[]))):[];
  const handoffSites=new Map(handoffs.map(handoff=>[handoff.id,handoff.siteId]));
+ const safeguardingIds=rows.filter(n=>n.resourceType==="safeguarding_concern"&&n.resourceId).map(n=>n.resourceId!);
+ const permittedSafeguarding=safeguardingIds.length&&["safeguarding_responder","safeguarding_lead"].includes(context.role)&&context.scope.siteIds?.length&&context.scope.organizationIds?.length?
+  await db.select({incidentId:s.safeguardingCaseAssignments.incidentId}).from(s.safeguardingCaseAssignments)
+   .innerJoin(s.incidents,eq(s.incidents.id,s.safeguardingCaseAssignments.incidentId))
+   .where(and(inArray(s.safeguardingCaseAssignments.incidentId,safeguardingIds),
+    eq(s.safeguardingCaseAssignments.personId,personId),isNull(s.safeguardingCaseAssignments.revokedAt),
+    inArray(s.incidents.siteId,context.scope.siteIds),inArray(s.incidents.organizationId,context.scope.organizationIds),
+    eq(s.incidents.type,"safeguarding_concern"),eq(s.incidents.classification,"safeguarding_restricted"))):[];
+ const permittedSafeguardingIds=new Set(permittedSafeguarding.map(row=>row.incidentId));
  const attendanceIds=rows.filter(row=>row.resourceType==="attendance_event"&&row.resourceId).map(row=>row.resourceId!);
  const familyAttendance=attendanceIds.length&&context.role==="guardian"?await db.select({
   id:s.attendanceEvents.id,studentPersonId:s.studentProfiles.personId,
@@ -277,7 +286,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     n.resourceType==="admission_offer"?permittedGuardianOffers.has(n.resourceId):
     n.resourceType==="submission"?guardianSubmissionById.has(n.resourceId):true));
  return visible.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
-  date:n.createdAt.toISOString(),href:n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
+  date:n.createdAt.toISOString(),href:n.resourceType==="safeguarding_concern"&&n.resourceId&&permittedSafeguardingIds.has(n.resourceId)?
+   `/safeguarding?case=${encodeURIComponent(n.resourceId)}`:
+   n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&
     (bySubmission.has(n.resourceId)||guardianSubmissionById.has(n.resourceId))?

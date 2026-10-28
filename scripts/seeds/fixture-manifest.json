@@ -1238,6 +1238,25 @@
         "audit_events"
       ]
     },
+    "/safeguarding": {
+      "persona": "onsite reporter or actively assigned safeguarding responder",
+      "fixtureRequired": false,
+      "rationale": "Restricted safeguarding intake requires a reviewed site policy, canonical jurisdiction, named responder roster, scoped grants and isolated synthetic records. No migration or connected browser/database acceptance is complete, so generic school seeds must not imply operational or legal readiness.",
+      "interactions": [
+        "submit an idempotent onsite concern and receive only the reporter acknowledgment and safety-instruction projection",
+        "route urgent concerns to named primary, deputy and CAN fallback responders with assignment-restricted access",
+        "record evidence and independent external-report attestations without inferring emergency dispatch or guardian notification"
+      ],
+      "downstreamRecords": [
+        "incidents",
+        "safeguarding_concerns",
+        "safeguarding_case_assignments",
+        "incident_evidence",
+        "safeguarding_external_reports",
+        "audit_events",
+        "domain_events"
+      ]
+    },
     "/family/join": {
       "persona": "public",
       "seeds": [

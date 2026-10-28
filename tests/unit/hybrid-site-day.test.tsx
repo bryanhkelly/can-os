@@ -41,7 +41,10 @@ describe("Hybrid Site daily facilitator workspace",()=>{
       for(const forbidden of ["/teacher/gradebook","/counselor","/support","/admissions","/admin"])
         expect(destinations).not.toContain(forbidden);
     }
-    expect(workspaceLinks.paraeducator).toEqual([{title:"My profile",path:"/profiles"}]);
+    expect(workspaceLinks.paraeducator).toEqual([
+      {title:"Report a safety concern",path:"/safeguarding"},
+      {title:"My profile",path:"/profiles"},
+    ]);
   });
   it("explains the boundary between physical presence, online activity and student release",()=>{
     const html=renderToStaticMarkup(<SiteDayPage />);
