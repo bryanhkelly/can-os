@@ -149,7 +149,7 @@ export const removeStudioCalendarDay=createServerFn({method:"POST"})
    await lockAttendanceConfigurationAtSite(tx,record.siteId);
    await tx.delete(academicCalendarDays).where(eq(academicCalendarDays.id,record.id));
    await emitEvent(tx,{
-    eventType:"AcademicCalendarChanged",aggregateType:"academic_calendar",
+    eventType:EventTypes.AcademicCalendarChanged,aggregateType:"academic_calendar",
     aggregateId:record.calendarId,actorPersonId:actor.actorPersonId,
     payload:{calendarDate:record.date,operation:"delete",siteId:record.siteId},
    });
@@ -251,7 +251,7 @@ export const populateStudioInstructionalDays=createServerFn({method:"POST"})
     await tx.insert(academicCalendarDays).values(rows).onConflictDoNothing();
    }
    await emitEvent(tx,{
-    eventType:"AcademicCalendarChanged",aggregateType:"academic_calendar",
+    eventType:EventTypes.AcademicCalendarChanged,aggregateType:"academic_calendar",
     aggregateId:calendar.id,actorPersonId:actor.actorPersonId,
     payload:{operation:"populate",weekdays:data.weekdays,scheduledDays:rows.length,
      siteId:calendar.siteId},

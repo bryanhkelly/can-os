@@ -3,6 +3,7 @@ import { z } from "zod";
 import { and, eq, inArray } from "drizzle-orm";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 
+import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
 const extended = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
 
@@ -123,7 +124,7 @@ export const addEnrichmentChild = createServerFn({ method: "POST" })
         after: { origin: "guardian_enrichment", householdId },
       });
       await emitEvent(tx, {
-        eventType: "EnrichmentChildProfileCreated",
+        eventType: EventTypes.EnrichmentChildProfileCreated,
         aggregateType: "student_profile", aggregateId: student.id,
         actorPersonId: actor.actorPersonId,
         payload: { origin: "guardian_enrichment" },
