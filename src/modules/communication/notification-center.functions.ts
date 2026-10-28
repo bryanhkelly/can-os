@@ -6,6 +6,10 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability } from "@/domain/command-context";
 import {z} from "zod";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+const pickupNotificationTypes=new Set([
+ "child_release_verified","child_pickup_denied","child_uncollected_follow_up",
+ "pickup_custody_hold_created","pickup_custody_hold_resolved",
+]);
 async function notificationActor(){
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId)throw new Error("Authenticated person required");
@@ -48,6 +52,29 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    inArray(s.attendanceEvents.siteId,context.scope.siteIds??[]),
    inArray(s.attendanceEvents.programId,context.scope.programIds??[]))):[];
  const attendanceStudent=new Map(familyAttendance.map(row=>[row.id,row.studentPersonId]));
+ const pickupRows=rows.filter(row=>pickupNotificationTypes.has(row.type)&&row.resourceId);
+ const pickupReleaseIds=pickupRows.filter(row=>row.resourceType==="pickup_release_event").map(row=>row.resourceId!);
+ const pickupHoldIds=pickupRows.filter(row=>row.resourceType==="pickup_custody_hold").map(row=>row.resourceId!);
+ const pickupActionIds=pickupRows.filter(row=>row.resourceType==="action").map(row=>row.resourceId!);
+ const guardianPickup=pickupRows.length&&context.role==="guardian";
+ const [pickupReleases,pickupHolds,pickupActions]=await Promise.all([
+  guardianPickup&&pickupReleaseIds.length?db.select({id:s.pickupReleaseEvents.id,studentPersonId:s.studentProfiles.personId})
+   .from(s.pickupReleaseEvents).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.pickupReleaseEvents.studentProfileId))
+   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"pickup"}))
+   .where(and(inArray(s.pickupReleaseEvents.id,pickupReleaseIds),inArray(s.pickupReleaseEvents.siteId,context.scope.siteIds??[]),inArray(s.pickupReleaseEvents.programId,context.scope.programIds??[]))):[],
+  guardianPickup&&pickupHoldIds.length?db.select({id:s.pickupCustodyHolds.id,studentPersonId:s.studentProfiles.personId})
+   .from(s.pickupCustodyHolds).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.pickupCustodyHolds.studentProfileId))
+   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"pickup"}))
+   .where(and(inArray(s.pickupCustodyHolds.id,pickupHoldIds),inArray(s.pickupCustodyHolds.siteId,context.scope.siteIds??[]),inArray(s.pickupCustodyHolds.programId,context.scope.programIds??[]))):[],
+  guardianPickup&&pickupActionIds.length?db.select({id:s.actions.id,studentPersonId:s.studentProfiles.personId})
+   .from(s.actions).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.actions.subjectId))
+   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"pickup"}))
+   .where(and(inArray(s.actions.id,pickupActionIds),eq(s.actions.type,"onsite_pickup_uncollected_child"),inArray(s.actions.siteId,context.scope.siteIds??[]),inArray(s.actions.programId,context.scope.programIds??[]))):[],
+ ]);
+ const pickupStudents=new Map<string,string>();
+ for(const row of pickupReleases)pickupStudents.set("pickup_release_event:"+row.id,row.studentPersonId);
+ for(const row of pickupHolds)pickupStudents.set("pickup_custody_hold:"+row.id,row.studentPersonId);
+ for(const row of pickupActions)pickupStudents.set("action:"+row.id,row.studentPersonId);
  const enrollmentApplicationIds=rows.filter(row=>row.resourceType==="application"&&
   ["enrollment_document_requested","enrollment_document_rejected","enrollment_form_rejected","admissions_stage_changed"].includes(row.type)&&row.resourceId).map(row=>row.resourceId!);
  const enrollmentApplications=enrollmentApplicationIds.length&&context.role==="guardian"?
@@ -281,13 +308,16 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  // its deep link. Staff and student notifications retain their own ownership
  // checks and projection paths.
  const visible=rows.filter(n=>context.role!=="guardian"||!n.resourceId||
-   (n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
+   (pickupNotificationTypes.has(n.type)?pickupStudents.has(n.resourceType+":"+n.resourceId):
+    n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
     n.resourceType==="application"?enrollmentStudent.has(n.resourceId):
     n.resourceType==="admission_offer"?permittedGuardianOffers.has(n.resourceId):
     n.resourceType==="submission"?guardianSubmissionById.has(n.resourceId):true));
  return visible.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
   date:n.createdAt.toISOString(),href:n.resourceType==="safeguarding_concern"&&n.resourceId&&permittedSafeguardingIds.has(n.resourceId)?
    `/safeguarding?case=${encodeURIComponent(n.resourceId)}`:
+   pickupNotificationTypes.has(n.type)&&n.resourceId&&pickupStudents.has(n.resourceType+":"+n.resourceId)?
+   `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
    n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&

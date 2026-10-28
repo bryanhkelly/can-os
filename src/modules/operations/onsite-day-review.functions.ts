@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { createHash } from "node:crypto";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { actions, programs, sites } from "@/db/schema";
+import { actions, pickupReleaseEvents, programs, sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { deriveOnsiteDayReconciliation } from "@/domain/onsite-day-reconciliation";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
@@ -54,18 +54,61 @@ async function reviewContext(date: string) {
 async function currentSnapshot(date: string) {
   const roster = await listExpectedOnsiteRoster({data:{date}});
   const summary = deriveOnsiteDayReconciliation(roster.programs, roster.students);
-  // No student names or case content in the site review Action.
-  // Event IDs make any later attendance correction invalidate the attestation.
+  const studentIds=[...new Set(roster.students.map(row=>row.studentProfileId))];
+  const programIds=[...new Set(roster.students.map(row=>row.programId))];
+  const [releaseRows,uncollectedRows]=studentIds.length?await Promise.all([
+    db.select({
+      id:pickupReleaseEvents.id,studentProfileId:pickupReleaseEvents.studentProfileId,
+      programId:pickupReleaseEvents.programId,status:pickupReleaseEvents.status,
+      attendanceEventId:pickupReleaseEvents.attendanceEventId,
+      occurredAt:pickupReleaseEvents.occurredAt,
+    }).from(pickupReleaseEvents).where(and(
+      inArray(pickupReleaseEvents.studentProfileId,studentIds),
+      inArray(pickupReleaseEvents.programId,programIds),
+      eq(pickupReleaseEvents.releaseDate,date),
+    )),
+    db.select({id:actions.id,subjectId:actions.subjectId,programId:actions.programId})
+      .from(actions).where(and(
+        eq(actions.type,"onsite_pickup_uncollected_child"),eq(actions.status,"open"),
+        eq(actions.subjectType,"student_profile"),inArray(actions.subjectId,studentIds),
+        inArray(actions.programId,programIds),sql`${actions.metadata}->>'date' = ${date}`,
+      )),
+  ]):[[],[]];
+  const matchesRoster=(row:{studentProfileId:string;programId:string|null})=>
+    !!row.programId && roster.students.some(student=>
+      student.studentProfileId===row.studentProfileId && student.programId===row.programId);
+  const releases=releaseRows.filter(matchesRoster);
+  const uncollected=uncollectedRows.filter(row=>matchesRoster({
+    studentProfileId:row.subjectId,programId:row.programId,
+  }));
+  const releasedKeys=new Set(releases.filter(row=>row.status==="released")
+    .map(row=>row.programId+":"+row.studentProfileId));
+  const presentKeys=roster.students.filter(row=>["present","tardy"].includes(row.status))
+    .map(row=>row.programId+":"+row.studentProfileId);
+  const custody={
+    presentEntries:presentKeys.length,
+    releasedEntries:presentKeys.filter(key=>releasedKeys.has(key)).length,
+    pendingReleaseEntries:presentKeys.filter(key=>!releasedKeys.has(key)).length,
+    deniedAttempts:releases.filter(row=>row.status==="denied").length,
+    uncollectedFollowUps:uncollected.length,
+  };
+  // No student names or case content in the site review Action. Source IDs
+  // make attendance, release, denial or follow-up changes stale the snapshot.
   const records = roster.students.map(row=>[
     row.programId,row.studentProfileId,row.status,row.attendanceEventId,
   ].join(":")).sort();
   const configuration = roster.programs.map(row=>[
     row.id,row.configuration,row.expectedDays,row.missingCalendarDates,
   ].join(":")).sort();
+  const custodyEvidence=releases.map(row=>[
+    row.id,row.programId,row.studentProfileId,row.status,row.attendanceEventId,
+    row.occurredAt.toISOString(),
+  ].join(":")).sort();
+  const followUpEvidence=uncollected.map(row=>row.id).sort();
   const fingerprint = createHash("sha256").update(JSON.stringify({
-    records,configuration,
+    records,configuration,custodyEvidence,followUpEvidence,
   })).digest("hex");
-  return { summary, fingerprint };
+  return { summary, fingerprint, custody };
 }
 
 async function lastReview(siteId: string, date: string) {
@@ -95,7 +138,7 @@ export const getOnsiteDayReview = createServerFn({method:"GET"})
         }
       }
     }
-    const {summary,fingerprint}=await currentSnapshot(data.date);
+    const {summary,fingerprint,custody}=await currentSnapshot(data.date);
     const review=await lastReview(site.id,data.date);
     return {
       date:data.date,canAttest,
@@ -107,7 +150,8 @@ export const getOnsiteDayReview = createServerFn({method:"GET"})
       reviewedAt:review?.createdAt.toISOString()??null,
       readyForAttendanceReview:coversAllPrograms && summary.readyForAttendanceReview,
       unresolvedIssues:summary.issues.length,
-      note:"Review is an attendance snapshot attestation only. New attendance edits or calendar changes invalidate it. It is not staff duty confirmation, child checkout, school certification, or a locked official record.",
+      custody,
+      note:"Review attests one attendance and custody-evidence snapshot. New attendance, release, denial or follow-up records invalidate it. It is not staff duty confirmation, legal school closure, or a locked official record.",
     };
   });
 
@@ -122,7 +166,7 @@ export const attestOnsiteDayReview = createServerFn({method:"POST"})
       throw new AuthorizationError("all active onsite site programs must be in the verified grant");
     if (actor.role!=="site_leader")
       throw new AuthorizationError("site leader attendance review authority");
-    const {summary,fingerprint}=await currentSnapshot(data.date);
+    const {summary,fingerprint,custody}=await currentSnapshot(data.date);
     if (!summary.readyForAttendanceReview)
       throw new Error("Unmarked attendance or schedule gaps prevent daily attendance attestation");
     return db.transaction(async tx=>{
@@ -162,9 +206,9 @@ export const attestOnsiteDayReview = createServerFn({method:"POST"})
         siteId:site.id,ownerPersonId:actor.actorPersonId,
         metadata:{date:data.date,fingerprint,
           expectedEntries:summary.expectedEntries,markedEntries:summary.markedEntries,
-          programs:summary.programs.length,confirmedRecordsReviewed:true,
-          scope:"attendance_snapshot_only"},
-        resolutionNote:"Reviewed observation coverage, not custody, supervision or statutory closure.",
+          programs:summary.programs.length,confirmedRecordsReviewed:true,custody,
+          scope:"attendance_and_custody_evidence_snapshot"},
+        resolutionNote:"Reviewed attendance and linked custody evidence, not staff supervision or statutory closure.",
         resolvedAt:new Date(),
       }).returning({id:actions.id});
       if(!record)throw new Error("Unable to record onsite attendance review");
@@ -172,7 +216,7 @@ export const attestOnsiteDayReview = createServerFn({method:"POST"})
         action:"onsite.attendance_day.reviewed",entityType:"action",
         entityId:record.id,scope:{organizationId:site.organizationId,siteId:site.id},
         after:{date:data.date,fingerprint,expectedEntries:summary.expectedEntries,
-          markedEntries:summary.markedEntries,attestedByPersonId:actor.actorPersonId},
+          markedEntries:summary.markedEntries,custody,attestedByPersonId:actor.actorPersonId},
       });
       return {reviewId:record.id,created:true};
     });

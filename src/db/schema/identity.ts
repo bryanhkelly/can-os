@@ -124,6 +124,7 @@ export const guardianRelationships = pgTable(
     canSubmitAttendanceExcuse: boolean("can_submit_attendance_excuse")
       .default(false)
       .notNull(),
+    canManagePickup: boolean("can_manage_pickup").default(false).notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

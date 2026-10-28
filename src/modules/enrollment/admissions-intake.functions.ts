@@ -609,6 +609,7 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
    const verifiedAt=new Date();
    await tx.update(guardianRelationships).set({
     canViewAcademics:true,canManageEnrollment:true,canSubmitAttendanceExcuse:true,
+    canManagePickup:true,
     metadata:{...relationship.metadata,verification:"verified",
      method:data.method,evidenceNote:data.evidenceNote,
      verifiedBy:actor.actorPersonId,verifiedAt:verifiedAt.toISOString()},

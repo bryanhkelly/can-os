@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { listGuardianEffectiveAbsences, submitEffectiveAttendanceExcuse } from "@/modules/attendance/onsite-attendance-workflow.functions";
 import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachmentCounts } from "@/modules/learning/submission-attachments.functions";
 import { attachmentAccept, attachmentMimeForFileName } from "@/modules/learning/attachment-mimes";
+import { GuardianPickupPanel } from "@/components/operations/GuardianPickupPanel";
 
 // Shared with the server-side excuse attachment validation (attachment-mimes).
 const excuseAttachmentAccept = attachmentAccept;
@@ -190,5 +191,6 @@ function GuardianAttendancePage() {
           </section>)}
         </div>}
       </>}
+      <GuardianPickupPanel studentPersonId={student} />
   </WorkspaceShell>;
 }

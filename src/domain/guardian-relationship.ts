@@ -5,7 +5,8 @@ export type GuardianRelationshipAccess =
   | "relationship"
   | "academic"
   | "enrollment"
-  | "attendance-excuse";
+  | "attendance-excuse"
+  | "pickup";
 
 type GuardianRelationshipSubjects =
   | { guardianPersonId: string | SQLWrapper; studentPersonId?: string | SQLWrapper; studentPersonIds?: never }
@@ -43,6 +44,9 @@ export function guardianRelationshipPredicate(
       break;
     case "attendance-excuse":
       conditions.push(eq(guardianRelationships.canSubmitAttendanceExcuse, true));
+      break;
+    case "pickup":
+      conditions.push(eq(guardianRelationships.canManagePickup, true));
       break;
   }
 

@@ -290,6 +290,7 @@ export const listExpectedOnsiteRoster = createServerFn({ method: "GET" })
           studentProfileId: r.studentProfileId, programId: r.programId,
           programName: programsAtSite.find(p => p.id === r.programId)!.name,
           studentName: r.studentName, sectionTitle: r.sectionTitle,
+          sectionId: r.sectionId,
           occurrenceKey: occurrence(data.date),
           attendanceEventId: record?.id ?? null,
           status: record?.status ?? "unmarked",

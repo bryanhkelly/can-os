@@ -58,6 +58,16 @@ export function OnsiteDayReconciliationPanel({date,roster}:{
       <p className="rounded border p-3">Issues
         <strong className="mt-1 block text-2xl">{summary.issues.length}</strong></p>
     </div>
+    {review?.custody&&<div className="mt-4 rounded-lg border p-4" aria-label="Custody release evidence summary">
+      <h3 className="text-sm font-semibold">Linked custody evidence</h3>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        <p>Present / tardy<strong className="mt-1 block text-xl">{review.custody.presentEntries}</strong></p>
+        <p>Verified releases<strong className="mt-1 block text-xl">{review.custody.releasedEntries}</strong></p>
+        <p>Awaiting release<strong className="mt-1 block text-xl">{review.custody.pendingReleaseEntries}</strong></p>
+        <p>Open follow-ups<strong className="mt-1 block text-xl">{review.custody.uncollectedFollowUps}</strong></p>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">{review.custody.deniedAttempts} denied pickup attempt(s) are linked to this snapshot. Pending release does not block an attendance-only attestation and never implies departure.</p>
+    </div>}
     <p className="mt-3 text-xs text-muted-foreground">
       {summary.distinctStudentCount} distinct students across {summary.programs.length} program(s).
       Counts are program-attendance entries; they are not a physical headcount.

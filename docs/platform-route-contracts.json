@@ -270,8 +270,8 @@
       "owner": "family",
       "verification": "pending",
       "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "writeBoundary": "verified guardian attendance-excuse relationship and document scope; guardian.pickup.manage plus current verified pickup relationship, active enrollment and shared Household for pickup authorization and disputed-custody reports",
+      "readBoundary": "current verified guardian relationship scoped to authorized students and attendance cases; pickup workspace limited to guardian.pickup.manage, active scoped enrollments and matching Households"
     },
     {
       "file": "src/routes/guardian.course-approvals.tsx",
@@ -585,8 +585,8 @@
       "owner": "attendance",
       "verification": "pending",
       "roleJourney": "pending",
-      "readBoundary": "pending",
-      "writeBoundary": "pending"
+      "readBoundary": "active site-bound onsite role with organization/site/program scope; pickup roster exposes only current present/tardy enrollments, valid Household-linked authorizations, holds, release evidence and follow-up state",
+      "writeBoundary": "attendance and day-review authority remain separate; onsite.pickup.release plus active scope/delegation for custody holds, denied pickup, uncollected follow-up and staff-witnessed verified release; only site leaders resolve holds"
     },
     {
       "file": "src/routes/sites.$siteId.publish.tsx",

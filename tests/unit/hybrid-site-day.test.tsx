@@ -31,6 +31,11 @@ vi.mock("@/modules/operations/onsite-physical-presence.functions",()=>({
 vi.mock("@/modules/operations/onsite-day-review.functions",()=>({
   attestOnsiteDayReview:vi.fn(),getOnsiteDayReview:vi.fn(),
 }));
+vi.mock("@/modules/operations/pickup.functions",()=>({
+  createPickupCustodyHold:vi.fn(),getOnsitePickupRoster:vi.fn(),
+  recordDeniedPickup:vi.fn(),recordUncollectedChild:vi.fn(),
+  recordVerifiedPickupRelease:vi.fn(),resolvePickupCustodyHold:vi.fn(),
+}));
 
 describe("Hybrid Site daily facilitator workspace",()=>{
   it("links only site-day and no grades, counseling or generic case consoles",()=>{

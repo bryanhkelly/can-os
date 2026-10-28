@@ -13,25 +13,17 @@
  *   amended, reviewed by the assigned reviewer, the guardian notified and
  *   the case closed → later the same child visits the health office, is
  *   sent home (guardian notified, checkout recorded) and is cleared to
- *   return → the site leader reconciles and attests the day.
+ *   return → the family authorizes a pickup adult, custody restrictions and
+ *   an unknown-adult attempt are handled, an uncollected-child follow-up is
+ *   opened and resolved by staff-witnessed verified release → the site
+ *   leader reconciles and attests the day.
  *
  * Cross-role denials (unrelated guardian, onsite-role excuse review,
  * non-medical health read, unauthorized incident read, reviewer-identity
  * mismatch, registrar day-review attestation, premature incident closure)
  * prove the day was safe, not just recorded. Everything rolls back; no
- * synthetic school day persists.
- *
- * KNOWN GAP — verified custody release: CAN OS currently has no
- * pickup-authorization entity or command. The supervision plan, duty
- * response and day-review surfaces each explicitly disclaim child custody
- * and release ("not ... child custody, or an accepted handoff",
- * "not custody, supervision or statutory closure"). The strongest
- * release-adjacent evidence that exists is the health-office checkout
- * (`checkedOutAt` on a sent-home visit plus the guardian notification),
- * asserted below. The blocked custody leg is tracked by the skipped test
- * at the end of this suite; Journey C must not be called a complete safe
- * school day until a verified-pickup capability lands and is exercised here
- * with an unauthorized-pickup denial.
+ * synthetic school day persists. This spec requires the pickup schema on the
+ * isolated FullFlow database and remains unexecuted until run there.
  */
 import { expect, it } from "vitest";
 import { eq } from "drizzle-orm";
@@ -75,8 +67,8 @@ const incidentCapabilities = [
   "incident.read",
 ] as const;
 
-integration("Journey C: a safe school day (GF4 + GF34 + GF35; custody release blocked)", () => {
-  it("runs arrival, supervision, attendance, an excused exception, an incident, health send-home and day reconciliation on one school", async () => {
+integration("Journey C: a safe school day including verified pickup", () => {
+  it("runs arrival, supervision, attendance, an excused exception, an incident, health send-home, verified release and day reconciliation on one school", async () => {
     const { siteDate } = await import("@/domain/expected-attendance");
     const attendance = await import("@/modules/attendance/onsite-attendance-workflow.functions");
     const supervision = await import("@/modules/operations/onsite-supervision.functions");
@@ -84,6 +76,7 @@ integration("Journey C: a safe school day (GF4 + GF34 + GF35; custody release bl
     const health = await import("@/modules/health/health-office-service");
     const incidents = await import("@/modules/incidents/incident-service");
     const dayReview = await import("@/modules/operations/onsite-day-review.functions");
+    const pickup = await import("@/modules/operations/pickup.functions");
 
     const timeZone = "America/Los_Angeles";
     const day = siteDate(new Date(), timeZone);
@@ -323,9 +316,8 @@ integration("Journey C: a safe school day (GF4 + GF34 + GF35; custody release bl
 
       // ── 6. Health office visit, recorded checkout, return clearance ──────
       // Later the same day Avery feels ill, is sent home and is cleared to
-      // return. The checkout row is the strongest release-adjacent evidence
-      // the platform records today — it is NOT verified custody release (see
-      // the known gap in this file's header).
+      // return. Health checkout remains medical disposition evidence; the
+      // separate verified custody handoff is asserted below.
       const nurse = await createPersona(journey.tx, {
         key: "nurse", role: "site_staff", organizationId: school.school.id,
         siteId: school.site.id, firstName: "Journey", lastName: "Nurse",
@@ -394,7 +386,142 @@ integration("Journey C: a safe school day (GF4 + GF34 + GF35; custody release bl
         eventType: "ReturnToSchoolCleared",
       });
 
-      // ── 7. The day is reconciled and attested ────────────────────────────
+      // ── 7. Verified custody release and unauthorized denial ─────────────
+      const familyApplication = first(await journey.tx.select({
+        householdId: s.applications.householdId,
+      }).from(s.applications).where(eq(s.applications.id, familyA.applicationId)));
+      journey.setActor(familyA.guardian.actor);
+      const authorizationInput = {
+        studentProfileId: familyA.studentProfileId,
+        programId: school.program.id,
+        householdId: familyApplication.householdId,
+        legalFirstName: "Morgan",
+        legalLastName: "Authorized",
+        relationshipLabel: "grandparent",
+        identityVerificationMethod: "government_photo_id",
+        startsOn: day,
+        expiresOn: null,
+        mutationId: crypto.randomUUID(),
+      } as const;
+      const authorization = await pickup.createPickupAuthorization({ data: authorizationInput });
+      expect(authorization.created).toBe(true);
+      expect(await pickup.createPickupAuthorization({ data: authorizationInput }))
+        .toMatchObject({ authorizationId: authorization.authorizationId, created: false });
+
+      // A same-Site guardian account without the verified child relationship
+      // cannot create release authority for this Household.
+      journey.setActor(impersonating(familyA.guardian.actor, outsider.person.id));
+      await expectJourneyDenied(pickup.createPickupAuthorization({ data: {
+        ...authorizationInput,
+        mutationId: crypto.randomUUID(),
+      } }), "verified guardian");
+
+      // A disputed-custody report immediately blocks an otherwise valid adult.
+      journey.setActor(familyA.guardian.actor);
+      const hold = await pickup.createPickupCustodyHold({ data: {
+        studentProfileId: familyA.studentProfileId,
+        programId: school.program.id,
+        householdId: familyApplication.householdId,
+        kind: "disputed_custody",
+        reason: "Family reports a custody dispute requiring school review.",
+        mutationId: crypto.randomUUID(),
+      } });
+      journey.setActor(school.siteLeader.actor);
+      const releaseInput = {
+        date: day,
+        studentProfileId: familyA.studentProfileId,
+        programId: school.program.id,
+        authorizationId: authorization.authorizationId,
+        identityVerified: true as const,
+        identityVerificationMethod: "government_photo_id" as const,
+        verifiedLegalName: "Morgan Authorized",
+        handoffEvidence: "Matched government photo ID and personally witnessed the handoff.",
+        confirmedHandoff: true as const,
+        mutationId: crypto.randomUUID(),
+      };
+      await expectJourneyDenied(pickup.recordVerifiedPickupRelease({ data: {
+        ...releaseInput,
+        mutationId: crypto.randomUUID(),
+      } }), "custody dispute");
+      await pickup.resolvePickupCustodyHold({ data: {
+        holdId: hold.holdId,
+        resolutionNote: "Site leader reviewed the dispute and documented permission to proceed.",
+        mutationId: crypto.randomUUID(),
+      } });
+
+      // An unknown adult is explicitly denied; the child remains supervised.
+      const denial = await pickup.recordDeniedPickup({ data: {
+        date: day,
+        studentProfileId: familyA.studentProfileId,
+        programId: school.program.id,
+        householdId: familyApplication.householdId,
+        presentedName: "Unverified Unknown Adult",
+        reason: "not_authorized",
+        identityVerified: false,
+        mutationId: crypto.randomUUID(),
+      } });
+      await expectJourneyDomainEvent(journey.tx, {
+        aggregateId: denial.denialId,
+        eventType: "ChildPickupDenied",
+      });
+
+      // Dismissal without release creates canonical supervised follow-up.
+      const uncollected = await pickup.recordUncollectedChild({ data: {
+        date: day,
+        studentProfileId: familyA.studentProfileId,
+        programId: school.program.id,
+        dismissalConfirmed: true,
+        followUpPlan: "Keep Avery with the site leader and call the verified family guardian.",
+        mutationId: crypto.randomUUID(),
+      } });
+      await expectJourneyDomainEvent(journey.tx, {
+        aggregateId: uncollected.actionId,
+        eventType: "ChildUncollectedFollowUpCreated",
+      });
+
+      // A matching authorization is not enough when the credential name and
+      // required verification method do not match the person at pickup.
+      await expectJourneyDenied(pickup.recordVerifiedPickupRelease({ data: {
+        ...releaseInput,
+        verifiedLegalName: "Someone Else",
+        mutationId: crypto.randomUUID(),
+      } }), "identity not verified");
+      const released = await pickup.recordVerifiedPickupRelease({ data: releaseInput });
+      expect(released.created).toBe(true);
+      expect(await pickup.recordVerifiedPickupRelease({ data: releaseInput }))
+        .toEqual({ releaseId: released.releaseId, created: false });
+      const releaseRow = first(await journey.tx.select().from(s.pickupReleaseEvents)
+        .where(eq(s.pickupReleaseEvents.id, released.releaseId)));
+      expect(releaseRow).toMatchObject({
+        studentProfileId: familyA.studentProfileId,
+        attendanceEventId: markA.attendanceEventId,
+        pickupAuthorizationId: authorization.authorizationId,
+        staffWitnessPersonId: school.siteLeader.person.id,
+        status: "released",
+        identityVerified: true,
+        handoffEvidence: releaseInput.handoffEvidence,
+      });
+      expect(releaseRow.occurredAt).toBeTruthy();
+      await expectJourneyDomainEvent(journey.tx, {
+        aggregateId: released.releaseId,
+        eventType: "ChildReleaseVerified",
+      });
+      await expectJourneyAudit(journey.tx, {
+        resourceId: released.releaseId,
+        action: "pickup.release.verified",
+      });
+      await expectJourneyNotification(journey.tx, {
+        recipientPersonId: familyA.guardian.person.id,
+        type: "child_release_verified",
+      });
+      const resolvedFollowUp = first(await journey.tx.select().from(s.actions)
+        .where(eq(s.actions.id, uncollected.actionId)));
+      expect(resolvedFollowUp.status).toBe("resolved");
+      const releasedRoster = await pickup.getOnsitePickupRoster({ data: { date: day } });
+      expect(releasedRoster.students.find(row =>
+        row.studentProfileId === familyA.studentProfileId)?.release?.id).toBe(released.releaseId);
+
+      // ── 8. The day is reconciled and attested ────────────────────────────
       // A registrar cannot impersonate a site-bound onsite leader. The
       // onsite scope guard denies this actor before the site-leader-only
       // attestation branch is reached.
@@ -420,13 +547,21 @@ integration("Journey C: a safe school day (GF4 + GF34 + GF35; custody release bl
       } })).toEqual({ reviewId: attested.reviewId, created: false });
       const after = await dayReview.getOnsiteDayReview({ data: { date: day } });
       expect(after.status).toBe("reviewed_snapshot");
+      expect(after.custody).toMatchObject({
+        presentEntries: 1,
+        releasedEntries: 1,
+        pendingReleaseEntries: 0,
+        deniedAttempts: 1,
+        uncollectedFollowUps: 0,
+      });
       await expectJourneyAudit(journey.tx, {
         resourceId: attested.reviewId,
         action: "onsite.attendance_day.reviewed",
       });
 
       // The reconciled roster reflects the whole day: arrival, excused
-      // absence, and both students accounted for.
+      // absence, and both students accounted for. Release does not rewrite
+      // the historical attendance mark; it links separate custody evidence.
       const finalRoster = await attendance.listExpectedOnsiteRoster({ data: { date: day } });
       expect(finalRoster.students.find(
         r => r.studentProfileId === familyA.studentProfileId)?.status).toBe("present");
@@ -440,6 +575,7 @@ integration("Journey C: a safe school day (GF4 + GF34 + GF35; custody release bl
         excuseId: excuse.excuseId,
         incidentId,
         visitId: visit.visitId,
+        releaseId: released.releaseId,
       };
     });
 
@@ -453,18 +589,7 @@ integration("Journey C: a safe school day (GF4 + GF34 + GF35; custody release bl
       .where(eq(s.attendanceEvents.id, result.markA))).toHaveLength(0);
     expect(await realDb.select({ id: s.incidents.id }).from(s.incidents)
       .where(eq(s.incidents.id, result.incidentId))).toHaveLength(0);
+    expect(await realDb.select({ id: s.pickupReleaseEvents.id }).from(s.pickupReleaseEvents)
+      .where(eq(s.pickupReleaseEvents.id, result.releaseId))).toHaveLength(0);
   }, 120_000);
-
-  // BLOCKED — verified custody release. CAN OS has no pickup-authorization
-  // entity, release command or pickup roster today; the supervision plan,
-  // duty response, physical-presence and day-review surfaces all explicitly
-  // disclaim child custody and release. When a verified-pickup capability
-  // lands, this leg must exercise it: authorized adult verified against the
-  // family's release authority → handoff/release evidence recorded → an
-  // unauthorized adult's pickup attempt denied → the day review reflects the
-  // release. Until then Journey C certifies attendance, health and incident
-  // handling only — not a complete, safe school day.
-  it.skip("verifies authorized child pickup and denies unauthorized release", async () => {
-    // Intentionally unimplemented: no production capability exists to test.
-  });
 });

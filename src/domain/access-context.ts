@@ -35,13 +35,13 @@ export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Obj
  site_website_editor: ["site.website.draft.read", "site.website.local.publish"],
  // First-observer site personnel: report-only capability, NEVER incident.read,
  // counseling access, enrollment editing or automatic emergency dispatch.
- room_facilitator: ["safeguarding.concern.submit", "onsite.attendance.record","profiles.credentials.submit"],
- site_staff: ["safeguarding.concern.submit", "onsite.attendance.record","profiles.credentials.submit"],
- site_leader: ["safeguarding.concern.submit", "onsite.attendance.record","profiles.credentials.submit"],
+ room_facilitator: ["safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit"],
+ site_staff: ["safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit"],
+ site_leader: ["safeguarding.concern.submit", "onsite.attendance.record","onsite.pickup.release","profiles.credentials.submit"],
  paraeducator: ["safeguarding.concern.submit"],
  student: ["student:read","assignments:submit","study-groups:participate","notifications:manage","communication.send","calendar.event.create"],
  teacher: ["teacher:read","profiles.credentials.submit","notifications:manage","assignments:grade","assignments:create","referrals:create","discussions:moderate","communication.send","attendance.write","attendance.excuse.review","action.create","action.resolve","program.read","calendar.event.create","calendar.event.manage","insights:read","capacity.read","conference.manage","conference.complete","conference.remind"],
- guardian: ["activity.register","guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read","communication.send","attendance.excuse.submit","calendar.event.create","conference.book"],
+ guardian: ["activity.register","guardian:read","notifications:manage","enrollment:manage","enrollment.apply","student:related-read","communication.send","attendance.excuse.submit","guardian.pickup.manage","calendar.event.create","conference.book"],
  registrar: ["network.affiliations.request", "network.affiliations.read", "curriculum.publish","curriculum.adopt","program.opening.handoff.manage","admissions:read","profiles.catalog.create","profiles.credentials.verify","notifications:manage","admissions:decide","enrollment.decide","enrollment.activate","enrollment:manage","registrations:approve","attendance.write","attendance.excuse.review","communication.send","program.read","program.launch.start","site.publication.manage","program.activate","staffing.policy.publish","calendar.event.create","calendar.event.manage","academic_year.manage","academic_year.activate","action.resolve","journey.requirement.complete","admin.manage","insights:read","insights:manage","capacity.read","capacity.manage","capacity.demand.manage","capacity.reserve","safeguarding.policy.manage"],
  // Named responders receive no Site-wide case browsing power. Every read and
  // mutation additionally requires an active assignment to the restricted case.
