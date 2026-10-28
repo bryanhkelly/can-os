@@ -95,10 +95,10 @@ export const conferenceBookings = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [
-    // One live booking per slot; cancelled bookings release the slot for a
-    // new family to book.
+    // One active booking per slot; cancelled bookings remain in history but
+    // release the slot. Mirrors applied migration 0046's enumerated statuses.
     uniqueIndex("conference_slot_booking_uq").on(table.conferenceSlotId).where(
-      sql`status != 'cancelled'`,
+      sql`status IN ('booked', 'held', 'no_show')`,
     ),
     index("conference_booking_student_idx").on(table.studentProfileId),
     index("conference_booking_guardian_idx").on(table.guardianPersonId),
