@@ -11,6 +11,7 @@ import { zipRosterFiles } from "@/domain/oneroster-zip";
 import { requireActor, recordAudit } from "@/modules/identity/actors.server";
 import { emitEvent } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 /** Explicit verified registrar roster-export capability; a curriculum publisher
  * grant on its own never authorizes exporting personal student information. */
 export const exportOneRosterBulkRoster = createServerFn({method:"POST"})
@@ -108,7 +109,7 @@ export const exportOneRosterBulkRoster = createServerFn({method:"POST"})
       after:{classes:classRows.length,students:studentRows.length,teachers:teacherRows.length,
         format:"OneRoster CSV 1.2",fileCount:Object.keys(files).length},
       scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id}});
-    await emitEvent(tx,{eventType:"OneRosterRosterExported",aggregateType:"program",
+    await emitEvent(tx,{eventType:EventTypes.OneRosterRosterExported,aggregateType:"program",
       aggregateId:program.id,actorPersonId:actor.actorPersonId,
       organizationId:program.organizationId,siteId:program.siteId,programId:program.id});
   });

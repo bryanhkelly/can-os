@@ -12,6 +12,7 @@ import { hasInstitutionalProgramCapability } from "@/modules/identity/institutio
 import { readMarketplace } from "./curriculum-marketplace.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 const context=z.object({programId:z.string().uuid()}).strict();
 const incoming=context.extend({
  fileName:z.string().trim().min(1).max(150).regex(/\.(imscc|zip)$/i),
@@ -65,7 +66,7 @@ export const validateCommonCartridgeImport=createServerFn({method:"POST"})
     scope:{organizationId:program.organizationId,programId:data.programId},
     after:{format:preview.profile,sha256:hash,resourceCount:preview.resources.length,
       noticeCount:preview.notices.length}});
-  await emitEvent(tx,{eventType:"CurriculumCartridgeValidated",
+  await emitEvent(tx,{eventType:EventTypes.CurriculumCartridgeValidated,
     aggregateType:"curriculum_import_job",aggregateId:job.id,
     actorPersonId:actor.actorPersonId,organizationId:program.organizationId,programId:data.programId});
   return {importId:job.id,status:"validated",preview:report,previouslyValidated:false};

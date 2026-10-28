@@ -10,6 +10,7 @@ import { requireActor } from "@/modules/identity/actors.server";
 import { readMarketplace } from "./curriculum-marketplace.server";
 import { writeAudit,emitEvent } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 /** Stages a roster *validation report*, never syncs live enrollments. */
 const csv=z.string().min(1).max(500_000);
 const files=z.object({
@@ -51,7 +52,7 @@ export const validateOneRosterCsvBundle=createServerFn({method:"POST"})
      entityType:"curriculum_import_job",entityId:job.id,
      scope:{organizationId:program.organizationId,programId:data.programId},
      after:{format:"oneroster",sha256:digest,valid:serialized.valid}});
-   await emitEvent(tx,{eventType:"OneRosterCsvValidated",
+   await emitEvent(tx,{eventType:EventTypes.OneRosterCsvValidated,
      aggregateType:"curriculum_import_job",aggregateId:job.id,
      actorPersonId:actor.actorPersonId,organizationId:program.organizationId,programId:data.programId});
    return {importId:job.id,status:serialized.valid?"validated":"rejected",
