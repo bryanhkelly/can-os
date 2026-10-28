@@ -40,9 +40,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    inArray(s.attendanceEvents.programId,context.scope.programIds??[]))):[];
  const attendanceStudent=new Map(familyAttendance.map(row=>[row.id,row.studentPersonId]));
  const enrollmentApplicationIds=rows.filter(row=>row.resourceType==="application"&&
-  ["enrollment_document_requested","enrollment_document_rejected","enrollment_form_rejected"].includes(row.type)&&row.resourceId).map(row=>row.resourceId!);
+  ["enrollment_document_requested","enrollment_document_rejected","enrollment_form_rejected","admissions_stage_changed"].includes(row.type)&&row.resourceId).map(row=>row.resourceId!);
  const enrollmentApplications=enrollmentApplicationIds.length&&context.role==="guardian"?
-  await db.select({id:s.applications.id,studentPersonId:s.studentProfiles.personId}).from(s.applications)
+  await db.select({id:s.applications.id,studentPersonId:s.studentProfiles.personId,stage:s.applications.stage,metadata:s.applications.metadata}).from(s.applications)
    .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
    .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.applications.studentProfileId))
    .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
@@ -53,6 +53,10 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     inArray(s.programs.siteId,context.scope.siteIds??[]),
     inArray(s.programs.organizationId,context.scope.organizationIds??[]))):[];
  const enrollmentStudent=new Map(enrollmentApplications.map(row=>[row.id,row.studentPersonId]));
+ // Stage decisions deep-link to the offer surface only once an offer is
+ // imminent; every other application notification stays on the apply workspace.
+ const enrollmentApplicationOfferReady=new Map(enrollmentApplications.map(row=>[row.id,
+  row.stage==="accepted"||row.metadata?.admissionsDisposition==="offer_ready"]));
  const sessionIds=rows.filter(n=>n.resourceType==="study_group_session"&&n.resourceId).map(n=>n.resourceId as string);
  const sessions=sessionIds.length&&context.role==="student"?await db.selectDistinct({
   id:s.studyGroupSessions.id,groupId:s.studyGroupSessions.groupId
@@ -219,6 +223,49 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    !action.programId||(context.scope.programIds??[]).includes(action.programId)).map(action=>action.id));
  const missingAssessmentByAction=new Map(followUps.filter(a=>typeof a.metadata.assessmentId==="string").map(a=>[a.id,a.metadata.assessmentId as string]));
 
+ // Thread notifications deep-link only when the recipient currently holds
+ // access: thread participants for messages, and the live class roster
+ // (student enrollment, verified guardian relationship or section teaching
+ // assignment) for class announcements, which have no participant rows.
+ const threadNotificationIds=rows.filter(n=>n.resourceType==="communication_thread"&&n.resourceId).map(n=>n.resourceId!);
+ const threadRows=threadNotificationIds.length?await db.select({id:s.communicationThreads.id,contextType:s.communicationThreads.contextType,contextId:s.communicationThreads.contextId,metadata:s.communicationThreads.metadata}).from(s.communicationThreads).where(inArray(s.communicationThreads.id,threadNotificationIds)):[];
+ const threadById=new Map(threadRows.map(thread=>[thread.id,thread]));
+ const memberThreadRows=threadRows.length?await db.select({threadId:s.communicationParticipants.threadId}).from(s.communicationParticipants)
+  .where(and(inArray(s.communicationParticipants.threadId,threadRows.map(thread=>thread.id)),
+   eq(s.communicationParticipants.participantType,"person"),
+   eq(s.communicationParticipants.participantId,personId))):[];
+ const memberThreadIds=new Set(memberThreadRows.map(row=>row.threadId));
+ const announcementSectionIds=[...new Set(threadRows.filter(thread=>thread.metadata?.kind==="class_announcement"&&thread.contextType==="section"&&thread.contextId).map(thread=>thread.contextId!))];
+ const accessibleAnnouncementSections=new Set<string>();
+ if(announcementSectionIds.length){
+  const scopedSections=await db.select({id:s.sections.id}).from(s.sections)
+   .where(and(inArray(s.sections.id,announcementSectionIds),
+    inArray(s.sections.siteId,context.scope.siteIds??[]),
+    inArray(s.sections.programId,context.scope.programIds??[])));
+  const scopedIds=scopedSections.map(section=>section.id);
+  if(scopedIds.length&&context.role==="student"){
+   const enrolled=await db.select({sectionId:s.enrollments.sectionId}).from(s.enrollments)
+    .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+    .where(and(eq(s.studentProfiles.personId,personId),eq(s.enrollments.kind,"section"),
+     eq(s.enrollments.status,"active"),inArray(s.enrollments.sectionId,scopedIds)));
+   for(const row of enrolled)if(row.sectionId)accessibleAnnouncementSections.add(row.sectionId);
+  }
+  if(scopedIds.length&&context.role==="guardian"){
+   const enrolled=await db.select({sectionId:s.enrollments.sectionId}).from(s.enrollments)
+    .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+    .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+      guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"academic",
+     }))
+    .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+     inArray(s.enrollments.sectionId,scopedIds)));
+   for(const row of enrolled)if(row.sectionId)accessibleAnnouncementSections.add(row.sectionId);
+  }
+  if(scopedIds.length&&context.role==="teacher"){
+   const teaching=await db.select({sectionId:s.sectionTeachers.sectionId}).from(s.sectionTeachers)
+    .where(and(eq(s.sectionTeachers.personId,personId),inArray(s.sectionTeachers.sectionId,scopedIds)));
+   for(const row of teaching)accessibleAnnouncementSections.add(row.sectionId);
+  }
+ }
  // A notification addressed to an adult is not continuing authority to
  // reveal child-specific content after guardianship is unverified or revoked.
  // Filter the whole sensitive notification (including title/body), not only
@@ -244,9 +291,19 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    (context.role==="student"?`/student/support?referral=${encodeURIComponent(n.resourceId)}`:null):
    n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:null):
-   n.resourceType==="application"&&n.resourceId&&enrollmentStudent.has(n.resourceId)?`/guardian/admission-offers?student=${encodeURIComponent(enrollmentStudent.get(n.resourceId)!)}&application=${encodeURIComponent(n.resourceId)}`:
+   n.resourceType==="application"&&n.resourceId&&enrollmentStudent.has(n.resourceId)?
+   (n.type==="admissions_stage_changed"&&!enrollmentApplicationOfferReady.get(n.resourceId)?"/guardian/apply":
+    `/guardian/admission-offers?student=${encodeURIComponent(enrollmentStudent.get(n.resourceId)!)}&application=${encodeURIComponent(n.resourceId)}`):
+   n.resourceType==="communication_thread"&&n.resourceId&&threadById.has(n.resourceId)?
+   (()=>{const thread=threadById.get(n.resourceId!)!;
+    if(thread.metadata?.kind==="class_announcement")
+     return thread.contextId&&accessibleAnnouncementSections.has(thread.contextId)?
+      `/classes?section=${encodeURIComponent(thread.contextId)}&tab=announcements`:null;
+    return memberThreadIds.has(thread.id)?`/messages?thread=${encodeURIComponent(thread.id)}`:null;})():
    n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?`/guardian/admission-offers?student=${encodeURIComponent(personByProfile.get(admissionOffers.find(offer=>offer.id===n.resourceId)!.studentProfileId)!)}&offer=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&context.role==="registrar"?`/admissions?application=${encodeURIComponent(admissionOffers.find(offer=>offer.id===n.resourceId)!.applicationId)}`:
+   n.type==="course_registration_guardian_review"&&context.role==="guardian"?"/guardian/course-approvals":
+   n.type==="field_trip_permission_requested"&&context.role==="guardian"?"/guardian/field-trips":
    n.type==="study_group_consent_requested"&&context.role==="guardian"&&(
     n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)||
     n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${encodeURIComponent(n.resourceId!)}`:"/guardian/group-permissions"):

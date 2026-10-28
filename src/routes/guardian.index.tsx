@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
 import { WorkspaceShell, EmptyState, QueryState, StatCard, PersonMark, StatusBadge } from "@/components/workspace";
-import { prioritizeFamilyNeeds } from "@/domain/family-needs";
+import { prioritizeFamilyNeeds, familyActionWorkspaceLink } from "@/domain/family-needs";
 
 export const Route = createFileRoute("/guardian/")({
  validateSearch:(search:Record<string,unknown>):{action?:string}=>({
@@ -71,6 +71,7 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
     {needs.length > 0 && <div className="mt-4 grid gap-3">
      {prioritized.filter(item=>!action||item.kind==="action"&&item.id===action).map(item => {
       const Container=action?"article":Link;
+      const workspace=action?familyActionWorkspaceLink(item):null;
       return <Container key={`${item.kind}-${item.id}`} to={item.href} href={action?undefined:item.href} className="block rounded-xl border bg-card p-5 transition-colors hover:bg-muted">
       <div className="flex flex-wrap items-start justify-between gap-3">
        <div>
@@ -83,6 +84,7 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
         {item.kind === "excuse" ? "Submit excuse" : item.kind === "action" ? (action?"Selected action":"Review action") : "View"}
        </span>
       </div>
+      {workspace&&<Link to={workspace} href={workspace} className="mt-3 inline-block text-sm font-semibold underline">Open the owning workspace →</Link>}
      </Container>;})}
     </div>}
     {action&&<Link to="/guardian" className="mt-4 inline-block text-sm underline">View all family needs</Link>}
@@ -137,6 +139,7 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
     <h2 className="text-lg font-semibold">Family</h2>
     <div className="mt-4 flex flex-wrap gap-3 text-sm">
      <Link to="/ask" className="rounded-full border px-4 py-2 hover:bg-muted">Ask CAN</Link>
+     <Link to="/guardian/experiences" className="rounded-full border px-4 py-2 hover:bg-muted">School calendar &amp; teacher conferences</Link>
      <Link to="/guardian/group-permissions" className="rounded-full border px-4 py-2 hover:bg-muted">Study group permissions</Link>
      <Link to="/guardian/watching" className="rounded-full border px-4 py-2 hover:bg-muted">Things CAN Is Watching</Link>
      <Link to="/guardian/admission-offers" search={{student:undefined}} className="rounded-full border px-4 py-2 hover:bg-muted">Admission offers</Link>
