@@ -8,6 +8,7 @@ import {
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireSitePublisher } from "./site-publication.server";
 
+import { EventTypes } from "@/domain/event-types";
 export type AcademicMarketingAction = "publish" | "unpublish";
 
 /** Reviewed, reversible academic marketing copy. No admissions/credit changes. */
@@ -113,7 +114,7 @@ export async function changeAcademicProgramPublication(
     });
     await emitEvent(tx, {
       eventType: target === "published"
-        ? "AcademicProgramMarketingPublished" : "AcademicProgramMarketingUnpublished",
+        ? EventTypes.AcademicProgramMarketingPublished : EventTypes.AcademicProgramMarketingUnpublished,
       aggregateType: "program", aggregateId: program.id,
       actorPersonId: actor.actorPersonId, organizationId: site.organizationId,
       siteId: site.id, programId: program.id,

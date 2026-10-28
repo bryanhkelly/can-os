@@ -11,6 +11,7 @@ import { recordAudit, type Actor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { emitEvent } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 export const teacherPolicyPublisherCapability = "staffing.policy.publish";
 const expressionSchema = z.object({
   op: z.literal("all"),
@@ -125,7 +126,7 @@ export async function reviseLaunchTeacherRequirements(actor: Actor, input: {
         reason: input.reason, confirmed: true },
     });
     await emitEvent(tx, {
-      eventType: "TeacherQualificationPolicyRevised", aggregateType: "compliance_framework_version",
+      eventType: EventTypes.TeacherQualificationPolicyRevised, aggregateType: "compliance_framework_version",
       aggregateId: created.id, actorPersonId: actor.actorPersonId, ...scope,
       payload: { previousVersionId: previous.id, version: nextVersion, qualificationKeys: keys,
         effectiveFrom: effectiveFrom.toISOString() },
