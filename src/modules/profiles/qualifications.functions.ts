@@ -15,6 +15,7 @@ import { emitEvent } from "@/platform/mutation";
 import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
 import { assertScopedQualificationReviewer, reviewQualification } from "./qualification-review.server";
 
+import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
 const selection = z.object({ personId: uuid.optional(), programId: uuid.optional() });
 const keyPattern = /^qualifications\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i;
@@ -155,7 +156,7 @@ export const getQualifications = createServerFn({ method: "GET" })
         return { ...claim, issuedAt: claim.issuedAt?.toISOString() ?? null, expiresAt: claim.expiresAt?.toISOString() ?? null,
           status: credentialStatusFromDecision(latest?.decision), sequence: latest?.sequence ?? 0,
           hasEvidence: Boolean(latest?.documentId),
-          history: events.map(({ documentId, ...event }) => ({ ...event, occurredAt: event.occurredAt.toISOString() })) };
+          history: events.map(({ documentId, ...event }) => ({ ...event, occurredAt: event.occurredAt.toISOString() })) });
       }),
     };
   });
@@ -211,7 +212,7 @@ export const finishQualificationUpload = createServerFn({ method: "POST" })
         verifiedAt: new Date(), metadata: { size: data.claim.size, claimId },
       }).returning({ id: documents.id });
       if (!document) throw new Error("Failed to save qualification evidence");
-      await emitEvent(tx, { eventType: "QualificationClaimCreated", aggregateType: "QualificationClaim",
+      await emitEvent(tx, { eventType: EventTypes.QualificationClaimCreated, aggregateType: "QualificationClaim",
         aggregateId: claimId, actorPersonId: actor.actorPersonId, payload: { definitionId: data.claim.definitionId, documentId: document.id } });
       await recordAudit(tx, actor, { action: "qualification.claim_created", resourceType: "QualificationClaim",
         resourceId: claimId, after: { definitionId: data.claim.definitionId, documentId: document.id } });

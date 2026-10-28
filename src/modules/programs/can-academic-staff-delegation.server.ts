@@ -10,6 +10,7 @@ import { assertCANSteward } from "@/domain/network-agreement-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireCurrentProgramSiteAuthorization } from "./program-site-authorization.server";
 
+import { EventTypes } from "@/domain/event-types";
 type AcademicStaffRole = "teacher" | "registrar";
 const recordCapability = "academic_records.issue";
 const origin = "can_academic_program_delegation";
@@ -116,7 +117,7 @@ export async function delegateCANAcademicProgramStaff(
       after:{personId:input.personId,role:input.role,capabilities,reason},
     });
     await emitEvent(tx,{
-      eventType:"CANAcademicProgramStaffDelegated",
+      eventType:EventTypes.CANAcademicProgramStaffDelegated,
       aggregateType:"role_assignment",aggregateId:created.id,
       actorPersonId:actor.actorPersonId,organizationId:program.institutionId,
       siteId:program.siteId,programId:input.programId,
@@ -160,7 +161,7 @@ export async function revokeCANAcademicProgramStaff(
       after:{revoked:true,reason},
     });
     await emitEvent(tx,{
-      eventType:"CANAcademicProgramStaffRevoked",aggregateType:"role_assignment",
+      eventType:EventTypes.CANAcademicProgramStaffRevoked,aggregateType:"role_assignment",
       aggregateId:current.id,actorPersonId:actor.actorPersonId,
       organizationId:program.institutionId,siteId:program.siteId,
       programId:program.programId,payload:{personId:current.personId,role:current.roleKey},
