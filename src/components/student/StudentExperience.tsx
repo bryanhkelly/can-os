@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { ArrowUpRight, BookOpen, CalendarDays, GraduationCap } from "lucide-react";
 import type { getMyStudentToday } from "@/modules/student-experience/student-today.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { FIRST_PUBLISHED_LESSON_ROUTE } from "@/domain/first-class-lesson";
@@ -23,21 +24,19 @@ export function StudentExperience({ liveData, success, support }: {
  const otherOpenActions=liveData.openActions.filter(action => !support?.tasks.some(task=>task.id===action.id));
  const format=(date:Date|string)=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short"}).format(new Date(date));
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Student" title={`Today, ${displayName}`}
-  subtitle="Your schedule, coursework and next steps, all from your school records."
-  actions={liveData.sections[0]
-    ? <Link to="/classes" search={{
-        section:liveData.sections[0].sectionId,tab:"lessons",
-        lesson:FIRST_PUBLISHED_LESSON_ROUTE,
-      }} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
-        Start my first lesson →
-      </Link>
-    : <Link to="/student/courses"
-        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
-        View my classes
-      </Link>}>
-  <div className="mt-7 grid gap-3 sm:grid-cols-3">
-   <Link to="/student/courses" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">Classes</p><p className="mt-2 text-3xl font-semibold">{liveData.sections.length}</p></Link>
-   <Link to="/student/assignments" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"To do / due soon":"Upcoming assignments"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":upcomingCount}</p></Link>
+  subtitle="Your schedule, coursework and next steps, all from your school records.">
+  <section aria-label="Start your learning day" className="student-day-hero relative isolate mt-3 overflow-hidden rounded-3xl border border-white/15 px-6 py-9 text-white shadow-xl sm:px-10 sm:py-12">
+   <div aria-hidden="true" className="student-day-hero-landscape absolute inset-0 -z-10" />
+   <div className="relative max-w-xl">
+    <p className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-black/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em]"><GraduationCap className="size-4" /> Your learning day</p>
+    <h2 className="mt-5 font-serif text-4xl leading-tight tracking-tight sm:text-5xl">Make today count.</h2>
+    <p className="mt-3 max-w-md text-sm leading-7 text-white/90 sm:text-base">A fresh start, a clear next step, and everything you need to keep learning.</p>
+    {liveData.sections[0] ? <Link to="/classes" search={{section:liveData.sections[0].sectionId,tab:"lessons",lesson:FIRST_PUBLISHED_LESSON_ROUTE}} className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">Start learning <ArrowUpRight className="size-4" /></Link> : <Link to="/student/courses" className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">View my classes <ArrowUpRight className="size-4" /></Link>}
+   </div>
+  </section>
+  <div className="mt-6 grid gap-3 sm:grid-cols-3">
+   <Link to="/student/courses" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="flex items-center gap-2 text-sm text-muted-foreground"><BookOpen className="size-4" /> Classes</p><p className="mt-2 text-3xl font-semibold">{liveData.sections.length}</p></Link>
+   <Link to="/student/assignments" className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="flex items-center gap-2 text-sm text-muted-foreground"><CalendarDays className="size-4" /> {success?"To do / due soon":"Upcoming assignments"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":upcomingCount}</p></Link>
    <Link to="/student/assignments" search={{filter:success?"todo":"missing"}} className="rounded-xl border bg-card p-5 hover:border-foreground focus-visible:outline-2"><p className="text-sm text-muted-foreground">{success?"Overdue / missing work":"Missing work"}</p><p className="mt-2 text-3xl font-semibold">{summaryUnavailable?"—":overdueCount}</p></Link>
   </div>
   <nav aria-label="Student workspace" className="mt-6 flex flex-wrap gap-2 text-sm">
