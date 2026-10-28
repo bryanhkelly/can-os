@@ -1,5 +1,6 @@
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpRight, CalendarDays, ClipboardCheck, Globe2, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, CalendarDays, ClipboardCheck, Globe2 } from "lucide-react";
 import { getSiteToday } from "@/modules/operations/site-today.functions";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
@@ -31,20 +32,7 @@ function SiteTodayPage() {
       <Link className="rounded-lg border px-3 py-2 text-sm" to="/operations"
         search={{siteId:undefined,programId:undefined}}>All operations →</Link>
     </div>}>
-    <section aria-label="Site operating overview" className="relative mt-3 overflow-hidden rounded-3xl border border-border/70 bg-card px-6 py-8 shadow-sm sm:px-9 sm:py-10">
-      <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-64 rounded-full bg-accent opacity-75 blur-3xl" />
-      <div className="relative">
-        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-primary"><ShieldCheck className="size-4" /> Site operations</p>
-        <h2 className="mt-3 max-w-2xl font-serif text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">A clear view of your school day.</h2>
-        <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">Review readiness, outstanding work and the schedule from your authorized site records.</p>
-        <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
-          <Link to="/readiness" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"><ClipboardCheck className="size-4" /> School readiness <ArrowUpRight className="size-4" /></Link>
-          <Link to="/site/day" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><CalendarDays className="size-4" /> Onsite day</Link>
-          <Link to="/sites/$siteId/publish" params={{siteId:data.site.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><Globe2 className="size-4" /> Public website</Link>
-        </div>
-      </div>
-    </section>
-    <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
+    <section aria<WorkflowIntro eyebrow="Site operations" title="A clear view of your school day." description="Review readiness, outstanding work and the schedule from your authorized site records." actions={<><Link to="/readiness" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"><ClipboardCheck className="size-4" /> School readiness <ArrowUpRight className="size-4" /></Link><Link to="/site/day" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><CalendarDays className="size-4" /> Onsite day</Link><Link to="/sites/$siteId/publish" params={{siteId:data.site.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><Globe2 className="size-4" /> Public website</Link></>} />a-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([
         ["Operations", "/operations"], ["Launch", "/operations/launch"],
         ["Readiness", "/readiness"], ["Admissions", "/admissions"],
