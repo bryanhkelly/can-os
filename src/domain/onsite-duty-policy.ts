@@ -36,6 +36,19 @@ export function selectAuthorizedOnsiteDuty(
   }
   return block;
 }
+
+/** A changed room or schedule is not a substitution unless the named adult changed. */
+export function isOnsiteDutySubstitution(current:{
+  sectionId:string;periodId:string|null;planToken:string;facilitatorPersonId:string|null;
+},prior:{
+  sectionId:string|null;ownerPersonId:string|null;
+  metadata:{periodId?:unknown;planToken?:unknown};
+}):boolean{
+  return prior.sectionId===current.sectionId&&prior.metadata.periodId===current.periodId&&
+    prior.metadata.planToken!==current.planToken&&!!prior.ownerPersonId&&
+    prior.ownerPersonId!==current.facilitatorPersonId;
+}
+
 /** A prior response for the same immutable plan cannot be contradicted or
  * rewritten from another request. A new assignment gets a new plan token. */
 export function resolveOnsiteDutyRetry(

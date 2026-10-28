@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { createHash } from "node:crypto";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, lte, or, isNull, sql } from "drizzle-orm";
@@ -9,6 +9,7 @@ import {
   deliveryArrangements, enrollments, organizations, people, programs, scheduleTemplatePeriods,
   scheduleTemplates, schoolYears, sections, sites, terms,
 } from "@/db/schema";
+import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
 import { siteDate } from "@/domain/expected-attendance";
@@ -40,19 +41,22 @@ export type OnsiteSupervisionPlan=Omit<SupervisionSummary,"blocks">&{
   projectionTruncated:boolean;
   blocks:OnsiteSupervisionPlanBlock[];
 };
+export type OnsiteOperationalSupervisionPlan=Omit<OnsiteSupervisionPlan,"blocks">&{
+  blocks:Array<OnsiteSupervisionPlanBlock&{
+    facilitatorPersonId:string|null;
+    backupPersonId:string|null;
+  }>;
+};
 
-/** A staff-safe read of planned instruction coverage at ONE original grant site.
- * Names here are assigned adults, not student/counselor/custody information. */
-export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
-  .validator((input:unknown)=>inputSchema.parse(input))
-  .handler(async ({data}):Promise<OnsiteSupervisionPlan>=>{
+/** Internal projection for callers that already authorized this actor and Site. */
+export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:AccessContext,data:{
+  date:string;siteId?:string;
+}):Promise<OnsiteOperationalSupervisionPlan>=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const actor=await getCommandContext(getRequest());
-    assertOnsiteAttendanceScope(actor);
     const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,
       timezone:sites.timezone,hostType:organizations.type}).from(sites)
       .innerJoin(organizations,eq(organizations.id,sites.organizationId))
-      .where(eq(sites.id,actor.grantSiteId!)).limit(1);
+      .where(eq(sites.id,data.siteId??actor.grantSiteId!)).limit(1);
     if(!site || !actor.scope.organizationIds?.includes(site.organizationId))
       throw new AuthorizationError("site staffing organization");
     if (siteDate(new Date(data.date+"T12:00:00Z"),"UTC")!==data.date)
@@ -359,13 +363,16 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     }
     const completeProjection=!(projectionTruncated||roomEvidence.truncated);
     const projection=summarizeOnsiteSupervision(result);
-    // Person IDs are needed for overlap detection, not for the client.
+    // Internal operational readers use person IDs to detect actual substitutions.
+    // The public server function strips them before returning the staff-safe plan.
     const blocks=projection.blocks.map(({
       facilitatorPersonId:assignedPersonId,backupPersonId:_backupPersonId,
       roomEvidenceVersion:_roomEvidenceVersion,
       delegationVersion,agreementVersion,...block
     })=>({
       ...block,
+      facilitatorPersonId:assignedPersonId,
+      backupPersonId:_backupPersonId??null,
       // An acknowledgment is valid only for this exact assignment/time
       // fingerprint. Changes to the scheduled duty invalidate older records.
       planToken:createHash("sha256").update(JSON.stringify([
@@ -407,4 +414,16 @@ export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
     }));
     return {date:data.date,siteId:site.id,
       projectionTruncated:!completeProjection,...projection,blocks};
+});
+
+/** A staff-safe read of planned instruction coverage at ONE original grant site. */
+export const getOnsiteSupervisionPlan = createServerFn({method:"GET"})
+  .validator((input:unknown)=>inputSchema.parse(input))
+  .handler(async ({data}):Promise<OnsiteSupervisionPlan>=>{
+    const actor=await getCommandContext(getRequest());
+    assertOnsiteAttendanceScope(actor);
+    const plan=await loadOnsiteSupervisionPlanForActor(actor,data);
+    return {...plan,blocks:plan.blocks.map(({
+      facilitatorPersonId:_facilitatorPersonId,backupPersonId:_backupPersonId,...block
+    })=>block)};
   });

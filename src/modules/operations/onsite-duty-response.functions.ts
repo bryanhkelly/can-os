@@ -1,15 +1,21 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { actions, sites } from "@/db/schema";
+import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
-import { selectAuthorizedOnsiteDuty, resolveOnsiteDutyRetry } from "@/domain/onsite-duty-policy";
+import {
+  isOnsiteDutySubstitution, selectAuthorizedOnsiteDuty, resolveOnsiteDutyRetry,
+} from "@/domain/onsite-duty-policy";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { getOnsiteSupervisionPlan } from "./onsite-supervision.functions";
+import {
+  getOnsiteSupervisionPlan, loadOnsiteSupervisionPlanForActor,
+  type OnsiteOperationalSupervisionPlan,
+} from "./onsite-supervision.functions";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
 import { requireCurrentSectionFacilitator } from "./site-section-facilitators.server";
@@ -43,13 +49,13 @@ async function currentActorSite() {
   return {actor,site};
 }
 
-/** The current plan and current actor determine what may be acknowledged.
- * No request-supplied staff member, program, room or site is trusted. */
-export const getOnsiteDutyResponses = createServerFn({method:"GET"})
-  .validator((value:unknown)=>daySchema.parse(value))
-  .handler(async({data})=>{
-    const {actor,site}=await currentActorSite();
-    const plan=await getOnsiteSupervisionPlan({data:{date:data.date}});
+/** Internal projection for callers that already authorized this actor and Site. */
+export const loadOnsiteDutyResponsesForActor=createServerOnlyFn(async (actor:AccessContext,site:{
+  id:string;timezone:string;organizationId:string;
+},data:{date:string},currentPlan?:OnsiteOperationalSupervisionPlan)=>{
+    const plan=currentPlan??await loadOnsiteSupervisionPlanForActor(actor,{
+      date:data.date,siteId:site.id,
+    });
     if(plan.siteId!==site.id)
       throw new AuthorizationError("site duty scope");
     // Keep safety-relevant "cannot cover" available; show affirmative
@@ -99,8 +105,11 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
           row.metadata.planToken===block.planToken&&
           (row.metadata.response==="accepted"||row.metadata.response==="cannot_cover"))
         :undefined;
+      const substitution=!truncated&&rows.some(row=>
+        isOnsiteDutySubstitution(block,row));
       return {
         sectionId:block.sectionId,periodId:block.periodId,
+        substitution,
         canRespond:block.canRespond&&!truncated,
         canAccept:block.canAccept&&!truncated &&
           (actor.role === "room_facilitator"
@@ -134,6 +143,14 @@ export const getOnsiteDutyResponses = createServerFn({method:"GET"})
       truncated:truncated||plan.projectionTruncated,
       note:"An acknowledgment records one assigned adult's stated availability for a scheduled block, not verified physical presence, room supervision, child custody, or an accepted handoff. Contact the site lead directly for coverage gaps.",
     };
+});
+
+/** The current plan and current actor determine what may be acknowledged. */
+export const getOnsiteDutyResponses = createServerFn({method:"GET"})
+  .validator((value:unknown)=>daySchema.parse(value))
+  .handler(async({data})=>{
+    const {actor,site}=await currentActorSite();
+    return loadOnsiteDutyResponsesForActor(actor,site,data);
   });
 
 /**

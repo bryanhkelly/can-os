@@ -3,8 +3,9 @@ import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, asc, eq, inArray, gte, lt, ne, isNull, notExists, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions, attendanceEvents, calendarEvents, calendarEventParticipants, enrollments, organizations, programs, scheduledOccurrences, sites } from "@/db/schema";
+import { actions, calendarEvents, calendarEventParticipants, enrollments, organizations, programs, scheduledOccurrences, sites } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { loadOnsiteDayOperationalSnapshot } from "@/modules/operations/onsite-day-review.functions";
 import { AuthorizationError } from "@/domain/command-context";
 import { listOpeningHandoffs,listOpeningOperators } from "@/modules/programs/opening-handoff.server";
 import { openingHandoffManagerCapability } from "@/modules/programs/opening-handoff.server";
@@ -19,7 +20,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
   .validator((input: unknown) => requestSchema.parse(input))
   .handler(async ({ data }) => {
     const actor = await getCommandContext(getRequest());
-    if (!actor.actorPersonId || actor.role !== "registrar" ||
+    if (!actor.actorPersonId || !["registrar","site_leader"].includes(actor.role) ||
         !actor.scope.siteIds?.includes(data.siteId)) {
       throw new AuthorizationError("site.today.read");
     }
@@ -66,7 +67,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
     const hasParticipants = db.select({id:calendarEventParticipants.id})
       .from(calendarEventParticipants)
       .where(eq(calendarEventParticipants.calendarEventId,calendarEvents.id));
-    const [actionRows, eventRows, attendanceRows, enrolledRows] = await Promise.all([
+    const [actionRows, eventRows, enrolledRows, snapshot] = await Promise.all([
       db.select({
         id: actions.id, title: actions.title, description: actions.description,
         priority: actions.priority, status: actions.status, dueAt: actions.dueAt,
@@ -87,36 +88,23 @@ export const getSiteToday = createServerFn({ method: "GET" })
           programIds.length ? or(isNull(scheduledOccurrences.programId),inArray(scheduledOccurrences.programId,programIds)) : isNull(scheduledOccurrences.programId)))
         .orderBy(asc(scheduledOccurrences.startsAt)).limit(200),
       programIds.length ? db.select({
-        id: attendanceEvents.id, programId: attendanceEvents.programId,
-        studentProfileId: attendanceEvents.studentProfileId, status: attendanceEvents.status,
-        expectedAt: attendanceEvents.expectedAt, occurrenceKey: attendanceEvents.occurrenceKey,
-        recordedAt: attendanceEvents.recordedAt,
-      }).from(attendanceEvents)
-        .where(and(eq(attendanceEvents.siteId, site.id), inArray(attendanceEvents.programId, programIds),
-          gte(attendanceEvents.expectedAt, start), lt(attendanceEvents.expectedAt, end)))
-        .orderBy(asc(attendanceEvents.recordedAt)).limit(2000) : Promise.resolve([]),
-      programIds.length ? db.select({
         studentProfileId: enrollments.studentProfileId, programId: enrollments.programId,
       }).from(enrollments).where(and(inArray(enrollments.programId, programIds),
         eq(enrollments.status, "active"), ne(enrollments.kind, "section"))) : Promise.resolve([]),
+      loadOnsiteDayOperationalSnapshot(actor,site,dayText),
     ]);
 
     const filteredActions = actionRows.filter(row => !row.programId || permitted.has(row.programId));
     const todayEvents = eventRows.filter(row =>
       (!row.programId || permitted.has(row.programId)) && localDate(row.startsAt) === dayText);
-    // Multiple revisions/section occurrences are not unique student attendance.
-    // Display event status counts as recorded observations, not an attendance percentage.
-    const todayAttendance = attendanceRows.filter(row => localDate(row.expectedAt) === dayText);
-    const latest = new Map<string, (typeof todayAttendance)[number]>();
-    for (const row of todayAttendance) {
-      const key = `${row.studentProfileId}:${row.programId}:${row.occurrenceKey}`;
-      const previous = latest.get(key);
-      if (!previous || row.recordedAt >= previous.recordedAt) latest.set(key, row);
-    }
-    const observations = [...latest.values()];
+    // Only effective staff-observed onsite day marks count as physical attendance.
+    const observations = snapshot.operational.students.filter(row=>
+      !["unmarked","expected"].includes(row.status));
     const enrollmentCount = new Set(enrolledRows.map(row => row.studentProfileId)).size;
     return {
       site, asOf: now.toISOString(), localDate: dayText,
+      canOpenOnsiteDay:actor.role==="site_leader",
+      schoolDay:snapshot.operational,
       programs: scopedPrograms,
       openingHandoffs:handoffs.map(row=>({...row,createdAt:row.createdAt.toISOString(),
         resolvedAt:row.resolvedAt?.toISOString()??null,
@@ -133,7 +121,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
         present: observations.filter(row => row.status === "present").length,
         absent: observations.filter(row => row.status === "absent").length,
         tardy: observations.filter(row => row.status === "tardy").length,
-        note: "Latest event per student, program and occurrence today; not a percent of expected students",
+        note: "Effective staff-observed onsite marks per scheduled student-program entry; virtual learning is excluded",
       },
       actions: filteredActions.map(row => ({
         ...row, dueAt: row.dueAt?.toISOString() ?? null,

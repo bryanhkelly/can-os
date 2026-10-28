@@ -76,6 +76,7 @@ integration("Journey C: a safe school day including verified pickup", () => {
     const health = await import("@/modules/health/health-office-service");
     const incidents = await import("@/modules/incidents/incident-service");
     const dayReview = await import("@/modules/operations/onsite-day-review.functions");
+    const siteToday = await import("@/modules/operations/site-today.functions");
     const pickup = await import("@/modules/operations/pickup.functions");
 
     const timeZone = "America/Los_Angeles";
@@ -535,6 +536,24 @@ integration("Journey C: a safe school day including verified pickup", () => {
       const before = await dayReview.getOnsiteDayReview({ data: { date: day } });
       expect(before.readyForAttendanceReview).toBe(true);
       expect(before.status).toBe("not_reviewed");
+      expect(before.schoolDay.students.find(row=>
+        row.studentProfileId===familyA.studentProfileId)).toMatchObject({
+        status:"present",healthVisitCount:1,incidentCount:1,
+        release:{id:released.releaseId},dismissalStatus:"released",
+        deniedPickupAttempts:1,activeEmergencyHold:false,activeCustodyHold:false,
+      });
+      expect(before.schoolDay.students.find(row=>
+        row.studentProfileId===familyB.studentProfileId)).toMatchObject({
+        status:"excused",guardianExplanationStatus:"approved",dismissalStatus:"not_present",
+      });
+      expect(before.schoolDay.staffing.blocks.find(row=>
+        row.sectionId===school.section.id)).toMatchObject({
+        dutyStatus:"accepted",substitution:false,
+      });
+      expect(before.schoolDay.exceptions).toMatchObject({
+        healthVisits:1,sentHome:1,incidents:1,openIncidents:0,
+        emergencyHolds:0,deniedPickupAttempts:1,uncollectedFollowUps:0,
+      });
       const attested = await dayReview.attestOnsiteDayReview({ data: {
         date: day,
         confirmedRecordsReviewed: true,
@@ -567,6 +586,46 @@ integration("Journey C: a safe school day including verified pickup", () => {
         r => r.studentProfileId === familyA.studentProfileId)?.status).toBe("present");
       expect(finalRoster.students.find(
         r => r.studentProfileId === familyB.studentProfileId)?.status).toBe("excused");
+
+      // A separate virtual-learning occurrence neither changes the physical
+      // onsite roster nor stales the physical school-day source fingerprint.
+      await journey.tx.insert(s.attendanceEvents).values({
+        studentProfileId:familyA.studentProfileId,programId:school.program.id,
+        siteId:school.site.id,sectionId:school.section.id,
+        occurrenceKey:day+":virtual-learning",status:"present",
+        expectedAt:new Date(),recordedByPersonId:school.siteLeader.person.id,
+        sourceKey:`journey-c-virtual-learning-${suffix}`,
+      });
+      expect((await dayReview.getOnsiteDayReview({data:{date:day}})).status)
+        .toBe("reviewed_snapshot");
+
+      // Registrar and Site leader read the same canonical day from Site Today;
+      // only the onsite leader receives the operational workspace handoff.
+      journey.setActor(school.operatorScoped);
+      const registrarToday=await siteToday.getSiteToday({data:{siteId:school.site.id}});
+      expect(registrarToday.canOpenOnsiteDay).toBe(false);
+      expect(registrarToday.attendance).toMatchObject({count:2,present:1,absent:0,tardy:0});
+      expect(registrarToday.schoolDay.students).toHaveLength(2);
+      expect(registrarToday.schoolDay.exceptions).toMatchObject({
+        healthVisits:1,incidents:1,deniedPickupAttempts:1,
+      });
+      journey.setActor(outsider.actor);
+      await expectJourneyDenied(siteToday.getSiteToday({data:{siteId:school.site.id}}),
+        "site.today.read");
+      journey.setActor(school.siteLeader.actor);
+      const leaderToday=await siteToday.getSiteToday({data:{siteId:school.site.id}});
+      expect(leaderToday.canOpenOnsiteDay).toBe(true);
+      expect(leaderToday.schoolDay.students.find(row=>
+        row.studentProfileId===familyA.studentProfileId)?.release?.id).toBe(released.releaseId);
+
+      // Canonical health evidence added after attestation makes the old review
+      // stale without an independent reconciliation checkbox or status write.
+      await health.recordHealthOfficeVisit(nurseContext,{
+        studentProfileId:familyA.studentProfileId,siteId:school.site.id,
+        reason:"Post-review source fingerprint verification.",sentHome:false,
+      });
+      expect((await dayReview.getOnsiteDayReview({data:{date:day}})).status)
+        .toBe("stale_after_changes");
 
       return {
         programId: school.program.id,

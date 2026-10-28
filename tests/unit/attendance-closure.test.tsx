@@ -16,6 +16,7 @@ vi.mock("@/modules/attendance/attendance-service",()=>({
 vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:async()=>state.actor}));
 vi.mock("@tanstack/react-start/server",()=>({getRequest:()=>new Request("http://localhost"),setResponseHeader:vi.fn()}));
 vi.mock("@tanstack/react-start",()=>({
+ createServerOnlyFn:(callback:unknown)=>callback,
  createServerFn:()=>({
   parse:(input:unknown)=>input,
   validator(parse:(input:unknown)=>unknown){this.parse=parse;return this;},

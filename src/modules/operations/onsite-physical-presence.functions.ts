@@ -1,9 +1,10 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { actions, sites } from "@/db/schema";
+import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
 import { siteDate } from "@/domain/expected-attendance";
@@ -11,7 +12,10 @@ import { inPhysicalCheckInWindow } from "@/domain/onsite-physical-presence-polic
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
-import { getOnsiteSupervisionPlan } from "./onsite-supervision.functions";
+import {
+  getOnsiteSupervisionPlan, loadOnsiteSupervisionPlanForActor,
+  type OnsiteOperationalSupervisionPlan,
+} from "./onsite-supervision.functions";
 import { requireCurrentSectionFacilitator } from "./site-section-facilitators.server";
 import {verifiedScheduledSectionFacilitators,scheduledBlockHasNamedFacilitator} from "./section-coverage-verification.server";
 import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
@@ -270,11 +274,12 @@ export const witnessOnsiteBlockPresence=createServerFn({method:"POST"})
  * An earlier witness record is stale whenever the current coverage token or
  * current CAN opening authorization changes.
  */
-export const getOnsitePhysicalPresence=createServerFn({method:"GET"})
-  .validator((v:unknown)=>todaySchema.parse(v))
-  .handler(async({data})=>{
-    const {actor,site}=await schoolSite();
-    const plan=await getOnsiteSupervisionPlan({data:{date:data.date}});
+export const loadOnsitePhysicalPresenceForActor=createServerOnlyFn(async (actor:AccessContext,site:{
+  id:string;timezone:string;organizationId:string;
+},data:{date:string},currentPlan?:OnsiteOperationalSupervisionPlan)=>{
+    const plan=currentPlan??await loadOnsiteSupervisionPlanForActor(actor,{
+      date:data.date,siteId:site.id,
+    });
     if(plan.siteId!==site.id || plan.projectionTruncated)
       return {blocks:[],truncated:true,hasWitnessedAllBlocks:false};
     const [reports,witnesses,exceptions]=await Promise.all([
@@ -318,12 +323,19 @@ export const getOnsitePhysicalPresence=createServerFn({method:"GET"})
         row.personId===actor.actorPersonId &&
         row.metadata.periodId===block.periodId &&
         row.metadata.planToken===block.planToken);
+      const reportedAdultCount=current?new Set(reports.filter(row=>
+        row.sectionId===block.sectionId&&row.metadata.periodId===block.periodId&&
+        row.metadata.planToken===block.planToken&&!!row.personId)
+        .map(row=>row.personId)).size:0;
+      const requiredAdultReports=block.requiresSectionDelegation?2:0;
       blocks.push({
         sectionId:block.sectionId,periodId:block.periodId,
         programId:block.programId,
         canReport:current && !!block.canCheckIn,
         canWitness:current && actor.role==="site_leader",
         ownPresenceReported:ownPresence,witnessedBothAdults:matched,
+        reportedAdultCount,requiredAdultReports,
+        missingAdultReports:Math.max(0,requiredAdultReports-reportedAdultCount),
         openingAuthorized:opening,
       });
     }
@@ -331,4 +343,11 @@ export const getOnsitePhysicalPresence=createServerFn({method:"GET"})
       hasWitnessedAllBlocks:blocks.length>0 &&
         blocks.every(row=>row.witnessedBothAdults),
       note:"Two named adults each report arrival; an authorized separate Site director witnesses their presence. This is a human attestation, not continuous presence tracking, student custody, pickup clearance or school-day closure."};
+});
+
+export const getOnsitePhysicalPresence=createServerFn({method:"GET"})
+  .validator((v:unknown)=>todaySchema.parse(v))
+  .handler(async({data})=>{
+    const {actor,site}=await schoolSite();
+    return loadOnsitePhysicalPresenceForActor(actor,site,data);
   });

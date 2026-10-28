@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  resolveOnsiteDutyRetry, selectAuthorizedOnsiteDuty,
+  isOnsiteDutySubstitution, resolveOnsiteDutyRetry, selectAuthorizedOnsiteDuty,
   type DutyAssignmentCandidate,
 } from "@/domain/onsite-duty-policy";
 
@@ -38,6 +38,25 @@ describe("Hybrid onsite assigned-duty authorization",()=>{
     expect(selectAuthorizedOnsiteDuty({...input,response:"cannot_cover"},[
       {...block,canAccept:false},
     ])).toBeTruthy();
+  });
+  it("detects a changed named adult without mislabeling room-only changes",()=>{
+    const current={...block,facilitatorPersonId:"adult-new"};
+    expect(isOnsiteDutySubstitution(current,{
+      sectionId:block.sectionId,ownerPersonId:"adult-old",
+      metadata:{periodId:block.periodId,planToken:"previous-plan"},
+    })).toBe(true);
+    expect(isOnsiteDutySubstitution(current,{
+      sectionId:block.sectionId,ownerPersonId:"adult-new",
+      metadata:{periodId:block.periodId,planToken:"room-only-change"},
+    })).toBe(false);
+    expect(isOnsiteDutySubstitution(current,{
+      sectionId:"another-section",ownerPersonId:"adult-old",
+      metadata:{periodId:block.periodId,planToken:"previous-plan"},
+    })).toBe(false);
+    expect(isOnsiteDutySubstitution(current,{
+      sectionId:block.sectionId,ownerPersonId:null,
+      metadata:{periodId:block.periodId,planToken:"previous-plan"},
+    })).toBe(false);
   });
   it("only permits an exact idempotent retry, not erasing a coverage exception",()=>{
     expect(resolveOnsiteDutyRetry(null,{response:"accepted"})).toBeNull();

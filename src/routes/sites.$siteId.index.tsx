@@ -24,6 +24,13 @@ function SiteTodayPage() {
   const localTime = (date: string) => new Intl.DateTimeFormat("en-US", {
     timeZone: data.site.timezone, hour: "numeric", minute: "2-digit",
   }).format(new Date(date));
+  const staffingExceptions=data.schoolDay.staffing.blocks.filter(block=>
+    !block.assignedPlan||block.substitution||block.missingAdultReports>0||
+    ["cannot_cover","stale_after_delegation","not_reported"].includes(block.dutyStatus));
+  const studentExceptions=data.schoolDay.students.filter(student=>
+    !["present","tardy"].includes(student.status)||!!student.guardianExplanationStatus||
+    student.healthVisitCount>0||student.incidentCount>0||student.activeEmergencyHold||
+    student.activeCustodyHold||student.deniedPickupAttempts>0||!!student.uncollectedActionId);
   return <WorkspaceShell eyebrow="CAN OS · Site Operations" title={data.site.name}
     subtitle={data.site.organizationName + " · " + data.localDate + " · " + data.site.timezone}
     actions={<div className="flex flex-wrap gap-2">
@@ -32,7 +39,7 @@ function SiteTodayPage() {
       <Link className="rounded-lg border px-3 py-2 text-sm" to="/operations"
         search={{siteId:undefined,programId:undefined}}>All operations →</Link>
     </div>}>
-    <WorkflowIntro eyebrow="Site operations" title="A clear view of your school day." description="Review readiness, outstanding work and the schedule from your authorized site records." actions={<><Link to="/readiness" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"><ClipboardCheck className="size-4" /> School readiness <ArrowUpRight className="size-4" /></Link><Link to="/site/day" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><CalendarDays className="size-4" /> Onsite day</Link><Link to="/sites/$siteId/publish" params={{siteId:data.site.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><Globe2 className="size-4" /> Public website</Link></>} />
+    <WorkflowIntro eyebrow="Site operations" title="A clear view of your school day." description="Review readiness, outstanding work and the schedule from your authorized site records." actions={<><Link to="/readiness" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"><ClipboardCheck className="size-4" /> School readiness <ArrowUpRight className="size-4" /></Link>{data.canOpenOnsiteDay&&<Link to="/site/day" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><CalendarDays className="size-4" /> Onsite day</Link>}<Link to="/sites/$siteId/publish" params={{siteId:data.site.id}} className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted"><Globe2 className="size-4" /> Public website</Link></>} />
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([
         ["Operations", "/operations"], ["Launch", "/operations/launch"],
@@ -54,6 +61,72 @@ function SiteTodayPage() {
         <p className="mt-2 text-xs text-muted-foreground">{note}</p>
       </section>)}
     </div>
+    <section aria-label="Supervised school day" className="mt-8 rounded-2xl border bg-card p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-serif text-2xl">Supervised school day</h2>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">One source-derived view of staff coverage, onsite attendance, family explanations, health and incident activity, and dismissal evidence. Learning activity is not physical attendance.</p>
+        </div>
+        {data.canOpenOnsiteDay&&<Link to="/site/day" className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-muted">Operate onsite day →</Link>}
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          ["Staffing gaps",data.schoolDay.staffing.unassignedOrConflicting+data.schoolDay.staffing.missingAdultReports,"Unassigned blocks and missing adult check-ins"],
+          ["Substitutions",data.schoolDay.staffing.substitutions,"Current adult differs from earlier duty evidence"],
+          ["Emergency exceptions",data.schoolDay.exceptions.emergencyHolds+data.schoolDay.exceptions.openIncidents,"Active emergency holds and open incidents"],
+          ["Dismissal follow-up",data.schoolDay.exceptions.uncollectedFollowUps,"Open uncollected-child actions"],
+        ].map(([label,value,note])=><div key={label} className="rounded-xl border p-4">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="mt-1 font-serif text-2xl">{value}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{note}</p>
+        </div>)}
+      </div>
+      {data.schoolDay.projectionTruncated&&<p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">Some source listings were capped. This is not a complete school-day review; resolve the source-data volume before attestation.</p>}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div>
+          <h3 className="font-semibold">Staff coverage and check-in</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{data.schoolDay.staffing.unacknowledged} blocks awaiting duty response · {data.schoolDay.staffing.coverageExceptions} coverage exceptions · {data.schoolDay.staffing.witnessedBlocks} independently witnessed blocks</p>
+          <div className="mt-3 space-y-2">
+            {staffingExceptions.slice(0,20).map(block=><article key={block.sectionId+":"+(block.periodId??"missing")} className="rounded-lg border p-3 text-sm">
+              <p className="font-medium">{block.sectionTitle} · {block.periodLabel??"Schedule missing"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{block.facilitatorName??"No verified facilitator"} · {block.dutyStatus.replaceAll("_"," ")}</p>
+              <ul className="mt-2 list-inside list-disc text-xs">
+                {!block.assignedPlan&&<li>Assignment needs review: {block.gaps.map(gap=>gap.replaceAll("_"," ")).join(", ")}</li>}
+                {block.substitution&&<li>Staffing substitution: earlier duty evidence names a different adult.</li>}
+                {block.missingAdultReports>0&&<li>{block.missingAdultReports} required adult arrival report(s) missing.</li>}
+                {block.requiredAdultReports>0&&<li>{block.reportedAdultCount} of {block.requiredAdultReports} arrival reports; independent witness {block.witnessedBothAdults?"recorded":"not recorded"}.</li>}
+              </ul>
+            </article>)}
+            {!staffingExceptions.length&&<p className="rounded-lg border p-3 text-sm text-muted-foreground">No current staffing or check-in exceptions in the authorized plan.</p>}
+          </div>
+        </div>
+        <div>
+          <h3 className="font-semibold">Student attendance, exceptions and dismissal</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{data.schoolDay.exceptions.pendingGuardianExplanations} pending family explanations · {data.schoolDay.exceptions.healthVisits} health visits · {data.schoolDay.exceptions.sentHome} sent home · {data.schoolDay.exceptions.incidents} incidents</p>
+          <div className="mt-3 space-y-2">
+            {studentExceptions.slice(0,30).map(student=><article key={student.programId+":"+student.studentProfileId} className="rounded-lg border p-3 text-sm">
+              <div className="flex flex-wrap justify-between gap-2">
+                <p className="font-medium">{student.studentName}</p>
+                <span className="text-xs capitalize text-muted-foreground">{student.status.replaceAll("_"," ")}</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{student.programName} · {student.sectionTitle??"Program roster"}</p>
+              <ul className="mt-2 list-inside list-disc text-xs">
+                {student.guardianExplanationStatus&&<li>Guardian explanation: {student.guardianExplanationStatus}.</li>}
+                {student.healthVisitCount>0&&<li>{student.healthVisitCount} health-office visit(s) linked to this school day.</li>}
+                {student.incidentCount>0&&<li>{student.incidentCount} incident record(s) linked to this school day.</li>}
+                {student.activeEmergencyHold&&<li>Emergency pickup hold is active; do not release.</li>}
+                {student.activeCustodyHold&&<li>Custody review hold is active; do not release.</li>}
+                {student.deniedPickupAttempts>0&&<li>{student.deniedPickupAttempts} denied pickup attempt(s) recorded.</li>}
+                {["present","tardy"].includes(student.status)&&<li>Dismissal: {student.dismissalStatus.replaceAll("_"," ")}.</li>}
+                {student.uncollectedActionId&&<li><Link to="/operations" search={{siteId:data.site.id,programId:undefined,action:student.uncollectedActionId}} className="underline">Review supervised uncollected-child follow-up →</Link></li>}
+              </ul>
+            </article>)}
+            {!studentExceptions.length&&<p className="rounded-lg border p-3 text-sm text-muted-foreground">No student attendance, explanation, health, incident or dismissal exceptions are currently linked.</p>}
+          </div>
+        </div>
+      </div>
+      <p className="mt-5 text-xs text-muted-foreground">{data.schoolDay.note}</p>
+    </section>
     <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <section>
         <h2 className="font-serif text-2xl">Needs your attention</h2>

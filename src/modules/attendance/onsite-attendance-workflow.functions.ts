@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -8,6 +8,7 @@ import {
   attendanceEvents, attendanceExcuses, documents, enrollments, guardianRelationships,
   people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
 } from "@/db/schema";
+import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
 import { requireCurrentSiteLocalDelegate, requiresIndependentChurchLocalDelegation } from "@/modules/operations/site-local-delegation.server";
@@ -74,7 +75,7 @@ function siteDayStart(date: string, timeZone: string): Date {
   return new Date(instant);
 }
 
-async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, selectedId?: string) {
+async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, siteId?: string) {
   // The inner join on sites guarantees a non-null site for every row.
   const rows = (await db.select({
     id: programs.id, name: programs.name, organizationId: programs.organizationId,
@@ -86,6 +87,7 @@ async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, se
       inArray(programs.organizationId, actor.scope.organizationIds!),
       inArray(programs.siteId, actor.scope.siteIds!),
       ...(isOnsiteAttendanceRole(actor.role) ? [eq(programs.siteId, actor.grantSiteId!)] : []),
+      ...(siteId ? [eq(programs.siteId, siteId)] : []),
       ...(selectedId ? [eq(programs.id, selectedId)] : []),
     ))).filter((row): row is Omit<typeof row, "siteId"> & { siteId: string } =>
       row.siteId !== null);
@@ -124,9 +126,9 @@ async function scopedOnsitePrograms(actor: Awaited<ReturnType<typeof staff>>, se
 }
 
 /** One server-authorized program/student/date entitlement, used for reads and writes. */
-async function resolveExpectedRoster(actor: Awaited<ReturnType<typeof staff>>,
-  date: string, programId?: string, studentId?: string) {
-  const programsAtSite = await scopedOnsitePrograms(actor, programId);
+async function resolveExpectedRoster(actor: AccessContext,
+  date: string, programId?: string, studentId?: string, siteId?: string) {
+  const programsAtSite = await scopedOnsitePrograms(actor, programId, siteId);
   const expectedIds = new Map<string, Set<string>>();
   const coverage = await loadExpectedAttendanceCoverage(programsAtSite, [], new Date(), 1,
     { date, studentIds: expectedIds });
@@ -258,46 +260,53 @@ export const getOnsiteStaffDayContext = createServerFn({ method: "GET" })
     };
   });
 
+/** Internal projection for callers that already authorized this actor and Site. */
+export const loadExpectedOnsiteRosterForActor=createServerOnlyFn(async (actor:AccessContext,data:{
+  date:string;programId?:string;siteId?:string;
+})=>{
+  const { roster, coverage, programsAtSite } = await resolveExpectedRoster(actor,
+    data.date, data.programId, undefined, data.siteId);
+  const rosterIds = [...new Set(roster.map(r => r.studentProfileId))];
+  const events = rosterIds.length ? await db.select({
+    id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
+    programId: attendanceEvents.programId, occurrenceKey: attendanceEvents.occurrenceKey,
+    status: attendanceEvents.status, recordedAt: attendanceEvents.recordedAt,
+  }).from(attendanceEvents).where(and(
+    inArray(attendanceEvents.programId, programsAtSite.map(p => p.id)),
+    inArray(attendanceEvents.studentProfileId, rosterIds),
+    eq(attendanceEvents.occurrenceKey, occurrence(data.date)))) : [];
+  const effective = new Map(effectiveAttendanceEvents(events)
+    .map(e => [e.programId + ":" + e.studentProfileId, e]));
+  return {
+    date: data.date,
+    programs: programsAtSite.map(p => ({
+      id: p.id, name: p.name, configuration: coverage.get(p.id)?.configuration ?? "not_onsite",
+      expectedDays: coverage.get(p.id)?.expectedDays ?? 0,
+      missingCalendarDates: coverage.get(p.id)?.daysWithoutCalendarConfiguration ?? 0,
+    })),
+    students: roster.map(r => {
+      const record = effective.get(r.programId + ":" + r.studentProfileId);
+      return {
+        studentProfileId: r.studentProfileId, programId: r.programId,
+        programName: programsAtSite.find(p => p.id === r.programId)!.name,
+        studentName: r.studentName, sectionTitle: r.sectionTitle,
+        sectionId: r.sectionId,
+        occurrenceKey: occurrence(data.date),
+        attendanceEventId: record?.id ?? null,
+        status: record?.status ?? "unmarked",
+      };
+    }).sort((a, b) => a.studentName.localeCompare(b.studentName) ||
+      a.programName.localeCompare(b.programName)),
+  };
+});
+
 export const listExpectedOnsiteRoster = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({
     date: dateField, programId: uuid.optional(),
   }).parse(value))
   .handler(async ({ data }) => {
     const actor = await staff("attendance.write");
-    const { roster, coverage, programsAtSite } = await resolveExpectedRoster(actor,
-      data.date, data.programId);
-    const rosterIds = [...new Set(roster.map(r => r.studentProfileId))];
-    const events = rosterIds.length ? await db.select({
-      id: attendanceEvents.id, studentProfileId: attendanceEvents.studentProfileId,
-      programId: attendanceEvents.programId, occurrenceKey: attendanceEvents.occurrenceKey,
-      status: attendanceEvents.status, recordedAt: attendanceEvents.recordedAt,
-    }).from(attendanceEvents).where(and(
-      inArray(attendanceEvents.programId, programsAtSite.map(p => p.id)),
-      inArray(attendanceEvents.studentProfileId, rosterIds),
-      eq(attendanceEvents.occurrenceKey, occurrence(data.date)))) : [];
-    const effective = new Map(effectiveAttendanceEvents(events)
-      .map(e => [e.programId + ":" + e.studentProfileId, e]));
-    return {
-      date: data.date,
-      programs: programsAtSite.map(p => ({
-        id: p.id, name: p.name, configuration: coverage.get(p.id)?.configuration ?? "not_onsite",
-        expectedDays: coverage.get(p.id)?.expectedDays ?? 0,
-        missingCalendarDates: coverage.get(p.id)?.daysWithoutCalendarConfiguration ?? 0,
-      })),
-      students: roster.map(r => {
-        const record = effective.get(r.programId + ":" + r.studentProfileId);
-        return {
-          studentProfileId: r.studentProfileId, programId: r.programId,
-          programName: programsAtSite.find(p => p.id === r.programId)!.name,
-          studentName: r.studentName, sectionTitle: r.sectionTitle,
-          sectionId: r.sectionId,
-          occurrenceKey: occurrence(data.date),
-          attendanceEventId: record?.id ?? null,
-          status: record?.status ?? "unmarked",
-        };
-      }).sort((a, b) => a.studentName.localeCompare(b.studentName) ||
-        a.programName.localeCompare(b.programName)),
-    };
+    return loadExpectedOnsiteRosterForActor(actor, data);
   });
 
 export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })

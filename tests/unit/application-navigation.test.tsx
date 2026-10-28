@@ -158,7 +158,14 @@ describe("application contextual navigation",()=>{
       actions:[{id:"task",title:"Review staffing",status:"open",priority:"normal",description:null,dueAt:null}],
       events:[{id:"event",title:"Evening assembly",startsAt:"2030-01-02T01:00:00Z",type:"assembly"}],
       programs:[{id:"program",name:"Test program",status:"active",type:"full_school",gradeRange:{min:"9",max:"12"}}],
-      openingHandoffs:[],
+      openingHandoffs:[],canOpenOnsiteDay:false,
+      schoolDay:{
+        staffing:{blocks:[],unassignedOrConflicting:0,missingAdultReports:0,substitutions:0,
+          unacknowledged:0,coverageExceptions:0,witnessedBlocks:0},
+        students:[],projectionTruncated:false,note:"Source-derived school-day projection",
+        exceptions:{pendingGuardianExplanations:0,healthVisits:0,sentHome:0,incidents:0,
+          emergencyHolds:0,openIncidents:0,uncollectedFollowUps:0},
+      },
     });
     const html=render(Site);
     expect(html).toContain('href="/operations?siteId=school&amp;action=task"');
