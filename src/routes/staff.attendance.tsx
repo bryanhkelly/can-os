@@ -1,3 +1,4 @@
+import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ObsoleteExcuseClosure } from "@/components/operations/ObsoleteExcuseClosure";
@@ -205,6 +206,7 @@ function StaffAttendancePage() {
         Mark students expected onsite at your school and review guardian-submitted excuses.
         Approved excuses correct the attendance record without erasing history.
       </p>
+      <WorkflowIntro eyebrow="School day · Attendance" title="A reliable record of who is here." description="Mark observed attendance, review excuses and reconcile changes without replacing the underlying history. Offline entries remain pending until synchronized." />
       <label className="mt-8 block max-w-sm text-sm font-semibold">
         Attendance date
         <input
