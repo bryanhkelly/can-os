@@ -315,7 +315,7 @@ async function main() {
       indexname='conference_slot_booking_uq'`,
   ]);
   const review = assessFullFlowMigrationReadiness({
-    ...identity, ...ledger, journal, types, columns, tables,
+    ...identity, ...ledger, lastTimestamp: ledger.last_timestamp, journal, types, columns, tables,
     authorizationColumns, authorizationIndexes, authorizationConstraints,
     localCopyColumns, localCopyIndexes, localCopyConstraints,
     guardianDefaults, familyStartColumns, familyStartIndexes,

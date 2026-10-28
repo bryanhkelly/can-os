@@ -47,4 +47,10 @@ describe("FullFlow Neon branch isolation", () => {
     expect(wrapper.indexOf('["scripts/review-fullflow-migrations.mjs"]'))
       .toBeLessThan(wrapper.indexOf('["run", "db:migrate"]'));
   });
+
+  it("maps the Postgres migration ledger timestamp into the reviewer contract", () => {
+    const reviewer = readFileSync("scripts/review-fullflow-migrations.mjs", "utf8");
+    expect(reviewer).toContain("max(created_at) AS last_timestamp");
+    expect(reviewer).toContain("...identity, ...ledger, lastTimestamp: ledger.last_timestamp, journal");
+  });
 });
