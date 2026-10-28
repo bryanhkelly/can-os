@@ -1,5 +1,4 @@
 import { WorkspaceShell, StatCard, StatusBadge } from "@/components/workspace";
-import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { listGuardianEffectiveAbsences, submitEffectiveAttendanceExcuse } from "@/modules/attendance/onsite-attendance-workflow.functions";
@@ -53,6 +52,10 @@ function GuardianAttendancePage() {
   }, [student]);
 
   useEffect(() => {
+    // Clear drafts when switching children to avoid cross-child form state.
+    setReasons({});
+    setExcuseFiles({});
+    setNotice("");
     void load();
   }, [load]);
 
