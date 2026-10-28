@@ -247,7 +247,9 @@ function LaunchWizardPage() {
 
         <OneHourSchoolLaunch launches={launches.launches} selectedProgramId={selection.programId}/>
 
-        <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
+        <details className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Advanced · Launch portfolio and detailed records</summary>
+          <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
+        </details>
         <div className="mt-8 grid gap-6">
           {extendedPlanning ? <ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId} /> : <p role="status" className="rounded-lg border p-3 text-sm">Extended-learning planning is unavailable. Verify database migrations 0032–0033; school launches remain accessible.</p>}
           <details id="new-school-launch" className="rounded-xl border bg-card p-5" open={launches.launches.length===0}>
