@@ -1,6 +1,6 @@
 import { WorkspaceShell, StatCard, StatusBadge } from "@/components/workspace";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listGuardianEffectiveAbsences, submitEffectiveAttendanceExcuse } from "@/modules/attendance/onsite-attendance-workflow.functions";
 import { createExcuseAttachmentUpload, attachDocumentToExcuse, listExcuseAttachmentCounts } from "@/modules/learning/submission-attachments.functions";
 import { attachmentAccept, attachmentMimeForFileName } from "@/modules/learning/attachment-mimes";
@@ -22,6 +22,7 @@ type Absence = Awaited<ReturnType<typeof listGuardianEffectiveAbsences>>["absenc
 function GuardianAttendancePage() {
   const {student,attendance}=Route.useSearch();
   const [absences, setAbsences] = useState<Absence[]>([]);
+  const requestVersion = useRef(0);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -31,23 +32,27 @@ function GuardianAttendancePage() {
   const [excuseFiles, setExcuseFiles] = useState<Record<string, File | null>>({});
 
   const load = useCallback(async () => {
+    const version = ++requestVersion.current;
     setLoading(true);
     setError("");
     try {
       const result = await listGuardianEffectiveAbsences({data:{studentPersonId:student}});
+      if (version !== requestVersion.current) return;
       setAbsences(result.absences);
       const excusedIds = result.absences.filter(absence => absence.excuse).map(absence => absence.attendanceEventId);
       if (excusedIds.length) {
         const counts = await listExcuseAttachmentCounts({ data: { attendanceEventIds: excusedIds } });
-        setDocCounts(Object.fromEntries(counts.counts.map(count => [count.attendanceEventId, count.count])));
+        if (version === requestVersion.current) setDocCounts(Object.fromEntries(counts.counts.map(count => [count.attendanceEventId, count.count])));
       } else {
-        setDocCounts({});
+        if (version === requestVersion.current) setDocCounts({});
       }
     } catch {
-      setAbsences([]);
-      setError("Sign in with an authorized guardian account to review attendance.");
+      if (version === requestVersion.current) {
+        setAbsences([]);
+        setError("Sign in with an authorized guardian account to review attendance.");
+      }
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }, [student]);
 
