@@ -1,3 +1,4 @@
+import { ArrowUpRight, ClipboardList, School, ShieldCheck } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 import type { listLaunches } from "@/modules/programs/launch.functions";
 import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
@@ -82,7 +83,7 @@ function OperationsPage(){
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · School operations</p>
   <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
   <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Review actions and launch readiness for an authorized school and program.</p>
-  <div className="mt-5 flex flex-wrap gap-3 rounded-xl border bg-card p-4">
+  <div className="mt-6 flex flex-wrap gap-4 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
    <label className="text-sm">School
     <select aria-label="Filter operations by school" value={selected.siteId??""} onChange={event=>selectScope(event.target.value||undefined)} className="ml-2 rounded border bg-background p-2">
      <option value="">All authorized schools</option>
@@ -99,7 +100,7 @@ function OperationsPage(){
   <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p>
   <OutboxHealthPanel/>
   {error&&<p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>}
-  {commandCenter&&<section className="mt-7 rounded-xl border bg-card p-5">
+  {commandCenter&&<section className="mt-7 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
     <h2 className="font-serif text-2xl">Live school operations</h2>
     <div className="mt-3 flex flex-wrap gap-4 text-sm">
      <span>{commandCenter.summary.sections} active sections</span>
