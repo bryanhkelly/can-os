@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ObsoleteExcuseClosure } from "@/components/operations/ObsoleteExcuseClosure";
+import { ExcuseAttachments } from "@/components/operations/ExcuseAttachments";
 import {
   listExpectedOnsiteRoster, markExpectedOnsiteAttendance,
   listExpectedPendingExcuses, reviewCurrentAttendanceExcuse,
@@ -295,6 +296,8 @@ function StaffAttendancePage() {
               <span className="rounded-full border px-3 py-1 text-xs">Submitted</span>
             </div>
             <p className="mt-3 rounded-lg bg-muted p-3 text-sm">{excuse.reason}</p>
+            <ExcuseAttachments attendanceEventId={excuse.attendanceEventId}
+              attachments={excuse.attachments} disabled={busy !== ""} />
             {!excuse.canReview && <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-400">Attendance was subsequently corrected. This earlier excuse cannot change the current mark. A registrar can close it with a reason.</p>}
             {excuse.canClose && excuse.currentAttendanceEventId &&
               <ObsoleteExcuseClosure excuse={excuse} onSaved={() => load(date)} />}
