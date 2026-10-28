@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { ArrowUpRight, BookOpen, ClipboardCheck, GraduationCap } from "lucide-react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
 import { TeacherLearningFollowUpForm } from "@/components/learning/TeacherLearningFollowUpForm";
@@ -47,17 +48,29 @@ function TeacherTodayPage() {
   subtitle="Your sections, grading queue, and missing work across your school today."
  >
   <QueryState loading={loading ? "Loading your day…" : ""} error={error}>
+   <section aria-label="Teaching workspace" className="relative mt-3 overflow-hidden rounded-3xl border border-border/70 bg-card px-6 py-8 shadow-sm sm:px-9 sm:py-10">
+    <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-accent opacity-75 blur-3xl" />
+    <div className="relative max-w-2xl">
+     <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-primary"><GraduationCap className="size-4" /> Your teaching day</p>
+     <h2 className="mt-3 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">Make room for great teaching.</h2>
+     <p className="mt-3 text-sm leading-7 text-muted-foreground sm:text-base">Your classes, student work, and follow-ups are ready when you are.</p>
+     <div className="mt-6 flex flex-wrap gap-3 text-sm font-semibold">
+      <Link to="/classes" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"><BookOpen className="size-4" /> My classes <ArrowUpRight className="size-4" /></Link>
+      <Link to="/teacher/gradebook" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 hover:bg-muted"><ClipboardCheck className="size-4" /> Gradebook</Link>
+     </div>
+    </div>
+   </section>
    {data && !data.connected && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">Neon is not connected. Today's snapshot cannot load.</p>}
 
    {ready && <>
-    <div className="mt-8 grid grid-cols-3 gap-3" aria-label="Today summary">
+    <div className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Today summary">
      <Link to="/classes"><StatCard label="Sections" value={data.sections.length} /></Link>
      <Link to="/teacher/gradebook"><StatCard label="Needs grading" value={data.ungraded.length} /></Link>
      <Link to="/teacher/missing-work"><StatCard label="Missing work" value={data.missingWork.length} /></Link>
     </div>
 
     <section className="mt-10">
-     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">My sections</p>
+     <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">My sections</p>
      {data.sections.length === 0 && <EmptyState className="mt-4" title="No sections are assigned to you yet." />}
      <div className="mt-4 grid gap-3 sm:grid-cols-2">
       {data.sections.map(section => <article key={section.id} className="rounded-xl border bg-card p-5">
