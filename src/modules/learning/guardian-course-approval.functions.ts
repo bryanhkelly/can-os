@@ -14,6 +14,7 @@ import { and,desc,eq,inArray,isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
 
+import { EventTypes } from "@/domain/event-types";
 const CONSENT_TYPE = "course_registration_add_decision";
 const CONSENT_SUBJECT = "course_registration_request";
 const CONSENT_VERSION = "course-registration/v1";
@@ -207,7 +208,7 @@ export const decideGuardianCourseApproval = createServerFn({ method: "POST" })
         after: { decision: data.approve ? "approve" : "decline", consentRecordId: decision.id },
       });
       await emitEvent(tx, {
-        eventType: "CourseRegistrationGuardianDecision", aggregateType: "action",
+        eventType: EventTypes.CourseRegistrationGuardianDecision, aggregateType: "action",
         aggregateId: request.id, actorPersonId: actor.actorPersonId,
         payload: { sectionId: section.id, studentProfileId: student.id, approved: data.approve },
       });
