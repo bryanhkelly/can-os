@@ -5,6 +5,7 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import { ProgramSiteAuthorizationPanel } from "@/components/operations/ProgramSiteAuthorizationPanel";
+import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
 import { LocalSiteDelegationPanel } from "@/components/operations/LocalSiteDelegationPanel";
 import { SectionFacilitatorPanel } from "@/components/operations/SectionFacilitatorPanel";
 import {SectionLifecycleWorkspace} from "@/components/operations/SectionLifecycleManager";
@@ -58,6 +59,9 @@ function Setup({data}:{data:Snapshot}){
    </div>)}
   </div>
   <ProgramSiteAuthorizationPanel programId={data.program.id}/>
+  {data.program.deliveryModel.onsite&&
+    data.program.academicProviderOrganizationId!==data.program.organizationId&&
+    <SchoolOpeningEvidencePanel programId={data.program.id}/>}
   {data.program.siteId && <>
     <LocalSiteDelegationPanel programId={data.program.id}/>
     <SectionFacilitatorPanel programId={data.program.id}/>

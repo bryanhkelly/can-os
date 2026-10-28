@@ -2,6 +2,7 @@ import { OperatingAgreementEvidencePicker } from "./OperatingAgreementEvidencePi
 import { useCallback, useEffect, useState } from "react";
 import { CANAcademicStaffDelegationPanel } from "./CANAcademicStaffDelegationPanel";
 import { SchoolOpeningReviewPanel } from "@/components/operations/SchoolOpeningReviewPanel";
+import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
 import {
   listCANOperatingAuthorizationDeskFn, reviewProgramSiteAuthorizationFn,
   revokeProgramSiteAuthorizationFn,
@@ -105,6 +106,7 @@ export function CANOperatingAuthorizationDesk() {
         </select>
       </label>
       {staffProgramId&&<>
+        <SchoolOpeningEvidencePanel key={"evidence:"+staffProgramId} programId={staffProgramId}/>
         <SchoolOpeningReviewPanel key={"opening:"+staffProgramId} programId={staffProgramId}/>
         <CANAcademicStaffDelegationPanel key={staffProgramId} programId={staffProgramId}/>
       </>}

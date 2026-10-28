@@ -588,3 +588,28 @@ actual emergency/attendance/incident evidence. No completed child arrival,
 custody handoff, authorized pickup or continuous site supervision is inferred.
 Live distinct-person, 2-adult school-day acceptance and disposable Neon schema
 validation must pass before Golden Flow B can leave **HOLD**.
+
+## Increment 10 — connected school-opening evidence workflow (2026-10-28)
+
+**Source implemented; live storage, database and browser acceptance remain pending.**
+The church launch workspace now submits all five existing opening-evidence
+categories through private, storage-verified document uploads, and the CAN
+authorization desk independently approves or rejects each exact version before
+the separate configuration decision. Submissions bind the current
+SchoolConfigurationVersion and canonical Site, host, CAN institution and
+jurisdiction. Corrections add a pending version and preserve prior documents,
+review reasons and downloads. The latest pending, rejected, expired or wrongly
+scoped version fails closed instead of falling back to an older approval.
+
+Church and CAN read models show category-specific status, responsible owner and
+next action. Upload finish, independent review and opening decisions are
+idempotent; mutations serialize on the Program and emit transactional
+AuditEvent/DomainEvent/outbox facts. Existing activation and physical-presence
+services continue to recheck the current agreement, director, evidence and
+configuration, so later changes block new guarded operations without deleting
+history or changing emergency reporting. No schema migration was required.
+
+Focused unit tests and static checks do not establish R2 conditional-write/CORS,
+malware quarantine, Neon transaction behavior or separate-session browser
+acceptance. Jurisdiction-specific legal review and the rest of Golden Flow B
+remain **HOLD**.

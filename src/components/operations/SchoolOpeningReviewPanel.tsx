@@ -97,13 +97,13 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
           onChange={e=>setReason(e.target.value)}/>
       </label>
       <div className="mt-2 flex gap-2">
-        {opening.status==="draft"&&<button type="button"
+        {opening.canDecide&&opening.status==="draft"&&<button type="button"
           disabled={busy||loading||reason.trim().length<10||!opening.approvalReady}
           onClick={()=>void decide("approve")}
           className="rounded border px-3 py-2 disabled:opacity-50">
           Approve independently reviewed opening
         </button>}
-        {opening.status==="approved"&&<button type="button"
+        {opening.canDecide&&opening.status==="approved"&&<button type="button"
           disabled={busy||loading||reason.trim().length<10}
           onClick={()=>void decide("suspend")}
           className="rounded border px-3 py-2 disabled:opacity-50">

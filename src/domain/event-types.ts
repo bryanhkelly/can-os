@@ -62,6 +62,8 @@ export const EventTypes = {
   ProgramActivated: "ProgramActivated",
   ChurchSchoolOpeningApproved: "ChurchSchoolOpeningApproved",
   ChurchSchoolOpeningSuspended: "ChurchSchoolOpeningSuspended",
+  ChurchSchoolOpeningEvidenceSubmitted: "ChurchSchoolOpeningEvidenceSubmitted",
+  ChurchSchoolOpeningEvidenceReviewed: "ChurchSchoolOpeningEvidenceReviewed",
   OnsiteAdultPresenceReported: "OnsiteAdultPresenceReported",
   OnsiteBlockPresenceWitnessed: "OnsiteBlockPresenceWitnessed",
   CANAcademicProgramStaffDelegated: "CANAcademicProgramStaffDelegated",

@@ -14,7 +14,7 @@ const state=vi.hoisted(()=>({
 }));
 vi.mock("@/db/client",()=>({db:{
   transaction:(callback:(tx:unknown)=>unknown)=>state.transaction(callback),
-  select:(...args:unknown[])=>tx.select(),
+  select:(..._args:unknown[])=>tx.select(),
 }}));
 vi.mock("@/platform/mutation",()=>({writeAudit:state.audit,emitEvent:state.event}));
 vi.mock("@/modules/programs/program-site-authorization.server",()=>({
@@ -87,9 +87,10 @@ function addValidEvidence(){
   state.rows.push(
     schoolOpeningEvidenceCategories.map((category,index)=>({
       id:"document-"+index,fileName:"Evidence "+index+".pdf",category,verifiedAt:new Date(Date.now()-60_000),
-      verifiedByPersonId:ids.verifier,uploadedByPersonId:"different-uploader",
-      expiresAt:new Date(Date.now()+86_400_000),
-      metadata:{siteId:ids.site,organizationId:ids.church,
+      verifiedByPersonId:ids.verifier,uploadedByPersonId:"different-uploader",storageProvider:"cloudflare_r2",
+      expiresAt:new Date(Date.now()+86_400_000),createdAt:new Date(Date.now()-120_000),
+      metadata:{siteId:ids.site,organizationId:ids.church,configurationId:ids.configuration,
+        storageVerified:true,reviewStatus:"approved",version:1,isCurrent:true,
         institutionOrganizationId:ids.can,jurisdictionId:"jurisdiction"},
     })),
     [{personId:ids.verifier}],
@@ -161,6 +162,12 @@ describe("school opening decision binds the reviewed configuration",()=>{
       .resolves.toEqual({configurationId:ids.configuration,status:"suspended"});
     expectNoDecision();
   });
+  it("deduplicates the same officer's approval retry without rechecking changed live evidence",async()=>{
+    arrange(configuration("approved",{approvedByPersonId:ids.reviewer}));
+    await expect(decideChurchSchoolOpening(actor,command))
+      .resolves.toEqual({configurationId:ids.configuration,status:"approved"});
+    expectNoDecision();expect(state.contract).not.toHaveBeenCalled();
+  });
   it.each([
     {configurationId:undefined},
     {expectedVersion:undefined},
@@ -175,7 +182,7 @@ describe("school opening decision binds the reviewed configuration",()=>{
 
 describe("school opening authorized evidence projection",()=>{
   function arrangeRead(){
-    arrange();state.rows.shift();addValidEvidence();
+    arrange();state.rows.shift();addValidEvidence();state.rows.push(state.rows[3]!);
   }
   it("returns only current verified metadata and preserves document IDs in commands",async()=>{
     arrangeRead();
@@ -210,18 +217,28 @@ describe("school opening authorized evidence projection",()=>{
     expect(model.evidenceReady).toBe(false);
     expect(model.evidenceIssue).toBeNull();
   });
+  it("allows the exact church registrar to track evidence without granting CAN review or approval",async()=>{
+    arrangeRead();
+    const churchActor:AccessContext={...actor,actorPersonId:"church-registrar",role:"registrar",grantSiteId:ids.site,
+      capabilities:new Set(["program.launch.start"]),
+      scope:{organizationIds:[ids.church],siteIds:[ids.site],programIds:[ids.program]}};
+    const model=await readChurchSchoolOpening(churchActor,ids.program);
+    expect(model.canSubmit).toBe(true);expect(model.canReview).toBe(false);expect(model.canDecide).toBe(false);
+    expect(model.approvalReady).toBe(false);expect(model.evidenceItems).toHaveLength(5);
+    expect(model.evidenceItems.every(item=>item.status==="approved")).toBe(true);
+  });
   it("rejects another institution before reading evidence",async()=>{
     arrangeRead();
     await expect(readChurchSchoolOpening({...actor,scope:{organizationIds:["other"]}},ids.program))
       .rejects.toThrow();
-    expect(state.rows).toHaveLength(4);
+    expect(state.rows).toHaveLength(5);
   });
 });
 
 
 describe("opening prerequisites match command gates",()=>{
   function arrangeRead(status="draft"){
-    arrange(configuration(status));state.rows.shift();addValidEvidence();
+    arrange(configuration(status));state.rows.shift();addValidEvidence();state.rows.push(state.rows[3]!);
   }
   it("allows only a draft with all three current prerequisites",async()=>{
     arrangeRead();

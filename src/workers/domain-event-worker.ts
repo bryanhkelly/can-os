@@ -56,6 +56,8 @@ for (const eventType of [
   EventTypes.ProgramActivated,
   EventTypes.ChurchSchoolOpeningApproved,
   EventTypes.ChurchSchoolOpeningSuspended,
+  EventTypes.ChurchSchoolOpeningEvidenceSubmitted,
+  EventTypes.ChurchSchoolOpeningEvidenceReviewed,
   EventTypes.OnsiteAdultPresenceReported,
   EventTypes.OnsiteBlockPresenceWitnessed,
   EventTypes.CANAcademicProgramStaffDelegated,

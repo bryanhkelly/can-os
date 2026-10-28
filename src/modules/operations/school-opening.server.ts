@@ -7,23 +7,21 @@ import {
 } from "@/db/schema";
 import { schoolOpeningDecisionSchema, type SchoolOpeningDecision } from "@/domain/school-opening-decision";
 import type { AccessContext } from "@/domain/access-context";
-import { AuthorizationError } from "@/domain/command-context";
+import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import {
+  schoolOpeningEvidenceCategories, schoolOpeningEvidenceLabels, schoolOpeningEvidenceNextAction,
+  schoolOpeningEvidenceStatus, type SchoolOpeningEvidenceCategory,
+} from "@/domain/school-opening-evidence";
 
 import { EventTypes } from "@/domain/event-types";
+export { schoolOpeningEvidenceCategories } from "@/domain/school-opening-evidence";
 type Reader = Pick<typeof db,"select">;
-/** These are independently reviewed supporting records, not user checkboxes. */
-export const schoolOpeningEvidenceCategories = [
-  "school_opening_jurisdiction_authority",
-  "school_opening_facility_approval",
-  "school_opening_safeguarding_reporting_procedure",
-  "school_opening_emergency_response",
-  "school_opening_authorized_pickup",
-] as const;
+export type ChurchSchoolIdentity = Awaited<ReturnType<typeof schoolIdentity>>;
 
-async function schoolIdentity(tx:Reader,programId:string){
+export async function schoolIdentity(tx:Reader,programId:string){
   const [school]=await tx.select({
     programId:programs.id,programStatus:programs.status,siteId:programs.siteId,
     organizationId:programs.organizationId,
@@ -49,7 +47,7 @@ async function schoolIdentity(tx:Reader,programId:string){
   return {...school,siteId};
 }
 
-function verifyCANSchoolApprover(actor:AccessContext,institutionId:string) {
+export function verifyCANSchoolApprover(actor:AccessContext,institutionId:string) {
   const originalOrganizations=actor.scope.organizationIds??[];
   if(actor.demoFacilitator || originalOrganizations.length!==1 ||
      !actor.actorPersonId || actor.grantSiteId!==null ||
@@ -58,7 +56,25 @@ function verifyCANSchoolApprover(actor:AccessContext,institutionId:string) {
   assertCANSteward(actor,{id:institutionId,type:"can_network"},"network.agreements.verify");
 }
 
-async function latestConfiguration(tx:Reader,programId:string){
+export function verifyChurchEvidenceSubmitter(actor:AccessContext,school:ChurchSchoolIdentity) {
+  if(actor.demoFacilitator || actor.role!=="registrar" || !actor.actorPersonId ||
+    !actor.scope.organizationIds?.includes(school.organizationId) ||
+    !actor.scope.siteIds?.includes(school.siteId) ||
+    !actor.scope.programIds?.includes(school.programId))
+    throw new AuthorizationError("verified church registrar for this exact Program and Site");
+  assertCapability(actor,"program.launch.start");
+}
+
+export function verifySchoolOpeningReader(actor:AccessContext,school:ChurchSchoolIdentity):"host"|"can" {
+  if(actor.role==="registrar") {
+    verifyChurchEvidenceSubmitter(actor,school);
+    return "host";
+  }
+  verifyCANSchoolApprover(actor,school.institutionId);
+  return "can";
+}
+
+export async function latestConfiguration(tx:Reader,programId:string){
   const [configuration]=await tx.select().from(schoolConfigurationVersions)
     .where(eq(schoolConfigurationVersions.programId,programId))
     .orderBy(desc(schoolConfigurationVersions.version)).limit(1);
@@ -70,20 +86,22 @@ async function latestConfiguration(tx:Reader,programId:string){
  * replacement and revocation are never replaced with a stale checkbox.
  */
 async function requireSchoolOpeningEvidence(tx:Reader, school:Awaited<ReturnType<typeof schoolIdentity>>,
-  now:Date,decisionPersonId?:string) {
+  configurationId:string,now:Date,decisionPersonId?:string) {
   const docs=await tx.select().from(documents).where(and(
     eq(documents.subjectType,"program"),eq(documents.subjectId,school.programId),
     inArray(documents.category,[...schoolOpeningEvidenceCategories]),
-  )).orderBy(desc(documents.createdAt),desc(documents.id)).limit(101);
-  if(docs.length>100)throw new AuthorizationError("school opening evidence listing incomplete");
+  )).orderBy(desc(documents.createdAt),desc(documents.id));
   const mostRecent=new Map<string,(typeof docs)[number]>();
   for(const doc of docs)if(!mostRecent.has(doc.category))mostRecent.set(doc.category,doc);
   const latest=[...schoolOpeningEvidenceCategories].map(category=>{
     const doc=mostRecent.get(category);
     if(!doc || !doc.verifiedAt || doc.verifiedAt>now ||
        !doc.verifiedByPersonId || !doc.expiresAt || doc.expiresAt<=now ||
+       (doc.metadata.reviewStatus!==undefined && doc.metadata.reviewStatus!=="approved") ||
+       doc.storageProvider!=="cloudflare_r2" || doc.metadata.storageVerified!==true ||
        doc.uploadedByPersonId===doc.verifiedByPersonId ||
        (decisionPersonId && doc.verifiedByPersonId===decisionPersonId) ||
+       doc.metadata.configurationId!==configurationId ||
        doc.metadata.siteId!==school.siteId ||
        doc.metadata.organizationId!==school.organizationId ||
        doc.metadata.institutionOrganizationId!==school.institutionId ||
@@ -176,7 +194,7 @@ export async function requireCurrentChurchSchoolOpening(
   await requireChurchHostedOperatingServices(tx,programId,[
     "school_of_record","academic_instruction","onsite_supervision",
   ]);
-  await requireSchoolOpeningEvidence(tx,school,now);
+  await requireSchoolOpeningEvidence(tx,school,configuration.id,now);
   await requireVerifiedChurchSiteDirector(tx,school,configuration.id,now);
   return {configurationId:configuration.id,version:configuration.version,
     schoolSiteId:school.siteId,hostOrganizationId:school.organizationId};
@@ -200,12 +218,14 @@ export async function decideChurchSchoolOpening(
       throw new Error("School configuration changed. Reload the review before recording a decision.");
     const now=new Date();
     if(input.decision==="approve"){
+      if(configuration.status==="approved"&&configuration.approvedByPersonId===actor.actorPersonId)
+        return {configurationId:configuration.id,status:"approved" as const};
       if(configuration.status!=="draft")
         throw new AuthorizationError("only the latest drafted school configuration can be approved");
       await requireChurchHostedOperatingServices(tx,input.programId,[
         "school_of_record","academic_instruction","onsite_supervision",
       ]);
-      const evidence=(await requireSchoolOpeningEvidence(tx,school,now,actor.actorPersonId!)).map(doc=>doc.id);
+      const evidence=(await requireSchoolOpeningEvidence(tx,school,configuration.id,now,actor.actorPersonId!)).map(doc=>doc.id);
       await requireVerifiedChurchSiteDirector(tx,school,configuration.id,now);
       await tx.update(schoolConfigurationVersions).set({
         status:"approved",approvedByPersonId:actor.actorPersonId,
@@ -254,7 +274,7 @@ export async function decideChurchSchoolOpening(
 
 export async function readChurchSchoolOpening(actor:AccessContext,programId:string) {
   const school=await schoolIdentity(db,programId);
-  verifyCANSchoolApprover(actor,school.institutionId);
+  const perspective=verifySchoolOpeningReader(actor,school);
   const config=await latestConfiguration(db,programId);
   const now=new Date();
   let agreementReady=false;
@@ -262,10 +282,11 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
   let evidence:Awaited<ReturnType<typeof requireSchoolOpeningEvidence>>=[];
   let evidenceIssue:string|null=null;
   try{
-    evidence=await requireSchoolOpeningEvidence(db,school,now,actor.actorPersonId!);
+    evidence=await requireSchoolOpeningEvidence(db,school,config.id,now,
+      perspective==="can"?actor.actorPersonId!:undefined);
   }catch(error){
     if(!(error instanceof AuthorizationError))throw error;
-    evidenceIssue="Required evidence is missing, expired, incomplete, or not independently verified by an active CAN officer.";
+    evidenceIssue=error.message;
   }
   try{
     await requireChurchHostedOperatingServices(db,programId,[
@@ -281,6 +302,41 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
   }catch(error){
     if(!(error instanceof AuthorizationError))throw error;
   }
+  const documentsByCategory=new Map<SchoolOpeningEvidenceCategory,(typeof documents.$inferSelect)[]>();
+  const rows=await db.select().from(documents).where(and(
+    eq(documents.subjectType,"program"),eq(documents.subjectId,programId),
+    inArray(documents.category,[...schoolOpeningEvidenceCategories]),
+  )).orderBy(desc(documents.createdAt),desc(documents.id));
+  for(const document of rows) {
+    const category=document.category as SchoolOpeningEvidenceCategory;
+    const versions=documentsByCategory.get(category)??[];
+    versions.push(document);documentsByCategory.set(category,versions);
+  }
+  const evidenceItems=schoolOpeningEvidenceCategories.map(category=>{
+    const versions=documentsByCategory.get(category)??[];
+    const latest=versions[0]??null;
+    const validScope=Boolean(latest && latest.expiresAt &&
+      latest.storageProvider==="cloudflare_r2" && latest.metadata.storageVerified===true &&
+      latest.metadata.configurationId===config.id && latest.metadata.siteId===school.siteId &&
+      latest.metadata.organizationId===school.organizationId &&
+      latest.metadata.institutionOrganizationId===school.institutionId &&
+      latest.metadata.jurisdictionId===school.jurisdictionId);
+    const status=!latest||validScope?schoolOpeningEvidenceStatus(latest,now):"invalid";
+    const responsibility=schoolOpeningEvidenceNextAction(status);
+    const project=(document:(typeof rows)[number],isCurrent:boolean)=>({
+      id:document.id,version:typeof document.metadata.version==="number"?document.metadata.version:1,
+      fileName:document.fileName,isCurrent,status:schoolOpeningEvidenceStatus(document,now),
+      submittedAt:document.createdAt.toISOString(),verifiedAt:document.verifiedAt?.toISOString()??null,
+      expiresAt:document.expiresAt?.toISOString()??null,
+      reviewReason:typeof document.metadata.reviewReason==="string"?document.metadata.reviewReason:null,
+    });
+    return {category,title:schoolOpeningEvidenceLabels[category],status,
+      responsibleOwner:responsibility.owner,nextAction:responsibility.action,
+      rejectionReason:latest&&status==="rejected"&&typeof latest.metadata.reviewReason==="string"
+        ?latest.metadata.reviewReason:null,
+      current:latest?project(latest,true):null,versions:versions.map(document=>project(document,document.id===latest?.id)),
+    };
+  });
   const prerequisites=[
     {id:"evidence",title:"Independent opening evidence",satisfied:evidenceIssue===null,
       detail:evidenceIssue??"All required categories have current independently verified evidence."},
@@ -292,13 +348,13 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
         :"Appoint a current verified church Site director to this configuration in Site staffing."},
   ];
   const prerequisitesReady=prerequisites.every(item=>item.satisfied);
-  // Retain the existing evidence/contract projection; approval additionally
-  // requires a draft and the same current director check as the command.
   const evidenceReady=evidenceIssue===null&&agreementReady;
   return {
-    approvalReady:config.status==="draft"&&prerequisitesReady,prerequisites,
+    approvalReady:perspective==="can"&&config.status==="draft"&&prerequisitesReady,prerequisites,
     programId,siteId:school.siteId,configurationId:config.id,version:config.version,
-    status:config.status,evidenceReady,evidence,evidenceIssue,
+    status:config.status,evidenceReady,evidence,evidenceIssue,evidenceItems,
+    canSubmit:perspective==="host"&&config.status!=="suspended",canReview:perspective==="can",
+    canDecide:perspective==="can",uploadsEnabled:process.env.CAN_R2_SCHOOL_OPENING_UPLOADS_ENABLED==="true",
     evidenceRequired:[...schoolOpeningEvidenceCategories],
     approvedAt:config.approvedAt?.toISOString()??null,
   };

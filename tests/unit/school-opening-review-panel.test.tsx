@@ -69,6 +69,7 @@ const review={
     {id:"agreement",title:"CAN–church service agreement",satisfied:true,detail:"Agreement is current."},
     {id:"director",title:"Church Site director",satisfied:true,detail:"Director is appointed."},
   ],evidence:[],evidenceIssue:null,version:1,status:"draft",evidenceReady:true,evidenceRequired:["facility"],approvedAt:null,
+  canDecide:true,
 };
 beforeEach(()=>{
   vi.clearAllMocks();state.slots=[];state.cursor=0;state.effects=[];
