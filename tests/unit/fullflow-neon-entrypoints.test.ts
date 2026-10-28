@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 describe("FullFlow Neon branch isolation", () => {
   it("pins both FullFlow and Journey C to the dedicated database before test execution", () => {
-    const source = readFileSync("scripts/run-integration-tests.mjs", "utf8");
+    const source = readFileSync("scripts/run-integration-tests.mjs", "utf8").replace(/\r\n/g, "\n");
     expect(source).toContain('const requiresFullFlowDatabase = mode === "full-flow" || mode === "journey-c";');
     expect(source).toContain('if (requiresFullFlowDatabase) {\n  const branchCheck');
     expect(source).toContain('if (requiresFullFlowDatabase) {\n  const schema');

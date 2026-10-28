@@ -55,6 +55,17 @@ jobs:
         run: npm run db:migrate
       - name: Run isolated admissions acceptance
         run: npm run test:integration:admissions
+      - name: Install Chromium for authenticated browser acceptance
+        run: npx playwright install --with-deps chromium
+      - name: Run authenticated admissions browser acceptance
+        run: npm run test:e2e:admissions
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admissions-browser-failure
+          path: test-results/
+          if-no-files-found: ignore
       - name: Publish release acceptance result
         if: always()
         shell: bash

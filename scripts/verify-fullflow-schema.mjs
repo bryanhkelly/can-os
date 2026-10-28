@@ -56,11 +56,21 @@ async function main() {
       "id", "site_id", "revision", "status", "content", "flagged_fields",
       "created_by_person_id", "restored_from_revision", "created_at",
     ],
+    guardian_relationships: ["can_manage_pickup"],
+    incident_evidence: ["idempotency_key"],
+    pickup_authorizations: ["id", "student_profile_id", "household_id", "program_id", "site_id", "pickup_person_id", "status", "source_key"],
+    pickup_custody_holds: ["id", "student_profile_id", "household_id", "program_id", "site_id", "status", "source_key"],
+    pickup_release_events: ["id", "student_profile_id", "attendance_event_id", "status", "identity_verified", "staff_witness_person_id", "occurred_at", "source_key"],
+    safeguarding_case_assignments: ["id", "incident_id", "person_id", "responsibility", "revoked_at"],
+    safeguarding_concerns: ["incident_id", "reporter_person_id", "idempotency_key", "student_profile_id", "policy_version", "acknowledgment_due_at"],
+    safeguarding_external_reports: ["id", "incident_id", "reporter_person_id", "idempotency_key", "status", "occurred_at"],
+    safeguarding_site_policies: ["id", "site_id", "jurisdiction_id", "procedure_version", "active"],
+    safeguarding_site_responders: ["id", "site_id", "person_id", "responsibility"],
   };
+  const requiredTables = Object.keys(required);
   const columns = await query`
     SELECT table_name, column_name FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name IN ('auth_request_rate_limits', 'access_sessions', 'lesson_progress', 'submissions', 'learning_activity_sessions', 'learning_activity_events', 'program_site_authorizations', 'site_local_content_versions')
+    WHERE table_schema = 'public' AND table_name = ANY(${requiredTables})
   `;
   const present = new Set(columns.map(row => `${row.table_name}.${row.column_name}`));
   const missing = Object.entries(required).flatMap(([table, names]) =>
@@ -77,17 +87,25 @@ async function main() {
     "program_site_authorization_current_uq",
     "site_local_content_site_revision_uq",
     "site_local_content_site_status_idx",
+    "pickup_authorization_source_key_uq",
+    "pickup_custody_hold_source_key_uq",
+    "pickup_release_event_source_key_uq",
+    "safeguarding_case_assignment_uq",
+    "safeguarding_concern_reporter_idempotency_uq",
+    "safeguarding_external_report_idempotency_uq",
+    "safeguarding_site_policy_site_uq",
+    "safeguarding_site_responder_role_uq",
+    "incident_evidence_actor_idempotency_uq",
   ];
   const indexes = await query`
-    SELECT indexname FROM pg_indexes WHERE schemaname = 'public'
-      AND tablename IN ('auth_request_rate_limits', 'access_sessions', 'lesson_progress', 'submissions', 'learning_activity_sessions', 'learning_activity_events', 'program_site_authorizations', 'site_local_content_versions')
+    SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = ANY(${requiredTables})
   `;
   const foundIndexes = new Set(indexes.map(row => row.indexname));
   const missingIndexes = expectedIndexes.filter(name => !foundIndexes.has(name));
   if (missingIndexes.length) {
     throw new Error(`FullFlow persistence constraints missing: ${missingIndexes.join(", ")}`);
   }
-  console.log(`FullFlow isolated schema verified: ${entries.length} migrations, session/auth/learning tables and uniqueness indexes.`);
+  console.log(`FullFlow isolated schema verified: ${entries.length} migrations, academic, safeguarding and pickup persistence checks.`);
 }
 
 main().catch(error => {

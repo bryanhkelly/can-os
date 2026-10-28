@@ -261,7 +261,7 @@ describe("FullFlow 0041-0046 staged migration readiness (read-only)", () => {
     "revocation_reason","created_at","updated_at",
   ];
   const guardianCols = ["can_view_academics","can_manage_enrollment","can_submit_attendance_excuse"];
-  // Committed journal timestamps for 0039-0046 (drizzle/meta/_journal.json).
+  // Committed journal timestamps for 0039-0047 (drizzle/meta/_journal.json).
   const stagedEntries = [
     {idx:39,tag:"0039_program_site_authorizations",when:1792731600000},
     {idx:40,tag:"0040_site_local_content",when:1792735200000},
@@ -271,6 +271,7 @@ describe("FullFlow 0041-0046 staged migration readiness (read-only)", () => {
     {idx:44,tag:"0044_school_configuration_operating_approval",when:1792749600000},
     {idx:45,tag:"0045_onsite_safety_qualification_definitions",when:1792753200000},
     {idx:46,tag:"0046_conference_booking_cancellation",when:1793154285012},
+    {idx:47,tag:"0047_ancient_may_parker",when:1793225613547},
   ];
   function stateThrough0040() {
     const base = reviewedState();
@@ -363,41 +364,70 @@ describe("FullFlow 0041-0046 staged migration readiness (read-only)", () => {
         indexdef:"CREATE UNIQUE INDEX conference_slot_booking_uq ON public.conference_bookings USING btree (conference_slot_id) WHERE (status <> 'cancelled'::conference_booking_status)",
       }]};
   }
-  it("permits staged 0041 through 0046 application on the dedicated branch", () => {
+  function stateThrough0047() {
+    const state = stateThrough0046();
+    const p0Tables = ["pickup_authorizations","pickup_custody_holds","pickup_release_events",
+      "safeguarding_case_assignments","safeguarding_concerns","safeguarding_external_reports",
+      "safeguarding_site_policies","safeguarding_site_responders"];
+    const p0Indexes = ["pickup_authorization_source_key_uq","pickup_authorization_roster_idx",
+      "pickup_authorization_person_idx","pickup_authorization_household_idx",
+      "pickup_custody_hold_source_key_uq","pickup_custody_hold_roster_idx",
+      "pickup_custody_hold_household_idx","pickup_release_event_source_key_uq",
+      "pickup_release_event_roster_idx","pickup_release_event_attendance_idx",
+      "pickup_release_event_site_time_idx","safeguarding_case_assignment_uq",
+      "safeguarding_case_assignment_person_idx","safeguarding_case_assignment_incident_idx",
+      "safeguarding_concern_reporter_idempotency_uq","safeguarding_concern_student_idx",
+      "safeguarding_external_report_idempotency_uq","safeguarding_external_report_incident_idx",
+      "safeguarding_site_policy_site_uq","safeguarding_site_responder_role_uq",
+      "safeguarding_site_responder_person_idx","incident_evidence_actor_idempotency_uq"];
+    return {...state, applied:48, lastTimestamp:"1793225613547",
+      tables:[...state.tables,...p0Tables.map(table_name=>({table_name}))],
+      p0SafetyColumns:[
+        {table_name:"guardian_relationships",column_name:"can_manage_pickup"},
+        {table_name:"incident_evidence",column_name:"idempotency_key"},
+      ],
+      p0SafetyIndexes:p0Indexes.map(indexname=>({indexname}))};
+  }
+  it("permits staged 0041 through 0047 application on the dedicated branch", () => {
     expect(assessFullFlowMigrationReadiness(stateThrough0040())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
       pendingMigrations:["0041_pending_guardian_access_defaults","0042_public_family_start_requests",
         "0043_student_access_consents","0044_school_configuration_operating_approval",
-        "0045_onsite_safety_qualification_definitions","0046_conference_booking_cancellation"],
+        "0045_onsite_safety_qualification_definitions","0046_conference_booking_cancellation",
+        "0047_ancient_may_parker"],
     });
     expect(assessFullFlowMigrationReadiness(stateThrough0041())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
       pendingMigrations:["0042_public_family_start_requests","0043_student_access_consents",
         "0044_school_configuration_operating_approval","0045_onsite_safety_qualification_definitions",
-        "0046_conference_booking_cancellation"],
+        "0046_conference_booking_cancellation","0047_ancient_may_parker"],
     });
     expect(assessFullFlowMigrationReadiness(stateThrough0042())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
       pendingMigrations:["0043_student_access_consents","0044_school_configuration_operating_approval",
-        "0045_onsite_safety_qualification_definitions","0046_conference_booking_cancellation"],
+        "0045_onsite_safety_qualification_definitions","0046_conference_booking_cancellation",
+        "0047_ancient_may_parker"],
     });
     expect(assessFullFlowMigrationReadiness(stateThrough0043())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
       pendingMigrations:["0044_school_configuration_operating_approval",
-        "0045_onsite_safety_qualification_definitions","0046_conference_booking_cancellation"],
+        "0045_onsite_safety_qualification_definitions","0046_conference_booking_cancellation",
+        "0047_ancient_may_parker"],
     });
     expect(assessFullFlowMigrationReadiness(stateThrough0044())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
       pendingMigrations:["0045_onsite_safety_qualification_definitions",
-        "0046_conference_booking_cancellation"],
+        "0046_conference_booking_cancellation","0047_ancient_may_parker"],
     });
-    // Journal at 0046 with the ledger applied only through 0045: stage 46,
-    // 0046 still pending.
     expect(assessFullFlowMigrationReadiness(stateThrough0045())).toMatchObject({
       ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
-      pendingMigrations:["0046_conference_booking_cancellation"],
+      pendingMigrations:["0046_conference_booking_cancellation","0047_ancient_may_parker"],
     });
     expect(assessFullFlowMigrationReadiness(stateThrough0046())).toMatchObject({
+      ready:true,status:"PRECONDITIONS_MATCH_NOT_APPLIED",
+      pendingMigrations:["0047_ancient_may_parker"],
+    });
+    expect(assessFullFlowMigrationReadiness(stateThrough0047())).toMatchObject({
       ready:true,status:"UP_TO_DATE",pendingMigrations:[],
     });
   });
@@ -460,6 +490,20 @@ describe("FullFlow 0041-0046 staged migration readiness (read-only)", () => {
         {typname:"conference_booking_status",enumlabel:"cancelled"}]},
     ]) {
       expect(assessFullFlowMigrationReadiness(premature).ready).toBe(false);
+    }
+  });
+  it("rejects partial or premature 0047 safeguarding and pickup artifacts", () => {
+    const before = stateThrough0046();
+    const complete = stateThrough0047();
+    for (const changed of [
+      {...before, tables:[...before.tables,{table_name:"pickup_authorizations"}]},
+      {...before, p0SafetyColumns:[{table_name:"guardian_relationships",column_name:"can_manage_pickup"}]},
+      {...before, p0SafetyIndexes:[{indexname:"pickup_authorization_source_key_uq"}]},
+      {...complete, tables:complete.tables.filter(x=>x.table_name!=="pickup_release_events")},
+      {...complete, p0SafetyColumns:complete.p0SafetyColumns.filter(x=>x.column_name!=="idempotency_key")},
+      {...complete, p0SafetyIndexes:complete.p0SafetyIndexes.filter(x=>x.indexname!=="safeguarding_case_assignment_uq")},
+    ]) {
+      expect(assessFullFlowMigrationReadiness(changed).ready).toBe(false);
     }
   });
 });

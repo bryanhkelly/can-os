@@ -32,6 +32,7 @@ const stagedTags = [
   "0044_school_configuration_operating_approval",
   "0045_onsite_safety_qualification_definitions",
   "0046_conference_booking_cancellation",
+  "0047_ancient_may_parker",
 ];
 
 export function assessFullFlowMigrationReadiness(input) {
@@ -40,7 +41,7 @@ export function assessFullFlowMigrationReadiness(input) {
     localCopyColumns = [], localCopyIndexes = [], localCopyConstraints = [],
     guardianDefaults = [], familyStartColumns = [], familyStartIndexes = [],
     consentColumns = [], consentIndexes = [], safetyQualificationKeys = [],
-    conferenceBookingIndexes = [] } = input;
+    conferenceBookingIndexes = [], p0SafetyColumns = [], p0SafetyIndexes = [] } = input;
   const issues = [];
   // A previously reviewed 0032-0038 sequence is already applied on the
   // dedicated branch. Before applying each staged migration, verify that exact
@@ -92,11 +93,14 @@ export function assessFullFlowMigrationReadiness(input) {
     const post0046 = applied === 47 && String(lastTimestamp) === when(46) &&
       hasAll("program_site_authorizations", "site_local_content_versions",
         "public_family_start_requests", "student_access_consents");
+    const post0047 = applied === 48 && String(lastTimestamp) === when(47) &&
+      hasAll("program_site_authorizations", "site_local_content_versions",
+        "public_family_start_requests", "student_access_consents");
     const stage = pre0039 ? 39 : post0039 ? 40 : post0040 ? 41 : post0041 ? 42 :
       post0042 ? 43 : post0043 ? 44 : post0044 ? 45 : post0045 ? 46 :
-      post0046 ? 47 : 0;
+      post0046 ? 47 : post0047 ? 48 : 0;
     if (!stage)
-      issues.push("0039-0046 migration ledger/table state is inconsistent or unexpected");
+      issues.push("0039-0047 migration ledger/table state is inconsistent or unexpected");
     if (stage >= 40) {
       const actualColumns = new Set(authorizationColumns.map(row => row.column_name));
       const requiredColumns = [
@@ -221,6 +225,53 @@ export function assessFullFlowMigrationReadiness(input) {
       if (enumValues.has("conference_booking_status.cancelled"))
         issues.push("0046 conference booking cancellation enum value present before its migration");
     }
+    // 0047 is additive only: restricted safeguarding records, verified pickup
+    // records, their evidence/idempotency fields, foreign keys and indexes.
+    const p0SafetyTables = [
+      "pickup_authorizations", "pickup_custody_holds", "pickup_release_events",
+      "safeguarding_case_assignments", "safeguarding_concerns",
+      "safeguarding_external_reports", "safeguarding_site_policies",
+      "safeguarding_site_responders",
+    ];
+    const p0SafetyRequiredColumns = [
+      "guardian_relationships.can_manage_pickup", "incident_evidence.idempotency_key",
+    ];
+    const p0SafetyRequiredIndexes = [
+      "pickup_authorization_source_key_uq", "pickup_authorization_roster_idx",
+      "pickup_authorization_person_idx", "pickup_authorization_household_idx",
+      "pickup_custody_hold_source_key_uq", "pickup_custody_hold_roster_idx",
+      "pickup_custody_hold_household_idx", "pickup_release_event_source_key_uq",
+      "pickup_release_event_roster_idx", "pickup_release_event_attendance_idx",
+      "pickup_release_event_site_time_idx", "safeguarding_case_assignment_uq",
+      "safeguarding_case_assignment_person_idx", "safeguarding_case_assignment_incident_idx",
+      "safeguarding_concern_reporter_idempotency_uq", "safeguarding_concern_student_idx",
+      "safeguarding_external_report_idempotency_uq", "safeguarding_external_report_incident_idx",
+      "safeguarding_site_policy_site_uq", "safeguarding_site_responder_role_uq",
+      "safeguarding_site_responder_person_idx", "incident_evidence_actor_idempotency_uq",
+    ];
+    const actualP0Columns = new Set(p0SafetyColumns.map(row => row.table_name + "." + row.column_name));
+    const actualP0Indexes = new Set(p0SafetyIndexes.map(row => row.indexname));
+    if (stage >= 48) {
+      for (const name of p0SafetyTables) {
+        if (!found.has(name)) issues.push("0047 safeguarding/pickup table missing: " + name);
+      }
+      for (const name of p0SafetyRequiredColumns) {
+        if (!actualP0Columns.has(name)) issues.push("0047 safeguarding/pickup column missing: " + name);
+      }
+      for (const name of p0SafetyRequiredIndexes) {
+        if (!actualP0Indexes.has(name)) issues.push("0047 safeguarding/pickup index missing: " + name);
+      }
+    } else if (stage) {
+      for (const name of p0SafetyTables) {
+        if (found.has(name)) issues.push("0047 safeguarding/pickup table present before migration: " + name);
+      }
+      for (const name of p0SafetyRequiredColumns) {
+        if (actualP0Columns.has(name)) issues.push("0047 safeguarding/pickup column present before migration: " + name);
+      }
+      for (const name of actualP0Indexes) {
+        issues.push("0047 safeguarding/pickup index present before migration: " + name);
+      }
+    }
     const stagedPending = stagedEntries.map(entry => entry.tag);
     const pendingMigrations = stage ? stagedPending.slice(stage - 39) : [];
     return {
@@ -269,7 +320,8 @@ async function main() {
     authorizationColumns,authorizationIndexes,authorizationConstraints,
     localCopyColumns,localCopyIndexes,localCopyConstraints,
     guardianDefaults,familyStartColumns,familyStartIndexes,
-    consentColumns,consentIndexes,safetyQualificationKeys,conferenceBookingIndexes] = await Promise.all([
+    consentColumns,consentIndexes,safetyQualificationKeys,conferenceBookingIndexes,
+    p0SafetyColumns,p0SafetyIndexes] = await Promise.all([
     query`SELECT current_setting('neon.project_id', true) AS project,
                  current_setting('neon.branch_id', true) AS branch`,
     query`SELECT count(*)::int AS applied, max(created_at) AS last_timestamp FROM drizzle.__drizzle_migrations`,
@@ -282,7 +334,7 @@ async function main() {
             (table_name IN ('activity_seasons','activity_registrations') AND column_name='metadata'))`,
     query`SELECT table_name FROM information_schema.tables
           WHERE table_schema='public' AND
-          table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations','site_local_content_versions','public_family_start_requests','student_access_consents')`,
+          table_name IN ('site_publications','program_publications','public_admissions_interests','program_site_authorizations','site_local_content_versions','public_family_start_requests','student_access_consents','pickup_authorizations','pickup_custody_holds','pickup_release_events','safeguarding_case_assignments','safeguarding_concerns','safeguarding_external_reports','safeguarding_site_policies','safeguarding_site_responders')`,
     query`SELECT column_name FROM information_schema.columns
       WHERE table_schema='public' AND table_name='program_site_authorizations'`,
     query`SELECT indexname FROM pg_indexes
@@ -313,6 +365,16 @@ async function main() {
     query`SELECT indexname, indexdef FROM pg_indexes
       WHERE schemaname='public' AND tablename='conference_bookings' AND
       indexname='conference_slot_booking_uq'`,
+    query`SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema='public' AND
+      ((table_name='guardian_relationships' AND column_name='can_manage_pickup') OR
+       (table_name='incident_evidence' AND column_name='idempotency_key'))`,
+    query`SELECT indexname FROM pg_indexes
+      WHERE schemaname='public' AND
+      (tablename IN ('pickup_authorizations','pickup_custody_holds','pickup_release_events',
+        'safeguarding_case_assignments','safeguarding_concerns','safeguarding_external_reports',
+        'safeguarding_site_policies','safeguarding_site_responders') OR
+       (tablename='incident_evidence' AND indexname='incident_evidence_actor_idempotency_uq'))`,
   ]);
   const review = assessFullFlowMigrationReadiness({
     ...identity, ...ledger, lastTimestamp: ledger.last_timestamp, journal, types, columns, tables,
@@ -320,6 +382,7 @@ async function main() {
     localCopyColumns, localCopyIndexes, localCopyConstraints,
     guardianDefaults, familyStartColumns, familyStartIndexes,
     consentColumns, consentIndexes, safetyQualificationKeys, conferenceBookingIndexes,
+    p0SafetyColumns, p0SafetyIndexes,
   });
   process.stdout.write(JSON.stringify(review,null,2)+"\n");
   if (!review.ready) process.exitCode = 1;
