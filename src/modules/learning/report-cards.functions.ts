@@ -14,7 +14,7 @@ import { authorizeClass } from "@/modules/learning/class-access.server";
 import type { Actor } from "@/modules/identity/actors.server";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,desc,eq,inArray,isNotNull,or,sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -701,6 +701,132 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
 
       return { corrected: true };
     });
+  });
+
+type FinalizationGradingPeriod = {
+  id: string;
+  name: string;
+  sequence: number;
+  startsOn: string;
+  endsOn: string;
+};
+
+type FinalizedSectionGrade = {
+  id: string;
+  studentProfileId: string;
+  studentName: string;
+  gradingPeriodId: string;
+  letterGrade: string | null;
+  percentage: string | null;
+  finalizedAt: string | null;
+  corrections: number;
+};
+
+/**
+ * Teacher-facing read behind the gradebook finalization panel: the grading
+ * periods of the section's term, whether the school year's grade scale is
+ * configured, and the section's finalized grades with their correction
+ * lineage depth. The finalize/correct mutations re-verify teacher, Section
+ * and institutional authority on every call; this read only decides which
+ * controls the gradebook renders and never weakens those gates.
+ */
+export const getSectionGradeFinalization = createServerFn({ method: "GET" })
+  .validator((value: unknown) => z.object({ sectionId: z.string().min(1) }).parse(value))
+  .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    const context = await getCommandContext(getRequest());
+    assertCapability(context, "assignments:grade");
+    if (context.role !== "teacher" || !context.actorPersonId) {
+      throw new AuthorizationError("teacher grade finalization");
+    }
+    if (!context.scope.siteIds?.length && !context.scope.sectionIds?.length) {
+      throw new AuthorizationError("teacher site or exact delegated Section membership");
+    }
+    if (!UUID.test(data.sectionId)) throw new AuthorizationError("section identifier");
+    if (!process.env.DATABASE_URL) {
+      return {
+        connected: false as const, section: null, gradeScaleConfigured: false,
+        enrolledStudents: 0,
+        gradingPeriods: [] as FinalizationGradingPeriod[],
+        grades: [] as FinalizedSectionGrade[],
+      };
+    }
+    const { db, s } = await stores();
+    // Same exact-Section authority as the gradebook grid itself.
+    const authorized = await authorizeClass(context as Actor, data.sectionId);
+    const [section] = await db
+      .select({ id: s.sections.id, title: s.sections.title, termId: s.sections.termId })
+      .from(s.sections)
+      .where(eq(s.sections.id, authorized.section.id))
+      .limit(1);
+    if (!section) throw new AuthorizationError("section");
+
+    const [gradingPeriodRows, yearRows, enrolled, gradeRows] = await Promise.all([
+      db.select({
+        id: s.gradingPeriods.id,
+        name: s.gradingPeriods.name,
+        sequence: s.gradingPeriods.sequence,
+        startsOn: s.gradingPeriods.startsOn,
+        endsOn: s.gradingPeriods.endsOn,
+      })
+        .from(s.gradingPeriods)
+        .where(eq(s.gradingPeriods.termId, section.termId))
+        .orderBy(asc(s.gradingPeriods.sequence)),
+      db.select({ gradeScaleId: s.schoolYears.gradeScaleId })
+        .from(s.schoolYears)
+        .where(eq(s.schoolYears.id, authorized.section.schoolYearId))
+        .limit(1),
+      db.select({ studentProfileId: s.enrollments.studentProfileId })
+        .from(s.enrollments)
+        .where(and(
+          eq(s.enrollments.kind, "section"),
+          eq(s.enrollments.status, "active"),
+          eq(s.enrollments.sectionId, section.id),
+        )),
+      db.select({
+        id: s.sectionGrades.id,
+        studentProfileId: s.sectionGrades.studentProfileId,
+        gradingPeriodId: s.sectionGrades.gradingPeriodId,
+        letterGrade: s.sectionGrades.letterGrade,
+        percentage: s.sectionGrades.percentage,
+        finalizedAt: s.sectionGrades.finalizedAt,
+        metadata: s.sectionGrades.metadata,
+        firstName: s.people.legalFirstName,
+        lastName: s.people.legalLastName,
+        preferredName: s.people.preferredName,
+      })
+        .from(s.sectionGrades)
+        .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.sectionGrades.studentProfileId))
+        .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
+        .where(and(
+          eq(s.sectionGrades.sectionId, section.id),
+          eq(s.sectionGrades.status, "finalized"),
+        ))
+        .orderBy(asc(s.people.legalLastName), asc(s.people.legalFirstName)),
+    ]);
+    const gradeScaleId = yearRows[0]?.gradeScaleId;
+    const [gradeScale] = gradeScaleId
+      ? await db.select({ configuration: s.gradeScales.configuration })
+        .from(s.gradeScales).where(eq(s.gradeScales.id, gradeScaleId)).limit(1)
+      : [];
+
+    return {
+      connected: true as const,
+      section: { id: section.id, title: section.title },
+      gradeScaleConfigured: Boolean(gradeScale?.configuration.entries.length),
+      enrolledStudents: enrolled.length,
+      gradingPeriods: gradingPeriodRows,
+      grades: gradeRows.map((row) => ({
+        id: row.id,
+        studentProfileId: row.studentProfileId,
+        studentName: `${row.preferredName ?? row.firstName} ${row.lastName}`,
+        gradingPeriodId: row.gradingPeriodId,
+        letterGrade: row.letterGrade,
+        percentage: row.percentage,
+        finalizedAt: row.finalizedAt?.toISOString() ?? null,
+        corrections: Array.isArray(row.metadata?.corrections) ? row.metadata.corrections.length : 0,
+      })),
+    };
   });
 
 /** Finalized grades for one grading period (or all, grouped client-side). */
