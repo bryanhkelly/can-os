@@ -182,6 +182,8 @@ export const EventTypes = {
   QualificationDefinitionCreated: "QualificationDefinitionCreated",
   QualificationClaimCreated: "QualificationClaimCreated",
   QualificationVerificationDecided: "QualificationVerificationDecided",
+  StaffInvitationIssued: "StaffInvitationIssued",
+  StaffInvitationAccepted: "StaffInvitationAccepted",
   EnrichmentChildProfileCreated: "EnrichmentChildProfileCreated",
   ExtendedLearningRegistrationPublished: "ExtendedLearningRegistrationPublished",
   StudyGroupCreated: "StudyGroupCreated",

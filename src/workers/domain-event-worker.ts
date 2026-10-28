@@ -218,6 +218,8 @@ for (const eventType of [
   EventTypes.QualificationDefinitionCreated,
   EventTypes.QualificationClaimCreated,
   EventTypes.QualificationVerificationDecided,
+  EventTypes.StaffInvitationIssued,
+  EventTypes.StaffInvitationAccepted,
   EventTypes.EnrichmentChildProfileCreated,
   EventTypes.ExtendedLearningRegistrationPublished,
   EventTypes.StudyGroupCreated,

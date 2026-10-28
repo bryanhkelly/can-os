@@ -8,6 +8,7 @@ import { listDemoFacilitatorGrants } from "./demo-facilitator.server";
 import { recordSessionSecurityEvent } from "./session-security-audit.server";
 import { and,eq,gt,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
+import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 
 const CHALLENGE_LIFETIME_MS=10*60*1000;
 const REQUEST_COOLDOWN_MS=60*1000;
@@ -33,7 +34,9 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
    eq(accountPersonGrants.isSynthetic,false),eq(people.active,true)));
- if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role)))return genericResult;
+ const pendingInvitations=memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))
+  ?[]:await listPendingStaffInvitations(db,account.id);
+ if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length)return genericResult;
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
  // Serialize concurrent requests for the same account before enforcing cooldown.
@@ -80,7 +83,9 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    .innerJoin(people,eq(people.id,accountPersonGrants.personId))
    .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
     eq(accountPersonGrants.isSynthetic,false),eq(people.active,true)));
-  const activeGrant=grants.find(g=>Object.hasOwn(roleCapabilities,g.role));
+  const pending=await listPendingStaffInvitations(tx,account.id);
+  const accepted=await acceptStaffInvitations(tx,account.id,pending,now);
+  const activeGrant=grants.find(g=>Object.hasOwn(roleCapabilities,g.role))??accepted[0];
   if(!activeGrant)throw new Error("No supported CAN OS membership");
   const secret=issueOpaqueSecret();
   const [session]=await tx.insert(accessSessions).values({
