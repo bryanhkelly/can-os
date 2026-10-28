@@ -12,6 +12,7 @@ import { readRubric,scoreRubric } from "@/modules/learning/rubric";
 import { writtenSubmissionResponse } from "@/domain/submission-response";
 
 
+import { EventTypes } from "@/domain/event-types";
 /** Never accept a browser-selected actor or role for assignment authorization. */
 async function studentActor(){
  const context=await getCommandContext(getRequest());
@@ -119,7 +120,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
    const emitSubmission=async(submissionId:string)=>{
-    await emitEvent(tx, {eventType:"SubmissionReceived",aggregateType:"submission",
+    await emitEvent(tx, {eventType:EventTypes.SubmissionReceived,aggregateType:"submission",
      aggregateId:submissionId,actorPersonId:studentPersonId,payload:{
       assessmentId:assessment.id,studentProfileId:studentId,sectionId:assessment.sectionId,timeliness}});
    };
@@ -129,7 +130,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
     for(const action of rows){
      if(action.metadata.assessmentId!==assessment.id||action.status==="resolved"||action.status==="cancelled")continue;
      await tx.update(s.actions).set({status:"resolved",resolvedAt:now,resolutionNote:"Student submitted overdue assignment.",updatedAt:now}).where(eq(s.actions.id,action.id));
-     await emitEvent(tx, {eventType:"ActionResolved",aggregateType:"action",
+     await emitEvent(tx, {eventType:EventTypes.ActionResolved,aggregateType:"action",
       aggregateId:action.id,actorPersonId:studentPersonId,payload:{submissionId,assessmentId:assessment.id}});
      await writeAudit(tx, {actorPersonId:studentPersonId,action:"missing_work.resolved_by_submission",resourceType:"action",resourceId:action.id,before:{status:action.status},after:{status:"resolved",submissionId},context:{accountId:context.accountId,sessionId:context.sessionId,assessmentId:assessment.id}});
     }

@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route as Courses } from "@/routes/student.courses";
 import { Route as Notifications } from "@/routes/notifications";
-import { Route as Operations } from "@/routes/operations";
-import { Route as Site } from "@/routes/sites.$siteId";
+import { Route as Operations } from "@/routes/operations.index";
+import { Route as Site } from "@/routes/sites.$siteId.index";
 import { Route as Admissions } from "@/routes/admissions.index";
 import { Route as Intake } from "@/routes/admissions.intake";
 import { Route as Families } from "@/routes/admissions.families";
@@ -39,6 +39,7 @@ vi.mock("@/modules/communication/notification-center.functions",()=>({
 vi.mock("@/modules/communication/delivery-history.functions",()=>({getDeliveryHistory:vi.fn()}));
 vi.mock("@/modules/operations/command-center.functions",()=>({getLiveOperationsCommandCenter:vi.fn()}));
 vi.mock("@/modules/operations/release-health.functions",()=>({getReleaseHealth:vi.fn()}));
+vi.mock("@/modules/operations/outbox-health.functions",()=>({getOutboxHealthSummary:vi.fn()}));
 vi.mock("@/modules/operations/action-workspace.functions",()=>({
   getOperationsActions:vi.fn(),updateOperationsAction:vi.fn(),assignOperationsAction:vi.fn(),
 }));

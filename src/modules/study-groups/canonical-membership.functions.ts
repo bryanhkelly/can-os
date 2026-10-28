@@ -10,6 +10,7 @@ import { and,asc,desc,eq,inArray,isNull,sql } from "drizzle-orm";
 import { z } from "zod";
 import { assertGroupScope,eligibleStudent } from "./canonical-membership.server";
 
+import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
 
 export const createStudentStudyGroup = createServerFn({ method: "POST" })
@@ -108,7 +109,7 @@ export const createStudentStudyGroup = createServerFn({ method: "POST" })
         after: { status: "pending", studentPersonId: actor.actorPersonId },
       });
       await emitEvent(tx, {
-        eventType: "StudyGroupCreated", aggregateType: "study_group",
+        eventType: EventTypes.StudyGroupCreated, aggregateType: "study_group",
         aggregateId: group.id, actorPersonId: actor.actorPersonId,
         payload: {
           sectionId: section.id, siteId: section.siteId, programId: section.programId,
@@ -116,7 +117,7 @@ export const createStudentStudyGroup = createServerFn({ method: "POST" })
         },
       });
       await emitEvent(tx, {
-        eventType: "StudyGroupMembershipRequested", aggregateType: "study_group_membership",
+        eventType: EventTypes.StudyGroupMembershipRequested, aggregateType: "study_group_membership",
         aggregateId: membership.id, actorPersonId: actor.actorPersonId,
         payload: { groupId: group.id },
       });
@@ -172,7 +173,7 @@ export const createFacilitatedGroup = createServerFn({ method: "POST" })
         after: { title: valid.title, kind: valid.kind, maxMembers: valid.maxMembers },
       });
       await emitEvent(tx, {
-        eventType: "StudyGroupCreated", aggregateType: "study_group",
+        eventType: EventTypes.StudyGroupCreated, aggregateType: "study_group",
         aggregateId: group.id, actorPersonId: actor.actorPersonId,
         payload: { sectionId: scope.sectionId, siteId: scope.siteId, programId: scope.programId },
       });
@@ -257,7 +258,7 @@ export const requestCanonicalGroupMembership = createServerFn({ method: "POST" }
         after: { status: "pending", studentPersonId: actor.actorPersonId },
       });
       await emitEvent(tx, {
-        eventType: "StudyGroupMembershipRequested", aggregateType: "study_group_membership",
+        eventType: EventTypes.StudyGroupMembershipRequested, aggregateType: "study_group_membership",
         aggregateId: membershipId, actorPersonId: actor.actorPersonId, payload: { groupId: group.id },
       });
       return { membershipId, pending: true };
@@ -346,7 +347,7 @@ export const decideCanonicalGroupConsent = createServerFn({ method: "POST" })
         after: { consentRecordId: consent.id, approved: data.approve },
       });
       await emitEvent(tx, {
-        eventType: "StudyGroupGuardianConsentDecided", aggregateType: "study_group_membership",
+        eventType: EventTypes.StudyGroupGuardianConsentDecided, aggregateType: "study_group_membership",
         aggregateId: member.id, actorPersonId: actor.actorPersonId,
         payload: { groupId: group.id, approved: data.approve, consentRecordId: consent.id },
       });
@@ -440,7 +441,7 @@ export const decideCanonicalGroupMembership = createServerFn({ method: "POST" })
         before: { status: "pending" }, after: { status: data.approve ? "approved" : "declined" },
       });
       await emitEvent(tx, {
-        eventType: "StudyGroupMembershipDecided", aggregateType: "study_group_membership",
+        eventType: EventTypes.StudyGroupMembershipDecided, aggregateType: "study_group_membership",
         aggregateId: member.id, actorPersonId: actor.actorPersonId,
         payload: { groupId: group.id, approved: data.approve },
       });

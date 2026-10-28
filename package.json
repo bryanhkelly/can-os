@@ -27,6 +27,7 @@
     "test:integration:curriculum-journey": "node scripts/run-integration-tests.mjs curriculum-journey",
     "test:integration:network-onboarding": "node scripts/run-integration-tests.mjs network-onboarding",
     "test:integration:full-flow": "node scripts/run-integration-tests.mjs full-flow",
+    "test:integration:journey-c": "node scripts/run-integration-tests.mjs journey-c",
     "storybook": "storybook dev -p 6006 --no-open",
     "build-storybook": "storybook build",
     "test:storybook": "vitest run --config vitest.storybook.config.ts",

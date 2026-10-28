@@ -1,7 +1,7 @@
 import type { EffectCallback, ReactNode, SetStateAction } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Route as Students } from "@/routes/staff.students";
+import { Route as Students } from "@/routes/staff.students.index";
 import { Route as Teachers } from "@/routes/staff.teachers";
 import { Route as StudentReport } from "@/routes/student.report-card";
 import { Route as GuardianReport } from "@/routes/guardian.report-cards";
