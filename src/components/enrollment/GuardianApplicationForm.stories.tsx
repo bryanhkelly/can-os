@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { WorkspaceShell } from "@/components/workspace";
@@ -78,5 +79,30 @@ export const NoEligiblePrograms: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("status")).toHaveTextContent("No eligible school is currently available");
     await expect(canvas.queryByRole("button", { name: "Submit application" })).not.toBeInTheDocument();
+  },
+};
+
+
+function ProgramDeepLinkHarness() {
+  const [requestedProgramId, setRequestedProgramId] = useState("program-one");
+  return <div>
+    <button type="button" onClick={() => setRequestedProgramId("program-two")}>Switch program deep link</button>
+    <GuardianApplicationForm
+      programs={[{ id: "program-one", name: "Program One" }, { id: "program-two", name: "Program Two" }]}
+      households={[]}
+      requestedProgramId={requestedProgramId}
+      onSubmit={async () => ({ applicationId: "test-only" })}
+    />
+  </div>;
+}
+
+export const ProgramDeepLinkChange: Story = {
+  render: () => <ProgramDeepLinkHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const select = canvas.getByLabelText("School and program") as HTMLSelectElement;
+    await expect(select).toHaveValue("program-one");
+    await userEvent.click(canvas.getByRole("button", { name: "Switch program deep link" }));
+    await waitFor(() => expect(select).toHaveValue("program-two"));
   },
 };
