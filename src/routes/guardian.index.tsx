@@ -6,7 +6,8 @@ import { WorkspaceShell, EmptyState, QueryState, StatCard, PersonMark, StatusBad
 import { prioritizeFamilyNeeds, familyActionWorkspaceLink } from "@/domain/family-needs";
 
 export const Route = createFileRoute("/guardian/")({
- validateSearch:(search:Record<string,unknown>):{action?:string}=>({
+ validateSearch:(search:Record<string,unknown>):{action?:string;student?:string}=>({
+  student:typeof search.student==="string"?search.student:undefined,
   action:typeof search.action==="string"?search.action:undefined,
  }),
  component:FamilyHomePage,
@@ -16,7 +17,7 @@ type Child = Awaited<ReturnType<typeof getFamilyHome>>["children"][number];
 type NeedItem = Awaited<ReturnType<typeof getGuardianNeedsYou>>["items"][number];
 
 function FamilyHomePage() {
- const {action}=Route.useSearch();
+ const {action,student}=Route.useSearch();
  const [children, setChildren] = useState<Child[]>([]);
  const [needs, setNeeds] = useState<NeedItem[]>([]);
  const [loading, setLoading] = useState(true);
@@ -35,13 +36,15 @@ function FamilyHomePage() {
   return () => { active = false; };
  }, []);
 
- return <FamilyHomeView children={children} needs={needs} loading={loading} error={error} action={action}/>;
+ return <FamilyHomeView children={children} needs={needs} loading={loading} error={error} action={action} student={student}/>;
 }
 
-export function FamilyHomeView({children,needs,loading,error,action}:{
- children:Child[];needs:NeedItem[];loading:boolean;error:string;action?:string;
+export function FamilyHomeView({children,needs,loading,error,action,student}:{
+ children:Child[];needs:NeedItem[];loading:boolean;error:string;action?:string;student?:string;
 }){
  const prioritized=prioritizeFamilyNeeds(needs,Date.now());
+ const selectedChild=children.find(child=>child.studentPersonId===student);
+ const visibleChildren=selectedChild?[selectedChild]:children;
  return <WorkspaceShell
   width="wide"
   eyebrow="CAN OS · Family"
@@ -71,10 +74,12 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
      </div>
     </div>
    </section>
+   {children.length>1&&<nav aria-label="Filter family overview by child" className="mt-6 flex flex-wrap items-center gap-2"><Link to="/guardian" search={{action,student:undefined}} aria-current={!selectedChild?"page":undefined} className={"rounded-full border px-4 py-2 text-sm font-semibold "+(!selectedChild?"bg-primary text-primary-foreground":"bg-card")}>All children</Link>{children.map(child=><Link key={child.studentPersonId} to="/guardian" search={{action,student:child.studentPersonId}} aria-current={selectedChild?.studentPersonId===child.studentPersonId?"page":undefined} className={"rounded-full border px-4 py-2 text-sm font-semibold "+(selectedChild?.studentPersonId===child.studentPersonId?"bg-primary text-primary-foreground":"bg-card")}>{child.displayName}</Link>)}</nav>}
+   {student&&!selectedChild&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
-    <StatCard label="Your children" value={children.length}/>
+    <StatCard label={selectedChild?"Selected child":"Your children"} value={visibleChildren.length}/>
     <StatCard label="Needs your attention" value={needs.length}/>
-    <StatCard label="Missing assignments" value={children.reduce((total,child)=>total+child.missingCount,0)}/>
+    <StatCard label="Missing assignments" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
    <section aria-label="Needs you" className="mt-10">
     <div className="flex items-baseline justify-between gap-3">
@@ -120,7 +125,7 @@ export function FamilyHomeView({children,needs,loading,error,action}:{
      </Link>
     </div>}
     {children.length > 0 && <div className="mt-4 grid gap-4 sm:grid-cols-2">
-     {children.map(child => <article key={child.studentProfileId} className="rounded-xl border bg-card p-5">
+     {visibleChildren.map(child => <article key={child.studentProfileId} className="rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
        <div className="flex items-start gap-3">
         <PersonMark name={`${child.displayName} ${child.lastName}`}/>
