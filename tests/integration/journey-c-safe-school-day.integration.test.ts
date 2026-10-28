@@ -395,11 +395,14 @@ integration("Journey C: a safe school day (GF4 + GF34 + GF35; custody release bl
       });
 
       // ── 7. The day is reconciled and attested ────────────────────────────
+      // A registrar cannot impersonate a site-bound onsite leader. The
+      // onsite scope guard denies this actor before the site-leader-only
+      // attestation branch is reached.
       journey.setActor(school.operatorScoped);
       await expectJourneyDenied(dayReview.attestOnsiteDayReview({ data: {
         date: day,
         confirmedRecordsReviewed: true,
-      } }), "site leader attendance review authority");
+      } }), "active site-bound onsite attendance assignment");
 
       journey.setActor(school.siteLeader.actor);
       const before = await dayReview.getOnsiteDayReview({ data: { date: day } });
