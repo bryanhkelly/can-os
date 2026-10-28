@@ -1,3 +1,4 @@
+import { ArrowUpRight, ClipboardCheck, ShieldCheck } from "lucide-react";
 import {useEffect,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {createAdmissionsInquiry,listAdmissionsExistingStudents,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
@@ -66,6 +67,15 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  return <WorkspaceShell eyebrow="CAN OS · Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
   actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
+  <section aria-label="Intake workflow guidance" className="relative mt-3 overflow-hidden rounded-3xl border border-border/70 bg-card px-6 py-8 shadow-sm sm:px-9 sm:py-10">
+    <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-64 rounded-full bg-accent opacity-70 blur-3xl" />
+    <div className="relative">
+      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-primary"><ShieldCheck className="size-4" /> Verified admissions workflow</p>
+      <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Every applicant, a clear next step.</h2>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">Start with a family inquiry, review identity and eligibility, then record decisions in the canonical admissions workflow. A public inquiry never proves guardianship.</p>
+      <a href="#new-inquiry" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"><ClipboardCheck className="size-4" /> New inquiry <ArrowUpRight className="size-4" /></a>
+    </div>
+  </section>
   {error&&<p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
   {notice&&<p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
   <PublicInterestInbox items={data.publicInterests.filter(row =>
