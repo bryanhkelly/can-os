@@ -5,6 +5,17 @@ export async function createAcademicTimeFixture(input: {
   suffix: string;
   startsOn?: string;
   endsOn?: string;
+  /** Term span; defaults to the fall window of the fixed 2027 fixture. */
+  termStartsOn?: string;
+  termEndsOn?: string;
+  /**
+   * Instructional calendar days. Defaults to the single fixed 2027-09-14 day.
+   * Journey tests that exercise a real school-local "today" pass their own
+   * computed dates.
+   */
+  calendarDays?: Array<{ date: string; type?: string; instructionalMinutes?: number }>;
+  /** Weekdays (UTC 0–6) that get one instruction period; defaults to [2]. */
+  scheduleDays?: number[];
 }) {
   const [{ db }, schema] = await Promise.all([
     import("@/db/client"),
@@ -56,8 +67,8 @@ export async function createAcademicTimeFixture(input: {
       key: `fall-${input.suffix}`,
       name: "Fall Semester",
       sequence: 1,
-      startsOn,
-      endsOn: "2027-12-19",
+      startsOn: input.termStartsOn ?? startsOn,
+      endsOn: input.termEndsOn ?? "2027-12-19",
     })
     .returning();
 
@@ -84,12 +95,17 @@ export async function createAcademicTimeFixture(input: {
     })
     .returning();
 
-  await db.insert(schema.academicCalendarDays).values({
-    academicCalendarId: calendar.id,
-    calendarDate: "2027-09-14",
-    type: "instructional",
-    instructionalMinutes: 360,
-  });
+  const calendarDayInputs = input.calendarDays ?? [
+    { date: "2027-09-14", type: "instructional", instructionalMinutes: 360 },
+  ];
+  const calendarDays = await db.insert(schema.academicCalendarDays).values(
+    calendarDayInputs.map(day => ({
+      academicCalendarId: calendar.id,
+      calendarDate: day.date,
+      type: day.type ?? "instructional",
+      instructionalMinutes: day.instructionalMinutes ?? 360,
+    })),
+  ).returning();
 
   const [scheduleTemplate] = await db
     .insert(schema.scheduleTemplates)
@@ -103,15 +119,17 @@ export async function createAcademicTimeFixture(input: {
     })
     .returning();
 
-  await db.insert(schema.scheduleTemplatePeriods).values({
-    scheduleTemplateId: scheduleTemplate.id,
-    dayOfWeek: 2,
-    sequence: 1,
-    label: "Morning",
-    startsAtLocal: "08:30:00",
-    endsAtLocal: "09:30:00",
-    type: "instruction",
-  });
+  const schedulePeriods = await db.insert(schema.scheduleTemplatePeriods).values(
+    (input.scheduleDays ?? [2]).map((dayOfWeek, index) => ({
+      scheduleTemplateId: scheduleTemplate.id,
+      dayOfWeek,
+      sequence: index + 1,
+      label: "Morning",
+      startsAtLocal: "08:30:00",
+      endsAtLocal: "09:30:00",
+      type: "instruction",
+    })),
+  ).returning();
 
   return {
     gradeScale,
@@ -119,6 +137,8 @@ export async function createAcademicTimeFixture(input: {
     term,
     gradingPeriod,
     calendar,
+    calendarDays,
     scheduleTemplate,
+    schedulePeriods,
   };
 }
