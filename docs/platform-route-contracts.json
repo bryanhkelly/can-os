@@ -292,6 +292,15 @@
       "writeBoundary": "pending"
     },
     {
+      "file": "src/routes/guardian.experiences.tsx",
+      "route": "/guardian/experiences",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/guardian.field-trips.tsx",
       "route": "/guardian/field-trips",
       "owner": "field-trips",
@@ -463,6 +472,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/operations.launch.index.tsx",
+      "route": "/operations/launch/",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/operations.school-years.tsx",
       "route": "/operations/school-years",
       "owner": "operations",
@@ -474,6 +492,15 @@
     {
       "file": "src/routes/operations.tsx",
       "route": "/operations",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.index.tsx",
+      "route": "/operations/",
       "owner": "operations",
       "verification": "pending",
       "roleJourney": "pending",
@@ -571,6 +598,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/sites.$siteId.index.tsx",
+      "route": "/sites/$siteId/",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/sites.index.tsx",
       "route": "/sites/",
       "owner": "operations",
@@ -600,6 +636,15 @@
     {
       "file": "src/routes/staff.students.tsx",
       "route": "/staff/students",
+      "owner": "staff",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/staff.students.index.tsx",
+      "route": "/staff/students/",
       "owner": "staff",
       "verification": "pending",
       "roleJourney": "pending",

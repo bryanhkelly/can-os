@@ -10,7 +10,7 @@ const baseSeeds = manifest.baseSeeds ?? [];
 const entries = manifest.routes ?? {};
 
 const pageFiles = readdirSync("src/routes").filter(
-  (f) => f.endsWith(".tsx") && !f.startsWith("__") && !["student.tsx", "admissions.tsx"].includes(f),
+  (f) => f.endsWith(".tsx") && !f.startsWith("__") && !["student.tsx", "admissions.tsx", "operations.tsx", "operations.launch.tsx", "sites.$siteId.tsx", "staff.students.tsx"].includes(f),
 );
 const pages = pageFiles.map((file) => {
   const name = file.slice(0, -4);
