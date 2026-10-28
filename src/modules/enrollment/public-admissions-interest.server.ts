@@ -10,6 +10,7 @@ import { publicAdmissionsInterestInput, type PublicAdmissionsInterestInput } fro
 import { isPublicSiteSlug } from "@/domain/public-site-address";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 const BUDGET = 30;
 const WINDOW_SECONDS = 60;
 
@@ -123,7 +124,7 @@ export async function recordPublicAdmissionsInterest(
 
     // Events/audit intentionally never include a raw visitor name/email/note.
     await emitEvent(tx, {
-      eventType: "PublicAdmissionsInterestReceived",
+      eventType: EventTypes.PublicAdmissionsInterestReceived,
       aggregateType: "public_admissions_interest",
       aggregateId: created.id,
       siteId: matched.siteId,

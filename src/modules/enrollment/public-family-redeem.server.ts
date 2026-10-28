@@ -11,6 +11,7 @@ import { requireChurchHostedOperatingServices } from "@/modules/programs/program
 import { recordSessionSecurityEvent } from "@/modules/identity/session-security-audit.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 const SESSION_LIFETIME_MS=12*60*60*1000;
 function pepper():string {
  const value=process.env.CAN_ACCESS_TOKEN_PEPPER;
@@ -125,7 +126,7 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
     role:"guardian",method:"email_link",
   });
   await emitEvent(tx,{
-    eventType:"PublicFamilyStartVerified",aggregateType:"public_family_start_request",
+    eventType:EventTypes.PublicFamilyStartVerified,aggregateType:"public_family_start_request",
     aggregateId:intent.id,actorPersonId:personId,organizationId:school.organizationId,
     siteId:school.siteId!,programId:intent.programId,
     payload:{status:"verified_email",role:"guardian"},

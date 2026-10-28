@@ -9,6 +9,7 @@ import { requireChurchHostedOperatingServices } from "@/modules/programs/program
 import { sendAccessLinkViaResend, type AccessEmailSender } from "@/modules/identity/resend-access-mail.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 const LIFETIME_MS=10*60*1000;
 const COOLDOWN_MS=60*1000;
 
@@ -63,7 +64,7 @@ export async function requestPublicFamilyStart(
   }).returning({id:publicFamilyStartRequests.id});
   if(!entry)throw new Error("Unable to prepare family verification");
   // No child details or public email appear in event and audit payloads.
-  await emitEvent(tx,{eventType:"PublicFamilyStartRequested",
+  await emitEvent(tx,{eventType:EventTypes.PublicFamilyStartRequested,
     aggregateType:"public_family_start_request",aggregateId:entry.id,
     siteId:school.siteId,organizationId:school.organizationId,programId:school.programId,
     payload:{status:"pending_email_verification"}});
