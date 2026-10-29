@@ -120,16 +120,19 @@ function Setup({data}:{data:Snapshot}){
     </select></label>
     <label className="text-sm">Published curriculum<select required value={versionId} onChange={e=>setVersionId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
      <option value="">Choose curriculum</option>{data.catalog.map(x=><option key={x.versionId} value={x.versionId}>
-      {x.code} · {x.title} · v{x.version} · {x.origin==="adopted"?`Adopted from ${x.publisherName}`:"Institution-owned"}
+      {x.code} · {x.title} · v{x.version} · {x.origin==="adopted"?`Adopted from ${x.publisherName}`:"Institution-owned"} · {x.recommendation.recommended?"Recommended for a first class":"Needs instructional content"}
      </option>)}
     </select></label>
     {selectedTerm&&<div className="sm:col-span-2 rounded border p-3 text-sm" role="status">
       <p>Scheduling for <strong>{selectedYear?.name??"the selected school year"}</strong> · {selectedTerm.name}.</p>
-      {selectedCourse&&<p className="mt-1">
-        Course release: {selectedCourse.code} · v{selectedCourse.version} ·
+      {selectedCourse&&<div className="mt-1">
+        <p>Course release: {selectedCourse.code} · v{selectedCourse.version} ·
         {selectedCourse.origin==="adopted"?` Adopted publisher: ${selectedCourse.publisherName} · Pack: ${selectedCourse.packName}`:" Institution-owned curriculum"}.
-        Existing sections retain their pinned version.
-      </p>}
+        Existing sections retain their pinned version.</p>
+        <p className="mt-2 font-medium">{selectedCourse.recommendation.recommended?"Recommended course option":"Content blocker"}</p>
+        <p className="mt-1">{selectedCourse.recommendation.explanation}</p>
+        <p className="mt-1 text-xs text-muted-foreground">Available: {selectedCourse.recommendation.available?"published":"unavailable"} · License: {selectedCourse.recommendation.licensed===null?"institution-owned":selectedCourse.recommendation.licensed?"active":"not active"} · Adoption: {selectedCourse.recommendation.adopted===null?"not required":selectedCourse.recommendation.adopted?"active for this program":"not adopted"} · Instruction: {selectedCourse.recommendation.instructionReady?"real introductory lesson":"not ready"}.</p>
+      </div>}
       <p className="mt-1 text-xs text-muted-foreground">Adoption eligibility is currently program-scoped, not yet versioned by academic year. Annual adoption rollover is a separate release.</p>
     </div>}
     <label className="text-sm">Class code<input value={code} required onChange={e=>setCode(e.target.value)} placeholder="BIO-101-A" className="mt-1 block w-full rounded border bg-background p-2"/></label>
@@ -219,6 +222,12 @@ function SectionRow({section,staff,busy,authority,assign,saveCredits}:{
      {item.state==="blocked"?"Blocked":"Review"} · {item.message}
     </span>)}
   </div>
+  <section className="mt-4 rounded-lg border p-3" aria-label={"First week readiness for "+section.title}>
+   <h3 className="text-sm font-semibold">First week: {section.classroom.ready?"ready to teach and learn":"setup incomplete"}</h3>
+   <p className="mt-1 text-xs text-muted-foreground">Readiness comes from the pinned lesson, published instructed assessment, independently qualified coverage and live class membership.</p>
+   {section.classroom.ready?<p className="mt-2 text-sm">Start with “{section.classroom.firstWeek.lesson!.title}”, then assign “{section.classroom.firstWeek.assessment!.title}” to {section.classroom.activeStudentCount} enrolled {section.classroom.activeStudentCount===1?"student":"students"}.</p>:
+    <ul className="mt-2 list-inside list-disc space-y-1 text-xs">{section.classroom.blockers.map(item=><li key={item.key}>{item.message}</li>)}</ul>}
+  </section>
   <div className="mt-3 flex flex-wrap items-end gap-2">
    <label className="min-w-48 flex-1 text-xs">Assign instructor<select className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50" value={personId} disabled={!authority.teacherAssignment} onChange={e=>setPersonId(e.target.value)}>
     <option value="">Choose teacher</option>{staff.filter(t=>!section.teachers.some(a=>a.personId===t.personId))

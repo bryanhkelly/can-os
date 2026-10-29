@@ -34,6 +34,9 @@ const snapshot: Snapshot = {
     readiness: { sectionId: "section", ready: false,
       items: [{ key: "launch_staffing", state: "blocked", message: "Qualification policy not configured." }],
       metrics: { enrollmentCapacity: 30, activeEnrollment: 0, expectedDemand: null, reservedInstructionalSeats: 0 } },
+    classroom: { sectionId: "section", ready: false, activeStudentCount: 0,
+      blockers: [{ key: "missing_qualified_teacher", message: "Assign an eligible teacher." }],
+      firstWeek: { lesson: null, assessment: null } },
   }],
 };
 function render(data: Snapshot) {

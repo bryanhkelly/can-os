@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
+import { recommendCourseOption } from "@/domain/first-classroom";
 import {
   courseTemplates, courseTemplateVersions, curriculumAdoptions,
   curriculumEntitlements, curriculumPackItems, curriculumPackVersions, curriculumPacks, organizations,
@@ -26,7 +27,7 @@ export async function listLaunchEligibleCourses(program: {
   const owned = await query.select({
     versionId: courseTemplateVersions.id, version: courseTemplateVersions.version,
     title: courseTemplates.title, code: courseTemplates.code,
-    subject: courseTemplates.subject,
+    subject: courseTemplates.subject, curriculum: courseTemplateVersions.curriculum,
   })
     .from(courseTemplateVersions)
     .innerJoin(courseTemplates, eq(courseTemplates.id, courseTemplateVersions.courseTemplateId))
@@ -38,7 +39,7 @@ export async function listLaunchEligibleCourses(program: {
   const adopted = await query.select({
     versionId: courseTemplateVersions.id, version: courseTemplateVersions.version,
     title: courseTemplates.title, code: courseTemplates.code,
-    subject: courseTemplates.subject,
+    subject: courseTemplates.subject, curriculum: courseTemplateVersions.curriculum,
     packName:curriculumPacks.name,publisherName:organizations.name,
   })
     .from(curriculumAdoptions)
@@ -76,7 +77,17 @@ export async function listLaunchEligibleCourses(program: {
   ]));
   for (const course of adopted) deduplicated.set(course.versionId,{...course,origin:"adopted"});
   return [...deduplicated.values()].sort((a, b) =>
-    a.title.localeCompare(b.title) || a.version - b.version || a.versionId.localeCompare(b.versionId));
+    a.title.localeCompare(b.title) || a.version - b.version || a.versionId.localeCompare(b.versionId))
+    .map(({ curriculum, ...course }) => ({
+      ...course,
+      recommendation: recommendCourseOption({
+        origin: course.origin,
+        published: true,
+        licenseActive: course.origin === "institution_owned" || course.origin === "adopted",
+        adoptionActive: course.origin === "institution_owned" || course.origin === "adopted",
+        curriculum,
+      }),
+    }));
 }
 
 /** Keep the section-creation authorization exactly aligned with the picker. */

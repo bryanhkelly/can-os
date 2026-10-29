@@ -106,6 +106,38 @@ describe("Student Today summary navigation", () => {
     expect(html).toContain('href="/student/experiences?action=help"');
     expect(html).not.toContain('href="/student/experiences?action=revision"');
   });
+
+  it("hands an enrolled student into actual first-week lesson and submission work", () => {
+    const html = renderToStaticMarkup(<StudentExperience liveData={{
+      student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+      generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+      sections: [{ sectionId: "section-1", sectionTitle: "Biology", siteId: "site", programId: "program", schoolYearId: "year" }],
+      firstWeek: [{ sectionId: "section-1", ready: true, blockers: [], activeStudentCount: 1,
+        firstWeek: { lesson: { id: "investigate", title: "Investigate cells" }, assessment: { id: "assessment-1", title: "Cell observations" } } }],
+      coursework: [], events: [], openActions: [], recoveryCandidates: [],
+    }} />);
+    expect(html).toContain("Start first-week work");
+    expect(html).toContain('href="/student/assignments?section=section-1&amp;assessment=assessment-1"');
+    expect(html).toContain('href="/classes?section=section-1&amp;tab=lessons&amp;lesson=investigate"');
+    expect(html).toContain("Investigate cells");
+    expect(html).toContain("Cell observations");
+  });
+
+  it("does not offer a false start when an enrolled class has no submittable assessment", () => {
+    const html = renderToStaticMarkup(<StudentExperience liveData={{
+      student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+      generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+      sections: [{ sectionId: "section-1", sectionTitle: "Biology", siteId: "site", programId: "program", schoolYearId: "year" }],
+      firstWeek: [{ sectionId: "section-1", ready: false, activeStudentCount: 1,
+        blockers: [{ key: "missing_assessment", message: "Publish an assessment with student instructions so learners can submit real work." }],
+        firstWeek: { lesson: { id: "investigate", title: "Investigate cells" }, assessment: null } }],
+      coursework: [], events: [], openActions: [], recoveryCandidates: [],
+    }} />);
+    expect(html).not.toContain("Start first-week work");
+    expect(html).toContain("View my classes");
+    expect(html).toContain("Publish an assessment with student instructions");
+    expect(html).not.toContain('assessment=undefined');
+  });
 });
 
 describe("assignment navigation filters", () => {

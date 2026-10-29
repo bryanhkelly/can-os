@@ -6,6 +6,7 @@ import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-
 import { TeacherLearningFollowUpForm } from "@/components/learning/TeacherLearningFollowUpForm";
 import { TeacherLearningFollowUpsPanel } from "@/components/learning/TeacherLearningFollowUpsPanel";
 import { TeacherConferencePanel } from "@/components/teacher/TeacherConferencePanel";
+import { TeacherFirstWeekCard } from "@/components/teacher/TeacherFirstWeekCard";
 import { WorkspaceShell, StatCard, EmptyState, QueryState } from "@/components/workspace";
 
 export const Route = createFileRoute("/teacher/")({ component: TeacherTodayPage });
@@ -73,11 +74,8 @@ function TeacherTodayPage() {
      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">My sections</p>
      {data.sections.length === 0 && <EmptyState className="mt-4" title="No currently authorized teaching sections." description="A named delegation, Section assignment, required qualification or school agreement may be missing, revoked or expired. Contact your school administrator. Historical grades and issued transcripts are unchanged." />}
      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-      {data.sections.map(section => <article key={section.id} className="rounded-xl border bg-card p-5">
-       <h2 className="font-semibold"><Link to="/classes" search={{section:section.id}} className="hover:underline">{section.title}</Link></h2>
-       <Link to="/teacher/gradebook" search={{section:section.id}} className="mt-2 inline-block text-sm underline">Class gradebook</Link>
-       <p className="mt-1 text-sm text-muted-foreground">{section.studentCount} enrolled {section.studentCount === 1 ? "student" : "students"}</p>
-      </article>)}
+      {data.sections.map(section => <TeacherFirstWeekCard key={section.id} id={section.id}
+       title={section.title} studentCount={section.studentCount} classroom={section.classroom}/>)}
      </div>
     </section>
 

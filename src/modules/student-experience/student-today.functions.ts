@@ -6,6 +6,7 @@ import { studentProfiles } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { getStudentToday } from "./student-today.server";
+import { readFirstClassrooms } from "@/modules/learning/first-classroom.server";
 
 /** Do not accept a student ID from the browser. The session defines the learner. */
 export const getMyStudentToday = createServerFn({ method: "GET" }).handler(async () => {
@@ -34,6 +35,7 @@ export const getMyStudentToday = createServerFn({ method: "GET" }).handler(async
   });
   return {
     ...snapshot,
+    firstWeek: await readFirstClassrooms(snapshot.sections.map(section => section.sectionId)),
     coursework: snapshot.coursework.map(({ feedback, response, ...item }) => item),
     recoveryCandidates: snapshot.recoveryCandidates.map(({ feedback, response, ...item }) => item),
   };

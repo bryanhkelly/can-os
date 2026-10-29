@@ -7,6 +7,7 @@ import {
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { readClassContent } from "@/domain/class-content";
+import { recommendCourseOption } from "@/domain/first-classroom";
 import { schoolCourseOutline } from "@/domain/school-course-outline";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import type { Actor } from "@/modules/identity/actors.server";
@@ -98,6 +99,12 @@ export async function readMarketplace(actor: Actor, programId: string) {
   packs:packs.map(pack=>({
    ...pack,courses:items.filter(item=>item.packVersionId===pack.versionId).map(({curriculum,...course})=>({
     ...course,preview:schoolCourseOutline(curriculum),
+    recommendation:recommendCourseOption({
+     origin:"adopted",published:true,
+     licenseActive:entitlements.some(item=>item.packId===pack.id&&item.status==="active"),
+     adoptionActive:adoptions.some(item=>item.packId===pack.id&&item.packVersionId===pack.versionId&&item.status==="active"),
+     curriculum,
+    }),
    })),
    entitlement:entitlements.find(e=>e.packId===pack.id)?.status??null,
    adoption:adoptions.find(a=>a.packId===pack.id)

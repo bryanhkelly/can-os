@@ -1,11 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { accessibleClasses } from "./class-access.server";
 import type { Actor } from "@/modules/identity/actors.server";
+import { readFirstClassrooms } from "./first-classroom.server";
+import type { FirstClassroom } from "@/domain/first-classroom";
 
 async function assertTeacher() {
  const context = await getCommandContext(getRequest());
@@ -19,7 +21,7 @@ async function assertTeacher() {
 const EMPTY_TODAY = {
  connected: false,
  teacher: { firstName: "" },
- sections: [] as { id: string; title: string; studentCount: number }[],
+ sections: [] as { id: string; title: string; studentCount: number; classroom: FirstClassroom }[],
  ungraded: [] as { sectionId: string; assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; submittedAt: string | null }[],
  missingWork: [] as { sectionId: string; assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; dueAt: string }[],
  notices: [] as { id: string; title: string; body: string | null; status: string; createdAt: string }[],
@@ -57,26 +59,16 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
    eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
    inArray(s.enrollments.sectionId,sectionIds),
  );
- const counts = await db.select({
-  sectionId: s.enrollments.sectionId,
-  studentCount: sql<number>`count(distinct ${s.enrollments.studentProfileId})::int`,
- }).from(s.enrollments)
-  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
-  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
-  .innerJoin(activeProgram,and(
-    eq(activeProgram.studentProfileId,s.enrollments.studentProfileId),
-    eq(activeProgram.programId,s.sections.programId),
-    eq(activeProgram.schoolYearId,s.terms.schoolYearId),
-    eq(activeProgram.kind,"program"),eq(activeProgram.status,"active"),
-  ))
-  .where(liveSectionMembership)
-  .groupBy(s.enrollments.sectionId);
- const countBySection = new Map(counts.map(row => [row.sectionId, Number(row.studentCount)]));
- const sections = assigned.map(row => ({
-  id: row.sectionId,
-  title: row.title,
-  studentCount: countBySection.get(row.sectionId) ?? 0,
- }));
+ const classrooms = await readFirstClassrooms(sectionIds);
+ const sections = assigned.map(row => {
+  const classroom = classrooms.find(item => item.sectionId === row.sectionId)!;
+  return {
+   id: row.sectionId,
+   title: row.title,
+   studentCount: classroom.activeStudentCount,
+   classroom,
+  };
+ });
 
  // submission_status has no "late" value; late work arrives as status "submitted"
  // with timeliness "late", so the queue keys on ungraded submitted attempts.

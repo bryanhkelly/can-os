@@ -25,6 +25,7 @@ import { hasInstitutionalProgramCapability } from "@/modules/identity/institutio
 import { listLaunchTeacherPolicies,teacherPolicyPublisherCapability } from "./teacher-policy.server";
 import { listLaunchEligibleCourses, assertLaunchEligibleCourse } from "./launch-curriculum-eligibility.server";
 import { requireChurchHostedOperatingServices } from "./program-site-authorization.server";
+import { readFirstClassrooms } from "@/modules/learning/first-classroom.server";
 const uuid=z.string().uuid();
 
 const instructionalServices=["academic_instruction","curriculum"] as const;
@@ -122,7 +123,12 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
     candidates,
     readiness:{...readiness,items:readiness.items.map(({evidence,...item})=>item)}};
   }));
-  return {program,years,terms:termRows,catalog,teachingStaff,sections:sectionSnapshots,
+  const classrooms=await readFirstClassrooms(sectionRows.map(row=>row.id),new Map(
+   sectionSnapshots.map(section=>[section.id,
+    section.readiness.items.find(item=>item.key==="launch_staffing")?.state==="ready"])));
+  const classroomSections=sectionSnapshots.map(section=>({...section,
+   classroom:classrooms.find(classroom=>classroom.sectionId===section.id)!}));
+  return {program,years,terms:termRows,catalog,teachingStaff,sections:classroomSections,
    qualificationCatalog,policyPublished:Boolean(publishedPolicy),canAuthorCatalog,teacherPolicies,
    canPublishTeacherPolicy,canReviseTeacherPolicy,academicAuthority};
  });

@@ -498,6 +498,13 @@ integration("FullFlow: one school and Program across the six-stage academic jour
           accountId: crypto.randomUUID(), grantId: crypto.randomUUID(),
         };
         state.actor = teacherActor;
+        const teacherTodayService = await import("@/modules/learning/teacher-today.functions");
+        const studentTodayService = await import("@/modules/student-experience/student-today.functions");
+        const beforeFirstWork = first((await teacherTodayService.getTeacherToday()).sections
+          .filter(item => item.id === section.id));
+        expect(beforeFirstWork.classroom.ready).toBe(false);
+        expect(beforeFirstWork.classroom.blockers.map(item => item.key)).toContain("missing_assessment");
+        expect(beforeFirstWork.classroom.firstWeek.lesson?.id).toBe("solve-one");
         const assessment = await gradebook.createAssessment({data: {
           sectionId: section.id,
           title: "FullFlow Algebra: Explain your solution",
@@ -508,7 +515,19 @@ integration("FullFlow: one school and Program across the six-stage academic jour
           publishNow: true,
         }});
         expect(assessment.status).toBe("published");
+        const authorizedTeacherHandoff = first((await teacherTodayService.getTeacherToday()).sections
+          .filter(item => item.id === section.id));
+        expect(authorizedTeacherHandoff.classroom).toMatchObject({
+          ready: true, activeStudentCount: 1,
+          firstWeek: { lesson: { id: "solve-one" }, assessment: { id: assessment.assessmentId } },
+        });
         state.actor = studentActor;
+        const authorizedStudentHandoff = first((await studentTodayService.getMyStudentToday()).firstWeek
+          .filter(item => item.sectionId === section.id));
+        expect(authorizedStudentHandoff).toMatchObject({
+          ready: true, activeStudentCount: 1,
+          firstWeek: { lesson: { id: "solve-one" }, assessment: { id: assessment.assessmentId } },
+        });
         const delivery = await classroom.getClassWorkspace({data: {sectionId: section.id}});
         expect(delivery.content?.modules.some(module=>
           module.lessons.some(lesson=>lesson.id==="solve-one"))).toBe(true);
@@ -997,6 +1016,9 @@ integration("FullFlow: one school and Program across the six-stage academic jour
         const operational = await sections.getLaunchAcademicSetup({data:{programId}});
         expect(operational.program.id).toBe(programId);
         expect(operational.sections.some(x=>x.id===section.id)).toBe(true);
+        expect(first(operational.sections.filter(item => item.id === section.id)).classroom.ready).toBe(true);
+        expect(first(operational.catalog.filter(item => item.versionId === draft.versionId)).recommendation)
+          .toMatchObject({ available: true, licensed: true, adopted: true, instructionReady: true, recommended: true });
         const admissions = await (await import(
           "@/modules/enrollment/admissions-dashboard.functions")).getAdmissionsDashboard({
           data: {programId,siteId:site.id},
