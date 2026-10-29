@@ -584,13 +584,15 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
       "academic_instruction","academic_records","onsite_supervision",
       "school_of_record","credit_issuance","admissions","curriculum",
     ];
-    const agreementEvidence=async()=>{
+    const agreementEvidence=async(expiresAt?:Date)=>{
       const [doc]=await tx.insert(s.documents).values({
         subjectType:"program",subjectId:launch.programId,
         category:"program_site_operating_agreement",fileName:"guard-signed.pdf",
-        storageProvider:"synthetic-test",storageKey:"guard-approved-"+suffix,
+        storageProvider:"synthetic-test",
+        storageKey:"guard-approved-"+suffix+"-"+crypto.randomUUID().slice(0,8),
         uploadedByPersonId:hostPerson.id,
         verifiedAt:new Date(Date.now()-3600000),verifiedByPersonId:verifierPerson.id,
+        ...(expiresAt?{expiresAt}:{}),
         metadata:{
           hostOrganizationId:church.id,institutionOrganizationId:can.id,
           siteId:site!.id,creditIssuingOrganizationId:can.id,
@@ -1134,5 +1136,217 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
     expect(await realDb.select({id:s.programSiteAuthorizations.id})
       .from(s.programSiteAuthorizations)
       .where(eq(s.programSiteAuthorizations.id,authorizationId))).toHaveLength(0);
+  },120_000);
+
+  it("surfaces a lapsed approved row and the steward renews it under fresh evidence, idempotently", async () => {
+    const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-program-site-renewal");
+    let complete = false;
+    let authorizationId = "";
+    try {
+      await realDb.transaction(async tx => {
+        state.tx = tx;
+        const s = await import("@/db/schema");
+        const { eq } = await import("drizzle-orm");
+        const {
+          requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
+          renewProgramSiteAuthorization, requireCurrentProgramSiteAuthorization,
+          getHostProgramSiteAuthorization, listCANOperatingAuthorizationDesk,
+        } = await import("@/modules/programs/program-site-authorization.server");
+        const suffix = crypto.randomUUID().slice(0,8);
+        const f = await createAuthorizationFixture(tx,suffix);
+        const requested = await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        authorizationId=requested.authorizationId;
+        const evidence=await f.agreementEvidence();
+        await reviewProgramSiteAuthorization(f.steward,{
+          authorizationId,decision:"approved",
+          reason:"Independent verification of both contracting organizations.",
+          evidenceDocumentId:evidence.id,
+          effectiveFrom:new Date(Date.now()-3600000),
+          effectiveThrough:new Date(Date.now()+86400000*180),
+        });
+        // Time passes: the approved row lapses but keeps status 'approved' and
+        // its current-version slot; every dependent read fails closed.
+        const lapsedThrough=new Date(Date.now()-1000);
+        await tx.update(s.programSiteAuthorizations).set({effectiveThrough:lapsedThrough})
+          .where(eq(s.programSiteAuthorizations.id,authorizationId));
+        await expect(requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction",
+        ])).rejects.toThrow("current independently verified CAN-church operating authority");
+        expect((await listCANOperatingAuthorizationDesk(f.steward)).authorizations
+          .find(x=>x.id===authorizationId)).toMatchObject({status:"approved",lapsed:true});
+        expect((await getHostProgramSiteAuthorization(f.host,f.launch.programId))
+          .authorization).toMatchObject({status:"approved",lapsed:true});
+        // Renewal denials: the host registrar, a foreign CAN steward and the
+        // requester wearing a steward role are never the renewing steward.
+        const newThrough=new Date(Date.now()+86400000*365);
+        const renewalEvidence=await f.agreementEvidence(
+          new Date(newThrough.getTime()+86400000*30));
+        const renew=(actor:AccessContext,overrides:Record<string,unknown>={})=>
+          renewProgramSiteAuthorization(actor,{
+            authorizationId,evidenceDocumentId:renewalEvidence.id,
+            effectiveThrough:newThrough,
+            reason:"CAN renewed the agreement under freshly verified evidence.",
+            ...overrides,
+          });
+        await expect(renew(f.host)).rejects.toThrow("separate CAN institutional reviewer");
+        await expect(renew(f.foreignSteward)).rejects.toThrow("separate CAN institutional reviewer");
+        const selfGrant={id:crypto.randomUUID(),accountId:crypto.randomUUID(),
+          personId:f.hostPerson.id,role:"can_network_steward" as const,
+          organizationId:f.can.id,siteId:null,active:true};
+        const selfSteward=resolveAccessContext({
+          accountId:selfGrant.accountId,activeGrantId:selfGrant.id,sessionId:"synthetic-rollback",
+        },[selfGrant]);
+        await expect(renew(selfSteward)).rejects.toThrow("independent reviewer");
+        // Evidence whose own expiry predates the renewed window is rejected.
+        const shortEvidence=await f.agreementEvidence(
+          new Date(newThrough.getTime()-86400000));
+        await expect(renew(f.steward,{evidenceDocumentId:shortEvidence.id}))
+          .rejects.toThrow("independently verified two-party operating agreement evidence");
+        // A non-extending end date is rejected even for the lapsed row.
+        await expect(renew(f.steward,{effectiveThrough:lapsedThrough})).rejects.toThrow(
+          "Renewal requires a new future end date that extends the current agreement window");
+        // The contracting steward renews the SAME row under fresh evidence.
+        await expect(renew(f.steward)).resolves.toEqual({authorizationId,renewed:true});
+        const [row]=await tx.select({
+          status:s.programSiteAuthorizations.status,
+          evidenceDocumentId:s.programSiteAuthorizations.evidenceDocumentId,
+          effectiveThrough:s.programSiteAuthorizations.effectiveThrough,
+          reviewedByPersonId:s.programSiteAuthorizations.reviewedByPersonId,
+          reviewReason:s.programSiteAuthorizations.reviewReason,
+          revokedAt:s.programSiteAuthorizations.revokedAt,
+          suspendedAt:s.programSiteAuthorizations.suspendedAt,
+        }).from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.id,authorizationId));
+        expect(row).toMatchObject({
+          status:"approved",evidenceDocumentId:renewalEvidence.id,
+          effectiveThrough:newThrough,reviewedByPersonId:f.stewardPerson.id,
+          revokedAt:null,suspendedAt:null,
+        });
+        expect(row!.reviewReason).toMatch(/Independent verification/);
+        // The renewed row is authoritative again and no longer reads lapsed.
+        expect(await requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction","school_of_record",
+        ])).toBe(authorizationId);
+        expect((await listCANOperatingAuthorizationDesk(f.steward)).authorizations
+          .find(x=>x.id===authorizationId)).toMatchObject({status:"approved",lapsed:false});
+        expect((await getHostProgramSiteAuthorization(f.host,f.launch.programId))
+          .authorization).toMatchObject({lapsed:false});
+        // Replaying the identical renewal is a no-op without duplicate records.
+        await expect(renew(f.steward)).resolves.toEqual({authorizationId,renewed:false});
+        const audit=await tx.select({action:s.auditEvents.action})
+          .from(s.auditEvents).where(eq(s.auditEvents.resourceId,authorizationId));
+        expect(audit.map(x=>x.action).filter(a=>a==="program.site.authorization.renewed"))
+          .toHaveLength(1);
+        const events=await tx.select({eventType:s.domainEvents.eventType})
+          .from(s.domainEvents).where(eq(s.domainEvents.aggregateId,authorizationId));
+        expect(events.map(x=>x.eventType)
+          .filter(e=>e==="ProgramSiteAuthorizationRenewed")).toHaveLength(1);
+        // A later end date with the SAME evidence is a real second renewal,
+        // while a non-extending end date with different evidence is rejected.
+        await expect(renew(f.steward,{evidenceDocumentId:evidence.id}))
+          .rejects.toThrow("extends the current agreement window");
+        complete=true;
+        throw rollback;
+      });
+    } catch(error) {
+      if(error!==rollback)throw error;
+    } finally {state.tx=undefined;}
+    expect(complete).toBe(true);
+    const s=await import("@/db/schema");
+    const {eq}=await import("drizzle-orm");
+    expect(await realDb.select({id:s.programSiteAuthorizations.id})
+      .from(s.programSiteAuthorizations)
+      .where(eq(s.programSiteAuthorizations.id,authorizationId))).toHaveLength(0);
+  },120_000);
+
+  it("rejects renewal from requested, denied, suspended and revoked statuses", async () => {
+    const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-program-site-renewal-status");
+    let complete = false;
+    let authorizationId = "";
+    let deniedId = "";
+    try {
+      await realDb.transaction(async tx => {
+        state.tx = tx;
+        const s = await import("@/db/schema");
+        const { eq } = await import("drizzle-orm");
+        const {
+          requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
+          suspendProgramSiteAuthorization, resumeProgramSiteAuthorization,
+          revokeProgramSiteAuthorization, renewProgramSiteAuthorization,
+        } = await import("@/modules/programs/program-site-authorization.server");
+        const suffix = crypto.randomUUID().slice(0,8);
+        const f = await createAuthorizationFixture(tx,suffix);
+        const requested = await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        authorizationId=requested.authorizationId;
+        const evidence=await f.agreementEvidence();
+        const newThrough=new Date(Date.now()+86400000*365);
+        const renew=(id:string)=>renewProgramSiteAuthorization(f.steward,{
+          authorizationId:id,evidenceDocumentId:evidence.id,effectiveThrough:newThrough,
+          reason:"Renewal requires a currently approved authorization.",
+        });
+        await expect(renew(authorizationId)).rejects.toThrow(
+          "Only a currently approved authorization can be renewed");
+        await reviewProgramSiteAuthorization(f.steward,{
+          authorizationId,decision:"approved",
+          reason:"Independent verification of both contracting organizations.",
+          evidenceDocumentId:evidence.id,
+          effectiveFrom:new Date(Date.now()-3600000),
+          effectiveThrough:new Date(Date.now()+86400000*180),
+        });
+        await suspendProgramSiteAuthorization(f.steward,{
+          authorizationId,
+          reason:"CAN paused delegated operations pending a compliance review.",
+        });
+        await expect(renew(authorizationId)).rejects.toThrow(
+          "Only a currently approved authorization can be renewed");
+        await resumeProgramSiteAuthorization(f.steward,{
+          authorizationId,
+          reason:"The compliance review closed; operations may resume.",
+        });
+        await revokeProgramSiteAuthorization(f.steward,{
+          authorizationId,
+          reason:"CAN withdrew the operating relationship for this school.",
+        });
+        await expect(renew(authorizationId)).rejects.toThrow(
+          "Only a currently approved authorization can be renewed");
+        // A denied replacement request is equally not renewable.
+        const replacement=await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        deniedId=replacement.authorizationId;
+        await reviewProgramSiteAuthorization(f.steward,{
+          authorizationId:deniedId,decision:"denied",
+          reason:"The submitted agreement evidence could not be independently verified.",
+        });
+        await expect(renew(deniedId)).rejects.toThrow(
+          "Only a currently approved authorization can be renewed");
+        // Every failed renewal left the terminal states untouched.
+        const rows=await tx.select({
+          id:s.programSiteAuthorizations.id,status:s.programSiteAuthorizations.status,
+          effectiveThrough:s.programSiteAuthorizations.effectiveThrough,
+        }).from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.programId,f.launch.programId));
+        expect(rows.find(x=>x.id===authorizationId)).toMatchObject({status:"revoked"});
+        expect(rows.find(x=>x.id===deniedId)).toMatchObject({
+          status:"denied",effectiveThrough:null,
+        });
+        complete=true;
+        throw rollback;
+      });
+    } catch(error) {
+      if(error!==rollback)throw error;
+    } finally {state.tx=undefined;}
+    expect(complete).toBe(true);
+    const s=await import("@/db/schema");
+    const {inArray}=await import("drizzle-orm");
+    expect(await realDb.select({id:s.programSiteAuthorizations.id})
+      .from(s.programSiteAuthorizations)
+      .where(inArray(s.programSiteAuthorizations.id,[authorizationId,deniedId]))).toHaveLength(0);
   },120_000);
 });
