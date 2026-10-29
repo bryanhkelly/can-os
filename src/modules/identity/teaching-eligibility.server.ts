@@ -2,6 +2,7 @@ import { and, eq, isNotNull, isNull, or, sql, type SQLWrapper } from "drizzle-or
 import type { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people, programs, roleAssignments } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { activeRoleAssignmentPredicate } from "./role-assignment-state.server";
 
 /** Exact provider-owned Program delegation, shared by readiness and live access.
  * A Section assignment or institution-wide account grant cannot replace it.
@@ -17,6 +18,7 @@ export function programTeacherDelegationPredicate(input: {
     eq(roleAssignments.roleKey, "teacher"),
     eq(roleAssignments.organizationId, input.providerOrganizationId),
     eq(roleAssignments.programId, input.programId),
+    activeRoleAssignmentPredicate(),
     input.siteId === null ? isNull(roleAssignments.siteId) :
       or(isNull(roleAssignments.siteId), eq(roleAssignments.siteId, input.siteId)),
   );

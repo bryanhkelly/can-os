@@ -4,6 +4,7 @@ import { organizations, programs, roleAssignments } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 
 /**
  * A separate, exact-Program CAN record-issuer grant. It must never be copied
@@ -47,6 +48,7 @@ export async function listDelegatedCANTranscriptPrograms(
       eq(programs.creditIssuingOrganizationId, roleAssignments.organizationId),
       or(isNull(roleAssignments.siteId),
         eq(roleAssignments.siteId, programs.siteId)),
+      activeRoleAssignmentPredicate(),
       sql`${roleAssignments.capabilities} @> ${JSON.stringify(["academic_records.issue"])}::jsonb`,
     ))
     // Hold active grant rows until the transaction issuing the record commits.

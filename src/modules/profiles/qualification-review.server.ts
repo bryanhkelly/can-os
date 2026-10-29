@@ -3,8 +3,9 @@ import { documents,memberships,qualificationClaims,qualificationVerificationEven
 import { AuthorizationError,type CommandContext } from "@/domain/command-context";
 import { credentialStatusFromDecision,decideCredentialReview,type VerificationDecision } from "@/domain/credential-workflow";
 import { reviewerCanVerify } from "@/domain/reviewer-authorization";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
-import { desc,eq } from "drizzle-orm";
+import { and,desc,eq } from "drizzle-orm";
 import { EventTypes } from "@/domain/event-types";
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -13,8 +14,10 @@ type Reader = Pick<typeof db,"select">;
 export async function assertScopedQualificationReviewer(context: CommandContext, subjectPersonId: string, executor: Reader = db) {
   if (!context.actorPersonId || context.actorPersonId === subjectPersonId || !context.capabilities.has("profiles.credentials.verify"))
     throw new AuthorizationError("independent credential reviewer");
-  const actorRoles = await executor.select().from(roleAssignments).where(eq(roleAssignments.personId, context.actorPersonId));
-  const subjectRoles = await executor.select().from(roleAssignments).where(eq(roleAssignments.personId, subjectPersonId));
+  const actorRoles = await executor.select().from(roleAssignments).where(and(
+    eq(roleAssignments.personId, context.actorPersonId),activeRoleAssignmentPredicate()));
+  const subjectRoles = await executor.select().from(roleAssignments).where(and(
+    eq(roleAssignments.personId, subjectPersonId),activeRoleAssignmentPredicate()));
   const actorMemberships = await executor.select().from(memberships).where(eq(memberships.personId, context.actorPersonId));
   const subjectMemberships = await executor.select().from(memberships).where(eq(memberships.personId, subjectPersonId));
   const authorized=reviewerCanVerify({context,subjectPersonId,actorRoles,subjectRoles,actorMemberships,subjectMemberships});
