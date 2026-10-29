@@ -4,6 +4,7 @@ import { memberships, organizations, people, roleAssignments, sites } from "@/db
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertPartnerWebsitePreviewScope, siteWebsiteDraftReadCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 
 /**
  * Verified Site-specific membership + person + Site role relationship.
@@ -44,10 +45,10 @@ export async function requirePartnerWebsiteEditor(
       eq(roleAssignments.organizationId, site.organizationId),
       eq(roleAssignments.siteId, site.id),
       isNull(roleAssignments.programId),
+      activeRoleAssignmentPredicate(),
       sql`${roleAssignments.capabilities} @> ${JSON.stringify([capability])}::jsonb`,
     )).limit(1);
   if (!assignment) throw new AuthorizationError("explicit Site website editor assignment");
   return { ...site, canPublish: assignment.capabilities.includes(siteWebsiteLocalPublishCapability) };
 
 }
-

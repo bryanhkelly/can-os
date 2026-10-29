@@ -8,6 +8,7 @@ import {
 import { credentialStatusFromDecision } from "@/domain/credential-workflow";
 import { AuthorizationError } from "@/domain/command-context";
 import { verifiedTeacherAccountPredicate } from "@/modules/identity/teaching-eligibility.server";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { evaluateQualificationCoverage, instructionalWindow, type CoveragePolicy } from "./qualification-coverage";
 import { teachingEvaluationWindow, type TeachingEligibilityHorizon } from "./teaching-evaluation-window";
 
@@ -29,6 +30,7 @@ export function teachingRolePredicate(scope: {
 }) {
   return and(
     eq(roleAssignments.roleKey,"teacher"),
+    activeRoleAssignmentPredicate(),
     scope.siteId===null ? isNull(roleAssignments.siteId) : or(isNull(roleAssignments.siteId),eq(roleAssignments.siteId,scope.siteId)),
     eq(roleAssignments.organizationId,scope.providerId),
     scope.organizationId===scope.providerId
