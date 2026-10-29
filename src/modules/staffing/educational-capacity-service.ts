@@ -26,6 +26,7 @@ import { EventTypes } from "@/domain/event-types";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { and,eq,gte,inArray,lte,sql } from "drizzle-orm";
 import { currentCapacityReservationFilter, isCurrentCapacityReservation } from "./reservation-policy";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 
 /** Acquired before capacity reservation locks when teacher assignments may change. */
 async function lockSectionStaffingSite(
@@ -601,6 +602,7 @@ export async function reserveInstructionalCapacity(
         .where(and(
           eq(roleAssignments.personId, offering.personId),
           eq(roleAssignments.roleKey, "teacher"),
+          activeRoleAssignmentPredicate(),
           inArray(roleAssignments.organizationId, [
             demand.organizationId,
             ...(offering.organizationId ? [offering.organizationId] : []),
@@ -861,6 +863,7 @@ export async function replaceCommittedCapacity(context: CommandContext, input: {
       throw new Error("Replacement instructor cannot teach this subject");
     const [role]=await tx.select({id:roleAssignments.id}).from(roleAssignments).where(and(
       eq(roleAssignments.personId,replacement.personId),eq(roleAssignments.roleKey,"teacher"),
+      activeRoleAssignmentPredicate(),
       inArray(roleAssignments.organizationId,[demand.organizationId,...(replacement.organizationId?[replacement.organizationId]:[])]))).limit(1);
     if(!role)throw new Error("Replacement instructor has no active teaching authorization");
     if(!weeklyPatternCovers(replacement.pattern,await loadSectionPeriods(tx,demand.scheduleTemplateId)))
