@@ -233,6 +233,7 @@ export const getGradebook = createServerFn({ method: "GET" })
     studentProfileId: row.studentProfileId,
     status: row.status,
     timeliness: row.timeliness,
+    attemptNumber:row.attemptNumber,
     score: row.score,
     feedbackComment: typeof row.feedback?.comment === "string" ? row.feedback.comment : "",
     feedbackRubric: readRubricScores(

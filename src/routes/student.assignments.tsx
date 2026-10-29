@@ -62,7 +62,9 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  const selectedIndex=items.findIndex(item=>item.assessmentId===selected);
  const previousAssignment=items[selectedIndex-1],nextAssignment=items[selectedIndex+1];
  const [draft,setDraft]=useState(()=>chosen?.responseText??"");
- const editable=Boolean(chosen&&chosen.workAvailability.actionable&&
+ const nextAttempt=chosen?.status==="returned"?(chosen.attemptNumber??1)+1:chosen?.attemptNumber??1;
+ const attemptLimitReached=Boolean(chosen&&chosen.metadata.maxAttempts!==null&&nextAttempt>chosen.metadata.maxAttempts);
+ const editable=Boolean(chosen&&!attemptLimitReached&&chosen.workAvailability.actionable&&
   (!chosen.status||chosen.status==="assigned"||chosen.status==="returned"));
  useEffect(()=>{
   if(!selected){setAttachments([]);return;}
@@ -162,6 +164,10 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
        className="mt-2 inline-block text-sm underline">Review publisher lesson: {chosen.metadata.curriculumLessonTitle??chosen.metadata.curriculumLessonId}</Link>}
      <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{chosen.instructions??"Follow your teacher's instructions."}</p>
      <p className="mt-3 text-xs text-muted-foreground">Due {formatDate(chosen.dueAt)} · {chosen.assessmentStatus}</p>
+     {chosen.metadata.maxAttempts!==null&&<p className="mt-3 text-xs text-muted-foreground">
+      Attempt {chosen.attemptNumber??1} of {chosen.metadata.maxAttempts} permitted attempts
+     </p>}
+     {attemptLimitReached&&<p role="status" className="mt-3 text-sm">This assignment's attempt limit has been reached. Contact your teacher about next steps.</p>}
      {!chosen.workAvailability.actionable&&<p className="mt-3 text-sm" role="status">
       {chosen.workAvailability.reason==="unreleased"
        ?"Opens "+formatDate(chosen.availableAt)

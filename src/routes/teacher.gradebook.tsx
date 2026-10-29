@@ -1,3 +1,4 @@
+import { MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -53,6 +54,7 @@ function TeacherGradebookPage() {
  const [newRubric, setNewRubric] = useState<Array<{id:string;label:string;maxPoints:string;description:string}>>([]);
  const rubricSequence=useRef(0);
  const [points, setPoints] = useState("");
+ const [maxAttempts, setMaxAttempts] = useState("");
  const [due, setDue] = useState("");
  const [publishConfirmed,setPublishConfirmed]=useState(false);
  const [assignmentKind,setAssignmentKind]=useState<"homework"|"classwork"|"quiz"|"test"|"project"|"discussion">(
@@ -206,6 +208,10 @@ function TeacherGradebookPage() {
   if (!title.trim() || !Number.isFinite(pointsValue) || pointsValue < 1 || pointsValue > 1000) {
    setNotice("Enter a title and a point value between 1 and 1000."); return;
   }
+  const attemptLimit=maxAttempts.trim()?Number(maxAttempts):undefined;
+  if(attemptLimit!==undefined&&(!Number.isInteger(attemptLimit)||attemptLimit<1||attemptLimit>MAX_ASSESSMENT_ATTEMPTS)){
+   setNotice("Maximum attempts must be a whole number from 1 to "+MAX_ASSESSMENT_ATTEMPTS+".");return;
+  }
   const rubricCriteria = newRubric.map(row=>({
    id:row.id,label:row.label.trim(),maxPoints:row.maxPoints.trim()?Number(row.maxPoints):NaN,
    ...(row.description.trim()?{description:row.description.trim()}:{}),
@@ -220,6 +226,7 @@ function TeacherGradebookPage() {
     title,
     instructions,
     pointsPossible: pointsValue,
+    ...(attemptLimit!==undefined?{maxAttempts:attemptLimit}:{}),
     rubricCriteria,
     assignmentKind,
     publishNow,
@@ -231,6 +238,7 @@ function TeacherGradebookPage() {
    setInstructions("");
    setNewRubric([]);
    setPoints("");
+   setMaxAttempts("");
    setDue("");
    setPublishConfirmed(false);
    setCurriculumLessonId("");
@@ -340,7 +348,9 @@ function TeacherGradebookPage() {
        <p className="font-semibold">Score: {reviewCell.score??"—"} / {reviewAssessment.pointsPossible??"—"}</p>
        {reviewAssessment.rubric.map(criterion=><p key={criterion.id}>{criterion.label}: {reviewCell.feedbackRubric.find(item=>item.id===criterion.id)?.points??"—"} / {criterion.maxPoints}</p>)}
        <p className="whitespace-pre-wrap">{reviewCell.feedbackComment||"No feedback comment recorded."}</p>
-       {reviewCell.status==="graded"&&<button type="button" disabled={busy} onClick={()=>returnForRevision(reviewCell.submissionId)} className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">Return for revision</button>}
+       {reviewCell.status==="graded"&&reviewAssessment.maxAttempts!==null&&reviewCell.attemptNumber>=reviewAssessment.maxAttempts
+        ?<p className="text-sm">The configured attempt limit has been reached. This submission cannot be returned for another attempt.</p>
+        :reviewCell.status==="graded"&&<button type="button" disabled={busy} onClick={()=>returnForRevision(reviewCell.submissionId)} className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">Return for revision</button>}
       </div>}
      </WorkspacePanel>
     </div>}
@@ -379,6 +389,12 @@ function TeacherGradebookPage() {
         </select>
        </label>
      </div>
+     <label className="mt-4 block text-sm font-semibold">Maximum attempts (optional)
+      <input aria-label="Maximum assignment attempts" type="number" min={1} max={MAX_ASSESSMENT_ATTEMPTS} step={1}
+       value={maxAttempts} onChange={event=>setMaxAttempts(event.target.value)}
+       placeholder="No configured limit" className="mt-2 block w-48 rounded-lg border bg-background p-3"/>
+      <span className="mt-2 block text-xs font-normal text-muted-foreground">Includes the first submission. Each revision still requires a teacher to return the work.</span>
+     </label>
      <label className="mt-4 block text-sm font-semibold">Student instructions
       <textarea aria-label="Student assignment instructions" className="mt-2 w-full rounded-lg border bg-background p-3" rows={5} maxLength={20000}
        value={instructions} onChange={event=>setInstructions(event.target.value)} placeholder="Directions, deliverables, submission requirements and allowed resources." />
@@ -435,6 +451,7 @@ function TeacherGradebookPage() {
           {assessment.rubric.length > 0 && ` · ${assessment.rubric.length} criteria`}
           {" · "+assessment.kind}
           {" · "+assessment.status}
+          {assessment.maxAttempts!==null&&" · "+assessment.maxAttempts+" maximum attempts"}
          </span>
          <label className="mt-2 block text-xs font-normal">New due date
           <input aria-label={"Due date for "+assessment.title} type="date"
