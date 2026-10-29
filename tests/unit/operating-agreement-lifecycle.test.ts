@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
-import { requestProgramSiteAuthorization, revokeProgramSiteAuthorization } from "@/modules/programs/program-site-authorization.server";
+import { requestProgramSiteAuthorization, revokeProgramSiteAuthorization, suspendProgramSiteAuthorization, resumeProgramSiteAuthorization } from "@/modules/programs/program-site-authorization.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 const state = vi.hoisted(() => ({ rows: [] as unknown[][], writes: [] as Record<string, unknown>[] }));
@@ -66,5 +66,31 @@ describe("current operating agreement lifecycle", () => {
     state.rows = [[record], ...identityRows()];
     await expect(revokeProgramSiteAuthorization(actor, { authorizationId: "agreement", reason: "Unrelated party must be denied." })).rejects.toThrow();
     expect(state.writes).toEqual([]); expect(emitEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("CAN-only suspension and resumption", () => {
+  const reason = "Independent CAN compliance decision recorded.";
+  it.each([
+    ["suspend", suspendProgramSiteAuthorization, "approved"],
+    ["resume", resumeProgramSiteAuthorization, "suspended"],
+  ] as const)("denies host and requester attempts to %s", async (_name, command, status) => {
+    for (const actor of [host, { ...steward, actorPersonId: "requester" }]) {
+      state.rows = [[{ ...record, status, requestedByPersonId: "requester" }], ...identityRows()];
+      await expect(command(actor, { authorizationId: "agreement", reason })).rejects.toThrow();
+      expect(state.writes).toEqual([]);
+      expect(emitEvent).not.toHaveBeenCalled();
+    }
+  });
+  it.each([
+    [suspendProgramSiteAuthorization, "approved", "suspended", "ProgramSiteAuthorizationSuspended"],
+    [resumeProgramSiteAuthorization, "suspended", "approved", "ProgramSiteAuthorizationResumed"],
+  ] as const)("changes only lifecycle state under independent CAN authority", async (command, status, result, eventType) => {
+    state.rows = [[{ ...record, status, requestedByPersonId: "requester" }], ...identityRows()];
+    await expect(command(steward, { authorizationId: "agreement", reason }))
+      .resolves.toEqual({ authorizationId: "agreement", status: result });
+    expect(state.writes[0]).toMatchObject({ status: result });
+    expect(state.writes[0]).not.toHaveProperty("effectiveThrough");
+    expect(emitEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ eventType }));
   });
 });

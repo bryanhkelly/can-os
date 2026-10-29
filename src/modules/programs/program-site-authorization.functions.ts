@@ -74,6 +74,26 @@ export const revokeProgramSiteAuthorizationFn = createServerFn({ method:"POST" }
     return revokeProgramSiteAuthorization(await getCommandContext(getRequest()), data);
   });
 
+/** Only the existing domain service can authorize institutional lifecycle changes. */
+export const suspendProgramSiteAuthorizationFn = createServerFn({ method: "POST" })
+  .validator((value: unknown) => revokeSchema.parse(value))
+  .handler(async ({ data }) => {
+    const [{ getCommandContext }, { suspendProgramSiteAuthorization }] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./program-site-authorization.server"),
+    ]);
+    return suspendProgramSiteAuthorization(await getCommandContext(getRequest()), data);
+  });
+export const resumeProgramSiteAuthorizationFn = createServerFn({ method: "POST" })
+  .validator((value: unknown) => revokeSchema.parse(value))
+  .handler(async ({ data }) => {
+    const [{ getCommandContext }, { resumeProgramSiteAuthorization }] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./program-site-authorization.server"),
+    ]);
+    return resumeProgramSiteAuthorization(await getCommandContext(getRequest()), data);
+  });
+
 /** Contracting parties, the exact Site and the issuer are never client input. */
 export const registerOperatingAgreementEvidenceFn = createServerFn({ method:"POST" })
   .validator((value: unknown) => registerEvidenceSchema.parse(value))

@@ -5,7 +5,8 @@ import { SchoolOpeningReviewPanel } from "@/components/operations/SchoolOpeningR
 import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
 import {
   listCANOperatingAuthorizationDeskFn, reviewProgramSiteAuthorizationFn,
-  revokeProgramSiteAuthorizationFn,
+  revokeProgramSiteAuthorizationFn, suspendProgramSiteAuthorizationFn,
+  resumeProgramSiteAuthorizationFn,
 } from "@/modules/programs/program-site-authorization.functions";
 
 type Desk=Awaited<ReturnType<typeof listCANOperatingAuthorizationDeskFn>>;
@@ -20,12 +21,16 @@ export function CANOperatingAuthorizationDesk() {
   useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:"Unable to load operating authorizations"));},[load]);
   const update=(id:string,key:"evidence"|"from"|"through"|"reason",value:string)=>
     setInputs(rows=>({...rows,[id]:{evidence:"",from:"",through:"",reason:"",...rows[id],[key]:value,...(key==="through"?{evidence:""}:{})}}));
-  async function decide(id:string,decision:"approved"|"denied"|"revoked") {
+  async function decide(id:string,decision:"approved"|"denied"|"revoked"|"suspended"|"resumed") {
     const value=inputs[id]??{evidence:"",from:"",through:"",reason:""};
     setBusy(true);setNotice("");setError("");
     try {
       if(decision==="revoked")
         await revokeProgramSiteAuthorizationFn({data:{authorizationId:id,reason:value.reason}});
+      else if(decision==="suspended")
+        await suspendProgramSiteAuthorizationFn({data:{authorizationId:id,reason:value.reason}});
+      else if(decision==="resumed")
+        await resumeProgramSiteAuthorizationFn({data:{authorizationId:id,reason:value.reason}});
       else
         await reviewProgramSiteAuthorizationFn({data:{
           authorizationId:id,decision,reason:value.reason,
@@ -54,6 +59,13 @@ export function CANOperatingAuthorizationDesk() {
         return <article key={item.id} className="rounded-lg border p-3 text-sm">
           <p className="font-semibold">{item.programName} · {item.hostName}</p>
           <p className="mt-1 text-xs">{item.status} · Version {item.version} · {item.services.join(", ")}</p>
+          {item.status==="suspended"&&<p className="mt-1 text-xs" role="status">
+            Delegated services are suspended. Review the concern before resuming or revoke the agreement.
+            Resumption does not extend the agreement period or replace independent school-opening review.
+          </p>}
+          {item.effectiveThrough&&<p className="mt-1 text-xs">
+            Agreement ends (exclusive): {new Date(item.effectiveThrough).toLocaleDateString()}
+          </p>}
           {item.lapsed&&<p className="mt-1 text-xs" role="status">
             Agreement window elapsed: delegated operations are blocked until renewal under fresh evidence.
           </p>}
@@ -84,6 +96,10 @@ export function CANOperatingAuthorizationDesk() {
                 <button type="button" disabled={busy||value.reason.trim().length<10}
                   onClick={()=>void decide(item.id,"denied")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Deny request</button>
               </>}
+              {item.status==="approved"&&<button type="button" disabled={busy||value.reason.trim().length<10}
+                onClick={()=>void decide(item.id,"suspended")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Suspend agreement</button>}
+              {item.status==="suspended"&&<button type="button" disabled={busy||value.reason.trim().length<10}
+                onClick={()=>void decide(item.id,"resumed")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Resume agreement</button>}
               {(item.status==="approved"||item.status==="suspended")&&<button type="button" disabled={busy||value.reason.trim().length<10}
                 onClick={()=>void decide(item.id,"revoked")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Revoke agreement</button>}
             </div>
