@@ -12,6 +12,7 @@ export type SessionSecurityAction =
   | "identity.session.revoked"
   | "identity.session.revoked_remote"
   | "identity.sessions.revoked_all"
+  | "identity.sessions.revoked_all_admin"
   | "identity.sessions.revoked_grant"
   | "identity.membership.selected";
 

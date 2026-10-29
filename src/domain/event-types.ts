@@ -132,6 +132,7 @@ export const EventTypes = {
   FamilyInvitationRecipientStatusChanged: "FamilyInvitationRecipientStatusChanged",
   FamilyInvitationBatchCompleted: "FamilyInvitationBatchCompleted",
   StudentLearningAccessApproved: "StudentLearningAccessApproved",
+  AccessAccountDisabled: "AccessAccountDisabled",
   GuardianAccessRevoked: "GuardianAccessRevoked",
   GuardianAccessRestored: "GuardianAccessRestored",
   StudentLearningAccessRevoked: "StudentLearningAccessRevoked",
