@@ -79,6 +79,24 @@ export async function changeSectionFacilitator(actor: AccessContext, input: {
       await tx.update(programResponsibilityAssignments).set({
         effectiveThrough: now, updatedAt: now,
       }).where(eq(programResponsibilityAssignments.id, prior.id));
+      // Retain the facilitator role row as evidence while excluding it from
+      // every live projection (same treatment as CAN staff revocation).
+      if (prior.responsibleRoleAssignmentId) {
+        const [dutyRole] = await tx.select({
+          id: roleAssignments.id, metadata: roleAssignments.metadata,
+        }).from(roleAssignments)
+          .where(eq(roleAssignments.id, prior.responsibleRoleAssignmentId)).limit(1);
+        if (dutyRole && dutyRole.metadata?.origin === "local_section_facilitator" &&
+            !dutyRole.metadata?.revokedAt) {
+          await tx.update(roleAssignments).set({
+            capabilities: [],
+            metadata: { ...dutyRole.metadata, revokedAt: now.toISOString(),
+              revocationReason: `Section facilitator duty revoked for Section ${section.id}`,
+              revokedByPersonId: actor.actorPersonId },
+            updatedAt: now,
+          }).where(eq(roleAssignments.id, dutyRole.id));
+        }
+      }
       await writeAudit(tx, actor, {
         action: "site.section_facilitator.revoked",
         entityType: "program_responsibility_assignment", entityId: prior.id,
@@ -112,14 +130,41 @@ export async function changeSectionFacilitator(actor: AccessContext, input: {
         eq(people.active, true), eq(accessAccounts.disabled, false),
         sql`${accessAccounts.emailVerifiedAt} is not null`)).limit(1);
     if (!candidate) throw new AuthorizationError("verified Site facilitator identity");
-    const [role] = await tx.insert(roleAssignments).values({
-      personId: input.personId, roleKey: "room_facilitator",
-      organizationId: section.organizationId, siteId: section.siteId,
-      programId: section.programId, capabilities: ["onsite.attendance.record"],
-      metadata: { origin: "local_section_facilitator", sectionId: section.id,
-        expiresAt: through.toISOString() },
-    }).returning({ id: roleAssignments.id });
-    if (!role) throw new Error("Unable to persist Section role");
+    // Re-appointment restores the retained, soft-revoked role row with its
+    // original id instead of accumulating duplicate historical rows.
+    const [revokedRole] = await tx.select({
+      id: roleAssignments.id, metadata: roleAssignments.metadata,
+    }).from(roleAssignments).where(and(
+      eq(roleAssignments.personId, input.personId),
+      eq(roleAssignments.organizationId, section.organizationId),
+      eq(roleAssignments.siteId, section.siteId),
+      eq(roleAssignments.programId, section.programId),
+      eq(roleAssignments.roleKey, "room_facilitator"),
+      sql`${roleAssignments.metadata}->>'origin' = 'local_section_facilitator'`,
+      sql`${roleAssignments.metadata}->>'sectionId' = ${section.id}`,
+      sql`${roleAssignments.metadata}->>'revokedAt' is not null`,
+    )).orderBy(desc(roleAssignments.updatedAt)).limit(1);
+    let role: { id: string };
+    if (revokedRole) {
+      const [restored] = await tx.update(roleAssignments).set({
+        capabilities: ["onsite.attendance.record"],
+        metadata: { ...revokedRole.metadata, expiresAt: through.toISOString(),
+          revokedAt: null, revocationReason: null, revokedByPersonId: null },
+        updatedAt: now,
+      }).where(eq(roleAssignments.id, revokedRole.id)).returning({ id: roleAssignments.id });
+      if (!restored) throw new Error("Unable to restore Section role");
+      role = restored;
+    } else {
+      const [created] = await tx.insert(roleAssignments).values({
+        personId: input.personId, roleKey: "room_facilitator",
+        organizationId: section.organizationId, siteId: section.siteId,
+        programId: section.programId, capabilities: ["onsite.attendance.record"],
+        metadata: { origin: "local_section_facilitator", sectionId: section.id,
+          expiresAt: through.toISOString() },
+      }).returning({ id: roleAssignments.id });
+      if (!created) throw new Error("Unable to persist Section role");
+      role = created;
+    }
     let id: string;
     if (prior) {
       await tx.update(programResponsibilityAssignments).set({
