@@ -933,4 +933,206 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
       .from(s.programSiteAuthorizations)
       .where(inArray(s.programSiteAuthorizations.id,[revokedId,replacementId]))).toHaveLength(0);
   },120_000);
+
+  it("suspends an approved authorization fail-closed with audit and event, and blocks a new version request", async () => {
+    const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-program-site-suspension");
+    let complete = false;
+    let authorizationId = "";
+    try {
+      await realDb.transaction(async tx => {
+        state.tx = tx;
+        const s = await import("@/db/schema");
+        const { eq } = await import("drizzle-orm");
+        const {
+          requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
+          suspendProgramSiteAuthorization, resumeProgramSiteAuthorization,
+          requireCurrentProgramSiteAuthorization,
+        } = await import("@/modules/programs/program-site-authorization.server");
+        const suffix = crypto.randomUUID().slice(0,8);
+        const f = await createAuthorizationFixture(tx,suffix);
+        const requested = await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        authorizationId=requested.authorizationId;
+        // Race guard: a merely requested (never approved) row cannot be suspended.
+        await expect(suspendProgramSiteAuthorization(f.steward,{
+          authorizationId,reason:"A pending request is not approved authority.",
+        })).rejects.toThrow("Only a currently approved authorization can be suspended");
+        const evidence=await f.agreementEvidence();
+        await reviewProgramSiteAuthorization(f.steward,{
+          authorizationId,decision:"approved",
+          reason:"Independent verification of both contracting organizations.",
+          evidenceDocumentId:evidence.id,
+          effectiveFrom:new Date(Date.now()-3600000),
+          effectiveThrough:new Date(Date.now()+86400000*180),
+        });
+        // Race guard: a non-suspended row cannot be resumed.
+        await expect(resumeProgramSiteAuthorization(f.steward,{
+          authorizationId,reason:"An approved authorization was never suspended.",
+        })).rejects.toThrow("Only a currently suspended authorization can be resumed");
+        // The host church cannot suspend; its withdrawal remedy is revocation.
+        await expect(suspendProgramSiteAuthorization(f.host,{
+          authorizationId,reason:"A host church must never suspend this agreement.",
+        })).rejects.toThrow("separate CAN institutional reviewer");
+        // A steward scoped to a DIFFERENT CAN network cannot suspend either.
+        await expect(suspendProgramSiteAuthorization(f.foreignSteward,{
+          authorizationId,reason:"A foreign CAN network must never suspend this agreement.",
+        })).rejects.toThrow("separate CAN institutional reviewer");
+        // The requesting person can never suspend their own request, even with
+        // a CAN steward role on the contracting institution.
+        const selfGrant={id:crypto.randomUUID(),accountId:crypto.randomUUID(),
+          personId:f.hostPerson.id,role:"can_network_steward" as const,
+          organizationId:f.can.id,siteId:null,active:true};
+        const selfSteward=resolveAccessContext({
+          accountId:selfGrant.accountId,activeGrantId:selfGrant.id,sessionId:"synthetic-rollback",
+        },[selfGrant]);
+        await expect(suspendProgramSiteAuthorization(selfSteward,{
+          authorizationId,reason:"The requester must never suspend their own agreement.",
+        })).rejects.toThrow("independent reviewer");
+        // Failed attempts leave the approved authority fully usable.
+        expect(await requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction","school_of_record",
+        ])).toBe(authorizationId);
+        await expect(suspendProgramSiteAuthorization(f.steward,{
+          authorizationId,
+          reason:"CAN paused delegated operations pending a compliance review.",
+        })).resolves.toEqual({authorizationId,status:"suspended"});
+        // Suspension fails every dependent read closed immediately.
+        await expect(requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction",
+        ])).rejects.toThrow("current independently verified CAN-church operating authority");
+        const [suspended]=await tx.select({
+          status:s.programSiteAuthorizations.status,
+          suspendedByPersonId:s.programSiteAuthorizations.suspendedByPersonId,
+          suspendedAt:s.programSiteAuthorizations.suspendedAt,
+          suspensionReason:s.programSiteAuthorizations.suspensionReason,
+        }).from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.id,authorizationId));
+        expect(suspended).toMatchObject({
+          status:"suspended",suspendedByPersonId:f.stewardPerson.id,
+          suspendedAt:expect.any(Date),
+        });
+        expect(suspended!.suspensionReason).toMatch(/compliance review/);
+        const suspensionAudit=await tx.select({action:s.auditEvents.action})
+          .from(s.auditEvents).where(eq(s.auditEvents.resourceId,authorizationId));
+        expect(suspensionAudit.map(x=>x.action)).toEqual(expect.arrayContaining([
+          "program.site.authorization.request",
+          "program.site.authorization.review",
+          "program.site.authorization.suspended",
+        ]));
+        const suspensionEvents=await tx.select({eventType:s.domainEvents.eventType})
+          .from(s.domainEvents).where(eq(s.domainEvents.aggregateId,authorizationId));
+        expect(suspensionEvents.map(x=>x.eventType)).toEqual(expect.arrayContaining([
+          "ProgramSiteAuthorizationApproved",
+          "ProgramSiteAuthorizationSuspended",
+        ]));
+        // A suspended row still occupies the current-version slot: the host
+        // cannot request a replacement until it is resumed or revoked.
+        const blocked=await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        }).then(
+          ()=>{throw new Error("new version request unexpectedly succeeded");},
+          (error:unknown)=>error,
+        );
+        // The real failure is the current-slot partial unique index, surfaced
+        // as the cause of Drizzle's query error.
+        expect(String((blocked as {cause?:unknown}).cause??blocked))
+          .toContain('duplicate key value violates unique constraint "program_site_authorization_current_uq"');
+        complete=true;
+        throw rollback;
+      });
+    } catch(error) {
+      if(error!==rollback)throw error;
+    } finally {state.tx=undefined;}
+    expect(complete).toBe(true);
+    const s=await import("@/db/schema");
+    const {eq}=await import("drizzle-orm");
+    expect(await realDb.select({id:s.programSiteAuthorizations.id})
+      .from(s.programSiteAuthorizations)
+      .where(eq(s.programSiteAuthorizations.id,authorizationId))).toHaveLength(0);
+  },120_000);
+
+  it("resumes a suspended authorization without extending its window, with audit and event", async () => {
+    const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-program-site-resumption");
+    let complete = false;
+    let authorizationId = "";
+    try {
+      await realDb.transaction(async tx => {
+        state.tx = tx;
+        const s = await import("@/db/schema");
+        const { eq } = await import("drizzle-orm");
+        const {
+          requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
+          suspendProgramSiteAuthorization, resumeProgramSiteAuthorization,
+          requireCurrentProgramSiteAuthorization,
+        } = await import("@/modules/programs/program-site-authorization.server");
+        const suffix = crypto.randomUUID().slice(0,8);
+        const f = await createAuthorizationFixture(tx,suffix);
+        const requested = await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        authorizationId=requested.authorizationId;
+        const evidence=await f.agreementEvidence();
+        const through=new Date(Date.now()+86400000*180);
+        await reviewProgramSiteAuthorization(f.steward,{
+          authorizationId,decision:"approved",
+          reason:"Independent verification of both contracting organizations.",
+          evidenceDocumentId:evidence.id,
+          effectiveFrom:new Date(Date.now()-3600000),effectiveThrough:through,
+        });
+        await suspendProgramSiteAuthorization(f.steward,{
+          authorizationId,
+          reason:"CAN paused delegated operations pending a compliance review.",
+        });
+        await expect(requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction",
+        ])).rejects.toThrow("current independently verified CAN-church operating authority");
+        await expect(resumeProgramSiteAuthorization(f.steward,{
+          authorizationId,
+          reason:"The compliance review closed; operations may resume.",
+        })).resolves.toEqual({authorizationId,status:"approved"});
+        // The same approved row is authoritative again, with no window change.
+        expect(await requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction","onsite_supervision",
+        ])).toBe(authorizationId);
+        const [resumed]=await tx.select({
+          status:s.programSiteAuthorizations.status,
+          suspendedByPersonId:s.programSiteAuthorizations.suspendedByPersonId,
+          suspendedAt:s.programSiteAuthorizations.suspendedAt,
+          suspensionReason:s.programSiteAuthorizations.suspensionReason,
+          effectiveThrough:s.programSiteAuthorizations.effectiveThrough,
+        }).from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.id,authorizationId));
+        expect(resumed).toMatchObject({
+          status:"approved",suspendedByPersonId:null,suspendedAt:null,
+          suspensionReason:null,
+        });
+        expect(resumed!.effectiveThrough).toEqual(through);
+        const resumptionAudit=await tx.select({action:s.auditEvents.action})
+          .from(s.auditEvents).where(eq(s.auditEvents.resourceId,authorizationId));
+        expect(resumptionAudit.map(x=>x.action)).toEqual(expect.arrayContaining([
+          "program.site.authorization.suspended",
+          "program.site.authorization.resumed",
+        ]));
+        const resumptionEvents=await tx.select({eventType:s.domainEvents.eventType})
+          .from(s.domainEvents).where(eq(s.domainEvents.aggregateId,authorizationId));
+        expect(resumptionEvents.map(x=>x.eventType)).toEqual(expect.arrayContaining([
+          "ProgramSiteAuthorizationSuspended",
+          "ProgramSiteAuthorizationResumed",
+        ]));
+        complete=true;
+        throw rollback;
+      });
+    } catch(error) {
+      if(error!==rollback)throw error;
+    } finally {state.tx=undefined;}
+    expect(complete).toBe(true);
+    const s=await import("@/db/schema");
+    const {eq}=await import("drizzle-orm");
+    expect(await realDb.select({id:s.programSiteAuthorizations.id})
+      .from(s.programSiteAuthorizations)
+      .where(eq(s.programSiteAuthorizations.id,authorizationId))).toHaveLength(0);
+  },120_000);
 });
