@@ -33,6 +33,7 @@ const stagedTags = [
   "0045_onsite_safety_qualification_definitions",
   "0046_conference_booking_cancellation",
   "0047_ancient_may_parker",
+  "0048_many_wasp",
 ];
 
 export function assessFullFlowMigrationReadiness(input) {
@@ -96,11 +97,14 @@ export function assessFullFlowMigrationReadiness(input) {
     const post0047 = applied === 48 && String(lastTimestamp) === when(47) &&
       hasAll("program_site_authorizations", "site_local_content_versions",
         "public_family_start_requests", "student_access_consents");
+    const post0048 = applied === 49 && String(lastTimestamp) === when(48) &&
+      hasAll("program_site_authorizations", "site_local_content_versions",
+        "public_family_start_requests", "student_access_consents");
     const stage = pre0039 ? 39 : post0039 ? 40 : post0040 ? 41 : post0041 ? 42 :
       post0042 ? 43 : post0043 ? 44 : post0044 ? 45 : post0045 ? 46 :
-      post0046 ? 47 : post0047 ? 48 : 0;
+      post0046 ? 47 : post0047 ? 48 : post0048 ? 49 : 0;
     if (!stage)
-      issues.push("0039-0047 migration ledger/table state is inconsistent or unexpected");
+      issues.push("0039-0048 migration ledger/table state is inconsistent or unexpected");
     if (stage >= 40) {
       const actualColumns = new Set(authorizationColumns.map(row => row.column_name));
       const requiredColumns = [
@@ -271,6 +275,25 @@ export function assessFullFlowMigrationReadiness(input) {
       for (const name of actualP0Indexes) {
         issues.push("0047 safeguarding/pickup index present before migration: " + name);
       }
+    }
+    // 0048 adds the reversible CAN suspension fields to the authorization
+    // ledger plus the mirroring suspended consistency CHECK; the columns and
+    // constraint must not exist before and must exist after it is applied.
+    const suspensionColumns = ["suspended_at", "suspended_by_person_id", "suspension_reason"];
+    const actualAuthColumns = new Set(authorizationColumns.map(row => row.column_name));
+    const actualAuthConstraints = new Set(authorizationConstraints.map(row => row.conname));
+    if (stage >= 49) {
+      for (const name of suspensionColumns) {
+        if (!actualAuthColumns.has(name)) issues.push("0048 suspension column missing: " + name);
+      }
+      if (!actualAuthConstraints.has("program_site_authorization_suspended_ck"))
+        issues.push("0048 suspension constraint missing: program_site_authorization_suspended_ck");
+    } else if (stage) {
+      for (const name of suspensionColumns) {
+        if (actualAuthColumns.has(name)) issues.push("0048 suspension column present before migration: " + name);
+      }
+      if (actualAuthConstraints.has("program_site_authorization_suspended_ck"))
+        issues.push("0048 suspension constraint present before migration: program_site_authorization_suspended_ck");
     }
     const stagedPending = stagedEntries.map(entry => entry.tag);
     const pendingMigrations = stage ? stagedPending.slice(stage - 39) : [];

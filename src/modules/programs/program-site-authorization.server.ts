@@ -243,6 +243,105 @@ export async function revokeProgramSiteAuthorization(
   });
 }
 
+/** CAN-only reversible suspension of an approved operating authorization.
+ * Suspension fails every dependent read closed immediately while preserving
+ * the agreement evidence; the host's remedy stays revocation, never suspension.
+ * The suspended row keeps the current-version slot occupied until it is
+ * resumed or revoked.
+ */
+export async function suspendProgramSiteAuthorization(
+  actor: AccessContext, input: { authorizationId: string; reason: string },
+) {
+  const reason = input.reason.trim();
+  if (reason.length < 10 || reason.length > 500)
+    throw new Error("Provide a 10–500 character suspension reason");
+  return db.transaction(async tx => {
+    const [record] = await tx.select().from(programSiteAuthorizations)
+      .where(eq(programSiteAuthorizations.id, input.authorizationId)).for("update").limit(1);
+    if (!record) throw new AuthorizationError("existing current authorization");
+    const identity = await loadOperatingIdentity(tx, record.programId);
+    // Only the independent CAN steward may suspend; the host's withdrawal
+    // remedy is revocation, and the requester can never suspend their own ask.
+    assertIndependentCANReviewer(actor, identity);
+    if (identity.siteId !== record.siteId ||
+        identity.hostOrganizationId !== record.hostOrganizationId ||
+        identity.institutionOrganizationId !== record.institutionOrganizationId)
+      throw new AuthorizationError("unchanged contracting parties");
+    if (actor.actorPersonId === record.requestedByPersonId)
+      throw new AuthorizationError("independent reviewer");
+    if (record.status !== "approved")
+      throw new Error("Only a currently approved authorization can be suspended");
+    const now = new Date();
+    await tx.update(programSiteAuthorizations).set({
+      status: "suspended", suspendedByPersonId: actor.actorPersonId,
+      suspendedAt: now, suspensionReason: reason, updatedAt: now,
+    }).where(eq(programSiteAuthorizations.id, record.id));
+    await writeAudit(tx, actor, {
+      action: "program.site.authorization.suspended",
+      entityType: "program_site_authorization", entityId: record.id,
+      scope: { organizationId: identity.institutionOrganizationId,
+        siteId: identity.siteId, programId: identity.programId },
+      before: { status: "approved" }, after: { status: "suspended", reason },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.ProgramSiteAuthorizationSuspended,
+      aggregateType: "program_site_authorization", aggregateId: record.id,
+      actorPersonId: actor.actorPersonId,
+      organizationId: identity.institutionOrganizationId,
+      siteId: identity.siteId, programId: identity.programId,
+      payload: { institutionOrganizationId: identity.institutionOrganizationId },
+    });
+    return { authorizationId: record.id, status: "suspended" as const };
+  });
+}
+
+/** Independent CAN steward resumes a suspended authorization. Resuming never
+ * extends the effective window: reads stay fail-closed once it has elapsed.
+ */
+export async function resumeProgramSiteAuthorization(
+  actor: AccessContext, input: { authorizationId: string; reason: string },
+) {
+  const reason = input.reason.trim();
+  if (reason.length < 10 || reason.length > 500)
+    throw new Error("Provide a 10–500 character resumption reason");
+  return db.transaction(async tx => {
+    const [record] = await tx.select().from(programSiteAuthorizations)
+      .where(eq(programSiteAuthorizations.id, input.authorizationId)).for("update").limit(1);
+    if (!record) throw new AuthorizationError("existing current authorization");
+    const identity = await loadOperatingIdentity(tx, record.programId);
+    assertIndependentCANReviewer(actor, identity);
+    if (identity.siteId !== record.siteId ||
+        identity.hostOrganizationId !== record.hostOrganizationId ||
+        identity.institutionOrganizationId !== record.institutionOrganizationId)
+      throw new AuthorizationError("unchanged contracting parties");
+    if (actor.actorPersonId === record.requestedByPersonId)
+      throw new AuthorizationError("independent reviewer");
+    if (record.status !== "suspended")
+      throw new Error("Only a currently suspended authorization can be resumed");
+    const now = new Date();
+    await tx.update(programSiteAuthorizations).set({
+      status: "approved", suspendedByPersonId: null,
+      suspendedAt: null, suspensionReason: null, updatedAt: now,
+    }).where(eq(programSiteAuthorizations.id, record.id));
+    await writeAudit(tx, actor, {
+      action: "program.site.authorization.resumed",
+      entityType: "program_site_authorization", entityId: record.id,
+      scope: { organizationId: identity.institutionOrganizationId,
+        siteId: identity.siteId, programId: identity.programId },
+      before: { status: "suspended" }, after: { status: "approved", reason },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.ProgramSiteAuthorizationResumed,
+      aggregateType: "program_site_authorization", aggregateId: record.id,
+      actorPersonId: actor.actorPersonId,
+      organizationId: identity.institutionOrganizationId,
+      siteId: identity.siteId, programId: identity.programId,
+      payload: { institutionOrganizationId: identity.institutionOrganizationId },
+    });
+    return { authorizationId: record.id, status: "approved" as const };
+  });
+}
+
 /** Read on every cross-institutional operation, not just on login or launch.
  * Program/Site/host/issuer authority is derived from DB rows, never a client claim.
  */
