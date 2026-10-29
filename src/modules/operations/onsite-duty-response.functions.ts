@@ -1,6 +1,6 @@
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { actions, sites } from "@/db/schema";
@@ -11,18 +11,22 @@ import {
   isOnsiteDutySubstitution, selectAuthorizedOnsiteDuty, resolveOnsiteDutyRetry,
 } from "@/domain/onsite-duty-policy";
 import { siteDate } from "@/domain/expected-attendance";
+import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import {
   getOnsiteSupervisionPlan, loadOnsiteSupervisionPlanForActor,
   type OnsiteOperationalSupervisionPlan,
 } from "./onsite-supervision.functions";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
-import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
+import {
+  currentSiteDirectorPersonId, requireCurrentSiteLocalDelegate,
+} from "./site-local-delegation.server";
 import { requireCurrentSectionFacilitator } from "./site-section-facilitators.server";
 import { requireCurrentOnsiteAdultSafety } from "./onsite-block-safety.server";
-import { writeAudit } from "@/platform/mutation";
+import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
 
 const dutyType = "onsite_instruction_duty_response";
+const gapActionType = "onsite_coverage_gap";
 const daySchema = z.object({
   date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value=>{
     const stamp=new Date(value+"T12:00:00Z");
@@ -235,14 +239,73 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
         resolutionNote:null,
       }).returning({id:actions.id});
       if(!record)throw new Error("Could not save onsite duty response");
+      // A reported coverage failure is an actionable operating exception,
+      // not only a historical record: keep one open, owned follow-up per
+      // Section and date until an assigned adult affirmatively covers it.
+      let coverageGapActionId:string|null=null;
+      if (data.response === "cannot_cover") {
+        const [existingGap]=await tx.select({id:actions.id}).from(actions).where(and(
+          eq(actions.type,gapActionType),eq(actions.status,"open"),
+          eq(actions.sectionId,data.sectionId),eq(actions.programId,block.programId),
+          sql`${actions.metadata}->>'date' = ${data.date}`,
+        )).limit(1);
+        if (existingGap) {
+          coverageGapActionId=existingGap.id;
+        } else {
+          const ownerPersonId=await currentSiteDirectorPersonId(tx,block.programId);
+          const [gap]=await tx.insert(actions).values({
+            type:gapActionType,status:"open",priority:"high",
+            title:"Coverage gap for scheduled onsite block on "+data.date,
+            description:"The assigned adult reported they cannot cover this scheduled block. Arrange a verified replacement and confirm the reviewed room, backup and qualification plan still holds.",
+            subjectType:"section",subjectId:data.sectionId,
+            organizationId:site.organizationId,siteId:site.id,
+            programId:block.programId,sectionId:data.sectionId,
+            ownerPersonId,
+            metadata:{date:data.date,periodId:data.periodId,responseId:record.id,
+              reason:data.reason??null},
+          }).returning({id:actions.id});
+          if(!gap)throw new Error("Could not create coverage gap follow-up");
+          coverageGapActionId=gap.id;
+          const gapEventId=await emitEvent(tx,{
+            eventType:EventTypes.ActionCreated,
+            aggregateType:"action",aggregateId:gap.id,
+            actorPersonId:actor.actorPersonId,
+            organizationId:site.organizationId,siteId:site.id,programId:block.programId,
+            payload:{type:gapActionType,sectionId:data.sectionId,date:data.date,
+              periodId:data.periodId,ownerPersonId,responseId:record.id},
+          });
+          if (ownerPersonId && ownerPersonId!==actor.actorPersonId) {
+            await notifyMany(tx,[{
+              recipientPersonId:ownerPersonId,
+              type:"onsite_coverage_gap_assigned",
+              title:"Scheduled block coverage gap needs your action",
+              body:"An assigned adult reported they cannot cover a scheduled block at your site. Arrange verified replacement coverage in the supervision workspace.",
+              resourceType:"action",resourceId:gap.id,eventId:gapEventId,
+            }]);
+          }
+        }
+      } else {
+        // A current affirmative duty response closes this block's open
+        // coverage-gap follow-ups without rewriting their history.
+        const openGaps=await tx.select({id:actions.id}).from(actions).where(and(
+          eq(actions.type,gapActionType),eq(actions.status,"open"),
+          eq(actions.sectionId,data.sectionId),eq(actions.programId,block.programId),
+          sql`${actions.metadata}->>'date' = ${data.date}`,
+        )).limit(20);
+        if (openGaps.length) await tx.update(actions).set({
+          status:"resolved",resolvedAt:new Date(),updatedAt:new Date(),
+          resolutionNote:"Duty affirmatively covered by the assigned adult: "+record.id,
+        }).where(inArray(actions.id,openGaps.map(row=>row.id)));
+      }
       await writeAudit(tx,actor,{
         action:"onsite.instruction_duty.responded",
         entityType:"action",entityId:record.id,
         scope:{organizationId:site.organizationId,siteId:site.id,
           programId:block.programId,sectionId:data.sectionId},
         after:{date:data.date,periodId:data.periodId,response:data.response,
-          ...(data.reason?{reason:data.reason}:{}),planToken:block.planToken},
+          ...(data.reason?{reason:data.reason}:{}),planToken:block.planToken,
+          coverageGapActionId},
       });
-      return {responseId:record.id,created:true,response:data.response};
+      return {responseId:record.id,created:true,response:data.response,coverageGapActionId};
     });
   });

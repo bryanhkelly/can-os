@@ -199,3 +199,60 @@ export const setOperationsActionDeadline=createServerFn({method:"POST"})
      return {changed:true as const};
    });
  });
+
+/** Onsite exceptions the named local owner (usually the church Site director)
+ * closes personally. Everything else stays in the registrar operations
+ * workspace or its owning domain workflow. */
+const onsiteOwnerResolvableTypes=new Set([
+  "onsite_coverage_gap",
+  "onsite_pickup_denied_follow_up",
+  "onsite_pickup_uncollected_child",
+]);
+
+/** The assigned owner resolves their own onsite coverage-gap and custody
+ * follow-up Actions with a factual note. Owner-only, type-allowlisted and
+ * scope-checked; resolution never edits the underlying attendance, pickup or
+ * duty history, and an identical retry is a no-op. */
+export const resolveOwnedSiteOperationalAction=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({
+   id:z.string().uuid(),resolutionNote:z.string().trim().min(10).max(2000),
+ }).strict().parse(value))
+ .handler(async({data})=>{
+   const actor=await getCommandContext(getRequest());
+   if(!actor.actorPersonId||actor.role!=="site_leader"||!actor.scope.siteIds?.length)
+     throw new AuthorizationError("verified site leadership grant");
+   return db.transaction(async tx=>{
+     const [record]=await tx.select().from(actions)
+       .where(and(eq(actions.id,data.id),inArray(actions.siteId,actor.scope.siteIds!)))
+       .for("update").limit(1);
+     if(!record||!record.siteId)
+       throw new AuthorizationError("site action scope");
+     if(record.organizationId&&!actor.scope.organizationIds?.includes(record.organizationId))
+       throw new AuthorizationError("action school ownership");
+     if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))
+       throw new AuthorizationError("action program scope");
+     if(!onsiteOwnerResolvableTypes.has(record.type))
+       throw new AuthorizationError("this Action is resolved in its owning workflow");
+     if(record.ownerPersonId!==actor.actorPersonId)
+       throw new AuthorizationError("only the assigned owner resolves this follow-up");
+     if(record.status==="resolved"&&record.resolutionNote===data.resolutionNote)
+       return {saved:true};
+     if(record.status==="cancelled"||record.status==="resolved")
+       throw new Error("Action is closed");
+     const now=new Date();
+     await tx.update(actions).set({status:"resolved",resolvedAt:now,
+       resolutionNote:data.resolutionNote,updatedAt:now}).where(eq(actions.id,record.id));
+     await writeAudit(tx,actor,{action:"action.status.change",entityType:"action",
+       entityId:record.id,
+       scope:{organizationId:record.organizationId,siteId:record.siteId,programId:record.programId},
+       before:{status:record.status},
+       after:{status:"resolved",resolutionNote:data.resolutionNote,ownerResolved:true}});
+     await emitEvent(tx,{
+       eventType:EventTypes.ActionResolved,aggregateType:"action",
+       aggregateId:record.id,actorPersonId:actor.actorPersonId,
+       organizationId:record.organizationId,siteId:record.siteId,programId:record.programId,
+       payload:{subjectType:record.subjectType,subjectId:record.subjectId,type:record.type},
+     });
+     return {saved:true};
+   });
+ });

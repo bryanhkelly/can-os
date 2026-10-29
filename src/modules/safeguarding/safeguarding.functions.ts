@@ -6,10 +6,13 @@ import { safeguardingObservationSchema } from "@/domain/safeguarding-intake-poli
 import {
   acknowledgeSafeguardingConcern,
   addSafeguardingEvidence,
+  claimOverdueSafeguardingResponse,
   escalateSafeguardingConcern,
   getSafeguardingCase,
   getSafeguardingWorkspace,
+  listOverdueUnacknowledgedSafeguardingCases,
   recordSafeguardingExternalReport,
+  resolveSafeguardingConcern,
   saveSafeguardingSiteConfiguration,
   submitSafeguardingConcern,
 } from "./safeguarding-service";
@@ -49,6 +52,20 @@ export const acknowledgeAssignedSafeguardingConcern = createServerFn({ method: "
 export const escalateAssignedSafeguardingConcern = createServerFn({ method: "POST" })
   .validator((value: unknown) => incidentInput.parse(value))
   .handler(async ({ data }) => escalateSafeguardingConcern(await actor(), data.incidentId));
+
+export const resolveAssignedSafeguardingConcern = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    incidentId: uuid,
+    resolutionSummary: text(10, 2000),
+  }).strict().parse(value))
+  .handler(async ({ data }) => resolveSafeguardingConcern(await actor(), data));
+
+export const getOverdueUnacknowledgedSafeguardingCases = createServerFn({ method: "GET" })
+  .handler(async () => listOverdueUnacknowledgedSafeguardingCases(await actor()));
+
+export const claimOverdueSafeguardingCaseResponse = createServerFn({ method: "POST" })
+  .validator((value: unknown) => incidentInput.parse(value))
+  .handler(async ({ data }) => claimOverdueSafeguardingResponse(await actor(), data.incidentId));
 
 export const addRestrictedSafeguardingEvidence = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({

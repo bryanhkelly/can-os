@@ -361,3 +361,57 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
     approvedAt:config.approvedAt?.toISOString()??null,
   };
 }
+
+/**
+ * Minimal opening-state projection for verified LOCAL onsite staff (Site
+ * leaders, room facilitators and site staff running the school day). It
+ * exposes only the configuration status and non-sensitive blocker
+ * categories — never evidence documents, verifier identity, rejection
+ * reasons or CAN review internals. A suspended or no-longer-current opening
+ * must stay visible to the people physically supervising children, while
+ * historical attendance and incident records remain untouched.
+ */
+export async function readLocalSchoolOpeningStatus(actor:AccessContext,programId:string) {
+  const school=await schoolIdentity(db,programId);
+  if(actor.demoFacilitator || !actor.actorPersonId ||
+    !["site_leader","room_facilitator","site_staff"].includes(actor.role) ||
+    !actor.scope.organizationIds?.includes(school.organizationId) ||
+    !actor.scope.siteIds?.includes(school.siteId) ||
+    !actor.scope.programIds?.includes(school.programId))
+    throw new AuthorizationError("verified local onsite staff for this Program and Site");
+  let configuration:Awaited<ReturnType<typeof latestConfiguration>>|null=null;
+  try{
+    configuration=await latestConfiguration(db,programId);
+  }catch(error){
+    if(!(error instanceof AuthorizationError))throw error;
+  }
+  if(!configuration)
+    return {programId,schoolSiteId:school.siteId,status:"unconfigured" as const,
+      blocked:true,blockers:["opening_evidence","operating_agreement","site_director"],
+      approvedAt:null};
+  const now=new Date();
+  const blockers:string[]=[];
+  try{
+    await requireChurchHostedOperatingServices(db,programId,[
+      "school_of_record","academic_instruction","onsite_supervision",
+    ]);
+  }catch(error){
+    if(!(error instanceof AuthorizationError))throw error;
+    blockers.push("operating_agreement");
+  }
+  try{
+    await requireSchoolOpeningEvidence(db,school,configuration.id,now);
+  }catch(error){
+    if(!(error instanceof AuthorizationError))throw error;
+    blockers.push("opening_evidence");
+  }
+  try{
+    await requireVerifiedChurchSiteDirector(db,school,configuration.id,now);
+  }catch(error){
+    if(!(error instanceof AuthorizationError))throw error;
+    blockers.push("site_director");
+  }
+  const blocked=configuration.status!=="approved"||blockers.length>0;
+  return {programId,schoolSiteId:school.siteId,status:configuration.status,
+    blocked,blockers,approvedAt:configuration.approvedAt?.toISOString()??null};
+}

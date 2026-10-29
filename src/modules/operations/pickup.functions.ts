@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "@/db/client";
@@ -14,7 +14,10 @@ import {
   pickupAuthorizations,
   pickupCustodyHolds,
   pickupReleaseEvents,
+  programResponsibilityAssignments,
   programs,
+  roleAssignments,
+  schoolConfigurationVersions,
   studentProfiles,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -52,6 +55,7 @@ const targetSchema = z.object({
 }).strict();
 const identityMethods = z.enum(["government_photo_id", "school_issued_id"]);
 const uncollectedActionType = "onsite_pickup_uncollected_child";
+const deniedPickupActionType = "onsite_pickup_denied_follow_up";
 
 function source(prefix: string, id: string) {
   return prefix + ":" + id;
@@ -225,6 +229,26 @@ async function notifyPickupGuardians(tx: Tx, input: {
     resourceId: input.resourceId,
     eventId: input.eventId,
   })));
+}
+
+/** The currently appointed site director owns denial follow-up when one
+ * exists; otherwise the recording staff member stays accountable. */
+async function currentSiteDirectorPersonId(tx: Tx, programId: string, at: Date) {
+  const [configuration] = await tx.select({ id: schoolConfigurationVersions.id })
+    .from(schoolConfigurationVersions)
+    .where(eq(schoolConfigurationVersions.programId, programId))
+    .orderBy(desc(schoolConfigurationVersions.version)).limit(1);
+  if (!configuration) return null;
+  const [director] = await tx.select({ personId: roleAssignments.personId })
+    .from(programResponsibilityAssignments)
+    .innerJoin(roleAssignments, eq(roleAssignments.id, programResponsibilityAssignments.responsibleRoleAssignmentId))
+    .where(and(
+      eq(programResponsibilityAssignments.configurationVersionId, configuration.id),
+      eq(programResponsibilityAssignments.responsibilityKey, "site_director"),
+      lte(programResponsibilityAssignments.effectiveFrom, at),
+      gt(programResponsibilityAssignments.effectiveThrough, at),
+    )).limit(1);
+  return director?.personId ?? null;
 }
 
 async function scopedRoster(date: string, studentProfileId?: string, programId?: string) {
@@ -881,7 +905,11 @@ export const recordDeniedPickup = createServerFn({ method: "POST" })
             replay.studentProfileId !== data.studentProfileId || replay.status !== "denied" ||
             replay.denialReason !== data.reason)
           throw new Error("Denied pickup mutation ID was already used for different input");
-        return { denialId: replay.id, created: false as const };
+        const [existingFollowUp] = await tx.select({ id: actions.id }).from(actions).where(and(
+          eq(actions.type, deniedPickupActionType),
+          sql`${actions.metadata}->>'denialId' = ${replay.id}`,
+        )).limit(1);
+        return { denialId: replay.id, followUpActionId: existingFollowUpOrNull(existingFollowUp), created: false as const };
       }
       const attendance = await currentAttendance(tx, data);
       const [released] = await tx.select({ id: pickupReleaseEvents.id }).from(pickupReleaseEvents)
@@ -902,6 +930,7 @@ export const recordDeniedPickup = createServerFn({ method: "POST" })
           )).limit(1);
         if (!knownAuthorization) throw new AuthorizationError("known pickup Person for this student and Household");
       }
+      const occurredAt = new Date();
       const [record] = await tx.insert(pickupReleaseEvents).values({
         studentProfileId: data.studentProfileId,
         householdId: data.householdId,
@@ -916,24 +945,54 @@ export const recordDeniedPickup = createServerFn({ method: "POST" })
         identityVerified: data.identityVerified,
         identityVerificationMethod: data.identityVerificationMethod,
         staffWitnessPersonId: actor.actorPersonId!,
-        occurredAt: new Date(),
+        occurredAt,
         detail: data.detail,
         sourceKey,
       }).returning({ id: pickupReleaseEvents.id });
       if (!record) throw new Error("Unable to record denied pickup");
+      // A denial is a safety-relevant operating exception, not only a
+      // notification: it becomes an assigned canonical Action so site
+      // leadership has accountable, visible follow-up work.
+      const ownerPersonId = (await currentSiteDirectorPersonId(tx, data.programId, occurredAt))
+        ?? actor.actorPersonId!;
+      const [followUp] = await tx.insert(actions).values({
+        type: deniedPickupActionType,
+        status: "open",
+        priority: "high",
+        title: "Denied pickup attempt requires site leadership review",
+        description: "A pickup attempt was denied and the student remained under school supervision. Review the recorded denial, current custody instructions and whether a custody hold is needed.",
+        ownerPersonId,
+        organizationId: school.organizationId,
+        siteId: school.siteId,
+        programId: data.programId,
+        subjectType: "student_profile",
+        subjectId: data.studentProfileId,
+        metadata: { date: data.date, denialId: record.id, reason: data.reason,
+          attendanceEventId: attendance.id, sourceKey },
+      }).returning({ id: actions.id });
+      if (!followUp) throw new Error("Unable to create denied-pickup follow-up");
+      const followUpEventId = await emitEvent(tx, {
+        eventType: EventTypes.ActionCreated,
+        aggregateType: "action", aggregateId: followUp.id,
+        actorPersonId: actor.actorPersonId,
+        organizationId: school.organizationId, siteId: school.siteId, programId: data.programId,
+        payload: { type: deniedPickupActionType, denialId: record.id,
+          studentProfileId: data.studentProfileId, ownerPersonId },
+      });
       const eventId = await emitEvent(tx, {
         eventType: EventTypes.ChildPickupDenied,
         aggregateType: "pickup_release_event", aggregateId: record.id,
         actorPersonId: actor.actorPersonId,
         organizationId: school.organizationId, siteId: school.siteId, programId: data.programId,
         payload: { studentProfileId: data.studentProfileId, attendanceEventId: attendance.id,
-          reason: data.reason },
+          reason: data.reason, followUpActionId: followUp.id },
       });
       await writeAudit(tx, actor, {
         action: "pickup.release.denied", entityType: "pickup_release_event", entityId: record.id,
         scope: { organizationId: school.organizationId, siteId: school.siteId, programId: data.programId },
         after: { studentProfileId: data.studentProfileId, attendanceEventId: attendance.id,
-          reason: data.reason, staffWitnessPersonId: actor.actorPersonId },
+          reason: data.reason, staffWitnessPersonId: actor.actorPersonId,
+          followUpActionId: followUp.id, followUpOwnerPersonId: ownerPersonId },
         contextExtras: { classification: "family_custody", mutationId: data.mutationId,
           detail: data.detail ?? null },
       });
@@ -943,9 +1002,22 @@ export const recordDeniedPickup = createServerFn({ method: "POST" })
         body: "The school denied a pickup attempt and kept the student under school supervision. Contact the school for next steps.",
         resourceType: "pickup_release_event", resourceId: record.id, eventId,
       });
-      return { denialId: record.id, created: true as const };
+      if (ownerPersonId !== actor.actorPersonId) {
+        await notifyMany(tx, [{
+          recipientPersonId: ownerPersonId,
+          type: "pickup_denial_follow_up_assigned",
+          title: "Denied pickup attempt needs your review",
+          body: "A pickup attempt was denied at your site and the student remained supervised. Review the assigned follow-up in Operations.",
+          resourceType: "action", resourceId: followUp.id, eventId: followUpEventId,
+        }]);
+      }
+      return { denialId: record.id, followUpActionId: followUp.id, created: true as const };
     });
   });
+
+function existingFollowUpOrNull(row: { id: string } | undefined) {
+  return row?.id ?? null;
+}
 
 export const recordUncollectedChild = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({

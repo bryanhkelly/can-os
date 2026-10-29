@@ -6,7 +6,7 @@ import { OnsiteSupervisionPanel } from "@/components/operations/OnsiteSupervisio
 import { OnsiteDayReconciliationPanel } from "@/components/operations/OnsiteDayReconciliationPanel";
 import { OnsitePickupPanel } from "@/components/operations/OnsitePickupPanel";
 import {
-  getOnsiteStaffDayContext, listExpectedOnsiteRoster,
+  getOnsiteStaffDayContext, getSiteDayOpeningStatuses, listExpectedOnsiteRoster,
   markExpectedOnsiteAttendance,
 } from "@/modules/attendance/onsite-attendance-workflow.functions";
 
@@ -14,7 +14,14 @@ export const Route = createFileRoute("/site/day")({ component: SiteDayPage });
 
 type Roster = Awaited<ReturnType<typeof listExpectedOnsiteRoster>>;
 type Student = Roster["students"][number];
+type OpeningStatuses = Awaited<ReturnType<typeof getSiteDayOpeningStatuses>>["statuses"];
 const marks = ["present", "tardy", "absent"] as const;
+
+const openingBlockerLabels: Record<string, string> = {
+  operating_agreement: "the CAN–church service agreement is not current",
+  opening_evidence: "required independently verified opening evidence is missing or expired",
+  site_director: "no current verified site director is appointed",
+};
 
 /**
  * Onsite facilitator surface: one site and its scheduled school-day roster.
@@ -26,6 +33,7 @@ export function SiteDayPage() {
     Awaited<ReturnType<typeof getOnsiteStaffDayContext>> | null>(null);
   const [date, setDate] = useState("");
   const [roster, setRoster] = useState<Roster | null>(null);
+  const [openings, setOpenings] = useState<OpeningStatuses>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -54,6 +62,11 @@ export function SiteDayPage() {
       setError("Sign in with a room facilitator, site staff or site leader membership for this site.");
       setLoading(false);
     });
+    // Opening status is an advisory banner; a failure here must not block the
+    // roster, which reports its own hard failures.
+    void getSiteDayOpeningStatuses().then(result => {
+      if (active) setOpenings(result.statuses);
+    }).catch(() => {});
     return () => { active = false; };
   }, [load]);
 
@@ -89,6 +102,31 @@ export function SiteDayPage() {
       {context && <span>{context.timeZone}</span>}
       <span>Attendance does not authorize student release.</span>
     </div>
+    {openings.some(opening => opening.blocked) &&
+      <section role="alert" aria-label="School opening status"
+        className="mt-4 border-l-4 border-rose-500 bg-muted/40 px-5 py-4">
+        <h2 className="font-semibold">School opening is not currently authorized</h2>
+        <p className="mt-1 text-sm">
+          A church-hosted school at this site is not approved to operate right now.
+          Keep supervising and recording the day accurately — an attendance record is a
+          historical fact, never authorization to operate. Contact the church registrar
+          and your CAN school-opening officer.
+        </p>
+        <ul className="mt-2 list-disc pl-5 text-sm">
+          {openings.filter(opening => opening.blocked).map(opening => {
+            const programName = roster?.programs.find(program => program.id === opening.programId)?.name;
+            return <li key={opening.programId}>
+              <span className="font-medium">{programName ?? "School program"}: </span>
+              {opening.status === "suspended" ? "opening suspended by CAN" :
+                opening.status === "approved" ? "approval prerequisites no longer hold" :
+                opening.status === "unconfigured" ? "no approved school configuration exists" :
+                "opening not yet approved"}
+              {opening.blockers.length > 0 && " — " +
+                opening.blockers.map(blocker => openingBlockerLabels[blocker] ?? blocker).join("; ")}
+            </li>;
+          })}
+        </ul>
+      </section>}
     <WorkflowIntro eyebrow="Site supervision · Attendance" title="A clear record of the onsite day." description="Record staff-observed attendance for your assigned site. Online learning activity is not proof of physical presence, and arrival marks do not authorize student release." />
     {context && <label className="mt-6 block max-w-sm text-sm font-semibold">
       School-local attendance date
