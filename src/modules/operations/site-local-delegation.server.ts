@@ -61,9 +61,10 @@ async function currentConfiguration(tx: Reader, programId: string) {
   return configuration ?? null;
 }
 
-/** The currently appointed, in-term site director for a Program, if any.
- * Read-only escalation-targeting helper; it grants no access and does not
- * prove that the director's account, grant or agreement is otherwise valid. */
+/** Current named local director with an effective appointment, live Site grant
+ * and a verified, enabled account. This is an escalation target, not authority
+ * to supervise a block. Keep safety reporting possible after agreement expiry.
+ */
 export async function currentSiteDirectorPersonId(
   tx: Reader, programId: string, at = new Date(),
 ): Promise<string | null> {
@@ -72,11 +73,32 @@ export async function currentSiteDirectorPersonId(
   const [director] = await tx.select({ personId: roleAssignments.personId })
     .from(programResponsibilityAssignments)
     .innerJoin(roleAssignments, eq(roleAssignments.id, programResponsibilityAssignments.responsibleRoleAssignmentId))
+    .innerJoin(programs, eq(programs.id, programId))
+    .innerJoin(sites, and(eq(sites.id, programs.siteId),
+      eq(sites.organizationId, programs.organizationId)))
+    .innerJoin(accountPersonGrants, and(
+      eq(accountPersonGrants.personId, roleAssignments.personId),
+      eq(accountPersonGrants.role, roleAssignments.roleKey),
+      eq(accountPersonGrants.organizationId, sites.organizationId),
+      eq(accountPersonGrants.siteId, sites.id),
+    ))
+    .innerJoin(people, eq(people.id, roleAssignments.personId))
+    .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
     .where(and(
       eq(programResponsibilityAssignments.configurationVersionId, configuration.id),
       eq(programResponsibilityAssignments.responsibilityKey, "site_director"),
+      eq(programResponsibilityAssignments.accountableOrganizationId, sites.organizationId),
+      eq(roleAssignments.programId, programId),
+      eq(roleAssignments.organizationId, sites.organizationId),
+      eq(roleAssignments.siteId, sites.id),
+      eq(roleAssignments.roleKey, "site_leader"),
+      activeRoleAssignmentPredicate(),
+      sql`${roleAssignments.capabilities} @> ${JSON.stringify(["onsite.attendance.record"])}::jsonb`,
       lte(programResponsibilityAssignments.effectiveFrom, at),
       gt(programResponsibilityAssignments.effectiveThrough, at),
+      eq(accountPersonGrants.active, true), eq(people.active, true),
+      eq(accessAccounts.disabled, false),
+      sql`${accessAccounts.emailVerifiedAt} is not null`,
     )).limit(1);
   return director?.personId ?? null;
 }

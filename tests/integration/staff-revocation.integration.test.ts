@@ -255,7 +255,7 @@ integration("staff revocation enforcement", () => {
       await realDb.transaction(async tx => {
         state.tx = tx;
         const s = await import("@/db/schema");
-        const { setSiteLocalDelegation, requireCurrentSiteLocalDelegate } =
+        const { setSiteLocalDelegation, requireCurrentSiteLocalDelegate, currentSiteDirectorPersonId } =
           await import("@/modules/operations/site-local-delegation.server");
         const suffix = crypto.randomUUID().slice(0, 8);
         const fixture = await seedChurchCanProgram(tx, suffix);
@@ -287,11 +287,27 @@ integration("staff revocation enforcement", () => {
         await expect(requireCurrentSiteLocalDelegate(tx, leader, program.id, "site_director"))
           .resolves.toBeUndefined();
 
+        expect(await currentSiteDirectorPersonId(tx, program.id)).toBe(leaderPerson.id);
+        // Appointment history alone must not keep routing work to ineligible people.
+        await tx.update(s.accountPersonGrants).set({active:false}).where(eq(s.accountPersonGrants.id,leaderGrant.id));
+        expect(await currentSiteDirectorPersonId(tx, program.id)).toBeNull();
+        await tx.update(s.accountPersonGrants).set({active:true}).where(eq(s.accountPersonGrants.id,leaderGrant.id));
+        await tx.update(s.accessAccounts).set({disabled:true}).where(eq(s.accessAccounts.id,leaderAccount.id));
+        expect(await currentSiteDirectorPersonId(tx, program.id)).toBeNull();
+        await tx.update(s.accessAccounts).set({disabled:false,emailVerifiedAt:null}).where(eq(s.accessAccounts.id,leaderAccount.id));
+        expect(await currentSiteDirectorPersonId(tx, program.id)).toBeNull();
+        await tx.update(s.accessAccounts).set({emailVerifiedAt:new Date()}).where(eq(s.accessAccounts.id,leaderAccount.id));
+        await tx.update(s.people).set({active:false}).where(eq(s.people.id,leaderPerson.id));
+        expect(await currentSiteDirectorPersonId(tx, program.id)).toBeNull();
+        await tx.update(s.people).set({active:true}).where(eq(s.people.id,leaderPerson.id));
+        expect(await currentSiteDirectorPersonId(tx, program.id)).toBe(leaderPerson.id);
+
         const revoked = await setSiteLocalDelegation(registrar, {
           programId: program.id, responsibility: "site_director", action: "revoke",
           expectedAssignmentId: assignmentId,
         });
         expect(revoked).toEqual({ changed: true, responsibility: "site_director", assignmentId });
+        expect(await currentSiteDirectorPersonId(tx, program.id)).toBeNull();
         await expect(requireCurrentSiteLocalDelegate(tx, leader, program.id, "site_director"))
           .rejects.toThrow("effective, named local Site responsibility");
 
