@@ -337,6 +337,13 @@
       "when": 1793225613547,
       "tag": "0047_ancient_may_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793298762009,
+      "tag": "0048_many_wasp",
+      "breakpoints": true
     }
   ]
 }

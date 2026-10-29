@@ -29,13 +29,17 @@ export const programSiteAuthorizations = pgTable("program_site_authorizations", 
   revokedByPersonId: uuid("revoked_by_person_id").references(() => people.id, { onDelete: "restrict" }),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   revocationReason: text("revocation_reason"),
+  suspendedByPersonId: uuid("suspended_by_person_id").references(() => people.id, { onDelete: "restrict" }),
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  suspensionReason: text("suspension_reason"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, table => [
   uniqueIndex("program_site_authorization_version_uq").on(table.programId,table.version),
   // Match the SQL migration's one-request-or-approval-per-Program uniqueness.
+  // A suspended row still occupies the current slot: resolution is resume or revoke.
   uniqueIndex("program_site_authorization_current_uq").on(table.programId)
-    .where(sql`${table.status} IN ('requested','approved')`),
+    .where(sql`${table.status} IN ('requested','approved','suspended')`),
   index("program_site_authorization_site_idx").on(table.siteId,table.status),
   index("program_site_authorization_institution_idx").on(table.institutionOrganizationId,table.status),
 ]);
