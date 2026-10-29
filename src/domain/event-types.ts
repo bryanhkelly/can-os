@@ -134,6 +134,8 @@ export const EventTypes = {
   StudentLearningAccessApproved: "StudentLearningAccessApproved",
   GuardianAccessRevoked: "GuardianAccessRevoked",
   GuardianAccessRestored: "GuardianAccessRestored",
+  StudentLearningAccessRevoked: "StudentLearningAccessRevoked",
+  StudentLearningAccessRestored: "StudentLearningAccessRestored",
   SectionProvisioned: "SectionProvisioned",
   SectionScheduleChanged: "SectionScheduleChanged",
   SectionClosed: "SectionClosed",
