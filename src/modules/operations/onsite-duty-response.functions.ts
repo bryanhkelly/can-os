@@ -257,15 +257,16 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
         } else {
           const ownerPersonId=await currentSiteDirectorPersonId(tx,block.programId);
           const [gap]=await tx.insert(actions).values({
-            type:gapActionType,status:"open",priority:"high",
-            title:"Coverage gap for scheduled onsite block on "+data.date,
-            description:"The assigned adult reported they cannot cover this scheduled block. Arrange a verified replacement and confirm the reviewed room, backup and qualification plan still holds.",
+            type:gapActionType,status:"open",priority:ownerPersonId?"high":"urgent",
+            title:(ownerPersonId?"Coverage gap":"Unassigned coverage escalation")+" for scheduled onsite block on "+data.date,
+            description:"The assigned adult reported they cannot cover this scheduled block. Arrange a verified replacement and confirm the reviewed room, backup and qualification plan still holds."+
+              (ownerPersonId?"":" No eligible current site director can receive this Action. The host registrar must appoint an eligible local director and assign this unresolved follow-up."),
             subjectType:"section",subjectId:data.sectionId,
             organizationId:site.organizationId,siteId:site.id,
             programId:block.programId,sectionId:data.sectionId,
             ownerPersonId,
             metadata:{date:data.date,periodId:data.periodId,planToken:block.planToken,responseId:record.id,
-              reason:data.reason??null},
+              reason:data.reason??null,ownerEscalation:ownerPersonId===null},
           }).returning({id:actions.id});
           if(!gap)throw new Error("Could not create coverage gap follow-up");
           coverageGapActionId=gap.id;
@@ -275,7 +276,8 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
             actorPersonId:actor.actorPersonId,
             organizationId:site.organizationId,siteId:site.id,programId:block.programId,
             payload:{type:gapActionType,sectionId:data.sectionId,date:data.date,
-              periodId:data.periodId,planToken:block.planToken,ownerPersonId,responseId:record.id},
+              periodId:data.periodId,planToken:block.planToken,ownerPersonId,responseId:record.id,
+              ownerEscalation:ownerPersonId===null},
           });
           if (ownerPersonId && ownerPersonId!==actor.actorPersonId) {
             await notifyMany(tx,[{

@@ -139,6 +139,18 @@ describe("daily operations attention", () => {
     expect(items.some(item => ["admissions", "documents", "academic", "staffing"].includes(item.category))).toBe(false);
   });
 
+  it("shows unassigned coverage escalations to local leaders without exposing unrelated unowned work", () => {
+    const items = buildDailyOperationsAttention({role:"site_leader",actorPersonId:"leader-1",actions:[
+      action("gap",{type:"onsite_coverage_gap",ownerPersonId:null,ownerName:null,priority:"critical"}),
+      action("ordinary",{ownerPersonId:null}),
+      action("case",{type:"safeguarding_concern",ownerPersonId:null}),
+    ]});
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({id:"action:gap",category:"staffing",priority:"critical",
+      ownerName:null,href:"/sites/site-1",
+      nextStep:"Ask the host registrar to appoint an eligible director and assign this gap"});
+  });
+
   it("keeps support and safeguarding details out of the broad attention projection", () => {
     const restricted = [
       "support_referral",

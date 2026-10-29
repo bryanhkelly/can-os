@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   predicates: [] as unknown[],
   inserts: [] as Record<string, unknown>[],
   update: vi.fn(),
+  director: "director" as string | null,
   block: {} as Record<string, unknown>,
 }));
 vi.mock("@tanstack/react-start", () => ({
@@ -31,7 +32,7 @@ vi.mock("@/modules/operations/onsite-supervision.functions", () => ({
 }));
 vi.mock("@/modules/programs/program-site-authorization.server", () => ({ requireChurchHostedOperatingServices: vi.fn() }));
 vi.mock("@/modules/operations/site-local-delegation.server", () => ({
-  currentSiteDirectorPersonId: async () => "director", requireCurrentSiteLocalDelegate: vi.fn(),
+  currentSiteDirectorPersonId: async () => state.director, requireCurrentSiteLocalDelegate: vi.fn(),
 }));
 vi.mock("@/modules/operations/site-section-facilitators.server", () => ({ requireCurrentSectionFacilitator: vi.fn() }));
 vi.mock("@/modules/operations/onsite-block-safety.server", () => ({ requireCurrentOnsiteAdultSafety: vi.fn() }));
@@ -65,7 +66,7 @@ const periodA = "00000000-0000-4000-8000-000000000002";
 const periodB = "00000000-0000-4000-8000-000000000003";
 const date = () => new Date().toISOString().slice(0, 10);
 beforeEach(() => {
-  vi.clearAllMocks(); state.rows = []; state.predicates = []; state.inserts = [];
+  vi.clearAllMocks(); state.rows = []; state.predicates = []; state.inserts = []; state.director = "director";
   state.actor = {
     actorPersonId: "adult", accountId: "account", sessionId: "session", grantId: "grant",
     grantSiteId: "site", role: "room_facilitator", capabilities: new Set(["onsite.attendance.record"]),
@@ -108,4 +109,16 @@ describe("scheduled-block coverage gap Actions", () => {
       type: "onsite_instruction_duty_response", metadata: { scope: "staff_availability_only" },
     });
   });
+  it("keeps an urgent explicit escalation open if no eligible director exists", async () => {
+    state.director = null;
+    await respondToOnsiteDuty({ data: {
+      date: date(), sectionId, periodId: periodA, response: "cannot_cover", reason: "unavailable", confirmed: true,
+    } });
+    expect(state.inserts[1]).toMatchObject({status:"open",priority:"urgent",ownerPersonId:null,
+      metadata:{ownerEscalation:true}});
+    expect(state.inserts[1].title).toContain("Unassigned coverage escalation");
+    expect(state.inserts[1].description).toContain("host registrar must appoint");
+    expect(state.update).not.toHaveBeenCalled();
+  });
+
 });
