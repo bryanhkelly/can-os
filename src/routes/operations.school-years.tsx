@@ -48,7 +48,7 @@ function Studio({data}:{data:Snapshot}){
    <h2 className="font-serif text-2xl">Create a school year</h2>
    <div className="mt-4 grid gap-3 sm:grid-cols-2">
     <label className="text-sm">Site<select value={siteId} onChange={e=>{setSiteId(e.target.value);setProgramId("");}} className="mt-1 w-full rounded border p-2 bg-background">{data.sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-    <label className="text-sm">Program (optional)<select value={programId} onChange={e=>setProgramId(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"><option value="">Site-wide</option>{scopedPrograms.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+    <label className="text-sm">Program (optional)<select value={programId} onChange={e=>setProgramId(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"><option value="">Site-wide</option>{scopedPrograms.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
     <label className="text-sm">Year name<input value={name} onChange={e=>setName(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"/></label>
     <label className="text-sm">Year key<input value={key} onChange={e=>setKey(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"/></label>
     <label className="text-sm">Starts<input type="date" value={start} onChange={e=>setStart(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"/></label>
@@ -156,10 +156,10 @@ function ScheduleEditor({schedule,busy,run}:{
     {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d,n)=><option key={n} value={n}>{d}</option>)}
    </select></label>
    <label className="text-xs">Order<input type="number" min={1} value={p.sequence} onChange={e=>change(i,"sequence",Number(e.target.value))} className="block w-14 rounded border bg-background p-1"/></label>
-   <label className="text-xs">Label<input value={p.label} onChange={e=>change(i,"label",e.target.value)} className="block rounded border bg-background p-1"/></label>
+   <label className="text-xs">Label<input value={p.label} onChange={e=>change(i,"label",e.target.value)} className="block w-28 rounded border bg-background p-1"/></label>
    <label className="text-xs">From<input type="time" value={p.startsAtLocal} onChange={e=>change(i,"startsAtLocal",e.target.value)} className="block rounded border bg-background p-1"/></label>
    <label className="text-xs">Until<input type="time" value={p.endsAtLocal} onChange={e=>change(i,"endsAtLocal",e.target.value)} className="block rounded border bg-background p-1"/></label>
-   <label className="text-xs">Type<select value={p.type} onChange={e=>change(i,"type",e.target.value as typeof p.type)} className="block rounded border bg-background p-1">
+   <label className="text-xs">Type<select value={p.type} onChange={e=>change(i,"type",e.target.value)} className="block rounded border bg-background p-1">
     {["instruction","break","lunch","chapel","advisory"].map(t=><option key={t} value={t}>{t}</option>)}
    </select></label>
    <button type="button" onClick={()=>setPeriods(rows=>rows.filter((_,n)=>n!==i))} className="text-xs underline">Remove</button>
