@@ -235,8 +235,15 @@ integration("Church-owned Site with independently authorized CAN academic servic
           reason:"The academic registrar is no longer assigned to this school.",
         });
         expect(await listDelegatedCANTranscriptPrograms(staffActor,tx)).toEqual([]);
+        expect((await listCANAcademicProgramStaff(steward,launch.programId)).current
+          .some(row=>row.id===granted.roleAssignmentId)).toBe(false);
+        await expect(revokeCANAcademicProgramStaff(steward,{
+          roleAssignmentId:granted.roleAssignmentId,reason:"Repeat revocation must not reactivate access.",
+        })).rejects.toThrow("specific CAN-owned academic staff delegation");
         const renewed=await delegateCANAcademicProgramStaff(steward,staffCommand);
-        expect(renewed.created).toBe(true);
+        expect(renewed).toEqual({roleAssignmentId:granted.roleAssignmentId,created:true});
+        expect(await listDelegatedCANTranscriptPrograms(staffActor,tx))
+          .toEqual([{programId:launch.programId,siteId:site.id}]);
         // Contracting authority is not a host registrar's CAN membership.
         await expect(requireInstitutionalAcademicProgramAuthority(tx,host,
           launch.programId,["academic_instruction","academic_records"]))
@@ -404,20 +411,42 @@ integration("Church-owned Site with independently authorized CAN academic servic
         // CAN account and historical Section assignment intact. Even an older
         // authenticated context must immediately lose this teaching access.
         expect((await staffedPublishedSectionIds([section!.id],tx)).has(section!.id)).toBe(true);
+        const complianceHistory=await tx.select({id:s.staffingEligibilityEvaluations.id})
+          .from(s.staffingEligibilityEvaluations)
+          .where(eq(s.staffingEligibilityEvaluations.roleAssignmentId,
+            teacherDelegation.roleAssignmentId));
+        expect(complianceHistory.length).toBeGreaterThan(0);
         await revokeCANAcademicProgramStaff(steward,{
           roleAssignmentId:teacherDelegation.roleAssignmentId,
           reason:"CAN withdraws this instructor from the contracted Program.",
         });
+        const [revokedAssignment]=await tx.select({
+          capabilities:s.roleAssignments.capabilities,
+          revokedAt:s.roleAssignments.metadata,
+        }).from(s.roleAssignments)
+          .where(eq(s.roleAssignments.id,teacherDelegation.roleAssignmentId));
+        expect(revokedAssignment?.capabilities).toEqual([]);
+        expect(revokedAssignment?.revokedAt?.revokedAt).toEqual(expect.any(String));
+        expect(await tx.select({id:s.staffingEligibilityEvaluations.id})
+          .from(s.staffingEligibilityEvaluations)
+          .where(eq(s.staffingEligibilityEvaluations.roleAssignmentId,
+            teacherDelegation.roleAssignmentId))).toEqual(complianceHistory);
         expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(false);
         expect((await staffedPublishedSectionIds([section!.id],tx)).has(section!.id)).toBe(false);
         await expect(authorizeClass(canTeacher as Actor,section!.id))
           .rejects.toThrow("current provider-owned teacher Program delegation");
         expect(await accessibleClasses(canTeacher as Actor)).toEqual([]);
         // Restore through the canonical command for the remaining agreement tests.
-        await delegateCANAcademicProgramStaff(steward,{
+        const restoredTeacherDelegation=await delegateCANAcademicProgramStaff(steward,{
           programId:launch.programId,personId:canPerson.id,role:"teacher",
           reason:"CAN restores instruction for the remaining acceptance checks.",
         });
+        expect(restoredTeacherDelegation).toEqual({
+          roleAssignmentId:teacherDelegation.roleAssignmentId,created:true,
+        });
+        expect((await verifiedTeacherSectionIds([section!.id],tx)).has(section!.id)).toBe(true);
+        expect((await authorizeClass(canTeacher as Actor,section!.id)).section.id)
+          .toBe(section!.id);
         const [original] = await tx.select({
           organizationId:s.programs.organizationId,
           status:s.programs.status,
@@ -490,5 +519,5 @@ integration("Church-owned Site with independently authorized CAN academic servic
     expect(await realDb.select({id:s.programSiteAuthorizations.id})
       .from(s.programSiteAuthorizations)
       .where(eq(s.programSiteAuthorizations.id,authorizationId))).toHaveLength(0);
-  },120_000);
+  },300_000);
 });
