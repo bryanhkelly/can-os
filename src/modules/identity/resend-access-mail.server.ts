@@ -3,7 +3,15 @@
  * Resend delivers mail; it never decides who the user is or what they can access.
  * Call from server code only; never import this module into a client component.
  */
-export type OneTimeAccessMessage = {to: string; accessUrl: string};
+export type OneTimeAccessMessage = {
+ to: string;
+ accessUrl: string;
+ /** Optional authorized outreach copy; the sender address remains server-configured. */
+ subject?: string;
+ introduction?: string;
+ /** Stable across retries of the same logical recipient. */
+ idempotencyKey?: string;
+};
 export type AccessEmailSender = (message: OneTimeAccessMessage) => Promise<void>;
 
 async function writeTestAccessMail(message:OneTimeAccessMessage):Promise<boolean>{
@@ -23,21 +31,26 @@ async function writeTestAccessMail(message:OneTimeAccessMessage):Promise<boolean
  return true;
 }
 
-export const sendAccessLinkViaResend: AccessEmailSender = async ({to,accessUrl}) => {
+export const sendAccessLinkViaResend: AccessEmailSender = async message => {
+ const {to,accessUrl}=message;
  const url=new URL(accessUrl);
  if(url.protocol!=="https:" || !url.hostname) throw new Error("Access link must use HTTPS");
  const allowedOrigin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
  if(!allowedOrigin || url.origin!==new URL(allowedOrigin).origin) throw new Error("Invalid access link origin");
- if(await writeTestAccessMail({to,accessUrl}))return;
+ if(await writeTestAccessMail(message))return;
  const apiKey=process.env.RESEND_API_KEY;
  const from=process.env.CAN_ACCESS_FROM_EMAIL;
  if(!apiKey || !from) throw new Error("Resend access mail is not configured");
+ const instructions=`Use this one-time link to sign in to CAN OS. It expires in 10 minutes. If you did not request it, you can ignore this message.\n\n${accessUrl}`;
  const response=await fetch("https://api.resend.com/emails",{
   method:"POST",
-  headers:{"Authorization":`Bearer ${apiKey}`,"Content-Type":"application/json"},
+  headers:{
+   "Authorization":`Bearer ${apiKey}`,"Content-Type":"application/json",
+   ...(message.idempotencyKey?{"Idempotency-Key":message.idempotencyKey}:{}),
+  },
   body:JSON.stringify({
-   from,to:[to],subject:"Your CAN OS sign-in link",
-   text:`Use this one-time link to sign in to CAN OS. It expires in 10 minutes. If you did not request it, you can ignore this message.\n\n${accessUrl}`
+   from,to:[to],subject:message.subject??"Your CAN OS sign-in link",
+   text:message.introduction?`${message.introduction}\n\n${instructions}`:instructions,
   }),
  });
  if(!response.ok) throw new Error("Unable to deliver access email");

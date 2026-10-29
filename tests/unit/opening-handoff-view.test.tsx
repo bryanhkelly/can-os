@@ -12,6 +12,9 @@ vi.mock("@tanstack/react-router",()=>({
   useRouter:()=>({invalidate:vi.fn()}),
 }));
 vi.mock("@/modules/programs/opening-handoff.functions",()=>({acknowledgeLaunchHandoff:vi.fn(),transferLaunchHandoff:vi.fn()}));
+vi.mock("@/modules/enrollment/family-invitations.functions",()=>({
+  listFamilyInvitations:vi.fn(),sendFamilyInvitations:vi.fn(),
+}));
 vi.mock("@/modules/programs/launch.functions",()=>({
   activateLaunch:vi.fn(),completeLaunchRequirement:vi.fn(),listLaunches:vi.fn(),listLaunchOptions:vi.fn(),
   startLaunch:vi.fn(),createLaunchSite:vi.fn(),scheduleLaunchOrientation:vi.fn(),

@@ -1,4 +1,5 @@
 import { FamilyInviteImporter } from "@/components/operations/FamilyInviteImporter";
+import { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
 import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useState } from "react";
@@ -23,12 +24,13 @@ export const Route = createFileRoute("/operations/launch/")({
       return {
         options: await listLaunchOptions(),
         launches: await listLaunches(),
+        familyInvitations: await listFamilyInvitations().catch(() => null),
         // A pending migration for extended programs must not prevent core school launch.
         extendedPlanning: await listExtendedSeasonPlanning().catch(() => null),
         authError: "",
       };
     } catch {
-      return { options: null, launches: null, extendedPlanning: null, authError: "Sign in with an authorized registrar account to manage program launches." };
+      return { options: null, launches: null, familyInvitations: null, extendedPlanning: null, authError: "Sign in with an authorized registrar account to manage program launches." };
     }
   },
   component: LaunchWizardPage,
@@ -36,9 +38,10 @@ export const Route = createFileRoute("/operations/launch/")({
 
 function LaunchWizardPage() {
   const selection=Route.useSearch();
-  const { options, launches, extendedPlanning, authError }: {
+  const { options, launches, familyInvitations, extendedPlanning, authError }: {
     options: Awaited<ReturnType<typeof listLaunchOptions>> | null;
     launches: Awaited<ReturnType<typeof listLaunches>> | null;
+    familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
     extendedPlanning: Awaited<ReturnType<typeof listExtendedSeasonPlanning>> | null;
     authError: string;
   } = Route.useLoaderData();
@@ -191,8 +194,8 @@ function LaunchWizardPage() {
         <OneHourSchoolLaunch launches={launches.launches} selectedProgramId={selection.programId}/>
 
         {launches.launches.length>0&&<details className="mt-5 rounded-xl border bg-card p-5">
-          <summary className="cursor-pointer text-sm font-semibold">Optional · Family outreach preparation</summary>
-          <FamilyInviteImporter schoolName={launches.launches.find(item=>item.id===selection.programId)?.name??launches.launches[0]?.name??"Your school"}/>
+          <summary className="cursor-pointer text-sm font-semibold">Optional · Family outreach</summary>
+          <FamilyInviteImporter workspace={familyInvitations} selectedProgramId={selection.programId}/>
         </details>}
 
         <details className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Advanced · Launch portfolio and detailed records</summary>

@@ -21,6 +21,7 @@ import {
 } from "@/modules/learning/academic-event-handler";
 import { handleNotificationPolicyEvent } from "@/platform/notifications/policy-handler";
 import { processEventSubscriptions } from "@/platform/subscriptions";
+import { handleFamilyInvitationBatch } from "@/modules/enrollment/family-invitations.server";
 
 export type DomainEventHandler = (eventId: string) => Promise<void>;
 
@@ -35,6 +36,7 @@ registerDomainEventHandler(EventTypes.AssessmentPublished, handleAcademicPassThr
 registerDomainEventHandler(EventTypes.AssignmentBecameMissing, handleAcademicInterventionEvent);
 registerDomainEventHandler(EventTypes.SubmissionReceived, handleSubmissionReceivedEvent);
 registerDomainEventHandler(EventTypes.GradePosted, handleGradePostedEvent);
+registerDomainEventHandler(EventTypes.FamilyInvitationBatchRequested, handleFamilyInvitationBatch);
 registerDomainEventHandler(EventTypes.CommunicationMessageSent, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.ClassAnnouncementPublished, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.AdmissionsStageChanged, handleNotificationPolicyEvent);
@@ -164,6 +166,8 @@ for (const eventType of [
   EventTypes.PublicAdmissionsInterestConverted,
   EventTypes.PublicFamilyStartRequested,
   EventTypes.PublicFamilyStartVerified,
+  EventTypes.FamilyInvitationRecipientStatusChanged,
+  EventTypes.FamilyInvitationBatchCompleted,
   EventTypes.StudentLearningAccessApproved,
   EventTypes.SectionProvisioned,
   EventTypes.SectionScheduleChanged,
