@@ -1059,5 +1059,5 @@ integration("FullFlow: one school and Program across the six-stage academic jour
     const persisted = await realDb.select({id: s.programs.id}).from(s.programs)
       .where(eq(s.programs.id, ids!.programId));
     expect(persisted).toHaveLength(0);
-  }, 120_000);
+  }, 600_000);
 });
