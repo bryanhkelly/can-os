@@ -315,6 +315,58 @@ integration("staff revocation enforcement", () => {
         expect(events).toHaveLength(1);
         expect(events[0]).toMatchObject({ payload: { responsibility: "site_director" } });
 
+        // The named duty's roleAssignments row is soft-revoked with the delegation.
+        const { activeRoleAssignmentPredicate } =
+          await import("@/modules/identity/role-assignment-state.server");
+        const dutyLink = first(await tx.select({
+          roleAssignmentId: s.programResponsibilityAssignments.responsibleRoleAssignmentId,
+        }).from(s.programResponsibilityAssignments)
+          .where(eq(s.programResponsibilityAssignments.id, assignmentId!)));
+        const dutyRoleId = dutyLink.roleAssignmentId!;
+        const revokedDuty = first(await tx.select().from(s.roleAssignments)
+          .where(eq(s.roleAssignments.id, dutyRoleId)));
+        expect(revokedDuty.capabilities).toEqual([]);
+        expect(revokedDuty.metadata).toMatchObject({
+          origin: "local_site_delegation", responsibility: "site_director",
+          revokedByPersonId: registrar.actorPersonId,
+        });
+        expect(typeof revokedDuty.metadata?.revokedAt).toBe("string");
+        expect(await tx.select({ id: s.roleAssignments.id }).from(s.roleAssignments)
+          .where(and(eq(s.roleAssignments.id, dutyRoleId), activeRoleAssignmentPredicate())))
+          .toHaveLength(0);
+
+        // Repeat-revoke of the already-ended duty keeps the existing no-op behavior.
+        const repeatRevoke = await setSiteLocalDelegation(registrar, {
+          programId: program.id, responsibility: "site_director", action: "revoke",
+          expectedAssignmentId: assignmentId,
+        });
+        expect(repeatRevoke).toEqual({ changed: false, responsibility: "site_director", assignmentId });
+
+        // Re-appointment restores the SAME retained row with live capabilities.
+        const reappointed = await setSiteLocalDelegation(registrar, {
+          programId: program.id, responsibility: "site_director", action: "appoint",
+          personId: leaderPerson.id,
+          validThrough: new Date(Date.now() + 30 * 86400_000).toISOString(),
+          expectedAssignmentId: assignmentId,
+        });
+        expect(reappointed).toEqual({ changed: true, responsibility: "site_director", assignmentId });
+        const restoredLink = first(await tx.select({
+          roleAssignmentId: s.programResponsibilityAssignments.responsibleRoleAssignmentId,
+        }).from(s.programResponsibilityAssignments)
+          .where(eq(s.programResponsibilityAssignments.id, assignmentId!)));
+        expect(restoredLink.roleAssignmentId).toBe(dutyRoleId);
+        const restoredDuty = first(await tx.select().from(s.roleAssignments)
+          .where(eq(s.roleAssignments.id, dutyRoleId)));
+        expect(restoredDuty.capabilities).toEqual(["onsite.attendance.record"]);
+        expect(restoredDuty.metadata?.revokedAt).toBeNull();
+        expect(restoredDuty.metadata?.revocationReason).toBeNull();
+        expect(restoredDuty.metadata?.revokedByPersonId).toBeNull();
+        expect(await tx.select({ id: s.roleAssignments.id }).from(s.roleAssignments)
+          .where(and(eq(s.roleAssignments.id, dutyRoleId), activeRoleAssignmentPredicate())))
+          .toHaveLength(1);
+        await expect(requireCurrentSiteLocalDelegate(tx, leader, program.id, "site_director"))
+          .resolves.toBeUndefined();
+
         // Wrong role: the delegate cannot run the issuer-side revocation function.
         await expect(setSiteLocalDelegation(leader, {
           programId: program.id, responsibility: "site_director", action: "revoke",
@@ -422,6 +474,53 @@ integration("staff revocation enforcement", () => {
           ));
         expect(events).toHaveLength(1);
 
+        // The facilitator's roleAssignments row is soft-revoked with the duty.
+        const { activeRoleAssignmentPredicate } =
+          await import("@/modules/identity/role-assignment-state.server");
+        const dutyLink = first(await tx.select({
+          roleAssignmentId: s.programResponsibilityAssignments.responsibleRoleAssignmentId,
+        }).from(s.programResponsibilityAssignments)
+          .where(eq(s.programResponsibilityAssignments.id, assignmentId!)));
+        const dutyRoleId = dutyLink.roleAssignmentId!;
+        const revokedDuty = first(await tx.select().from(s.roleAssignments)
+          .where(eq(s.roleAssignments.id, dutyRoleId)));
+        expect(revokedDuty.capabilities).toEqual([]);
+        expect(revokedDuty.metadata).toMatchObject({
+          origin: "local_section_facilitator", sectionId: section.id,
+          revokedByPersonId: registrar.actorPersonId,
+        });
+        expect(typeof revokedDuty.metadata?.revokedAt).toBe("string");
+        expect(await tx.select({ id: s.roleAssignments.id }).from(s.roleAssignments)
+          .where(and(eq(s.roleAssignments.id, dutyRoleId), activeRoleAssignmentPredicate())))
+          .toHaveLength(0);
+
+        // Repeat-revoke of the already-ended duty keeps the existing no-op behavior.
+        const repeatRevoke = await changeSectionFacilitator(registrar, {
+          sectionId: section.id, personId: facilitatorPerson.id, action: "revoke",
+          expectedAssignmentId: assignmentId,
+        });
+        expect(repeatRevoke).toEqual({ changed: false, assignmentId });
+
+        // Re-appointment restores the SAME retained row with live capabilities.
+        const reappointed = await changeSectionFacilitator(registrar, {
+          sectionId: section.id, personId: facilitatorPerson.id, action: "appoint",
+          expectedAssignmentId: assignmentId,
+          validThrough: new Date(Date.now() + 30 * 86400_000).toISOString(),
+        });
+        expect(reappointed).toEqual({ changed: true, assignmentId });
+        const restoredLink = first(await tx.select({
+          roleAssignmentId: s.programResponsibilityAssignments.responsibleRoleAssignmentId,
+        }).from(s.programResponsibilityAssignments)
+          .where(eq(s.programResponsibilityAssignments.id, assignmentId!)));
+        expect(restoredLink.roleAssignmentId).toBe(dutyRoleId);
+        const restoredDuty = first(await tx.select().from(s.roleAssignments)
+          .where(eq(s.roleAssignments.id, dutyRoleId)));
+        expect(restoredDuty.capabilities).toEqual(["onsite.attendance.record"]);
+        expect(restoredDuty.metadata?.revokedAt).toBeNull();
+        expect(restoredDuty.metadata?.revocationReason).toBeNull();
+        expect(restoredDuty.metadata?.revokedByPersonId).toBeNull();
+        expect(await activeFacilitatorSectionIds(tx, facilitator, program.id)).toEqual([section.id]);
+
         // Wrong role: the facilitator cannot run the issuer-side revocation function.
         await expect(changeSectionFacilitator(facilitator, {
           sectionId: section.id, personId: facilitatorPerson.id, action: "revoke",
@@ -442,6 +541,127 @@ integration("staff revocation enforcement", () => {
     } finally {
       state.tx = undefined;
       state.request = undefined;
+    }
+    expect(checked).toBe(true);
+  }, 120_000);
+
+  it("re-inviting a revoked site_website_editor restores the same roleAssignments row", async () => {
+    const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-publisher-reinvitation");
+    let checked = false;
+    try {
+      await realDb.transaction(async tx => {
+        state.tx = tx;
+        vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", PEPPER);
+        const s = await import("@/db/schema");
+        const { inviteStaffMember } = await import("@/modules/identity/admin.functions");
+        const { siteWebsitePublisherCapabilities } =
+          await import("@/modules/sites/site-publisher-invitation.server");
+        const { activeRoleAssignmentPredicate } =
+          await import("@/modules/identity/role-assignment-state.server");
+        const suffix = crypto.randomUUID().slice(0, 8);
+
+        const church = first(await tx.insert(s.organizations).values({
+          type: "church", name: `Publisher Church ${suffix}`, slug: `publisher-church-${suffix}`,
+        }).returning());
+        const site = first(await tx.insert(s.sites).values({
+          organizationId: church.id, name: "Publisher Campus", slug: `publisher-site-${suffix}`,
+        }).returning());
+        const registrarPerson = first(await tx.insert(s.people).values({
+          legalFirstName: "Publisher", legalLastName: `Registrar-${suffix}`,
+        }).returning());
+        const registrarAccount = first(await tx.insert(s.accessAccounts).values({
+          emailNormalized: `publisher-registrar-${suffix}@example.invalid`, emailVerifiedAt: new Date(),
+        }).returning());
+        const registrarGrant = first(await tx.insert(s.accountPersonGrants).values({
+          accountId: registrarAccount.id, personId: registrarPerson.id, role: "registrar",
+          organizationId: church.id, siteId: site.id,
+        }).returning());
+        state.request = await openSession(tx, registrarAccount.id, registrarGrant.id);
+
+        const inviteInput = {
+          email: `publisher-${suffix}@example.invalid`,
+          firstName: "Web", lastName: `Publisher-${suffix}`,
+          role: "site_website_editor" as const, siteId: site.id,
+        };
+        const invited = await inviteStaffMember({ data: inviteInput });
+        expect(invited).toMatchObject({ created: true, pending: true });
+        const invitedPersonId = invited.personId;
+
+        const liveAssignment = first(await tx.select().from(s.roleAssignments).where(and(
+          eq(s.roleAssignments.personId, invitedPersonId),
+          eq(s.roleAssignments.organizationId, church.id),
+          eq(s.roleAssignments.siteId, site.id),
+          eq(s.roleAssignments.roleKey, "site_website_editor"),
+        )));
+        const roleAssignmentId = liveAssignment.id;
+        expect([...liveAssignment.capabilities].sort())
+          .toEqual([...siteWebsitePublisherCapabilities].sort());
+
+        // No revocation path exists for site_website_editor today: set up the
+        // revoked state directly, mirroring the soft-revocation convention.
+        await tx.update(s.roleAssignments).set({
+          capabilities: [],
+          metadata: { ...liveAssignment.metadata, revokedAt: new Date().toISOString(),
+            revocationReason: "Website publishing duty withdrawn",
+            revokedByPersonId: registrarPerson.id },
+        }).where(eq(s.roleAssignments.id, roleAssignmentId));
+        expect(await tx.select({ id: s.roleAssignments.id }).from(s.roleAssignments)
+          .where(and(eq(s.roleAssignments.id, roleAssignmentId), activeRoleAssignmentPredicate())))
+          .toHaveLength(0);
+
+        // Keep the account→person link through an unrelated grant and remove
+        // the stale invitation grant so re-invitation re-provisions the role.
+        await tx.insert(s.accountPersonGrants).values({
+          accountId: invited.accountId, personId: invitedPersonId, role: "site_staff",
+          organizationId: church.id, siteId: site.id, active: false,
+        });
+        await tx.delete(s.accountPersonGrants)
+          .where(eq(s.accountPersonGrants.id, invited.grantId));
+
+        const reinvited = await inviteStaffMember({ data: inviteInput });
+        expect(reinvited).toMatchObject({ created: true, pending: true });
+        expect(reinvited.personId).toBe(invitedPersonId);
+
+        // The SAME retained row is restored; no duplicate assignment appears.
+        const restored = first(await tx.select().from(s.roleAssignments)
+          .where(eq(s.roleAssignments.id, roleAssignmentId)));
+        expect(restored.metadata?.revokedAt).toBeNull();
+        expect(restored.metadata?.revocationReason).toBeNull();
+        expect(restored.metadata?.revokedByPersonId).toBeNull();
+        expect([...restored.capabilities].sort())
+          .toEqual([...siteWebsitePublisherCapabilities].sort());
+        expect(await tx.select({ id: s.roleAssignments.id }).from(s.roleAssignments)
+          .where(and(eq(s.roleAssignments.id, roleAssignmentId), activeRoleAssignmentPredicate())))
+          .toHaveLength(1);
+        const allAssignments = await tx.select({ id: s.roleAssignments.id })
+          .from(s.roleAssignments).where(and(
+            eq(s.roleAssignments.personId, invitedPersonId),
+            eq(s.roleAssignments.roleKey, "site_website_editor"),
+          ));
+        expect(allAssignments).toEqual([{ id: roleAssignmentId }]);
+
+        // The invite path's normal event records the restored relationship.
+        const events = await tx.select({ payload: s.domainEvents.payload })
+          .from(s.domainEvents).where(and(
+            eq(s.domainEvents.eventType, "StaffInvitationIssued"),
+            eq(s.domainEvents.aggregateId, reinvited.grantId),
+          ));
+        expect(events).toHaveLength(1);
+        expect(events[0]!.payload).toMatchObject({
+          role: "site_website_editor",
+          publisherRelationship: { membershipCreated: false, assignmentCreated: true },
+        });
+
+        checked = true;
+        throw rollback;
+      });
+    } catch (error) {
+      if (error !== rollback) throw error;
+    } finally {
+      state.tx = undefined;
+      state.request = undefined;
+      vi.unstubAllEnvs();
     }
     expect(checked).toBe(true);
   }, 120_000);
