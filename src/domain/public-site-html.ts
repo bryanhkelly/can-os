@@ -1,5 +1,5 @@
 import type { PublicAcademicProgram } from "./academic-program-publication";
-import type { SiteLocalContent } from "./site-local-content";
+import { normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
 
 /** Standalone, escaped HTML. No hydration, external scripts or CAN OS shell. */
 type PublicOffering = ReturnType<typeof import("./public-site-catalog").toPublicSiteEnrichment>;
@@ -30,7 +30,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const school = escapePublicHtml(page.site.name);
   const org = escapePublicHtml(page.site.organizationName);
   const host = escapePublicHtml(page.host);
-  const local = page.localContent;
+  const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
+  const theme = local?.branding.theme ?? "classic";
   const localItems = local ? [
     ["Welcome", local.welcomeMessage],
     ["Our community", local.localDescription],
@@ -38,9 +39,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ["Statement of faith", local.statementOfFaith],
     ["Spiritual formation", local.spiritualFormation],
   ].filter((item): item is [string, string] => Boolean(item[1]?.trim())) : [];
-  const localSection = localItems.length ? `<section aria-labelledby="church-identity-title" class="church-section">
+  const image = local?.branding.heroImage;
+  const localSection = localItems.length || image ? `<section aria-labelledby="church-identity-title" class="church-section">
     <p class="tag">Content provided by the local church</p>
     <h2 id="church-identity-title">Our church and community</h2>
+    ${image ? `<img class="local-hero-image" src="${escapePublicHtml(image.dataUrl)}"
+      alt="${escapePublicHtml(image.altText)}" loading="lazy" decoding="async"/>` : ""}
     ${localItems.map(([label, value]) => `<div class="local-field">
       <h3>${escapePublicHtml(label)}</h3>
       <p>${escapePublicHtml(value)}</p>
@@ -138,6 +142,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
 <meta name="description" content="Explore programs offered through ${school}."/>
 <style>
 :root{font-family:ui-sans-serif,system-ui,sans-serif;color:#193047;background:#f6f8fa;line-height:1.5}
+body.theme-warm{color:#422f28;background:#fbf6ef}body.theme-light{color:#24313b;background:#fff}
 *{box-sizing:border-box}body{margin:0}header,main,footer{max-width:1160px;margin:auto;padding-left:clamp(20px,5vw,64px);padding-right:clamp(20px,5vw,64px)}
 header{padding-top:24px;padding-bottom:22px;border-bottom:1px solid #dce2e8;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
 .brand{font-size:.75rem;letter-spacing:.13em;text-transform:uppercase;font-weight:700;color:#475467}
@@ -154,6 +159,7 @@ main{padding-top:48px;padding-bottom:80px}
 .church-section{border:1px solid #dce2e8;border-radius:20px;padding:clamp(22px,4vw,40px);background:#fff;margin-bottom:48px}
 .local-field{margin-top:18px}.local-field h3{font-size:1rem;margin:0 0 6px}
 .local-field p{white-space:pre-line;overflow-wrap:anywhere;color:#475467;line-height:1.6;margin:0}
+.local-hero-image{display:block;width:100%;max-height:420px;object-fit:cover;border-radius:14px;margin:18px 0 24px}
 footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-size:.82rem;color:#667085}
 .inquiry-form{margin-top:22px;padding-top:18px;border-top:1px solid #dce2e8;display:grid;gap:12px}
 .inquiry-form label{display:grid;gap:5px;font-size:.82rem;color:#475467}
@@ -171,7 +177,7 @@ footer{border-top:1px solid #dce2e8;padding-top:22px;padding-bottom:40px;font-si
 .bot-field{display:none}
 </style>
 </head>
-<body>
+<body class="theme-${theme}">
 <header><p class="brand">CAN Academy · Local partner site</p><p>${org}</p></header>
 <main>
   <h1>${school}</h1>

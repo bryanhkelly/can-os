@@ -5,7 +5,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
-import type { SiteLocalContent } from "@/domain/site-local-content";
+import { normalizeSiteLocalContent, type SiteLocalContent } from "@/domain/site-local-content";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
@@ -28,7 +28,9 @@ export async function getPartnerWebsitePreview(actor: AccessContext) {
   const host = address ? publicSiteHost(address.slug) : null;
   const local = address ? await readCurrentLocalContent(site.id) : null;
   const history = address ? await readLocalContentHistory(site.id) : [];
-  const editingContent: SiteLocalContent | null = history[0]?.content ?? local?.content ?? null;
+  const latestContent = history[0]?.content ?? local?.content;
+  const editingContent: SiteLocalContent | null = latestContent
+    ? normalizeSiteLocalContent(latestContent) : null;
   return {
     siteName: site.name,
     organizationName: site.organizationName,

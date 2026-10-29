@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  accessAccounts, accountPersonGrants, auditEvents, domainEvents, people,
+  accessAccounts, accountPersonGrants, auditEvents, domainEvents, memberships, people, roleAssignments,
 } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
 
@@ -90,6 +90,28 @@ describe("authorized church-local invitation provisioning", () => {
     });
     expect(state.inserts.some(row => row.table === auditEvents && row.value.action === "admin.staff_invitation.issued")).toBe(true);
     expect(state.requestAccess).toHaveBeenCalledWith("director@example.test");
+  });
+
+  it("provisions a pending publisher with only the exact-Site website relationship", async () => {
+    state.selects.push(
+      [{ siteId: actor.grantSiteId }],
+      [{ id: input.siteId, organizationType: "church" }],
+      [], [], [], [], [],
+    );
+    const result = await state.handlers[3]!({ data: { ...input, role: "site_website_editor" } });
+    expect(result).toMatchObject({ created: true, pending: true, emailSent: true });
+    expect(state.inserts.find(row => row.table === accountPersonGrants)?.value).toMatchObject({
+      role: "site_website_editor", siteId: input.siteId, active: false,
+    });
+    expect(state.inserts.find(row => row.table === memberships)?.value).toMatchObject({
+      personId: "person-1", organizationId: actor.scope.organizationIds[0],
+    });
+    expect(state.inserts.find(row => row.table === roleAssignments)?.value).toMatchObject({
+      personId: "person-1", organizationId: actor.scope.organizationIds[0], siteId: input.siteId,
+      programId: null, roleKey: "site_website_editor",
+      capabilities: ["site.website.draft.read", "site.website.local.publish"],
+    });
+    expect(state.requestAccess).toHaveBeenCalledOnce();
   });
 
   it("rejects CAN institutional provisioning before any transaction", async () => {

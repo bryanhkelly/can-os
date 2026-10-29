@@ -164,9 +164,14 @@ function AdminConsolePage() {
                   <FormLabel className="text-sm font-semibold">Role</FormLabel>
                   <FormControl>
                     <select className={`${fieldClass} capitalize`} {...field}>
-                      {roles.map(option => <option key={option} value={option}>{option}</option>)}
+                      {roles.map(option => <option key={option} value={option}>{option.replaceAll("_", " ")}</option>)}
                     </select>
                   </FormControl>
+                  {field.value === "site_website_editor" && <p className="mt-2 text-xs text-muted-foreground">
+                    After secure email acceptance, this publisher can edit only church-owned website copy,
+                    branding and approved artwork at the selected Site. It grants no registrar, student-record,
+                    academic approval, institutional publication or administrator access.
+                  </p>}
                   <FormMessage />
                 </FormItem>
               )} />

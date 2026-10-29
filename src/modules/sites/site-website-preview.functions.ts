@@ -12,7 +12,10 @@ export const getPartnerWebsitePreviewView = createServerFn({ method: "GET" })
   });
 
 import { z } from "zod";
-import { siteLocalContentLimits } from "@/domain/site-local-content";
+import {
+  siteLocalContentLimits, siteLocalImageConsentStates, siteLocalImageMaxBase64Length,
+  siteLocalThemes,
+} from "@/domain/site-local-content";
 import { publishPartnerLocalContent } from "./site-local-content.server";
 
 const localFields = Object.fromEntries(
@@ -20,7 +23,18 @@ const localFields = Object.fromEntries(
     name, z.string().max(max),
   ]),
 ) as Record<keyof typeof siteLocalContentLimits, z.ZodString>;
-const localContentSchema = z.object(localFields).strict();
+const localContentSchema = z.object({
+  ...localFields,
+  branding: z.object({
+    theme: z.enum(siteLocalThemes),
+    heroImage: z.object({
+      dataUrl: z.string().max(siteLocalImageMaxBase64Length + 32),
+      altText: z.string().max(180),
+      rightsConfirmed: z.boolean(),
+      childImageConsent: z.enum(siteLocalImageConsentStates),
+    }).strict().nullable(),
+  }).strict(),
+}).strict();
 
 export const publishChurchWebsiteContent = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({

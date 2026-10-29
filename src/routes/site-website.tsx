@@ -1,8 +1,11 @@
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { Eye, Globe2, LockKeyhole, PencilLine } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
-import { emptySiteLocalContent, siteLocalContentLimits, type SiteLocalContent } from "@/domain/site-local-content";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  emptySiteLocalContent, siteLocalContentLimits, siteLocalImageMaxBytes,
+  siteLocalThemes, type SiteLocalContent, type SiteLocalImageConsent, type SiteLocalTextField,
+} from "@/domain/site-local-content";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -79,7 +82,47 @@ function PartnerSiteWebsitePage() {
   </WorkspaceShell>;
 }
 
-const churchFields: ReadonlyArray<{ key: keyof SiteLocalContent; label: string; help: string; multi: boolean }> = [
+function blobDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === "string"
+      ? resolve(reader.result) : reject(new Error("Artwork could not be read"));
+    reader.onerror = () => reject(new Error("Artwork could not be read"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Re-encoding removes source metadata and excludes SVG/external image loads. */
+async function prepareWebsiteArtwork(file: File): Promise<string> {
+  if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 8 * 1024 * 1024) {
+    throw new Error("Choose a PNG or JPEG image no larger than 8 MB");
+  }
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Artwork could not be decoded"));
+      image.src = sourceUrl;
+    });
+    const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Artwork processing is unavailable in this browser");
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const png = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
+    if (!png || png.size > siteLocalImageMaxBytes) {
+      throw new Error("Processed artwork must be no larger than 160 KB; choose a simpler or smaller image");
+    }
+    return blobDataUrl(png);
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+const churchFields: ReadonlyArray<{ key: SiteLocalTextField; label: string; help: string; multi: boolean }> = [
   { key: "welcomeMessage", label: "Welcome", help: "A message from your local church.", multi: true },
   { key: "localDescription", label: "Local community and school vision", help: "Local vision, history, activities and community information; do not promise official academic services.", multi: true },
   { key: "denomination", label: "Denominational affiliation", help: "Describe your church's identity. Do not claim an endorsement that has not been granted.", multi: false },
@@ -134,6 +177,21 @@ function LocalWebsiteCopyEditor({
     } finally { setBusy(false); }
   }
 
+  async function selectArtwork(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const dataUrl = await prepareWebsiteArtwork(file);
+      setContent(old => ({ ...old, branding: { ...old.branding, heroImage: {
+        dataUrl, altText: "", rightsConfirmed: false, childImageConsent: "unconfirmed",
+      } } }));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Artwork could not be prepared");
+    } finally { setBusy(false); }
+  }
+
   return <section aria-labelledby="local-copy-title" className="mt-6 rounded-xl border bg-card p-5">
     <h2 id="local-copy-title" className="text-xl font-semibold">Your church's website content</h2>
     <p className="mt-2 text-sm text-muted-foreground">
@@ -154,6 +212,60 @@ function LocalWebsiteCopyEditor({
     {error && <p role="alert" className="mt-3 rounded-lg border p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">{notice}</p>}
     <form onSubmit={event => void submit(event)} className="mt-5 space-y-4">
+      <fieldset disabled={busy || !data.canPublish} className="space-y-4 rounded-xl border p-4">
+        <legend className="px-2 text-sm font-semibold">Local branding and approved artwork</legend>
+        <label className="block text-sm">
+          <span className="font-medium">Theme</span>
+          <select value={content.branding.theme} onChange={event => setContent(old => ({
+            ...old, branding: { ...old.branding, theme: event.target.value as typeof siteLocalThemes[number] },
+          }))} className="mt-2 w-full rounded-lg border bg-background p-2 text-sm">
+            <option value="classic">Classic blue</option>
+            <option value="warm">Warm neutrals</option>
+            <option value="light">Simple light</option>
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium">Church or community artwork (optional)</span>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            PNG or JPEG, re-encoded locally to a metadata-free PNG. No remote URLs, embeds or tracking.
+          </span>
+          <input type="file" accept="image/png,image/jpeg" onChange={event => void selectArtwork(event)}
+            className="mt-2 block w-full text-sm" />
+        </label>
+        {content.branding.heroImage && <div className="space-y-3 rounded-lg bg-muted/40 p-3">
+          <img src={content.branding.heroImage.dataUrl} alt="Selected artwork preview"
+            className="max-h-52 w-full rounded-lg object-cover" />
+          <label className="block text-sm">
+            <span className="font-medium">Artwork description for screen readers</span>
+            <input type="text" required maxLength={180} value={content.branding.heroImage.altText}
+              onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
+                heroImage: old.branding.heroImage ? { ...old.branding.heroImage, altText: event.target.value } : null,
+              } }))} className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" required checked={content.branding.heroImage.rightsConfirmed}
+              onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
+                heroImage: old.branding.heroImage ? { ...old.branding.heroImage, rightsConfirmed: event.target.checked } : null,
+              } }))} className="mt-1" />
+            <span>I own this image or have documented permission to publish it on this public website.</span>
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium">Child privacy and consent</span>
+            <select required value={content.branding.heroImage.childImageConsent}
+              onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
+                heroImage: old.branding.heroImage ? { ...old.branding.heroImage,
+                  childImageConsent: event.target.value as SiteLocalImageConsent } : null,
+              } }))} className="mt-2 w-full rounded-lg border bg-background p-2 text-sm">
+              <option value="unconfirmed">Choose a confirmation</option>
+              <option value="no_identifiable_children">No identifiable children appear</option>
+              <option value="guardian_consent_confirmed">Documented guardian consent covers every identifiable child</option>
+            </select>
+          </label>
+          <button type="button" onClick={() => setContent(old => ({
+            ...old, branding: { ...old.branding, heroImage: null },
+          }))} className="rounded-lg border px-3 py-1 text-xs">Remove artwork</button>
+        </div>}
+      </fieldset>
       {churchFields.map(field => <label key={field.key} className="block text-sm">
         <span className="font-medium">{field.label}</span>
         <span className="mt-1 block text-xs text-muted-foreground">{field.help}</span>
@@ -173,9 +285,8 @@ function LocalWebsiteCopyEditor({
         {busy ? "Saving…" : "Publish church-owned content"}
       </button>
       <p className="text-xs text-muted-foreground">
-        Revision {data.currentRevision}. HTML, embeds and media uploads are not supported.
-        Student photographs, testimonials and social media links will receive separate
-        consent and safety controls in later bites.
+        Revision {data.currentRevision}. Raw HTML, embeds, testimonials and social links are not supported.
+        Artwork requires rights and child-privacy confirmations on every new revision.
       </p>
     </form>
     {data.localHistory.length > 0 && <div className="mt-8 border-t pt-5">

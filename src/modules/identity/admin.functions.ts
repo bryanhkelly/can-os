@@ -14,6 +14,7 @@ import {
 import {
   listPendingStaffInvitations, STAFF_INVITATION_AGGREGATE,
 } from "@/modules/identity/staff-invitations.server";
+import { provisionSiteWebsitePublisherRelationship } from "@/modules/sites/site-publisher-invitation.server";
 // The staff-invite flow must not grant student, guardian, or CAN institutional identities.
 const assignableRoles = localStaffInviteRoles;
 
@@ -248,17 +249,20 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
         accountId: account!.id, personId, role: data.role, organizationId, siteId, active: false,
       }).returning({ id: accountPersonGrants.id });
       if (!grant) throw new Error("Staff invitation grant could not be created");
+      const publisherRelationship = data.role === "site_website_editor"
+        ? await provisionSiteWebsitePublisherRelationship(tx, { personId, organizationId, siteId })
+        : null;
       await emitEvent(tx, {
         eventType: EventTypes.StaffInvitationIssued,
         aggregateType: STAFF_INVITATION_AGGREGATE,
         aggregateId: grant.id,
         actorPersonId: actor.actorPersonId,
         organizationId, siteId,
-        payload: { accountId: account!.id, personId, role: data.role },
+        payload: { accountId: account!.id, personId, role: data.role, publisherRelationship },
       });
       await recordAudit(tx, actor, {
         action: "admin.staff_invitation.issued", resourceType: STAFF_INVITATION_AGGREGATE, resourceId: grant.id,
-        after: { accountId: account!.id, personId, role: data.role, organizationId, siteId, active: false },
+        after: { accountId: account!.id, personId, role: data.role, organizationId, siteId, active: false, publisherRelationship },
         scope: { organizationId, siteId },
       });
       return { accountId: account!.id, personId, grantId: grant.id, created: true as const, pending: true };

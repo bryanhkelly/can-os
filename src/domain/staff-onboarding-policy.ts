@@ -5,6 +5,7 @@ import { AuthorizationError } from "@/domain/command-context";
 export const localStaffInviteRoles = [
   "teacher", "registrar", "specialist", "counselor", "room_facilitator",
   "site_staff", "site_leader", "paraeducator", "safeguarding_responder", "safeguarding_lead",
+  "site_website_editor",
 ] as const;
 
 export const localStaffInviteInput = z.object({
