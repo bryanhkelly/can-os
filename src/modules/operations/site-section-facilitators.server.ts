@@ -9,6 +9,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { assertLocalDelegationIssuer, delegationExpiration } from "@/domain/site-local-delegation-policy";
 import { sectionFacilitatorKey } from "@/domain/site-section-delegation";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { requiresIndependentChurchLocalDelegation } from "./site-local-delegation.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -197,6 +198,7 @@ export async function activeFacilitatorSectionIds(tx: Reader, actor: AccessConte
       eq(roleAssignments.roleKey, "room_facilitator"),
       eq(roleAssignments.programId, programId),
       eq(roleAssignments.siteId, actor.grantSiteId),
+      activeRoleAssignmentPredicate(),
       sql`${roleAssignments.capabilities} @> ${JSON.stringify(["onsite.attendance.record"])}::jsonb`,
       sql`${roleAssignments.metadata}->>'origin' = 'local_section_facilitator'`,
       sql`${roleAssignments.metadata}->>'sectionId' = ${sections.id}::text`,
