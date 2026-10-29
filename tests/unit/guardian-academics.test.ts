@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guardianFeedbackReleased, latestGuardianAttempts, guardianAssignmentSummary, priorReturnedGuardianFeedback } from "@/domain/guardian-academics";
+import { guardianFeedbackReleased, latestGuardianAttempts, guardianAssignmentSummary, priorReturnedGuardianFeedback, releasedGuardianAttempts } from "@/domain/guardian-academics";
 
 describe("guardian assignment release policy", () => {
  it("never exposes grades for drafts or submitted work", () => {
@@ -46,5 +46,26 @@ describe("guardian assignment release policy", () => {
  });
  it("handles assignments with no submissions", () => {
   expect(latestGuardianAttempts([{assessmentId:"a",attemptNumber:null}])).toHaveLength(1);
+ });
+});
+
+
+describe("guardian follow-up history across revisions",()=>{
+ it("retains only released attempts of the selected assessment without copying academic evidence",()=>{
+  const history=[
+   {assessmentId:"a",submissionId:"returned-1",attemptNumber:1,submissionStatus:"returned",score:"4",response:"Private response"},
+   {assessmentId:"a",submissionId:"graded-2",attemptNumber:2,submissionStatus:"graded",score:"8",response:"Other response"},
+   {assessmentId:"a",submissionId:"draft-3",attemptNumber:3,submissionStatus:"assigned",score:"private",response:"New draft"},
+   {assessmentId:"a",submissionId:"submitted-4",attemptNumber:4,submissionStatus:"submitted"},
+   {assessmentId:"b",submissionId:"unrelated",attemptNumber:1,submissionStatus:"graded"},
+  ];
+  expect(releasedGuardianAttempts(history,"a")).toEqual([
+   {submissionId:"graded-2",attemptNumber:2},{submissionId:"returned-1",attemptNumber:1},
+  ]);
+ });
+ it("excludes empty and unsubmitted assignment slots",()=>{
+  expect(releasedGuardianAttempts([
+   {assessmentId:"a",submissionId:null,attemptNumber:null,submissionStatus:null},
+  ],"a")).toEqual([]);
  });
 });
