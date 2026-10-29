@@ -30,8 +30,10 @@ function Studio({data}:{data:Snapshot}){
   return scales.length===1?scales[0]!.id:"";
  });
  const [newScaleName,setNewScaleName]=useState("Standard A–F");
- // Suggested from the current date; every field stays editable.
- const [suggestedYear]=useState(()=>suggestedSchoolYear());
+ // Prefer the selected Program's persisted target; no URL date or browser
+ // checklist becomes canonical planning state. Every field stays editable.
+ const [suggestedYear]=useState(()=>suggestedSchoolYear(new Date(),
+  data.programs.find(program=>program.id===selection.programId)?.targetOpeningDate));
  const [name,setName]=useState(suggestedYear.name);
  const [key,setKey]=useState(suggestedYear.key);
  const [start,setStart]=useState(suggestedYear.startsOn),[end,setEnd]=useState(suggestedYear.endsOn);
@@ -44,6 +46,7 @@ function Studio({data}:{data:Snapshot}){
  const scopedPrograms=data.programs.filter(p=>p.siteId===siteId);
  const site=data.sites.find(s=>s.id===siteId);
  const siteScales=data.gradeScales.filter(scale=>scale.organizationId===site?.organizationId);
+ const targetOpeningDate=scopedPrograms.find(program=>program.id===programId)?.targetOpeningDate;
  const selectedScaleId=siteScales.some(scale=>scale.id===scaleId)?scaleId:
   siteScales.length===1?siteScales[0]!.id:"";
  return <WorkspaceShell eyebrow="CAN OS · Academic operations" title="School-year studio"
@@ -62,6 +65,14 @@ function Studio({data}:{data:Snapshot}){
     <label className="text-sm">Ends<input type="date" value={end} onChange={e=>setEnd(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"/></label>
     <label className="text-sm sm:col-span-2">Grading scale<select value={selectedScaleId} onChange={e=>setScaleId(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"><option value="">Choose scale</option>{siteScales.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
    </div>
+   {targetOpeningDate&&<div className="mt-3 rounded border p-3 text-sm">
+    <p>Target opening: {targetOpeningDate}. Suggested dates are planning defaults; review terms,
+     instructional days and local calendar requirements before activation.</p>
+    <button type="button" disabled={busy} onClick={()=>{
+      const suggested=suggestedSchoolYear(new Date(),targetOpeningDate);
+      setName(suggested.name);setKey(suggested.key);setStart(suggested.startsOn);setEnd(suggested.endsOn);
+    }} className="mt-2 rounded border px-3 py-2 text-sm disabled:opacity-50">Use saved target opening date</button>
+   </div>}
    {!siteScales.length&&<p role="status" className="mt-3 text-sm">
     This school needs a grading scale. Create the standard scale below, then continue with its school year.
    </p>}
@@ -188,3 +199,4 @@ function ScheduleEditor({schedule,busy,run}:{
   </div>
  </div>;
 }
+
