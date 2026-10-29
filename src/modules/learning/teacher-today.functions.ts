@@ -109,7 +109,9 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   .where(and(
    inArray(s.assessments.sectionId, sectionIds),
    eq(s.sections.active, true),
-   eq(s.assessments.status, "published"),
+   // Closing submissions does not finish the teacher's grading obligation.
+   // Existing accepted work remains reviewable in the canonical gradebook.
+   inArray(s.assessments.status, ["published", "closed"]),
    eq(s.submissions.status, "submitted"),
    isNull(s.submissions.gradedAt),
    isNull(s.submissions.score),
