@@ -6,6 +6,7 @@ import {
 } from "@/db/schema";
 import { sectionFacilitatorKey } from "@/domain/site-section-delegation";
 import { coversLocalSupervisionBlock } from "@/domain/onsite-supervision-coverage";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 
 type Reader = Pick<typeof db, "select">;
 export type ScheduledSectionAdult = {
@@ -78,6 +79,7 @@ export async function verifiedScheduledSectionFacilitators(
       eq(roleAssignments.siteId, scope.siteId),
       eq(roleAssignments.roleKey, "room_facilitator"),
       sql`${roleAssignments.metadata}->>'origin' = 'local_section_facilitator'`,
+      activeRoleAssignmentPredicate(),
       sql`${roleAssignments.capabilities} @> ${JSON.stringify(["onsite.attendance.record"])}::jsonb`,
       eq(accountPersonGrants.active, true),
       eq(accountPersonGrants.isSynthetic, false),
