@@ -58,7 +58,7 @@ function Setup({data}:{data:Snapshot}){
     <p className="mt-1 font-serif text-3xl">{count}</p>
    </div>)}
   </div>
-  <ProgramSiteAuthorizationPanel programId={data.program.id}/>
+  <ProgramSiteAuthorizationPanel key={data.program.id} programId={data.program.id}/>
   {(!data.academicAuthority.teacherAssignment||!data.academicAuthority.creditConfiguration)&&
    <p role="status" className="mt-4 rounded-lg border border-warning/40 p-4 text-sm">
     Current academic authority is incomplete. Existing assignments, credits and official records remain visible,
@@ -243,3 +243,4 @@ function SectionRow({section,staff,busy,authority,assign,saveCredits}:{
   </div>}
  </article>;
 }
+
