@@ -6,6 +6,7 @@ import {
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireCurrentProgramSiteAuthorization } from "./program-site-authorization.server";
@@ -96,39 +97,51 @@ export async function delegateCANAcademicProgramStaff(
       isNull(roleAssignments.siteId),
       eq(roleAssignments.roleKey,input.role),
     )).limit(1);
+    const capabilities=input.role==="registrar"?[recordCapability]:["academic_instruction"];
+    let roleAssignmentId:string;
     if(existing){
       if(existing.metadata?.origin!==origin)
         throw new AuthorizationError("an existing independently managed CAN role must be reviewed separately");
-      return {roleAssignmentId:existing.id,created:false};
+      if(!existing.metadata?.revokedAt)return {roleAssignmentId:existing.id,created:false};
+      const [restored]=await tx.update(roleAssignments).set({
+        capabilities,
+        metadata:{...existing.metadata,authorizedByPersonId:actor.actorPersonId,
+          reason,contractService:serviceFor(input.role),revokedAt:null,
+          revocationReason:null,revokedByPersonId:null},
+        updatedAt:new Date(),
+      }).where(eq(roleAssignments.id,existing.id)).returning({id:roleAssignments.id});
+      if(!restored)throw new Error("Cannot restore exact academic Program role");
+      roleAssignmentId=restored.id;
+    }else{
+      const [created]=await tx.insert(roleAssignments).values({
+        personId:input.personId,organizationId:program.institutionId,
+        siteId:null,programId:input.programId,roleKey:input.role,capabilities,
+        metadata:{origin,authorizedByPersonId:actor.actorPersonId,
+          reason,contractService:serviceFor(input.role)},
+      }).returning({id:roleAssignments.id});
+      if(!created)throw new Error("Cannot grant exact academic Program role");
+      roleAssignmentId=created.id;
     }
-    const capabilities=input.role==="registrar"?[recordCapability]:["academic_instruction"];
-    const [created]=await tx.insert(roleAssignments).values({
-      personId:input.personId,organizationId:program.institutionId,
-      siteId:null,programId:input.programId,roleKey:input.role,capabilities,
-      metadata:{origin,authorizedByPersonId:actor.actorPersonId,
-        reason,contractService:serviceFor(input.role)},
-    }).returning({id:roleAssignments.id});
-    if(!created)throw new Error("Cannot grant exact academic Program role");
     await writeAudit(tx,actor,{
       action:"can.academic_program_staff.delegated",
-      entityType:"role_assignment",entityId:created.id,
+      entityType:"role_assignment",entityId:roleAssignmentId,
       scope:{organizationId:program.institutionId,siteId:program.siteId,
         programId:input.programId},
       after:{personId:input.personId,role:input.role,capabilities,reason},
     });
     await emitEvent(tx,{
       eventType:EventTypes.CANAcademicProgramStaffDelegated,
-      aggregateType:"role_assignment",aggregateId:created.id,
+      aggregateType:"role_assignment",aggregateId:roleAssignmentId,
       actorPersonId:actor.actorPersonId,organizationId:program.institutionId,
       siteId:program.siteId,programId:input.programId,
       payload:{personId:input.personId,role:input.role},
     });
-    return {roleAssignmentId:created.id,created:true};
+    return {roleAssignmentId,created:true};
   });
 }
 
 /** Revocation is always possible after a service contract lapses. The historic
- * staff assignment is retained in AuditEvent/DomainEvent, not a live role.
+ * assignment and its compliance evaluations are retained, never as a live role.
  */
 export async function revokeCANAcademicProgramStaff(
   actor:AccessContext,input:{roleAssignmentId:string;reason:string},
@@ -149,9 +162,15 @@ export async function revokeCANAcademicProgramStaff(
     if(!current || current.programId!==program.programId ||
        current.organizationId!==program.institutionId ||
        current.siteId!==null || current.metadata?.origin!==origin ||
-       !["teacher","registrar"].includes(current.roleKey))
+       current.metadata?.revokedAt || !["teacher","registrar"].includes(current.roleKey))
       throw new AuthorizationError("specific CAN-owned academic staff delegation");
-    await tx.delete(roleAssignments).where(eq(roleAssignments.id,current.id));
+    const revokedAt=new Date();
+    await tx.update(roleAssignments).set({
+      capabilities:[],
+      metadata:{...current.metadata,revokedAt:revokedAt.toISOString(),
+        revocationReason:reason,revokedByPersonId:actor.actorPersonId},
+      updatedAt:revokedAt,
+    }).where(eq(roleAssignments.id,current.id));
     await writeAudit(tx,actor,{
       action:"can.academic_program_staff.revoked",
       entityType:"role_assignment",entityId:current.id,
@@ -198,6 +217,7 @@ export async function listCANAcademicProgramStaff(
         eq(roleAssignments.programId,programId),
         isNull(roleAssignments.siteId),
         inArray(roleAssignments.roleKey,["teacher","registrar"]),
+        activeRoleAssignmentPredicate(),
       )).limit(101),
   ]);
   return {

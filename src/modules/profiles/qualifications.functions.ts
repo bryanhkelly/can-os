@@ -11,6 +11,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { credentialStatusFromDecision } from "@/domain/credential-workflow";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { requireActor, recordAudit, type Actor } from "@/modules/identity/actors.server";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { emitEvent } from "@/platform/mutation";
 import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
 import { assertScopedQualificationReviewer, reviewQualification } from "./qualification-review.server";
@@ -69,6 +70,7 @@ async function ownTeacher(actor: Actor, executor: Reader = db) {
     .innerJoin(people, eq(people.id, roleAssignments.personId))
     .where(and(eq(roleAssignments.personId, actor.actorPersonId), eq(people.active, true),
       eq(roleAssignments.roleKey, "teacher"),
+      activeRoleAssignmentPredicate(),
       inArray(roleAssignments.organizationId, actor.scope.organizationIds ?? []),
       or(isNull(roleAssignments.siteId), inArray(roleAssignments.siteId, actor.scope.siteIds ?? [])),
       or(isNull(roleAssignments.programId), inArray(roleAssignments.programId, actor.scope.programIds ?? [])),
@@ -92,6 +94,7 @@ async function authorizedSubject(actor: Actor, input: z.infer<typeof selection>,
   const [teacher] = await executor.select({ id: roleAssignments.id }).from(roleAssignments)
     .innerJoin(people, eq(people.id, roleAssignments.personId))
     .where(and(eq(roleAssignments.personId, personId), inArray(roleAssignments.roleKey,["teacher","room_facilitator","site_leader","site_staff"]), eq(people.active, true),
+      activeRoleAssignmentPredicate(),
       inArray(roleAssignments.organizationId, [program.organizationId, program.academicProviderOrganizationId]),
       or(isNull(roleAssignments.siteId), eq(roleAssignments.siteId, program.siteId)),
       or(isNull(roleAssignments.programId), eq(roleAssignments.programId, program.id)))).limit(1);
