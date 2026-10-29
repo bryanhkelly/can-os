@@ -337,19 +337,24 @@ export async function revokeProgramSiteAuthorization(
         identity.hostOrganizationId !== record.hostOrganizationId ||
         identity.institutionOrganizationId !== record.institutionOrganizationId)
       throw new AuthorizationError("unchanged contracting parties");
-    if (record.status !== "approved")
-      throw new Error("Only a currently approved authorization can be revoked");
+    if (record.status !== "approved" && record.status !== "suspended")
+      throw new Error("Only a currently approved or suspended authorization can be revoked");
     const now = new Date();
     await tx.update(programSiteAuthorizations).set({
+      // Suspension fields describe current state; immutable audits retain history.
       status: "revoked", revokedByPersonId: actor.actorPersonId,
       revokedAt: now, revocationReason: reason, updatedAt: now,
+      suspendedByPersonId: null, suspendedAt: null, suspensionReason: null,
     }).where(eq(programSiteAuthorizations.id, record.id));
     await writeAudit(tx, actor, {
       action: "program.site.authorization.revoke",
       entityType: "program_site_authorization", entityId: record.id,
       scope: { organizationId: identity.hostOrganizationId,
         siteId: identity.siteId, programId: identity.programId },
-      before: { status: "approved" }, after: { status: "revoked", reason },
+      before: { status: record.status, suspendedByPersonId: record.suspendedByPersonId,
+        suspendedAt: record.suspendedAt?.toISOString() ?? null,
+        suspensionReason: record.suspensionReason },
+      after: { status: "revoked", reason },
     });
     await emitEvent(tx, {
       eventType: EventTypes.ProgramSiteAuthorizationRevoked,
