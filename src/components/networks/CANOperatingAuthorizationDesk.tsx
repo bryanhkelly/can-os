@@ -57,7 +57,7 @@ export function CANOperatingAuthorizationDesk() {
           {item.lapsed&&<p className="mt-1 text-xs" role="status">
             Agreement window elapsed: delegated operations are blocked until renewal under fresh evidence.
           </p>}
-          {(item.status==="requested"||item.status==="approved")&&<div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {(item.status==="requested"||item.status==="approved"||item.status==="suspended")&&<div className="mt-3 grid gap-2 sm:grid-cols-2">
             {item.status==="requested"&&<>
               <div className="sm:col-span-2">
                 <OperatingAgreementEvidencePicker key={item.id} authorizationId={item.id}
@@ -84,7 +84,7 @@ export function CANOperatingAuthorizationDesk() {
                 <button type="button" disabled={busy||value.reason.trim().length<10}
                   onClick={()=>void decide(item.id,"denied")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Deny request</button>
               </>}
-              {item.status==="approved"&&<button type="button" disabled={busy||value.reason.trim().length<10}
+              {(item.status==="approved"||item.status==="suspended")&&<button type="button" disabled={busy||value.reason.trim().length<10}
                 onClick={()=>void decide(item.id,"revoked")} className="rounded border px-3 py-2 text-xs disabled:opacity-50">Revoke agreement</button>}
             </div>
           </div>}
