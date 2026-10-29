@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
-import { requestProgramSiteAuthorization, revokeProgramSiteAuthorization, suspendProgramSiteAuthorization, resumeProgramSiteAuthorization } from "@/modules/programs/program-site-authorization.server";
+import { requestProgramSiteAuthorization, revokeProgramSiteAuthorization, suspendProgramSiteAuthorization, resumeProgramSiteAuthorization, renewProgramSiteAuthorization } from "@/modules/programs/program-site-authorization.server";
+import { assertCurrentOperatingAuthorization, assertOperatingAgreementEvidence } from "@/domain/program-site-operating-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 const state = vi.hoisted(() => ({ rows: [] as unknown[][], writes: [] as Record<string, unknown>[] }));
@@ -92,5 +93,52 @@ describe("CAN-only suspension and resumption", () => {
     expect(state.writes[0]).toMatchObject({ status: result });
     expect(state.writes[0]).not.toHaveProperty("effectiveThrough");
     expect(emitEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ eventType }));
+  });
+});
+
+describe("renewal by a different independent CAN steward", () => {
+  it("keeps new evidence usable on the next entitlement read and audits the previous reviewer", async () => {
+    const before = new Date(Date.now() - 86_400_000);
+    const through = new Date(Date.now() + 86_400_000);
+    const renewedThrough = new Date(Date.now() + 86_400_000 * 30);
+    const agreement = { ...record, status: "approved", services: ["academic_instruction" as const],
+      requestedByPersonId: "requester", reviewedByPersonId: "original-approver",
+      reviewedAt: before, effectiveFrom: before, effectiveThrough: through,
+      revokedAt: null, evidenceDocumentId: "old-document", version: 1 };
+    const identity = { programId: "program", programOrganizationId: "church", siteId: "site",
+      siteOrganizationId: "church", hostOrganizationId: "church", hostOrganizationType: "church",
+      institutionOrganizationId: "can", institutionOrganizationType: "can_network",
+      creditIssuingOrganizationId: null };
+    const evidence = { subjectType: "program", subjectId: "program",
+      category: "program_site_operating_agreement", verifiedAt: before,
+      verifiedByPersonId: "original-approver", expiresAt: renewedThrough,
+      metadata: { hostOrganizationId: "church", institutionOrganizationId: "can", siteId: "site",
+        hostSignatureVerified: true, institutionSignatureVerified: true,
+        authorizedServices: ["academic_instruction"] } };
+    state.rows = [[agreement], ...identityRows(), [evidence]];
+    await expect(renewProgramSiteAuthorization(steward, {
+      authorizationId: "agreement", evidenceDocumentId: "renewal-document",
+      effectiveThrough: renewedThrough, reason: "Independent renewal by the current CAN steward.",
+    })).resolves.toEqual({ authorizationId: "agreement", renewed: true });
+    const renewed = { ...agreement, ...state.writes[0] } as typeof agreement;
+    // With the old approver retained, the new evidence fails the very next read.
+    expect(() => assertOperatingAgreementEvidence(evidence, identity, agreement.services,
+      agreement.requestedByPersonId, agreement.reviewedByPersonId, renewedThrough)).toThrow();
+    expect(() => assertOperatingAgreementEvidence(evidence, identity, renewed.services,
+      renewed.requestedByPersonId, renewed.reviewedByPersonId, renewedThrough)).not.toThrow();
+    expect(() => assertCurrentOperatingAuthorization(renewed, identity, ["academic_instruction"])).not.toThrow();
+    expect(writeAudit).toHaveBeenCalledWith(expect.anything(), steward, expect.objectContaining({
+      before: expect.objectContaining({ reviewedByPersonId: "original-approver",
+        reviewedAt: before.toISOString(), evidenceDocumentId: "old-document" }),
+      after: expect.objectContaining({ reviewedByPersonId: "steward", evidenceDocumentId: "renewal-document" }),
+    }));
+    // Renewal updates only agreement evidence, validity, reviewer and timestamp.
+    expect(Object.keys(state.writes[0]).sort()).toEqual([
+      "effectiveThrough", "evidenceDocumentId", "reviewedAt", "reviewedByPersonId", "updatedAt",
+    ]);
+    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(emitEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      eventType: "ProgramSiteAuthorizationRenewed",
+    }));
   });
 });

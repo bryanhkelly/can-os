@@ -525,6 +525,9 @@ export async function renewProgramSiteAuthorization(
       record.requestedByPersonId, actor.actorPersonId!, input.effectiveThrough, now);
     await tx.update(programSiteAuthorizations).set({
       effectiveThrough: input.effectiveThrough,
+      // Current evidence is checked against this decision's independent reviewer
+      // on subsequent entitlement reads, not the historical initial approver.
+      reviewedByPersonId: actor.actorPersonId, reviewedAt: now,
       evidenceDocumentId: input.evidenceDocumentId, updatedAt: now,
     }).where(eq(programSiteAuthorizations.id, record.id));
     await writeAudit(tx, actor, {
@@ -533,9 +536,12 @@ export async function renewProgramSiteAuthorization(
       scope: { organizationId: identity.institutionOrganizationId,
         siteId: identity.siteId, programId: identity.programId },
       before: { effectiveThrough: record.effectiveThrough?.toISOString() ?? null,
-        evidenceDocumentId: record.evidenceDocumentId },
+        evidenceDocumentId: record.evidenceDocumentId,
+        reviewedByPersonId: record.reviewedByPersonId,
+        reviewedAt: record.reviewedAt?.toISOString() ?? null },
       after: { effectiveThrough: input.effectiveThrough.toISOString(),
-        evidenceDocumentId: input.evidenceDocumentId, reason },
+        evidenceDocumentId: input.evidenceDocumentId,
+        reviewedByPersonId: actor.actorPersonId, reviewedAt: now.toISOString(), reason },
     });
     await emitEvent(tx, {
       eventType: EventTypes.ProgramSiteAuthorizationRenewed,
