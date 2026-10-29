@@ -24,7 +24,11 @@ function Studio({data}:{data:Snapshot}){
  const selection=Route.useSearch();
  const [siteId,setSiteId]=useState(selection.siteId??data.programs.find(p=>p.id===selection.programId)?.siteId??data.sites[0]?.id??"");
  const [programId,setProgramId]=useState(selection.programId??"");
- const [scaleId,setScaleId]=useState(data.gradeScales[0]?.id??"");
+ const [scaleId,setScaleId]=useState(()=>{
+  const selectedSite=data.sites.find(site=>site.id===siteId);
+  const scales=data.gradeScales.filter(scale=>scale.organizationId===selectedSite?.organizationId);
+  return scales.length===1?scales[0]!.id:"";
+ });
  const [newScaleName,setNewScaleName]=useState("Standard A–F");
  // Suggested from the current date; every field stays editable.
  const [suggestedYear]=useState(()=>suggestedSchoolYear());
@@ -39,6 +43,9 @@ function Studio({data}:{data:Snapshot}){
  }
  const scopedPrograms=data.programs.filter(p=>p.siteId===siteId);
  const site=data.sites.find(s=>s.id===siteId);
+ const siteScales=data.gradeScales.filter(scale=>scale.organizationId===site?.organizationId);
+ const selectedScaleId=siteScales.some(scale=>scale.id===scaleId)?scaleId:
+  siteScales.length===1?siteScales[0]!.id:"";
  return <WorkspaceShell eyebrow="CAN OS · Academic operations" title="School-year studio"
   subtitle="Configure site-owned school years, terms, grading periods and academic calendars. Activation requires readiness checks."
   actions={<Link to="/operations" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>}>
@@ -47,25 +54,31 @@ function Studio({data}:{data:Snapshot}){
   <section className="mt-8 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Create a school year</h2>
    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-    <label className="text-sm">Site<select value={siteId} onChange={e=>{setSiteId(e.target.value);setProgramId("");}} className="mt-1 w-full rounded border p-2 bg-background">{data.sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+    <label className="text-sm">Site<select value={siteId} onChange={e=>{setSiteId(e.target.value);setProgramId("");setScaleId("");}} className="mt-1 w-full rounded border p-2 bg-background">{data.sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
     <label className="text-sm">Program (optional)<select value={programId} onChange={e=>setProgramId(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"><option value="">Site-wide</option>{scopedPrograms.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
     <label className="text-sm">Year name<input value={name} onChange={e=>setName(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"/></label>
     <label className="text-sm">Year key<input value={key} onChange={e=>setKey(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"/></label>
     <label className="text-sm">Starts<input type="date" value={start} onChange={e=>setStart(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"/></label>
     <label className="text-sm">Ends<input type="date" value={end} onChange={e=>setEnd(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"/></label>
-    <label className="text-sm sm:col-span-2">Grading scale<select value={scaleId} onChange={e=>setScaleId(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"><option value="">Choose scale</option>{data.gradeScales.filter(g=>g.organizationId===site?.organizationId).map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+    <label className="text-sm sm:col-span-2">Grading scale<select value={selectedScaleId} onChange={e=>setScaleId(e.target.value)} className="mt-1 w-full rounded border p-2 bg-background"><option value="">Choose scale</option>{siteScales.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
    </div>
+   {!siteScales.length&&<p role="status" className="mt-3 text-sm">
+    This school needs a grading scale. Create the standard scale below, then continue with its school year.
+   </p>}
    <div className="mt-3 flex flex-wrap items-end gap-2">
     <label className="text-xs">New grading scale name
       <input value={newScaleName} onChange={e=>setNewScaleName(e.target.value)}
         className="mt-1 block rounded border bg-background p-2 text-sm"/>
     </label>
     <button type="button" disabled={busy||!site?.organizationId||!newScaleName.trim()}
-      onClick={()=>run(()=>createStudioGradeScale({data:{
-        organizationId:site!.organizationId,name:newScaleName}}))}
+      onClick={()=>run(async()=>{
+        const result=await createStudioGradeScale({data:{
+          organizationId:site!.organizationId,name:newScaleName}});
+        setScaleId(result.gradeScaleId);
+      })}
       className="rounded border px-3 py-2 text-sm disabled:opacity-50">Create standard A–F scale</button>
    </div>
-   <button disabled={busy||!siteId||!scaleId} onClick={()=>run(()=>createStudioYear({data:{siteId,...(programId?{programId}:{}),gradeScaleId:scaleId,key,name,startsOn:start,endsOn:end}}))} className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create school year</button>
+   <button disabled={busy||!siteId||!selectedScaleId} onClick={()=>run(()=>createStudioYear({data:{siteId,...(programId?{programId}:{}),gradeScaleId:selectedScaleId,key,name,startsOn:start,endsOn:end}}))} className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Create school year</button>
   </section>
   <h2 className="mt-10 font-serif text-2xl">School years</h2>
   <div className="mt-4 space-y-4">{data.years.filter(y=>!siteId||y.siteId===siteId).map(y=><YearCard key={y.id} year={y} busy={busy} run={run}/>)}
