@@ -26,7 +26,7 @@ function pepper():string {
  * submits the canonical Application from the signed-in guardian workspace.
  */
 export async function redeemPublicFamilyStart(rawToken:string):Promise<{
- setCookie:string;programId:string;
+ setCookie:string;programId:string;requestId:string;
 }> {
  if(!/^[A-Za-z0-9_-]{40,}$/.test(rawToken))throw new AuthorizationError("valid family verification link");
  const digest=hashAccessSecret(rawToken,pepper());
@@ -138,6 +138,6 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
     after:{status:"verified_email",guardianGrantId:createdGrant.id},
     context:{accountId:account.id,sessionId:session.id}});
   return {setCookie:sessionCookieHeader(sessionSecret,SESSION_LIFETIME_MS/1000),
-    programId:intent.programId};
+    programId:intent.programId,requestId:intent.id};
  });
 }

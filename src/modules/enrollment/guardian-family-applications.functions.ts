@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  accessAccounts, applications, guardianRelationships, householdMemberships, households,
-  people, programs, studentProfiles,
+  accessAccounts, admissionSeatPools, applications, guardianRelationships,
+  householdMemberships, households, people, programs, schoolYears, studentProfiles,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -33,6 +33,9 @@ const applicationInput = z.object({
   requestId: uuid,
   programId: uuid,
   householdId: uuid.optional(),
+  schoolYearId: uuid.optional(),
+  studentProfileId: uuid.optional(),
+  familyStartRequestId: uuid.optional(),
   studentFirstName: z.string().trim().min(1).max(100),
   studentLastName: z.string().trim().min(1).max(100),
   gradeLevel: z.string().trim().min(1).max(10),
@@ -49,7 +52,7 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
     const organizationIds=actor.scope.organizationIds??[];
     const siteIds=actor.scope.siteIds??[];
     if(!programIds.length || !organizationIds.length || !siteIds.length)
-      return {programs:[],applications:[],households:[]};
+      return {programs:[],applications:[],households:[],students:[]};
     const available=await db.select({
       id:programs.id,name:programs.name,siteId:programs.siteId,
     }).from(programs).where(and(
@@ -68,6 +71,22 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
       }
     }));
     const activePrograms=verified.filter((program):program is NonNullable<typeof program>=>program!==null);
+    const yearRows=activePrograms.length?await db.select({
+      programId:admissionSeatPools.programId,id:schoolYears.id,name:schoolYears.name,
+    }).from(admissionSeatPools)
+      .innerJoin(programs,eq(programs.id,admissionSeatPools.programId))
+      .innerJoin(schoolYears,eq(schoolYears.id,admissionSeatPools.schoolYearId))
+      .where(and(
+        inArray(admissionSeatPools.programId,activePrograms.map(program=>program.id)),
+        eq(schoolYears.status,"active"),
+        eq(schoolYears.organizationId,programs.organizationId),
+        eq(schoolYears.siteId,programs.siteId),
+        or(isNull(schoolYears.programId),eq(schoolYears.programId,programs.id)),
+      )).orderBy(schoolYears.name):[];
+    const programsWithYears=activePrograms.map(program=>({...program,
+      schoolYears:yearRows.filter(year=>year.programId===program.id)
+        .map(({id,name})=>({id,name}))}));
+
     // A registrar may have created an inquiry on behalf of a family.
     // The adult can resume it only AFTER the precise child relationship is
     // independently verified. Own submissions remain visible while pending.
@@ -83,6 +102,7 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
       programName:programs.name,studentPersonId:studentProfiles.personId,
       studentFirstName:people.legalFirstName,
       studentLastName:people.legalLastName,stage:applications.stage,
+      metadata:applications.metadata,siteId:programs.siteId,
       updatedAt:applications.updatedAt,
     }).from(applications)
       .innerJoin(programs,eq(programs.id,applications.programId))
@@ -99,12 +119,38 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
       .innerJoin(households,eq(households.id,householdMemberships.householdId))
       .where(eq(householdMemberships.personId,actor.actorPersonId))
       .orderBy(households.displayName).limit(100);
+    const verifiedStudents=verifiedStudentIds.length?await db.select({
+      studentProfileId:studentProfiles.id,studentPersonId:studentProfiles.personId,
+      studentFirstName:people.legalFirstName,studentLastName:people.legalLastName,
+      gradeLevel:studentProfiles.gradeLevel,
+    }).from(studentProfiles).innerJoin(people,eq(people.id,studentProfiles.personId))
+      .where(and(inArray(studentProfiles.personId,verifiedStudentIds),eq(people.active,true))):[];
+    const sharedMemberships=verifiedStudentIds.length&&families.length?await db.select({
+      studentPersonId:householdMemberships.personId,householdId:householdMemberships.householdId,
+    }).from(householdMemberships).where(and(
+      inArray(householdMemberships.personId,verifiedStudentIds),
+      inArray(householdMemberships.householdId,families.map(family=>family.id)),
+    )):[];
+    const students=verifiedStudents.flatMap(student=>sharedMemberships
+      .filter(membership=>membership.studentPersonId===student.studentPersonId)
+      .map(membership=>({...student,householdId:membership.householdId,
+        gradeLevel:student.gradeLevel??""})));
+    const applicationYearIds=[...new Set(existing.map(row=>
+      typeof row.metadata.schoolYearId==="string"?row.metadata.schoolYearId:null)
+      .filter((id):id is string=>!!id))];
+    const applicationYears=applicationYearIds.length?await db.select({id:schoolYears.id,
+      name:schoolYears.name}).from(schoolYears).where(inArray(schoolYears.id,applicationYearIds)):[];
     const verifiedIds=new Set(verifiedStudentIds);
-    return {programs:activePrograms, applications:existing.map(row=>({
-      ...row,
+    return {programs:programsWithYears, applications:existing.map(row=>({
+      applicationId:row.applicationId,programId:row.programId,programName:row.programName,
+      studentPersonId:row.studentPersonId,studentFirstName:row.studentFirstName,
+      studentLastName:row.studentLastName,stage:row.stage,siteId:row.siteId,
+      source:typeof row.metadata.source==="string"?row.metadata.source:null,
+      schoolYearId:typeof row.metadata.schoolYearId==="string"?row.metadata.schoolYearId:null,
+      schoolYearName:applicationYears.find(year=>year.id===row.metadata.schoolYearId)?.name??null,
       guardianVerified:verifiedIds.has(row.studentPersonId),
       updatedAt:row.updatedAt.toISOString(),
-    })),households:families};
+    })),households:families,students};
   });
 
 /** This calls the existing canonical Application/Journey transaction.
@@ -121,6 +167,10 @@ export const startGuardianFamilyApplication = createServerFn({method:"POST"})
       programId:data.programId,
       idempotencyKey:`guardian-application:${actor.actorPersonId}:${data.requestId}`,
       ...(data.householdId?{householdId:data.householdId}:{}),
+      ...(data.schoolYearId?{schoolYearId:data.schoolYearId}:{}),
+      ...(data.studentProfileId?{existingStudentProfileId:data.studentProfileId}:{}),
+      ...(data.familyStartRequestId?{familyStartRequestId:data.familyStartRequestId}:{}),
+      source:data.familyStartRequestId?"published_site":"family_account",
       student:{legalFirstName:data.studentFirstName,legalLastName:data.studentLastName,
         gradeLevel:data.gradeLevel},
       guardianRelationshipLabel:"parent_or_legal_guardian_unverified",

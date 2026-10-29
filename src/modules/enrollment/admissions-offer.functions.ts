@@ -9,6 +9,7 @@ import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {operationsSelectionSchema,resolveOperationsSelection} from "@/modules/operations/operations-scope.server";
 import {assertCapability,assertProgramScope,AuthorizationError} from "@/domain/command-context";
+import {familyApplicationSchoolYearId} from "@/domain/family-application-handoff";
 
 async function authorizedActor(role:"registrar"|"guardian",capability:string,programId:string){
  const actor=await getCommandContext(getRequest());
@@ -31,7 +32,10 @@ export const getAdmissionOfferOptions=createServerFn({method:"GET"})
  const apps=await db.select({id:applications.id,programId:applications.programId,metadata:applications.metadata}).from(applications).where(inArray(applications.programId,scoped.programIds)).limit(150);
  if(!apps.length)return [];
  const pools=await db.select({programId:admissionSeatPools.programId,schoolYearId:admissionSeatPools.schoolYearId,capacity:admissionSeatPools.capacity,name:schoolYears.name}).from(admissionSeatPools).innerJoin(schoolYears,eq(schoolYears.id,admissionSeatPools.schoolYearId)).where(inArray(admissionSeatPools.programId,scoped.programIds));
- return apps.map(app=>({applicationId:app.id,years:pools.filter(p=>p.programId===app.programId).map(p=>({id:p.schoolYearId,name:p.name,capacity:p.capacity}))}));
+ return apps.map(app=>({applicationId:app.id,years:pools.filter(p=>
+  p.programId===app.programId&&(!familyApplicationSchoolYearId(app.metadata)||
+   familyApplicationSchoolYearId(app.metadata)===p.schoolYearId))
+  .map(p=>({id:p.schoolYearId,name:p.name,capacity:p.capacity}))}));
 });
 
 async function loadApplication(id:string){

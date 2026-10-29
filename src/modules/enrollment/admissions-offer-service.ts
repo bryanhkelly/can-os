@@ -12,6 +12,7 @@ import { emitEvent,notify,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray } from "drizzle-orm";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
+import { assertFamilyApplicationOfferYear } from "@/domain/family-application-handoff";
 import { requireSectionForChurchHostedActivation } from "@/domain/accepted-offer-placement";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { activateSectionEnrollment } from "./section-allocation.service";
@@ -95,6 +96,7 @@ export async function issueSyntheticAdmissionOffer(context:AccessContext,input:{
   ]);
   assertRecordWriteAllowed(app.metadata,"registrar");
   assertApplicationOffersAllowed(app);
+  assertFamilyApplicationOfferYear(app.metadata,input.schoolYearId);
   const {pool}=await lockPool(tx,app.programId,input.schoolYearId);
   await expireElapsedOffers(tx,context,app.programId,input.schoolYearId,new Date());
   const [retry]=await tx.select().from(admissionOffers).where(eq(admissionOffers.idempotencyKey,input.idempotencyKey)).limit(1);

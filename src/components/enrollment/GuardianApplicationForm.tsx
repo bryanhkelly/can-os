@@ -7,8 +7,19 @@ import { Select } from "@/components/ui/select";
 import { WorkspaceNotice } from "@/components/workspace";
 import { GuidedSetupShell, type GuidedSetupStep } from "@/components/workflow";
 
-export interface GuardianApplicationProgram { id: string; name: string }
+export interface GuardianApplicationProgram {
+  id: string;
+  name: string;
+  schoolYears?: readonly { id: string; name: string }[];
+}
 export interface GuardianApplicationHousehold { id: string; name: string }
+export interface GuardianApplicationStudent {
+  studentProfileId: string;
+  studentFirstName: string;
+  studentLastName: string;
+  gradeLevel: string;
+  householdId: string;
+}
 export interface GuardianApplicationSubmission {
   requestId: string;
   programId: string;
@@ -16,6 +27,9 @@ export interface GuardianApplicationSubmission {
   studentLastName: string;
   gradeLevel: string;
   householdId?: string;
+  schoolYearId?: string;
+  studentProfileId?: string;
+  familyStartRequestId?: string;
 }
 
 const setupSteps: readonly GuidedSetupStep[] = [
@@ -25,10 +39,13 @@ const setupSteps: readonly GuidedSetupStep[] = [
   { id: "decision", title: "Decision", description: "Authorized school review", status: "upcoming" },
 ];
 
-export function GuardianApplicationForm({ programs, households, requestedProgramId, onSubmit, onSubmitted }: {
+export function GuardianApplicationForm({ programs, households, students = [], requestedProgramId,
+  familyStartRequestId, onSubmit, onSubmitted }: {
   programs: readonly GuardianApplicationProgram[];
   households: readonly GuardianApplicationHousehold[];
+  students?: readonly GuardianApplicationStudent[];
   requestedProgramId?: string;
+  familyStartRequestId?: string;
   onSubmit: (input: GuardianApplicationSubmission) => Promise<{ applicationId: string }>;
   onSubmitted?: () => Promise<void> | void;
 }) {
@@ -41,6 +58,10 @@ export function GuardianApplicationForm({ programs, households, requestedProgram
       setProgramId(requestedProgramId);
     }
   }, [requestedProgramId, programs]);
+  const selectedProgram = programs.find(program => program.id === programId);
+  const [schoolYearId, setSchoolYearId] = useState("");
+  const [studentOptionId, setStudentOptionId] = useState("");
+  const [studentProfileId, setStudentProfileId] = useState("");
   const [householdId, setHouseholdId] = useState(households[0]?.id ?? "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -54,6 +75,21 @@ export function GuardianApplicationForm({ programs, households, requestedProgram
     requestAnimationFrame(() => feedbackRef.current?.focus());
   }
 
+  function selectStudent(optionId: string) {
+    setStudentOptionId(optionId);
+    const student = students.find(item =>
+      `${item.studentProfileId}:${item.householdId}` === optionId);
+    setStudentProfileId(student?.studentProfileId ?? "");
+    if (!student) {
+      setFirstName(""); setLastName(""); setGrade("");
+      return;
+    }
+    setHouseholdId(student.householdId);
+    setFirstName(student.studentFirstName);
+    setLastName(student.studentLastName);
+    setGrade(student.gradeLevel);
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -64,9 +100,13 @@ export function GuardianApplicationForm({ programs, households, requestedProgram
         requestId, programId, studentFirstName: firstName,
         studentLastName: lastName, gradeLevel: grade,
         ...(householdId ? { householdId } : {}),
+        ...(schoolYearId ? { schoolYearId } : {}),
+        ...(studentProfileId ? { studentProfileId } : {}),
+        ...(familyStartRequestId ? { familyStartRequestId } : {}),
       });
-      setNotice(`Application received (${result.applicationId}). The school must independently verify your guardian relationship before forms, offers and academic access are enabled.`);
+      setNotice(`Application received (${result.applicationId}). Review its real school-managed status, checklist and offers here.`);
       setRequestId(crypto.randomUUID());
+      setStudentProfileId(""); setStudentOptionId("");
       setFirstName("");
       setLastName("");
       setGrade("");
@@ -80,11 +120,11 @@ export function GuardianApplicationForm({ programs, households, requestedProgram
     }
   }
 
-  return <GuidedSetupShell title="New student application"
+  return <GuidedSetupShell title="Student application"
     description="Start one canonical application. You can return to this workspace for the school's independent verification and next steps."
     steps={setupSteps} aside={<div className="text-sm leading-6 text-muted-foreground">
       <h3 className="font-semibold text-foreground">What submission does</h3>
-      <p className="mt-2">It creates an application and enrollment journey with guardian verification pending.</p>
+      <p className="mt-2">It creates an application and enrollment journey. A new guardian relationship remains pending independent verification.</p>
       <h3 className="mt-5 font-semibold text-foreground">What it does not do</h3>
       <p className="mt-2">It does not establish legal guardianship, accept an offer, activate enrollment or place a student into classes.</p>
     </div>}>
@@ -96,13 +136,36 @@ export function GuardianApplicationForm({ programs, households, requestedProgram
       <fieldset disabled={busy} className="contents">
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={`${id}-program`}>School and program</Label>
-          <Select id={`${id}-program`} name="programId" required value={programId} onChange={event => setProgramId(event.target.value)}>
+          <Select id={`${id}-program`} name="programId" required value={programId}
+            onChange={event => { setProgramId(event.target.value); setSchoolYearId(""); setStudentProfileId(""); setStudentOptionId(""); }}>
             {programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
           </Select>
         </div>
         <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor={`${id}-year`}>Application academic year</Label>
+          <Select id={`${id}-year`} name="schoolYearId" required value={schoolYearId}
+            onChange={event => setSchoolYearId(event.target.value)}>
+            <option value="">Select an academic year</option>
+            {selectedProgram?.schoolYears?.map(year => <option key={year.id} value={year.id}>{year.name}</option>)}
+          </Select>
+          {!selectedProgram?.schoolYears?.length && <p className="text-xs text-muted-foreground">
+            This school has not opened a configured academic year for family applications. Contact admissions.
+          </p>}
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor={`${id}-student`}>Student identity</Label>
+          <Select id={`${id}-student`} value={studentOptionId} onChange={event => selectStudent(event.target.value)}>
+            <option value="">A new student</option>
+            {students.map(student => <option key={`${student.studentProfileId}:${student.householdId}`}
+              value={`${student.studentProfileId}:${student.householdId}`}>
+              {student.studentFirstName} {student.studentLastName}
+            </option>)}
+          </Select>
+          <p className="text-xs leading-5 text-muted-foreground">Existing students appear only through a verified managing relationship and shared household.</p>
+        </div>
+        <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={`${id}-household`}>Family household</Label>
-          <Select id={`${id}-household`} name="householdId" value={householdId}
+          <Select id={`${id}-household`} name="householdId" value={householdId} disabled={!!studentProfileId}
             aria-describedby={`${id}-household-hint`} onChange={event => setHouseholdId(event.target.value)}>
             <option value="">Create a new family household</option>
             {households.map(family => <option key={family.id} value={family.id}>{family.name}</option>)}
@@ -114,21 +177,22 @@ export function GuardianApplicationForm({ programs, households, requestedProgram
         <div className="space-y-2">
           <Label htmlFor={`${id}-first-name`}>Student legal first name</Label>
           <Input id={`${id}-first-name`} name="studentFirstName" autoComplete="off" required maxLength={100}
-            value={firstName} onChange={event => setFirstName(event.target.value)} />
+            readOnly={!!studentProfileId} value={firstName} onChange={event => setFirstName(event.target.value)} />
         </div>
         <div className="space-y-2">
           <Label htmlFor={`${id}-last-name`}>Student legal last name</Label>
           <Input id={`${id}-last-name`} name="studentLastName" autoComplete="off" required maxLength={100}
-            value={lastName} onChange={event => setLastName(event.target.value)} />
+            readOnly={!!studentProfileId} value={lastName} onChange={event => setLastName(event.target.value)} />
         </div>
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={`${id}-grade`}>Entering grade level</Label>
           <Input id={`${id}-grade`} name="gradeLevel" required maxLength={10} value={grade}
-            aria-describedby={`${id}-grade-hint`} placeholder="For example, 9" onChange={event => setGrade(event.target.value)} />
+            readOnly={!!studentProfileId} aria-describedby={`${id}-grade-hint`} placeholder="For example, 9"
+            onChange={event => setGrade(event.target.value)} />
           <p id={`${id}-grade-hint`} className="text-xs leading-5 text-muted-foreground">Use the grade the student is applying to enter.</p>
         </div>
         <div className="sm:col-span-2">
-          <Button type="submit" size="lg" disabled={busy || !programId} aria-busy={busy}>
+          <Button type="submit" size="lg" disabled={busy || !programId || !schoolYearId} aria-busy={busy}>
             {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}
             {busy ? "Submitting application…" : "Submit application"}
           </Button>

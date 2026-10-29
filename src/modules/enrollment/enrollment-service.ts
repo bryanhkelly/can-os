@@ -1,5 +1,6 @@
 import { db } from "@/db/client";
 import {
+accessAccounts,
 admissionSeatPools,
 applications,
 enrollments,
@@ -10,11 +11,18 @@ journeys,
 journeyRequirements,
 people,
 programs,
+publicAdmissionsInterests,
+publicFamilyStartRequests,
 schoolYears,
 studentProfiles
 } from "@/db/schema";
 import { assertApplicationAcceptance,assertApplicationRetryOwnership } from "@/domain/admissions-transitions";
 import { assertGuardianApplicationOpening } from "@/domain/guardian-application-opening";
+import {
+assertFamilyApplicationRetry,
+assertVerifiedFamilyStudentReuse,
+schoolYearMatchesFamilyProgram,
+} from "@/domain/family-application-handoff";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {
 assertCapability,
@@ -29,7 +37,7 @@ import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
-import { and,eq,inArray,sql } from "drizzle-orm";
+import { and,desc,eq,inArray,isNotNull,isNull,sql } from "drizzle-orm";
 
 /** Enrollment commands must never interpret an absent program grant as global access. */
 function requireEnrollmentProgramScope(context:CommandContext,programId:string):void {
@@ -44,6 +52,10 @@ export async function startFamilyApplication(
     idempotencyKey: string;
     householdId?: string;
     householdDisplayName?: string;
+    schoolYearId?: string;
+    existingStudentProfileId?: string;
+    familyStartRequestId?: string;
+    source?: "family_account" | "published_site";
     student: {
       legalFirstName: string;
       legalLastName: string;
@@ -68,7 +80,12 @@ export async function startFamilyApplication(
     throw new AuthorizationError(`program scope: ${input.programId}`);
   }
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
+  if ((input.existingStudentProfileId || input.familyStartRequestId) && !input.parentSelfService) {
+    throw new AuthorizationError("verified guardian application handoff");
+  }
   const actorPersonId = context.actorPersonId;
+  const accountId = "accountId" in context && typeof context.accountId === "string"
+    ? context.accountId : null;
 
   return db.transaction(async (tx) => {
     if (input.parentSelfService) {
@@ -81,6 +98,7 @@ export async function startFamilyApplication(
       assertGuardianApplicationOpening(opening,context.scope);
       await requireChurchHostedOperatingServices(tx,input.programId,["admissions","school_of_record"]);
     }
+
     const [existing] = await tx
       .select({
         applicationId: applications.id,
@@ -88,6 +106,7 @@ export async function startFamilyApplication(
         studentProfileId: applications.studentProfileId,
         submittedByPersonId: applications.submittedByPersonId,
         programId: applications.programId,
+        metadata: applications.metadata,
       })
       .from(applications)
       .where(eq(applications.idempotencyKey, input.idempotencyKey))
@@ -95,10 +114,31 @@ export async function startFamilyApplication(
 
     if (existing) {
       assertApplicationRetryOwnership(existing,actorPersonId,input.programId);
+      assertFamilyApplicationRetry({application:{...existing,metadata:existing.metadata??{}},
+        studentProfileId:input.existingStudentProfileId,
+        schoolYearId:input.schoolYearId,familyStartRequestId:input.familyStartRequestId});
+      if (input.householdId && input.householdId !== existing.householdId) {
+        throw new Error("Application request key was reused for another Household");
+      }
       // Ownership of an old submission is not sufficient if household access was revoked.
       const [activeMembership] = await tx.select({id:householdMemberships.id}).from(householdMemberships)
         .where(and(eq(householdMemberships.householdId,existing.householdId),eq(householdMemberships.personId,actorPersonId))).limit(1);
       if (!activeMembership) throw new Error("Guardian is no longer a member of the Application Household");
+      if (input.existingStudentProfileId) {
+        const [profile] = await tx.select({personId:studentProfiles.personId}).from(studentProfiles)
+          .where(eq(studentProfiles.id,input.existingStudentProfileId)).limit(1);
+        const [relationship] = profile ? await tx.select({metadata:guardianRelationships.metadata,
+          canManageEnrollment:guardianRelationships.canManageEnrollment}).from(guardianRelationships)
+          .where(and(eq(guardianRelationships.guardianPersonId,actorPersonId),
+            eq(guardianRelationships.studentPersonId,profile.personId))).limit(1) : [];
+        const [studentMembership] = await tx.select({id:householdMemberships.id}).from(householdMemberships)
+          .where(and(eq(householdMemberships.householdId,existing.householdId),
+            eq(householdMemberships.personId,profile?.personId??""))).limit(1);
+        assertVerifiedFamilyStudentReuse({relationship:relationship ? {
+          verification:relationship.metadata.verification,
+          canManageEnrollment:relationship.canManageEnrollment,
+        } : null,adultHouseholdMember:true,studentHouseholdMember:!!studentMembership});
+      }
       const [existingJourney] = await tx
         .select({ id: journeys.id })
         .from(journeys)
@@ -123,15 +163,49 @@ export async function startFamilyApplication(
     }
 
     const [program] = await tx
-      .select({ id: programs.id, organizationId: programs.organizationId, metadata: programs.metadata })
+      .select({ id: programs.id, organizationId: programs.organizationId,
+        siteId: programs.siteId, metadata: programs.metadata })
       .from(programs)
       .where(eq(programs.id, input.programId))
       .limit(1);
-
     if (!program) throw new Error("Program not found");
     requireEnrollmentProgramScope(context, input.programId);
 
+    if (input.schoolYearId) {
+      const [year] = await tx.select({id:schoolYears.id,organizationId:schoolYears.organizationId,
+        siteId:schoolYears.siteId,programId:schoolYears.programId,status:schoolYears.status})
+        .from(schoolYears).where(eq(schoolYears.id,input.schoolYearId)).limit(1);
+      if (!schoolYearMatchesFamilyProgram(year,program)) {
+        throw new Error("School year must be active and belong to the application's Program and Site");
+      }
+    }
+
+    let familyStart: {id:string;email:string} | undefined;
+    if (input.familyStartRequestId) {
+      if (!accountId || !program.siteId) throw new AuthorizationError("verified family account and Site");
+      const [start] = await tx.select({id:publicFamilyStartRequests.id,
+        email:publicFamilyStartRequests.emailNormalized})
+        .from(publicFamilyStartRequests)
+        .innerJoin(accessAccounts,and(
+          eq(accessAccounts.id,accountId),
+          eq(accessAccounts.emailNormalized,publicFamilyStartRequests.emailNormalized),
+        ))
+        .where(and(
+          eq(publicFamilyStartRequests.id,input.familyStartRequestId),
+          eq(publicFamilyStartRequests.programId,program.id),
+          eq(publicFamilyStartRequests.siteId,program.siteId),
+          isNotNull(publicFamilyStartRequests.consumedAt),
+          isNotNull(accessAccounts.emailVerifiedAt),
+        )).limit(1);
+      if (!start) throw new AuthorizationError("verified family start for this account, Site and Program");
+      familyStart = start;
+    }
+
     let householdId = input.householdId;
+    let actorHouseholdMember = false;
+    if (input.existingStudentProfileId && !householdId) {
+      throw new Error("Select the student's existing shared Household");
+    }
 
     if (householdId) {
       const [membership] = await tx
@@ -148,6 +222,7 @@ export async function startFamilyApplication(
       if (!membership) {
         throw new Error("Guardian is not a member of the supplied Household");
       }
+      actorHouseholdMember = true;
       // Serialize sibling submissions within the same household. Never merge
       // two children based solely on a matching name; require admissions
       // review if the household already has that student's open application.
@@ -172,6 +247,7 @@ export async function startFamilyApplication(
         relationshipLabel: "guardian",
         isPrimaryContact: true,
       });
+      actorHouseholdMember = true;
     }
 
     if(input.parentSelfService) {
@@ -179,60 +255,91 @@ export async function startFamilyApplication(
         .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
         .innerJoin(people,eq(people.id,studentProfiles.personId))
         .where(and(eq(applications.programId,input.programId),
-          // This exact authenticated adult's own submission or a child
-          // already in their selected Household. Never match by surname
-          // alone, and never infer a verified guardian relationship.
-          sql`(${applications.submittedByPersonId} = ${actorPersonId}
-            OR ${applications.householdId} = ${householdId})`,
           inArray(applications.stage,["inquiry","application","eligibility","accepted"]),
-          sql`lower(btrim(${people.legalFirstName})) = ${input.student.legalFirstName.trim().toLowerCase()}`,
-          sql`lower(btrim(${people.legalLastName})) = ${input.student.legalLastName.trim().toLowerCase()}`,
+          ...(input.existingStudentProfileId ? [
+            eq(applications.studentProfileId,input.existingStudentProfileId),
+          ] : [
+            // Never match a new student by surname alone outside this exact
+            // authenticated adult's submission or selected Household.
+            sql`(${applications.submittedByPersonId} = ${actorPersonId}
+              OR ${applications.householdId} = ${householdId})`,
+            sql`lower(btrim(${people.legalFirstName})) = ${input.student.legalFirstName.trim().toLowerCase()}`,
+            sql`lower(btrim(${people.legalLastName})) = ${input.student.legalLastName.trim().toLowerCase()}`,
+          ]),
         )).limit(1);
-      if(duplicate)throw new Error("This household already has an open application for this student and school. Continue that application or contact admissions for identity resolution.");
+      if(duplicate)throw new Error("This student already has an open application for this Program. Continue that application or contact admissions for identity resolution.");
     }
 
-    const [studentPerson] = await tx
-      .insert(people)
-      .values({
-        legalFirstName: input.student.legalFirstName,
-        legalLastName: input.student.legalLastName,
-        preferredName: input.student.preferredName,
-      })
-      .returning({ id: people.id });
+    let studentProfileId: string;
+    let reusedVerifiedStudent = false;
+    if (input.existingStudentProfileId) {
+      const [profile] = await tx.select({id:studentProfiles.id,personId:studentProfiles.personId})
+        .from(studentProfiles).where(eq(studentProfiles.id,input.existingStudentProfileId))
+        .for("update").limit(1);
+      const [studentPerson] = profile ? await tx.select({id:people.id}).from(people)
+        .where(and(eq(people.id,profile.personId),eq(people.active,true))).limit(1) : [];
+      if (!profile || !studentPerson) throw new AuthorizationError("active existing student identity");
+      const [relationship] = await tx.select({metadata:guardianRelationships.metadata,
+        canManageEnrollment:guardianRelationships.canManageEnrollment}).from(guardianRelationships)
+        .where(and(eq(guardianRelationships.guardianPersonId,actorPersonId),
+          eq(guardianRelationships.studentPersonId,profile.personId))).for("share").limit(1);
+      const [studentMembership] = await tx.select({id:householdMemberships.id}).from(householdMemberships)
+        .where(and(eq(householdMemberships.householdId,householdId),
+          eq(householdMemberships.personId,profile.personId))).limit(1);
+      assertVerifiedFamilyStudentReuse({relationship:relationship ? {
+        verification:relationship.metadata.verification,
+        canManageEnrollment:relationship.canManageEnrollment,
+      } : null,adultHouseholdMember:actorHouseholdMember,
+        studentHouseholdMember:!!studentMembership});
+      studentProfileId = profile.id;
+      reusedVerifiedStudent = true;
+    } else {
+      const [studentPerson] = await tx
+        .insert(people)
+        .values({
+          legalFirstName: input.student.legalFirstName,
+          legalLastName: input.student.legalLastName,
+          preferredName: input.student.preferredName,
+        })
+        .returning({ id: people.id });
 
-    if (!studentPerson) throw new Error("Failed to create Student Person");
+      if (!studentPerson) throw new Error("Failed to create Student Person");
 
-    await tx.insert(householdMemberships).values({
-      householdId,
-      personId: studentPerson.id,
-      relationshipLabel: "student",
-      isPrimaryContact: false,
-    });
-
-    await tx.insert(guardianRelationships).values({
-      guardianPersonId: actorPersonId,
-      studentPersonId: studentPerson.id,
-      relationshipLabel: input.guardianRelationshipLabel ?? "parent",
-      ...(input.parentSelfService ? {canViewAcademics:false,canManageEnrollment:false,
-        canSubmitAttendanceExcuse:false,
-        metadata:{verification:"pending",source:"authenticated_guardian_application"}} : {}),
-    });
-
-    const [studentProfile] = await tx
-      .insert(studentProfiles)
-      .values({
+      await tx.insert(householdMemberships).values({
+        householdId,
         personId: studentPerson.id,
-        gradeLevel: input.student.gradeLevel,
-      })
-      .returning({ id: studentProfiles.id });
+        relationshipLabel: "student",
+        isPrimaryContact: false,
+      });
 
-    if (!studentProfile) throw new Error("Failed to create StudentProfile");
+      await tx.insert(guardianRelationships).values({
+        guardianPersonId: actorPersonId,
+        studentPersonId: studentPerson.id,
+        relationshipLabel: input.guardianRelationshipLabel ?? "parent",
+        ...(input.parentSelfService ? {canViewAcademics:false,canManageEnrollment:false,
+          canSubmitAttendanceExcuse:false,
+          metadata:{verification:"pending",source:"authenticated_guardian_application"}} : {}),
+      });
 
+      const [studentProfile] = await tx
+        .insert(studentProfiles)
+        .values({
+          personId: studentPerson.id,
+          gradeLevel: input.student.gradeLevel,
+        })
+        .returning({ id: studentProfiles.id });
+
+      if (!studentProfile) throw new Error("Failed to create StudentProfile");
+      studentProfileId = studentProfile.id;
+    }
+
+    const source = familyStart ? "published_site" : input.source ??
+      (input.parentSelfService ? "family_account" : undefined);
     const [application] = await tx
       .insert(applications)
       .values({
         householdId,
-        studentProfileId: studentProfile.id,
+        studentProfileId,
         programId: input.programId,
         stage: "application",
         idempotencyKey: input.idempotencyKey,
@@ -240,7 +347,13 @@ export async function startFamilyApplication(
         submittedAt: new Date(),
         ...(input.parentSelfService ? {metadata:{
           origin:"authenticated_guardian_application",
-          guardianVerification:"pending",
+          guardianVerification:reusedVerifiedStudent ? "verified" : "pending",
+          contactPersonId:actorPersonId,
+          studentIdentityReused:reusedVerifiedStudent,
+          ...(source ? {source} : {}),
+          ...(program.siteId ? {siteId:program.siteId} : {}),
+          ...(input.schoolYearId ? {schoolYearId:input.schoolYearId} : {}),
+          ...(familyStart ? {publicFamilyStartRequestId:familyStart.id} : {}),
         }} : {}),
       })
       .returning({ id: applications.id });
@@ -259,6 +372,45 @@ export async function startFamilyApplication(
       insertErrorLabel: "Enrollment",
     });
 
+    if (familyStart && program.siteId) {
+      // A matching public inquiry is provenance only. The email challenge and
+      // account were verified above; the child's guardian relationship remains
+      // pending unless an existing verified relationship was explicitly reused.
+      const [interest] = await tx.select({id:publicAdmissionsInterests.id,
+        status:publicAdmissionsInterests.status}).from(publicAdmissionsInterests)
+        .where(and(
+          eq(publicAdmissionsInterests.programId,program.id),
+          eq(publicAdmissionsInterests.siteId,program.siteId),
+          inArray(publicAdmissionsInterests.status,["new","contacted"]),
+          isNull(publicAdmissionsInterests.applicationId),
+          sql`lower(btrim(${publicAdmissionsInterests.contactEmail})) = ${familyStart.email}`,
+        )).orderBy(desc(publicAdmissionsInterests.createdAt)).for("update").limit(1);
+      if (interest) {
+        const now = new Date();
+        await tx.update(publicAdmissionsInterests).set({applicationId:application.id,
+          status:"converted",convertedAt:now,convertedByPersonId:actorPersonId,updatedAt:now})
+          .where(eq(publicAdmissionsInterests.id,interest.id));
+        await tx.update(applications).set({metadata:{
+          origin:"authenticated_guardian_application",
+          guardianVerification:reusedVerifiedStudent ? "verified" : "pending",
+          contactPersonId:actorPersonId,studentIdentityReused:reusedVerifiedStudent,
+          source:"published_site",siteId:program.siteId,
+          ...(input.schoolYearId ? {schoolYearId:input.schoolYearId} : {}),
+          publicFamilyStartRequestId:familyStart.id,publicInterestId:interest.id,
+        }}).where(eq(applications.id,application.id));
+        await emitEvent(tx,{eventType:EventTypes.PublicAdmissionsInterestConverted,
+          aggregateType:"public_admissions_interest",aggregateId:interest.id,
+          actorPersonId,organizationId:program.organizationId,siteId:program.siteId,
+          programId:program.id,payload:{applicationId:application.id,status:"converted",
+            verifiedFamilyStartRequestId:familyStart.id}});
+        await writeAudit(tx,context,{action:"admissions.public_interest.convert",
+          entityType:"public_admissions_interest",entityId:interest.id,
+          scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
+          before:{status:interest.status},after:{status:"converted",applicationId:application.id,
+            verifiedEmailFamilyStart:true,guardianRelationshipVerification:reusedVerifiedStudent?"verified":"pending"}});
+      }
+    }
+
     await emitEvent(tx, {
       eventType: EventTypes.ApplicationStarted,
       aggregateType: "application",
@@ -266,8 +418,12 @@ export async function startFamilyApplication(
       actorPersonId: actorPersonId,
       payload: {
         householdId,
-        studentProfileId: studentProfile.id,
+        studentProfileId,
         programId: input.programId,
+        siteId: program.siteId,
+        schoolYearId: input.schoolYearId ?? null,
+        source: source ?? null,
+        studentIdentityReused: reusedVerifiedStudent,
         journeyId,
       },
     });
@@ -278,12 +434,17 @@ export async function startFamilyApplication(
       entityId: application.id,
       scope: {
         organizationId: program.organizationId,
+        siteId: program.siteId,
         programId: input.programId,
       },
       after: {
         stage: "application",
         householdId,
-        studentProfileId: studentProfile.id,
+        studentProfileId,
+        siteId: program.siteId,
+        schoolYearId: input.schoolYearId ?? null,
+        source: source ?? null,
+        studentIdentityReused: reusedVerifiedStudent,
       },
       contextExtras: { idempotencyKey: input.idempotencyKey },
     });
@@ -291,7 +452,7 @@ export async function startFamilyApplication(
     return {
       applicationId: application.id,
       householdId,
-      studentProfileId: studentProfile.id,
+      studentProfileId,
       journeyId,
     };
   });

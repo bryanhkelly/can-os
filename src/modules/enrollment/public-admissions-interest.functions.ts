@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import { programs, publicAdmissionsInterests } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { requestPublicFamilyStart, resolvePublishedFamilyStartDestination } from "./public-family-start.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
@@ -57,6 +58,66 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       contactedAt: row.contactedAt?.toISOString() ?? null,
       convertedAt: row.convertedAt?.toISOString() ?? null,
     }));
+  });
+
+/** Send the canonical adult-only verified-email application entry. The public
+ * inquiry remains unverified contact data and no child or guardian authority
+ * is created by this invitation. */
+export const invitePublicAdmissionsInterestToApply = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({interestId:z.string().uuid()}).strict().parse(value))
+  .handler(async ({data}) => {
+    const actor = await requireAdmissionsIntakeReader();
+    const [interest] = await db.select({
+      id:publicAdmissionsInterests.id,status:publicAdmissionsInterests.status,
+      applicationId:publicAdmissionsInterests.applicationId,
+      siteId:publicAdmissionsInterests.siteId,programId:publicAdmissionsInterests.programId,
+      organizationId:programs.organizationId,
+      firstName:publicAdmissionsInterests.contactFirstName,
+      lastName:publicAdmissionsInterests.contactLastName,
+      email:publicAdmissionsInterests.contactEmail,
+    }).from(publicAdmissionsInterests)
+      .innerJoin(programs,eq(programs.id,publicAdmissionsInterests.programId))
+      .where(and(
+        eq(publicAdmissionsInterests.id,data.interestId),
+        eq(publicAdmissionsInterests.siteId,programs.siteId),
+        inArray(publicAdmissionsInterests.programId,actor.scope.programIds),
+        inArray(programs.organizationId,actor.scope.organizationIds),
+        inArray(publicAdmissionsInterests.siteId,actor.scope.siteIds??[]),
+      )).limit(1);
+    if (!interest) throw new AuthorizationError("admissions interest scope");
+    if (!["new","contacted"].includes(interest.status) || interest.applicationId)
+      throw new Error("This inquiry is no longer available for an application invitation");
+    const destination = await resolvePublishedFamilyStartDestination(db,interest.programId);
+    if (destination.siteId!==interest.siteId || destination.organizationId!==interest.organizationId)
+      throw new AuthorizationError("published family application destination");
+    const outcome = await requestPublicFamilyStart(destination.slug,{
+      requestId:crypto.randomUUID(),programId:interest.programId,
+      firstName:interest.firstName,lastName:interest.lastName,email:interest.email,
+      contactConsent:"yes",website:"",
+    },undefined,{idempotencyKey:`public-interest:${interest.id}`});
+    await db.transaction(async tx => {
+      const [current] = await tx.select({id:publicAdmissionsInterests.id,
+        status:publicAdmissionsInterests.status,contactedAt:publicAdmissionsInterests.contactedAt})
+        .from(publicAdmissionsInterests).where(and(
+          eq(publicAdmissionsInterests.id,interest.id),
+          inArray(publicAdmissionsInterests.status,["new","contacted"]),
+        )).for("update").limit(1);
+      if (!current) throw new Error("Inquiry changed while the family invitation was sent");
+      const now = new Date();
+      await tx.update(publicAdmissionsInterests).set({status:"contacted",
+        contactedAt:current.contactedAt??now,updatedAt:now})
+        .where(eq(publicAdmissionsInterests.id,interest.id));
+      await writeAudit(tx,actor,{action:"admissions.public_interest.family_start_invite",
+        entityType:"public_admissions_interest",entityId:interest.id,
+        scope:{organizationId:interest.organizationId,siteId:interest.siteId,programId:interest.programId},
+        before:{status:current.status},after:{status:"contacted",familyStartRequestId:outcome.requestId}});
+      await emitEvent(tx,{eventType:EventTypes.PublicAdmissionsInterestStatusChanged,
+        aggregateType:"public_admissions_interest",aggregateId:interest.id,
+        actorPersonId:actor.actorPersonId,organizationId:interest.organizationId,
+        siteId:interest.siteId,programId:interest.programId,
+        payload:{status:"contacted",familyStartRequestId:outcome.requestId}});
+    });
+    return outcome;
   });
 
 export const setPublicAdmissionsInterestStatus = createServerFn({ method: "POST" })

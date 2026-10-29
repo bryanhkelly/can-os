@@ -10,8 +10,9 @@ import {
 } from "@/modules/enrollment/guardian-family-applications.functions";
 
 export const Route = createFileRoute("/guardian/apply")({
-  validateSearch: (search: Record<string, unknown>): { programId?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { programId?: string; familyStart?: string } => ({
     programId: typeof search.programId === "string" ? search.programId : undefined,
+    familyStart: typeof search.familyStart === "string" ? search.familyStart : undefined,
   }),
   loader: safeLoader(getGuardianFamilyApplicationWorkspace, {
     authMessage: "Sign in with your verified family account to apply to a school.",
@@ -29,7 +30,7 @@ function GuardianApplyWorkspace({ data }: {
   data: Awaited<ReturnType<typeof getGuardianFamilyApplicationWorkspace>>;
 }) {
   const router = useRouter();
-  const requestedProgramId = Route.useSearch().programId;
+  const { programId: requestedProgramId, familyStart } = Route.useSearch();
 
   return <WorkspaceShell eyebrow="CAN OS · Family" title="Apply to a school"
     subtitle="Start a real academic application for an eligible CAN school. An application does not automatically approve enrollment or grant access to a child's records."
@@ -50,7 +51,11 @@ function GuardianApplyWorkspace({ data }: {
               ? "Review your enrollment checklist and any offers. Verification does not itself activate enrollment."
               : "Admissions must independently verify your relationship before forms, offers or child academic records become available."}
           </p>
-          <p className="mt-2 text-xs text-muted-foreground">Last updated {new Date(app.updatedAt).toLocaleDateString()}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {app.schoolYearName ? `${app.schoolYearName} · ` : ""}
+            {app.source === "published_site" ? "Published school website" : "Family account"} ·
+            Last updated {new Date(app.updatedAt).toLocaleDateString()}
+          </p>
           {app.guardianVerified && <Button asChild variant="outline" size="sm" className="mt-4"><Link to="/guardian/admission-offers"
             search={{ application: app.applicationId }}>Resume this student's enrollment checklist →</Link></Button>}
         </article>)}
@@ -61,7 +66,8 @@ function GuardianApplyWorkspace({ data }: {
       </Link></Button>
     </WorkspacePanel>
     <div className="mt-6">
-      <GuardianApplicationForm programs={data.programs} households={data.households} requestedProgramId={requestedProgramId}
+      <GuardianApplicationForm programs={data.programs} households={data.households}
+        students={data.students} requestedProgramId={requestedProgramId} familyStartRequestId={familyStart}
         onSubmit={input => startGuardianFamilyApplication({ data: input })}
         onSubmitted={async () => { await router.invalidate(); }} />
     </div>

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import {
-  listPublicAdmissionsInterests, setPublicAdmissionsInterestStatus,
+  invitePublicAdmissionsInterestToApply, listPublicAdmissionsInterests,
+  setPublicAdmissionsInterestStatus,
 } from "@/modules/enrollment/public-admissions-interest.functions";
 
 type Row = Awaited<ReturnType<typeof listPublicAdmissionsInterests>>[number];
@@ -24,6 +25,18 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
       await router.invalidate();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not update interest.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+  async function inviteToApply(row: Row) {
+    setBusyId(row.id); setError(""); setNotice("");
+    try {
+      await invitePublicAdmissionsInterestToApply({data:{interestId:row.id}});
+      setNotice("Verified-email application invitation requested. This does not verify guardianship or create an Application.");
+      await router.invalidate();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not invite family to apply.");
     } finally {
       setBusyId(null);
     }
@@ -62,6 +75,12 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
               className="rounded-lg border px-3 py-2 text-xs font-semibold">
               Review and create inquiry
             </Link>}
+            {!row.applicationId && ["new","contacted"].includes(row.status) &&
+              <button type="button" disabled={busyId !== null}
+                onClick={() => void inviteToApply(row)}
+                className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">
+                Invite to apply
+              </button>}
             {row.status === "new" && <button type="button" disabled={busyId !== null}
               onClick={() => void changeStatus(row, "contacted")}
               className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">

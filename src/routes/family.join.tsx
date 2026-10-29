@@ -19,7 +19,7 @@ export const Route=createFileRoute("/family/join")({
    try{
      const {redeemPublicFamilyStart}=await import("@/modules/enrollment/public-family-redeem.server");
      const redeemed=await redeemPublicFamilyStart(body.token);
-     return Response.json({ok:true,programId:redeemed.programId},{
+     return Response.json({ok:true,programId:redeemed.programId,requestId:redeemed.requestId},{
        headers:{"Cache-Control":"no-store","Set-Cookie":redeemed.setCookie,
          "Referrer-Policy":"no-referrer"}});
    }catch{
@@ -51,9 +51,10 @@ function FamilyJoinPage(){
        return;
      }
      setToken(null);
-     const result=await response.json() as {programId:string};
+     const result=await response.json() as {programId:string;requestId:string};
      const dest=new URL("/guardian/apply",window.location.origin);
      dest.searchParams.set("programId",result.programId);
+     dest.searchParams.set("familyStart",result.requestId);
      window.location.replace(dest.toString());
    }catch{setStatus("Unable to verify your email right now.");}
    finally{setBusy(false);}
