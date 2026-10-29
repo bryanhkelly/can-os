@@ -39,7 +39,7 @@ const applicant=z.union([
   guardianLastName:z.string().trim().min(1).max(100),guardianEmail:z.string().trim().email(),
  }).strict(),
 ]);
-async function registrar(){
+export async function registrar(){
  const actor=await getCommandContext(getRequest());
  if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.programIds?.length)throw new AuthorizationError("admissions registrar");
  assertCapability(actor,"enrollment.decide");
