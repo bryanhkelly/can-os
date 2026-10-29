@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ assessment: {} as Record<string, unknown>, writes: vi.fn() }));
+const state = vi.hoisted(() => ({ assessment: {} as Record<string, unknown>, latest: null as Record<string, unknown> | null, writes: vi.fn() }));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({ validator: () => ({ handler: (handler: unknown) => handler }), handler: (handler: unknown) => handler }),
 }));
@@ -15,22 +15,26 @@ vi.mock("@/modules/learning/gradebook.functions", () => ({
   createAssessment: vi.fn(), gradeSubmission: vi.fn(), manageAssessment: vi.fn(), returnSubmissionForRevision: vi.fn(),
 }));
 vi.mock("@/db/client", () => {
+  let reads = 0;
   const query = () => {
+    const assessmentRead = reads++ === 0;
     const chain: Record<string, unknown> = {};
-    for (const method of ["from", "innerJoin", "where"]) chain[method] = () => chain;
-    chain.limit = async () => [state.assessment];
+    for (const method of ["from", "innerJoin", "where", "orderBy"]) chain[method] = () => chain;
+    chain.limit = () => assessmentRead ? Promise.resolve([state.assessment])
+      : { for: async () => state.latest ? [state.latest] : [] };
     return chain;
   };
   return { db: {
     select: () => ({ from: () => ({ where: () => ({ limit: async () => [{ id: "student" }] }) }) }),
-    transaction: async (fn: (tx: unknown) => unknown) => fn({
+    transaction: async (fn: (tx: unknown) => unknown) => { reads = 0; return fn({
       select: query, execute: async () => {}, insert: state.writes, update: state.writes,
-    }),
+    }); },
   } };
 });
 import { saveAssignmentDraft, saveAssignmentResponse } from "@/modules/student-experience/assignments.functions";
 beforeEach(() => {
   vi.clearAllMocks();
+  state.latest = null;
   state.assessment = { id: "assessment", sectionId: "section", status: "published",
     availableAt: null, closesAt: null, metadata: {} };
 });
@@ -45,4 +49,29 @@ describe("student write availability", () => {
       expect(state.writes).not.toHaveBeenCalled();
     });
   }
+});
+
+
+describe("submission retry receipts", () => {
+  it("returns the original receipt without modifying an accepted attempt", async () => {
+    state.latest = { id: "original-receipt", status: "submitted", response: { text: "Final answer" } };
+    const invoke = saveAssignmentResponse as unknown as (arg: unknown) => Promise<unknown>;
+    await expect(invoke({ data: { assessmentId: "assessment", text: " Final answer " } }))
+      .resolves.toEqual({ submissionId: "original-receipt" });
+    expect(state.writes).not.toHaveBeenCalled();
+  });
+  it("allows the submission coordinator to retry its identical draft step", async () => {
+    state.latest = { id: "original-receipt", status: "submitted", response: { text: "Final answer" } };
+    const invoke = saveAssignmentDraft as unknown as (arg: unknown) => Promise<unknown>;
+    await expect(invoke({ data: { assessmentId: "assessment", text: "Final answer" } }))
+      .resolves.toEqual({ saved: true });
+    expect(state.writes).not.toHaveBeenCalled();
+  });
+  it.each([saveAssignmentDraft, saveAssignmentResponse])("rejects a changed response after submission", async fn => {
+    state.latest = { id: "original-receipt", status: "submitted", response: { text: "Final answer" } };
+    const invoke = fn as unknown as (arg: unknown) => Promise<unknown>;
+    await expect(invoke({ data: { assessmentId: "assessment", text: "Different answer" } }))
+      .rejects.toThrow(/overwritten|editable/);
+    expect(state.writes).not.toHaveBeenCalled();
+  });
 });

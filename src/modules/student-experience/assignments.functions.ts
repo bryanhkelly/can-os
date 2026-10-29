@@ -122,6 +122,10 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    assertAssessmentActionable(assessment);
    const priorRows=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
    const prior=priorRows[0];
+   // Network retries must return the original receipt, not create another
+   // attempt or repeat audit/domain events. A changed response stays locked.
+   if(prior?.status==="submitted"&&prior.response?.text===text)
+    return {submissionId:prior.id};
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
    const emitSubmission=async(submissionId:string)=>{
@@ -258,6 +262,10 @@ export const saveAssignmentDraft=createServerFn({method:"POST"})
    if(authorized.studentProfileId!==studentId)throw new AuthorizationError("student assignment identity");
    assertAssessmentActionable(assessment);
    const [latest]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
+   // The submit coordinator may retry after losing its final response.
+   // Treat only identical already-submitted text as a harmless saved draft.
+   if(latest?.status==="submitted"&&latest.response?.text===data.text.trim())
+    return {saved:true};
    if(latest && !["assigned","returned"].includes(latest.status))throw new Error("Submitted work cannot be overwritten");
    if(latest?.status==="returned"){
     const [draft]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,attemptNumber:latest.attemptNumber+1,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing().returning({id:s.submissions.id});
