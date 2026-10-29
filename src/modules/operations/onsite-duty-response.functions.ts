@@ -1,6 +1,6 @@
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { actions, sites } from "@/db/schema";
@@ -239,15 +239,18 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
         resolutionNote:null,
       }).returning({id:actions.id});
       if(!record)throw new Error("Could not save onsite duty response");
-      // A reported coverage failure is an actionable operating exception,
-      // not only a historical record: keep one open, owned follow-up per
-      // Section and date until an assigned adult affirmatively covers it.
+      // A reported coverage failure is an actionable operating exception.
+      // The exact scheduled block and current plan own the follow-up; another
+      // period or a statement of availability cannot establish safe coverage.
       let coverageGapActionId:string|null=null;
       if (data.response === "cannot_cover") {
         const [existingGap]=await tx.select({id:actions.id}).from(actions).where(and(
           eq(actions.type,gapActionType),eq(actions.status,"open"),
-          eq(actions.sectionId,data.sectionId),eq(actions.programId,block.programId),
+          eq(actions.siteId,site.id),eq(actions.programId,block.programId),
+          eq(actions.sectionId,data.sectionId),
           sql`${actions.metadata}->>'date' = ${data.date}`,
+          sql`${actions.metadata}->>'periodId' = ${data.periodId}`,
+          sql`${actions.metadata}->>'planToken' = ${block.planToken}`,
         )).limit(1);
         if (existingGap) {
           coverageGapActionId=existingGap.id;
@@ -261,7 +264,7 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
             organizationId:site.organizationId,siteId:site.id,
             programId:block.programId,sectionId:data.sectionId,
             ownerPersonId,
-            metadata:{date:data.date,periodId:data.periodId,responseId:record.id,
+            metadata:{date:data.date,periodId:data.periodId,planToken:block.planToken,responseId:record.id,
               reason:data.reason??null},
           }).returning({id:actions.id});
           if(!gap)throw new Error("Could not create coverage gap follow-up");
@@ -272,7 +275,7 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
             actorPersonId:actor.actorPersonId,
             organizationId:site.organizationId,siteId:site.id,programId:block.programId,
             payload:{type:gapActionType,sectionId:data.sectionId,date:data.date,
-              periodId:data.periodId,ownerPersonId,responseId:record.id},
+              periodId:data.periodId,planToken:block.planToken,ownerPersonId,responseId:record.id},
           });
           if (ownerPersonId && ownerPersonId!==actor.actorPersonId) {
             await notifyMany(tx,[{
@@ -284,19 +287,11 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
             }]);
           }
         }
-      } else {
-        // A current affirmative duty response closes this block's open
-        // coverage-gap follow-ups without rewriting their history.
-        const openGaps=await tx.select({id:actions.id}).from(actions).where(and(
-          eq(actions.type,gapActionType),eq(actions.status,"open"),
-          eq(actions.sectionId,data.sectionId),eq(actions.programId,block.programId),
-          sql`${actions.metadata}->>'date' = ${data.date}`,
-        )).limit(20);
-        if (openGaps.length) await tx.update(actions).set({
-          status:"resolved",resolvedAt:new Date(),updatedAt:new Date(),
-          resolutionNote:"Duty affirmatively covered by the assigned adult: "+record.id,
-        }).where(inArray(actions.id,openGaps.map(row=>row.id)));
       }
+      // Accepted duty is availability, not proof of the reviewed room,
+      // primary/backup staffing, current grants, safety evidence or physical
+      // arrival. Preserve the accountable gap until investigated resolution
+      // through resolveOwnedSiteOperationalAction; never bulk-close it here.
       await writeAudit(tx,actor,{
         action:"onsite.instruction_duty.responded",
         entityType:"action",entityId:record.id,
