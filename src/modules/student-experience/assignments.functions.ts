@@ -9,6 +9,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { z } from "zod";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
+import { assessmentAttemptLimit, assertAssessmentAttemptAllowed } from "@/domain/assessment-attempt-policy";
 import { assessmentAvailability, assertAssessmentActionable } from "@/domain/assessment-availability";
 import { writtenSubmissionResponse } from "@/domain/submission-response";
 
@@ -88,6 +89,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   dueAt:row.dueAt?.toISOString()??null,submittedAt:row.submittedAt?.toISOString()??null,
   gradedAt:row.gradedAt?.toISOString()??null,
   metadata:{rubric:typeof row.metadata.rubric==="string"?row.metadata.rubric:"",
+    maxAttempts:assessmentAttemptLimit(row.metadata),
     criteria:readRubric(row.metadata.rubricCriteria),synthetic:row.metadata.synthetic===true,
     assignmentKind:typeof row.metadata.assignmentKind==="string"?row.metadata.assignmentKind:"classwork",
     curriculumLessonId:typeof row.metadata.curriculumLessonId==="string"?row.metadata.curriculumLessonId:null,
@@ -127,6 +129,8 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    if(prior?.status==="submitted"&&prior.response?.text===text)
     return {submissionId:prior.id};
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
+   assertAssessmentAttemptAllowed(assessment.metadata,prior?.status==="returned"
+    ?prior.attemptNumber+1:prior?.attemptNumber??1);
    const now=new Date(),timeliness=assessment.dueAt&&now>assessment.dueAt?"late":"on_time";
    const emitSubmission=async(submissionId:string)=>{
     await emitEvent(tx, {eventType:EventTypes.SubmissionReceived,aggregateType:"submission",
@@ -267,6 +271,8 @@ export const saveAssignmentDraft=createServerFn({method:"POST"})
    if(latest?.status==="submitted"&&latest.response?.text===data.text.trim())
     return {saved:true};
    if(latest && !["assigned","returned"].includes(latest.status))throw new Error("Submitted work cannot be overwritten");
+   assertAssessmentAttemptAllowed(assessment.metadata,latest?.status==="returned"
+    ?latest.attemptNumber+1:latest?.attemptNumber??1);
    if(latest?.status==="returned"){
     const [draft]=await tx.insert(s.submissions).values({assessmentId:assessment.id,studentProfileId:studentId,attemptNumber:latest.attemptNumber+1,status:"assigned",response:{text:data.text,draft:true}}).onConflictDoNothing().returning({id:s.submissions.id});
     if(draft){await writeAudit(tx, {actorPersonId:context.actorPersonId,action:"assignment.draft_revision",resourceType:"submission",resourceId:draft.id,after:{status:"assigned"},context:{accountId:context.accountId,sessionId:context.sessionId}});return {saved:true};}

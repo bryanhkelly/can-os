@@ -75,3 +75,13 @@ describe("submission retry receipts", () => {
     expect(state.writes).not.toHaveBeenCalled();
   });
 });
+
+describe("student revision attempt limits",()=>{
+ it.each([saveAssignmentDraft,saveAssignmentResponse])("rejects a next attempt beyond the stored assessment limit",async fn=>{
+  state.assessment.metadata={maxAttempts:2};
+  state.latest={id:"returned",status:"returned",attemptNumber:2,response:{text:"Prior work"}};
+  const invoke=fn as unknown as (arg:unknown)=>Promise<unknown>;
+  await expect(invoke({data:{assessmentId:"assessment",text:"A third attempt"}})).rejects.toThrow("attempt limit");
+  expect(state.writes).not.toHaveBeenCalled();
+ });
+});

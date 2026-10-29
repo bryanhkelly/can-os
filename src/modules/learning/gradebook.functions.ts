@@ -1,3 +1,4 @@
+import { assessmentAttemptLimit, assertAssessmentAttemptAllowed, MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
 import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { createAssessmentStatus } from "@/domain/assessment-publication";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
@@ -222,6 +223,7 @@ export const getGradebook = createServerFn({ method: "GET" })
     dueAt: row.dueAt?.toISOString() ?? null,
     pointsPossible: row.pointsPossible,
     rubric: readRubric(row.metadata?.rubricCriteria),
+    maxAttempts:assessmentAttemptLimit(row.metadata),
     kind:typeof row.metadata?.assignmentKind==="string"?row.metadata.assignmentKind:"classwork",
     curriculumLessonId:typeof row.metadata?.curriculumLessonId==="string"?row.metadata.curriculumLessonId:null,
    })),
@@ -310,6 +312,7 @@ export const createAssessment = createServerFn({ method: "POST" })
   assignmentKind:z.enum(["homework","classwork","quiz","test","project","discussion"]).optional().default("classwork"),
   curriculumLessonId:z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/).optional(),
   dueAt: z.string().refine(v => !Number.isNaN(new Date(v).getTime()), "dueAt must be an ISO date").optional(),
+  maxAttempts:z.number().int().min(1).max(MAX_ASSESSMENT_ATTEMPTS).optional(),
   publishNow:z.boolean().optional().default(false),
  }).strict().parse(value))
  .handler(async ({ data }) => {
@@ -345,6 +348,7 @@ export const createAssessment = createServerFn({ method: "POST" })
     metadata:{...(data.rubric?{rubric:data.rubric}:{}),
       ...(rubricCriteria.length?{rubricCriteria,rubricVersion:1}:{}),
       assignmentKind:data.assignmentKind,
+      ...(data.maxAttempts!==undefined?{maxAttempts:data.maxAttempts}:{}),
       publisherCourseVersionId:teachingSection.versionId,
       ...(data.curriculumLessonId?{curriculumLessonTitle:publisherLessonChoices(
         teachingSection.curriculum,teachingSection.status).find(lesson=>lesson.id===data.curriculumLessonId)?.title}:{}),
@@ -513,7 +517,7 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
    const [record]=await tx.select({
     id:s.submissions.id,status:s.submissions.status,
     assessmentStatus:s.assessments.status,
-    availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,
+    availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,metadata:s.assessments.metadata,
     assessmentId:s.assessments.id,sectionId:s.sections.id,
     studentProfileId:s.submissions.studentProfileId,attemptNumber:s.submissions.attemptNumber,
     studentPersonId:s.studentProfiles.personId,
@@ -539,6 +543,7 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
    assertAssessmentActionable({
     status:record.assessmentStatus,availableAt:record.availableAt,closesAt:record.closesAt,
    });
+   assertAssessmentAttemptAllowed(record.metadata,record.attemptNumber+1);
    const activeProgramMembership=alias(s.enrollments,"revision_return_program_membership");
    const [member]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
     .innerJoin(activeProgramMembership,and(

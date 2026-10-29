@@ -1,3 +1,4 @@
+import { assertAssessmentAttemptAllowed } from "@/domain/assessment-attempt-policy";
 import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
@@ -194,6 +195,8 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
       const [latest] = await tx.select().from(s.submissions)
         .where(and(eq(s.submissions.assessmentId, assessment.id), eq(s.submissions.studentProfileId, studentId)))
         .orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
+      if (!latest || latest.status === "assigned")
+        assertAssessmentAttemptAllowed(assessment.metadata, latest?.attemptNumber ?? 1);
       const mergeAttachments = (response: Record<string, unknown>): { response: Record<string, unknown>; already: boolean } => {
         const existing = Array.isArray(response.attachments)
           ? (response.attachments as unknown[]).filter((item): item is string => typeof item === "string")

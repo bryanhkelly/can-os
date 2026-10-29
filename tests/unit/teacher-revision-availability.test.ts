@@ -63,3 +63,12 @@ describe("usable teacher revision return", () => {
     expect(state.notify).toHaveBeenCalledOnce();
   });
 });
+
+describe("teacher revision attempt limit",()=>{
+ it("does not return a final permitted attempt or send an unusable revision notice",async()=>{
+  state.record.metadata={maxAttempts:1};
+  await expect(invoke()).rejects.toThrow("attempt limit");
+  expect(state.update).not.toHaveBeenCalled();
+  expect(state.notify).not.toHaveBeenCalled();
+ });
+});
