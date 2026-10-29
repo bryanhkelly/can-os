@@ -55,16 +55,21 @@ export async function openAuthenticatedPage(
 ): Promise<AuthenticatedPage> {
   const context = await browser.newContext({ baseURL: origin });
   try {
-    await context.addCookies([{
-      name: accessSessionCookie,
-      value: secret,
-      url: origin,
-      path: "/",
-      httpOnly: true,
-      secure: true,
-      sameSite: "Lax",
-    }]);
-    return { context, page: await context.newPage() };
+    const page = await context.newPage();
+    const cookieUrl = new URL("/__can_e2e_session__", origin).toString();
+    // Chromium rejects direct Secure-cookie injection for an http URL, while
+    // correctly trusting the same cookie from a localhost response.
+    await page.route(cookieUrl, route => route.fulfill({
+      status: 200,
+      headers: {
+        "Content-Type": "text/plain",
+        "Set-Cookie": `${accessSessionCookie}=${secret}; Path=/; Secure; HttpOnly; SameSite=Lax`,
+      },
+      body: "Synthetic session established",
+    }));
+    await page.goto(cookieUrl);
+    await page.unroute(cookieUrl);
+    return { context, page };
   } catch (error) {
     await context.close().catch(() => undefined);
     throw error;
