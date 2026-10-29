@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import {
@@ -31,13 +31,22 @@ export async function readFirstClassrooms(
 
   const activeProgram = alias(enrollments, "first_class_active_program");
   const [assessmentRows, membershipRows, staffing] = await Promise.all([
+    // Never direct a student to work that is unpublished, not yet released
+    // (a future availableAt schedules the release) or closed.
     db.select({
       id: assessments.id,
       sectionId: assessments.sectionId,
       title: assessments.title,
       instructions: assessments.instructions,
+      curriculumLessonId: sql<string | null>`case
+        when jsonb_typeof(${assessments.metadata}->'curriculumLessonId') = 'string'
+        then ${assessments.metadata}->>'curriculumLessonId' end`,
     }).from(assessments)
-      .where(and(inArray(assessments.sectionId, ids), eq(assessments.status, "published")))
+      .where(and(
+        inArray(assessments.sectionId, ids),
+        eq(assessments.status, "published"),
+        or(isNull(assessments.availableAt), lte(assessments.availableAt, new Date())),
+      ))
       .orderBy(asc(assessments.createdAt)),
     db.select({
       sectionId: enrollments.sectionId,
