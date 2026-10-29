@@ -202,16 +202,16 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
         return { response: { ...response, attachments: [...existing, document.id] }, already: false };
       };
       if (latest) {
-        // Submitted attempts still accept attachments: the submit flow overwrites
-        // response text wholesale, so the UI attaches right after submitting.
-        if (latest.status !== "assigned" && latest.status !== "submitted") {
-          throw new Error("This attempt can no longer accept attachments");
-        }
         const merged = mergeAttachments(latest.response);
+        // A retry for an already attached file is harmless; new evidence must
+        // be attached while the attempt is still a draft.
         if (merged.already) return { submissionId: latest.id, attached: true, alreadyAttached: true };
+        if (latest.status !== "assigned") {
+          throw new Error("Submitted attempts cannot accept new attachments");
+        }
         const [updated] = await tx.update(s.submissions)
           .set({ response: merged.response, updatedAt: new Date() })
-          .where(and(eq(s.submissions.id, latest.id), inArray(s.submissions.status, ["assigned", "submitted"])))
+          .where(and(eq(s.submissions.id, latest.id), eq(s.submissions.status, "assigned")))
           .returning({ id: s.submissions.id });
         if (!updated) throw new Error("Assignment changed in another tab; refresh before attaching");
         await writeAudit(tx, {

@@ -1,3 +1,4 @@
+import { submitAssignmentWork } from "@/modules/student-experience/submit-assignment-work";
 import {useEffect,useRef,useState} from "react";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -88,29 +89,27 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
   saveGeneration.current++;
   setBusy(true);setError("");setNotice("");
   try{
-   await saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}});
-   // The submission endpoint writes response text; files are attached after it.
-   const failures:string[]=[];
-   for(const file of pendingFiles){
-    try{
+   const receipt=await submitAssignmentWork({
+    files:pendingFiles,
+    saveDraft:()=>saveAssignmentDraft({data:{assessmentId:chosen.assessmentId,text:draft}}),
+    attach:async(file)=>{
      const contentType=attachmentMime(file.name);
      if(!contentType||file.size<16||file.size>10*1024*1024)
-      throw new Error("Unsupported file type or size");
+      throw new Error("Unsupported file type or size: "+file.name);
      const upload=await createSubmissionAttachmentUpload({data:{
       assessmentId:chosen.assessmentId,fileName:file.name,contentType,sizeBytes:file.size
      }});
      const response=await fetch(upload.uploadUrl,{method:"PUT",headers:{"Content-Type":contentType},body:file});
-     if(!response.ok)throw new Error("Storage upload failed");
+     if(!response.ok)throw new Error("Upload failed for "+file.name+". Your draft is saved; retry before submitting.");
      await attachDocumentToSubmission({data:{assessmentId:chosen.assessmentId,documentId:upload.documentId}});
-    }catch{failures.push(file.name);}
-   }
-   setPendingFiles([]);
+    },
+    attached:(file)=>setPendingFiles(current=>current.filter(item=>item!==file)),
+    submit:()=>saveAssignmentResponse({data:{assessmentId:chosen.assessmentId,text:draft}}),
+   });
+   setNotice("Your assignment has been submitted. Receipt: "+receipt.submissionId);
    const updatedFiles=await listSubmissionAttachments({data:{assessmentId:chosen.assessmentId}});
    setAttachments(updatedFiles.attachments);
    await router.invalidate();
-   setNotice(failures.length
-    ?"Your response was submitted, but attachments need attention: "+failures.join(", ")
-    :"Your assignment has been submitted.");
   }catch(cause){
    setError(cause instanceof Error?cause.message:"Unable to submit assignment");
   }finally{setBusy(false);}
@@ -192,7 +191,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
       }}>{file.fileName}</button>)}</div>}
      {editable?<div className="mt-6">
       <label className="text-sm font-semibold">Your response
-       <textarea rows={8} value={draft} maxLength={20000} onChange={event=>{setDraft(event.target.value);setDraftStatus("idle")}}
+       <textarea disabled={busy} rows={8} value={draft} maxLength={20000} onChange={event=>{setDraft(event.target.value);setDraftStatus("idle")}}
         className="mt-2 block w-full rounded-xl border bg-background p-3 text-sm" placeholder="Write your response…"/>
       </label>
       <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">Draft: {draftStatus==="saving"?"Saving…":draftStatus==="saved"?"Saved":draftStatus==="error"?"Could not autosave":"Ready"}</p>
