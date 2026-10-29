@@ -608,6 +608,14 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
           ? gradeLabelForPercentage(data.percentage, scaleEntries)
           : grade.letterGrade);
 
+      // PostgreSQL numeric values retain scale ("84.00"); compare their
+      // values before treating an identical network retry as a new correction.
+      const samePercentage = newPercentage === grade.percentage ||
+        (newPercentage !== null && grade.percentage !== null &&
+          Number(newPercentage) === Number(grade.percentage));
+      if (samePercentage && newLetterGrade === grade.letterGrade)
+        return { corrected: false };
+
       const priorCorrections = Array.isArray(grade.metadata?.corrections)
         ? (grade.metadata.corrections as GradeCorrection[])
         : [];

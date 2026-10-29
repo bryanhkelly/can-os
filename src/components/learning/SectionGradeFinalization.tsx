@@ -92,13 +92,15 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
     }
     setBusy(true); setError(""); setNotice("");
     try {
-      await correctSectionGrade({ data: {
+      const result = await correctSectionGrade({ data: {
         sectionGradeId: grade.id,
         ...(percentage ? { percentage: Number(percentage) } : {}),
         ...(letter ? { letterGrade: letter } : {}),
         reason,
       } });
-      setNotice(`Corrected the finalized grade for ${grade.studentName}. The correction is recorded in the grade history and the student and guardians are notified; already-issued transcripts keep their original snapshot.`);
+      setNotice(result.corrected
+        ? `Corrected the finalized grade for ${grade.studentName}. The correction is recorded in the grade history and the student and guardians are notified; already-issued transcripts keep their original snapshot.`
+        : "The finalized grade already has these values. No new correction or notifications were created.");
       setCorrectingId("");
       setCorrectionPercentage("");
       setCorrectionLetter("");
