@@ -9,7 +9,8 @@ const program:SchoolProgramRecord={
   academicProviderOrganizationId:"school",creditIssuingOrganizationId:"issuer",
   counts:{
     adoptedCurriculumPacks:0,sections:0,publishedSections:0,staffedSections:0,
-    applications:0,acceptedApplications:0,activeProgramStudents:0,
+    applications:0,incomingApplications:0,outstandingEnrollmentRequirements:0,
+    acceptedApplications:0,activeProgramStudents:0,
     placedStudents:0,publishedAssessments:0,submittedWork:0,
     gradedWork:0,unresolvedGuardianResponses:0,
   },

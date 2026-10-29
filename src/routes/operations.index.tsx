@@ -9,6 +9,8 @@ import {useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
 import {getOperationsActions,updateOperationsAction,assignOperationsAction,setOperationsActionDeadline} from "@/modules/operations/action-workspace.functions";
+import {AttentionQueue} from "@/components/operations/AttentionQueue";
+import {buildDailyOperationsAttention} from "@/domain/daily-operations";
 export const Route=createFileRoute("/operations/")({
  validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;action?:string}=>({
   siteId:typeof search.siteId==="string"?search.siteId:undefined,
@@ -80,6 +82,12 @@ function OperationsPage(){
    const date=new Date(iso);
    return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
  }
+ const attentionItems=buildDailyOperationsAttention({
+   role:"registrar",actorPersonId:"verified-server-session",
+   actions:data.items.filter(item=>!selected.action||item.id===selected.action),
+   staffingIssues:commandCenter?.issues??[],
+   programs:dashboard?.programs??[],
+ });
  return <main className="mx-auto max-w-6xl px-5 py-10">
   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · School operations</p>
   <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
@@ -102,6 +110,7 @@ function OperationsPage(){
   <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p>
   <OutboxHealthPanel/>
   {error&&<p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>}
+  <AttentionQueue items={attentionItems}/>
   {commandCenter&&<section aria-label="Operations exception summary" className="mt-8">
     <h2 className="font-serif text-3xl font-semibold">Operational health</h2>
     <p className="mt-2 text-sm text-muted-foreground">Prioritize verified staffing and capacity exceptions before routine school monitoring. Readiness approvals remain controlled by their owning workflows.</p>

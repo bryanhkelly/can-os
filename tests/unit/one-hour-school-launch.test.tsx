@@ -110,4 +110,10 @@ describe("guided school launch", () => {
     expect(html).toContain("Opening stays locked");
     expect(html).toContain("Review launch record");
   });
+
+  it("offers Site Today as the daily destination for an active site program", () => {
+    const html = render(launch({ status: "active" }));
+    expect(html).toContain("Daily work now lives");
+    expect(html).toContain("Open Site Today");
+  });
 });

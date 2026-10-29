@@ -2,8 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowUpRight, BookOpen, CalendarDays, Mail, Sparkles } from "lucide-react";
 import { getFamilyHome, getGuardianNeedsYou } from "@/modules/family/family-home.functions";
-import { WorkspaceShell, EmptyState, QueryState, StatCard, PersonMark, StatusBadge } from "@/components/workspace";
-import { prioritizeFamilyNeeds, familyActionWorkspaceLink } from "@/domain/family-needs";
+import { WorkspaceShell, QueryState, StatCard, PersonMark, StatusBadge } from "@/components/workspace";
+import { prioritizeFamilyNeeds } from "@/domain/family-needs";
+import { buildGuardianAttention } from "@/domain/daily-operations";
+import { AttentionQueue } from "@/components/operations/AttentionQueue";
 
 export const Route = createFileRoute("/guardian/")({
  validateSearch:(search:Record<string,unknown>):{action?:string;student?:string}=>({
@@ -82,34 +84,14 @@ export function FamilyHomeView({children,needs,loading,error,action,student}:{
     <StatCard label="Needs your attention" value={needs.length}/>
     <StatCard label="Missing assignments" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
-   <section aria-label="Needs you" className="mt-10">
-    <div className="flex items-baseline justify-between gap-3">
-     <h2 className="font-serif text-2xl font-semibold tracking-tight">Needs you</h2>
-     {needs.length > 0 && <span className="rounded-full border px-3 py-1 text-xs">{needs.length} open</span>}
-    </div>
-    {needs.length === 0 && <EmptyState className="mt-4 bg-card" title="You are all caught up. Nothing needs your attention right now." />}
-    {needs.length > 0 && <div className="mt-4 grid gap-3">
-     {prioritized.filter(item=>!action||item.kind==="action"&&item.id===action).map(item => {
-      const Container=action?"article":Link;
-      const workspace=action?familyActionWorkspaceLink(item):null;
-      return <Container key={`${item.kind}-${item.id}`} to={item.href} href={action?undefined:item.href} className="block rounded-xl border bg-card p-5 transition-colors hover:bg-muted">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-       <div>
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.type.replaceAll("_", " ")}</p>
-        <p className="mt-1 font-semibold">{item.title}</p>
-        {item.detail && <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>}
-        {"dueAt" in item&&item.dueAt&&<p className="mt-2 text-xs text-muted-foreground">Due {new Date(item.dueAt).toLocaleDateString()}</p>}
-       </div>
-       <span className="rounded-full border px-3 py-1 text-xs">
-        {item.kind === "excuse" ? "Submit excuse" : item.kind === "action" ? (action?"Selected action":"Review action") : "View"}
-       </span>
-      </div>
-      {workspace&&<Link to={workspace} href={workspace} className="mt-3 inline-block text-sm font-semibold underline">Open the owning workspace →</Link>}
-     </Container>;})}
-    </div>}
+   <div className="mt-6">
+    <AttentionQueue
+     items={buildGuardianAttention(prioritized.filter(item=>!action||item.kind==="action"&&item.id===action))}
+     empty={action?"The selected action is not available in your current family workspace.":"You are all caught up. Nothing needs your attention right now."}
+    />
     {action&&<Link to="/guardian" className="mt-4 inline-block text-sm underline">View all family needs</Link>}
     {action&&!needs.some(item=>item.kind==="action"&&item.id===action)&&!loading&&<p role="alert" className="mt-4 rounded-xl border p-4">This action is unavailable in your current family workspace.</p>}
-   </section>
+   </div>
 
    <section aria-label="Your children" className="mt-12">
     <h2 className="font-serif text-2xl font-semibold tracking-tight">Your children</h2>

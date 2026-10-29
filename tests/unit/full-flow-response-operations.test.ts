@@ -34,6 +34,12 @@ describe("FullFlow operational record projection", () => {
     teacherAssignments:[{sectionId:"sec-A",personId:"teacher-A"},{sectionId:"sec-A",personId:"teacher-A-2"}],
     adoptions:[{programId:"A",status:"active"},{programId:"A",status:"revoked"},{programId:"B",status:"active"}],
     applications:[{programId:"A",stage:"accepted"},{programId:"A",stage:"eligibility"},{programId:"B",stage:"application"}],
+    enrollmentRequirements:[
+      {programId:"A",status:"needs_you",blocking:true},
+      {programId:"A",status:"complete",blocking:true},
+      {programId:"A",status:"needs_you",blocking:false},
+      {programId:"B",status:"needs_can",blocking:true},
+    ],
     enrollments:[
       {programId:"A",kind:"program",status:"active",studentProfileId:"student-1",sectionId:null,schoolYearId:"year-A"},
       {programId:"A",kind:"program",status:"active",studentProfileId:"student-1",sectionId:null,schoolYearId:"year-A"},
@@ -53,22 +59,41 @@ describe("FullFlow operational record projection", () => {
     responses:[{programId:"A",status:"open"},{programId:"A",status:"resolved"},
       {programId:"B",status:"waiting"}],
   };
-  it("keeps all six journey metrics within their program and excludes inactive classes", () => {
+  it("keeps journey metrics within their program and excludes inactive classes", () => {
     const snapshot=summarizeFullFlowOperations(rows);
     expect(snapshot.programs).toHaveLength(2);
     expect(snapshot.programs[0]?.counts).toMatchObject({
       adoptedCurriculumPacks:1,sections:1,publishedSections:1,
-      staffedSections:1,applications:2,acceptedApplications:1,
-      activeProgramStudents:1,placedStudents:1,publishedAssessments:1,
+      staffedSections:1,applications:2,incomingApplications:1,outstandingEnrollmentRequirements:1,
+      acceptedApplications:1,activeProgramStudents:1,placedStudents:1,publishedAssessments:1,
       gradedWork:1,submittedWork:1,unresolvedGuardianResponses:1,
     });
     expect(snapshot.programs[1]?.counts).toMatchObject({
       sections:1,publishedSections:0,staffedSections:0,activeProgramStudents:1,
+      incomingApplications:1,outstandingEnrollmentRequirements:1,
       placedStudents:0,gradedWork:1,unresolvedGuardianResponses:1,
     });
     expect(snapshot.totals.activeProgramStudents).toBe(2);
+    expect(snapshot.totals.incomingApplications).toBe(2);
+    expect(snapshot.totals.outstandingEnrollmentRequirements).toBe(2);
     expect(snapshot.totals.gradedWork).toBe(2);
     expect(snapshot.totals.unresolvedGuardianResponses).toBe(2);
+  });
+  it("counts only incoming admissions stages and incomplete blocking Journey requirements",()=>{
+    const snapshot=summarizeFullFlowOperations({...rows,
+      applications:["lead","inquiry","application","eligibility","accepted","rejected","withdrawn","enrolled"]
+        .map(stage=>({programId:"A",stage})),
+      enrollmentRequirements:[
+        {programId:"A",status:"needs_you",blocking:true},
+        {programId:"A",status:"needs_can",blocking:true},
+        {programId:"A",status:"complete",blocking:true},
+        {programId:"A",status:"needs_you",blocking:false},
+      ],
+    });
+    expect(snapshot.programs[0]?.counts.incomingApplications).toBe(4);
+    expect(snapshot.programs[0]?.counts.outstandingEnrollmentRequirements).toBe(2);
+    expect(snapshot.programs[1]?.counts.incomingApplications).toBe(0);
+    expect(snapshot.programs[1]?.counts.outstandingEnrollmentRequirements).toBe(0);
   });
   it("does not count an orphan Section enrollment as a student's class placement", () => {
     const snapshot=summarizeFullFlowOperations({

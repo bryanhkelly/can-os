@@ -156,6 +156,8 @@ describe("application contextual navigation",()=>{
       localDate:"2030-01-01",asOf:"2030-01-01T12:00:00Z",
       enrollment:{count:1,note:"Active"},attendance:{count:1,present:1,absent:0,tardy:0,note:"Recorded"},
       actions:[{id:"task",title:"Review staffing",status:"open",priority:"normal",description:null,dueAt:null}],
+      attentionItems:[{id:"action:task",category:"staffing",title:"Review staffing",detail:"Review the staffing follow-up.",
+        href:"/operations?siteId=school&action=task",nextStep:"Review action",ownerName:null,dueAt:null,priority:"normal"}],
       events:[{id:"event",title:"Evening assembly",startsAt:"2030-01-02T01:00:00Z",type:"assembly"}],
       programs:[{id:"program",name:"Test program",status:"active",type:"full_school",gradeRange:{min:"9",max:"12"}}],
       openingHandoffs:[],canOpenOnsiteDay:false,

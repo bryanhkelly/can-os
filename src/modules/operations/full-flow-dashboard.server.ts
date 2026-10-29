@@ -2,7 +2,7 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accountPersonGrants, actions, applications, assessments, courseTemplateVersions, curriculumAdoptions,
-  enrollments, people, programs, sections, sectionTeachers, submissions, terms,
+  enrollments, journeyRequirements, journeys, people, programs, sections, sectionTeachers, submissions, terms,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -42,7 +42,7 @@ export async function readFullFlowOperations(actor: AccessContext) {
   ));
   if (!visible.length) return { asOf: new Date().toISOString(), ...empty };
   const selected = visible.map(p => p.id);
-  const [sectionsRows, adoptions, applicationsRows, enrollmentRows, responses] = await Promise.all([
+  const [sectionsRows, adoptions, applicationsRows, enrollmentRequirements, enrollmentRows, responses] = await Promise.all([
     db.select({
       id: sections.id, programId: sections.programId, active: sections.active,
       versionStatus: courseTemplateVersions.status,schoolYearId:terms.schoolYearId,
@@ -54,6 +54,15 @@ export async function readFullFlowOperations(actor: AccessContext) {
       .from(curriculumAdoptions).where(inArray(curriculumAdoptions.programId, selected)),
     db.select({programId: applications.programId, stage: applications.stage})
       .from(applications).where(inArray(applications.programId, selected)),
+    // The same application Journey requirements used by family readiness.
+    // Only student-free status counts enter the broad operational projection.
+    db.select({programId:applications.programId,status:journeyRequirements.status,
+      blocking:journeyRequirements.blocking})
+      .from(journeyRequirements)
+      .innerJoin(journeys,eq(journeys.id,journeyRequirements.journeyId))
+      .innerJoin(applications,and(eq(applications.id,journeys.participantId),
+        eq(journeys.participantType,"application")))
+      .where(inArray(applications.programId,selected)),
     db.select({
       programId: enrollments.programId, kind: enrollments.kind,
       status: enrollments.status, studentProfileId: enrollments.studentProfileId,
@@ -100,7 +109,7 @@ export async function readFullFlowOperations(actor: AccessContext) {
     asOf: new Date().toISOString(),
     ...summarizeFullFlowOperations({
       programs: visible, sections: sectionsRows, teacherAssignments, adoptions,
-      applications: applicationsRows, enrollments: enrollmentRows,
+      applications: applicationsRows, enrollmentRequirements, enrollments: enrollmentRows,
       assessments: assessmentsRows, submissions: submissionRows, responses,
     }),
   };

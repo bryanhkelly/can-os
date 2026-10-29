@@ -9,6 +9,7 @@ export type FullFlowRows = {
   teacherAssignments: Array<{sectionId:string;personId:string}>;
   adoptions: Array<{programId:string;status:string}>;
   applications: Array<{programId:string;stage:string}>;
+  enrollmentRequirements?: Array<{programId:string;status:string;blocking:boolean}>;
   enrollments: Array<{programId:string|null;kind:string;status:string;
     studentProfileId:string;sectionId:string|null;schoolYearId:string|null}>;
   assessments: Array<{id:string;sectionId:string;status:string}>;
@@ -44,6 +45,9 @@ export function summarizeFullFlowOperations(rows: FullFlowRows) {
       .map(e => e.studentProfileId));
     const unresolved = rows.responses.filter(a => a.programId === program.id &&
       ["open","in_progress","waiting"].includes(a.status)).length;
+    const applications = rows.applications.filter(a => a.programId === program.id);
+    const outstandingRequirements = (rows.enrollmentRequirements ?? []).filter(requirement =>
+      requirement.programId === program.id && requirement.blocking && requirement.status !== "complete").length;
     return {
       id: program.id, name: program.name, status: program.status, type: program.type,
       siteId: program.siteId,
@@ -54,8 +58,10 @@ export function summarizeFullFlowOperations(rows: FullFlowRows) {
         sections: sections.length,
         publishedSections: sections.filter(s => s.versionStatus === "published").length,
         staffedSections: teachers.size,
-        applications: rows.applications.filter(a => a.programId === program.id).length,
-        acceptedApplications: rows.applications.filter(a => a.programId === program.id && a.stage === "accepted").length,
+        applications: applications.length,
+        incomingApplications: applications.filter(a => ["lead","inquiry","application","eligibility"].includes(a.stage)).length,
+        outstandingEnrollmentRequirements: outstandingRequirements,
+        acceptedApplications: applications.filter(a => a.stage === "accepted").length,
         activeProgramStudents: programStudents.size,
         placedStudents: placedStudents.size,
         publishedAssessments: assessments.length,
@@ -67,8 +73,9 @@ export function summarizeFullFlowOperations(rows: FullFlowRows) {
   });
   const keys = [
     "adoptedCurriculumPacks", "sections", "publishedSections", "staffedSections",
-    "applications", "acceptedApplications", "activeProgramStudents", "placedStudents",
-    "publishedAssessments", "submittedWork", "gradedWork", "unresolvedGuardianResponses",
+    "applications", "incomingApplications", "outstandingEnrollmentRequirements", "acceptedApplications",
+    "activeProgramStudents", "placedStudents", "publishedAssessments", "submittedWork", "gradedWork",
+    "unresolvedGuardianResponses",
   ] as const;
   const totals = Object.fromEntries(keys.map(key => [
     key, result.reduce((sum, item) => sum + item.counts[key], 0),

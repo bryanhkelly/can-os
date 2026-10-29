@@ -7,6 +7,7 @@ import {
   type LaunchGuidanceTask,
 } from "@/domain/launch-guidance";
 import { isExtendedLearningType } from "@/domain/program-offerings";
+import { postLaunchOperationsDestination } from "@/domain/launch-operations-handoff";
 import {
   activateLaunch,
   completeLaunchRequirement,
@@ -203,8 +204,16 @@ export function OneHourSchoolLaunch({ launches, selectedProgramId }: {
   }
   async function open(recipientPersonId?: string) {
     await run(async () => {
-      await activateLaunch({ data: { programId: launch!.id, recipientPersonId } });
-      setOpened({ name: launch!.name, siteId: launch!.siteId });
+      const activeLaunch = launch!;
+      await activateLaunch({ data: { programId: activeLaunch.id, recipientPersonId } });
+      // Navigation happens only after the canonical activation command returns.
+      // The command alone decides readiness and opening authority.
+      const href = postLaunchOperationsDestination({ programId: activeLaunch.id, siteId: activeLaunch.siteId });
+      if (activeLaunch.siteId) {
+        await router.navigate({ href });
+        return;
+      }
+      setOpened({ name: activeLaunch.name, siteId: null });
     });
   }
 
@@ -236,6 +245,10 @@ export function OneHourSchoolLaunch({ launches, selectedProgramId }: {
       </select>
     </label>}
     {error && <p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
+    {launch.status === "active" && launch.siteId && <p role="status" className="mt-4 rounded-lg border p-4 text-sm">
+      {launch.name} is active. Daily work now lives with the opening handoff, staffing, admissions and academic activity in Site Today.{" "}
+      <Link to="/sites/$siteId" params={{ siteId: launch.siteId }} className="font-semibold underline">Open Site Today →</Link>
+    </p>}
     {opened && <p role="status" className="mt-4 rounded-lg border p-4 text-sm">
       {opened.name} is active. {opened.siteId
         ? <Link to="/sites/$siteId" params={{ siteId: opened.siteId }} className="underline">

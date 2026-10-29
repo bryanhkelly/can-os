@@ -8,6 +8,8 @@ import { TeacherLearningFollowUpsPanel } from "@/components/learning/TeacherLear
 import { TeacherConferencePanel } from "@/components/teacher/TeacherConferencePanel";
 import { TeacherFirstWeekCard } from "@/components/teacher/TeacherFirstWeekCard";
 import { WorkspaceShell, StatCard, EmptyState, QueryState } from "@/components/workspace";
+import { AttentionQueue } from "@/components/operations/AttentionQueue";
+import { buildTeacherAttention } from "@/domain/daily-operations";
 
 export const Route = createFileRoute("/teacher/")({ component: TeacherTodayPage });
 
@@ -79,20 +81,7 @@ function TeacherTodayPage() {
      </div>
     </section>
 
-    <section className="mt-10">
-     <div className="flex flex-wrap items-baseline justify-between gap-3">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Needs grading</p>
-      <Link to="/teacher/gradebook" className="text-xs font-semibold underline">Open gradebook →</Link>
-     </div>
-     {data.ungraded.length === 0 && <EmptyState className="mt-4" title="Nothing waiting for a grade. Nice work." />}
-     <div className="mt-4 grid gap-3">
-      {data.ungraded.map(item => <article key={`${item.assessmentId}:${item.studentProfileId}`} className="rounded-xl border bg-card p-5">
-       <p className="text-xs text-muted-foreground">{item.sectionTitle} · submitted {item.submittedAt ? new Date(item.submittedAt).toLocaleDateString() : "recently"}</p>
-       <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:item.sectionId,assessment:item.assessmentId,student:item.studentProfileId}} className="hover:underline">{item.assessmentTitle}</Link></h2>
-       <p className="mt-1 text-sm">{item.studentName}</p>
-      </article>)}
-     </div>
-    </section>
+    <AttentionQueue items={buildTeacherAttention(data)} empty="No grading, missing-work follow-up or assigned notices need your attention."/>
 
     <section className="mt-10" aria-label="Observed learning participation">
       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Learning participation</p>
@@ -128,29 +117,6 @@ function TeacherTodayPage() {
 
     <TeacherConferencePanel />
 
-    <section className="mt-10">
-     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Missing work</p>
-     {data.missingWork.length === 0 && <EmptyState className="mt-4" title="No overdue missing work in your sections." />}
-     <div className="mt-4 grid gap-3">
-      {data.missingWork.map(item => <article key={`${item.assessmentId}:${item.studentProfileId}`} className="rounded-xl border bg-card p-5">
-       <p className="text-xs text-muted-foreground">{item.sectionTitle} · due {new Date(item.dueAt).toLocaleDateString()}</p>
-       <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:item.sectionId,assessment:item.assessmentId,student:item.studentProfileId}} className="hover:underline">{item.assessmentTitle}</Link></h2>
-       <p className="mt-1 text-sm">{item.studentName} · no submission recorded</p>
-      </article>)}
-     </div>
-    </section>
-
-    <section className="mt-10">
-     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Notices</p>
-     {data.notices.length === 0 && <EmptyState className="mt-4" title="No recent notices." />}
-     <div className="mt-4 grid gap-3">
-      {data.notices.map(notice => <article key={notice.id} className="rounded-xl border bg-card p-5">
-       <p className="text-xs text-muted-foreground">{new Date(notice.createdAt).toLocaleDateString()}{notice.status === "unread" ? " · unread" : ""}</p>
-       <h2 className="mt-2 font-semibold"><Link to="/notifications" search={{notification:notice.id}} className="hover:underline">{notice.title}</Link></h2>
-       {notice.body && <p className="mt-1 text-sm text-muted-foreground">{notice.body}</p>}
-      </article>)}
-     </div>
-    </section>
    </>}
   </QueryState>
  </WorkspaceShell>;

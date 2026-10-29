@@ -1,4 +1,5 @@
 import type { summarizeFullFlowOperations } from "./full-flow-operational-snapshot";
+import { activeProgramOperationsHref } from "./launch-operations-handoff";
 
 export type SchoolProgramRecord = ReturnType<typeof summarizeFullFlowOperations>["programs"][number];
 export type LaunchJourneyRecord = {
@@ -32,11 +33,12 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
   const c=program.counts;
   const encoded=encodeURIComponent(program.id);
   const site=program.siteId?encodeURIComponent(program.siteId):"";
-  const operations=`/operations?programId=${encoded}${site?`&siteId=${site}`:""}`;
+  const schoolOpen=program.status==="active";
+  const operations=schoolOpen?activeProgramOperationsHref({programId:program.id,siteId:program.siteId,status:program.status}):
+    `/operations?programId=${encoded}${site?`&siteId=${site}`:""}`;
   const academic=`/operations/launch/${encoded}`;
   const checklist=`/operations/launch?programId=${encoded}${site?`&siteId=${site}`:""}`;
   const blocking=journey?.requirements.filter(r=>r.blocking&&r.status!=="complete")??[];
-  const schoolOpen=program.status==="active";
   const staffed=c.sections>0&&c.publishedSections===c.sections&&c.staffedSections===c.sections;
   // Do not mark enrollment-to-classroom complete while any active student
   // still lacks a valid class placement in this Program.
@@ -52,8 +54,8 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
     {key:"launch",title:"Configure and open the high school",
       state:schoolOpen?"recorded":"needs_attention",
       evidence:schoolOpen?"Program active":`Program ${program.status.replaceAll("_"," ")}; ${blocking.length} recorded blocking launch requirement(s)`,
-      nextAction:schoolOpen?"Review launch history":"Review genuine launch requirements and academic authority",
-      href:checklist,suggestedRole:"School registrar"},
+      nextAction:schoolOpen&&program.siteId?"Open Site Today":schoolOpen?"Review launch history":"Review genuine launch requirements and academic authority",
+      href:schoolOpen?operations:checklist,suggestedRole:"School registrar"},
     {key:"instruction",title:"Adopt curriculum, staff and provision classes",
       state:staffed?"recorded":"needs_attention",
       evidence:`${c.adoptedCurriculumPacks} active pack adoption(s) · ${c.publishedSections}/${c.sections} published sections · ${c.staffedSections}/${c.sections} staffed`,

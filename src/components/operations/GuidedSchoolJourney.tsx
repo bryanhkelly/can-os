@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { guidedSchoolJourney, type LaunchJourneyRecord, type SchoolProgramRecord } from "@/domain/guided-school-journey";
 
 /**
@@ -20,8 +19,7 @@ export function GuidedSchoolJourney({program,journey}:{
           Review steps require verification; they never self-complete.
         </p>
       </div>
-      <Link to="/operations/launch" search={{siteId:program.siteId??undefined,programId:program.id}}
-        className="text-sm underline">Launch requirements →</Link>
+      <a href={steps[0]?.href} className="text-sm underline">{steps[0]?.nextAction} →</a>
     </div>
     <ol className="mt-4 grid gap-3 md:grid-cols-2">
       {steps.map((step,index)=><li key={step.key} className="rounded-lg border p-4">

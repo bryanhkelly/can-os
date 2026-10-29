@@ -33,13 +33,18 @@ export const getOperationsActions=createServerFn({method:"GET"})
  const allowedPrograms=scoped.programIds.length ? or(isNull(actions.programId),inArray(actions.programId,scoped.programIds)) : isNull(actions.programId);
  const records=await db.select({
   id:actions.id,title:actions.title,description:actions.description,type:actions.type,
-  siteId:actions.siteId,ownerPersonId:actions.ownerPersonId,
+  siteId:actions.siteId,programId:actions.programId,ownerPersonId:actions.ownerPersonId,
+  ownerFirstName:people.legalFirstName,ownerLastName:people.legalLastName,
   status:actions.status,priority:actions.priority,dueAt:actions.dueAt,createdAt:actions.createdAt
- }).from(actions).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
+ }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
    asc(actions.dueAt),desc(actions.createdAt)).limit(250);
  const items=dedupeQueue(records.map(record=>({
-  id:record.id,kind:"action" as const,title:record.title,siteId:record.siteId,ownerPersonId:record.ownerPersonId,
-  detail:record.description??record.type.replaceAll("_"," "),
+  id:record.id,kind:"action" as const,
+  title:record.type==="support_referral"?"Restricted student support referral":record.title,
+  siteId:record.siteId,ownerPersonId:record.ownerPersonId,
+  detail:record.type==="support_referral"
+   ?"Open the authorized support workspace for private details and the domain-owned next step."
+   :record.description??record.type.replaceAll("_"," "),
   priority:record.priority==="urgent"?"critical" as const:record.priority==="high"?"high" as const:"normal" as const,
   createdAt:record.createdAt.toISOString(),
   dueAt:record.dueAt?.toISOString()??null, status:record.status,
@@ -48,7 +53,9 @@ export const getOperationsActions=createServerFn({method:"GET"})
  })));
  const scopedItems=prioritizeSchoolActions(items.map(item=>{
   const record=records.find(record=>record.id===item.id);
-  return {...item,siteId:record?.siteId??null,ownerPersonId:record?.ownerPersonId??null,
+  return {...item,type:record?.type??"operations",programId:record?.programId??null,
+   siteId:record?.siteId??null,ownerPersonId:record?.ownerPersonId??null,
+   ownerName:record?.ownerFirstName&&record.ownerLastName?`${record.ownerFirstName} ${record.ownerLastName}`:null,
    dueAt:record?.dueAt?.toISOString()??null,status:record?.status??"open",
    priority:item.priority==="critical"?"critical" as const:
      item.priority==="high"?"high" as const:"normal" as const,
