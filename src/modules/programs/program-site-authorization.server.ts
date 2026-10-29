@@ -354,7 +354,8 @@ export async function revokeProgramSiteAuthorization(
       eventType: EventTypes.ProgramSiteAuthorizationRevoked,
       aggregateType: "program_site_authorization", aggregateId: record.id,
       actorPersonId: actor.actorPersonId,
-      organizationId: identity.hostOrganizationId, siteId: identity.siteId, programId: identity.programId,
+      organizationId: identity.hostOrganizationId,
+      siteId: identity.siteId, programId: identity.programId,
       payload: { institutionOrganizationId: identity.institutionOrganizationId },
     });
     return { authorizationId: record.id, status: "revoked" as const };
