@@ -11,6 +11,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import {
   schoolOpeningEvidenceCategories, schoolOpeningEvidenceLabels, schoolOpeningEvidenceNextAction,
   schoolOpeningEvidenceStatus, type SchoolOpeningEvidenceCategory,
@@ -162,6 +163,7 @@ async function requireVerifiedChurchSiteDirector(
           eq(roleAssignments.programId,school.programId),
           eq(roleAssignments.roleKey,"site_leader"),
           sql`${roleAssignments.metadata}->>'origin' = 'local_site_delegation'`,
+          activeRoleAssignmentPredicate(),
           sql`${roleAssignments.capabilities} @> ${JSON.stringify(["onsite.attendance.record"])}::jsonb`,
           eq(accountPersonGrants.active,true),
           eq(accountPersonGrants.isSynthetic,false),
