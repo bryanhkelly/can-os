@@ -2,6 +2,7 @@ import { db } from "@/db/client";
 import {
   documents,
   enrollments,
+  incidentAmendments,
   incidentEvidence,
   incidentNotifications,
   incidents,
@@ -33,7 +34,7 @@ import {
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 
 export const safeguardingResponsibilities = ["primary", "deputy", "can_lead"] as const;
 export type SafeguardingResponsibility = (typeof safeguardingResponsibilities)[number];
@@ -492,6 +493,94 @@ export async function escalateSafeguardingConcern(actor: AccessContext, incident
   });
 }
 
+/** Accountable closure of a restricted case by an assigned responder who has
+ * already recorded their own human acknowledgment. Closure never deletes
+ * evidence, notification or external-report records, and does not complete or
+ * replace any outside-agency legal duty. The conditional status transition is
+ * the idempotency boundary: only the transaction that moves the case out of
+ * `filed` writes the amendment, event and audit entries. */
+export async function resolveSafeguardingConcern(
+  actor: AccessContext,
+  input: { incidentId: string; resolutionSummary: string },
+) {
+  const summary = input.resolutionSummary.trim();
+  if (summary.length < 10 || summary.length > 2000) {
+    throw new Error("Provide a 10-2000 character factual resolution summary");
+  }
+  const { incident, assignment } = await loadIncidentAndAssignment(
+    actor,
+    input.incidentId,
+    "safeguarding.respond",
+  );
+  return db.transaction(async (tx) => {
+    const acknowledged = await tx.select({ id: incidentNotifications.id })
+      .from(incidentNotifications).where(and(
+        eq(incidentNotifications.incidentId, incident.id),
+        eq(incidentNotifications.recipientPersonId, actor.actorPersonId!),
+        eq(incidentNotifications.purpose, "safeguarding_concern_response"),
+        isNotNull(incidentNotifications.acknowledgedAt),
+      )).limit(1);
+    if (!acknowledged.length) {
+      throw new Error("Record your own human acknowledgment before closing this restricted case");
+    }
+    const closedAt = new Date();
+    const changed = await tx.update(incidents).set({
+      status: "closed",
+      closedAt,
+      closedByPersonId: actor.actorPersonId,
+      updatedAt: closedAt,
+      metadata: { ...incident.metadata, safeguardingResolutionSummary: summary },
+    }).where(and(
+      eq(incidents.id, incident.id),
+      eq(incidents.status, "filed"),
+    )).returning({ id: incidents.id });
+    if (!changed.length) {
+      const [current] = await tx.select({
+        status: incidents.status,
+        closedAt: incidents.closedAt,
+        closedByPersonId: incidents.closedByPersonId,
+      }).from(incidents).where(eq(incidents.id, incident.id)).limit(1);
+      if (current?.status === "closed" && current.closedByPersonId === actor.actorPersonId) {
+        return { incidentId: incident.id, closedAt: current.closedAt ?? closedAt, replayed: true };
+      }
+      throw new Error("This safeguarding case was already closed by another responder");
+    }
+    await tx.insert(incidentAmendments).values({
+      incidentId: incident.id,
+      amendedByPersonId: actor.actorPersonId!,
+      field: "status",
+      priorValue: { value: "filed" },
+      newValue: { value: "closed" },
+      reason: summary,
+    });
+    const eventId = await emitEvent(tx, {
+      eventType: EventTypes.IncidentClosed,
+      aggregateType: "incident",
+      aggregateId: incident.id,
+      actorPersonId: actor.actorPersonId,
+      organizationId: incident.organizationId,
+      siteId: incident.siteId,
+      programId: incident.programId,
+      payload: {
+        incidentNumber: incident.incidentNumber,
+        responsibility: assignment.responsibility,
+        resolutionSummaryRecorded: true,
+        externalDutyCompleted: false,
+      },
+    });
+    await writeAudit(tx, actor, {
+      action: "safeguarding.concern.resolve",
+      entityType: "incident",
+      entityId: incident.id,
+      scope: { organizationId: incident.organizationId, siteId: incident.siteId, programId: incident.programId },
+      before: { status: "filed" },
+      after: { status: "closed", resolutionSummary: summary, responsibility: assignment.responsibility },
+      contextExtras: { domainEventId: eventId },
+    });
+    return { incidentId: incident.id, closedAt, replayed: false };
+  });
+}
+
 async function authorizeEvidenceOrExternalReporter(
   actor: AccessContext,
   incidentId: string,
@@ -762,6 +851,8 @@ export async function getSafeguardingWorkspace(actor: AccessContext) {
       incidentId: row.incident.id,
       incidentNumber: row.incident.incidentNumber,
       siteId: row.incident.siteId,
+      status: row.incident.status,
+      closedAt: row.incident.closedAt,
       reportedAt: row.incident.reportedAt,
       occurredAt: row.incident.occurredAt,
       urgent: row.concern.urgent,
@@ -841,6 +932,10 @@ export async function getSafeguardingCase(actor: AccessContext, incidentId: stri
         summary: incident.summary,
         immediateActions: incident.immediateActions,
         classification: incident.classification,
+        closedAt: incident.closedAt,
+        resolutionSummary: typeof incident.metadata.safeguardingResolutionSummary === "string"
+          ? incident.metadata.safeguardingResolutionSummary
+          : null,
       },
       concern,
       student: student ? {

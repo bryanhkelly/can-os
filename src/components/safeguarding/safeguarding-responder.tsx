@@ -6,6 +6,7 @@ import {
   escalateAssignedSafeguardingConcern,
   getAssignedSafeguardingCase,
   getMySafeguardingWorkspace,
+  resolveAssignedSafeguardingConcern,
 } from "@/modules/safeguarding/safeguarding.functions";
 import { SafeguardingEvidenceForm, SafeguardingExternalReportForm } from "./safeguarding-forms";
 
@@ -26,9 +27,10 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [resolution, setResolution] = useState("");
 
   const openCase = useCallback(async (incidentId: string) => {
-    setSelectedId(incidentId); setLoading(true); setError(""); setNotice("");
+    setSelectedId(incidentId); setLoading(true); setError(""); setNotice(""); setResolution("");
     try { setDetail(await getAssignedSafeguardingCase({ data: { incidentId } })); }
     catch (cause) { setDetail(null); setError(cause instanceof Error ? cause.message : "This restricted case cannot be opened."); }
     finally { setLoading(false); }
@@ -58,12 +60,26 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
     finally { setBusy(""); }
   }
 
+  async function closeCase() {
+    if (!selectedId || busy) return;
+    setBusy("close"); setError(""); setNotice("");
+    try {
+      const result = await resolveAssignedSafeguardingConcern({ data: { incidentId: selectedId, resolutionSummary: resolution } });
+      setNotice(result.replayed
+        ? "This case was already closed under your name; the existing closure record is preserved."
+        : "Case closed. Every record is preserved, and closure does not complete or replace any external reporting duty.");
+      setResolution("");
+      await refresh();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "The closure was not saved."); }
+    finally { setBusy(""); }
+  }
+
   return <div className="grid gap-6 lg:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]">
     <section aria-label="Assigned safeguarding cases">
       <h2 className="font-serif text-2xl font-semibold">My assigned cases</h2>
       <p className="mt-2 text-sm text-muted-foreground">Site membership alone grants no access. Only active named assignments appear.</p>
       {!workspace.cases.length ? <EmptyState title="No assigned safeguarding cases" description="Ordinary support referrals and unassigned incidents are not available in this workspace." /> : <div className="mt-4 space-y-3">{workspace.cases.map(item => <button key={item.incidentId} type="button" onClick={() => void openCase(item.incidentId)} aria-pressed={selectedId === item.incidentId} className={"w-full rounded-xl border p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " + (selectedId === item.incidentId ? "bg-muted" : "bg-card")}>
-        <span className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-semibold">{item.incidentNumber}</span><StatusBadge tone={item.urgent ? "danger" : item.acknowledgedAt ? "success" : "attention"}>{item.urgent ? "Urgent" : item.acknowledgedAt ? "Acknowledged" : "Needs response"}</StatusBadge></span>
+        <span className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-semibold">{item.incidentNumber}</span><StatusBadge tone={item.status === "closed" ? "neutral" : item.urgent ? "danger" : item.acknowledgedAt ? "success" : "attention"}>{item.status === "closed" ? "Closed" : item.urgent ? "Urgent" : item.acknowledgedAt ? "Acknowledged" : "Needs response"}</StatusBadge></span>
         <span className="mt-2 block text-xs text-muted-foreground">{item.responsibility.replaceAll("_", " ")} · reported {date(item.reportedAt)}</span>
         <span className="mt-1 block text-xs">{item.concernKinds.map(kind => kind.replaceAll("_", " ")).join(", ")}</span>
       </button>)}</div>}
@@ -71,11 +87,15 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
     <div className="min-w-0">
       <QueryState loading={loading ? "Loading assigned restricted case…" : undefined} error={error || undefined} isEmpty={!selectedId && !loading} empty={<EmptyState title="Select an assigned case" description="Opening a case checks your current capability, scope and named assignment and records a sensitive-read audit." />}>
         {detail && <>
-          <WorkspacePanel title={detail.incident.incidentNumber} description={`Reported ${date(detail.incident.reportedAt)} · ${detail.concern.urgent ? "Urgent human review" : "Restricted safeguarding response"}`} actions={<StatusBadge tone="danger">Restricted</StatusBadge>}>
-            <div className="flex flex-wrap gap-2">
+          <WorkspacePanel title={detail.incident.incidentNumber} description={`Reported ${date(detail.incident.reportedAt)} · ${detail.concern.urgent ? "Urgent human review" : "Restricted safeguarding response"}`} actions={<StatusBadge tone={detail.incident.status === "closed" ? "neutral" : "danger"}>{detail.incident.status === "closed" ? "Closed" : "Restricted"}</StatusBadge>}>
+            {detail.incident.status !== "closed" && <div className="flex flex-wrap gap-2">
               <Button disabled={!!busy} onClick={() => void command("acknowledge")}>{busy === "acknowledge" ? "Recording…" : "Acknowledge human response"}</Button>
               <Button variant="outline" disabled={!!busy} onClick={() => void command("escalate")}>{busy === "escalate" ? "Escalating…" : "Escalate to fallback"}</Button>
-            </div>
+            </div>}
+            {detail.incident.status === "closed" && <WorkspaceNotice tone="success" className="mt-2">
+              This case is closed{detail.incident.closedAt ? ` as of ${date(detail.incident.closedAt)}` : ""}. All evidence, acknowledgment and external-report records remain preserved, and closure does not complete or replace any outside-agency legal duty.
+              {detail.incident.resolutionSummary ? <span className="mt-2 block whitespace-pre-wrap">Resolution summary: {detail.incident.resolutionSummary}</span> : null}
+            </WorkspaceNotice>}
             {notice && <WorkspaceNotice tone="success" className="mt-4">{notice}</WorkspaceNotice>}
             <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
               <div><dt className="font-semibold">Observed or learned</dt><dd className="mt-1">{date(detail.incident.occurredAt)}</dd></div>
@@ -106,6 +126,19 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
             {!detail.externalReports.length ? <p className="text-sm text-muted-foreground">No outside action has been recorded. This says nothing about whether a legal duty applies.</p> : <ul className="space-y-3 text-sm">{detail.externalReports.map(item => <li key={item.id} className="rounded-lg border p-3"><div className="flex flex-wrap justify-between gap-2"><span className="font-medium">{item.status.replaceAll("_", " ")} · {item.agencyLabel}</span><span>{date(item.occurredAt)}</span></div><p className="mt-1 text-muted-foreground">{item.channel}{item.reference ? ` · Reference ${item.reference}` : ""}</p>{item.details && <p className="mt-2 whitespace-pre-wrap">{item.details}</p>}</li>)}</ul>}
           </WorkspacePanel>
           <SafeguardingExternalReportForm incidentId={selectedId} onSaved={refresh} />
+
+          {detail.incident.status !== "closed" && <WorkspacePanel title="Accountable closure" description="Closing ends the active internal response. Every record stays intact, and closure never completes or replaces an external legal reporting duty." className="mt-5">
+            <label className="block text-sm font-semibold">
+              Factual resolution summary (required)
+              <textarea value={resolution} maxLength={2000} rows={4}
+                onChange={event => setResolution(event.target.value)}
+                placeholder="What was actually done, by whom, and what — if anything — remains outstanding?"
+                className="mt-2 w-full rounded border bg-background p-3 text-sm font-normal" />
+            </label>
+            <Button className="mt-3" disabled={!!busy || resolution.trim().length < 10} onClick={() => void closeCase()}>
+              {busy === "close" ? "Closing…" : "Close restricted case"}
+            </Button>
+          </WorkspacePanel>}
         </>}
       </QueryState>
     </div>
