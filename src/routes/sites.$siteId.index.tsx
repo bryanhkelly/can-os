@@ -17,6 +17,13 @@ export const Route = createFileRoute("/sites/$siteId/")({
     )(),
   component: SiteTodayPage,
 });
+
+const openingBlockerLabels: Record<string, string> = {
+  operating_agreement: "the CAN–church service agreement is not current",
+  opening_evidence: "required independently verified opening evidence is missing or expired",
+  site_director: "no current verified site director is appointed",
+};
+
 function SiteTodayPage() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) return <LoaderFailure eyebrow="CAN OS · Site Operations"
@@ -32,6 +39,7 @@ function SiteTodayPage() {
     !["present","tardy"].includes(student.status)||!!student.guardianExplanationStatus||
     student.healthVisitCount>0||student.incidentCount>0||student.activeEmergencyHold||
     student.activeCustodyHold||student.deniedPickupAttempts>0||!!student.uncollectedActionId);
+  const blockedOpenings=data.schoolOpenings.filter(opening=>opening.blocked);
   return <WorkspaceShell eyebrow="CAN OS · Site Operations" title={data.site.name}
     subtitle={data.site.organizationName + " · " + data.localDate + " · " + data.site.timezone}
     actions={<div className="flex flex-wrap gap-2">
@@ -49,6 +57,30 @@ function SiteTodayPage() {
       ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/operations","/operations/launch","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
     </nav>
+    {blockedOpenings.length>0&&
+      <section role="alert" aria-label="School opening authorization"
+        className="mt-6 border-l-4 border-rose-500 bg-muted/40 px-5 py-4">
+        <h2 className="font-semibold">School opening is not currently authorized</h2>
+        <p className="mt-1 text-sm">
+          A church-hosted school at this site is not approved to operate right now. The supervised
+          day below remains a historical record — it never authorizes operation. Contact the church
+          registrar and your CAN school-opening officer.
+        </p>
+        <ul className="mt-2 list-disc pl-5 text-sm">
+          {blockedOpenings.map(opening=>{
+            const program=data.programs.find(item=>item.id===opening.programId);
+            return <li key={opening.programId}>
+              <span className="font-medium">{program?.name??"School program"}: </span>
+              {opening.status==="suspended"?"opening suspended by CAN":
+                opening.status==="approved"?"approval prerequisites no longer hold":
+                opening.status==="unconfigured"?"no approved school configuration exists":
+                "opening not yet approved"}
+              {opening.blockers.length>0&&" — "+opening.blockers.map(blocker=>
+                openingBlockerLabels[blocker]??blocker).join("; ")}
+            </li>;
+          })}
+        </ul>
+      </section>}
     <OpeningHandoffs handoffs={data.openingHandoffs}/>
     <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {[

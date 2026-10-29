@@ -13,6 +13,7 @@ import { getSchoolOperationsCommandCenter } from "./command-center-service";
 import { listOpeningHandoffs,listOpeningOperators } from "@/modules/programs/opening-handoff.server";
 import { openingHandoffManagerCapability } from "@/modules/programs/opening-handoff.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
+import { readLocalSchoolOpeningStatus } from "@/modules/operations/school-opening.server";
 import type { Actor } from "@/modules/identity/actors.server";
 
 const requestSchema = z.object({ siteId: z.string().uuid() });
@@ -52,6 +53,19 @@ export const getSiteToday = createServerFn({ method: "GET" })
       if(await hasInstitutionalProgramCapability({...actor,actorPersonId:actor.actorPersonId} satisfies Actor,
         {...program,organizationId:site.organizationId,siteId:site.id},openingHandoffManagerCapability))
         managerPrograms.add(program.id);
+    }
+    // Independently hosted church/CAN schools: surface the current opening
+    // authorization state (status + non-sensitive blocker categories only) so
+    // a suspension or lapsed prerequisite is visible beside the live school
+    // day. Registrars use the full school-opening desk instead; programs
+    // without an independent church/CAN identity produce no entry.
+    const schoolOpenings=[];
+    for(const program of scopedPrograms){
+      try{
+        schoolOpenings.push(await readLocalSchoolOpeningStatus(actor,program.id));
+      }catch(error){
+        if(!(error instanceof AuthorizationError))throw error;
+      }
     }
     // Site-local day boundaries, including daylight-saving transitions.
     const now = new Date();
@@ -135,6 +149,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
       canOpenOnsiteDay:actor.role==="site_leader",
       schoolDay:snapshot.operational,
       programs: scopedPrograms,
+      schoolOpenings,
       attentionItems,
       openingHandoffs:handoffs.map(row=>({...row,createdAt:row.createdAt.toISOString(),
         resolvedAt:row.resolvedAt?.toISOString()??null,
