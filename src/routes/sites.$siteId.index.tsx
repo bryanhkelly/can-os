@@ -8,6 +8,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { OpeningHandoffs } from "@/components/operations/OpeningHandoffs";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
+import { SiteOwnedActionResolution } from "@/components/operations/SiteOwnedActionResolution";
 
 export const Route = createFileRoute("/sites/$siteId/")({
   loader: ({ params }) =>
@@ -23,6 +24,12 @@ const openingBlockerLabels: Record<string, string> = {
   opening_evidence: "required independently verified opening evidence is missing or expired",
   site_director: "no current verified site director is appointed",
 };
+
+const ownerResolvableTypes = new Set([
+  "onsite_coverage_gap",
+  "onsite_pickup_denied_follow_up",
+  "onsite_pickup_uncollected_child",
+]);
 
 function SiteTodayPage() {
   const outcome = Route.useLoaderData();
@@ -40,6 +47,8 @@ function SiteTodayPage() {
     student.healthVisitCount>0||student.incidentCount>0||student.activeEmergencyHold||
     student.activeCustodyHold||student.deniedPickupAttempts>0||!!student.uncollectedActionId);
   const blockedOpenings=data.schoolOpenings.filter(opening=>opening.blocked);
+  const ownedFollowUps=data.actions.filter(action=>
+    action.ownerPersonId===data.viewerPersonId&&ownerResolvableTypes.has(action.type));
   return <WorkspaceShell eyebrow="CAN OS · Site Operations" title={data.site.name}
     subtitle={data.site.organizationName + " · " + data.localDate + " · " + data.site.timezone}
     actions={<div className="flex flex-wrap gap-2">
@@ -162,6 +171,7 @@ function SiteTodayPage() {
     </section>
     <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <section>
+        {ownedFollowUps.length>0&&<SiteOwnedActionResolution actions={ownedFollowUps}/>}
         <AttentionQueue items={data.attentionItems} empty="No opening, staffing, admissions, document, family or academic work needs attention in your current site scope."/>
         <h2 className="mt-8 font-serif text-2xl">Today's schedule</h2>
         <div className="mt-4 space-y-3">

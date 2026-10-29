@@ -147,6 +147,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
     return {
       site, asOf: now.toISOString(), localDate: dayText,
       canOpenOnsiteDay:actor.role==="site_leader",
+      viewerPersonId:actor.actorPersonId,
       schoolDay:snapshot.operational,
       programs: scopedPrograms,
       schoolOpenings,
