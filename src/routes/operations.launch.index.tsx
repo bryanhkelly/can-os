@@ -95,6 +95,10 @@ function LaunchWizardPage() {
   }
 
   const hostSites = options?.sites.filter((site) => site.organizationId === hostOrganizationId) ?? [];
+  // Recognize an existing campus before the leader accidentally forks it.
+  const duplicateNewSite = hostSites.find(site =>
+    (newSiteSlug.trim().length > 0 && site.slug === newSiteSlug.trim()) ||
+    (newSiteName.trim().length >= 2 && site.name.trim().toLowerCase() === newSiteName.trim().toLowerCase()));
 
   // Turnkey defaults: when the registrar grant covers exactly one church, and
   // that church has exactly one Site, preselect both instead of asking the
@@ -413,7 +417,10 @@ function LaunchWizardPage() {
                       <input aria-label="New site slug" placeholder="campus-slug" className={inputClass} value={newSiteSlug} onChange={e=>setNewSiteSlug(e.target.value)}/>
                       <input aria-label="New site timezone" placeholder="Timezone" className={inputClass} value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}/>
                     </div>
-                    <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Create site</button>
+                    {duplicateNewSite && <p role="status" className="mt-2 text-xs">
+                      This church already has the site “{duplicateNewSite.name}”. Choose it in the Site list above instead of creating a duplicate.
+                    </p>}
+                    <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Create site</button>
                     {createdSiteDraft && <div role="status" className="mt-3 rounded-lg border p-3 text-sm">
                       <p className="font-semibold">Your website draft is prepared</p>
                       <p className="mt-1 font-mono">{createdSiteDraft.host}</p>
