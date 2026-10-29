@@ -57,6 +57,7 @@ async function submissionForReview(submissionId:string){
   id:s.submissions.id,assessmentId:s.submissions.assessmentId,studentProfileId:s.submissions.studentProfileId,
   studentPersonId:s.studentProfiles.personId,response:s.submissions.response,attemptNumber:s.submissions.attemptNumber,
   submittedAt:s.submissions.submittedAt,status:s.submissions.status,
+  score:s.submissions.score,feedback:s.submissions.feedback,
  }).from(s.submissions).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.submissions.studentProfileId))
   .where(eq(s.submissions.id,submissionId)).limit(1);
  if(!submission||!["submitted","graded","returned"].includes(submission.status))
@@ -89,6 +90,8 @@ export const getSubmissionReview=createServerFn({method:"GET"})
    .from(s.submissions).where(and(eq(s.submissions.assessmentId,submission.assessmentId),
     eq(s.submissions.studentProfileId,submission.studentProfileId))).orderBy(desc(s.submissions.attemptNumber));
   return {
+   score:submission.score,
+   feedbackComment:typeof submission.feedback?.comment==="string"?submission.feedback.comment:"",
    responseText:typeof submission.response.text==="string"?submission.response.text:"",
    attemptNumber:submission.attemptNumber,submittedAt:submission.submittedAt?.toISOString()??null,
    attachments:documents.map(document=>({id:document.id,fileName:document.fileName})),
