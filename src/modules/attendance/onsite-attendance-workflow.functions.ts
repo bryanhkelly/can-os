@@ -13,6 +13,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
 import { requireCurrentSiteLocalDelegate, requiresIndependentChurchLocalDelegation } from "@/modules/operations/site-local-delegation.server";
 import { activeFacilitatorSectionIds, requireCurrentSectionFacilitator } from "@/modules/operations/site-section-facilitators.server";
+import { readLocalSchoolOpeningStatus } from "@/modules/operations/school-opening.server";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
 import { siteDate } from "@/domain/expected-attendance";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -307,6 +308,30 @@ export const listExpectedOnsiteRoster = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const actor = await staff("attendance.write");
     return loadExpectedOnsiteRosterForActor(actor, data);
+  });
+
+/**
+ * Local-operator opening projection: for each onsite Program this staff
+ * member is already scoped to see, whether an independently hosted
+ * church/CAN school is currently authorized to operate. Only the
+ * configuration status and non-sensitive blocker categories are returned —
+ * never evidence documents, verifier identity or CAN review internals.
+ * Programs without an independent church/CAN identity produce no entry.
+ */
+export const getSiteDayOpeningStatuses = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const actor = await staff("attendance.write");
+    const programsAtSite = await scopedOnsitePrograms(actor);
+    const statuses = [];
+    for (const program of programsAtSite) {
+      try {
+        statuses.push(await readLocalSchoolOpeningStatus(actor, program.id));
+      } catch (error) {
+        if (!(error instanceof AuthorizationError)) throw error;
+        // Not an independently hosted church/CAN school: no opening gate applies.
+      }
+    }
+    return { statuses };
   });
 
 export const markExpectedOnsiteAttendance = createServerFn({ method: "POST" })
