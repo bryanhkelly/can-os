@@ -105,11 +105,16 @@ function LaunchWizardPage() {
   // leader to find records the system already knows. Selections stay editable.
   useEffect(() => {
     if (!options) return;
+    const selectedSite = options.sites.find(site => site.id === siteId);
+    if (!hostOrganizationId && selectedSite) {
+      setHostOrganizationId(selectedSite.organizationId);
+      return;
+    }
     const [onlyOrganization] = options.organizations;
     if (!hostOrganizationId && options.organizations.length === 1 && onlyOrganization) {
       setHostOrganizationId(onlyOrganization.id);
     }
-  }, [options, hostOrganizationId]);
+  }, [options, hostOrganizationId, siteId]);
   useEffect(() => {
     const [onlySite] = hostSites;
     if (siteId || !hostOrganizationId) return;
@@ -213,7 +218,7 @@ function LaunchWizardPage() {
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
-        <OneHourSchoolLaunch launches={launches.launches} selectedProgramId={selection.programId}/>
+        <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
 
         {launches.launches.length>0&&<details className="mt-5 rounded-xl border bg-card p-5">
           <summary className="cursor-pointer text-sm font-semibold">Optional · Family outreach</summary>
@@ -487,3 +492,4 @@ function LaunchWizardPage() {
     </WorkspaceShell>
   );
 }
+
