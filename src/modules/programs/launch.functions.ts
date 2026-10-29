@@ -76,6 +76,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
           id: s.sites.id,
           organizationId: s.sites.organizationId,
           name: s.sites.name,
+          slug: s.sites.slug,
           timezone: s.sites.timezone,
         })
         .from(s.sites)
@@ -250,11 +251,23 @@ export const createLaunchSite = createServerFn({method:"POST"})
   const actor=await registrarContext("program.launch.start");
   if(!actor.actorPersonId||!actor.scope.organizationIds?.includes(data.organizationId)||actor.grantSiteId!==null)
    throw new AuthorizationError("organization-wide site creation");
-  const [{db},s,{provisionNewSitePublicationDraft}]=await Promise.all([
+  const [{db},s,{provisionNewSitePublicationDraft},{and,eq,or,sql}]=await Promise.all([
    import("@/db/client"),import("@/db/schema"),
    import("@/modules/sites/site-public-provisioning.server"),
+   import("drizzle-orm"),
   ]);
   return db.transaction(async tx=>{
+   // D1: recognize the church's existing Site instead of creating a duplicate.
+   // The unique index only covers slug; a renamed slug would otherwise fork the campus.
+   const [existing]=await tx.select({id:s.sites.id,name:s.sites.name,slug:s.sites.slug})
+    .from(s.sites)
+    .where(and(eq(s.sites.organizationId,data.organizationId),or(
+     eq(s.sites.slug,data.slug),
+     sql`lower(${s.sites.name}) = ${data.name.trim().toLowerCase()}`,
+    )))
+    .limit(1);
+   if(existing)throw new Error(
+    `This church already has the site "${existing.name}" (${existing.slug}). Select it from the Site list instead of creating a duplicate.`);
    const [site]=await tx.insert(s.sites).values({...data}).returning({id:s.sites.id});
    if(!site)throw new Error("Failed to create Site");
    await emitEvent(tx,{
