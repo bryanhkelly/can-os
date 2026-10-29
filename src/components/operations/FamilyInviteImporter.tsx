@@ -5,7 +5,10 @@ import {
   FAMILY_INVITATION_MAX_RECIPIENTS,
   type FamilyInvitationWorkspace,
 } from "@/domain/family-invitations";
-import { sendFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
+import {
+  retryFamilyInvitationBatch,
+  sendFamilyInvitations,
+} from "@/modules/enrollment/family-invitations.functions";
 
 function recipientStatus(status: FamilyInvitationWorkspace["batches"][number]["recipients"][number]["status"]) {
   switch (status) {
@@ -79,6 +82,22 @@ export function FamilyInviteImporter({
       await router.invalidate();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to queue family invitations");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function retryFailed(batchId: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await retryFamilyInvitationBatch({ data: { batchId } });
+      setResult(response.retried
+        ? `Retry queued for ${response.retried} recipient${response.retried === 1 ? "" : "s"}. Provider acceptance is not inbox delivery.`
+        : "No failed recipients are waiting for a retry.");
+      await router.invalidate();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to retry failed invitations");
     } finally {
       setBusy(false);
     }
@@ -166,14 +185,21 @@ export function FamilyInviteImporter({
     {workspace.batches.length > 0 && <div className="mt-8">
       <h3 className="font-serif text-xl">Invitation responses</h3>
       <p className="mt-1 text-xs text-muted-foreground">Provider acceptance is not inbox delivery. A response is recorded only when the recipient redeems the verified application link.</p>
-      <div className="mt-3 space-y-3">{workspace.batches.map(batch => <details key={batch.id} className="rounded-xl border p-4">
+      <div className="mt-3 space-y-3">{workspace.batches.map(batch => {
+        const retryable = batch.recipients.filter(recipient => recipient.status === "retrying").length;
+        return <details key={batch.id} className="rounded-xl border p-4">
         <summary className="cursor-pointer text-sm font-semibold">{batch.subject} · {batch.programName} · {batch.recipients.length} recipients</summary>
         <p className="mt-2 text-xs text-muted-foreground">Queued {new Date(batch.createdAt).toLocaleString()} · {batch.outboxStatus === "failed" ? "Automatic retries exhausted; operations alerted." : batch.status === "complete" ? "All recipients accepted by the provider." : "Outbox processing or retrying."}</p>
+        {retryable > 0 && <button type="button" disabled={busy} onClick={() => void retryFailed(batch.id)}
+          className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          {busy ? "Queueing retry…" : `Retry ${retryable} failed recipient${retryable === 1 ? "" : "s"}`}
+        </button>}
         <ul className="mt-3 space-y-2">{batch.recipients.map(recipient => <li key={recipient.email} className="flex flex-col gap-1 border-b pb-2 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="break-words">{[recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || "Name not supplied"} · {recipient.email}</span>
           <span className="text-xs text-muted-foreground">{recipientStatus(recipient.status)}{recipient.respondedAt ? ` · ${new Date(recipient.respondedAt).toLocaleString()}` : ""}</span>
         </li>)}</ul>
-      </details>)}</div>
+      </details>;
+      })}</div>
     </div>}
   </section>;
 }

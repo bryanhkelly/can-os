@@ -193,6 +193,80 @@ export async function sendFamilyInvitationBatch(
   });
 }
 
+/**
+ * Registrar-initiated retry after the outbox exhausted automatic retries.
+ * Emits a fresh batch-requested event for the same aggregate; the existing
+ * consumer re-attempts only recipients not yet accepted by the provider, so
+ * an accepted family is never emailed again. The consumer re-resolves the
+ * published destination and operating authorization at send time, so a retry
+ * cannot reopen a closed school. No delivery is claimed: acceptance by the
+ * provider is not inbox delivery.
+ */
+export async function requestFamilyInvitationRetry(
+  context: AccessContext,
+  batchId: string,
+): Promise<{ batchId: string; retried: number }> {
+  assertFamilyInvitationRegistrar(context);
+  return db.transaction(async tx => {
+    const [thread] = await tx.select({
+      id: communicationThreads.id,
+      contextId: communicationThreads.contextId,
+      metadata: communicationThreads.metadata,
+    }).from(communicationThreads).where(and(
+      eq(communicationThreads.id, batchId),
+      eq(communicationThreads.contextType, "program"),
+      sql`${communicationThreads.metadata}->>'kind' = ${FAMILY_INVITATION_BATCH_KIND}`,
+    )).for("update").limit(1);
+    if (!thread?.contextId) throw new Error("Family invitation batch unavailable");
+
+    const [program] = await tx.select({
+      organizationId: programs.organizationId,
+      siteId: programs.siteId,
+    }).from(programs).where(eq(programs.id, thread.contextId)).limit(1);
+    if (!program) throw new Error("Family invitation batch unavailable");
+    assertOrganizationScope(context, program.organizationId);
+    assertSiteScope(context, program.siteId);
+    assertProgramScope(context, thread.contextId);
+
+    const metadata = familyInvitationBatchMetadataSchema.parse(thread.metadata);
+    const failed = metadata.recipients.filter(recipient => recipient.status === "failed");
+    if (!failed.length) return { batchId, retried: 0 };
+
+    // The row lock above serializes concurrent clicks: the loser re-reads and
+    // sees the winner's pending event instead of stacking a duplicate send.
+    const [inFlight] = await tx.select({ id: domainEvents.id }).from(domainEvents).where(and(
+      eq(domainEvents.aggregateType, "communication_thread"),
+      eq(domainEvents.aggregateId, thread.id),
+      eq(domainEvents.eventType, EventTypes.FamilyInvitationBatchRequested),
+      inArray(domainEvents.status, ["pending", "processing"]),
+    )).limit(1);
+    if (inFlight) throw new Error("A retry is already being processed for this batch");
+
+    await emitEvent(tx, {
+      eventType: EventTypes.FamilyInvitationBatchRequested,
+      aggregateType: "communication_thread",
+      aggregateId: thread.id,
+      actorPersonId: context.actorPersonId,
+      organizationId: program.organizationId,
+      siteId: program.siteId,
+      programId: thread.contextId,
+      payload: { recipientCount: failed.length, retry: true },
+    });
+    await writeAudit(tx, context, {
+      action: "family.invitation_batch.retry",
+      entityType: "communication_thread",
+      entityId: thread.id,
+      scope: {
+        organizationId: program.organizationId,
+        siteId: program.siteId,
+        programId: thread.contextId,
+      },
+      after: { retriedRecipients: failed.length },
+    });
+    return { batchId, retried: failed.length };
+  });
+}
+
 export async function listFamilyInvitationWorkspace(
   context: AccessContext,
 ): Promise<FamilyInvitationWorkspace> {
