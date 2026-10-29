@@ -74,6 +74,8 @@ describe("persistent server-initialized workspace shell", () => {
     expect(html).toContain("Test School");
     expect(html).toContain('aria-label="Account menu"');
     expect(html).toContain("Ask CAN");
+    expect(html.match(/<button[^>]*aria-label="Switch workspace"/g)).toHaveLength(1);
+    expect(html).not.toContain("Switcher mode");
     expect(html).not.toContain("Loading account");
     expect(html).not.toContain("/teacher/gradebook");
     await Promise.all([

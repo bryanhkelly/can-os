@@ -5,6 +5,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import {getQuickWinActions,requestQuickWinHelp} from "@/modules/actions/student-actions.functions";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { isStudentSupportAction } from "@/modules/actions/student-action-policy";
+import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 
 const loadSupportReferrals=async()=>{
  const viewer=await getSupportViewerRole();
@@ -40,26 +41,23 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
    setError(cause instanceof Error?cause.message:"Unable to request support");
   }finally{setBusy(false);}
  }
- return <main className="mx-auto max-w-4xl px-5 py-10">
-  <Link to="/student" className="text-xs font-semibold underline">← Student Today</Link>
-  <p className="mt-7 text-xs font-bold uppercase tracking-wider text-muted-foreground">CAN OS · Student support</p>
-  <h1 className="mt-2 font-serif text-4xl">Get help and follow through.</h1>
-  <p className="mt-3 text-sm text-muted-foreground">Your open support requests and recovery actions appear here. Teachers and support staff manage the private referral and service records in their own workspaces.</p>
-  {error&&<p role="alert" className="mt-4 rounded border p-3 text-sm">{error}</p>}
-  {notice&&<p role="status" className="mt-4 rounded border p-3 text-sm">{notice}</p>}
-  <section className="mt-7 rounded-xl border bg-card p-5">
-   <h2 className="font-semibold">Ask your school for help</h2>
-   <label className="mt-3 block text-sm">What do you need help with?
+ return <WorkspaceShell eyebrow="CAN OS · Student support" title="Get help and follow through."
+  subtitle="Your open support requests and recovery actions appear here. Teachers and support staff manage the private referral and service records in their own workspaces."
+  breadcrumbs={<Link to="/student" className="underline">Student Today</Link>}>
+  {error&&<WorkspaceNotice tone="danger" className="mb-5">{error}</WorkspaceNotice>}
+  {notice&&<WorkspaceNotice tone="success" className="mb-5">{notice}</WorkspaceNotice>}
+  <WorkspacePanel title="Ask your school for help">
+   <label className="block text-sm">What do you need help with?
     <textarea value={message} onChange={event=>setMessage(event.target.value)}
       rows={4} maxLength={1000} className="mt-2 w-full rounded border bg-background p-3"
       placeholder="Describe the schoolwork, learning, or support concern"/>
    </label>
    <button type="button" disabled={busy||message.trim().length<3}
-     onClick={askForHelp} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-40">Send request</button>
-  </section>
+     onClick={askForHelp} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40">Send request</button>
+  </WorkspacePanel>
   <section className="mt-7">
    <h2 className="font-serif text-2xl">Your support actions</h2>
-   {relevant.length===0&&<p className="mt-3 rounded-xl border p-4 text-sm text-muted-foreground">No support actions recorded yet.</p>}
+   {relevant.length===0&&<EmptyState className="mt-3" title="No support actions recorded yet."/>}
    <div className="mt-3 space-y-3">{relevant.map(action=>{
     const target=action.subjectType==="assessment"&&action.subjectId
      ?{to:"/student/assignments" as const,search:{assessment:action.subjectId}}
@@ -67,11 +65,11 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
     return <article key={action.id} className="rounded-xl border bg-card p-4">
     <p className="font-semibold"><Link {...target} className="hover:underline">{action.title}</Link></p>
     <p className="mt-2 text-sm text-muted-foreground">{action.description}</p>
-    <p className="mt-2 text-xs capitalize">Status: {action.status.replaceAll("_"," ")}</p>
+    <StatusBadge tone={action.status==="resolved"?"success":"info"}>Status: {action.status.replaceAll("_"," ")}</StatusBadge>
     <Link {...target} className="mt-3 inline-block text-sm underline">{target.to==="/student/assignments"?"Review assignment":"Review action"} →</Link>
    </article>;})}</div>
   </section>
- </main>;
+ </WorkspaceShell>;
 }
 
 const destinations=[
@@ -120,31 +118,27 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
   finally{setBusy(false);}
  }
  const next=chosen?stages[stages.indexOf(chosen.stage as typeof stages[number])+1]:undefined;
- return <main className="mx-auto max-w-6xl px-5 pb-24 pt-9">
-  <Link to={role==="teacher"?"/teacher":role==="counselor"?"/counselor":"/coach"} className="text-xs font-semibold text-muted-foreground hover:underline">← Workspace home</Link>
-  <p className="mt-8 text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Student support</p>
-  <h1 className="mt-2 font-serif text-5xl">Student support that follows through.</h1>
-  <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">A teacher raises a concern, a support professional accepts responsibility, and everyone can see the appropriate status and next step.</p>
-  <p className="mt-2 text-xs text-muted-foreground">School-support records are shared with authorized staff. Do not enter clinical or private counseling notes here.</p>
-  <div className="mt-7 flex flex-wrap items-center gap-4">
-   <span className="text-sm">Verified staff role: <strong>{role??"Unavailable"}</strong></span>
-   <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">{referrals.length} referral(s)</span>
-  </div>
-  {error&&<p role="alert" className="mt-5 rounded-lg border border-red-300 p-3 text-sm">{error}</p>}
-  {message&&<p role="status" className="mt-5 rounded-lg border border-emerald-300 p-3 text-sm">{message}</p>}
-  {selected&&<Link to={route} search={{}} className="mt-4 inline-block text-sm underline">View all referrals</Link>}
-  {selected&&!chosen&&<p role="alert" className="mt-4 rounded-xl border p-4 text-sm">This referral is unavailable in your current support workspace.</p>}
+ return <WorkspaceShell width="wide" eyebrow="CAN OS · Student support" title="Student support that follows through."
+  subtitle={<>A teacher raises a concern, a support professional accepts responsibility, and everyone can see the appropriate status and next step.<span className="mt-2 block text-xs">School-support records are shared with authorized staff. Do not enter clinical or private counseling notes here.</span></>}
+  breadcrumbs={<Link to={role==="teacher"?"/teacher":role==="counselor"?"/counselor":"/coach"} className="underline">Workspace home</Link>}
+  actions={<StatusBadge tone="info">{referrals.length} referral(s)</StatusBadge>}>
+  <p className="mb-5 text-sm">Verified staff role: <strong>{role??"Unavailable"}</strong></p>
+  {error&&<WorkspaceNotice tone="danger" className="mb-5">{error}</WorkspaceNotice>}
+  {message&&<WorkspaceNotice tone="success" className="mb-5">{message}</WorkspaceNotice>}
+  {selected&&<Link to={route} search={{}} className="mb-4 inline-block text-sm underline">View all referrals</Link>}
+  {selected&&!chosen&&<WorkspaceNotice tone="danger" className="mb-4">This referral is unavailable in your current support workspace.</WorkspaceNotice>}
   <div className="mt-8 grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
    <section>
     <h2 className="font-serif text-3xl">{role==="teacher"?"My referrals":"Support caseload"}</h2>
     <div className="mt-4 space-y-3">
      {referrals.filter(item=>!selected||item.id===selected).map(item=><Link key={item.id} to={route} search={{referral:item.id}} className={`block w-full rounded-xl border bg-card p-5 text-left hover:border-foreground/40 ${selected===item.id?"border-foreground":"border-border"}`}>
-      <div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.category} · {item.priority}</p><span className="rounded-full bg-stone-warm px-2 py-1 text-xs">{item.stage.replaceAll("_"," ")}</span></div>
+      <div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.category} · {item.priority}</p><StatusBadge tone={item.stage==="closed"?"success":"info"}>{item.stage.replaceAll("_"," ")}</StatusBadge></div>
       <h3 className="mt-2 text-base font-semibold">{item.title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{item.description}</p>
       <p className="mt-3 text-xs text-muted-foreground">Assigned: {item.assignedTo}</p>
-      {role==="teacher"&&item.academicRecommendation&&<p className="mt-2 rounded-lg bg-stone-warm p-3 text-xs">Academic update: {item.academicRecommendation}</p>}
+      {role==="teacher"&&item.academicRecommendation&&<p className="mt-2 rounded-lg bg-muted p-3 text-xs">Academic update: {item.academicRecommendation}</p>}
      </Link>)}
+     {!referrals.length&&<EmptyState title="No support referrals are available in your workspace."/>}
     </div>
    </section>
    {role==="teacher"?<section className="h-fit rounded-2xl border border-border bg-card p-6">
@@ -167,7 +161,7 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
      <textarea value={observations} onChange={e=>setObservations(e.target.value)} rows={5} placeholder="Describe the learning concern, its impact and what has been tried" className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"/>
     </label>
     <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={includeEvidence} onChange={e=>setIncludeEvidence(e.target.checked)} className="mt-1"/> Include relevant academic evidence</label>
-    <p className="mt-4 rounded-lg bg-stone-warm p-3 text-xs">This routes to a designated support function. Urgent safeguarding concerns require a separate immediate-response pathway.</p>
+    <p className="mt-4 rounded-lg bg-muted p-3 text-xs">This routes to a designated support function. Urgent safeguarding concerns require a separate immediate-response pathway.</p>
     <button disabled={busy||!studentProfileId||observations.trim().length<3} onClick={()=>execute(()=>createSupportReferral({data:{category,priority,observations,includeEvidence,studentProfileId}}),"Referral saved for triage.")} className="mt-4 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit referral</button>
    </section>:<section className="h-fit rounded-2xl border border-border bg-card p-6">
     <h2 className="font-serif text-3xl">Triage & service record</h2>
@@ -190,7 +184,7 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
       <label className="mt-3 block text-xs">Review target<input type="date" value={reviewDate} onChange={e=>setReviewDate(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
       <button disabled={busy||goal.trim().length<3||intervention.trim().length<3||!reviewDate} onClick={()=>execute(()=>saveSupportPlan({data:{referralId:chosen.id,goal,intervention,targetDate:reviewDate}}),"Support plan saved.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-40">Save support plan</button>
      </div>}
-     {chosen.plan&&<div className="mt-5 rounded-xl bg-stone-warm p-4 text-sm"><p className="font-semibold">Support plan</p><p className="mt-2">Goal: {chosen.plan.goal}</p><p className="mt-2">Intervention: {chosen.plan.intervention}</p><p className="mt-2 text-xs">Review: {chosen.plan.targetDate.slice(0,10)}</p></div>}
+     {chosen.plan&&<div className="mt-5 rounded-xl bg-muted p-4 text-sm"><p className="font-semibold">Support plan</p><p className="mt-2">Goal: {chosen.plan.goal}</p><p className="mt-2">Intervention: {chosen.plan.intervention}</p><p className="mt-2 text-xs">Review: {chosen.plan.targetDate.slice(0,10)}</p></div>}
      {["plan_created","in_service"].includes(chosen.stage)&&<div className="mt-5 rounded-xl border border-border p-4">
        <h3 className="font-semibold">Schedule student support</h3>
        <label className="mt-3 block text-xs">Service type<select value={serviceKind} onChange={e=>setServiceKind(e.target.value as typeof serviceKind)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"><option value="coaching">Academic coaching</option><option value="tutoring">Tutoring</option><option value="learning_support">Learning support</option><option value="planning">College/career planning</option></select></label>
@@ -208,5 +202,5 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
    </section>}
   </div>
   <p className="mt-8 text-xs leading-6 text-muted-foreground">Access is controlled by your verified staff membership and the student’s school and program relationships. Confidential safeguarding cases require a separate immediate-response pathway.</p>
- </main>;
+ </WorkspaceShell>;
 }

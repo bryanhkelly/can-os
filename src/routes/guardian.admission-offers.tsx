@@ -6,6 +6,7 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {GuardianEnrollmentChecklist} from "@/components/enrollment/GuardianEnrollmentChecklist";
 import {StudentLearningAccessHandoff} from "@/components/enrollment/StudentLearningAccessHandoff";
+import {EmptyState,StatusBadge,WorkspaceNotice,WorkspacePanel,WorkspaceShell} from "@/components/workspace";
 
 const loadGuardianOffers=(studentPersonId?:string)=>getGuardianAdmissionOffers({data:{studentPersonId}});
 export const Route=createFileRoute("/guardian/admission-offers")({
@@ -39,22 +40,26 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
   catch(e){setError(e instanceof Error?e.message:"Unable to respond to offer");}
   finally{setBusy(null);}
  }
- return <main className="mx-auto max-w-4xl space-y-6 px-5 py-10">
-  <header><h1 className="font-serif text-4xl">Enrollment offers</h1><p className="mt-2 text-muted-foreground">Review offers for students whose enrollment you are authorized to manage.</p>{student&&<Link to="/guardian/admission-offers" className="mt-2 inline-block text-xs font-semibold underline">View offers for all children →</Link>}</header>
-  {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}
+ return <WorkspaceShell eyebrow="CAN OS · Family" title="Enrollment offers"
+  subtitle="Review offers for students whose enrollment you are authorized to manage."
+  breadcrumbs={<Link to="/guardian" className="underline">Family home</Link>}
+  actions={<Link to="/guardian/apply" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">View or start application</Link>}>
+  <div className="space-y-6">
+  {student&&<Link to="/guardian/admission-offers" className="inline-block text-xs font-semibold underline">View offers for all children →</Link>}
+  {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
   {offer&&<Link to="/guardian/admission-offers" search={{student}} className="inline-block text-sm underline">View all offers for this child</Link>}
-  {offer&&!applications.some(app=>app.offers.some(item=>item.id===offer))&&<p role="alert" className="rounded-lg border p-4">This offer is unavailable in your current family workspace.</p>}
-  {application&&!applications.some(app=>app.applicationId===application)&&<p role="alert" className="rounded-lg border p-4">This enrollment application is unavailable in your current family workspace.</p>}
+  {offer&&!applications.some(app=>app.offers.some(item=>item.id===offer))&&<WorkspaceNotice tone="danger">This offer is unavailable in your current family workspace.</WorkspaceNotice>}
+  {application&&!applications.some(app=>app.applicationId===application)&&<WorkspaceNotice tone="danger">This enrollment application is unavailable in your current family workspace.</WorkspaceNotice>}
   {application&&<Link to="/guardian/admission-offers" search={{student}} className="inline-block text-sm underline">View all enrollment applications</Link>}
-  {applications.filter(app=>(!application||app.applicationId===application)&&(!offer||app.offers.some(item=>item.id===offer))).map(app=><section className="rounded-xl border p-5" key={app.applicationId}>
-    <h2 className="text-xl font-semibold">{app.studentName}</h2><p className="text-sm text-muted-foreground">{app.program}</p>
+  {applications.filter(app=>(!application||app.applicationId===application)&&(!offer||app.offers.some(item=>item.id===offer))).map(app=><WorkspacePanel key={app.applicationId} title={app.studentName} description={app.program}>
     {app.waitlisted&&<p role="status" className="mt-2 text-sm">Application waitlisted. Contact admissions about availability and next steps.</p>}
     {(app.applicationStage==="withdrawn"||app.applicationStage==="declined")&&<p role="status" className="mt-2 text-sm">Application {app.applicationStage}. Contact admissions if your plans change.</p>}
     <button type="button" aria-expanded={checklist===app.applicationId||application===app.applicationId}
       className="mt-3 rounded border px-3 py-2 text-sm" onClick={()=>setChecklist(app.applicationId)}>View enrollment checklist</button>
     {(checklist===app.applicationId||application===app.applicationId)&&<GuardianEnrollmentChecklist key={app.applicationId} applicationId={app.applicationId}/>}
     {app.offers.filter(item=>!offer||item.id===offer).map(o=><div className="mt-3 border-t pt-3" key={o.id}>
-     <p className="text-sm">Offer status: {o.status}{o.expiresAt?" · Expires "+new Date(o.expiresAt).toLocaleDateString():""}</p>
+     <StatusBadge tone={o.status==="accepted"?"success":o.status==="issued"?"info":o.status==="declined"||o.status==="revoked"?"danger":"neutral"}>Offer status: {o.status}</StatusBadge>
+     {o.expiresAt&&<p className="mt-2 text-xs text-muted-foreground">Expires {new Date(o.expiresAt).toLocaleDateString()}</p>}
      <p className="mt-2 text-sm">School year: {o.schoolYearName}</p>
      <p role="status" className="mt-2 text-sm">{o.progress.message}</p>
      {!o.enrollmentActive&&app.blockers.length>0&&<ul aria-label="Enrollment requirements awaiting review" className="mt-2 list-inside list-disc text-sm">
@@ -78,27 +83,24 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
         <Link to="/guardian" className="rounded-lg border px-3 py-2">Family home →</Link>
        </div>
      </div>}
-    </div>)}{app.offers.length===0&&<div className="mt-3 rounded-lg border p-3 text-sm">
-      <p role="status" className="font-semibold">No enrollment offer has been issued yet.</p>
-      <p className="mt-2 text-muted-foreground">Your school is reviewing this application
-        ({app.applicationStage.replaceAll("_"," ")}). Use the enrollment checklist to
-        complete any requested forms or corrections. An application is not an active
-        enrollment or class assignment.</p>
-      {app.blockers.length>0&&<p className="mt-2">
+    </div>)}{app.offers.length===0&&<div className="mt-3">
+      <EmptyState title="No enrollment offer has been issued yet."
+       description={`Your school is reviewing this application (${app.applicationStage.replaceAll("_", " ")}). Use the enrollment checklist to complete any requested forms or corrections. An application is not an active enrollment or class assignment.`}/>
+      {app.blockers.length>0&&<p className="mt-2 text-sm">
         {app.blockers.length} required {app.blockers.length===1?"item needs":"items need"} review.
       </p>}
-      <button type="button" className="mt-3 rounded border px-3 py-2 font-semibold"
+      <button type="button" className="mt-3 rounded border px-3 py-2 text-sm font-semibold"
         onClick={()=>setChecklist(app.applicationId)}>Review enrollment checklist →</button>
      </div>}
-  </section>)}
-  {applications.length===0&&<div className="rounded-lg border p-4 text-sm">
-    <p>No verified enrollment applications or offers are available for this family membership.</p>
-    <p className="mt-2 text-muted-foreground">A new family application may still be pending independent
-      guardian verification. You can review applications submitted with your verified email sign-in.</p>
-    <Link to="/guardian/apply" className="mt-3 inline-block rounded border px-3 py-2 font-semibold">
+  </WorkspacePanel>)}
+  {applications.length===0&&<div>
+    <EmptyState title="No verified enrollment applications or offers are available for this family membership."
+     description="A new family application may still be pending independent guardian verification. You can review applications submitted with your verified email sign-in."/>
+    <Link to="/guardian/apply" className="mt-3 inline-block rounded border px-3 py-2 text-sm font-semibold">
       View or start my application →
     </Link>
   </div>}
   <Link to="/guardian" className="text-sm underline">Back to family home →</Link>
- </main>;
+  </div>
+ </WorkspaceShell>;
 }

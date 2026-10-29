@@ -1,8 +1,9 @@
-import {Link,useLocation,useNavigate} from "@tanstack/react-router";
+import {Link,useLocation} from "@tanstack/react-router";
 import {lazy,Suspense,useEffect,useState,type ReactNode} from "react";
 import {Bell,MessageCircle,Search,Menu,ChevronDown,UserRound,Home,BookOpen,Users,CalendarDays,ClipboardList,Settings,MessagesSquare,LifeBuoy,ShieldAlert} from "lucide-react";
 import {openPaletteEvent} from "@/lib/workspace-search";
-import {ContextTray} from "@/components/workspace";
+import {ContextTray,WorkspaceNotice} from "@/components/workspace";
+import {WorkspaceContextSwitcher} from "./WorkspaceContextSwitcher";
 import {useWorkspaceSession} from "./WorkspaceSession";
 
 const NotificationTray=lazy(()=>import("./NotificationTray").then(module=>({default:module.NotificationTray})));
@@ -41,15 +42,13 @@ export function SidebarLinks({links,activePath}:{links:{title:string;path:string
 }
 export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const location=useLocation();
- const navigate=useNavigate();
  const {session,error:sessionError}=useWorkspaceSession();
  const [error,setError]=useState("");
+ const [switcherError,setSwitcherError]=useState("");
  const [changing,setChanging]=useState(false);
  const [tray,setTray]=useState<"notifications"|"ask"|null>(null);
  const [menuOpen,setMenuOpen]=useState(false);
  const [switcherOpen,setSwitcherOpen]=useState(false);
- const [switcherQuery,setSwitcherQuery]=useState("");
- const [switcherMode,setSwitcherMode]=useState<"workspace"|"view-as">("workspace");
  const [accountOpen,setAccountOpen]=useState(false);
  useEffect(()=>{setTray(null);setMenuOpen(false);setSwitcherOpen(false);setAccountOpen(false)},[location.pathname]);
  const authenticated=session?.authenticated?session:null;
@@ -70,10 +69,14 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
   if(!response.ok)throw new Error("Unable to sign out. Please try again.");
   window.location.assign("/access");
  };
- async function changeSession(command:()=>Promise<void>){
-  setChanging(true);setError("");
+ async function changeSession(command:()=>Promise<void>,switching=false){
+  setChanging(true);setError("");setSwitcherError("");
   try{await command()}
-  catch(error){setError(error instanceof Error?error.message:"Unable to update your session.");setChanging(false)}
+  catch(error){
+   const message=error instanceof Error?error.message:"Unable to update your session.";
+   if(switching)setSwitcherError(message);else setError(message);
+   setChanging(false);
+  }
  }
  return <><div className={current?"min-h-screen lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]":"min-h-screen"}>
  {current&&<aside aria-label="Workspace sidebar" className="hidden border-r bg-card lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
@@ -88,30 +91,22 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  <div className="min-w-0"><header aria-label="Workspace top bar" className="sticky top-0 z-30 border-b bg-card px-4 py-3 sm:px-6">
   <div className="flex min-w-0 flex-wrap items-center gap-3">
    {current&&<button type="button" aria-label={menuOpen?"Close workspace navigation":"Open workspace navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(value=>!value)} className="rounded-lg border p-2 lg:hidden"><Menu className="size-4"/></button>}
-   {current?<button type="button" disabled={changing} aria-haspopup="dialog" aria-expanded={switcherOpen} onClick={()=>setSwitcherOpen(true)} className="mr-auto flex min-w-0 max-w-[min(65vw,22rem)] items-center gap-2 rounded-xl border border-border/70 bg-background px-3 py-2 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+   {current?<button type="button" aria-label="Switch workspace" disabled={changing} aria-haspopup="dialog" aria-expanded={switcherOpen} onClick={()=>{setSwitcherError("");setSwitcherOpen(true)}} className="mr-auto flex min-w-0 max-w-[min(65vw,22rem)] items-center gap-2 rounded-xl border border-border/70 bg-background px-3 py-2 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <span className="shrink-0 font-serif text-lg font-semibold">CAN OS</span><span className="min-w-0 border-l pl-2"><span className="block text-xs font-semibold capitalize">{current.role.replaceAll("_"," ")}</span><span className="block truncate text-xs text-muted-foreground">{authenticated?.sites.length===1?authenticated.sites[0]?.name:authenticated?.sites.length?authenticated.sites.length+" schools":"Your workspace"}</span></span><ChevronDown className="size-4 shrink-0" aria-hidden="true"/>
    </button>:<Link to="/" className="mr-auto font-serif text-xl font-semibold">CAN OS</Link>}
    {current&&<button type="button" aria-label="Search or ask CAN" onClick={()=>window.dispatchEvent(new Event(openPaletteEvent))} className="rounded-lg border px-3 py-2 text-xs"><Search className="mr-1 inline size-3"/> <span className="hidden sm:inline">Search or ask CAN</span><span className="sm:hidden">Search</span></button>}
    {current&&<button type="button" onClick={()=>setTray("ask")} aria-label="Ask CAN" aria-haspopup="dialog" className="rounded-lg border p-2 text-xs"><MessageCircle className="size-4" aria-hidden="true"/></button>}
    {current&&<button type="button" onClick={()=>setTray("notifications")} aria-label="Notifications" aria-haspopup="dialog" className="rounded-lg border p-2"><Bell className="size-4" aria-hidden="true"/></button>}
    {authenticated?<button type="button" aria-label="Account menu" aria-haspopup="dialog" aria-expanded={accountOpen} onClick={()=>setAccountOpen(true)} className="rounded-full border bg-muted p-2"><UserRound className="size-4" aria-hidden="true"/></button>:session&&<Link to="/access" className="text-xs font-semibold">Sign in</Link>}
-   {(error||sessionError)&&<p role="alert" className="w-full rounded-lg border border-amber-500 p-3 text-sm">{error||sessionError}</p>}
-   {authenticated?.demoFacilitator&&<p role="status" className="w-full rounded-lg border border-amber-500 p-2 text-xs">Demo admin session: acting as {current?.firstName} {current?.lastName} ({current?.role}). Changes affect shared synthetic data. User switches are audited.</p>}
+   {(error||sessionError)&&<WorkspaceNotice tone="danger" className="w-full">{error||sessionError}</WorkspaceNotice>}
+   {authenticated?.demoFacilitator&&<WorkspaceNotice className="w-full">Demo admin session: acting as {current?.firstName} {current?.lastName} ({current?.role}). Changes affect shared synthetic data. User switches are audited.</WorkspaceNotice>}
   </div>
  </header>{children}</div></div>
- {authenticated&&<><ContextTray title="Workspace switcher" open={switcherOpen} onClose={()=>setSwitcherOpen(false)}>
-  <div className="mb-5 rounded-2xl bg-muted/50 p-4"><p className="font-serif text-2xl font-semibold">{current?.firstName} {current?.lastName}</p><p className="mt-1 text-sm text-muted-foreground capitalize">{current?.role.replaceAll("_"," ")} · {authenticated.sites.length===1?authenticated.sites[0]?.name:authenticated.sites.length+" schools"}</p></div>
-  <div className="mb-4 grid grid-cols-2 rounded-xl bg-muted p-1" role="group" aria-label="Switcher mode">
-   <button type="button" aria-pressed={switcherMode==="workspace"} onClick={()=>{setSwitcherMode("workspace");setSwitcherQuery("");}} className={"min-h-11 rounded-lg px-3 text-sm font-semibold "+(switcherMode==="workspace"?"bg-background shadow-sm":"text-muted-foreground")}>Switch workspace</button>
-   <button type="button" disabled={!authenticated.demoFacilitator} aria-pressed={switcherMode==="view-as"} onClick={()=>{setSwitcherMode("view-as");setSwitcherQuery("");}} className={"min-h-11 rounded-lg px-3 text-sm font-semibold "+(switcherMode==="view-as"?"bg-background shadow-sm":"text-muted-foreground")}>View As</button>
-  </div>
-  {!authenticated.demoFacilitator&&<p className="mb-4 text-xs text-muted-foreground">View As requires an authorized review session.</p>}
-  <label htmlFor="workspace-switcher-search" className="mb-2 block text-sm font-medium">Search {switcherMode==="workspace"?"workspaces":"review identities"}</label>
-  <input id="workspace-switcher-search" type="search" autoComplete="off" value={switcherQuery} onChange={event=>setSwitcherQuery(event.target.value)} placeholder="Search people, roles, or schools…" className="mb-5 min-h-11 w-full rounded-xl border bg-background px-4 text-sm focus-visible:outline-2 focus-visible:outline-ring"/>
-  <div className="space-y-2">{grants.filter(g=>(switcherMode==="view-as"?authenticated.demoFacilitator:true)&&`${g.firstName} ${g.lastName} ${g.role} ${authenticated.sites.map(site=>site.name).join(" ")}`.toLowerCase().includes(switcherQuery.trim().toLowerCase())).map(g=><button key={g.id} type="button" disabled={changing} aria-current={g.id===authenticated.activeGrantId?"true":undefined} onClick={()=>{if(g.id===authenticated.activeGrantId){setSwitcherOpen(false);return;}void changeSession(()=>switchGrant(g.id));}} className="flex min-h-20 w-full flex-col justify-center rounded-xl border bg-card px-4 py-3 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"><span className="text-sm font-semibold capitalize">{g.role.replaceAll("_"," ")}</span><span className="mt-1 text-xs text-muted-foreground">{g.firstName} {g.lastName}{g.id===authenticated.activeGrantId?" · Active":""}</span></button>)}</div>
-  {switcherMode==="view-as"&&<p role="status" className="mt-5 rounded-xl border border-amber-500 p-3 text-sm">Review identities are limited to this demo session. Changes affect synthetic data and are audited.</p>}
- </ContextTray><ContextTray title="Account" open={accountOpen} onClose={()=>setAccountOpen(false)}>
-  <div className="space-y-2 text-sm"><Link to="/profiles" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">My profile</Link><Link to="/account/sessions" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">Account sessions</Link><button type="button" onClick={()=>{setAccountOpen(false);setSwitcherOpen(true)}} className="block w-full rounded-lg p-3 text-left hover:bg-muted">Switch workspace</button>{current?.role==="student"&&<Link to="/student/settings" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">Account settings</Link>}<button type="button" disabled={changing} onClick={()=>void changeSession(signOut)} className="block w-full rounded-lg p-3 text-left font-semibold hover:bg-muted">Sign out</button></div>
+ {authenticated&&<><WorkspaceContextSwitcher session={authenticated} open={switcherOpen} changing={changing}
+  error={switcherError} onClose={()=>setSwitcherOpen(false)}
+  onSwitch={id=>void changeSession(()=>switchGrant(id),true)}/>
+ <ContextTray title="Account" open={accountOpen} onClose={()=>setAccountOpen(false)}>
+  <div className="space-y-2 text-sm"><Link to="/profiles" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">My profile</Link><Link to="/account/sessions" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">Account sessions</Link>{current?.role==="student"&&<Link to="/student/settings" onClick={()=>setAccountOpen(false)} className="block rounded-lg p-3 hover:bg-muted">Account settings</Link>}<button type="button" disabled={changing} onClick={()=>void changeSession(signOut)} className="block w-full rounded-lg p-3 text-left font-semibold hover:bg-muted">Sign out</button></div>
  </ContextTray></>}
  {current&&<><ContextTray title="Workspace navigation" open={menuOpen} onClose={()=>setMenuOpen(false)}>
   <p className="mb-3 text-sm font-semibold">{current.firstName} {current.lastName} · {current.role}</p>

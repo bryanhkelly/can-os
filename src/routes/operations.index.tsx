@@ -1,4 +1,4 @@
-import { WorkflowIntro } from "@/components/workspace/workflow-intro";
+import { EmptyState, QueryState, StatCard, StatusBadge, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { ArrowUpRight, ClipboardList, School, ShieldCheck } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
 import type { listLaunches } from "@/modules/programs/launch.functions";
@@ -45,11 +45,10 @@ function OperationsPage(){
  const [busy,setBusy]=useState<string|null>(null);
  const [error,setError]=useState("");
  const [dueDrafts,setDueDrafts]=useState<Record<string,string>>({});
- if(authError||!data||!health)return <main className="mx-auto max-w-6xl px-5 py-10">
-  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · Operations</p>
-  <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
-  <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{authError||"Operations data is unavailable."}</p>
- </main>;
+ if(authError||!data||!health)return <WorkspaceShell width="wide" eyebrow="CAN OS · Operations" title="Needs You"
+  subtitle="Review actions and launch readiness for an authorized school and program.">
+  <QueryState error={authError||"Operations data is unavailable. No operational changes were made."}/>
+ </WorkspaceShell>;
  async function moveAction(id:string,status:"in_progress"|"waiting"|"resolved"){
   setBusy(id);setError("");
   try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim()){setBusy(null);return;}await updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}});await router.invalidate();}
@@ -88,28 +87,29 @@ function OperationsPage(){
    staffingIssues:commandCenter?.issues??[],
    programs:dashboard?.programs??[],
  });
- return <main className="mx-auto max-w-6xl px-5 py-10">
-  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">CAN OS · School operations</p>
-  <h1 className="mt-2 font-serif text-5xl">Needs You</h1>
-  <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Review actions and launch readiness for an authorized school and program.</p>
-  <WorkflowIntro eyebrow="Institutional oversight" title="See what needs a decision." description="One view of authorized school operations, launch readiness and exceptions. Operational actions remain subject to their existing permissions." actions={<><Link to="/operations/launch" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">School launches</Link><Link to="/operations/workflows" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Workflows</Link></>} />
-  <div className="mt-6 flex flex-wrap gap-4 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
-   <label className="text-sm">School
-    <select aria-label="Filter operations by school" value={selected.siteId??""} onChange={event=>selectScope(event.target.value||undefined)} className="ml-2 rounded border bg-background p-2">
-     <option value="">All authorized schools</option>
-     {data.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
-    </select>
-   </label>
-   <label className="text-sm">Program
-    <select aria-label="Filter operations by program" value={selected.programId??""} onChange={event=>selectScope(selected.siteId,event.target.value||undefined)} className="ml-2 rounded border bg-background p-2">
-     <option value="">All authorized programs</option>
-     {data.programs.map(program=><option key={program.id} value={program.id}>{program.name}</option>)}
-    </select>
-   </label>
-  </div>
+ return <WorkspaceShell width="wide" eyebrow="CAN OS · School operations" title="Needs You"
+  subtitle="Review actions and launch readiness for an authorized school and program. Operational actions remain subject to their existing permissions."
+  actions={<div className="flex flex-wrap gap-2"><Link to="/operations/launch" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">School launches</Link><Link to="/operations/workflows" className="inline-flex min-h-11 items-center rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Workflows</Link></div>}>
+  <section aria-label="Operations filters" className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+   <h2 className="text-sm font-semibold">Filter operational records</h2>
+   <div className="mt-3 flex flex-wrap gap-4">
+    <label className="min-w-52 flex-1 text-sm">School
+     <select aria-label="Filter operations by school" value={selected.siteId??""} onChange={event=>selectScope(event.target.value||undefined)} className="mt-2 block min-h-11 w-full rounded-lg border bg-background px-3 py-2">
+      <option value="">All authorized schools</option>
+      {data.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+     </select>
+    </label>
+    <label className="min-w-52 flex-1 text-sm">Program
+     <select aria-label="Filter operations by program" value={selected.programId??""} onChange={event=>selectScope(selected.siteId,event.target.value||undefined)} className="mt-2 block min-h-11 w-full rounded-lg border bg-background px-3 py-2">
+      <option value="">All authorized programs</option>
+      {data.programs.map(program=><option key={program.id} value={program.id}>{program.name}</option>)}
+     </select>
+    </label>
+   </div>
+  </section>
   <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p>
   <OutboxHealthPanel/>
-  {error&&<p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>}
+  {error&&<WorkspaceNotice tone="danger" className="mt-4">No operational change was completed. {error}</WorkspaceNotice>}
   <AttentionQueue items={attentionItems}/>
   {commandCenter&&<section aria-label="Operations exception summary" className="mt-8">
     <h2 className="font-serif text-3xl font-semibold">Operational health</h2>
@@ -208,13 +208,13 @@ function OperationsPage(){
    </>}
   </section>
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
-  {[["Open items",data.summary.total],["Urgent",data.summary.urgent],["Overdue",data.summary.overdue],["Unassigned",data.summary.unassigned],["Waiting",data.summary.waiting],["Needs response",data.summary.needsResponse]].map(([label,num])=><div key={label} className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 font-serif text-3xl">{num}</p></div>)}
+  {[["Open items",data.summary.total],["Urgent",data.summary.urgent],["Overdue",data.summary.overdue],["Unassigned",data.summary.unassigned],["Waiting",data.summary.waiting],["Needs response",data.summary.needsResponse]].map(([label,num])=><StatCard key={label} label={label} value={num}/>)}
   </div>
   <p className="mt-6"><Link to="/sites" className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Open School/Site Today →</Link> <Link to="/operations/school-years" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Configure school year →</Link> <Link to="/operations/course-policies" search={{siteId:selected.siteId,programId:selected.programId}} className="inline-flex rounded-lg border px-4 py-2 text-sm font-semibold">Course policies →</Link></p>
   <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]"><section><h2 className="font-serif text-3xl">Action queue</h2><div className="mt-4 space-y-3">
   {selected.action&&<Link to="/operations" search={{siteId:selected.siteId,programId:selected.programId}} className="text-sm underline">View all actions</Link>}
-  {selected.action&&!data.items.some(item=>item.id===selected.action)&&<p role="alert" className="rounded-xl border p-4 text-sm">This action is unavailable in the current operations queue.</p>}
-  {data.items.filter(item=>!selected.action||item.id===selected.action).map(i=><article className="rounded-xl border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold"><Link to="/operations" search={{siteId:selected.siteId,programId:selected.programId,action:i.id}} className="hover:underline">{i.title}</Link></h3><span className="text-xs uppercase text-muted-foreground">{i.priority}</span></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p>
+  {selected.action&&!data.items.some(item=>item.id===selected.action)&&<WorkspaceNotice tone="danger">This action is unavailable in the current operations queue.</WorkspaceNotice>}
+  {data.items.filter(item=>!selected.action||item.id===selected.action).map(i=><article className="rounded-xl border bg-card p-4" key={i.kind+i.id}><div className="flex items-center justify-between gap-3"><h3 className="font-semibold"><Link to="/operations" search={{siteId:selected.siteId,programId:selected.programId,action:i.id}} className="hover:underline">{i.title}</Link></h3><StatusBadge tone={i.priority==="critical"?"danger":i.priority==="high"?"attention":"neutral"}>{i.priority}</StatusBadge></div><p className="mt-2 text-sm text-muted-foreground">{i.detail}</p>
   <p className="mt-2 text-xs text-muted-foreground">Status: {i.status?.replaceAll("_"," ") ?? "open"}
    {i.dueAt&&<> · Due {new Date(i.dueAt).toLocaleDateString()}
     {new Date(i.dueAt).getTime()<Date.now()&&<strong className="ml-2 text-foreground">Overdue</strong>}</>}
@@ -239,7 +239,7 @@ function OperationsPage(){
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>
  </>}</div></article>)}
-  {!data.items.length&&<p className="rounded-xl border p-5 text-sm">No actions currently require attention.</p>}
+  {!data.items.length&&<EmptyState title="No actions currently require attention."/>}
   </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3 rounded-xl border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p><Link className="underline" to="/notifications">Notifications</Link></p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
- </main>;
+ </WorkspaceShell>;
 }

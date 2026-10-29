@@ -13,6 +13,7 @@ import { Route as CourseRequests } from "@/routes/operations.course-requests";
 import { Route as Offers } from "@/routes/guardian.admission-offers";
 import { Route as Permissions } from "@/routes/guardian.group-permissions";
 import { Route as StudentGroups } from "@/routes/student.study-groups";
+import { Route as TeacherGroups } from "@/routes/teacher.study-groups";
 import { readinessFromSnapshot } from "@/domain/program-readiness";
 
 const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,data:null as unknown}));
@@ -85,10 +86,21 @@ vi.mock("@/modules/study-groups/canonical-workspace.functions",()=>({
 }));
 vi.mock("@/modules/study-groups/canonical-membership.functions",()=>({
   decideCanonicalGroupConsent:vi.fn(),requestCanonicalGroupMembership:vi.fn(),leaveCanonicalGroup:vi.fn(),
+  createFacilitatedGroup:vi.fn(),decideCanonicalGroupMembership:vi.fn(),createStudentStudyGroup:vi.fn(),
 }));
-vi.mock("@/modules/study-groups/study-group-queries.functions",()=>({listStudyGroups:vi.fn(),getStudyGroupDetail:vi.fn()}));
-vi.mock("@/modules/study-groups/canonical-moderation.functions",()=>({createCanonicalGroupPost:vi.fn(),reportCanonicalGroupPost:vi.fn()}));
-vi.mock("@/modules/study-groups/canonical-sessions.functions",()=>({rsvpCanonicalGroupSession:vi.fn()}));
+vi.mock("@/modules/study-groups/study-group-queries.functions",()=>({
+  listStudyGroups:vi.fn(),getStudyGroupDetail:vi.fn(),listFacilitatorGroupScopes:vi.fn(),
+  listStudyGroupReviewQueue:vi.fn(),listStudyGroupReports:vi.fn(),listStudentStudyGroupSections:vi.fn(),
+  listStudentStudyGroupClassmates:vi.fn(),
+}));
+vi.mock("@/modules/study-groups/facilitator-query.functions",()=>({getFacilitatorStudyGroups:vi.fn()}));
+vi.mock("@/modules/study-groups/canonical-moderation.functions",()=>({
+  createCanonicalGroupPost:vi.fn(),reportCanonicalGroupPost:vi.fn(),resolveCanonicalGroupReport:vi.fn(),
+}));
+vi.mock("@/modules/study-groups/canonical-sessions.functions",()=>({
+  rsvpCanonicalGroupSession:vi.fn(),createCanonicalGroupSession:vi.fn(),reviseCanonicalGroupSession:vi.fn(),
+  listCanonicalGroupAttendance:vi.fn(),recordCanonicalGroupAttendance:vi.fn(),
+}));
 
 function render(route:{options:{component?:unknown}}){
   const Page=route.options.component;
@@ -411,5 +423,40 @@ describe("application contextual navigation",()=>{
       groups:[{id:"group",title:"English study group",kind:"course",capacity:20,membership:null}]});
     const html=render(StudentGroups);
     expect(html.match(/href="\/student\/study-groups\?group=group"/g)).toHaveLength(2);
+  });
+});
+
+describe("major-role shared shell adoption",()=>{
+  beforeEach(()=>{state.search={};state.data=null;});
+
+  it.each([
+    ["guardian enrollment",Offers,[],"CAN OS · Family","Family home"],
+    ["student support",Support,{viewerRole:"student",actions:[]},"CAN OS · Student support","Student Today"],
+    ["student groups",StudentGroups,{enabled:true,writesEnabled:false,membershipEnabled:false,contentEnabled:false,creationEnabled:false,sections:[],groups:[]},"CAN OS · Student","Student Today"],
+    ["teacher groups",TeacherGroups,{enabled:false,writesEnabled:false,membershipEnabled:false,creationEnabled:false,moderationEnabled:false,queue:[],reports:[],groups:[],scopes:[]},"CAN OS · Teacher","Teacher Today"],
+  ] as const)("uses one standard shell and header for %s",(_name,route,data,eyebrow,breadcrumb)=>{
+    successful(data);
+    const html=render(route);
+    expect(html.match(/<main/g)).toHaveLength(1);
+    expect(html.match(/<h1/g)).toHaveLength(1);
+    expect(html).toContain(eyebrow);
+    expect(html).toContain(breadcrumb);
+    expect(html).toContain("min-h-screen bg-background");
+  });
+
+  it("keeps operator scope filters inside the standard shell with shared metrics",()=>{
+    state.data={
+      operations:{items:[],sites:[],programs:[],assignees:[],summary:{total:0,urgent:0,overdue:0,unassigned:0,waiting:0,needsResponse:0}},
+      health:{buildId:"test",schemaStatus:"compatible",details:"Ready"},commandCenter:null,authError:"",
+    };
+    const html=render(Operations);
+    expect(html.match(/<main/g)).toHaveLength(1);
+    expect(html.match(/<h1/g)).toHaveLength(1);
+    expect(html).toContain('aria-label="Operations filters"');
+    expect(html).toContain('aria-label="Filter operations by school"');
+    expect(html).toContain('aria-label="Filter operations by program"');
+    expect(html).toContain("No actions currently require attention.");
+    expect(html).toContain("School launches");
+    expect(html).toContain("Workflows");
   });
 });
