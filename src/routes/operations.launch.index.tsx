@@ -4,6 +4,7 @@ import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
 import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
+import { suggestedLaunchInstitutions } from "@/domain/launch-institution-defaults";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
@@ -120,6 +121,21 @@ function LaunchWizardPage() {
     if (siteId || !hostOrganizationId) return;
     if (hostSites.length === 1 && onlySite) setSiteId(onlySite.id);
   }, [hostSites, hostOrganizationId, siteId]);
+
+  useEffect(() => {
+    if (!options) return;
+    const suggested = suggestedLaunchInstitutions({
+      type, creditMode, providers: options.academicProviderOrganizations,
+      issuers: options.creditIssuingOrganizations,
+      selectedProviderId: academicProviderOrganizationId,
+    });
+    if (!academicProviderOrganizationId && suggested.providerId)
+      setAcademicProviderOrganizationId(suggested.providerId);
+    if (!creditIssuingOrganizationId && suggested.issuerId)
+      setCreditIssuingOrganizationId(suggested.issuerId);
+    if (!jurisdictionId && options.jurisdictions.length === 1)
+      setJurisdictionId(options.jurisdictions[0]!.id);
+  }, [options, type, creditMode, academicProviderOrganizationId, creditIssuingOrganizationId, jurisdictionId]);
 
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
