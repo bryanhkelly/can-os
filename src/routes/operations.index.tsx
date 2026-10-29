@@ -229,8 +229,11 @@ function OperationsPage(){
   </p>
   <div className="mt-3 flex flex-wrap gap-3">{i.openingHandoff&&i.siteId?<Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-sm underline">Named-recipient acknowledgment in Site Today →</Link>:i.managedBySupport?<p className="text-xs text-muted-foreground">Managed by the support team in their authorized referral workspace.</p>:<><label className="flex items-center gap-2 text-xs">Assigned to
  <select aria-label={"Assign "+i.title} className="rounded border bg-background px-2 py-1" disabled={busy!==null} value={i.ownerPersonId??""} onChange={event=>void assignAction(i.id,event.target.value||null,i.priority==="critical"?"urgent":i.priority==="high"?"high":"normal")}>
- <option value="">Unassigned</option>
- {data.assignees.filter(person=>person.siteId===i.siteId).map(person=><option key={person.id} value={person.id}>{person.firstName} {person.lastName} · {person.role}</option>)}
+ <option value="" disabled={i.type==="onsite_coverage_gap"&&!!i.eligibleOwnerPersonId}>Unassigned</option>
+ {i.type==="onsite_coverage_gap"&&i.ownerPersonId&&i.ownerPersonId!==i.eligibleOwnerPersonId&&
+  <option value={i.ownerPersonId} disabled>Previous assignee — reassign to the current director</option>}
+ {data.assignees.filter(person=>person.siteId===i.siteId&&
+   (i.type==="onsite_coverage_gap"?person.role==="site_leader"&&person.id===i.eligibleOwnerPersonId:person.role!=="site_leader")).map(person=><option key={person.id} value={person.id}>{person.firstName} {person.lastName} · {person.role}</option>)}
  </select></label>
  <label className="flex flex-col gap-1 text-xs">Due date (your local time)
   <input type="datetime-local" aria-label={"Deadline for "+i.title}
@@ -244,7 +247,9 @@ function OperationsPage(){
    onClick={()=>void changeDeadline(i.id,dueDrafts[i.id]??"")}>Save due date</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"in_progress")}>Start</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
- <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>
+ {i.type==="onsite_coverage_gap"&&i.siteId?
+  <Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-xs underline">Assigned director resolves in Site Today →</Link>:
+  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>}
  </>}</div></article>)}
   {!data.items.length&&<EmptyState title="No actions currently require attention."/>}
   </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3 rounded-xl border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p><Link className="underline" to="/notifications">Notifications</Link></p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
