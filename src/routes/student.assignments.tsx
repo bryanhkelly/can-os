@@ -62,7 +62,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  const selectedIndex=items.findIndex(item=>item.assessmentId===selected);
  const previousAssignment=items[selectedIndex-1],nextAssignment=items[selectedIndex+1];
  const [draft,setDraft]=useState(()=>chosen?.responseText??"");
- const editable=Boolean(chosen&&chosen.assessmentStatus==="published"&&
+ const editable=Boolean(chosen&&chosen.workAvailability.actionable&&
   (!chosen.status||chosen.status==="assigned"||chosen.status==="returned"));
  useEffect(()=>{
   if(!selected){setAttachments([]);return;}
@@ -162,6 +162,14 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
        className="mt-2 inline-block text-sm underline">Review publisher lesson: {chosen.metadata.curriculumLessonTitle??chosen.metadata.curriculumLessonId}</Link>}
      <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{chosen.instructions??"Follow your teacher's instructions."}</p>
      <p className="mt-3 text-xs text-muted-foreground">Due {formatDate(chosen.dueAt)} · {chosen.assessmentStatus}</p>
+     {!chosen.workAvailability.actionable&&<p className="mt-3 text-sm" role="status">
+      {chosen.workAvailability.reason==="unreleased"
+       ?"Opens "+formatDate(chosen.availableAt)
+       :"Closed for student work. Your saved work and feedback remain available."}
+     </p>}
+     {chosen.submissionId&&chosen.submittedAt&&<p className="mt-3 text-xs text-muted-foreground">
+      Submitted {new Date(chosen.submittedAt).toLocaleString()} · Receipt: {chosen.submissionId}
+     </p>}
      <div className="mt-3"><StatusBadge tone={chosen.timeliness==="missing"?"attention":chosen.status==="graded"?"success":"neutral"}>{chosen.status??"Assigned"}{chosen.timeliness==="missing"?" · Missing":chosen.timeliness==="late"?" · Late":""}</StatusBadge></div>
      {chosen.metadata.rubric&&<p className="mt-4 rounded-lg bg-muted p-3 text-sm">Rubric: {chosen.metadata.rubric}</p>}
      {(chosen.metadata.criteria??[]).length>0&&<details className="mt-4 rounded-lg border p-4" open>

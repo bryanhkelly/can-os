@@ -9,7 +9,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { z } from "zod";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
-import { assertAssessmentActionable } from "@/domain/assessment-availability";
+import { assessmentAvailability, assertAssessmentActionable } from "@/domain/assessment-availability";
 import { writtenSubmissionResponse } from "@/domain/submission-response";
 
 
@@ -55,6 +55,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
  const rows=await db.select({
   assessmentId:s.assessments.id,sectionId:s.assessments.sectionId,
   title:s.assessments.title,instructions:s.assessments.instructions,
+  availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,
   dueAt:s.assessments.dueAt,pointsPossible:s.assessments.pointsPossible,
   submissionId:s.submissions.id,status:s.submissions.status,
   timeliness:s.submissions.timeliness,submittedAt:s.submissions.submittedAt,
@@ -79,6 +80,8 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
       .sort((a,b)=>(b.attemptNumber??0)-(a.attemptNumber??0))[0]
    :undefined;
   return {...row,
+  workAvailability:assessmentAvailability({status:row.assessmentStatus,availableAt:row.availableAt,closesAt:row.closesAt}),
+  availableAt:row.availableAt?.toISOString()??null,closesAt:row.closesAt?.toISOString()??null,
   revisionFeedbackText:typeof returned?.feedback?.comment==="string"?returned.feedback.comment:"",
   revisionFeedbackSubmissionId:returned?.submissionId??null,
   attempts:history.map(item=>({attempt:item.attemptNumber??1,status:item.status??"assigned",score:item.score,submittedAt:item.submittedAt?.toISOString()??null,feedback:typeof item.feedback?.comment==="string"?item.feedback.comment:""})),
