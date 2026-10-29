@@ -216,6 +216,13 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
     const actorPersonId = context.actorPersonId;
 
     return db.transaction(async (tx) => {
+      // Serialize even the first finalization, when no grade row exists yet
+      // to lock. Parallel retries then observe the prior immutable result.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(
+        hashtext('section_grade_finalization'),
+        hashtext(${data.sectionId + ":" + data.gradingPeriodId})
+      )`);
+
       const [section] = await tx
         .select({
           id: s.sections.id,

@@ -214,10 +214,12 @@ integration("GF25 report card and transcript", () => {
       eq(s.enrollments.studentProfileId,finalizationProfile!.id),
       eq(s.enrollments.kind,"program"),
     ));
-    await expect(finalizeSectionGrades({ data: {
-      sectionId: section!.id,
-      gradingPeriodId: academicTime.gradingPeriod.id,
-    } })).resolves.toEqual({ finalized: 1, skipped: 1 });
+    const concurrentFinalizations = await Promise.all([0,1].map(()=>
+      finalizeSectionGrades({data:{
+        sectionId:section!.id,gradingPeriodId:academicTime.gradingPeriod.id,
+      }})));
+    expect(concurrentFinalizations.map(result=>result.finalized).sort()).toEqual([0,1]);
+    expect(concurrentFinalizations.map(result=>result.skipped).sort()).toEqual([1,2]);
     await expect(finalizeSectionGrades({ data: {
       sectionId: section!.id,
       gradingPeriodId: academicTime.gradingPeriod.id,
