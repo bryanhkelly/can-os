@@ -254,6 +254,7 @@
 /* Student Home: original CSS landscape; no external asset or layout shift. */
 .student-day-hero {
   background: #17365b;
+  color: #fff;
 }
 .student-day-hero-landscape {
   background:

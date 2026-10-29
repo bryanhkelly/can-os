@@ -9,7 +9,8 @@ const meta = {
   title: "Workflows/GF22 Guardian application",
   component: GuardianApplicationForm,
   args: {
-    programs: [{ id: "program-high-school", name: "CAN High School · Grades 9–12" }],
+    programs: [{ id: "program-high-school", name: "CAN High School · Grades 9–12",
+      schoolYears: [{ id: "school-year-story", name: "2027–2028" }] }],
     households: [{ id: "household-story", name: "Synthetic family household" }],
     onSubmit: success,
     onSubmitted: fn(),
@@ -21,6 +22,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 async function fillRequiredFields(canvas: ReturnType<typeof within>) {
+  await userEvent.selectOptions(canvas.getByLabelText("Application academic year"), "school-year-story");
   await userEvent.type(canvas.getByLabelText("Student legal first name"), "Jordan");
   await userEvent.type(canvas.getByLabelText("Student legal last name"), "Lee");
   await userEvent.type(canvas.getByLabelText("Entering grade level"), "9");

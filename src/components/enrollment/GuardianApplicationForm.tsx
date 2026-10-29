@@ -71,9 +71,9 @@ export function GuardianApplicationForm({ programs, households, students = [], r
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
-  function focusFeedback() {
-    requestAnimationFrame(() => feedbackRef.current?.focus());
-  }
+  useEffect(() => {
+    if (notice || error) feedbackRef.current?.focus();
+  }, [notice, error]);
 
   function selectStudent(optionId: string) {
     setStudentOptionId(optionId);
@@ -110,11 +110,9 @@ export function GuardianApplicationForm({ programs, households, students = [], r
       setFirstName("");
       setLastName("");
       setGrade("");
-      focusFeedback();
       await onSubmitted?.();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to submit application");
-      focusFeedback();
     } finally {
       setBusy(false);
     }
