@@ -52,3 +52,4 @@ export async function requirePartnerWebsiteEditor(
   return { ...site, canPublish: assignment.capabilities.includes(siteWebsiteLocalPublishCapability) };
 
 }
+

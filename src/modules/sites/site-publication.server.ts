@@ -187,6 +187,7 @@ export async function changeSitePublication(
       .for("update").limit(1);
     if (!current) throw new Error("Reserve a public address before changing publication status");
     requirePublicSiteSlug(current.slug);
+
     // Only a changed-to-published state requires content readiness.
     // This queries the canonical published Seasons inside the same transaction.
     // Unpublishing is never prevented by empty or expired offerings.
