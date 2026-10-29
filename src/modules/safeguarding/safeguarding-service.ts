@@ -34,7 +34,7 @@ import {
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 
 export const safeguardingResponsibilities = ["primary", "deputy", "can_lead"] as const;
 export type SafeguardingResponsibility = (typeof safeguardingResponsibilities)[number];
@@ -578,6 +578,202 @@ export async function resolveSafeguardingConcern(
       contextExtras: { domainEventId: eventId },
     });
     return { incidentId: incident.id, closedAt, replayed: false };
+  });
+}
+
+/**
+ * Metadata-only safety net: a restricted case whose acknowledgment target has
+ * passed with NO recorded human acknowledgment must be visible to the site's
+ * currently configured deputy and CAN fallback responders, or an unavailable
+ * primary silently strands a child-safety concern. This listing exposes no
+ * case content — only existence, urgency and the missed target — for sites
+ * where the actor is the CURRENT named deputy/CAN fallback, and every read is
+ * audited like other restricted access.
+ */
+export async function listOverdueUnacknowledgedSafeguardingCases(actor: AccessContext) {
+  if (!isSafeguardingResponderRole(actor.role) || !actor.actorPersonId ||
+      !actor.scope.siteIds?.length || !actor.scope.organizationIds?.length)
+    throw new AuthorizationError("scoped safeguarding responder grant");
+  const configured = await db.select({
+    siteId: safeguardingSiteResponders.siteId,
+    responsibility: safeguardingSiteResponders.responsibility,
+  }).from(safeguardingSiteResponders)
+    .innerJoin(people, eq(people.id, safeguardingSiteResponders.personId))
+    .where(and(
+      eq(safeguardingSiteResponders.personId, actor.actorPersonId),
+      eq(people.active, true),
+      inArray(safeguardingSiteResponders.siteId, actor.scope.siteIds),
+      inArray(safeguardingSiteResponders.responsibility, ["deputy", "can_lead"]),
+    ));
+  if (!configured.length) return { overdue: [] };
+  const responsibilityBySite = new Map(configured.map(row => [row.siteId, row.responsibility]));
+  const candidates = await db.select({
+    incidentId: incidents.id,
+    incidentNumber: incidents.incidentNumber,
+    siteId: incidents.siteId,
+    reportedAt: incidents.reportedAt,
+    urgent: safeguardingConcerns.urgent,
+    acknowledgmentDueAt: safeguardingConcerns.acknowledgmentDueAt,
+  }).from(safeguardingConcerns)
+    .innerJoin(incidents, eq(incidents.id, safeguardingConcerns.incidentId))
+    .where(and(
+      inArray(incidents.siteId, [...responsibilityBySite.keys()]),
+      inArray(incidents.organizationId, actor.scope.organizationIds),
+      eq(incidents.type, "safeguarding_concern"),
+      eq(incidents.classification, "safeguarding_restricted"),
+      eq(incidents.status, "filed"),
+      lt(safeguardingConcerns.acknowledgmentDueAt, new Date()),
+    )).orderBy(asc(safeguardingConcerns.acknowledgmentDueAt)).limit(50);
+  if (!candidates.length) return { overdue: [] };
+  const ids = candidates.map(row => row.incidentId);
+  const acknowledged = await db.select({ incidentId: incidentNotifications.incidentId })
+    .from(incidentNotifications).where(and(
+      inArray(incidentNotifications.incidentId, ids),
+      eq(incidentNotifications.purpose, "safeguarding_concern_response"),
+      isNotNull(incidentNotifications.acknowledgedAt),
+    ));
+  const acknowledgedIds = new Set(acknowledged.map(row => row.incidentId));
+  const mine = await db.select({ incidentId: safeguardingCaseAssignments.incidentId })
+    .from(safeguardingCaseAssignments).where(and(
+      inArray(safeguardingCaseAssignments.incidentId, ids),
+      eq(safeguardingCaseAssignments.personId, actor.actorPersonId),
+      isNull(safeguardingCaseAssignments.revokedAt),
+    ));
+  const mineIds = new Set(mine.map(row => row.incidentId));
+  const overdue = candidates.filter(row =>
+    !acknowledgedIds.has(row.incidentId) && !mineIds.has(row.incidentId));
+  if (overdue.length) {
+    await db.transaction(async tx => {
+      await writeAudit(tx, actor, {
+        action: "safeguarding.overdue.list",
+        entityType: "person",
+        entityId: actor.actorPersonId!,
+        scope: { siteIds: actor.scope.siteIds, organizationIds: actor.scope.organizationIds },
+        after: { incidentIds: overdue.map(row => row.incidentId) },
+        contextExtras: { classification: "safeguarding_restricted", metadataOnly: true },
+      });
+    });
+  }
+  return {
+    overdue: overdue.map(row => ({
+      incidentId: row.incidentId,
+      incidentNumber: row.incidentNumber,
+      siteId: row.siteId,
+      urgent: row.urgent,
+      reportedAt: row.reportedAt,
+      acknowledgmentDueAt: row.acknowledgmentDueAt,
+      claimResponsibility: responsibilityBySite.get(row.siteId)!,
+    })),
+  };
+}
+
+/**
+ * A configured deputy/CAN fallback takes over a restricted case whose
+ * acknowledgment target has passed with no recorded human acknowledgment.
+ * This is not synthetic authorization: the person must be the site's CURRENT
+ * named deputy/CAN fallback with an active Person record and matching scope,
+ * the case must still be filed and completely unacknowledged, and the
+ * assignment uniqueness constraint is the idempotency boundary. The takeover
+ * creates a real named assignment and response handoff, with event and audit
+ * records; case content remains restricted until that assignment exists.
+ */
+export async function claimOverdueSafeguardingResponse(actor: AccessContext, incidentId: string) {
+  if (!isSafeguardingResponderRole(actor.role) || !actor.actorPersonId)
+    throw new AuthorizationError("scoped safeguarding responder grant");
+  const [incident] = await db.select().from(incidents).where(eq(incidents.id, incidentId)).limit(1);
+  if (!incident || incident.type !== "safeguarding_concern" ||
+      incident.classification !== "safeguarding_restricted")
+    throw new AuthorizationError("restricted safeguarding case resource");
+  assertOrganizationScope(actor, incident.organizationId);
+  assertSiteScope(actor, incident.siteId);
+  const [configuration] = await db.select({
+    responsibility: safeguardingSiteResponders.responsibility,
+  }).from(safeguardingSiteResponders)
+    .innerJoin(people, eq(people.id, safeguardingSiteResponders.personId))
+    .where(and(
+      eq(safeguardingSiteResponders.siteId, incident.siteId),
+      eq(safeguardingSiteResponders.personId, actor.actorPersonId),
+      inArray(safeguardingSiteResponders.responsibility, ["deputy", "can_lead"]),
+      eq(people.active, true),
+    )).limit(1);
+  if (!configuration)
+    throw new AuthorizationError("current configured deputy or CAN fallback responder for this site");
+  const [concern] = await db.select({
+    acknowledgmentDueAt: safeguardingConcerns.acknowledgmentDueAt,
+  }).from(safeguardingConcerns)
+    .where(eq(safeguardingConcerns.incidentId, incidentId)).limit(1);
+  if (!concern) throw new AuthorizationError("safeguarding concern resource");
+  if (incident.status !== "filed")
+    throw new Error("This case is no longer awaiting a first response");
+  if (concern.acknowledgmentDueAt >= new Date())
+    throw new Error("The acknowledgment target has not passed; the assigned responder still has time");
+  const [existingAssignment] = await db.select({ id: safeguardingCaseAssignments.id })
+    .from(safeguardingCaseAssignments).where(and(
+      eq(safeguardingCaseAssignments.incidentId, incidentId),
+      eq(safeguardingCaseAssignments.personId, actor.actorPersonId),
+      isNull(safeguardingCaseAssignments.revokedAt),
+    )).limit(1);
+  if (existingAssignment)
+    throw new Error("You are already assigned to this case; use acknowledge or escalate");
+  const acknowledged = await db.select({ id: incidentNotifications.id })
+    .from(incidentNotifications).where(and(
+      eq(incidentNotifications.incidentId, incidentId),
+      eq(incidentNotifications.purpose, "safeguarding_concern_response"),
+      isNotNull(incidentNotifications.acknowledgedAt),
+    )).limit(1);
+  if (acknowledged.length)
+    throw new Error("A responder has already acknowledged this case; no takeover is needed");
+  return db.transaction(async tx => {
+    // Re-check inside the transaction: a concurrent acknowledgment between
+    // the pre-checks and this write must cancel the takeover.
+    const raced = await tx.select({ id: incidentNotifications.id })
+      .from(incidentNotifications).where(and(
+        eq(incidentNotifications.incidentId, incidentId),
+        eq(incidentNotifications.purpose, "safeguarding_concern_response"),
+        isNotNull(incidentNotifications.acknowledgedAt),
+      )).limit(1);
+    if (raced.length)
+      throw new Error("A responder has already acknowledged this case; no takeover is needed");
+    const created = await tx.insert(safeguardingCaseAssignments).values({
+      incidentId,
+      personId: actor.actorPersonId!,
+      responsibility: configuration.responsibility,
+      assignedByPersonId: actor.actorPersonId,
+    }).onConflictDoNothing().returning({ id: safeguardingCaseAssignments.id });
+    if (!created.length)
+      throw new Error("This responsibility is already assigned; reload your workspace");
+    await tx.insert(incidentNotifications).values({
+      incidentId,
+      recipientPersonId: actor.actorPersonId!,
+      recipientType: "safeguarding_responder",
+      recipientLabel: configuration.responsibility,
+      channel: "in_app",
+      purpose: "safeguarding_concern_response",
+      status: "pending" as const,
+    });
+    const eventId = await emitEvent(tx, {
+      eventType: EventTypes.SafeguardingConcernEscalated,
+      aggregateType: "incident",
+      aggregateId: incidentId,
+      actorPersonId: actor.actorPersonId,
+      organizationId: incident.organizationId,
+      siteId: incident.siteId,
+      programId: incident.programId,
+      payload: {
+        routedResponsibilities: [configuration.responsibility],
+        trigger: "acknowledgment_overdue",
+        emergencyServicesDispatched: false,
+      },
+    });
+    await writeAudit(tx, actor, {
+      action: "safeguarding.concern.claim_overdue",
+      entityType: "incident",
+      entityId: incidentId,
+      scope: { organizationId: incident.organizationId, siteId: incident.siteId, programId: incident.programId },
+      after: { responsibility: configuration.responsibility, trigger: "acknowledgment_overdue" },
+      contextExtras: { domainEventId: eventId },
+    });
+    return { claimed: true as const, responsibility: configuration.responsibility };
   });
 }
 

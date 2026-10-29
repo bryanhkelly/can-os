@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, QueryState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   acknowledgeAssignedSafeguardingConcern,
+  claimOverdueSafeguardingCaseResponse,
   escalateAssignedSafeguardingConcern,
   getAssignedSafeguardingCase,
   getMySafeguardingWorkspace,
+  getOverdueUnacknowledgedSafeguardingCases,
   resolveAssignedSafeguardingConcern,
 } from "@/modules/safeguarding/safeguarding.functions";
 import { SafeguardingEvidenceForm, SafeguardingExternalReportForm } from "./safeguarding-forms";
@@ -13,6 +15,7 @@ import { SafeguardingEvidenceForm, SafeguardingExternalReportForm } from "./safe
 type Workspace = Awaited<ReturnType<typeof getMySafeguardingWorkspace>>;
 type ResponderWorkspace = Extract<Workspace, { mode: "responder" }>;
 type CaseDetail = Awaited<ReturnType<typeof getAssignedSafeguardingCase>>;
+type OverdueList = Awaited<ReturnType<typeof getOverdueUnacknowledgedSafeguardingCases>>["overdue"];
 const date = (value: Date | string) => new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 const name = (row: { preferredName: string | null; legalFirstName: string; legalLastName: string }) => row.preferredName ?? `${row.legalFirstName} ${row.legalLastName}`;
 
@@ -23,6 +26,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
 }) {
   const [selectedId, setSelectedId] = useState(initialCaseId ?? "");
   const [detail, setDetail] = useState<CaseDetail | null>(null);
+  const [overdue, setOverdue] = useState<OverdueList>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -36,13 +40,22 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
     finally { setLoading(false); }
   }, []);
 
+  const loadOverdue = useCallback(async () => {
+    // The overdue safety net is advisory to the assigned-case list; a failure
+    // here must never hide the responder's own assigned cases.
+    try { setOverdue((await getOverdueUnacknowledgedSafeguardingCases()).overdue); }
+    catch { /* assigned cases remain authoritative */ }
+  }, []);
+
   useEffect(() => {
     if (!initialCaseId) return;
     const task = window.setTimeout(() => void openCase(initialCaseId), 0);
     return () => window.clearTimeout(task);
   }, [initialCaseId, openCase]);
 
-  async function refresh() { await reload(); if (selectedId) await openCase(selectedId); }
+  useEffect(() => { void loadOverdue(); }, [loadOverdue]);
+
+  async function refresh() { await reload(); await loadOverdue(); if (selectedId) await openCase(selectedId); }
 
   async function command(kind: "acknowledge" | "escalate") {
     if (!selectedId || busy) return;
@@ -57,6 +70,19 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
       }
       await refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The response update was not saved."); }
+    finally { setBusy(""); }
+  }
+
+  async function claim(incidentId: string) {
+    if (busy) return;
+    setBusy("claim:" + incidentId); setError(""); setNotice("");
+    try {
+      const result = await claimOverdueSafeguardingCaseResponse({ data: { incidentId } });
+      setNotice("You are now the named " + result.responsibility.replaceAll("_", " ") +
+        " responder for this case. Record your human acknowledgment, then review the facts.");
+      await refresh();
+      await openCase(incidentId);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "The takeover was not saved."); }
     finally { setBusy(""); }
   }
 
@@ -83,6 +109,29 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
         <span className="mt-2 block text-xs text-muted-foreground">{item.responsibility.replaceAll("_", " ")} · reported {date(item.reportedAt)}</span>
         <span className="mt-1 block text-xs">{item.concernKinds.map(kind => kind.replaceAll("_", " ")).join(", ")}</span>
       </button>)}</div>}
+      {overdue.length > 0 && <div className="mt-6" aria-label="Unacknowledged cases past their response target">
+        <h3 className="text-sm font-semibold">Unacknowledged past response target</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Restricted cases at your site whose acknowledgment target passed with no recorded human
+          response. Taking over creates your real named assignment; case content stays restricted
+          until it exists. This is never a substitute for the offline emergency procedure.
+        </p>
+        <div className="mt-3 space-y-3">{overdue.map(item =>
+          <div key={item.incidentId} className="rounded-xl border border-rose-300 p-4">
+            <span className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-semibold">{item.incidentNumber}</span>
+              <StatusBadge tone={item.urgent ? "danger" : "attention"}>{item.urgent ? "Urgent · overdue" : "Overdue"}</StatusBadge>
+            </span>
+            <span className="mt-2 block text-xs text-muted-foreground">
+              Reported {date(item.reportedAt)} · response target was {date(item.acknowledgmentDueAt)}
+            </span>
+            <Button className="mt-3" variant="outline" disabled={!!busy}
+              onClick={() => void claim(item.incidentId)}>
+              {busy === "claim:" + item.incidentId ? "Assigning…" : "Take over response as " + item.claimResponsibility.replaceAll("_", " ")}
+            </Button>
+          </div>)}
+        </div>
+      </div>}
     </section>
     <div className="min-w-0">
       <QueryState loading={loading ? "Loading assigned restricted case…" : undefined} error={error || undefined} isEmpty={!selectedId && !loading} empty={<EmptyState title="Select an assigned case" description="Opening a case checks your current capability, scope and named assignment and records a sensitive-read audit." />}>
