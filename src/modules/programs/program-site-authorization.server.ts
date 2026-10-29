@@ -689,6 +689,8 @@ export async function getHostProgramSiteAuthorization(
     effectiveThrough: programSiteAuthorizations.effectiveThrough,
     revokedAt: programSiteAuthorizations.revokedAt,
     reviewReason: programSiteAuthorizations.reviewReason,
+    suspendedAt: programSiteAuthorizations.suspendedAt,
+    suspensionReason: programSiteAuthorizations.suspensionReason,
   }).from(programSiteAuthorizations)
     .where(eq(programSiteAuthorizations.programId, programId))
     .orderBy(desc(programSiteAuthorizations.version)).limit(1);
@@ -702,7 +704,7 @@ export async function getHostProgramSiteAuthorization(
     canIssueCredit: identity.creditIssuingOrganizationId !== null,
     authorization: record ? {
       ...record,
-      lapsed: record.status === "approved" && record.effectiveThrough !== null &&
+      lapsed: (record.status === "approved" || record.status === "suspended") && record.effectiveThrough !== null &&
         record.effectiveThrough <= now,
     } : null,
   };
@@ -733,6 +735,8 @@ export async function listCANOperatingAuthorizationDesk(actor: AccessContext) {
     reviewedAt: programSiteAuthorizations.reviewedAt,
     effectiveFrom: programSiteAuthorizations.effectiveFrom,
     effectiveThrough: programSiteAuthorizations.effectiveThrough,
+    suspendedAt: programSiteAuthorizations.suspendedAt,
+    suspensionReason: programSiteAuthorizations.suspensionReason,
   }).from(programSiteAuthorizations)
     .innerJoin(programs, eq(programSiteAuthorizations.programId, programs.id))
     .innerJoin(organizations, eq(programSiteAuthorizations.hostOrganizationId, organizations.id))
@@ -745,7 +749,7 @@ export async function listCANOperatingAuthorizationDesk(actor: AccessContext) {
   return {
     authorizations: requests.map(request => ({
       ...request,
-      lapsed: request.status === "approved" && request.effectiveThrough !== null &&
+      lapsed: (request.status === "approved" || request.status === "suspended") && request.effectiveThrough !== null &&
         request.effectiveThrough <= now,
     })),
   };

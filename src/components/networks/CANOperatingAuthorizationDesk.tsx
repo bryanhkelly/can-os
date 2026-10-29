@@ -68,11 +68,18 @@ export function CANOperatingAuthorizationDesk() {
             Delegated services are suspended. Review the concern before resuming or revoke the agreement.
             Resumption does not extend the agreement period or replace independent school-opening review.
           </p>}
+          {item.status==="suspended"&&item.suspensionReason&&<p className="mt-1 text-xs">
+            Suspension reason: {item.suspensionReason}
+          </p>}
+          {item.effectiveFrom&&<p className="mt-1 text-xs">
+            Agreement begins: {new Date(item.effectiveFrom).toLocaleString()}
+          </p>}
           {item.effectiveThrough&&<p className="mt-1 text-xs">
-            Agreement ends (exclusive): {new Date(item.effectiveThrough).toLocaleDateString()}
+            Agreement ends (exclusive): {new Date(item.effectiveThrough).toLocaleString()}
           </p>}
           {item.lapsed&&<p className="mt-1 text-xs" role="status">
             Agreement window elapsed: delegated operations are blocked until renewal under fresh evidence.
+            {item.status==="suspended"&&" Resolve the suspension before renewing; resuming alone does not extend the expired term."}
           </p>}
           {(item.status==="requested"||item.status==="approved"||item.status==="suspended")&&<div className="mt-3 grid gap-2 sm:grid-cols-2">
             {(item.status==="requested"||item.status==="approved")&&<>

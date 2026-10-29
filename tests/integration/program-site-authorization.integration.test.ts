@@ -968,7 +968,8 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
         const {
           requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
           suspendProgramSiteAuthorization, resumeProgramSiteAuthorization,
-          requireCurrentProgramSiteAuthorization,
+          requireCurrentProgramSiteAuthorization, getHostProgramSiteAuthorization,
+          listCANOperatingAuthorizationDesk,
         } = await import("@/modules/programs/program-site-authorization.server");
         const suffix = crypto.randomUUID().slice(0,8);
         const f = await createAuthorizationFixture(tx,suffix);
@@ -1060,6 +1061,16 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
         }).from(s.programSiteAuthorizations)
           .where(eq(s.programSiteAuthorizations.programId,f.launch.programId));
         expect(unchanged).toEqual([{id:authorizationId,status:"suspended",version:1}]);
+        expect((await getHostProgramSiteAuthorization(f.host,f.launch.programId)).authorization)
+          .toMatchObject({status:"suspended",lapsed:false,
+            suspensionReason:"CAN paused delegated operations pending a compliance review."});
+        // Expiry is independent of suspension: both conditions must be visible.
+        await tx.update(s.programSiteAuthorizations).set({effectiveThrough:new Date(Date.now()-1000)})
+          .where(eq(s.programSiteAuthorizations.id,authorizationId));
+        expect((await getHostProgramSiteAuthorization(f.host,f.launch.programId)).authorization)
+          .toMatchObject({status:"suspended",lapsed:true});
+        expect((await listCANOperatingAuthorizationDesk(f.steward)).authorizations
+          .find(row=>row.id===authorizationId)).toMatchObject({status:"suspended",lapsed:true});
         complete=true;
         throw rollback;
       });
