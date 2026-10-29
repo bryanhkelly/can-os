@@ -2,8 +2,9 @@ import { FamilyInviteImporter } from "@/components/operations/FamilyInviteImport
 import { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
 import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
+import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
@@ -64,6 +65,7 @@ function LaunchWizardPage() {
   const creditMode = type === "summer_program" && summerCreditBearing ? "credit_bearing" : isExtendedLearningType(type) ? "non_credit" : "credit_bearing";
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [slugEdited, setSlugEdited] = useState(false);
   const [gradeMin, setGradeMin] = useState("K");
   const [gradeMax, setGradeMax] = useState("12");
   const [onsite, setOnsite] = useState(true);
@@ -93,6 +95,26 @@ function LaunchWizardPage() {
   }
 
   const hostSites = options?.sites.filter((site) => site.organizationId === hostOrganizationId) ?? [];
+  // Recognize an existing campus before the leader accidentally forks it.
+  const duplicateNewSite = hostSites.find(site =>
+    (newSiteSlug.trim().length > 0 && site.slug === newSiteSlug.trim()) ||
+    (newSiteName.trim().length >= 2 && site.name.trim().toLowerCase() === newSiteName.trim().toLowerCase()));
+
+  // Turnkey defaults: when the registrar grant covers exactly one church, and
+  // that church has exactly one Site, preselect both instead of asking the
+  // leader to find records the system already knows. Selections stay editable.
+  useEffect(() => {
+    if (!options) return;
+    const [onlyOrganization] = options.organizations;
+    if (!hostOrganizationId && options.organizations.length === 1 && onlyOrganization) {
+      setHostOrganizationId(onlyOrganization.id);
+    }
+  }, [options, hostOrganizationId]);
+  useEffect(() => {
+    const [onlySite] = hostSites;
+    if (siteId || !hostOrganizationId) return;
+    if (hostSites.length === 1 && onlySite) setSiteId(onlySite.id);
+  }, [hostSites, hostOrganizationId, siteId]);
 
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
@@ -291,11 +313,18 @@ function LaunchWizardPage() {
                   {isExtendedLearningType(type) && <p className="text-xs text-muted-foreground">Summer and after-school offerings share the Program record. Existing academic-year, section, staffing and opening gates still apply; short-course registration and recurring-session operations need further integration.</p>}
                   <label className="block text-xs">
                     Name
-                    <input aria-label="Program name" className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} />
+                    <input aria-label="Program name" className={inputClass} value={name} onChange={(e) => {
+                      const value = e.target.value;
+                      setName(value);
+                      if (!slugEdited) setSlug(suggestedLaunchSlug(value));
+                    }} required maxLength={200} />
                   </label>
                   <label className="block text-xs">
                     Slug
-                    <input aria-label="Program slug" className={inputClass} value={slug} onChange={(e) => setSlug(e.target.value)} required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="grace-academy-hs" />
+                    <input aria-label="Program slug" className={inputClass} value={slug} onChange={(e) => {
+                      setSlugEdited(true);
+                      setSlug(e.target.value);
+                    }} required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="grace-academy-hs" />
                   </label>
                   <div className="flex gap-3">
                     <label className="block flex-1 text-xs">
@@ -388,7 +417,10 @@ function LaunchWizardPage() {
                       <input aria-label="New site slug" placeholder="campus-slug" className={inputClass} value={newSiteSlug} onChange={e=>setNewSiteSlug(e.target.value)}/>
                       <input aria-label="New site timezone" placeholder="Timezone" className={inputClass} value={newSiteTimezone} onChange={e=>setNewSiteTimezone(e.target.value)}/>
                     </div>
-                    <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Create site</button>
+                    {duplicateNewSite && <p role="status" className="mt-2 text-xs">
+                      This church already has the site “{duplicateNewSite.name}”. Choose it in the Site list above instead of creating a duplicate.
+                    </p>}
+                    <button type="button" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">Create site</button>
                     {createdSiteDraft && <div role="status" className="mt-3 rounded-lg border p-3 text-sm">
                       <p className="font-semibold">Your website draft is prepared</p>
                       <p className="mt-1 font-mono">{createdSiteDraft.host}</p>

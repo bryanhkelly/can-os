@@ -5,6 +5,7 @@ import {
  addStudioCalendar, addStudioCalendarDay, removeStudioCalendarDay, populateStudioInstructionalDays, addStudioSchedule, replaceStudioSchedulePeriods, activateStudioYear,
 } from "@/modules/academic-time/school-year-studio.functions";
 import { safeLoader } from "@/lib/safe-loader";
+import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell } from "@/components/workspace";
 export const Route=createFileRoute("/operations/school-years")({
@@ -25,9 +26,11 @@ function Studio({data}:{data:Snapshot}){
  const [programId,setProgramId]=useState(selection.programId??"");
  const [scaleId,setScaleId]=useState(data.gradeScales[0]?.id??"");
  const [newScaleName,setNewScaleName]=useState("Standard A–F");
- const [name,setName]=useState("2027–2028 School Year");
- const [key,setKey]=useState("2027-28");
- const [start,setStart]=useState("2027-08-16"),[end,setEnd]=useState("2028-06-09");
+ // Suggested from the current date; every field stays editable.
+ const [suggestedYear]=useState(()=>suggestedSchoolYear());
+ const [name,setName]=useState(suggestedYear.name);
+ const [key,setKey]=useState(suggestedYear.key);
+ const [start,setStart]=useState(suggestedYear.startsOn),[end,setEnd]=useState(suggestedYear.endsOn);
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  async function run(operation:()=>Promise<unknown>){
   setBusy(true);setError("");setNotice("");
