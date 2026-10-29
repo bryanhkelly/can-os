@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import {
   assessments, courseTemplateVersions, enrollments, sections, terms,
 } from "@/db/schema";
+import { assessmentAvailability } from "@/domain/assessment-availability";
 import { buildFirstClassroom } from "@/domain/first-classroom";
 import { evaluateLaunchStaffing } from "@/modules/staffing/launch-staffing.server";
 
@@ -15,6 +16,7 @@ export async function readFirstClassrooms(
   sectionIds: readonly string[],
   qualifiedTeacherBySection?: ReadonlyMap<string, boolean>,
 ) {
+  const now = new Date();
   const ids = [...new Set(sectionIds)];
   if (!ids.length) return [];
   const rows = await db.select({
@@ -38,6 +40,9 @@ export async function readFirstClassrooms(
       sectionId: assessments.sectionId,
       title: assessments.title,
       instructions: assessments.instructions,
+      status: assessments.status,
+      availableAt: assessments.availableAt,
+      closesAt: assessments.closesAt,
       curriculumLessonId: sql<string | null>`case
         when jsonb_typeof(${assessments.metadata}->'curriculumLessonId') = 'string'
         then ${assessments.metadata}->>'curriculumLessonId' end`,
@@ -45,7 +50,7 @@ export async function readFirstClassrooms(
       .where(and(
         inArray(assessments.sectionId, ids),
         eq(assessments.status, "published"),
-        or(isNull(assessments.availableAt), lte(assessments.availableAt, new Date())),
+        or(isNull(assessments.availableAt), lte(assessments.availableAt, now)),
       ))
       .orderBy(asc(assessments.createdAt)),
     db.select({
@@ -79,6 +84,6 @@ export async function readFirstClassrooms(
     curriculum: row.curriculum,
     qualifiedTeacher: staffing.find(([sectionId]) => sectionId === row.id)?.[1] ?? false,
     activeStudentCount: Number(membershipRows.find(item => item.sectionId === row.id)?.studentCount ?? 0),
-    publishedAssessments: assessmentRows.filter(item => item.sectionId === row.id),
+    publishedAssessments: assessmentRows.filter(item => item.sectionId === row.id && assessmentAvailability(item, now).actionable),
   }));
 }

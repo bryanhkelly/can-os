@@ -88,3 +88,22 @@ describe("first classroom evidence", () => {
     expect(result.firstWeek.assessment).toEqual({ id: "assessment-4", title: "Opening task" });
   });
 });
+
+describe("first classroom fallback boundaries", () => {
+  it("never falls back to work linked to another lesson", () => {
+    const result = buildFirstClassroom("section-1", { ...readyEvidence,
+      publishedAssessments: [{ ...assessment, curriculumLessonId: "later" }] });
+    expect(result.firstWeek.assessment).toBeNull();
+    expect(result.blockers).toContainEqual(expect.objectContaining({ key: "missing_assessment" }));
+  });
+  it("finds genuinely unlinked work after unrelated work", () => {
+    const result = buildFirstClassroom("section-1", { ...readyEvidence,
+      publishedAssessments: [{ ...assessment, curriculumLessonId: "later" },
+        { ...assessment, id: "intro", curriculumLessonId: null }] });
+    expect(result.firstWeek.assessment?.id).toBe("intro");
+  });
+  it("does not recommend work without a real first lesson", () => {
+    expect(buildFirstClassroom("section-1", { ...readyEvidence, curriculum: emptyCurriculum,
+      publishedAssessments: [{ ...assessment, curriculumLessonId: null }] }).firstWeek.assessment).toBeNull();
+  });
+});

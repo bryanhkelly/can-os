@@ -63,11 +63,11 @@ export function buildFirstClassroom(sectionId: string, input: {
   // work for this class remains an acceptable fallback.
   const submittable = input.publishedAssessments.filter(item => Boolean(item.instructions?.trim()));
   const assessment = (lesson ? submittable.find(item => item.curriculumLessonId === lesson.id) : undefined)
-    ?? submittable[0] ?? null;
+    ?? (lesson ? submittable.find(item => item.curriculumLessonId === null) : undefined) ?? null;
   const blockers: FirstClassBlocker[] = [];
   if (!input.sectionActive) blockers.push({ key: "inactive_section", message: "Activate this class before beginning instruction." });
   if (!lesson) blockers.push({ key: "missing_lesson", message: "Publish a learner-facing lesson with reading, practice or a resource." });
-  if (!assessment) blockers.push({ key: "missing_assessment", message: "Publish an assessment with student instructions so learners can submit real work." });
+  if (!assessment) blockers.push({ key: "missing_assessment", message: "Publish available work with student instructions linked to the first lesson, or an unlinked introductory assessment." });
   if (!input.qualifiedTeacher) blockers.push({ key: "missing_qualified_teacher", message: "Assign an eligible teacher whose verified qualifications and delivery cover the instructional window." });
   if (input.activeStudentCount < 1) blockers.push({ key: "missing_students", message: "Assign at least one actively enrolled student to this class for the same program and school year." });
   return {
