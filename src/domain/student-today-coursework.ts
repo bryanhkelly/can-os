@@ -14,6 +14,9 @@ export function isCurrentCoursework(row: {
     // Returned work always needs the student: a revision request past its due
     // date must never fall off the daily list just because it is no longer new.
     row.status === "returned" ||
+    // Saving a revision creates an assigned next attempt. Its draft still
+    // needs attention even when the original due date is in the past.
+    row.status === "assigned" ||
     row.timeliness === "missing" ||
     (row.dueAt !== null && row.dueAt >= dayStart) ||
     (row.submittedAt !== null && row.submittedAt >= dayStart);
