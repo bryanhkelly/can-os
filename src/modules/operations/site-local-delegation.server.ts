@@ -157,6 +157,24 @@ export async function setSiteLocalDelegation(actor: AccessContext, input: {
       await tx.update(programResponsibilityAssignments).set({
         effectiveThrough: now, updatedAt: now,
       }).where(eq(programResponsibilityAssignments.id, current.id));
+      // The duty's role row is retained as compliance evidence but must stop
+      // projecting as a live assignment (same treatment as CAN staff revocation).
+      if (current.responsibleRoleAssignmentId) {
+        const [dutyRole] = await tx.select({
+          id: roleAssignments.id, metadata: roleAssignments.metadata,
+        }).from(roleAssignments)
+          .where(eq(roleAssignments.id, current.responsibleRoleAssignmentId)).limit(1);
+        if (dutyRole && dutyRole.metadata?.origin === "local_site_delegation" &&
+            !dutyRole.metadata?.revokedAt) {
+          await tx.update(roleAssignments).set({
+            capabilities: [],
+            metadata: { ...dutyRole.metadata, revokedAt: now.toISOString(),
+              revocationReason: `Local site responsibility "${key}" revoked`,
+              revokedByPersonId: actor.actorPersonId },
+            updatedAt: now,
+          }).where(eq(roleAssignments.id, dutyRole.id));
+        }
+      }
       await writeAudit(tx, actor, {
         action: "site.local_responsibility.revoked",
         entityType: "program_responsibility_assignment", entityId: current.id,
@@ -188,15 +206,43 @@ export async function setSiteLocalDelegation(actor: AccessContext, input: {
       organizationMatches: candidate?.organizationId === host.organizationId,
       siteMatches: candidate?.siteId === host.siteId,
     }, key);
-    const [role] = await tx.insert(roleAssignments).values({
-      personId: input.personId, organizationId: host.organizationId,
-      siteId: host.siteId, programId: host.id, roleKey: requiredRole,
-      // Responsibility alone MUST NOT mint academic privileges or new account grants.
-      capabilities: ["onsite.attendance.record"],
-      metadata: { origin: "local_site_delegation", responsibility: key,
-        expiresAt: expires.toISOString() },
-    }).returning({ id: roleAssignments.id });
-    if (!role) throw new Error("Cannot record named local staff assignment");
+    // Re-appointment restores the retained, soft-revoked duty row with its
+    // original id instead of accumulating duplicate historical rows.
+    const [revokedRole] = await tx.select({
+      id: roleAssignments.id, metadata: roleAssignments.metadata,
+    }).from(roleAssignments).where(and(
+      eq(roleAssignments.personId, input.personId),
+      eq(roleAssignments.organizationId, host.organizationId),
+      eq(roleAssignments.siteId, host.siteId),
+      eq(roleAssignments.programId, host.id),
+      eq(roleAssignments.roleKey, requiredRole),
+      sql`${roleAssignments.metadata}->>'origin' = 'local_site_delegation'`,
+      sql`${roleAssignments.metadata}->>'responsibility' = ${key}`,
+      sql`${roleAssignments.metadata}->>'revokedAt' is not null`,
+    )).orderBy(desc(roleAssignments.updatedAt)).limit(1);
+    let role: { id: string };
+    if (revokedRole) {
+      const [restored] = await tx.update(roleAssignments).set({
+        // Responsibility alone MUST NOT mint academic privileges or new account grants.
+        capabilities: ["onsite.attendance.record"],
+        metadata: { ...revokedRole.metadata, expiresAt: expires.toISOString(),
+          revokedAt: null, revocationReason: null, revokedByPersonId: null },
+        updatedAt: now,
+      }).where(eq(roleAssignments.id, revokedRole.id)).returning({ id: roleAssignments.id });
+      if (!restored) throw new Error("Cannot restore named local staff assignment");
+      role = restored;
+    } else {
+      const [created] = await tx.insert(roleAssignments).values({
+        personId: input.personId, organizationId: host.organizationId,
+        siteId: host.siteId, programId: host.id, roleKey: requiredRole,
+        // Responsibility alone MUST NOT mint academic privileges or new account grants.
+        capabilities: ["onsite.attendance.record"],
+        metadata: { origin: "local_site_delegation", responsibility: key,
+          expiresAt: expires.toISOString() },
+      }).returning({ id: roleAssignments.id });
+      if (!created) throw new Error("Cannot record named local staff assignment");
+      role = created;
+    }
 
     let assignmentId: string;
     if (current) {

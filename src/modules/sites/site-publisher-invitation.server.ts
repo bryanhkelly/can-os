@@ -10,7 +10,7 @@ export const siteWebsitePublisherCapabilities = [
   siteWebsiteLocalPublishCapability,
 ] as const;
 
-type Mutation = Pick<typeof db, "select" | "insert">;
+type Mutation = Pick<typeof db, "select" | "insert" | "update">;
 
 /**
  * Add only the relationship rows required by the canonical staff invitation.
@@ -40,6 +40,7 @@ export async function provisionSiteWebsitePublisherRelationship(
 
   const [existingAssignment] = await tx.select({
     id: roleAssignments.id, capabilities: roleAssignments.capabilities,
+    metadata: roleAssignments.metadata,
   }).from(roleAssignments).where(and(
     eq(roleAssignments.personId, input.personId),
     eq(roleAssignments.organizationId, input.organizationId),
@@ -48,6 +49,19 @@ export async function provisionSiteWebsitePublisherRelationship(
     eq(roleAssignments.roleKey, "site_website_editor"),
   )).limit(1);
   if (existingAssignment) {
+    // A soft-revoked assignment is retained compliance evidence, not a live
+    // grant: re-invitation restores the same row instead of no-oping on it.
+    if (existingAssignment.metadata?.revokedAt) {
+      const [restored] = await tx.update(roleAssignments).set({
+        capabilities: [...siteWebsitePublisherCapabilities],
+        metadata: { ...existingAssignment.metadata, revokedAt: null,
+          revocationReason: null, revokedByPersonId: null },
+        updatedAt: new Date(),
+      }).where(eq(roleAssignments.id, existingAssignment.id))
+        .returning({ id: roleAssignments.id });
+      if (!restored) throw new Error("Website publisher role assignment could not be restored");
+      return { membershipCreated, assignmentCreated: true };
+    }
     const actual = [...existingAssignment.capabilities].sort();
     const expected = [...siteWebsitePublisherCapabilities].sort();
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {
