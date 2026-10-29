@@ -1,3 +1,4 @@
+import { TeacherGradeResponsesPanel } from "@/components/learning/TeacherGradeResponsesPanel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowUpRight, BookOpen, ClipboardCheck, GraduationCap } from "lucide-react";
@@ -112,6 +113,8 @@ function TeacherTodayPage() {
         <p className="mt-3 text-sm">Use existing <Link to="/teacher/missing-work" className="underline">missing-work follow-up</Link> and authorized support referrals for human-reviewed interventions.</p>
       </>}
     </section>
+
+    <TeacherGradeResponsesPanel />
 
     <TeacherLearningFollowUpsPanel />
 
