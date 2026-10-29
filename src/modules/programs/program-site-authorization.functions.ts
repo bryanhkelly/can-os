@@ -22,6 +22,24 @@ const revokeSchema = z.object({
   authorizationId: uuid,
   reason: z.string().trim().min(10).max(500),
 }).strict();
+const serviceEnum = z.enum([
+  "academic_instruction", "curriculum", "school_of_record",
+  "credit_issuance", "admissions", "academic_records", "onsite_supervision",
+]);
+const registerEvidenceSchema = z.object({
+  programId: uuid,
+  siteId: uuid,
+  fileName: z.string().trim().min(1).max(150),
+  effectiveThrough: z.string().datetime({ offset: true }),
+  expiresAt: z.string().datetime({ offset: true }),
+  verifierPersonId: uuid,
+  hostSignatureVerified: z.boolean(),
+  institutionSignatureVerified: z.boolean(),
+  authorizedServices: z.array(serviceEnum).min(1).max(7),
+  storageKey: z.string().regex(/^operating-agreements\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i).optional(),
+  mimeType: z.enum(["application/pdf", "image/jpeg", "image/png"]).optional(),
+  fileSize: z.number().int().min(16).max(10 * 1024 * 1024).optional(),
+}).strict();
 
 /** No actor, approval status or contracting party may be supplied by a client. */
 export const requestProgramSiteAuthorizationFn = createServerFn({ method:"POST" })
@@ -54,6 +72,21 @@ export const revokeProgramSiteAuthorizationFn = createServerFn({ method:"POST" }
       import("./program-site-authorization.server"),
     ]);
     return revokeProgramSiteAuthorization(await getCommandContext(getRequest()), data);
+  });
+
+/** Contracting parties, the exact Site and the issuer are never client input. */
+export const registerOperatingAgreementEvidenceFn = createServerFn({ method:"POST" })
+  .validator((value: unknown) => registerEvidenceSchema.parse(value))
+  .handler(async ({data}) => {
+    const [{getCommandContext}, {registerOperatingAgreementEvidence}] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./program-site-authorization.server"),
+    ]);
+    return registerOperatingAgreementEvidence(await getCommandContext(getRequest()), {
+      ...data,
+      effectiveThrough: new Date(data.effectiveThrough),
+      expiresAt: new Date(data.expiresAt),
+    });
   });
 
 export const getHostProgramSiteAuthorizationFn = createServerFn({ method:"GET" })

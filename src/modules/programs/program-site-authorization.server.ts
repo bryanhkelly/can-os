@@ -1,4 +1,5 @@
-import { and, desc, eq, gt, isNull, lte } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, desc, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   documents, organizations, programs, programSiteAuthorizations, sites,
@@ -12,9 +13,13 @@ import {
   type OperatingProgramIdentity, type OperatingService,
 } from "@/domain/program-site-operating-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { verifyPrivateObject } from "@/platform/storage/r2";
 
 import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db, "select">;
+
+/** Private-bucket key policy for uploaded operating agreement originals. */
+const operatingAgreementKeyPattern = /^operating-agreements\/[a-f0-9-]{36}\/[a-f0-9-]{36}$/i;
 
 /** Resolve all contracting parties from actual canonical Program, Site and Org rows. */
 async function loadOperatingIdentity(
@@ -108,6 +113,120 @@ export async function requestProgramSiteAuthorization(
       payload: { institutionOrganizationId: identity.institutionOrganizationId, services },
     });
     return { authorizationId: created.id, status: "requested" as const, created: true };
+  });
+}
+
+/** Host registrar registers the externally reviewed CAN–church operating
+ * agreement as evidence, making independent steward approval reachable.
+ * Contracting parties, the exact Site and the issuer are derived from
+ * canonical rows; the client attests only signatures, verifier and services.
+ * The document row is registered separately from any private object upload.
+ */
+export async function registerOperatingAgreementEvidence(
+  actor: AccessContext,
+  input: {
+    programId: string; siteId: string; fileName: string;
+    effectiveThrough: Date; expiresAt: Date;
+    verifierPersonId: string;
+    hostSignatureVerified: boolean; institutionSignatureVerified: boolean;
+    authorizedServices: string[];
+    storageKey?: string; mimeType?: string; fileSize?: number;
+  },
+) {
+  const fileName = input.fileName.trim();
+  if (!fileName || fileName.length > 150 ||
+      !Number.isFinite(input.effectiveThrough.getTime()) || input.effectiveThrough <= new Date() ||
+      !Number.isFinite(input.expiresAt.getTime()))
+    throw new Error("Agreement evidence requires a file name and a valid future-effective interval");
+  return db.transaction(async tx => {
+    // Serialize duplicate/retry registration on the canonical Program.
+    await tx.select({ id: programs.id }).from(programs)
+      .where(eq(programs.id, input.programId)).for("update").limit(1);
+    const identity = await loadOperatingIdentity(tx, input.programId);
+    assertHostRequester(actor, identity);
+    if (input.siteId !== identity.siteId)
+      throw new AuthorizationError("operating agreement evidence for this Program's exact Site");
+    const services = normalizeOperatingServices(input.authorizedServices);
+    const metadata: Record<string, unknown> = {
+      hostOrganizationId: identity.hostOrganizationId,
+      institutionOrganizationId: identity.institutionOrganizationId,
+      siteId: identity.siteId,
+      creditIssuingOrganizationId: identity.creditIssuingOrganizationId,
+      hostSignatureVerified: input.hostSignatureVerified,
+      institutionSignatureVerified: input.institutionSignatureVerified,
+      authorizedServices: services,
+    };
+    const contentHash = createHash("sha256").update(JSON.stringify({
+      programId: identity.programId, siteId: identity.siteId,
+      hostOrganizationId: identity.hostOrganizationId,
+      institutionOrganizationId: identity.institutionOrganizationId,
+      creditIssuingOrganizationId: identity.creditIssuingOrganizationId,
+      services, verifierPersonId: input.verifierPersonId,
+      effectiveThrough: input.effectiveThrough.toISOString(),
+      expiresAt: input.expiresAt.toISOString(),
+      storageKey: input.storageKey ?? null,
+    })).digest("hex");
+    const [existing] = await tx.select({ id: documents.id }).from(documents).where(and(
+      eq(documents.subjectType, "program"),
+      eq(documents.subjectId, identity.programId),
+      eq(documents.category, "program_site_operating_agreement"),
+      sql`${documents.metadata}->>'contentHash' = ${contentHash}`,
+    )).limit(1);
+    if (existing) return { documentId: existing.id, created: false as const };
+    let storageProvider = "external_record";
+    let storageKey = `operating-agreements/${identity.programId}/${crypto.randomUUID()}`;
+    if (input.storageKey !== undefined) {
+      if (process.env.CAN_R2_OPERATING_AGREEMENT_UPLOADS_ENABLED !== "true")
+        throw new Error("Operating agreement evidence uploads are not enabled for this deployment");
+      if (!operatingAgreementKeyPattern.test(input.storageKey) ||
+          !input.fileSize || !input.mimeType)
+        throw new Error("Uploaded agreement evidence requires a bounded size and declared type");
+      await verifyPrivateObject({ key: input.storageKey, keyPattern: operatingAgreementKeyPattern,
+        expectedSize: input.fileSize, expectedContentType: input.mimeType });
+      storageProvider = "cloudflare_r2";
+      storageKey = input.storageKey;
+    } else if (input.fileSize !== undefined || input.mimeType !== undefined) {
+      throw new Error("Agreement object size and type require an uploaded storage key");
+    }
+    // The candidate must already satisfy the same structural contract the
+    // independent reviewer enforces; the unknown future reviewer is bound to
+    // the requester so self-verification is rejected here.
+    const verifiedAt = new Date();
+    assertOperatingAgreementEvidence({
+      subjectType: "program", subjectId: identity.programId,
+      category: "program_site_operating_agreement",
+      verifiedAt, verifiedByPersonId: input.verifierPersonId,
+      expiresAt: input.expiresAt, metadata,
+    }, identity, services, actor.actorPersonId!, actor.actorPersonId!,
+      input.effectiveThrough, verifiedAt);
+    const [created] = await tx.insert(documents).values({
+      subjectType: "program", subjectId: identity.programId,
+      category: "program_site_operating_agreement", fileName,
+      storageProvider, storageKey, mimeType: input.mimeType ?? null,
+      sensitivityTier: "restricted", expiresAt: input.expiresAt,
+      verifiedAt, verifiedByPersonId: input.verifierPersonId,
+      uploadedByPersonId: actor.actorPersonId!,
+      metadata: { ...metadata, contentHash },
+    }).returning({ id: documents.id });
+    if (!created) throw new Error("Unable to register operating agreement evidence");
+    await writeAudit(tx, actor, {
+      action: "program.site.operating_agreement_evidence.register",
+      entityType: "document", entityId: created.id,
+      scope: { organizationId: identity.hostOrganizationId, siteId: identity.siteId,
+        programId: identity.programId },
+      after: { category: "program_site_operating_agreement",
+        verifierPersonId: input.verifierPersonId, services, contentHash,
+        expiresAt: input.expiresAt.toISOString(),
+        effectiveThrough: input.effectiveThrough.toISOString() },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.OperatingAgreementEvidenceRegistered, aggregateType: "document",
+      aggregateId: created.id, actorPersonId: actor.actorPersonId,
+      organizationId: identity.hostOrganizationId, siteId: identity.siteId,
+      programId: identity.programId,
+      payload: { institutionOrganizationId: identity.institutionOrganizationId, services },
+    });
+    return { documentId: created.id, created: true as const };
   });
 }
 
@@ -235,8 +354,7 @@ export async function revokeProgramSiteAuthorization(
       eventType: EventTypes.ProgramSiteAuthorizationRevoked,
       aggregateType: "program_site_authorization", aggregateId: record.id,
       actorPersonId: actor.actorPersonId,
-      organizationId: identity.hostOrganizationId,
-      siteId: identity.siteId, programId: identity.programId,
+      organizationId: identity.hostOrganizationId, siteId: identity.siteId, programId: identity.programId,
       payload: { institutionOrganizationId: identity.institutionOrganizationId },
     });
     return { authorizationId: record.id, status: "revoked" as const };
