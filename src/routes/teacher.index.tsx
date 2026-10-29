@@ -12,7 +12,12 @@ import { WorkspaceShell, StatCard, EmptyState, QueryState } from "@/components/w
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
 import { buildTeacherAttention } from "@/domain/daily-operations";
 
-export const Route = createFileRoute("/teacher/")({ component: TeacherTodayPage });
+export const Route = createFileRoute("/teacher/")({
+ validateSearch:(search:Record<string,unknown>)=>({
+  gradeAction:typeof search.gradeAction==="string"?search.gradeAction:undefined,
+ }),
+ component: TeacherTodayPage,
+});
 
 type Today = Awaited<ReturnType<typeof getTeacherToday>>;
 type Evidence = Awaited<ReturnType<typeof getTeacherLearningEvidence>>;
@@ -23,6 +28,7 @@ function greeting() {
 }
 
 function TeacherTodayPage() {
+ const {gradeAction}=Route.useSearch();
  const [data, setData] = useState<Today | null>(null);
  const [activity, setActivity] = useState<Evidence | null>(null);
  const [activityError, setActivityError] = useState("");
@@ -114,7 +120,7 @@ function TeacherTodayPage() {
       </>}
     </section>
 
-    <TeacherGradeResponsesPanel />
+    <TeacherGradeResponsesPanel selectedAction={gradeAction}/>
 
     <TeacherLearningFollowUpsPanel />
 
