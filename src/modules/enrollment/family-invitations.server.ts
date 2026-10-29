@@ -355,6 +355,7 @@ export async function listFamilyInvitationWorkspace(
       return {
         id: batch.id,
         programId: batch.programId,
+        siteId: programsById.get(batch.programId)?.siteId ?? null,
         programName,
         subject: batch.subject,
         introduction: batch.metadata.introduction,
@@ -511,3 +512,4 @@ export async function handleFamilyInvitationBatch(eventId: string): Promise<void
     });
   });
 }
+

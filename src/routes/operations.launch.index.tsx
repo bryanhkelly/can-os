@@ -241,7 +241,7 @@ function LaunchWizardPage() {
 
         {launches.launches.length>0&&<details className="mt-5 rounded-xl border bg-card p-5">
           <summary className="cursor-pointer text-sm font-semibold">Optional · Family outreach</summary>
-          <FamilyInviteImporter workspace={familyInvitations} selectedProgramId={selection.programId}/>
+          <FamilyInviteImporter key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} workspace={familyInvitations} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
         </details>}
 
         <details className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Advanced · Launch portfolio and detailed records</summary>
