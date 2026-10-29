@@ -127,15 +127,13 @@ integration("GF25 report card and transcript", () => {
       sectionId: section!.id,
       personId: teacher!.id,
     });
-    await db.insert(s.enrollments).values([profile!, finalizationProfile!].map(studentProfile => ({
-      studentProfileId: studentProfile.id,
-      kind: "section" as const,
-      status: "active" as const,
-      organizationId: host!.id,
-      programId: program!.id,
-      sectionId: section!.id,
-      schoolYearId: academicTime.schoolYear.id,
-    })));
+    await db.insert(s.enrollments).values([profile!, finalizationProfile!].flatMap(studentProfile =>
+      (["program", "section"] as const).map(kind => ({
+        studentProfileId: studentProfile.id, kind, status: "active" as const,
+        organizationId: host!.id, programId: program!.id,
+        sectionId: kind === "section" ? section!.id : null,
+        schoolYearId: academicTime.schoolYear.id,
+      }))));
     const [assessment] = await db.insert(s.assessments).values({
       sectionId: section!.id,
       title: "Quarter assessment",
@@ -204,6 +202,18 @@ integration("GF25 report card and transcript", () => {
       role: "teacher",
       capabilities: new Set(["assignments:grade"]),
     };
+    // A stale Section record must not finalize a withdrawn Program learner.
+    await db.update(s.enrollments).set({status:"withdrawn"}).where(and(
+      eq(s.enrollments.studentProfileId,finalizationProfile!.id),
+      eq(s.enrollments.kind,"program"),
+    ));
+    await expect(finalizeSectionGrades({data:{
+      sectionId:section!.id,gradingPeriodId:academicTime.gradingPeriod.id,
+    }})).resolves.toEqual({finalized:0,skipped:1});
+    await db.update(s.enrollments).set({status:"active"}).where(and(
+      eq(s.enrollments.studentProfileId,finalizationProfile!.id),
+      eq(s.enrollments.kind,"program"),
+    ));
     await expect(finalizeSectionGrades({ data: {
       sectionId: section!.id,
       gradingPeriodId: academicTime.gradingPeriod.id,

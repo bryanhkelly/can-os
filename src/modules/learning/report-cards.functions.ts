@@ -3,6 +3,7 @@ assertCapability,
 AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
+import { currentSectionStudentIds } from "./current-section-enrollment.server";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { gradeLabelForPercentage,isPassingGrade } from "@/domain/grade-scale-policy";
@@ -286,17 +287,9 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         );
       const assessmentIds = assessmentsInWindow.map((row) => row.id);
 
-      const enrolled = await tx
-        .select({ studentProfileId: s.enrollments.studentProfileId })
-        .from(s.enrollments)
-        .where(
-          and(
-            eq(s.enrollments.kind, "section"),
-            eq(s.enrollments.status, "active"),
-            eq(s.enrollments.sectionId, section.id),
-          ),
-        );
-      const studentIds = enrolled.map((row) => row.studentProfileId);
+      const studentIds = await currentSectionStudentIds(tx, {
+        id: section.id, programId: section.programId, schoolYearId: period.schoolYearId,
+      });
       if (!assessmentIds.length || !studentIds.length) {
         return { finalized: 0, skipped: studentIds.length };
       }
@@ -784,13 +777,10 @@ export const getSectionGradeFinalization = createServerFn({ method: "GET" })
         .from(s.schoolYears)
         .where(eq(s.schoolYears.id, authorized.section.schoolYearId))
         .limit(1),
-      db.select({ studentProfileId: s.enrollments.studentProfileId })
-        .from(s.enrollments)
-        .where(and(
-          eq(s.enrollments.kind, "section"),
-          eq(s.enrollments.status, "active"),
-          eq(s.enrollments.sectionId, section.id),
-        )),
+      currentSectionStudentIds(db, {
+        id: section.id, programId: authorized.section.programId,
+        schoolYearId: authorized.section.schoolYearId,
+      }),
       db.select({
         id: s.sectionGrades.id,
         studentProfileId: s.sectionGrades.studentProfileId,
