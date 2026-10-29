@@ -12,6 +12,7 @@ import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent } from "./site-local-content.server";
 import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { EventTypes } from "@/domain/event-types";
@@ -45,6 +46,7 @@ export async function requireSitePublisher(actor: AccessContext, siteId: string,
       eq(roleAssignments.organizationId, site.organizationId),
       or(isNull(roleAssignments.siteId), eq(roleAssignments.siteId, site.id)),
       isNull(roleAssignments.programId),
+      activeRoleAssignmentPredicate(),
       sql`${roleAssignments.capabilities} @> ${JSON.stringify([sitePublicationManageCapability])}::jsonb`,
     )).limit(1);
 
@@ -185,7 +187,6 @@ export async function changeSitePublication(
       .for("update").limit(1);
     if (!current) throw new Error("Reserve a public address before changing publication status");
     requirePublicSiteSlug(current.slug);
-
     // Only a changed-to-published state requires content readiness.
     // This queries the canonical published Seasons inside the same transaction.
     // Unpublishing is never prevented by empty or expired offerings.
