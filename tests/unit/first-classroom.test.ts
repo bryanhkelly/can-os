@@ -11,7 +11,7 @@ const emptyCurriculum = { learning: {
   version: 1,
   modules: [{ id: "start", title: "Start here", lessons: [{ id: "shell", title: "Shell", body: " ", resources: [] }] }],
 } };
-const assessment = { id: "assessment-1", title: "First investigation", instructions: "Explain your observations in three sentences." };
+const assessment = { id: "assessment-1", title: "First investigation", instructions: "Explain your observations in three sentences.", curriculumLessonId: "welcome" };
 const readyEvidence = {
   sectionActive: true,
   courseVersionPublished: true,
@@ -68,5 +68,23 @@ describe("first classroom evidence", () => {
     const result = buildFirstClassroom("section-1", { ...readyEvidence, courseVersionPublished: false });
     expect(result.firstWeek.lesson).toBeNull();
     expect(result.blockers.map(item => item.key)).toContain("missing_lesson");
+  });
+  it("suggests the assessment authored for the first lesson, not an unrelated earlier one", () => {
+    const unrelated = { id: "assessment-0", title: "Later unit quiz", instructions: "Answer every question.", curriculumLessonId: "other-lesson" };
+    const result = buildFirstClassroom("section-1", { ...readyEvidence, publishedAssessments: [unrelated, assessment] });
+    expect(result.firstWeek.lesson?.id).toBe("welcome");
+    expect(result.firstWeek.assessment).toEqual({ id: "assessment-1", title: "First investigation" });
+  });
+  it("skips a lesson-linked assessment without student instructions and uses submittable work", () => {
+    const linkedShell = { id: "assessment-2", title: "Linked shell", instructions: " ", curriculumLessonId: "welcome" };
+    const fallback = { id: "assessment-3", title: "Class check-in", instructions: "Introduce yourself.", curriculumLessonId: null };
+    const result = buildFirstClassroom("section-1", { ...readyEvidence, publishedAssessments: [linkedShell, fallback] });
+    expect(result.firstWeek.assessment).toEqual({ id: "assessment-3", title: "Class check-in" });
+  });
+  it("keeps unlinked published classwork as the suggestion when no assessment names the lesson", () => {
+    const unlinked = { id: "assessment-4", title: "Opening task", instructions: "Complete the opening task.", curriculumLessonId: null };
+    const result = buildFirstClassroom("section-1", { ...readyEvidence, publishedAssessments: [unlinked] });
+    expect(result.ready).toBe(true);
+    expect(result.firstWeek.assessment).toEqual({ id: "assessment-4", title: "Opening task" });
   });
 });

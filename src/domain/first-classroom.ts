@@ -42,6 +42,8 @@ export type FirstClassAssessment = {
   id: string;
   title: string;
   instructions: string | null;
+  /** Canonical lesson link recorded at authoring time; null for unlinked work. */
+  curriculumLessonId: string | null;
 };
 
 /** Readiness is derived from actual instructional and membership records, never persisted as a badge. */
@@ -55,7 +57,13 @@ export function buildFirstClassroom(sectionId: string, input: {
 }) {
   const content = input.courseVersionPublished ? readClassContent(input.curriculum) : null;
   const lesson = content?.modules.flatMap(module => module.lessons).find(isLearnerFacingInstruction) ?? null;
-  const assessment = input.publishedAssessments.find(item => Boolean(item.instructions?.trim())) ?? null;
+  // The suggested first assignment must belong to the lesson the student is
+  // told to study. Prefer the published assessment explicitly authored for
+  // that lesson over an unrelated earlier-created one; unlinked published
+  // work for this class remains an acceptable fallback.
+  const submittable = input.publishedAssessments.filter(item => Boolean(item.instructions?.trim()));
+  const assessment = (lesson ? submittable.find(item => item.curriculumLessonId === lesson.id) : undefined)
+    ?? submittable[0] ?? null;
   const blockers: FirstClassBlocker[] = [];
   if (!input.sectionActive) blockers.push({ key: "inactive_section", message: "Activate this class before beginning instruction." });
   if (!lesson) blockers.push({ key: "missing_lesson", message: "Publish a learner-facing lesson with reading, practice or a resource." });
