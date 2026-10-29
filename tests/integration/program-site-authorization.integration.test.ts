@@ -521,3 +521,416 @@ integration("Church-owned Site with independently authorized CAN academic servic
       .where(eq(s.programSiteAuthorizations.id,authorizationId))).toHaveLength(0);
   },300_000);
 });
+
+integration("Program-Site authorization denial, windows, cross-tenant and CAN revocation guards", () => {
+  async function createAuthorizationFixture(tx: Transaction, suffix: string) {
+    const s = await import("@/db/schema");
+    const { startProgramLaunch } = await import("@/modules/programs/program-launch-service");
+    const [can, otherCan, church, other] = await Promise.all([
+      tx.insert(s.organizations).values({
+        type:"can_network", name:"CAN Guard " + suffix, slug:"can-guard-"+suffix,
+      }).returning(),
+      tx.insert(s.organizations).values({
+        type:"can_network", name:"Foreign CAN " + suffix, slug:"foreign-can-"+suffix,
+      }).returning(),
+      tx.insert(s.organizations).values({
+        type:"church", name:"Guard Church " + suffix, slug:"guard-church-"+suffix,
+      }).returning(),
+      tx.insert(s.organizations).values({
+        type:"church", name:"Guard Other Church " + suffix, slug:"guard-other-"+suffix,
+      }).returning(),
+    ]).then(rows=>rows.map(x=>x[0]!));
+    const [site] = await tx.insert(s.sites).values({
+      organizationId:church.id, name:"Guard Campus", slug:"guard-site-"+suffix,
+      timezone:"America/Chicago",
+    }).returning();
+    const [jurisdiction] = await tx.insert(s.jurisdictions).values({
+      code:"test-guard-"+suffix, name:"Synthetic guard jurisdiction",
+    }).returning();
+    const [hostPerson, stewardPerson, foreignPerson, verifierPerson] = await Promise.all([
+      tx.insert(s.people).values({legalFirstName:"Guard",legalLastName:"Registrar"}).returning(),
+      tx.insert(s.people).values({legalFirstName:"Guard",legalLastName:"Steward"}).returning(),
+      tx.insert(s.people).values({legalFirstName:"Foreign",legalLastName:"Steward"}).returning(),
+      tx.insert(s.people).values({legalFirstName:"Guard",legalLastName:"Verifier"}).returning(),
+    ]).then(rows=>rows.map(x=>x[0]!));
+    await tx.insert(s.journeyDefinitions).values({
+      key:"program-launch", version:"guard-"+suffix,
+      owningOrganizationId:can.id, audience:"partner", title:"Program launch",
+      configuration:{requirements:[{key:"staffing",title:"Staffing",blocking:true,owner:"partner"}]},
+    });
+    const contextFor=(role:"registrar"|"can_network_steward",personId:string,orgId:string,siteId:string|null):AccessContext=>{
+      const grant={id:crypto.randomUUID(),accountId:crypto.randomUUID(),personId,role,
+        organizationId:orgId,siteId,active:true};
+      return resolveAccessContext({
+        accountId:grant.accountId,activeGrantId:grant.id,sessionId:"synthetic-rollback",
+      },[grant]);
+    };
+    const host = contextFor("registrar",hostPerson.id,church.id,site!.id);
+    const steward = contextFor("can_network_steward",stewardPerson.id,can.id,null);
+    const foreignSteward = contextFor("can_network_steward",foreignPerson.id,otherCan.id,null);
+    const unrelated = contextFor("registrar",hostPerson.id,other.id,null);
+    const launch = await startProgramLaunch(host,{
+      hostOrganizationId:church.id,siteId:site!.id,jurisdictionId:jurisdiction!.id,
+      type:"church_hosted_academy",name:"Guard CAN Academy",
+      slug:"guard-launch-"+suffix,
+      gradeRange:{min:"9",max:"12"},
+      deliveryModel:{onsite:true,asynchronous:true,onsiteDaysPerWeek:2},
+      academicProviderOrganizationId:can.id,
+      creditIssuingOrganizationId:can.id,
+      creditMode:"credit_bearing",
+    });
+    host.scope.programIds=[launch.programId];
+    const services=[
+      "academic_instruction","academic_records","onsite_supervision",
+      "school_of_record","credit_issuance","admissions","curriculum",
+    ];
+    const agreementEvidence=async()=>{
+      const [doc]=await tx.insert(s.documents).values({
+        subjectType:"program",subjectId:launch.programId,
+        category:"program_site_operating_agreement",fileName:"guard-signed.pdf",
+        storageProvider:"synthetic-test",storageKey:"guard-approved-"+suffix,
+        uploadedByPersonId:hostPerson.id,
+        verifiedAt:new Date(Date.now()-3600000),verifiedByPersonId:verifierPerson.id,
+        metadata:{
+          hostOrganizationId:church.id,institutionOrganizationId:can.id,
+          siteId:site!.id,creditIssuingOrganizationId:can.id,
+          hostSignatureVerified:true,institutionSignatureVerified:true,
+          authorizedServices:services,
+        },
+      }).returning();
+      return doc!;
+    };
+    return {
+      can,church,site,services,launch,host,steward,foreignSteward,unrelated,
+      hostPerson,stewardPerson,agreementEvidence,
+    };
+  }
+
+  it("denies a request with event and audit, fails closed, then allows a new-version re-request", async () => {
+    const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-program-site-denial");
+    let complete = false;
+    let deniedId = "";
+    let replacementId = "";
+    try {
+      await realDb.transaction(async tx => {
+        state.tx = tx;
+        const s = await import("@/db/schema");
+        const { asc, eq } = await import("drizzle-orm");
+        const {
+          requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
+          revokeProgramSiteAuthorization, requireCurrentProgramSiteAuthorization,
+          getHostProgramSiteAuthorization,
+        } = await import("@/modules/programs/program-site-authorization.server");
+        const suffix = crypto.randomUUID().slice(0,8);
+        const f = await createAuthorizationFixture(tx,suffix);
+        const requested = await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        deniedId=requested.authorizationId;
+        await expect(reviewProgramSiteAuthorization(f.steward,{
+          authorizationId:deniedId,decision:"denied",
+          reason:"The submitted agreement evidence could not be independently verified.",
+        })).resolves.toEqual({authorizationId:deniedId,status:"denied"});
+        const [deniedRow]=await tx.select({
+          status:s.programSiteAuthorizations.status,
+          reviewReason:s.programSiteAuthorizations.reviewReason,
+          reviewedByPersonId:s.programSiteAuthorizations.reviewedByPersonId,
+        }).from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.id,deniedId));
+        expect(deniedRow).toMatchObject({
+          status:"denied",reviewedByPersonId:f.stewardPerson.id,
+        });
+        expect(deniedRow!.reviewReason).toMatch(/could not be independently verified/);
+        const denialAudit=await tx.select({action:s.auditEvents.action})
+          .from(s.auditEvents).where(eq(s.auditEvents.resourceId,deniedId));
+        expect(denialAudit.map(x=>x.action)).toEqual(expect.arrayContaining([
+          "program.site.authorization.request",
+          "program.site.authorization.review",
+        ]));
+        const denialEvents=await tx.select({eventType:s.domainEvents.eventType})
+          .from(s.domainEvents).where(eq(s.domainEvents.aggregateId,deniedId));
+        expect(denialEvents.map(x=>x.eventType)).toEqual(expect.arrayContaining([
+          "ProgramSiteAuthorizationRequested",
+          "ProgramSiteAuthorizationDenied",
+        ]));
+        // A denied agreement grants no operating authority.
+        await expect(requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction",
+        ])).rejects.toThrow("current independently verified CAN-church operating authority");
+        expect((await getHostProgramSiteAuthorization(f.host,f.launch.programId))
+          .authorization?.status).toBe("denied");
+        // Race guards on the terminal denied row.
+        await expect(reviewProgramSiteAuthorization(f.steward,{
+          authorizationId:deniedId,decision:"denied",
+          reason:"A denied request cannot be reviewed a second time.",
+        })).rejects.toThrow(
+          "Authorization request already reviewed; use the revocation or new-version workflow");
+        await expect(revokeProgramSiteAuthorization(f.steward,{
+          authorizationId:deniedId,reason:"A denied request was never approved authority.",
+        })).rejects.toThrow("Only a currently approved authorization can be revoked");
+        // The host may submit a corrected replacement as a NEW version; the
+        // denied row remains preserved as decision history.
+        const replacement=await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        replacementId=replacement.authorizationId;
+        expect(replacement).toMatchObject({created:true,status:"requested"});
+        expect(replacementId).not.toBe(deniedId);
+        const versions=await tx.select({
+          id:s.programSiteAuthorizations.id,
+          version:s.programSiteAuthorizations.version,
+          status:s.programSiteAuthorizations.status,
+        }).from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.programId,f.launch.programId))
+          .orderBy(asc(s.programSiteAuthorizations.version));
+        expect(versions).toEqual([
+          {id:deniedId,version:1,status:"denied"},
+          {id:replacementId,version:2,status:"requested"},
+        ]);
+        const hostStatus=await getHostProgramSiteAuthorization(f.host,f.launch.programId);
+        expect(hostStatus.authorization).toMatchObject({id:replacementId,version:2,status:"requested"});
+        complete=true;
+        throw rollback;
+      });
+    } catch(error) {
+      if(error!==rollback)throw error;
+    } finally {state.tx=undefined;}
+    expect(complete).toBe(true);
+    const s=await import("@/db/schema");
+    const {inArray}=await import("drizzle-orm");
+    expect(await realDb.select({id:s.programSiteAuthorizations.id})
+      .from(s.programSiteAuthorizations)
+      .where(inArray(s.programSiteAuthorizations.id,[deniedId,replacementId]))).toHaveLength(0);
+  },120_000);
+
+  it("fails closed while an approved authorization's effective window has not yet opened", async () => {
+    const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-program-site-window");
+    let complete = false;
+    let authorizationId = "";
+    try {
+      await realDb.transaction(async tx => {
+        state.tx = tx;
+        const s = await import("@/db/schema");
+        const { eq } = await import("drizzle-orm");
+        const {
+          requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
+          requireCurrentProgramSiteAuthorization,
+        } = await import("@/modules/programs/program-site-authorization.server");
+        const suffix = crypto.randomUUID().slice(0,8);
+        const f = await createAuthorizationFixture(tx,suffix);
+        const requested = await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        authorizationId=requested.authorizationId;
+        const evidence=await f.agreementEvidence();
+        const futureFrom=new Date(Date.now()+86400000);
+        const through=new Date(Date.now()+86400000*180);
+        await reviewProgramSiteAuthorization(f.steward,{
+          authorizationId,decision:"approved",
+          reason:"Approved with a future start date for the coming term.",
+          evidenceDocumentId:evidence.id,effectiveFrom:futureFrom,effectiveThrough:through,
+        });
+        const [row]=await tx.select({status:s.programSiteAuthorizations.status})
+          .from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.id,authorizationId));
+        expect(row!.status).toBe("approved");
+        // Approved, but NOT yet effective: every dependent authority read must
+        // fail closed until the contractual window actually opens.
+        await expect(requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction",
+        ])).rejects.toThrow("current independently verified CAN-church operating authority");
+        // Once the window opens the same approved row becomes authoritative.
+        await tx.update(s.programSiteAuthorizations).set({
+          effectiveFrom:new Date(Date.now()-1000),
+        }).where(eq(s.programSiteAuthorizations.id,authorizationId));
+        expect(await requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction","onsite_supervision",
+        ])).toBe(authorizationId);
+        complete=true;
+        throw rollback;
+      });
+    } catch(error) {
+      if(error!==rollback)throw error;
+    } finally {state.tx=undefined;}
+    expect(complete).toBe(true);
+    const s=await import("@/db/schema");
+    const {eq}=await import("drizzle-orm");
+    expect(await realDb.select({id:s.programSiteAuthorizations.id})
+      .from(s.programSiteAuthorizations)
+      .where(eq(s.programSiteAuthorizations.id,authorizationId))).toHaveLength(0);
+  },120_000);
+
+  it("rejects cross-tenant review, revocation and host-projection reads without changing state", async () => {
+    const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-program-site-cross-tenant");
+    let complete = false;
+    let authorizationId = "";
+    try {
+      await realDb.transaction(async tx => {
+        state.tx = tx;
+        const {
+          requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
+          revokeProgramSiteAuthorization, requireCurrentProgramSiteAuthorization,
+          getHostProgramSiteAuthorization,
+        } = await import("@/modules/programs/program-site-authorization.server");
+        const suffix = crypto.randomUUID().slice(0,8);
+        const f = await createAuthorizationFixture(tx,suffix);
+        const requested = await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        authorizationId=requested.authorizationId;
+        const evidence=await f.agreementEvidence();
+        const from=new Date(Date.now()-3600000);
+        const through=new Date(Date.now()+86400000*180);
+        // An unrelated church's registrar and a steward scoped to a DIFFERENT
+        // CAN network are not this agreement's institutional reviewer.
+        await expect(reviewProgramSiteAuthorization(f.unrelated,{
+          authorizationId,decision:"approved",
+          reason:"Another church must never review this agreement.",
+          evidenceDocumentId:evidence.id,effectiveFrom:from,effectiveThrough:through,
+        })).rejects.toThrow("separate CAN institutional reviewer");
+        await expect(reviewProgramSiteAuthorization(f.foreignSteward,{
+          authorizationId,decision:"denied",
+          reason:"A foreign CAN network must never decide this agreement.",
+        })).rejects.toThrow("separate CAN institutional reviewer");
+        await reviewProgramSiteAuthorization(f.steward,{
+          authorizationId,decision:"approved",
+          reason:"The contracting CAN network independently verifies both parties.",
+          evidenceDocumentId:evidence.id,effectiveFrom:from,effectiveThrough:through,
+        });
+        await expect(revokeProgramSiteAuthorization(f.unrelated,{
+          authorizationId,reason:"Another church must never revoke this agreement.",
+        })).rejects.toThrow("verified church-host registrar for this Program and Site");
+        await expect(revokeProgramSiteAuthorization(f.foreignSteward,{
+          authorizationId,reason:"A foreign CAN network must never revoke this agreement.",
+        })).rejects.toThrow("separate CAN institutional reviewer");
+        // The host workspace projection is limited to the hosting registrar.
+        await expect(getHostProgramSiteAuthorization(f.steward,f.launch.programId))
+          .rejects.toThrow("host registrar Program and Site scope");
+        await expect(getHostProgramSiteAuthorization(f.unrelated,f.launch.programId))
+          .rejects.toThrow("host registrar Program and Site scope");
+        // Failed cross-tenant attempts leave the approved authority untouched.
+        expect(await requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction","school_of_record",
+        ])).toBe(authorizationId);
+        complete=true;
+        throw rollback;
+      });
+    } catch(error) {
+      if(error!==rollback)throw error;
+    } finally {state.tx=undefined;}
+    expect(complete).toBe(true);
+    const s=await import("@/db/schema");
+    const {eq}=await import("drizzle-orm");
+    expect(await realDb.select({id:s.programSiteAuthorizations.id})
+      .from(s.programSiteAuthorizations)
+      .where(eq(s.programSiteAuthorizations.id,authorizationId))).toHaveLength(0);
+  },120_000);
+
+  it("supports CAN-initiated revocation with audit and event, and re-request after revocation", async () => {
+    const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
+    const rollback = new Error("rollback-program-site-can-revocation");
+    let complete = false;
+    let revokedId = "";
+    let replacementId = "";
+    try {
+      await realDb.transaction(async tx => {
+        state.tx = tx;
+        const s = await import("@/db/schema");
+        const { asc, eq } = await import("drizzle-orm");
+        const {
+          requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
+          revokeProgramSiteAuthorization, requireCurrentProgramSiteAuthorization,
+        } = await import("@/modules/programs/program-site-authorization.server");
+        const suffix = crypto.randomUUID().slice(0,8);
+        const f = await createAuthorizationFixture(tx,suffix);
+        const requested = await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        revokedId=requested.authorizationId;
+        // Race guard: a merely requested (never approved) row cannot be revoked.
+        await expect(revokeProgramSiteAuthorization(f.steward,{
+          authorizationId:revokedId,reason:"A pending request is not approved authority.",
+        })).rejects.toThrow("Only a currently approved authorization can be revoked");
+        const evidence=await f.agreementEvidence();
+        await reviewProgramSiteAuthorization(f.steward,{
+          authorizationId:revokedId,decision:"approved",
+          reason:"Independent verification of both contracting organizations.",
+          evidenceDocumentId:evidence.id,
+          effectiveFrom:new Date(Date.now()-3600000),
+          effectiveThrough:new Date(Date.now()+86400000*180),
+        });
+        // Race guard: an already-reviewed request cannot be reviewed again.
+        await expect(reviewProgramSiteAuthorization(f.steward,{
+          authorizationId:revokedId,decision:"denied",
+          reason:"An approved authorization cannot be re-reviewed.",
+        })).rejects.toThrow(
+          "Authorization request already reviewed; use the revocation or new-version workflow");
+        await expect(requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        })).rejects.toThrow("Revoke the current authorization before requesting a replacement");
+        // Either contracting party may withdraw; here the CAN steward revokes.
+        await expect(revokeProgramSiteAuthorization(f.steward,{
+          authorizationId:revokedId,
+          reason:"CAN withdrew the operating relationship for this school.",
+        })).resolves.toEqual({authorizationId:revokedId,status:"revoked"});
+        const [revoked]=await tx.select({
+          status:s.programSiteAuthorizations.status,
+          revokedByPersonId:s.programSiteAuthorizations.revokedByPersonId,
+          revocationReason:s.programSiteAuthorizations.revocationReason,
+        }).from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.id,revokedId));
+        expect(revoked).toMatchObject({
+          status:"revoked",revokedByPersonId:f.stewardPerson.id,
+        });
+        expect(revoked!.revocationReason).toMatch(/CAN withdrew/);
+        const revocationAudit=await tx.select({action:s.auditEvents.action})
+          .from(s.auditEvents).where(eq(s.auditEvents.resourceId,revokedId));
+        expect(revocationAudit.map(x=>x.action)).toEqual(expect.arrayContaining([
+          "program.site.authorization.request",
+          "program.site.authorization.review",
+          "program.site.authorization.revoke",
+        ]));
+        const revocationEvents=await tx.select({eventType:s.domainEvents.eventType})
+          .from(s.domainEvents).where(eq(s.domainEvents.aggregateId,revokedId));
+        expect(revocationEvents.map(x=>x.eventType)).toEqual(expect.arrayContaining([
+          "ProgramSiteAuthorizationApproved",
+          "ProgramSiteAuthorizationRevoked",
+        ]));
+        await expect(requireCurrentProgramSiteAuthorization(tx,f.launch.programId,[
+          "academic_instruction",
+        ])).rejects.toThrow("current independently verified CAN-church operating authority");
+        // After revocation the host may contract a fresh version; the revoked
+        // row remains preserved as history.
+        const replacement=await requestProgramSiteAuthorization(f.host,{
+          programId:f.launch.programId,services:f.services,
+        });
+        replacementId=replacement.authorizationId;
+        expect(replacement).toMatchObject({created:true,status:"requested"});
+        const versions=await tx.select({
+          id:s.programSiteAuthorizations.id,
+          version:s.programSiteAuthorizations.version,
+          status:s.programSiteAuthorizations.status,
+        }).from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.programId,f.launch.programId))
+          .orderBy(asc(s.programSiteAuthorizations.version));
+        expect(versions).toEqual([
+          {id:revokedId,version:1,status:"revoked"},
+          {id:replacementId,version:2,status:"requested"},
+        ]);
+        complete=true;
+        throw rollback;
+      });
+    } catch(error) {
+      if(error!==rollback)throw error;
+    } finally {state.tx=undefined;}
+    expect(complete).toBe(true);
+    const s=await import("@/db/schema");
+    const {inArray}=await import("drizzle-orm");
+    expect(await realDb.select({id:s.programSiteAuthorizations.id})
+      .from(s.programSiteAuthorizations)
+      .where(inArray(s.programSiteAuthorizations.id,[revokedId,replacementId]))).toHaveLength(0);
+  },120_000);
+});
