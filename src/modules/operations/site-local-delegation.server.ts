@@ -61,6 +61,26 @@ async function currentConfiguration(tx: Reader, programId: string) {
   return configuration ?? null;
 }
 
+/** The currently appointed, in-term site director for a Program, if any.
+ * Read-only escalation-targeting helper; it grants no access and does not
+ * prove that the director's account, grant or agreement is otherwise valid. */
+export async function currentSiteDirectorPersonId(
+  tx: Reader, programId: string, at = new Date(),
+): Promise<string | null> {
+  const configuration = await currentConfiguration(tx, programId);
+  if (!configuration) return null;
+  const [director] = await tx.select({ personId: roleAssignments.personId })
+    .from(programResponsibilityAssignments)
+    .innerJoin(roleAssignments, eq(roleAssignments.id, programResponsibilityAssignments.responsibleRoleAssignmentId))
+    .where(and(
+      eq(programResponsibilityAssignments.configurationVersionId, configuration.id),
+      eq(programResponsibilityAssignments.responsibilityKey, "site_director"),
+      lte(programResponsibilityAssignments.effectiveFrom, at),
+      gt(programResponsibilityAssignments.effectiveThrough, at),
+    )).limit(1);
+  return director?.personId ?? null;
+}
+
 async function verifiedLocalCandidate(tx: Reader, input: {
   personId: string; role: string; siteId: string; organizationId: string;
 }) {
