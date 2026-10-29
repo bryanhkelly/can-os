@@ -177,6 +177,7 @@ export const EventTypes = {
   ProgramSiteAuthorizationRevoked: "ProgramSiteAuthorizationRevoked",
   ProgramSiteAuthorizationSuspended: "ProgramSiteAuthorizationSuspended",
   ProgramSiteAuthorizationResumed: "ProgramSiteAuthorizationResumed",
+  ProgramSiteAuthorizationRenewed: "ProgramSiteAuthorizationRenewed",
   OperatingAgreementEvidenceRegistered: "OperatingAgreementEvidenceRegistered",
   ProgramOpeningHandoffCreated: "ProgramOpeningHandoffCreated",
   ProgramOpeningHandoffTransferred: "ProgramOpeningHandoffTransferred",

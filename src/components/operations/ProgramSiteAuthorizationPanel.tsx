@@ -55,7 +55,12 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
     {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
     {!status?<p className="mt-3 text-sm">Checking institutional authorization…</p>:
     status.authorization?<div className="mt-3 text-sm">
-      <p><strong>Request v{status.authorization.version}:</strong> {status.authorization.status}</p>
+      <p><strong>Request v{status.authorization.version}:</strong> {status.authorization.status}
+        {status.authorization.lapsed&&" — lapsed"}</p>
+      {status.authorization.lapsed&&<p role="status" className="mt-2">
+        The agreement window has elapsed. Delegated CAN operations are blocked
+        until the independent CAN steward renews the agreement under fresh evidence.
+      </p>}
       {status.authorization.status==="requested"&&<p role="status" className="mt-2">
         Awaiting independent CAN review of the agreement and its verified evidence.
         You can continue planning classes, but this request does not open admissions or the school.

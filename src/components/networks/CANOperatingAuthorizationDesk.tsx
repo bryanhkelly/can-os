@@ -54,6 +54,9 @@ export function CANOperatingAuthorizationDesk() {
         return <article key={item.id} className="rounded-lg border p-3 text-sm">
           <p className="font-semibold">{item.programName} · {item.hostName}</p>
           <p className="mt-1 text-xs">{item.status} · Version {item.version} · {item.services.join(", ")}</p>
+          {item.lapsed&&<p className="mt-1 text-xs" role="status">
+            Agreement window elapsed: delegated operations are blocked until renewal under fresh evidence.
+          </p>}
           {(item.status==="requested"||item.status==="approved")&&<div className="mt-3 grid gap-2 sm:grid-cols-2">
             {item.status==="requested"&&<>
               <div className="sm:col-span-2">
