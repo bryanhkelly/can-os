@@ -1,3 +1,4 @@
+import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { createAssessmentStatus } from "@/domain/assessment-publication";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { authorizeClass,accessibleClasses } from "./class-access.server";
@@ -509,6 +510,7 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
    const [record]=await tx.select({
     id:s.submissions.id,status:s.submissions.status,
     assessmentStatus:s.assessments.status,
+    availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,
     assessmentId:s.assessments.id,sectionId:s.sections.id,
     studentProfileId:s.submissions.studentProfileId,attemptNumber:s.submissions.attemptNumber,
     studentPersonId:s.studentProfiles.personId,
@@ -531,6 +533,9 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
    // student notified to revise something they cannot submit.
    if(record.assessmentStatus!=="published" || !record.sectionActive)
     throw new Error("Reopen the published assessment and active class before returning work");
+   assertAssessmentActionable({
+    status:record.assessmentStatus,availableAt:record.availableAt,closesAt:record.closesAt,
+   });
    const activeProgramMembership=alias(s.enrollments,"revision_return_program_membership");
    const [member]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
     .innerJoin(activeProgramMembership,and(
