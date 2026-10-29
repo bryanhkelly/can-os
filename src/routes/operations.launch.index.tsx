@@ -5,6 +5,7 @@ import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
 import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedLaunchInstitutions } from "@/domain/launch-institution-defaults";
+import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
@@ -65,6 +66,7 @@ function LaunchWizardPage() {
   const [summerCreditBearing, setSummerCreditBearing] = useState(false);
   const creditMode = type === "summer_program" && summerCreditBearing ? "credit_bearing" : isExtendedLearningType(type) ? "non_credit" : "credit_bearing";
   const [name, setName] = useState("");
+  const [targetOpeningDate, setTargetOpeningDate] = useState(() => suggestedSchoolYear().startsOn);
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
   const [gradeMin, setGradeMin] = useState("K");
@@ -146,6 +148,7 @@ function LaunchWizardPage() {
       const result = await startLaunch({
         data: {
           name,
+          targetOpeningDate,
           slug,
           type,
           gradeRange: { min: gradeMin, max: gradeMax },
@@ -341,6 +344,12 @@ function LaunchWizardPage() {
                     }} required maxLength={200} />
                   </label>
                   <label className="block text-xs">
+                    Target opening date
+                    <input aria-label="Target opening date" type="date" required value={targetOpeningDate}
+                      onChange={event => setTargetOpeningDate(event.target.value)} className={inputClass}/>
+                    <span className="mt-1 block text-muted-foreground">Planning only. Your school still needs independent opening approval.</span>
+                  </label>
+                  <label className="block text-xs">
                     Slug
                     <input aria-label="Program slug" className={inputClass} value={slug} onChange={(e) => {
                       setSlugEdited(true);
@@ -508,4 +517,5 @@ function LaunchWizardPage() {
     </WorkspaceShell>
   );
 }
+
 

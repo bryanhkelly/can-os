@@ -250,6 +250,9 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
           Progress is saved to this Program and its Launch Journey after each recorded action.
           Return to this launch on another session or device; no browser checklist determines readiness.
         </p>
+        {launch.targetOpeningDate && <p className="mt-2 text-sm">
+          Target opening: {launch.targetOpeningDate} · planning date, not opening approval.
+        </p>}
       </div>
       <StatusBadge tone={guidance.pendingBlocking.length ? "attention" : "neutral"}>
         {guidance.pendingBlocking.length
@@ -339,4 +342,5 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     </details>}
   </section>;
 }
+
 

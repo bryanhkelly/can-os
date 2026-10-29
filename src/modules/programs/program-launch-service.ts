@@ -1,3 +1,4 @@
+import { isLaunchOpeningDate } from "@/domain/launch-opening-date";
 import { db } from "@/db/client";
 import { assertChurchHostedProviderIntent, assertChurchHostedActivationAuthorization } from "@/domain/church-hosted-provider";
 import { resolveProgramCreditMode, isExtendedLearningType, type ProgramType, type ProgramCreditMode } from "@/domain/program-offerings";
@@ -56,6 +57,7 @@ export async function startProgramLaunch(
     creditMode?: ProgramCreditMode;
     accreditationAuthorityOrganizationId?: string;
     journeyDefinitionKey?: string;
+    targetOpeningDate?: string;
   },
 ): Promise<{
   programId: string;
@@ -66,6 +68,8 @@ export async function startProgramLaunch(
   } | null;
 }> {
   assertCapability(context, "program.launch.start");
+  if (input.targetOpeningDate !== undefined && !isLaunchOpeningDate(input.targetOpeningDate))
+    throw new Error("Target opening date must be a valid calendar date");
   const creditMode = resolveProgramCreditMode(input);
 
   return db.transaction(async (tx) => {
@@ -127,7 +131,7 @@ export async function startProgramLaunch(
         hostOrganizationId: input.hostOrganizationId,
         academicProviderOrganizationId: input.academicProviderOrganizationId,
         creditIssuingOrganizationId: creditMode === "credit_bearing" ? input.creditIssuingOrganizationId : null,
-        metadata: { creditMode },
+        metadata: { creditMode, ...(input.targetOpeningDate ? { targetOpeningDate: input.targetOpeningDate } : {}) },
         accreditationAuthorityOrganizationId:
           input.accreditationAuthorityOrganizationId,
       })
@@ -171,6 +175,7 @@ export async function startProgramLaunch(
         siteId: input.siteId ?? null,
         programType: input.type,
         creditMode,
+        ...(input.targetOpeningDate ? { targetOpeningDate: input.targetOpeningDate } : {}),
         journeyId,
       },
     });
@@ -186,6 +191,7 @@ export async function startProgramLaunch(
       },
       after: {
         status: "launching",
+        ...(input.targetOpeningDate ? { targetOpeningDate: input.targetOpeningDate } : {}),
         type: input.type,
         creditMode,
         academicProviderOrganizationId: input.academicProviderOrganizationId,
@@ -491,3 +497,4 @@ export async function activateProgram(
     });
   });
 }
+
