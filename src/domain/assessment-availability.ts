@@ -12,3 +12,10 @@ export function assessmentAvailability(input: {
   if (input.closesAt && input.closesAt <= now) return { actionable: false, reason: "closed" } as const;
   return { actionable: true, reason: null } as const;
 }
+
+export function assertAssessmentActionable(input: Parameters<typeof assessmentAvailability>[0], now = new Date()) {
+  const result = assessmentAvailability(input, now);
+  if (!result.actionable) throw new Error(result.reason === "unreleased"
+    ? "This assignment has not been released yet"
+    : "This assignment is closed for student work");
+}

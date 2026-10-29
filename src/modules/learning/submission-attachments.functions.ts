@@ -1,3 +1,4 @@
+import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -84,7 +85,7 @@ async function requireEnrolledAssessment(
   tx: Tx, s: DbSchema, assessmentId: string, studentId: string, actor: Actor,
   allowClosedForRead=false,
 ) {
-  const [assessment] = await tx.select({ id: s.assessments.id, sectionId: s.assessments.sectionId, metadata: s.assessments.metadata })
+  const [assessment] = await tx.select({ id: s.assessments.id, sectionId: s.assessments.sectionId, status: s.assessments.status, availableAt: s.assessments.availableAt, closesAt: s.assessments.closesAt, metadata: s.assessments.metadata })
     .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
     .where(and(eq(s.assessments.id, assessmentId),
       allowClosedForRead?inArray(s.assessments.status,["published","closed"])
@@ -96,6 +97,7 @@ async function requireEnrolledAssessment(
   // all learning files, including short-lived download URL issuance.
   const enrollment=await authorizeClass(actor,assessment.sectionId,undefined,tx);
   if(enrollment.studentProfileId!==studentId)throw new AuthorizationError("current student learning scope");
+  if (!allowClosedForRead) assertAssessmentActionable(assessment);
   return assessment;
 }
 

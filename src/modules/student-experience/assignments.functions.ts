@@ -9,6 +9,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,sql } from "drizzle-orm";
 import { z } from "zod";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
+import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { writtenSubmissionResponse } from "@/domain/submission-response";
 
 
@@ -104,7 +105,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
   if(text.length<3||text.length>20000)throw new Error("Response must be 3–20,000 characters");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
-   const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,dueAt:s.assessments.dueAt,metadata:s.assessments.metadata})
+   const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,status:s.assessments.status,availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,dueAt:s.assessments.dueAt,metadata:s.assessments.metadata})
    .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
    .where(and(eq(s.assessments.id,data.assessmentId),eq(s.assessments.status,"published"),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]))).limit(1);
    if(!assessment)throw new Error("Published assessment not available in an authorized section");
@@ -115,6 +116,7 @@ export const saveAssignmentResponse=createServerFn({method:"POST"})
    // Check under the write transaction rather than trusting page state.
    const authorized=await authorizeClass(context as Actor,assessment.sectionId,undefined,tx);
    if(authorized.studentProfileId!==studentId)throw new AuthorizationError("student assignment identity");
+   assertAssessmentActionable(assessment);
    const priorRows=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
    const prior=priorRows[0];
    if(prior&&prior.status!=="assigned"&&prior.status!=="returned")throw new Error("Submission is no longer editable");
@@ -242,7 +244,7 @@ export const saveAssignmentDraft=createServerFn({method:"POST"})
   if(data.text.length>20000)throw new Error("Draft too long");
   const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
   return db.transaction(async tx=>{
-   const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,metadata:s.assessments.metadata})
+   const [assessment]=await tx.select({id:s.assessments.id,sectionId:s.assessments.sectionId,status:s.assessments.status,availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,metadata:s.assessments.metadata})
     .from(s.assessments).innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
     .where(and(eq(s.assessments.id,data.assessmentId),inArray(s.sections.siteId,context.scope.siteIds!),inArray(s.sections.programId,context.scope.programIds??[]),eq(s.assessments.status,"published"))).limit(1);
    if(!assessment)throw new Error("Published assessment not available in an authorized section");
@@ -251,6 +253,7 @@ export const saveAssignmentDraft=createServerFn({method:"POST"})
    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${studentId}), hashtext(${assessment.id}))`);
    const authorized=await authorizeClass(context as Actor,assessment.sectionId,undefined,tx);
    if(authorized.studentProfileId!==studentId)throw new AuthorizationError("student assignment identity");
+   assertAssessmentActionable(assessment);
    const [latest]=await tx.select().from(s.submissions).where(and(eq(s.submissions.assessmentId,assessment.id),eq(s.submissions.studentProfileId,studentId))).orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
    if(latest && !["assigned","returned"].includes(latest.status))throw new Error("Submitted work cannot be overwritten");
    if(latest?.status==="returned"){
