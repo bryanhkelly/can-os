@@ -1,12 +1,12 @@
 import { EmptyState, QueryState, StatCard, StatusBadge, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { ArrowUpRight, ClipboardList, School, ShieldCheck } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
-import type { listLaunches } from "@/modules/programs/launch.functions";
+import { getLaunchEntry, type listLaunches } from "@/modules/programs/launch.functions";
 import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
 import { OutboxHealthPanel } from "@/components/operations/OutboxHealthPanel";
 import { isGuidedAcademicSchool } from "@/domain/guided-school-journey";
 import {useState} from "react";
-import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
+import {createFileRoute,Link,useRouter,redirect} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
 import {getOperationsActions,updateOperationsAction,assignOperationsAction,setOperationsActionDeadline} from "@/modules/operations/action-workspace.functions";
 import {AttentionQueue} from "@/components/operations/AttentionQueue";
@@ -17,6 +17,13 @@ export const Route=createFileRoute("/operations/")({
   programId:typeof search.programId==="string"?search.programId:undefined,
   action:typeof search.action==="string"?search.action:undefined,
  }),
+ beforeLoad:async({search})=>{
+  // Exact Action links remain in operations. Failed authorization/readiness
+  // reads retain the existing operations access/error boundary.
+  if(search.action)return;
+  const entry=await getLaunchEntry({data:{siteId:search.siteId,programId:search.programId}}).catch(()=>null);
+  if(entry)throw redirect({to:"/operations/launch",search:entry,replace:true});
+ },
  loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
  loader:async({deps})=>{
  try{
@@ -250,3 +257,4 @@ function OperationsPage(){
   </div></section><aside><h2 className="font-serif text-3xl">Program operations</h2><div className="mt-4 space-y-3 rounded-xl border bg-card p-5 text-sm"><p><Link className="underline" to="/profiles">Personnel and credentials</Link></p><p className="text-xs text-muted-foreground">Student support referrals are managed by authorized teachers and specialists.</p><p><Link className="underline" to="/notifications">Notifications</Link></p><p className="text-xs text-muted-foreground">Readiness checklist and configuration templates follow this shared work queue.</p></div></aside></div>
  </WorkspaceShell>;
 }
+

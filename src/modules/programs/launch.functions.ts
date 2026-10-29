@@ -11,6 +11,8 @@ import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
 import { listOpeningOperators } from "./opening-handoff.server";
 
+import { launchEntrySelection } from "@/domain/launch-entry";
+
 const uuid = z.string().uuid();
 
 const startLaunchInput = z.object({
@@ -306,3 +308,28 @@ export const scheduleLaunchOrientation=createServerFn({method:"POST"})
    startsAt:start,endsAt:end,timezone:site?.timezone??data.timezone});
   return {eventId};
  });
+
+/** Read-only landing decision. Uses the same verified registrar/capability
+ * boundary as starting a launch; it never creates or completes records. */
+export const getLaunchEntry = createServerFn({ method: "GET" })
+  .validator((value: unknown) => z.object({
+    siteId: uuid.optional(), programId: uuid.optional(),
+  }).strict().parse(value))
+  .handler(async ({ data }) => {
+    const context = await registrarContext("program.launch.start");
+    const options = await listLaunchOptions();
+    if (!options.organizations.length) return null;
+    const [{ db }, s, { and, eq, inArray }] = await Promise.all([
+      import("@/db/client"), import("@/db/schema"), import("drizzle-orm"),
+    ]);
+    const records = context.scope.programIds?.length
+      ? await db.select({ id: s.programs.id, siteId: s.programs.siteId, status: s.programs.status })
+        .from(s.programs).where(and(
+          inArray(s.programs.id, context.scope.programIds),
+          inArray(s.programs.organizationId, options.organizations.map(org => org.id)),
+          ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
+        ))
+      : [];
+    return launchEntrySelection({ programs: records, sites: options.sites, selection: data });
+  });
+
