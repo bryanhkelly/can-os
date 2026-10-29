@@ -766,8 +766,11 @@ export async function listOperatingAgreementEvidence(
       identity.institutionOrganizationId !== request.institutionOrganizationId ||
       actor.actorPersonId === request.requestedByPersonId)
     throw new AuthorizationError("independent reviewer of unchanged Program-Site parties");
-  if (request.status !== "requested")
-    throw new Error("Evidence selection requires a pending authorization request");
+  if (request.status !== "requested" && request.status !== "approved")
+    throw new Error("Evidence selection requires a pending request or approved authorization");
+  if (request.status === "approved" && request.effectiveThrough !== null &&
+      request.effectiveThrough > at && input.effectiveThrough <= request.effectiveThrough)
+    throw new Error("Renewal evidence requires an end date that extends the current agreement window");
   const rows = await db.select({
     id: documents.id, fileName: documents.fileName,
     subjectType: documents.subjectType, subjectId: documents.subjectId,
