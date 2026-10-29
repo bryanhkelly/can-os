@@ -1031,16 +1031,16 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
         ]));
         // A suspended row still occupies the current-version slot: the host
         // cannot request a replacement until it is resumed or revoked.
-        const blocked=await requestProgramSiteAuthorization(f.host,{
+        await expect(requestProgramSiteAuthorization(f.host,{
           programId:f.launch.programId,services:f.services,
-        }).then(
-          ()=>{throw new Error("new version request unexpectedly succeeded");},
-          (error:unknown)=>error,
-        );
-        // The real failure is the current-slot partial unique index, surfaced
-        // as the cause of Drizzle's query error.
-        expect(String((blocked as {cause?:unknown}).cause??blocked))
-          .toContain('duplicate key value violates unique constraint "program_site_authorization_current_uq"');
+        })).rejects.toThrow("Revoke the current authorization before requesting a replacement");
+        // A domain denial must not abort the transaction or mutate history.
+        const unchanged=await tx.select({
+          id:s.programSiteAuthorizations.id,status:s.programSiteAuthorizations.status,
+          version:s.programSiteAuthorizations.version,
+        }).from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.programId,f.launch.programId));
+        expect(unchanged).toEqual([{id:authorizationId,status:"suspended",version:1}]);
         complete=true;
         throw rollback;
       });

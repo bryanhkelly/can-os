@@ -90,7 +90,8 @@ export async function requestProgramSiteAuthorization(
         throw new Error("A different operating authorization request is already pending");
       return { authorizationId: last.id, status: "requested" as const, created: false };
     }
-    if (last?.status === "approved") throw new Error("Revoke the current authorization before requesting a replacement");
+    if (last?.status === "approved" || last?.status === "suspended")
+      throw new Error("Revoke the current authorization before requesting a replacement");
     const [created] = await tx.insert(programSiteAuthorizations).values({
       programId: identity.programId, siteId: identity.siteId!,
       hostOrganizationId: identity.hostOrganizationId,
