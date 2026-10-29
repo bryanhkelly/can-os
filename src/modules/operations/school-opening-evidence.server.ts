@@ -12,7 +12,7 @@ import {
   type schoolOpeningEvidenceDownloadSchema,
 } from "@/domain/school-opening-evidence";
 import { createPrivateUploadUrl, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
 import { validateDocumentUpload } from "@/modules/enrollment/r2-documents.server";
 import {
   latestConfiguration, schoolIdentity, verifyCANSchoolApprover, verifyChurchEvidenceSubmitter,
@@ -159,10 +159,25 @@ export async function reviewSchoolOpeningEvidence(actor:AccessContext,input:Revi
     await writeAudit(tx,actor,{action:"school.opening.evidence.reviewed",entityType:"document",entityId:document.id,
       scope:scope(school),before:{reviewStatus:"pending"},after:{decision:input.decision,reason,version,
         configurationId:configuration.id}});
-    await emitEvent(tx,{eventType:EventTypes.ChurchSchoolOpeningEvidenceReviewed,aggregateType:"document",
+    const eventId=await emitEvent(tx,{eventType:EventTypes.ChurchSchoolOpeningEvidenceReviewed,aggregateType:"document",
       aggregateId:document.id,actorPersonId:actor.actorPersonId,organizationId:school.institutionId,
       siteId:school.siteId,programId:school.programId,payload:{category:document.category,version,
         decision:input.decision,configurationId:configuration.id}});
+    // Close the loop with the church submitter: a rejection they never learn
+    // about silently stalls the school's opening evidence. The reason itself
+    // stays in the review workspace; the notification carries no file content.
+    if(document.uploadedByPersonId)
+      await notifyMany(tx,[{
+        recipientPersonId:document.uploadedByPersonId,
+        type:"school_opening_evidence_reviewed",
+        title:input.decision==="approve"
+          ?"School-opening evidence approved"
+          :"School-opening evidence needs a corrected version",
+        body:input.decision==="approve"
+          ?"An independent CAN reviewer approved your submitted school-opening evidence. Other categories may still be outstanding."
+          :"An independent CAN reviewer did not approve your submitted school-opening evidence. Open the school-opening workspace to read the reason and submit a corrected new version.",
+        resourceType:"document",resourceId:document.id,eventId,
+      }]);
     return {documentId:document.id,status:input.decision,changed:true};
   });
 }
