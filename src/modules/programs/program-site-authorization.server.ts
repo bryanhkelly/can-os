@@ -461,6 +461,89 @@ export async function resumeProgramSiteAuthorization(
   });
 }
 
+/** Independent CAN steward renews an approved authorization under freshly
+ * verified agreement evidence. This is the remedy for a lapsed-but-approved
+ * row, which keeps the current-version slot occupied: renewal extends the
+ * SAME row instead of forcing a revoke-and-re-request cycle. Renewal never
+ * reopens review and never clears revocation/suspension history.
+ *
+ * Window rule: the new exclusive end must strictly extend the current window.
+ * For a lapsed row (effectiveThrough <= now) the window has already ended, so
+ * any future date extends it; for a live row the new end must be later than
+ * the current effectiveThrough. Equivalently: new end > max(current end, now).
+ */
+export async function renewProgramSiteAuthorization(
+  actor: AccessContext,
+  input: { authorizationId: string; evidenceDocumentId: string; effectiveThrough: Date; reason: string },
+) {
+  const reason = input.reason.trim();
+  if (reason.length < 10 || reason.length > 500)
+    throw new Error("Provide a 10–500 character renewal reason");
+  return db.transaction(async tx => {
+    const [record] = await tx.select().from(programSiteAuthorizations)
+      .where(eq(programSiteAuthorizations.id, input.authorizationId)).for("update").limit(1);
+    if (!record) throw new AuthorizationError("existing current authorization");
+    const identity = await loadOperatingIdentity(tx, record.programId);
+    // Only the independent CAN steward may renew, exactly as at review; the
+    // requester can never renew their own request.
+    assertIndependentCANReviewer(actor, identity);
+    if (identity.siteId !== record.siteId ||
+        identity.hostOrganizationId !== record.hostOrganizationId ||
+        identity.institutionOrganizationId !== record.institutionOrganizationId)
+      throw new AuthorizationError("unchanged contracting parties");
+    if (actor.actorPersonId === record.requestedByPersonId)
+      throw new AuthorizationError("independent reviewer");
+    if (record.status !== "approved")
+      throw new Error("Only a currently approved authorization can be renewed");
+    // Idempotent replay of the exact same renewal is a no-op: no second
+    // mutation, audit row or event.
+    if (record.evidenceDocumentId === input.evidenceDocumentId &&
+        record.effectiveThrough !== null &&
+        record.effectiveThrough.getTime() === input.effectiveThrough.getTime())
+      return { authorizationId: record.id, renewed: false as const };
+    const now = new Date();
+    if (!Number.isFinite(input.effectiveThrough.getTime()) || input.effectiveThrough <= now ||
+        (record.effectiveThrough !== null && record.effectiveThrough > now &&
+          input.effectiveThrough <= record.effectiveThrough))
+      throw new Error("Renewal requires a new future end date that extends the current agreement window");
+    const [doc] = await tx.select({
+      subjectType: documents.subjectType, subjectId: documents.subjectId,
+      category: documents.category, verifiedAt: documents.verifiedAt,
+      verifiedByPersonId: documents.verifiedByPersonId,
+      expiresAt: documents.expiresAt, metadata: documents.metadata,
+    }).from(documents).where(eq(documents.id, input.evidenceDocumentId)).limit(1);
+    // The same policy enforced at review: the fresh evidence must be verified
+    // by a third person (neither requester nor THIS renewing steward) and its
+    // own expiry must cover the full renewed window.
+    assertOperatingAgreementEvidence(doc, identity, record.services,
+      record.requestedByPersonId, actor.actorPersonId!, input.effectiveThrough, now);
+    await tx.update(programSiteAuthorizations).set({
+      effectiveThrough: input.effectiveThrough,
+      evidenceDocumentId: input.evidenceDocumentId, updatedAt: now,
+    }).where(eq(programSiteAuthorizations.id, record.id));
+    await writeAudit(tx, actor, {
+      action: "program.site.authorization.renewed",
+      entityType: "program_site_authorization", entityId: record.id,
+      scope: { organizationId: identity.institutionOrganizationId,
+        siteId: identity.siteId, programId: identity.programId },
+      before: { effectiveThrough: record.effectiveThrough?.toISOString() ?? null,
+        evidenceDocumentId: record.evidenceDocumentId },
+      after: { effectiveThrough: input.effectiveThrough.toISOString(),
+        evidenceDocumentId: input.evidenceDocumentId, reason },
+    });
+    await emitEvent(tx, {
+      eventType: EventTypes.ProgramSiteAuthorizationRenewed,
+      aggregateType: "program_site_authorization", aggregateId: record.id,
+      actorPersonId: actor.actorPersonId,
+      organizationId: identity.institutionOrganizationId,
+      siteId: identity.siteId, programId: identity.programId,
+      payload: { institutionOrganizationId: identity.institutionOrganizationId,
+        effectiveThrough: input.effectiveThrough.toISOString() },
+    });
+    return { authorizationId: record.id, renewed: true as const };
+  });
+}
+
 /** Read on every cross-institutional operation, not just on login or launch.
  * Program/Site/host/issuer authority is derived from DB rows, never a client claim.
  */
@@ -597,12 +680,19 @@ export async function getHostProgramSiteAuthorization(
   }).from(programSiteAuthorizations)
     .where(eq(programSiteAuthorizations.programId, programId))
     .orderBy(desc(programSiteAuthorizations.version)).limit(1);
+  // A lapsed row keeps status 'approved' (history is not rewritten); reads
+  // fail closed on the window and this flag tells the operator why.
+  const now = new Date();
   return {
     eligible: true, programId, siteId: identity.siteId,
     institutionOrganizationId: identity.institutionOrganizationId,
     recommendedServices: recommendedChurchOperatingServices(identity.creditIssuingOrganizationId !== null),
     canIssueCredit: identity.creditIssuingOrganizationId !== null,
-    authorization: record ?? null,
+    authorization: record ? {
+      ...record,
+      lapsed: record.status === "approved" && record.effectiveThrough !== null &&
+        record.effectiveThrough <= now,
+    } : null,
   };
 }
 
@@ -636,7 +726,17 @@ export async function listCANOperatingAuthorizationDesk(actor: AccessContext) {
     .innerJoin(organizations, eq(programSiteAuthorizations.hostOrganizationId, organizations.id))
     .where(eq(programSiteAuthorizations.institutionOrganizationId, orgId))
     .orderBy(desc(programSiteAuthorizations.requestedAt)).limit(100);
-  return { authorizations: requests };
+  // Approved rows whose window has elapsed are fail-closed on every read but
+  // keep their historical status; surface the lapse so the steward renews
+  // instead of revoking an already-expired agreement.
+  const now = new Date();
+  return {
+    authorizations: requests.map(request => ({
+      ...request,
+      lapsed: request.status === "approved" && request.effectiveThrough !== null &&
+        request.effectiveThrough <= now,
+    })),
+  };
 }
 
 
