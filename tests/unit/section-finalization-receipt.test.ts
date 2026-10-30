@@ -29,9 +29,10 @@ beforeEach(()=>{
  vi.clearAllMocks();
  state.members.mockResolvedValue(["already-finalized","no-submission","ungraded"]);
  state.rows=[
-  [{id:sectionId,programId:"program",termId:"term"}],
+  [{id:sectionId,programId:"program",termId:"term",siteId:"site"}],
   [{id:periodId,termId:"term",schoolYearId:"year",gradeScaleId:"scale",startsOn:"2026-10-01",endsOn:"2026-10-31"}],
   [{configuration:{entries:[{label:"A",minPercent:90,maxPercent:100}]}}],
+  [{timezone:"America/Los_Angeles"}], // School-local grading date.
   [{id:"assessment",pointsPossible:"10"}],
   [{assessmentId:"assessment",studentProfileId:"already-finalized",attemptNumber:1,score:"10"}],
   [], // Correlated newer-attempt query builder.
@@ -47,7 +48,7 @@ describe("grading-period finalization receipts",()=>{
   expect(state.writes).not.toHaveBeenCalled();
  });
  it("returns every learner as skipped when the period has no scoreable work",async()=>{
-  state.rows[3]=[];
+  state.rows[4]=[];
   await expect(invoke()).resolves.toEqual({finalized:0,skipped:3});
   expect(state.writes).not.toHaveBeenCalled();
  });
