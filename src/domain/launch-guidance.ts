@@ -68,6 +68,19 @@ function nextOwnedTask(tasks: LaunchGuidanceTask[]) {
     ?? null;
 }
 
+function latestDocumentReview(evidence: Record<string, unknown>[] = []) {
+  return evidence.filter(item => item.kind === "document_review" && typeof item.status === "string")
+    .reduce<Record<string, unknown> | null>((latest, item) => {
+      if (!latest) return item;
+      const currentAt = typeof item.reviewedAt === "string" ? Date.parse(item.reviewedAt) : NaN;
+      const latestAt = typeof latest.reviewedAt === "string" ? Date.parse(latest.reviewedAt) : NaN;
+      if (Number.isFinite(currentAt) && Number.isFinite(latestAt)) return currentAt >= latestAt ? item : latest;
+      if (Number.isFinite(currentAt)) return item;
+      if (Number.isFinite(latestAt)) return latest;
+      return item;
+    }, null);
+}
+
 /**
  * Derives the visible launch path from the persisted Program and Launch Journey.
  * There is deliberately no client-side progress or completion state to resume.
@@ -82,8 +95,8 @@ export function buildLaunchGuidance(launch: LaunchGuidanceRecord) {
     evidenceCount: requirement.evidence?.length ?? 0,
     reviewNoteCount: requirement.evidence?.filter(item => item.kind === "registrar_note").length ?? 0,
     rejectedReviewCount: requirement.evidence?.filter(item => item.kind === "document_review" && item.status === "rejected").length ?? 0,
-    latestReviewStatus: String([...(requirement.evidence ?? [])].reverse().find(item => item.kind === "document_review" && typeof item.status === "string")?.status ?? "") || null,
-    latestReviewReason: (() => { const review = [...(requirement.evidence ?? [])].reverse().find(item => item.kind === "document_review" && typeof item.status === "string"); return typeof review?.reason === "string" ? review.reason : typeof review?.text === "string" ? review.text : null; })(),
+    latestReviewStatus: String(latestDocumentReview(requirement.evidence)?.status ?? "") || null,
+    latestReviewReason: (() => { const review = latestDocumentReview(requirement.evidence); return typeof review?.reason === "string" ? review.reason : typeof review?.text === "string" ? review.text : null; })(),
     latestReviewAt: (() => { const review = [...(requirement.evidence ?? [])].reverse().find(item => item.kind === "document_review" && typeof item.status === "string"); return typeof review?.reviewedAt === "string" ? review.reviewedAt : null; })(),
     requiresRegistrarReview: requirement.metadata?.evidenceReviewRequired === true ||
       requirement.metadata?.enrollmentForm !== undefined ||
