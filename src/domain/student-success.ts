@@ -40,6 +40,8 @@ export type StudentSuccessAssignment = {
   status: string | null;
   timeliness: string | null;
   assessmentStatus: string;
+  /** Derived by the canonical assignment reader, never an authorization grant. */
+  canEdit: boolean;
 };
 
 export type StudentSuccessStepKind =
@@ -71,10 +73,11 @@ function classifyStudentAssignment(
   const published = item.assessmentStatus === "published";
   // A draft/closed assessment must not generate a submit-work CTA. Completed
   // assignments can still offer a safe view of actual grading/feedback.
-  if (published && status === "returned") return "revision";
-  if (status === "graded") return "review_feedback";
+  if (published && item.canEdit && status === "returned") return "revision";
+  if ((published || item.assessmentStatus==="closed") &&
+      (status === "graded" || status === "returned")) return "review_feedback";
   if (status === "submitted") return "awaiting_feedback";
-  if (!published || (status !== "assigned" && status !== null)) return null;
+  if (!published || !item.canEdit || (status !== "assigned" && status !== null)) return null;
   const due = item.dueAt === null ? null : Date.parse(item.dueAt);
   const validDue = due !== null && Number.isFinite(due) ? due : null;
   if (item.timeliness === "missing" || (validDue !== null && validDue < nowMs))

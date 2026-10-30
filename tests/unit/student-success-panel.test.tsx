@@ -17,11 +17,11 @@ describe("Student Success priority navigation", () => {
   const now = new Date("2026-10-22T12:00:00Z");
   const assignments = [
     { assessmentId:"math-work",sectionId:"section-math",title:"Complete fractions",course:"Mathematics",
-      dueAt:"2026-10-21T12:00:00Z",status:null,timeliness:null,assessmentStatus:"published" },
+      dueAt:"2026-10-21T12:00:00Z",status:null,timeliness:null,assessmentStatus:"published",canEdit:true },
     { assessmentId:"science-work",sectionId:"section-science",title:"Revise lab report",course:"Science",
-      dueAt:null,status:"returned",timeliness:"late",assessmentStatus:"published" },
+      dueAt:null,status:"returned",timeliness:"late",assessmentStatus:"published",canEdit:true },
     { assessmentId:"english-work",sectionId:"section-english",title:"Essay submitted",course:"English",
-      dueAt:"2026-10-22T14:00:00Z",status:"submitted",timeliness:"on_time",assessmentStatus:"published" },
+      dueAt:"2026-10-22T14:00:00Z",status:"submitted",timeliness:"on_time",assessmentStatus:"published",canEdit:true },
   ];
 
   it("shows next steps across multiple enrolled courses with exact assignment links", () => {

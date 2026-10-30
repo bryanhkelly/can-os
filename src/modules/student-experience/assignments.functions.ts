@@ -80,8 +80,14 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
      (item.attemptNumber??0)<(row.attemptNumber??0))
       .sort((a,b)=>(b.attemptNumber??0)-(a.attemptNumber??0))[0]
    :undefined;
+  const workAvailability=assessmentAvailability({status:row.assessmentStatus,availableAt:row.availableAt,closesAt:row.closesAt});
+  const maxAttempts=assessmentAttemptLimit(row.metadata);
+  const nextAttempt=(row.attemptNumber??1)+(row.status==="returned"?1:0);
+  const canEdit=workAvailability.actionable&&
+   (row.status===null||row.status==="assigned"||row.status==="returned")&&
+   (maxAttempts===null||nextAttempt<=maxAttempts);
   return {...row,
-  workAvailability:assessmentAvailability({status:row.assessmentStatus,availableAt:row.availableAt,closesAt:row.closesAt}),
+  workAvailability,canEdit,
   availableAt:row.availableAt?.toISOString()??null,closesAt:row.closesAt?.toISOString()??null,
   revisionFeedbackText:typeof returned?.feedback?.comment==="string"?returned.feedback.comment:"",
   revisionFeedbackSubmissionId:returned?.submissionId??null,
@@ -89,7 +95,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   dueAt:row.dueAt?.toISOString()??null,submittedAt:row.submittedAt?.toISOString()??null,
   gradedAt:row.gradedAt?.toISOString()??null,
   metadata:{rubric:typeof row.metadata.rubric==="string"?row.metadata.rubric:"",
-    maxAttempts:assessmentAttemptLimit(row.metadata),
+    maxAttempts,
     criteria:readRubric(row.metadata.rubricCriteria),synthetic:row.metadata.synthetic===true,
     assignmentKind:typeof row.metadata.assignmentKind==="string"?row.metadata.assignmentKind:"classwork",
     curriculumLessonId:typeof row.metadata.curriculumLessonId==="string"?row.metadata.curriculumLessonId:null,

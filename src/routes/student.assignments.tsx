@@ -64,8 +64,7 @@ function StudentAssignmentsView({data}:{data:AssignmentData}){
  const [draft,setDraft]=useState(()=>chosen?.responseText??"");
  const nextAttempt=chosen?.status==="returned"?(chosen.attemptNumber??1)+1:chosen?.attemptNumber??1;
  const attemptLimitReached=Boolean(chosen&&chosen.metadata.maxAttempts!==null&&nextAttempt>chosen.metadata.maxAttempts);
- const editable=Boolean(chosen&&!attemptLimitReached&&chosen.workAvailability.actionable&&
-  (!chosen.status||chosen.status==="assigned"||chosen.status==="returned"));
+ const editable=chosen?.canEdit===true;
  useEffect(()=>{
   if(!selected){setAttachments([]);return;}
   let active=true;
