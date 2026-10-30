@@ -319,7 +319,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       <p className="mt-2 text-xs font-semibold">Responsible: {launchResponsibility(next.state)}</p>
       {next.requirementId && <p className="mt-1 text-xs text-muted-foreground">Evidence entries: {next.evidenceCount ?? 0}{next.ownerPersonId ? ` · Assigned owner ID: ${next.ownerPersonId}` : ""}</p>}
       {next.requiresRegistrarReview && <p className="mt-2 text-sm font-semibold">This requirement needs the registrar evidence-review workflow; it cannot be self-certified.</p>}
-      {Boolean(next.rejectedReviewCount) && <p role="alert" className="mt-2 text-sm font-semibold">Evidence has been rejected ({next.rejectedReviewCount} recorded review events). Follow up through the registrar workflow.</p>}
+      {Boolean(next.rejectedReviewCount) && <p role="alert" className="mt-2 text-sm font-semibold">{next.latestReviewStatus === "rejected" ? "Latest evidence review was rejected; follow up through the registrar workflow." : `${next.rejectedReviewCount} historical rejection(s); latest review: ${next.latestReviewStatus ?? "unknown"}.`}</p>}
       {Boolean(next.reviewNoteCount) && <p className="mt-1 text-xs text-muted-foreground">{next.reviewNoteCount} registrar review note(s) on record.</p>}
       {next.requirementId && <p className="mt-1 text-xs text-muted-foreground">Saved requirement: <code className="select-all">{next.requirementId}</code></p>}
       {next.state === "needs_can" && <p className="mt-3 text-sm">
@@ -351,7 +351,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             {task.requirementId && <p className="mt-1 text-xs text-muted-foreground">Evidence entries on record: {task.evidenceCount ?? 0}</p>}
             {task.requiresRegistrarReview && <p className="mt-1 text-xs font-semibold">Registrar evidence review required — school self-completion is unavailable.</p>
             {Boolean(task.reviewNoteCount) && <p className="mt-1 text-xs text-muted-foreground">Registrar review notes: {task.reviewNoteCount}</p>}
-            {Boolean(task.rejectedReviewCount) && <p className="mt-1 text-xs font-semibold text-destructive">Rejected evidence records: {task.rejectedReviewCount}. Review corrections with the registrar.</p>}}
+            {Boolean(task.rejectedReviewCount) && <p className="mt-1 text-xs font-semibold text-destructive">Historical rejected review events: {task.rejectedReviewCount}. Latest review: {task.latestReviewStatus ?? "unknown"}.</p>}}
             {task.requirementId && <p className="mt-1 text-xs text-muted-foreground">Requirement reference: <code className="select-all">{task.requirementId}</code></p>}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
