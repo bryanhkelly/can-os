@@ -196,6 +196,9 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
                 title: s.journeyRequirements.title,
                 status: s.journeyRequirements.status,
                 blocking: s.journeyRequirements.blocking,
+                ownerPersonId: s.journeyRequirements.ownerPersonId,
+                evidence: s.journeyRequirements.evidence,
+                metadata: s.journeyRequirements.metadata,
               })
               .from(s.journeyRequirements)
               .where(eq(s.journeyRequirements.journeyId, journey.id))
