@@ -197,7 +197,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     if (!boundProgram || !boundProgram.siteId || boundProgram.organizationId!==program.organizationId ||
       boundProgram.siteId!==program.siteId ||
       !actor.scope.organizationIds?.includes(boundProgram.organizationId) ||
-      !actor.scope.siteIds?.includes(boundProgram.siteId))
+      (actor.scope.siteIds !== undefined && !actor.scope.siteIds.includes(boundProgram.siteId)))
      throw new AuthorizationError("public interest Program ownership changed");
     const [interest] = await tx.select({
       id:publicAdmissionsInterests.id,
