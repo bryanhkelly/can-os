@@ -273,10 +273,11 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
        .from(s.gradeScales).where(eq(s.gradeScales.id,period.gradeScaleId)).limit(1);
       if(!gradeScale?.configuration.entries.length)throw new Error("Active school grade scale is required");
 
-      // Window is [startsOn, endsOn] inclusive in the school-year timezone's dates.
-      const windowStart = new Date(`${period.startsOn}T00:00:00.000Z`);
-      const windowEnd = new Date(`${period.endsOn}T00:00:00.000Z`);
-      windowEnd.setUTCDate(windowEnd.getUTCDate() + 1);
+      // Compare the due timestamp as a local school date. UTC midnight can
+      // misclassify work due near the start/end of a grading period.
+      const [schoolSite] = await tx.select({ timezone: s.sites.timezone })
+        .from(s.sites).where(eq(s.sites.id, section.siteId)).limit(1);
+      if (!schoolSite?.timezone) throw new Error("School timezone is required for grade finalization");
 
       const assessmentsInWindow = await tx
         .select({
@@ -289,8 +290,8 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
             eq(s.assessments.sectionId, section.id),
             inArray(s.assessments.status, ["published", "closed"]),
             isNotNull(s.assessments.dueAt),
-            sql`${s.assessments.dueAt} >= ${windowStart.toISOString()}::timestamptz`,
-            sql`${s.assessments.dueAt} < ${windowEnd.toISOString()}::timestamptz`,
+            sql`(${s.assessments.dueAt} AT TIME ZONE ${schoolSite.timezone})::date >= ${period.startsOn}::date`,
+            sql`(${s.assessments.dueAt} AT TIME ZONE ${schoolSite.timezone})::date <= ${period.endsOn}::date`,
           ),
         );
       const assessmentIds = assessmentsInWindow.map((row) => row.id);
@@ -327,6 +328,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         assessmentsInWindow.map((row) => [row.id, Number(row.pointsPossible ?? 0)]),
       );
       const totals = new Map<string, { earned: number; possible: number }>();
+      const gradedAssessments = new Map<string, Set<string>>();
       for (const row of graded) {
         const possible = pointsByAssessment.get(row.assessmentId) ?? 0;
         if (possible <= 0) continue;
@@ -334,7 +336,17 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
         total.earned += Number(row.score ?? 0);
         total.possible += possible;
         totals.set(row.studentProfileId, total);
+        const completed = gradedAssessments.get(row.studentProfileId) ?? new Set<string>();
+        completed.add(row.assessmentId);
+        gradedAssessments.set(row.studentProfileId, completed);
       }
+      // A provisional average over completed work is NOT an official period
+      // grade. Until missing/excused/returned-work policy is represented by
+      // canonical evidence, fail closed rather than silently omit assignments.
+      const requiredAssessmentCount = [...pointsByAssessment.values()]
+        .filter(possible => possible > 0).length;
+      const completeTotals = new Map([...totals].filter(([studentProfileId]) =>
+        gradedAssessments.get(studentProfileId)?.size === requiredAssessmentCount));
 
       const existing = await tx
         .select({
@@ -356,9 +368,9 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
       const now = new Date();
       let finalized = 0;
       // Include active learners with no graded, scoreable work in the receipt.
-      let skipped = studentIds.length - totals.size;
+      let skipped = studentIds.length - completeTotals.size;
       const published: { studentProfileId: string; gradeId: string; letterGrade: string }[] = [];
-      for (const [studentProfileId, total] of totals) {
+      for (const [studentProfileId, total] of completeTotals) {
         const prior = existingByStudent.get(studentProfileId);
         // Finalized grades are immutable; corrections are a separate append-only flow.
         if (prior?.status === "finalized") {
