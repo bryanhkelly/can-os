@@ -399,6 +399,15 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
         }],
         updatedAt: now,
       }).where(eq(s.journeyRequirements.id, row.id));
+      if (data.decision === "accepted") {
+        await emitEvent(tx, {
+          eventType: EventTypes.JourneyRequirementCompleted,
+          aggregateType: "journey_requirement",
+          aggregateId: row.id,
+          actorPersonId: context.actorPersonId,
+          payload: { journeyId: row.journeyId },
+        });
+      }
       const incomplete = await tx.select({ id: s.journeyRequirements.id })
         .from(s.journeyRequirements).where(and(
           eq(s.journeyRequirements.journeyId, row.journeyId),
