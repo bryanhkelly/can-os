@@ -15,7 +15,7 @@ export const getScopedPrograms=createServerFn({method:"GET"}).handler(async()=>{
  if(!records.length)return [];
  const visibleIds=records.map(x=>x.id);
  const sections=await db.select({id:s.sections.id,programId:s.sections.programId}).from(s.sections).where(inArray(s.sections.programId,visibleIds));
- const enrollments=await db.select({id:s.enrollments.id,programId:s.enrollments.programId}).from(s.enrollments).where(inArray(s.enrollments.programId,visibleIds));
+ const enrollments=await db.select({id:s.enrollments.id,programId:s.enrollments.programId}).from(s.enrollments).where(and(inArray(s.enrollments.programId,visibleIds),eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
  const sectionIds=sections.map(x=>x.id);
  const teachers=sectionIds.length?await db.select({sectionId:s.sectionTeachers.sectionId}).from(s.sectionTeachers).where(inArray(s.sectionTeachers.sectionId,sectionIds)):[];
  return records.map(p=>({id:p.id,name:p.name,status:p.status,type:p.type,organizationName:p.organizationName,siteName:null,gradeRange:p.gradeRange,deliveryModel:p.deliveryModel,counts:{sections:sections.filter(x=>x.programId===p.id).length,enrollments:enrollments.filter(x=>x.programId===p.id).length,teachers:teachers.filter(x=>sections.some(sec=>sec.id===x.sectionId&&sec.programId===p.id)).length,calendarDays:0}}));
