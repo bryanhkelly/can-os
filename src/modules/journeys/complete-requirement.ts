@@ -49,7 +49,7 @@ export async function completeJourneyRequirement(
     if (current.participantType === "program" && current.requirementStatus !== "complete" && !options.allowedCurrentStatuses) {
       throw new Error("Program opening requirements must be completed through an owner-specific workflow.");
     }
-    if (current.requirementStatus !== "complete" && (current.metadata.evidenceReviewRequired === true || current.metadata.enrollmentForm !== undefined || current.evidence.some(item => item.kind === "document_review" || item.kind === "registrar_note")))
+    if (current.requirementStatus !== "complete" && (current.metadata.evidenceReviewRequired === true || current.metadata.enrollmentForm !== undefined || current.evidence.some(item => item.kind === "document_review" || item.kind === "launch_evidence_review" || item.kind === "registrar_note")))
       throw new Error("Enrollment forms and documents must be completed through their registrar review workflow.");
     if (current.journeyStatus === "cancelled") {
       throw new Error("Cannot complete requirements for a cancelled Journey");
