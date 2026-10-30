@@ -36,6 +36,9 @@ describe("guardian assignment release policy", () => {
    {assessmentId:"class-b",attemptNumber:1,submissionStatus:"returned",score:"7",feedback:"Other class"},
   ];
   expect(priorReturnedGuardianFeedback(history,history[1]!)?.feedback).toBe("Explain reasoning");
+  const drafting={...history[1]!,submissionStatus:"draft"};
+  expect(priorReturnedGuardianFeedback([...history,drafting],drafting)?.feedback).toBe("Explain reasoning");
+  expect(guardianFeedbackReleased(drafting.submissionStatus)).toBe(false);
   expect(guardianFeedbackReleased(history[1]!.submissionStatus)).toBe(false);
   expect(priorReturnedGuardianFeedback(history,history[0]!)).toBeUndefined();
   expect(priorReturnedGuardianFeedback(history,history[2]!)).toBeUndefined();
