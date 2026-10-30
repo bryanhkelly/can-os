@@ -309,6 +309,8 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         <StatusBadge tone={taskTone(next)}>{launchOwnershipLabel(next.state)}</StatusBadge>
       </div>
       <p className="mt-3 text-sm text-muted-foreground">{next.description}</p>
+      <p className="mt-2 text-xs font-semibold">Responsible: {launchResponsibility(next.state)}</p>
+      {next.requirementId && <p className="mt-1 text-xs text-muted-foreground">Saved requirement: <code className="select-all">{next.requirementId}</code></p>}
       {next.state === "needs_can" && <p className="mt-3 text-sm">
         CAN owns this work. Your school cannot mark it complete from this screen.
       </p>}
