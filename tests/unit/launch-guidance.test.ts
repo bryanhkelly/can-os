@@ -113,6 +113,19 @@ describe("canonical launch guidance", () => {
     expect(guidance.nextTask?.requiresRegistrarReview).toBe(true);
   });
 
+  it("counts submitted statements without changing requirement readiness", () => {
+    const guidance = buildLaunchGuidance(launch({
+      requirements: [{ id: "evidence", key: "safety", title: "Safety evidence", blocking: true,
+        status: "needs_can", evidence: [
+          { kind: "launch_evidence_statement", text: "Safety plan prepared", submittedAt: "2026-10-30T10:00:00Z" },
+          { kind: "launch_evidence_statement", text: "Updated plan", submittedAt: "2026-10-30T11:00:00Z" },
+        ] }],
+    }));
+    expect(guidance.nextTask?.evidenceStatementCount).toBe(2);
+    expect(guidance.nextTask?.latestEvidenceStatementAt).toBe("2026-10-30T11:00:00Z");
+    expect(guidance.ready).toBe(false);
+  });
+
   it("fails closed for an unrecognized persisted requirement state", () => {
     const guidance = buildLaunchGuidance(launch({
       requirements: [{ id: "unknown", key: "other", title: "Other", status: "unexpected", blocking: true }],
