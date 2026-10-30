@@ -297,9 +297,7 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
         row.evidence.findLastIndex(item => item.kind === "launch_evidence_review");
       if (pendingDecision && (row.status === "needs_can" || row.metadata.evidenceReviewRequired === true))
         throw new Error("Evidence is already awaiting institutional review");
-      if (row.status === "needs_can" && row.metadata.evidenceReviewRequired !== true &&
-          !context.capabilities.has("program.activate"))
-        throw new AuthorizationError("CAN-owned evidence submission");
+
       const latestReview = [...row.evidence].reverse().find(item => item.kind === "document_review" || item.kind === "launch_evidence_review");
       if (previousStatement?.text === data.statement && previousStatement?.submittedByPersonId === context.actorPersonId &&
           (!latestReview || row.evidence.lastIndexOf(previousStatement) > row.evidence.lastIndexOf(latestReview)))
