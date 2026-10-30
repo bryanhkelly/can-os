@@ -35,7 +35,6 @@ beforeEach(()=>{
   [{timezone:"America/Los_Angeles"}], // School-local grading date.
   [{id:"assessment",pointsPossible:"10"}],
   [{assessmentId:"assessment",studentProfileId:"already-finalized",attemptNumber:1,score:"10"}],
-  [], // Correlated newer-attempt query builder.
   [{id:"grade",studentProfileId:"already-finalized",status:"finalized"}],
  ];
 });
