@@ -81,7 +81,7 @@ function LaunchEvidenceStatement({ task, busy, submit }: {
   submit: (requirementId: string, statement: string) => Promise<boolean>;
 }) {
   const [statement, setStatement] = useState("");
-  if (!task.requirementId || !["needs_you", "needs_can"].includes(task.state)) return null;
+  if (!task.requirementId || !["needs_you", "needs_can"].includes(task.state) || task.pendingEvidenceReview) return null;
   return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
     event.preventDefault();
     if (statement.trim().length < 10) return;
