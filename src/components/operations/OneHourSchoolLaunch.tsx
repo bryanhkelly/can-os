@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/workspace";
 import {
   buildLaunchGuidance,
   launchOwnershipLabel,
+  launchResponsibility,
   type LaunchGuidanceTask,
 } from "@/domain/launch-guidance";
 import { isExtendedLearningType } from "@/domain/program-offerings";
@@ -336,6 +337,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <StatusBadge tone={taskTone(task)}>{launchOwnershipLabel(task.state)}</StatusBadge>
+            <span className="text-right text-xs font-medium">Responsible: {launchResponsibility(task.state)}</span>
             {task.state === "needs_can" && <span className="max-w-48 text-right text-xs text-muted-foreground">CAN must review and complete this requirement.</span>}
             {task.state === "waiting_third_party" && <span className="max-w-48 text-right text-xs text-muted-foreground">Awaiting an external party; this is not approval.</span>}
             {task.state === "needs_you" && <span className="max-w-48 text-right text-xs text-muted-foreground">School-owned work; confirm completion only after the underlying requirement is met.</span>}
