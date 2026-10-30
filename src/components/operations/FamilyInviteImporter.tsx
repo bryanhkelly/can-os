@@ -109,7 +109,7 @@ export function FamilyInviteImporter({
   }
 
   if (!workspace) {
-    return <section className="mt-7 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Invite families">
+    return <section id="invite-families" className="mt-7 scroll-mt-6 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Invite families">
       <h2 className="font-serif text-2xl">Invite families</h2>
       <p role="status" className="mt-3 text-sm text-muted-foreground">Family outreach is unavailable. Launch management remains accessible.</p>
     </section>;
