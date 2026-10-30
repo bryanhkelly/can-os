@@ -35,3 +35,28 @@ export const getAdmissionsDashboard=createServerFn({method:"GET"})
 });
 
 export const getSyntheticAdmissionsDashboard=getAdmissionsDashboard;
+
+
+/** Counts every active program enrollment in the authorized school scope, including
+ * students enrolled outside the admissions application workflow. */
+export const getActiveEnrollmentCounts=createServerFn({method:"GET"})
+ .validator((value:unknown)=>operationsSelectionSchema.parse(value??{}))
+ .handler(async({data})=>{
+  const actor=await getCommandContext(getRequest());
+  setResponseHeader("Cache-Control","private, no-store");
+  if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.programIds?.length)
+   throw new AuthorizationError("registrar enrollment totals");
+  assertCapability(actor,"enrollment.decide");
+  const scoped=await resolveOperationsSelection(actor,data);
+  if(!process.env.DATABASE_URL)return [] as {programId:string;activeStudents:number}[];
+  if(!scoped.programIds.length)return [];
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const {countDistinct}=await import("drizzle-orm");
+  return db.select({
+   programId:s.enrollments.programId,
+   activeStudents:countDistinct(s.enrollments.studentProfileId),
+  }).from(s.enrollments)
+   .where(and(inArray(s.enrollments.programId,scoped.programIds),
+    eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")))
+   .groupBy(s.enrollments.programId);
+ });
