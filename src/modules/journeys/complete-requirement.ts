@@ -34,6 +34,7 @@ export async function completeJourneyRequirement(
         organizationId: journeys.organizationId,
         siteId: journeys.siteId,
         programId: journeys.programId,
+        participantType: journeys.participantType,
         metadata: journeyRequirements.metadata,
         evidence: journeyRequirements.evidence,
       })
@@ -45,6 +46,9 @@ export async function completeJourneyRequirement(
 
     if (!current) throw new Error("Journey requirement not found");
     assertProgramScope(context, current.programId);
+    if (current.participantType === "program" && current.requirementStatus !== "complete" && !options.allowedCurrentStatuses) {
+      throw new Error("Program opening requirements must be completed through an owner-specific workflow.");
+    }
     if (current.requirementStatus !== "complete" && (current.metadata.evidenceReviewRequired === true || current.metadata.enrollmentForm !== undefined || current.evidence.some(item => item.kind === "document_review" || item.kind === "registrar_note")))
       throw new Error("Enrollment forms and documents must be completed through their registrar review workflow.");
     if (current.journeyStatus === "cancelled") {
