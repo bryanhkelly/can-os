@@ -45,7 +45,7 @@ export async function completeJourneyRequirement(
 
     if (!current) throw new Error("Journey requirement not found");
     assertProgramScope(context, current.programId);
-    if (current.metadata.enrollmentForm !== undefined || current.evidence.some(item => item.kind === "document_review"))
+    if (current.metadata.evidenceReviewRequired === true || current.metadata.enrollmentForm !== undefined || current.evidence.some(item => item.kind === "document_review" || item.kind === "registrar_note"))
       throw new Error("Enrollment forms and documents must be completed through their registrar review workflow.");
     if (current.journeyStatus === "cancelled") {
       throw new Error("Cannot complete requirements for a cancelled Journey");
