@@ -11,7 +11,7 @@ vi.mock("@tanstack/react-start",()=>({
 vi.mock("@tanstack/react-start/server",()=>({getRequest:vi.fn(),setResponseHeader:vi.fn()}));
 vi.mock("@/modules/identity/command-context.server",()=>({
   getCommandContext:async()=>({role:state.role,actorPersonId:"actor",
-    scope:{siteIds:["school"],programIds:["program"]}}),
+    scope:{organizationIds:["organization"],siteIds:["school"],programIds:["program"]}}),
 }));
 vi.mock("@/db/client",()=>({db:{select:state.select}}));
 vi.mock("@neondatabase/serverless",()=>({Pool:class {}}));
@@ -46,6 +46,24 @@ function offer(){
 }
 
 describe("authorized notification destinations",()=>{
+  it("shows a restricted handoff only with current named case access",async()=>{
+    state.role="safeguarding_responder";
+    notification("safeguarding_concern","case","safeguarding_response_required");
+    state.rows.safeguarding_case_assignments=[{incidentId:"case"}];
+    expect((await getNotifications())[0]?.href).toBe("/safeguarding?case=case");
+  });
+  it("removes the whole restricted handoff when case access is lost",async()=>{
+    state.role="safeguarding_responder";
+    notification("safeguarding_concern","case","safeguarding_response_required");
+    expect(await getNotifications()).toEqual([]);
+  });
+  it.each(["registrar","site_leader","guardian"])("hides restricted handoffs in the %s role",async role=>{
+    state.role=role;
+    notification("safeguarding_concern","case","safeguarding_response_required");
+    state.rows.safeguarding_case_assignments=[{incidentId:"case"}];
+    expect(await getNotifications()).toEqual([]);
+  });
+
   it("preserves both the child and offer for a guardian",async()=>{
     offer();
     expect((await getNotifications())[0]?.href).toBe("/guardian/admission-offers?student=child&offer=offer");
