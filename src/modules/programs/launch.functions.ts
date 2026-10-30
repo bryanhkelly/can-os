@@ -355,6 +355,8 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
           !row.evidence.some(item => item.kind === "launch_evidence_review"))
         throw new Error("School-owned work must use its owner-specific completion workflow unless institutional review is required");
       const latestSubmission = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_statement");
+      if (data.decision === "accepted" && row.metadata.evidenceReviewRequired !== true && row.status !== "needs_can")
+        throw new Error("Institutional acceptance requires an explicitly reviewable or CAN-owned requirement");
       if (!latestSubmission || typeof latestSubmission.submittedAt !== "string")
         throw new Error("Evidence must be submitted before review");
       if (latestSubmission.submittedByPersonId === context.actorPersonId)
