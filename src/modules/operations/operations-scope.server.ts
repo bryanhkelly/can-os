@@ -20,8 +20,10 @@ export async function resolveOperationsSelection(
   selection: OperationsSelection,
 ): Promise<{ siteIds: string[]; programIds: string[] }> {
   const authorizedSites = actor.scope.siteIds ?? [];
+  const authorizedOrganizations = actor.scope.organizationIds ?? [];
   const authorizedPrograms = actor.scope.programIds ?? [];
-  if (!authorizedSites.length) throw new AuthorizationError("operations site membership");
+  if (!authorizedSites.length && !authorizedOrganizations.length)
+    throw new AuthorizationError("operations organization or site membership");
   if (selection.siteId && !authorizedSites.includes(selection.siteId)) {
     throw new AuthorizationError("selected school");
   }
