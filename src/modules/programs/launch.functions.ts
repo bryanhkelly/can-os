@@ -364,8 +364,7 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
         throw new Error("Requirement is not awaiting review");
       if (row.metadata.enrollmentForm !== undefined)
         throw new Error("Enrollment forms require their dedicated review workflow");
-      if (row.status === "needs_you" && row.metadata.evidenceReviewRequired !== true &&
-          !row.evidence.some(item => item.kind === "launch_evidence_review"))
+      if (row.status === "needs_you" && row.metadata.evidenceReviewRequired !== true)
         throw new Error("School-owned work must use its owner-specific completion workflow unless institutional review is required");
       const latestSubmission = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_statement");
       if (data.decision === "accepted" && row.metadata.evidenceReviewRequired !== true && row.status !== "needs_can")
