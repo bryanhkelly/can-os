@@ -243,7 +243,7 @@ function LaunchWizardPage() {
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
-        <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} canReviewEvidence={launches.canReviewEvidence} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
+        <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} canReviewEvidence={launches.launches.find(item => item.id === selection.programId)?.canReviewEvidence ?? (launches.launches.length === 1 && launches.launches[0].canReviewEvidence)} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
 
         {launches.launches.length>0&&admissions&&<section aria-label="Admissions progress" className="mt-5 rounded-xl border bg-card p-4">
           <h2 className="text-sm font-semibold">Admissions progress</h2>
