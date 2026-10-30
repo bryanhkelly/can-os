@@ -78,7 +78,7 @@ export async function completeJourneyRequirement(
         .update(journeyRequirements)
         .set({
           status: "complete",
-          evidence,
+          evidence: [...current.evidence, ...evidence],
           completedAt,
           updatedAt: completedAt,
         })
