@@ -56,6 +56,12 @@ beforeEach(() => {
 });
 
 describe("Journey completion transactions", () => {
+  it("rejects program opening completion without an owner-specific workflow", async () => {
+    select.mockReturnValueOnce(query([{ ...current, participantType: "program" }]));
+    await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("owner-specific workflow");
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("cannot waive a configured enrollment signature through generic completion", async () => {
     select.mockReturnValueOnce(query([{ ...current, metadata: { enrollmentForm: {} } }]));
     await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("registrar review workflow");
