@@ -4,6 +4,7 @@ import { EmptyState, QueryState, StatusBadge, WorkspaceNotice, WorkspacePanel } 
 import {
   acknowledgeAssignedSafeguardingConcern,
   claimOverdueSafeguardingCaseResponse,
+  completeAssignedSafeguardingReview,
   escalateAssignedSafeguardingConcern,
   getAssignedSafeguardingCase,
   getMySafeguardingWorkspace,
@@ -32,6 +33,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [resolution, setResolution] = useState("");
+  const [reviewOutcomes,setReviewOutcomes] = useState<Record<string,string>>({});
 
   const openCase = useCallback(async (incidentId: string) => {
     setSelectedId(incidentId); setLoading(true); setError(""); setNotice(""); setResolution("");
@@ -84,6 +86,17 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
       await openCase(incidentId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The takeover was not saved."); }
     finally { setBusy(""); }
+  }
+
+  async function completeReview(reviewId:string){
+    if(!selectedId||busy)return;
+    setBusy("review:"+reviewId);setError("");setNotice("");
+    try{
+      await completeAssignedSafeguardingReview({data:{incidentId:selectedId,reviewId,outcome:reviewOutcomes[reviewId]??""}});
+      setNotice("Internal review outcome recorded. External reporting duties remain separate.");
+      await refresh();
+    }catch(cause){setError(cause instanceof Error?cause.message:"The review outcome was not saved.");}
+    finally{setBusy("");}
   }
 
   async function closeCase() {
@@ -176,6 +189,24 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
           </WorkspacePanel>
           <SafeguardingExternalReportForm incidentId={selectedId} onSaved={refresh} />
 
+          {!!detail.reviews.length&&<WorkspacePanel title="Assigned restricted case reviews"
+            description="Pending reviews block closure. Completing an internal review never records an external report or ends a legal duty." className="mt-5">
+            <ul className="space-y-3">{detail.reviews.map(review=><li key={review.id} className="rounded-lg border p-3 text-sm">
+              <p className="font-semibold">{review.level.replaceAll("_"," ")} · {review.status}</p>
+              {review.notes&&<p className="mt-2 whitespace-pre-wrap">{review.notes}</p>}
+              {review.decision&&<p className="mt-2 whitespace-pre-wrap">Outcome: {review.decision}</p>}
+              {review.canComplete&&<>
+                <label className="mt-3 block text-sm">Your factual review outcome
+                  <textarea rows={2} maxLength={2000} value={reviewOutcomes[review.id]??""}
+                    onChange={event=>setReviewOutcomes(values=>({...values,[review.id]:event.target.value}))}
+                    className="mt-1 w-full rounded border bg-background p-2"/>
+                </label>
+                <Button className="mt-2" disabled={!!busy||(reviewOutcomes[review.id]??"").trim().length<10}
+                  onClick={()=>void completeReview(review.id)}>Complete assigned review</Button>
+              </>}
+            </li>)}</ul>
+          </WorkspacePanel>}
+
           {detail.incident.status !== "closed" && <WorkspacePanel title="Accountable closure" description="Closing ends the active internal response. Every record stays intact, and closure never completes or replaces an external legal reporting duty." className="mt-5">
             <label className="block text-sm font-semibold">
               Factual resolution summary (required)
@@ -184,7 +215,7 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
                 placeholder="What was actually done, by whom, and what — if anything — remains outstanding?"
                 className="mt-2 w-full rounded border bg-background p-3 text-sm font-normal" />
             </label>
-            <Button className="mt-3" disabled={!!busy || resolution.trim().length < 10} onClick={() => void closeCase()}>
+            <Button className="mt-3" disabled={!!busy || resolution.trim().length < 10 || detail.reviews.some(review=>review.status==="pending")} onClick={() => void closeCase()}>
               {busy === "close" ? "Closing…" : "Close restricted case"}
             </Button>
           </WorkspacePanel>}

@@ -5,6 +5,7 @@ import {
   incidentAmendments,
   incidentEvidence,
   incidentNotifications,
+  incidentReviews,
   incidents,
   people,
   programs,
@@ -517,6 +518,11 @@ export async function resolveSafeguardingConcern(
     "safeguarding.respond",
   );
   return db.transaction(async (tx) => {
+    await tx.select({id:incidents.id}).from(incidents)
+      .where(eq(incidents.id,incident.id)).for("update").limit(1);
+    const pendingReviews=await tx.select({id:incidentReviews.id}).from(incidentReviews)
+      .where(and(eq(incidentReviews.incidentId,incident.id),eq(incidentReviews.status,"pending"))).limit(1);
+    if(pendingReviews.length)throw new Error("Complete all assigned restricted case reviews before closure");
     const acknowledged = await tx.select({ id: incidentNotifications.id })
       .from(incidentNotifications).where(and(
         eq(incidentNotifications.incidentId, incident.id),
@@ -1087,7 +1093,7 @@ export async function getSafeguardingCase(actor: AccessContext, incidentId: stri
     }).from(studentProfiles)
       .innerJoin(people, eq(people.id, studentProfiles.personId))
       .where(eq(studentProfiles.id, concern.studentProfileId)).limit(1) : [];
-    const [evidence, externalReports, assignments, notifications] = await Promise.all([
+    const [evidence, externalReports, assignments, notifications, reviews] = await Promise.all([
       tx.select().from(incidentEvidence).where(eq(incidentEvidence.incidentId, incidentId)).orderBy(asc(incidentEvidence.createdAt)),
       tx.select().from(safeguardingExternalReports).where(eq(safeguardingExternalReports.incidentId, incidentId)).orderBy(asc(safeguardingExternalReports.occurredAt)),
       tx.select({
@@ -1110,6 +1116,10 @@ export async function getSafeguardingCase(actor: AccessContext, incidentId: stri
         createdAt: incidentNotifications.createdAt,
         acknowledgedAt: incidentNotifications.acknowledgedAt,
       }).from(incidentNotifications).where(eq(incidentNotifications.incidentId, incidentId)),
+      tx.select({id:incidentReviews.id,reviewerPersonId:incidentReviews.reviewerPersonId,
+        level:incidentReviews.level,status:incidentReviews.status,notes:incidentReviews.notes,
+        decision:incidentReviews.decision,reviewedAt:incidentReviews.reviewedAt,
+      }).from(incidentReviews).where(eq(incidentReviews.incidentId,incidentId)).orderBy(asc(incidentReviews.createdAt)),
     ]);
     await writeAudit(tx, actor, {
       action: "safeguarding.case.read",
@@ -1148,6 +1158,46 @@ export async function getSafeguardingCase(actor: AccessContext, incidentId: stri
       externalReports,
       assignments,
       notifications,
+      reviews:reviews.map(review=>({...review,canComplete:incident.status==="filed"&&
+        review.status==="pending"&&review.reviewerPersonId===actor.actorPersonId})),
     };
+  });
+}
+
+/** Complete an existing canonical Incident review under restricted case access.
+ * An internal review outcome never attests that an outside legal duty ended.
+ */
+export async function completeSafeguardingCaseReview(actor:AccessContext,input:{
+  incidentId:string;reviewId:string;outcome:string;
+}){
+  const outcome=input.outcome.trim();
+  if(outcome.length<10||outcome.length>2000)throw new Error("Record a 10-2000 character factual review outcome");
+  const {incident}=await loadIncidentAndAssignment(actor,input.incidentId,"safeguarding.respond");
+  return db.transaction(async tx=>{
+    const [current]=await tx.select({status:incidents.status}).from(incidents)
+      .where(eq(incidents.id,incident.id)).for("update").limit(1);
+    const [review]=await tx.select().from(incidentReviews).where(and(
+      eq(incidentReviews.id,input.reviewId),eq(incidentReviews.incidentId,incident.id),
+    )).for("update").limit(1);
+    if(!review||review.reviewerPersonId!==actor.actorPersonId)
+      throw new AuthorizationError("only the named restricted case reviewer can complete this review");
+    if(review.status==="complete"){
+      if(review.decision===outcome)return {reviewId:review.id,replayed:true};
+      throw new Error("This review already has a recorded outcome");
+    }
+    if(current?.status!=="filed")throw new Error("This restricted case is closed");
+    const reviewedAt=new Date();
+    await tx.update(incidentReviews).set({status:"complete",decision:outcome,reviewedAt,updatedAt:reviewedAt})
+      .where(eq(incidentReviews.id,review.id));
+    const eventId=await emitEvent(tx,{
+      eventType:EventTypes.SafeguardingCaseReviewCompleted,aggregateType:"incident",aggregateId:incident.id,
+      actorPersonId:actor.actorPersonId,organizationId:incident.organizationId,siteId:incident.siteId,programId:incident.programId,
+      payload:{reviewId:review.id,classification:"safeguarding_restricted",outcomeRecorded:true,externalDutyCompleted:false},
+    });
+    await writeAudit(tx,actor,{action:"safeguarding.review.complete",entityType:"incident",entityId:incident.id,
+      scope:{organizationId:incident.organizationId,siteId:incident.siteId,programId:incident.programId},
+      before:{reviewId:review.id,status:"pending"},after:{reviewId:review.id,status:"complete",outcome},
+      contextExtras:{domainEventId:eventId}});
+    return {reviewId:review.id,replayed:false};
   });
 }

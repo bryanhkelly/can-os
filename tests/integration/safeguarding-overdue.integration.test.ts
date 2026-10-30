@@ -18,7 +18,7 @@ integration("scheduled restricted safeguarding handoff",()=>{
       state.tx=tx;
       const s=await import("@/db/schema");
       const {escalateOverdueSafeguardingConcerns:sweep}=await import("@/modules/safeguarding/safeguarding-overdue.server");
-      const {acknowledgeSafeguardingConcern}=await import("@/modules/safeguarding/safeguarding-service");
+      const {acknowledgeSafeguardingConcern,resolveSafeguardingConcern,completeSafeguardingCaseReview,getSafeguardingCase}=await import("@/modules/safeguarding/safeguarding-service");
       const suffix=crypto.randomUUID().slice(0,8);
       const [org]=await tx.insert(s.organizations).values({type:"christian_school",name:"Safeguarding sweep fixture",slug:"sg-sweep-"+suffix}).returning();
       const [site]=await tx.insert(s.sites).values({organizationId:org!.id,name:"Synthetic campus",slug:"sg-site-"+suffix,timezone:"UTC"}).returning();
@@ -71,6 +71,26 @@ integration("scheduled restricted safeguarding handoff",()=>{
       const actor=resolveAccessContext({accountId:replacement.account.id,activeGrantId:replacement.grant.id,sessionId:"synthetic"},[replacement.grant]);
       actor.scope.siteIds=[site!.id];actor.scope.programIds=[];
       await acknowledgeSafeguardingConcern(actor,overdue.id);
+      // Canonical pending reviews must not be stranded by restricted-case closure.
+      const [review]=await tx.insert(s.incidentReviews).values({incidentId:overdue.id,
+        reviewerPersonId:replacement.person.id,level:"safeguarding_follow_up",notes:"Synthetic policy review"}).returning();
+      const summary="The assigned response and internal case reviews have been recorded.";
+      await expect(resolveSafeguardingConcern(actor,{incidentId:overdue.id,resolutionSummary:summary}))
+        .rejects.toThrow("Complete all assigned restricted case reviews");
+      const detail=await getSafeguardingCase(actor,overdue.id);
+      expect(detail.reviews).toContainEqual(expect.objectContaining({id:review!.id,status:"pending",canComplete:true}));
+      const otherActor=resolveAccessContext({accountId:fallback.account.id,activeGrantId:fallback.grant.id,sessionId:"synthetic"},[fallback.grant]);
+      otherActor.scope.siteIds=[site!.id];otherActor.scope.programIds=[];
+      const complete={incidentId:overdue.id,reviewId:review!.id,outcome:"The assigned internal review has been completed and recorded."};
+      await expect(completeSafeguardingCaseReview(otherActor,complete)).rejects.toThrow("only the named restricted case reviewer");
+      expect(await completeSafeguardingCaseReview(actor,complete)).toMatchObject({replayed:false});
+      expect(await completeSafeguardingCaseReview(actor,complete)).toMatchObject({replayed:true});
+      const reviewEvents=await tx.select().from(s.domainEvents).where(and(eq(s.domainEvents.aggregateId,overdue.id),eq(s.domainEvents.eventType,"SafeguardingCaseReviewCompleted")));
+      expect(reviewEvents).toHaveLength(1);
+      expect(JSON.stringify(reviewEvents[0]!.payload)).not.toContain(complete.outcome);
+      await expect(resolveSafeguardingConcern(actor,{incidentId:overdue.id,resolutionSummary:summary})).resolves.toMatchObject({incidentId:overdue.id});
+      expect(await tx.select().from(s.safeguardingExternalReports).where(eq(s.safeguardingExternalReports.incidentId,overdue.id))).toHaveLength(0);
+
       expect((await sweep(now,1)).routedRecipients).toBe(0);
       const audit=await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.resourceId,overdue.id),eq(s.auditEvents.action,"safeguarding.concern.escalate_overdue")));
       expect(audit).toHaveLength(2);
