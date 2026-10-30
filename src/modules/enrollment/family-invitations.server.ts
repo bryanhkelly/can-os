@@ -271,8 +271,9 @@ export async function listFamilyInvitationWorkspace(
   context: AccessContext,
 ): Promise<FamilyInvitationWorkspace> {
   assertFamilyInvitationRegistrar(context);
-  const programIds = context.scope.programIds ?? [];
-  if (!programIds.length) return { programs: [], batches: [] };
+  const programIds = context.scope.programIds;
+  const organizationIds = context.scope.organizationIds ?? [];
+  if (!organizationIds.length || (programIds && !programIds.length)) return { programs: [], batches: [] };
 
   const candidates = await db.select({
     id: programs.id,
@@ -280,7 +281,9 @@ export async function listFamilyInvitationWorkspace(
     status: programs.status,
     organizationId: programs.organizationId,
     siteId: programs.siteId,
-  }).from(programs).where(inArray(programs.id, programIds));
+  }).from(programs).where(and(inArray(programs.organizationId, organizationIds),
+    ...(programIds ? [inArray(programs.id, programIds)] : []),
+    ...(context.scope.siteIds?.length ? [inArray(programs.siteId, context.scope.siteIds)] : [])));
   const scopedPrograms = [];
   const eligible = [];
   for (const candidate of candidates) {
