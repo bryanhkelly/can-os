@@ -113,6 +113,15 @@ describe("teacher submission review boundary", () => {
     });
     expect(state.sign).not.toHaveBeenCalled();
   });
+  it("returns a graded submission's score and teacher feedback without signing attachments", async () => {
+    state.rows[ROW.submission] = [{ ...submission, status: "graded", score: "8.5", feedback: { comment: "Explain your evidence." } }];
+    state.rows[ROW.attempts] = [{ id: submissionId, attemptNumber: 2, status: "graded", score: "8.5", submittedAt: submission.submittedAt }];
+    const result = await getSubmissionReview({ data: { submissionId } });
+    expect(result.score).toBe("8.5");
+    expect(result.feedbackComment).toBe("Explain your evidence.");
+    expect(result.attempts).toEqual([{ id: submissionId, attemptNumber: 2, status: "graded", score: "8.5", submittedAt: "2030-01-01T00:00:00.000Z" }]);
+    expect(state.sign).not.toHaveBeenCalled();
+  });
   it.each(["student", "guardian", "registrar"])("denies the %s role", async role => {
     state.context.role = role;
     await expect(getSubmissionReview({ data: { submissionId } })).rejects.toThrow(AuthorizationError);
