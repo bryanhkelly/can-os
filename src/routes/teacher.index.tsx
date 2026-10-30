@@ -8,6 +8,7 @@ import { TeacherLearningFollowUpForm } from "@/components/learning/TeacherLearni
 import { TeacherLearningFollowUpsPanel } from "@/components/learning/TeacherLearningFollowUpsPanel";
 import { TeacherConferencePanel } from "@/components/teacher/TeacherConferencePanel";
 import { TeacherFirstWeekCard } from "@/components/teacher/TeacherFirstWeekCard";
+import { TeacherDaySchedule } from "@/components/teacher/TeacherDaySchedule";
 import { WorkspaceShell, StatCard, EmptyState, QueryState } from "@/components/workspace";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
 import { buildTeacherAttention } from "@/domain/daily-operations";
@@ -78,6 +79,8 @@ function TeacherTodayPage() {
      <Link to="/teacher/gradebook"><StatCard label="Needs grading" value={data.ungraded.length} /></Link>
      <Link to="/teacher/missing-work"><StatCard label="Missing work" value={data.missingWork.length} /></Link>
     </div>
+
+    <TeacherDaySchedule sections={data.sections} />
 
     <section className="mt-10">
      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">My sections</p>
