@@ -126,6 +126,21 @@ describe("canonical launch guidance", () => {
     expect(guidance.ready).toBe(false);
   });
 
+  it("surfaces institutional launch rejection and keeps the school closed", () => {
+    const guidance = buildLaunchGuidance(launch({
+      requirements: [{ id: "safety", key: "safety", title: "Safety", status: "needs_you",
+        blocking: true, evidence: [
+          { kind: "launch_evidence_statement", text: "Plan submitted", submittedAt: "2026-10-30T10:00:00Z" },
+          { kind: "launch_evidence_review", status: "rejected", text: "Missing signatures",
+            reviewedAt: "2026-10-30T11:00:00Z" },
+        ] }],
+    }));
+    expect(guidance.nextTask?.latestReviewStatus).toBe("rejected");
+    expect(guidance.nextTask?.latestReviewReason).toBe("Missing signatures");
+    expect(guidance.nextTask?.requiresRegistrarReview).toBe(true);
+    expect(guidance.ready).toBe(false);
+  });
+
   it("fails closed for an unrecognized persisted requirement state", () => {
     const guidance = buildLaunchGuidance(launch({
       requirements: [{ id: "unknown", key: "other", title: "Other", status: "unexpected", blocking: true }],
