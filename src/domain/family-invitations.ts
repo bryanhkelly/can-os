@@ -171,6 +171,7 @@ export type FamilyInvitationWorkspace = {
   batches: Array<{
     id: string;
     programId: string;
+    siteId?: string | null;
     programName: string;
     subject: string;
     introduction: string;
@@ -187,3 +188,4 @@ export type FamilyInvitationWorkspace = {
     }>;
   }>;
 };
+

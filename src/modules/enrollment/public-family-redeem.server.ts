@@ -1,13 +1,12 @@
-import { and, eq, gt, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
- accessAccounts, accountPersonGrants, accessSessions, people, programs,
- programPublications, publicFamilyStartRequests, sitePublications, sites,
+ accessAccounts, accountPersonGrants, accessSessions, people, publicFamilyStartRequests,
 } from "@/db/schema";
 import { hashAccessSecret, issueOpaqueSecret, sessionCookieHeader } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { uniqueAccountPersonId } from "@/domain/verified-family-person";
-import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { resolvePublishedFamilyStartDestination } from "./public-family-start.server";
 import { recordSessionSecurityEvent } from "@/modules/identity/session-security-audit.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -45,24 +44,12 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
       siteId:publicFamilyStartRequests.siteId,
     });
   if(!intent)throw new AuthorizationError("valid unexpired single-use family link");
-  const [school]=await tx.select({
-    programId:programs.id,organizationId:programs.organizationId,
-    siteId:programs.siteId,status:programs.status,
-    siteOrganizationId:sites.organizationId,
-  }).from(programs)
-    .innerJoin(sites,eq(sites.id,programs.siteId))
-    .innerJoin(sitePublications,and(eq(sitePublications.siteId,sites.id),
-      eq(sitePublications.status,"published"),isNotNull(sitePublications.publishedAt)))
-    .innerJoin(programPublications,and(
-      eq(programPublications.programId,programs.id),
-      eq(programPublications.siteId,sites.id),
-      eq(programPublications.status,"published"),isNotNull(programPublications.publishedAt)))
-    .where(eq(programs.id,intent.programId))
-    .for("share",{of:programs}).limit(1);
-  if(!school || school.siteId!==intent.siteId ||
-    school.organizationId!==school.siteOrganizationId || school.status!=="active")
+  // Reuse the same published academic destination and current service gate as
+  // link issuance. It holds Site/Program publication and Program status stable
+  // for this transaction before any account, Person, grant or session is made.
+  const school=await resolvePublishedFamilyStartDestination(tx,intent.programId);
+  if(school.siteId!==intent.siteId)
     throw new AuthorizationError("school application opening changed");
-  await requireChurchHostedOperatingServices(tx,intent.programId,["admissions","school_of_record"]);
 
   // An email challenge proves email ownership, not custody or authority
   // over an existing Person. Lock the email's account before inspecting grants.
@@ -141,3 +128,4 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
     programId:intent.programId,requestId:intent.id};
  });
 }
+

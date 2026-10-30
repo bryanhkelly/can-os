@@ -67,7 +67,7 @@ const restrictedBroadActionTypes = new Set([
 
 function actionCategory(action: DailyOperationsAction): DailyAttentionCategory {
   if (action.openingHandoff || action.type === "program_opening_handoff") return "opening";
-  if (action.type === "section_waitlist") return "staffing";
+  if (action.type === "section_waitlist" || action.type === "onsite_coverage_gap") return "staffing";
   if (action.type === "guardian_grade_follow_up") return "family";
   if (action.type === "academic_intervention" || action.type === "missing_work_follow_up") return "academic";
   return "operations";
@@ -81,15 +81,18 @@ function actionHref(action: DailyOperationsAction): string {
   return "/operations?" + query.toString();
 }
 
-function actionAttention(action: DailyOperationsAction): DailyAttentionItem {
+function actionAttention(action: DailyOperationsAction, role: "registrar" | "site_leader"): DailyAttentionItem {
   const category = actionCategory(action);
   return {
     id: "action:" + action.id,
     category,
     title: action.title,
     detail: action.detail ?? action.description ?? "Review the canonical Action in Operations.",
-    href: actionHref(action),
-    nextStep: category === "opening" ? "Review the named handoff" :
+    href: action.type === "onsite_coverage_gap" && role === "site_leader" && action.siteId
+      ? "/sites/" + encodeURIComponent(action.siteId) : actionHref(action),
+    nextStep: action.type === "onsite_coverage_gap" && !action.ownerPersonId
+      ? "Ask the host registrar to appoint an eligible director and assign this gap"
+      : category === "opening" ? "Review the named handoff" :
       category === "family" ? "Review the family question" : "Review action",
     ownerName: action.ownerName ?? null,
     dueAt: action.dueAt,
@@ -114,7 +117,7 @@ function sortAttention(items: DailyAttentionItem[]): DailyAttentionItem[] {
 /**
  * Read-only navigation over canonical Actions and existing operational
  * projections. It does not calculate readiness, interventions or health.
- * Site leaders receive local assigned work only; registrars additionally see
+ * Site leaders receive local assigned work and unowned coverage escalations; registrars additionally see
  * student-free admissions and academic aggregates in their verified scope.
  */
 export function buildDailyOperationsAttention(input: {
@@ -127,8 +130,9 @@ export function buildDailyOperationsAttention(input: {
   const actions = input.actions.filter(action =>
     !restrictedBroadActionTypes.has(action.type ?? "") &&
     (input.role === "registrar" || action.ownerPersonId === input.actorPersonId ||
-      action.type === "program_opening_handoff" || action.openingHandoff));
-  const items = actions.map(actionAttention);
+      action.type === "program_opening_handoff" || action.openingHandoff ||
+      (action.type === "onsite_coverage_gap" && action.ownerPersonId === null)));
+  const items = actions.map(action => actionAttention(action, input.role));
   if (input.role === "site_leader") return sortAttention(items);
 
   for (const issue of input.staffingIssues ?? []) {

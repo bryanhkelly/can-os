@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "@tanstack/react-router";
 import {
   getHostProgramSiteAuthorizationFn, requestProgramSiteAuthorizationFn,
   revokeProgramSiteAuthorizationFn,
@@ -9,6 +10,7 @@ type Status = Awaited<ReturnType<typeof getHostProgramSiteAuthorizationFn>>;
 
 /** This only requests an agreement. School opening and CAN staff grants remain separate. */
 export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
+  const router = useRouter();
   const [status,setStatus] = useState<Status|null>(null);
   const [selected,setSelected] = useState<OperatingService[]>([]);
   const [busy,setBusy] = useState(false);
@@ -23,12 +25,30 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
     setSelected(current => current.length ? current.filter(service =>
       result.canIssueCredit || service !== "credit_issuance") : result.recommendedServices);
   },[programId]);
-  useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:"Unable to load agreement status"));},[load]);
+  useEffect(()=>{
+    let current = true;
+    void load().catch(e=>{
+      if(current){setStatus(null);setError(e instanceof Error?e.message:"Unable to load agreement status");}
+    });
+    return ()=>{current=false;};
+  },[load]);
+  async function refresh() {
+    setBusy(true);setError("");setNotice("");
+    try {
+      await load();
+      // Recompute the owning route's academic authority and classroom readiness
+      // from canonical services after an independent agreement lifecycle change.
+      await router.invalidate();
+    } catch(e) {
+      setStatus(null);
+      setError(e instanceof Error?e.message:"Unable to refresh agreement and readiness");
+    } finally { setBusy(false); }
+  }
   async function request() {
     setBusy(true);setError("");setNotice("");
     try {
       await requestProgramSiteAuthorizationFn({data:{programId,services:selected}});
-      await load();setNotice("Request recorded for independent CAN institutional review.");
+      await load();await router.invalidate();setNotice("Request recorded for independent CAN institutional review.");
     } catch(e){setError(e instanceof Error?e.message:"Request failed");}
     finally{setBusy(false);}
   }
@@ -39,7 +59,7 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
       await revokeProgramSiteAuthorizationFn({data:{
         authorizationId:status.authorization.id,reason:revokeReason,
       }});
-      await load();setNotice("Operating authorization revoked; new delegated activity is blocked.");
+      await load();await router.invalidate();setNotice("Operating authorization revoked; new delegated activity is blocked.");
     }catch(e){setError(e instanceof Error?e.message:"Revocation failed");}
     finally{setBusy(false);}
   }
@@ -51,6 +71,15 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
       transferring church ownership. The contract, individual staff grants, school opening
       and safeguarding approvals are independent checks.
     </p>
+    <button type="button" disabled={busy} onClick={()=>void refresh()}
+      className="mt-3 min-h-11 rounded border px-3 py-2 text-sm disabled:opacity-50">
+      {busy?"Updating…":"Refresh agreement and readiness"}
+    </button>
+    <p className="mt-2 text-xs text-muted-foreground">
+      After CAN reviews, renews or withdraws this agreement, refresh to recheck the
+      current service authority and academic setup. Only CAN can approve institutional services;
+      the church supplies the signed agreement and completes its own opening requirements.
+    </p>
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
     {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
     {!status?<p className="mt-3 text-sm">Checking institutional authorization…</p>:
@@ -60,19 +89,30 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
       {status.authorization.lapsed&&<p role="status" className="mt-2">
         The agreement window has elapsed. Delegated CAN operations are blocked
         until the independent CAN steward renews the agreement under fresh evidence.
+        {status.authorization.status==="suspended"&&" The suspension must also be resolved by CAN before services can resume."}
       </p>}
       {status.authorization.status==="requested"&&<p role="status" className="mt-2">
         Awaiting independent CAN review of the agreement and its verified evidence.
         You can continue planning classes, but this request does not open admissions or the school.
       </p>}
+      {status.authorization.status==="suspended"&&<p role="status" className="mt-2">
+        CAN has suspended this agreement. Delegated services are blocked.
+        Contact your CAN steward for review and resumption, or revoke the agreement below.
+        School opening authorization remains a separate requirement.
+      </p>}
+      {status.authorization.status==="suspended"&&status.authorization.suspensionReason&&
+        <p className="mt-2 text-xs">CAN suspension reason: {status.authorization.suspensionReason}</p>}
+      {status.authorization.effectiveFrom&&<p className="mt-1 text-xs">
+        Term begins: {new Date(status.authorization.effectiveFrom).toLocaleString()}
+      </p>}
       <p className="mt-1 text-xs">Services: {status.authorization.services.join(", ")}</p>
       {status.authorization.effectiveThrough&&<p className="mt-1 text-xs">
-        Term ends: {new Date(status.authorization.effectiveThrough).toLocaleDateString()}
+        Term ends (exclusive): {new Date(status.authorization.effectiveThrough).toLocaleString()}
       </p>}
       {status.authorization.reviewReason&&<p className="mt-2 text-xs">
         Institutional review: {status.authorization.reviewReason}
       </p>}
-      {status.authorization.status==="approved"&&<form onSubmit={e=>{e.preventDefault();void revoke();}} className="mt-3 space-y-2">
+      {(status.authorization.status==="approved"||status.authorization.status==="suspended")&&<form onSubmit={e=>{e.preventDefault();void revoke();}} className="mt-3 space-y-2">
         <label className="block text-xs">Reason for withdrawing church-hosted authority
           <input className="mt-1 w-full rounded border bg-background p-2" value={revokeReason}
             onChange={e=>setRevokeReason(e.target.value)} minLength={10} maxLength={500} required/>
@@ -106,3 +146,4 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
     </div>}
   </section>;
 }
+

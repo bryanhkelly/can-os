@@ -37,7 +37,9 @@ export async function resolvePublishedFamilyStartDestination(
      ...(slug?[eq(sitePublications.slug,slug)]:[]),
      eq(sitePublications.status,"published"),isNotNull(sitePublications.publishedAt),
      eq(programPublications.status,"published"),isNotNull(programPublications.publishedAt)))
-   .for("share",{of:sitePublications}).limit(1);
+   // Keep all three mutable admission facts stable until the caller's
+   // transaction completes, including Program withdrawal or suspension.
+   .for("share",{of:[sitePublications,programPublications,programs]}).limit(1);
  if(!school)throw new Error("School applications not open");
  assertPublishedFamilyInvitationDestination({
    type:school.type,status:school.status,programSiteId:school.programSiteId,
@@ -106,3 +108,4 @@ export async function requestPublicFamilyStart(
  });
  return outcome;
 }
+

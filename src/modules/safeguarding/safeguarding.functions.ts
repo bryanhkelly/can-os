@@ -6,7 +6,9 @@ import { safeguardingObservationSchema } from "@/domain/safeguarding-intake-poli
 import {
   acknowledgeSafeguardingConcern,
   addSafeguardingEvidence,
+  assignSafeguardingCaseReview,
   claimOverdueSafeguardingResponse,
+  completeSafeguardingCaseReview,
   escalateSafeguardingConcern,
   getSafeguardingCase,
   getSafeguardingWorkspace,
@@ -104,3 +106,13 @@ export const saveOperationalSafeguardingConfiguration = createServerFn({ method:
     responders: z.object({ primary: uuid, deputy: uuid, can_lead: uuid }).strict(),
   }).strict().parse(value))
   .handler(async ({ data }) => saveSafeguardingSiteConfiguration(await actor(), data));
+
+export const completeAssignedSafeguardingReview = createServerFn({method:"POST"})
+  .validator((value:unknown)=>z.object({incidentId:uuid,reviewId:uuid,outcome:text(10,2000)}).strict().parse(value))
+  .handler(async({data})=>completeSafeguardingCaseReview(await actor(),data));
+
+export const assignRestrictedSafeguardingReview = createServerFn({method:"POST"})
+  .validator((value:unknown)=>z.object({incidentId:uuid,reviewId:uuid,reviewerPersonId:uuid,
+    kind:z.enum(["protective_measure_review","external_reporting_review","follow_up_review"]),notes:text(10,2000),
+  }).strict().parse(value))
+  .handler(async({data})=>assignSafeguardingCaseReview(await actor(),data));

@@ -309,7 +309,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  // Filter the whole sensitive notification (including title/body), not only
  // its deep link. Staff and student notifications retain their own ownership
  // checks and projection paths.
- const visible=rows.filter(n=>context.role!=="guardian"||!n.resourceId||
+ const visible=rows.filter(n=>n.resourceType!=="safeguarding_concern"||
+   !!n.resourceId&&permittedSafeguardingIds.has(n.resourceId))
+  .filter(n=>context.role!=="guardian"||!n.resourceId||
    (pickupNotificationTypes.has(n.type)?pickupStudents.has(n.resourceType+":"+n.resourceId):
     n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
     n.resourceType==="application"?enrollmentStudent.has(n.resourceId):

@@ -46,3 +46,25 @@ describe("suggestedSchoolYear", () => {
     }
   });
 });
+
+describe("school year from the canonical launch target", () => {
+  it("uses the target date instead of the current-date planning cutoff", () => {
+    expect(suggestedSchoolYear(new Date("2026-10-29T12:00:00"), "2027-08-23")).toEqual({
+      name: "2027–2028 School Year", key: "2027-28", startsOn: "2027-08-23", endsOn: "2028-06-10",
+    });
+  });
+  it("supports a midyear opening without moving it to the next August", () => {
+    expect(suggestedSchoolYear(new Date("2026-10-29T12:00:00"), "2027-01-11")).toEqual({
+      name: "2026–2027 School Year", key: "2026-27", startsOn: "2027-01-11", endsOn: "2027-06-10",
+    });
+  });
+  it("keeps a summer opening before its suggested end date", () => {
+    expect(suggestedSchoolYear(new Date(), "2027-06-21")).toEqual({
+      name: "2027–2028 School Year", key: "2027-28", startsOn: "2027-06-21", endsOn: "2028-06-10",
+    });
+  });
+  it("rejects an invalid supplied target rather than silently replacing it", () => {
+    expect(()=>suggestedSchoolYear(new Date(), "2027-02-29")).toThrow("valid target opening date");
+  });
+});
+

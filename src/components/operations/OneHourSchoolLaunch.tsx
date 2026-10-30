@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { resolveLaunchResume } from "@/domain/launch-resume";
 import { Link, useRouter } from "@tanstack/react-router";
 import { StatusBadge } from "@/components/workspace";
 import {
@@ -161,15 +162,38 @@ function OpeningTask({ launch, busy, open }: {
   </div>;
 }
 
-export function OneHourSchoolLaunch({ launches, selectedProgramId }: {
+export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, selectedSiteId }: {
   launches: Launch[];
   selectedProgramId?: string;
+  selectedSiteId?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [opened, setOpened] = useState<{ name: string; siteId: string | null } | null>(null);
-  const launch = launches.find(item => item.id === selectedProgramId) ?? launches[0];
+  const { launches, launch, unavailable } = resolveLaunchResume(allLaunches, {
+    siteId: selectedSiteId, programId: selectedProgramId,
+  });
+  if (unavailable) return <section role="alert" className="mt-8 rounded-2xl border bg-card p-6">
+    <h2 className="font-serif text-2xl">This launch is unavailable</h2>
+    <p className="mt-3 text-sm">The requested Program is no longer in your pre-opening launch scope.
+      It may have opened or your access may have changed.</p>
+    <Link to="/operations" search={{ siteId: selectedSiteId, programId: selectedProgramId }}
+      className="mt-4 inline-block font-semibold underline">Review the operating workspace →</Link>
+    <Link to="/operations/launch" search={{ siteId: selectedSiteId, programId: undefined }}
+      className="ml-4 mt-4 inline-block font-semibold underline">Choose an available launch →</Link>
+  </section>;
+  if (!launch && launches.length > 1) return <section className="mt-8 rounded-2xl border bg-card p-6">
+    <h2 className="font-serif text-2xl">Choose the school to continue</h2>
+    <p className="mt-3 text-sm">Each school resumes its own saved Program and Launch Journey.</p>
+    <nav aria-label="Available school launches" className="mt-4 flex flex-wrap gap-3">
+      {launches.map(item => <Link key={item.id} to="/operations/launch"
+        search={{ siteId: item.siteId ?? undefined, programId: item.id }}
+        className="min-h-11 rounded-xl border px-4 py-3 text-sm font-semibold">
+        Continue {item.name}
+      </Link>)}
+    </nav>
+  </section>;
   if (!launch) return <section className="mt-8 rounded-2xl border bg-card p-6" aria-label="Launch your school">
     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">School launch</p>
     <h2 className="mt-2 font-serif text-3xl">Let&apos;s open your school</h2>
@@ -226,6 +250,9 @@ export function OneHourSchoolLaunch({ launches, selectedProgramId }: {
           Progress is saved to this Program and its Launch Journey after each recorded action.
           Return to this launch on another session or device; no browser checklist determines readiness.
         </p>
+        {launch.targetOpeningDate && <p className="mt-2 text-sm">
+          Target opening: {launch.targetOpeningDate} · planning date, not opening approval.
+        </p>}
       </div>
       <StatusBadge tone={guidance.pendingBlocking.length ? "attention" : "neutral"}>
         {guidance.pendingBlocking.length
@@ -297,10 +324,10 @@ export function OneHourSchoolLaunch({ launches, selectedProgramId }: {
       </ol>
     </details>
 
-    {guidance.optionalSetupAvailable && <details className="mt-4 rounded-xl border bg-background p-4">
+    <details className="mt-4 rounded-xl border bg-background p-4">
       <summary className="cursor-pointer text-sm font-semibold">Optional · Website, outreach and family intake</summary>
       <p className="mt-3 text-sm text-muted-foreground">
-        These tools do not replace opening requirements. A public website is not required for registrar-assisted intake.
+        You can prepare these items while opening reviews continue. These tools do not replace opening requirements. A public website is not required for registrar-assisted intake.
       </p>
       <nav aria-label="Optional launch setup" className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
         {launch.siteId && <Link to="/sites/$siteId/publish" params={{ siteId: launch.siteId }} className="underline">
@@ -312,6 +339,9 @@ export function OneHourSchoolLaunch({ launches, selectedProgramId }: {
         </Link>}
         <Link to="/messages" className="underline">Prepare family outreach</Link>
       </nav>
-    </details>}
+    </details>
   </section>;
 }
+
+
+

@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from "react";
+import { familyInvitationProgress, familyInvitationRetryLabel } from "@/domain/family-invitation-progress";
 import { useRouter } from "@tanstack/react-router";
+import { familyInvitationLaunchScope } from "@/domain/family-invitation-launch-scope";
 import { parseFamilyContacts } from "@/domain/family-contact-import";
 import {
   FAMILY_INVITATION_MAX_RECIPIENTS,
@@ -10,11 +12,11 @@ import {
   sendFamilyInvitations,
 } from "@/modules/enrollment/family-invitations.functions";
 
-function recipientStatus(status: FamilyInvitationWorkspace["batches"][number]["recipients"][number]["status"]) {
+function recipientStatus(status: FamilyInvitationWorkspace["batches"][number]["recipients"][number]["status"], outboxStatus: FamilyInvitationWorkspace["batches"][number]["outboxStatus"]) {
   switch (status) {
     case "responded": return "Application opened";
     case "provider_accepted": return "Provider accepted · inbox delivery not verified";
-    case "retrying": return "Retry needed";
+    case "retrying": return familyInvitationRetryLabel(outboxStatus);
     case "queued": return "Queued";
   }
 }
@@ -22,15 +24,18 @@ function recipientStatus(status: FamilyInvitationWorkspace["batches"][number]["r
 export function FamilyInviteImporter({
   workspace,
   selectedProgramId,
+  selectedSiteId,
 }: {
   workspace: FamilyInvitationWorkspace | null;
   selectedProgramId?: string;
+  selectedSiteId?: string;
 }) {
   const router = useRouter();
-  const programs = workspace?.programs ?? [];
-  const initialProgram = programs.find(program => program.id === selectedProgramId) ?? programs[0];
+  const { programs, batches, initialProgram } = familyInvitationLaunchScope(workspace, {
+    siteId: selectedSiteId, programId: selectedProgramId,
+  });
   const [programId, setProgramId] = useState(initialProgram?.id ?? "");
-  const selectedProgram = programs.find(program => program.id === programId) ?? programs[0];
+  const selectedProgram = programs.find(program => program.id === programId);
   const [raw, setRaw] = useState("");
   const [subject, setSubject] = useState(`${initialProgram?.name ?? "Our school"} is welcoming families`);
   const [introduction, setIntroduction] = useState("We're excited to invite your family to learn about our school.");
@@ -115,7 +120,7 @@ export function FamilyInviteImporter({
     <h2 className="mt-2 font-serif text-2xl">Invite families</h2>
     <p className="mt-2 text-sm text-muted-foreground">Paste up to {FAMILY_INVITATION_MAX_RECIPIENTS} addresses, review the recipients and message, then queue secure links directly to the published school application. Existing family identities are reused only after the recipient verifies their email and the existing account resolves to one Person.</p>
 
-    {!programs.length ? <p role="status" className="mt-5 rounded-lg border p-4 text-sm">No published, active, admissions-authorized Program is available in your scope. Publish the Site and Program and confirm operating authorization before inviting families.</p> : <>
+    {!programs.length ? <p role="status" className="mt-5 rounded-lg border p-4 text-sm">The selected school has no published, active, admissions-authorized Program available for invitations. Publish the Site and Program and confirm operating authorization before inviting families.</p> : <>
       <label className="mt-5 block text-sm font-semibold">Published school application
         <select value={selectedProgram?.id ?? ""} onChange={event => {
           const program = programs.find(item => item.id === event.target.value);
@@ -123,6 +128,7 @@ export function FamilyInviteImporter({
           if (program) setSubject(`${program.name} is welcoming families`);
           changed();
         }} className="mt-2 block w-full rounded-lg border bg-background p-3 font-normal">
+          <option value="">Choose the intended school application</option>
           {programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
         </select>
       </label>
@@ -165,7 +171,7 @@ export function FamilyInviteImporter({
         </label>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">Email uses the server-approved CAN access-mail sender. A typed sender or reply-to address cannot override it.</p>
-      <button type="button" disabled={!parsed.contacts.length || tooMany || !subject.trim() || !introduction.trim()}
+      <button type="button" disabled={!selectedProgram || busy || !parsed.contacts.length || tooMany || !subject.trim() || !introduction.trim()}
         onClick={() => { setPreview(true); setConfirmed(false); }}
         className="mt-5 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Preview invitation</button>
       {preview && <div className="mt-6 rounded-xl border p-5" aria-label="Invitation preview">
@@ -174,7 +180,7 @@ export function FamilyInviteImporter({
         <p className="mt-4 whitespace-pre-wrap text-sm">{introduction}</p>
         <p className="mt-3 text-sm">Each email includes a single-use, 10-minute link directly to {selectedProgram?.name}'s verified application.</p>
         <label className="mt-5 flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I reviewed the recipients and message and have a school-approved basis to contact these families.</label>
-        <button type="button" disabled={!confirmed || busy} onClick={() => void send()}
+        <button type="button" disabled={!selectedProgram || !confirmed || busy} onClick={() => void send()}
           className="mt-4 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? "Saving and queueing…" : "Save and queue invitations"}</button>
       </div>}
     </>}
@@ -182,24 +188,26 @@ export function FamilyInviteImporter({
     {error && <p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
     {result && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{result}</p>}
 
-    {workspace.batches.length > 0 && <div className="mt-8">
+    {batches.length > 0 && <div className="mt-8">
       <h3 className="font-serif text-xl">Invitation responses</h3>
       <p className="mt-1 text-xs text-muted-foreground">Provider acceptance is not inbox delivery. A response is recorded only when the recipient redeems the verified application link.</p>
-      <div className="mt-3 space-y-3">{workspace.batches.map(batch => {
-        const retryable = batch.recipients.filter(recipient => recipient.status === "retrying").length;
+      <div className="mt-3 space-y-3">{batches.map(batch => {
+        const progress = familyInvitationProgress(batch);
         return <details key={batch.id} className="rounded-xl border p-4">
         <summary className="cursor-pointer text-sm font-semibold">{batch.subject} · {batch.programName} · {batch.recipients.length} recipients</summary>
-        <p className="mt-2 text-xs text-muted-foreground">Queued {new Date(batch.createdAt).toLocaleString()} · {batch.outboxStatus === "failed" ? "Automatic retries exhausted; operations alerted." : batch.status === "complete" ? "All recipients accepted by the provider." : "Outbox processing or retrying."}</p>
-        {retryable > 0 && <button type="button" disabled={busy} onClick={() => void retryFailed(batch.id)}
+        <p className="mt-2 text-xs text-muted-foreground">Queued {new Date(batch.createdAt).toLocaleString()} · {progress.label}</p>
+        {progress.canRetry && <button type="button" disabled={busy} onClick={() => void retryFailed(batch.id)}
           className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
-          {busy ? "Queueing retry…" : `Retry ${retryable} failed recipient${retryable === 1 ? "" : "s"}`}
+          {busy ? "Queueing retry…" : `Retry ${progress.failedRecipients} failed recipient${progress.failedRecipients === 1 ? "" : "s"}`}
         </button>}
         <ul className="mt-3 space-y-2">{batch.recipients.map(recipient => <li key={recipient.email} className="flex flex-col gap-1 border-b pb-2 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="break-words">{[recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || "Name not supplied"} · {recipient.email}</span>
-          <span className="text-xs text-muted-foreground">{recipientStatus(recipient.status)}{recipient.respondedAt ? ` · ${new Date(recipient.respondedAt).toLocaleString()}` : ""}</span>
+          <span className="text-xs text-muted-foreground">{recipientStatus(recipient.status, batch.outboxStatus)}{recipient.respondedAt ? ` · ${new Date(recipient.respondedAt).toLocaleString()}` : ""}</span>
         </li>)}</ul>
       </details>;
       })}</div>
     </div>}
   </section>;
 }
+
+

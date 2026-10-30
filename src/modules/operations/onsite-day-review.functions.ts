@@ -1,7 +1,7 @@
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { createHash } from "node:crypto";
-import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -111,7 +111,11 @@ export const loadOnsiteDayOperationalSnapshot=createServerOnlyFn(async (actor:Ac
     }).from(incidents)
       .leftJoin(incidentPeople,eq(incidentPeople.incidentId,incidents.id))
       .leftJoin(studentProfiles,eq(studentProfiles.personId,incidentPeople.personId))
+      // Even counts and snapshot changes can reveal a restricted case. Named
+      // safeguarding access belongs only in its audited case workspace.
       .where(and(eq(incidents.siteId,site.id),inArray(incidents.programId,programIds),
+        ne(incidents.type,"safeguarding_concern"),
+        ne(incidents.classification,"safeguarding_restricted"),
         gte(incidents.occurredAt,broadStart),lt(incidents.occurredAt,broadEnd)))
       .limit(1001):Promise.resolve([]),
     studentIds.length?db.select({
