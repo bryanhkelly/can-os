@@ -383,7 +383,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             {task.requiresRegistrarReview && <p className="mt-1 text-xs font-semibold">Registrar evidence review required — school self-completion is unavailable.</p>
             {Boolean(task.reviewNoteCount) && <p className="mt-1 text-xs text-muted-foreground">Registrar review notes: {task.reviewNoteCount}</p>}
             {task.latestReviewStatus === "rejected" && task.latestReviewReason && <p className="mt-1 text-xs">Latest correction request: {task.latestReviewReason}</p>}
-            {Boolean(task.rejectedReviewCount) && <p className="mt-1 text-xs font-semibold text-destructive">Historical rejected review events: {task.rejectedReviewCount}. Latest review: {task.latestReviewStatus ?? "unknown"}.</p>}}
+            {Boolean(task.rejectedReviewCount) && <p className="mt-1 text-xs font-semibold text-destructive">Historical rejected review events: {task.rejectedReviewCount}. Latest review: {task.latestReviewStatus ?? "unknown"}.</p>}
             {task.requirementId && <p className="mt-1 text-xs text-muted-foreground">Requirement reference: <code className="select-all">{task.requirementId}</code></p>}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
