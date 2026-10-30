@@ -271,6 +271,7 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
         id: s.journeyRequirements.id,
         status: s.journeyRequirements.status,
         evidence: s.journeyRequirements.evidence,
+        metadata: s.journeyRequirements.metadata,
         journeyStatus: s.journeys.status,
         participantType: s.journeys.participantType,
         programId: s.journeys.programId,
@@ -293,7 +294,8 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
       const previousStatement = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_statement");
       const pendingDecision = row.evidence.findLastIndex(item => item.kind === "launch_evidence_statement") >
         row.evidence.findLastIndex(item => item.kind === "launch_evidence_review");
-      if (pendingDecision) throw new Error("Evidence is already awaiting institutional review");
+      if (pendingDecision && (row.status === "needs_can" || row.metadata.evidenceReviewRequired === true))
+        throw new Error("Evidence is already awaiting institutional review");
       const latestReview = [...row.evidence].reverse().find(item => item.kind === "document_review" || item.kind === "launch_evidence_review");
       if (previousStatement?.text === data.statement && previousStatement?.submittedByPersonId === context.actorPersonId &&
           (!latestReview || row.evidence.lastIndexOf(previousStatement) > row.evidence.lastIndexOf(latestReview)))
