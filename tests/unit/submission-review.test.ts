@@ -39,7 +39,7 @@ const storageKey = `learning/assignment/${assessmentId}/${documentId}`;
 const submission = {
   id: submissionId, assessmentId, studentProfileId: "profile", studentPersonId: "student",
   response: { text: "My submitted essay", attachments: [documentId] }, attemptNumber: 2,
-  submittedAt: new Date("2030-01-01"), status: "submitted",
+  submittedAt: new Date("2030-01-01"), status: "submitted", score: null, feedback: null,
 };
 const document = { id: documentId, fileName: "essay.pdf", storageKey, verifiedAt: new Date("2030-01-01") };
 // Canonical class-access rows: an active Section in the teacher's verified
@@ -106,6 +106,7 @@ describe("teacher submission review boundary", () => {
   it("returns the real response, verified file metadata and attempt history without a signed URL", async () => {
     const result = await getSubmissionReview({ data: { submissionId } });
     expect(result).toEqual({
+      score: null, feedbackComment: "",
       responseText: "My submitted essay", attemptNumber: 2, submittedAt: "2030-01-01T00:00:00.000Z",
       attachments: [{ id: documentId, fileName: "essay.pdf" }],
       attempts: [{ id: submissionId, attemptNumber: 2, status: "submitted", score: null, submittedAt: "2030-01-01T00:00:00.000Z" }],
