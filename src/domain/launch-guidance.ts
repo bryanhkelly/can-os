@@ -32,6 +32,7 @@ export type LaunchGuidanceTask = {
   evidenceCount?: number;
   evidenceStatementCount?: number;
   latestEvidenceStatementAt?: string | null;
+  latestEvidenceStatement?: string | null;
   reviewNoteCount?: number;
   rejectedReviewCount?: number;
   latestReviewStatus?: string | null;
@@ -97,6 +98,7 @@ export function buildLaunchGuidance(launch: LaunchGuidanceRecord) {
     evidenceReviewRequired: requirement.metadata?.evidenceReviewRequired === true,
     evidenceCount: requirement.evidence?.length ?? 0,
     evidenceStatementCount: requirement.evidence?.filter(item => item.kind === "launch_evidence_statement").length ?? 0,
+    latestEvidenceStatement: (() => { const entry = [...(requirement.evidence ?? [])].reverse().find(item => item.kind === "launch_evidence_statement"); return typeof entry?.text === "string" ? entry.text : null; })(),
     latestEvidenceStatementAt: (() => { const entry = [...(requirement.evidence ?? [])].reverse().find(item => item.kind === "launch_evidence_statement"); return typeof entry?.submittedAt === "string" ? entry.submittedAt : null; })(),
     reviewNoteCount: requirement.evidence?.filter(item => item.kind === "registrar_note").length ?? 0,
     pendingEvidenceReview: (() => { const entries = requirement.evidence ?? []; const submitted = entries.findLastIndex(item => item.kind === "launch_evidence_statement"); const reviewed = entries.findLastIndex(item => item.kind === "launch_evidence_review"); return submitted >= 0 && submitted > reviewed && requirement.status !== "complete"; })(),
