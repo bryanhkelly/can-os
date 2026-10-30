@@ -324,10 +324,10 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       </ol>
     </details>
 
-    {guidance.optionalSetupAvailable && <details className="mt-4 rounded-xl border bg-background p-4">
+    <details className="mt-4 rounded-xl border bg-background p-4">
       <summary className="cursor-pointer text-sm font-semibold">Optional · Website, outreach and family intake</summary>
       <p className="mt-3 text-sm text-muted-foreground">
-        These tools do not replace opening requirements. A public website is not required for registrar-assisted intake.
+        You can prepare these items while opening reviews continue. These tools do not replace opening requirements. A public website is not required for registrar-assisted intake.
       </p>
       <nav aria-label="Optional launch setup" className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
         {launch.siteId && <Link to="/sites/$siteId/publish" params={{ siteId: launch.siteId }} className="underline">
@@ -339,8 +339,9 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         </Link>}
         <Link to="/messages" className="underline">Prepare family outreach</Link>
       </nav>
-    </details>}
+    </details>
   </section>;
 }
+
 
 

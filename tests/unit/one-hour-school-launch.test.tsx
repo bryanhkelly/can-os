@@ -14,6 +14,10 @@ vi.mock("@/modules/programs/launch.functions", () => ({
   scheduleLaunchOrientation: vi.fn(),
 }));
 
+vi.mock("@/components/workspace", () => ({
+  StatusBadge: ({ children }: { children: ReactNode }) => <span>{children}</span>,
+}));
+
 type Launch = Awaited<ReturnType<typeof listLaunches>>["launches"][number];
 const base: Launch = {
   id: "program",
@@ -52,7 +56,10 @@ describe("guided school launch", () => {
     expect(html).toContain("cannot mark it complete");
     expect(html).not.toContain("Save school completion");
     expect(html).toContain("View the full saved launch path");
-    expect(html).not.toContain("Optional · Website, outreach and family intake");
+    expect(html).toContain("Optional · Website, outreach and family intake");
+    expect(html).toContain("Review private school website");
+    expect(html).toContain("while opening reviews continue");
+    expect(html).not.toContain(">Activate</button>");
     expect(html.match(/aria-label="Next launch task"/g)).toHaveLength(1);
   });
 
@@ -117,3 +124,4 @@ describe("guided school launch", () => {
     expect(html).toContain("Open Site Today");
   });
 });
+
