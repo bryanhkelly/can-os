@@ -332,8 +332,8 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
     journeyRequirementId: uuid,
     decision: z.enum(["accepted", "rejected"]),
     reason: z.string().trim().max(1000).default(""),
-  }).strict().refine(value => value.decision !== "rejected" || value.reason.length >= 5,
-    "A rejected submission requires a correction reason").parse(value))
+  }).strict().refine(value => value.decision !== "rejected" ? value.reason.length >= 1 : value.reason.length >= 5,
+    "Institutional decisions require a rationale; corrections require at least five characters").parse(value))
   .handler(async ({ data }) => {
     const context = await registrarContext("program.activate");
     if (!context.actorPersonId || context.grantSiteId !== null || context.scope.siteIds?.length)
