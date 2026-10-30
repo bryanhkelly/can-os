@@ -239,8 +239,8 @@ function LaunchWizardPage() {
         )}
         <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
 
-        {launches.launches.length>0&&<details className="mt-5 rounded-xl border bg-card p-5">
-          <summary className="cursor-pointer text-sm font-semibold">Optional · Family outreach</summary>
+        {launches.launches.length>0&&<details open className="mt-5 rounded-xl border bg-card p-5">
+          <summary className="cursor-pointer text-sm font-semibold">Family invitations and outreach progress</summary>
           <FamilyInviteImporter key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} workspace={familyInvitations} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
         </details>}
 
