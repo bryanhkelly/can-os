@@ -5,12 +5,13 @@ type ProgramPreview={id:string;name:string;status:string;type:string;organizatio
 /** Real program counts require a verified, scoped staff membership. */
 export const getScopedPrograms=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await requireActor(["teacher","registrar"],"program.read");
- const ids=actor.scope.programIds??[];
- if(!ids.length)return [] as ProgramPreview[];
+ if(!actor.scope.organizationIds?.length)return [] as ProgramPreview[];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const records=await db.select({id:s.programs.id,name:s.programs.name,status:s.programs.status,type:s.programs.type,gradeRange:s.programs.gradeRange,deliveryModel:s.programs.deliveryModel,metadata:s.programs.metadata,organizationName:s.organizations.name})
  .from(s.programs).innerJoin(s.organizations,eq(s.programs.organizationId,s.organizations.id))
- .where(and(inArray(s.programs.id,ids),inArray(s.programs.siteId,actor.scope.siteIds??[]))).limit(100);
+ .where(and(inArray(s.programs.organizationId,actor.scope.organizationIds),
+  ...(actor.scope.programIds?[inArray(s.programs.id,actor.scope.programIds)]:[]),
+  ...(actor.scope.siteIds?[inArray(s.programs.siteId,actor.scope.siteIds)]:[]))).limit(100);
  if(!records.length)return [];
  const visibleIds=records.map(x=>x.id);
  const sections=await db.select({id:s.sections.id,programId:s.sections.programId}).from(s.sections).where(inArray(s.sections.programId,visibleIds));
