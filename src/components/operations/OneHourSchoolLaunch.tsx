@@ -455,6 +455,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             {task.state === "blocked" && <span className="max-w-48 text-right text-xs text-muted-foreground">Review the canonical requirement record to resolve the blocker.</span>}
             {task.state !== "complete" && task.action !== "opening" &&
               <TaskDestination launch={launch} task={task} />}
+            {canReviewEvidence && task.pendingEvidenceReview && <InstitutionalEvidenceReview key={task.id} task={task} busy={busy} review={reviewEvidence} />}
             {task.state !== "complete" && task.action === "orientation" &&
               <Link to="/operations/launch/$programId" params={{programId:launch.id}}
                 search={{siteId:launch.siteId??undefined,programId:undefined}}
