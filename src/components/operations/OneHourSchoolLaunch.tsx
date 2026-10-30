@@ -317,6 +317,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       </div>
       <p className="mt-3 text-sm text-muted-foreground">{next.description}</p>
       <p className="mt-2 text-xs font-semibold">Responsible: {launchResponsibility(next.state)}</p>
+      {next.evidenceInstructions && <p className="mt-2 text-sm">Evidence requested: {next.evidenceInstructions}</p>}
       {next.requirementId && <p className="mt-1 text-xs text-muted-foreground">Evidence entries: {next.evidenceCount ?? 0}{next.ownerPersonId ? ` · Assigned owner ID: ${next.ownerPersonId}` : ""}</p>}
       {next.requiresRegistrarReview && <p className="mt-2 text-sm font-semibold">This requirement needs the registrar evidence-review workflow; it cannot be self-certified.</p>}
       {Boolean(next.rejectedReviewCount) && <p role="alert" className="mt-2 text-sm font-semibold">{next.latestReviewStatus === "rejected" ? "Latest evidence review was rejected; follow up through the registrar workflow." : `${next.rejectedReviewCount} historical rejection(s); latest review: ${next.latestReviewStatus ?? "unknown"}.`}</p>}
