@@ -325,9 +325,15 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
     const context = await registrarContext("program.activate");
     if (!context.actorPersonId || context.grantSiteId !== null || context.scope.siteIds?.length)
       throw new AuthorizationError("CAN institutional evidence reviewer");
-    const [{ db }, s, { and, eq, ne }] = await Promise.all([
+    const [{ db }, s, { and, eq, ne, inArray }] = await Promise.all([
       import("@/db/client"), import("@/db/schema"), import("drizzle-orm"),
     ]);
+    const canOrganizations = context.scope.organizationIds?.length
+      ? await db.select({ id: s.organizations.id }).from(s.organizations)
+          .where(and(inArray(s.organizations.id, context.scope.organizationIds),
+            eq(s.organizations.type, "can_network")))
+      : [];
+    if (!canOrganizations.length) throw new AuthorizationError("CAN institutional organization grant");
     return db.transaction(async tx => {
       const [row] = await tx.select({
         id: s.journeyRequirements.id, journeyId: s.journeyRequirements.journeyId,
