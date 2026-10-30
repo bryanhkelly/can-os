@@ -129,6 +129,7 @@ for (const eventType of [
   EventTypes.SafeguardingConcernAcknowledged,
   EventTypes.SafeguardingConcernEscalated,
   EventTypes.SafeguardingCaseReviewCompleted,
+  EventTypes.SafeguardingCaseReviewAssigned,
   EventTypes.SafeguardingEvidenceAdded,
   EventTypes.SafeguardingExternalReportRecorded,
   EventTypes.HealthComplianceUpdated,

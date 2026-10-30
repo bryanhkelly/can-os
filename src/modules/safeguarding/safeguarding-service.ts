@@ -1,5 +1,7 @@
 import { db } from "@/db/client";
 import {
+  accessAccounts,
+  accountPersonGrants,
   documents,
   enrollments,
   incidentAmendments,
@@ -1199,5 +1201,58 @@ export async function completeSafeguardingCaseReview(actor:AccessContext,input:{
       before:{reviewId:review.id,status:"pending"},after:{reviewId:review.id,status:"complete",outcome},
       contextExtras:{domainEventId:eventId}});
     return {reviewId:review.id,replayed:false};
+  });
+}
+
+/** Assign a canonical review only within an already-authorized restricted case.
+ * The client-generated review ID is the retry boundary, never an access grant.
+ */
+export async function assignSafeguardingCaseReview(actor:AccessContext,input:{
+  incidentId:string;reviewId:string;reviewerPersonId:string;
+  kind:"protective_measure_review"|"external_reporting_review"|"follow_up_review";notes:string;
+}){
+  const notes=input.notes.trim();
+  if(notes.length<10||notes.length>2000||
+    !["protective_measure_review","external_reporting_review","follow_up_review"].includes(input.kind))
+    throw new Error("Choose a recognized internal review and describe the task in 10-2000 characters");
+  const {incident}=await loadIncidentAndAssignment(actor,input.incidentId,"safeguarding.respond");
+  return db.transaction(async tx=>{
+    const [current]=await tx.select({status:incidents.status}).from(incidents)
+      .where(eq(incidents.id,incident.id)).for("update").limit(1);
+    const [existing]=await tx.select().from(incidentReviews).where(eq(incidentReviews.id,input.reviewId)).limit(1);
+    if(existing){
+      if(existing.incidentId===incident.id&&existing.reviewerPersonId===input.reviewerPersonId&&
+        existing.level===input.kind&&existing.notes===notes)return {reviewId:existing.id,replayed:true};
+      throw new Error("This review identifier is already in use");
+    }
+    if(current?.status!=="filed")throw new Error("This restricted case is closed");
+    const [eligible]=await tx.select({id:safeguardingCaseAssignments.id}).from(safeguardingCaseAssignments)
+      .innerJoin(people,eq(people.id,safeguardingCaseAssignments.personId))
+      .innerJoin(accountPersonGrants,eq(accountPersonGrants.personId,people.id))
+      .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+      .where(and(eq(safeguardingCaseAssignments.incidentId,incident.id),
+        eq(safeguardingCaseAssignments.personId,input.reviewerPersonId),isNull(safeguardingCaseAssignments.revokedAt),
+        eq(people.active,true),eq(accountPersonGrants.active,true),eq(accessAccounts.disabled,false),
+        isNotNull(accessAccounts.emailVerifiedAt),eq(accountPersonGrants.organizationId,incident.organizationId!),
+        or(eq(accountPersonGrants.siteId,incident.siteId),isNull(accountPersonGrants.siteId)),
+        inArray(accountPersonGrants.role,["safeguarding_responder","safeguarding_lead"])))
+      .for("share",{of:[safeguardingCaseAssignments,people,accountPersonGrants,accessAccounts]}).limit(1);
+    if(!eligible)throw new AuthorizationError("reviewer must already have current restricted case access");
+    const [created]=await tx.insert(incidentReviews).values({id:input.reviewId,incidentId:incident.id,
+      reviewerPersonId:input.reviewerPersonId,level:input.kind,notes})
+      .onConflictDoNothing().returning({id:incidentReviews.id});
+    if(!created)throw new Error("This review identifier is already in use");
+    const eventId=await emitEvent(tx,{
+      eventType:EventTypes.SafeguardingCaseReviewAssigned,aggregateType:"incident",aggregateId:incident.id,
+      actorPersonId:actor.actorPersonId,organizationId:incident.organizationId,siteId:incident.siteId,programId:incident.programId,
+      payload:{reviewId:input.reviewId,classification:"safeguarding_restricted"},
+    });
+    await notifyMany(tx,[{recipientPersonId:input.reviewerPersonId,type:"safeguarding_response_required",
+      title:"Restricted case review assigned",body:"Open your assigned safeguarding workspace to review the internal task.",
+      resourceType:"safeguarding_concern",resourceId:incident.id,eventId}]);
+    await writeAudit(tx,actor,{action:"safeguarding.review.assign",entityType:"incident",entityId:incident.id,
+      scope:{organizationId:incident.organizationId,siteId:incident.siteId,programId:incident.programId},
+      after:{reviewId:input.reviewId,reviewerPersonId:input.reviewerPersonId,kind:input.kind},contextExtras:{domainEventId:eventId}});
+    return {reviewId:input.reviewId,replayed:false};
   });
 }

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, QueryState, StatusBadge, WorkspaceNotice, WorkspacePanel } from "@/components/workspace";
 import {
   acknowledgeAssignedSafeguardingConcern,
+  assignRestrictedSafeguardingReview,
   claimOverdueSafeguardingCaseResponse,
   completeAssignedSafeguardingReview,
   escalateAssignedSafeguardingConcern,
@@ -34,9 +35,14 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
   const [notice, setNotice] = useState("");
   const [resolution, setResolution] = useState("");
   const [reviewOutcomes,setReviewOutcomes] = useState<Record<string,string>>({});
+  const [reviewDraftId,setReviewDraftId]=useState(()=>crypto.randomUUID());
+  const [reviewerId,setReviewerId]=useState("");
+  const [reviewNotes,setReviewNotes]=useState("");
+  const [reviewKind,setReviewKind]=useState<"protective_measure_review"|"external_reporting_review"|"follow_up_review">("follow_up_review");
 
   const openCase = useCallback(async (incidentId: string) => {
     setSelectedId(incidentId); setLoading(true); setError(""); setNotice(""); setResolution("");
+    setReviewDraftId(crypto.randomUUID());setReviewerId("");setReviewNotes("");
     try { setDetail(await getAssignedSafeguardingCase({ data: { incidentId } })); }
     catch (cause) { setDetail(null); setError(cause instanceof Error ? cause.message : "This restricted case cannot be opened."); }
     finally { setLoading(false); }
@@ -86,6 +92,19 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
       await openCase(incidentId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The takeover was not saved."); }
     finally { setBusy(""); }
+  }
+
+  async function assignReview(){
+    if(!selectedId||busy)return;
+    setBusy("assign-review");setError("");setNotice("");
+    try{
+      await assignRestrictedSafeguardingReview({data:{incidentId:selectedId,reviewId:reviewDraftId,
+        reviewerPersonId:reviewerId,kind:reviewKind,notes:reviewNotes}});
+      setReviewDraftId(crypto.randomUUID());setReviewNotes("");
+      setNotice("Internal review assigned without granting new case access.");
+      await refresh();
+    }catch(cause){setError(cause instanceof Error?cause.message:"The review assignment was not saved.");}
+    finally{setBusy("");}
   }
 
   async function completeReview(reviewId:string){
@@ -188,6 +207,31 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
             {!detail.externalReports.length ? <p className="text-sm text-muted-foreground">No outside action has been recorded. This says nothing about whether a legal duty applies.</p> : <ul className="space-y-3 text-sm">{detail.externalReports.map(item => <li key={item.id} className="rounded-lg border p-3"><div className="flex flex-wrap justify-between gap-2"><span className="font-medium">{item.status.replaceAll("_", " ")} · {item.agencyLabel}</span><span>{date(item.occurredAt)}</span></div><p className="mt-1 text-muted-foreground">{item.channel}{item.reference ? ` · Reference ${item.reference}` : ""}</p>{item.details && <p className="mt-2 whitespace-pre-wrap">{item.details}</p>}</li>)}</ul>}
           </WorkspacePanel>
           <SafeguardingExternalReportForm incidentId={selectedId} onSaved={refresh} />
+
+          {detail.incident.status==="filed"&&<WorkspacePanel title="Assign an internal case review"
+            description="Record reviews identified by the authorized case response. A review assignment grants no new case access and does not determine legal reporting requirements." className="mt-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm">Review type
+                <select value={reviewKind} onChange={event=>setReviewKind(event.target.value as typeof reviewKind)} className="mt-1 w-full rounded border bg-background p-2">
+                  <option value="follow_up_review">Follow-up review</option>
+                  <option value="protective_measure_review">Protective-measure review</option>
+                  <option value="external_reporting_review">External-reporting review</option>
+                </select>
+              </label>
+              <label className="text-sm">Assigned case responder
+                <select value={reviewerId} onChange={event=>setReviewerId(event.target.value)} className="mt-1 w-full rounded border bg-background p-2">
+                  <option value="">Choose an assigned responder</option>
+                  {[...new Map(detail.assignments.filter(row=>!row.revokedAt).map(row=>[row.personId,row])).values()]
+                    .map(row=><option key={row.personId} value={row.personId}>{name(row)}</option>)}
+                </select>
+              </label>
+            </div>
+            <label className="mt-3 block text-sm">What must be reviewed
+              <textarea rows={2} maxLength={2000} value={reviewNotes} onChange={event=>setReviewNotes(event.target.value)}
+                className="mt-1 w-full rounded border bg-background p-2"/>
+            </label>
+            <Button className="mt-3" disabled={!!busy||!reviewerId||reviewNotes.trim().length<10} onClick={()=>void assignReview()}>Assign restricted review</Button>
+          </WorkspacePanel>}
 
           {!!detail.reviews.length&&<WorkspacePanel title="Assigned restricted case reviews"
             description="Pending reviews block closure. Completing an internal review never records an external report or ends a legal duty." className="mt-5">

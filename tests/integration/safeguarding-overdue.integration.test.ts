@@ -18,7 +18,7 @@ integration("scheduled restricted safeguarding handoff",()=>{
       state.tx=tx;
       const s=await import("@/db/schema");
       const {escalateOverdueSafeguardingConcerns:sweep}=await import("@/modules/safeguarding/safeguarding-overdue.server");
-      const {acknowledgeSafeguardingConcern,resolveSafeguardingConcern,completeSafeguardingCaseReview,getSafeguardingCase}=await import("@/modules/safeguarding/safeguarding-service");
+      const {acknowledgeSafeguardingConcern,resolveSafeguardingConcern,completeSafeguardingCaseReview,getSafeguardingCase,assignSafeguardingCaseReview}=await import("@/modules/safeguarding/safeguarding-service");
       const suffix=crypto.randomUUID().slice(0,8);
       const [org]=await tx.insert(s.organizations).values({type:"christian_school",name:"Safeguarding sweep fixture",slug:"sg-sweep-"+suffix}).returning();
       const [site]=await tx.insert(s.sites).values({organizationId:org!.id,name:"Synthetic campus",slug:"sg-site-"+suffix,timezone:"UTC"}).returning();
@@ -72,8 +72,22 @@ integration("scheduled restricted safeguarding handoff",()=>{
       actor.scope.siteIds=[site!.id];actor.scope.programIds=[];
       await acknowledgeSafeguardingConcern(actor,overdue.id);
       // Canonical pending reviews must not be stranded by restricted-case closure.
-      const [review]=await tx.insert(s.incidentReviews).values({incidentId:overdue.id,
-        reviewerPersonId:replacement.person.id,level:"safeguarding_follow_up",notes:"Synthetic policy review"}).returning();
+      const review={id:crypto.randomUUID()};
+      const assignmentInput={incidentId:overdue.id,reviewId:review.id,reviewerPersonId:replacement.person.id,
+        kind:"follow_up_review" as const,notes:"Synthetic policy review"};
+      expect(await assignSafeguardingCaseReview(actor,assignmentInput)).toMatchObject({replayed:false});
+      expect(await assignSafeguardingCaseReview(actor,assignmentInput)).toMatchObject({replayed:true});
+      await expect(assignSafeguardingCaseReview(actor,{...assignmentInput,notes:"Different task on the same identifier"}))
+        .rejects.toThrow("already in use");
+      await expect(assignSafeguardingCaseReview(actor,{...assignmentInput,reviewId:crypto.randomUUID(),reviewerPersonId:primary.person.id}))
+        .rejects.toThrow("reviewer must already have current restricted case access");
+      await tx.update(s.accountPersonGrants).set({active:false}).where(eq(s.accountPersonGrants.id,fallback.grant.id));
+      await expect(assignSafeguardingCaseReview(actor,{...assignmentInput,reviewId:crypto.randomUUID(),reviewerPersonId:fallback.person.id}))
+        .rejects.toThrow("reviewer must already have current restricted case access");
+      await tx.update(s.accountPersonGrants).set({active:true}).where(eq(s.accountPersonGrants.id,fallback.grant.id));
+      const assignedEvents=await tx.select().from(s.domainEvents).where(and(eq(s.domainEvents.aggregateId,overdue.id),eq(s.domainEvents.eventType,"SafeguardingCaseReviewAssigned")));
+      expect(assignedEvents).toHaveLength(1);
+      expect(JSON.stringify(assignedEvents[0]!.payload)).not.toContain(assignmentInput.notes);
       const summary="The assigned response and internal case reviews have been recorded.";
       await expect(resolveSafeguardingConcern(actor,{incidentId:overdue.id,resolutionSummary:summary}))
         .rejects.toThrow("Complete all assigned restricted case reviews");
