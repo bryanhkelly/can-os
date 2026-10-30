@@ -65,8 +65,8 @@ function TeacherGradebookPage() {
  const reviewCell=gradebook?.cells.find(cell=>`${cell.studentProfileId}:${cell.assessmentId}`===reviewKey);
  const reviewAssessment=gradebook?.assessments.find(item=>item.id===reviewCell?.assessmentId);
  const reviewStudent=gradebook?.students.find(item=>item.studentProfileId===reviewCell?.studentProfileId);
- const reviewQueue=gradebook?.cells.filter(cell=>["submitted","graded","returned"].includes(cell.status)&&
-  (!search.assessment||cell.assessmentId===search.assessment))??[];
+ const reviewQueue=gradebook?.cells.filter(cell=>["submitted","graded","returned"].includes(cell.status))
+  .sort((a,b)=>Number(b.status==="submitted")-Number(a.status==="submitted"))??[];
  const reviewIndex=reviewQueue.findIndex(cell=>cell.submissionId===reviewCell?.submissionId);
  const previousReview=reviewQueue[reviewIndex-1],nextReview=reviewQueue[reviewIndex+1];
 
