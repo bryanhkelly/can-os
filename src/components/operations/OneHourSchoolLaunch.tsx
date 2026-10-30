@@ -27,10 +27,10 @@ function taskTone(task: LaunchGuidanceTask): "success" | "attention" | "neutral"
 
 function TaskDestination({ launch, task }: { launch: Launch; task: LaunchGuidanceTask }) {
   if (task.requiresRegistrarReview) {
-    return <Link to="/admissions/families"
-      search={{siteId:launch.siteId??undefined,programId:launch.id,application:undefined}}
+    return <Link to="/operations/launch/$programId" params={{programId:launch.id}}
+      search={{siteId:launch.siteId??undefined,programId:undefined}}
       className="inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold">
-      Review family evidence
+      Review requirement details
     </Link>;
   }
   if (task.action === "academics" || task.action === "review") {
