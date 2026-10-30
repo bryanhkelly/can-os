@@ -242,6 +242,17 @@ for (const eventType of [
   EventTypes.StudyGroupSessionCancelled,
   EventTypes.DemoRegistrarProvisioned,
   EventTypes.DemoFacilitatorProvisioned,
+  // Access and authorization lifecycle facts: audit evidence is already written
+  // transactionally; these only complete the outbox for shared subscriptions.
+  EventTypes.AccessAccountDisabled,
+  EventTypes.GuardianAccessRevoked,
+  EventTypes.GuardianAccessRestored,
+  EventTypes.StudentLearningAccessRevoked,
+  EventTypes.StudentLearningAccessRestored,
+  EventTypes.ProgramSiteAuthorizationSuspended,
+  EventTypes.ProgramSiteAuthorizationResumed,
+  EventTypes.ProgramSiteAuthorizationRenewed,
+  EventTypes.OperatingAgreementEvidenceRegistered,
 ] as const) {
   registerDomainEventHandler(eventType, handleAcademicPassThroughEvent);
 }
