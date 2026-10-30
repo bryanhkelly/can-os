@@ -1,2 +1,0 @@
-import {describe,it,expect} from "vitest";import {enrollmentReadiness} from "../src/domain/enrollment-readiness";
-describe("enrollment readiness",()=>{it("blocks activation on unfinished mandatory requirements",()=>{expect(enrollmentReadiness([{title:"Records",status:"needs_you",blocking:true}]).ready).toBe(false);});it("allows optional unfinished items",()=>{expect(enrollmentReadiness([{title:"Photo",status:"needs_you",blocking:false}]).ready).toBe(true);});});

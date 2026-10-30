@@ -43,7 +43,7 @@ describe("guided school launch",()=>{
     ]);
     expect(steps[0]?.evidence).toContain("1 recorded blocking");
     expect(steps[1]?.href).toContain("/operations/launch/");
-    expect(steps.at(-1)?.evidence).toContain("separate release gate");
+    expect(steps.at(-1)?.evidence).toContain("school-opening authority");
   });
   it("preserves partial progress without falsely claiming notifications or browser acceptance",()=>{
     const steps=guidedSchoolJourney({
@@ -53,7 +53,7 @@ describe("guided school launch",()=>{
         publishedAssessments:1,gradedWork:1,unresolvedGuardianResponses:1},
     },null);
     expect(steps.map(x=>x.state)).toEqual([
-      "recorded","recorded","recorded","recorded","review","review",
+      "review","review","recorded","recorded","review","review",
     ]);
     expect(steps[4]?.evidence).toContain("1 outstanding guardian");
     expect(steps[5]?.state).toBe("review");
@@ -100,3 +100,4 @@ describe("school action priorities",()=>{
     expect(schoolActionBacklog(list,now)).toEqual({overdue:0,unassigned:0,waiting:1});
   });
 });
+

@@ -1,1 +1,0 @@
-ALTER TYPE "public"."compliance_framework_version_status" ADD VALUE 'published';

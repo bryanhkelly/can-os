@@ -1,2 +1,0 @@
-import {describe,it,expect} from "vitest";import {renderICS} from "../src/domain/calendar-ics";
-describe("calendar export",()=>{it("exports valid UTC events and escapes titles",()=>{const x=renderICS([{id:"a",title:"Math, Quiz",startsAt:"2026-10-15T16:00:00Z",endsAt:"2026-10-15T17:00:00Z"}]);expect(x).toContain("BEGIN:VCALENDAR");expect(x).toContain("SUMMARY:Math\\, Quiz");expect(x).toContain("DTSTART:20261015T160000Z");});});

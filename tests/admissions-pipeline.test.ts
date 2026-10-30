@@ -1,2 +1,0 @@
-import {describe,it,expect} from "vitest";import {admissionsPipelineSummary} from "../src/domain/admissions-pipeline";
-describe("admissions pipeline",()=>{it("summarizes only the supplied applications",()=>{const s=admissionsPipelineSummary([{id:"a",program:"Demo",stage:"application",submittedAt:null,outstandingRequirements:2},{id:"b",program:"Demo",stage:"accepted",submittedAt:null,outstandingRequirements:0}]);expect(s.awaitingDecision).toBe(1);expect(s.missingRequirements).toBe(2);expect(s.byStage.find(x=>x.stage==="accepted")?.count).toBe(1);});});

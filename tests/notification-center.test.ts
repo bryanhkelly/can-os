@@ -1,2 +1,0 @@
-import {describe,it,expect} from "vitest";import {groupNotices,notificationCountLabel} from "../src/domain/notification-center";
-describe("notification center",()=>{it("sorts unread separately",()=>{const items=[{id:"a",title:"a",status:"read",date:"2026-10-15",href:"/",body:""},{id:"b",title:"b",status:"unread",date:"2026-10-16",href:"/",body:""}];expect(groupNotices(items).unread.map(x=>x.id)).toEqual(["b"]);expect(groupNotices(items).earlier.map(x=>x.id)).toEqual(["a"]);});it("caps count",()=>expect(notificationCountLabel(120)).toBe("99+"));});

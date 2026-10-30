@@ -33,8 +33,8 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
   const c=program.counts;
   const encoded=encodeURIComponent(program.id);
   const site=program.siteId?encodeURIComponent(program.siteId):"";
-  const schoolOpen=program.status==="active";
-  const operations=schoolOpen?activeProgramOperationsHref({programId:program.id,siteId:program.siteId,status:program.status}):
+  const programActive=program.status==="active";
+  const operations=programActive?activeProgramOperationsHref({programId:program.id,siteId:program.siteId,status:program.status}):
     `/operations?programId=${encoded}${site?`&siteId=${site}`:""}`;
   const academic=`/operations/launch/${encoded}`;
   const checklist=`/operations/launch?programId=${encoded}${site?`&siteId=${site}`:""}`;
@@ -51,15 +51,17 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
     : `/admissions/intake?programId=${encoded}${site?`&siteId=${site}`:""}`;
 
   return [
-    {key:"launch",title:"Configure and open the high school",
-      state:schoolOpen?"recorded":"needs_attention",
-      evidence:schoolOpen?"Program active":`Program ${program.status.replaceAll("_"," ")}; ${blocking.length} recorded blocking launch requirement(s)`,
-      nextAction:schoolOpen&&program.siteId?"Open Site Today":schoolOpen?"Review launch history":"Review genuine launch requirements and academic authority",
-      href:schoolOpen?operations:checklist,suggestedRole:"School registrar"},
+    {key:"launch",title:"Configure the school and review opening",
+      state:programActive?"review":"needs_attention",
+      evidence:programActive?"Program active; review current opening authority in the operating workspace.":
+        journey?`Program ${program.status.replaceAll("_"," ")}; ${blocking.length} recorded blocking launch requirement(s)`:
+          `Program ${program.status.replaceAll("_"," ")}; launch Journey unavailable. Readiness cannot be verified.`,
+      nextAction:programActive&&program.siteId?"Open Site Today":programActive?"Review launch history":"Review genuine launch requirements and academic authority",
+      href:programActive?operations:checklist,suggestedRole:"School registrar"},
     {key:"instruction",title:"Adopt curriculum, staff and provision classes",
-      state:staffed?"recorded":"needs_attention",
+      state:staffed?"review":"needs_attention",
       evidence:`${c.adoptedCurriculumPacks} active pack adoption(s) · ${c.publishedSections}/${c.sections} published sections · ${c.staffedSections}/${c.sections} staffed`,
-      nextAction:staffed?"Review sections":"Configure course adoption, academic year and qualified teachers",
+      nextAction:staffed?"Review first-classroom readiness":"Configure course adoption, academic year and qualified teachers",
       href:academic,suggestedRole:"Curriculum publisher / school registrar"},
     {key:"enrollment",title:"Admit, enroll and place families",
       state:enrolled?"recorded":"needs_attention",
@@ -78,10 +80,11 @@ export function guidedSchoolJourney(program: SchoolProgramRecord, journey: Launc
       evidence:`${c.gradedWork} graded submissions · ${c.unresolvedGuardianResponses} outstanding guardian questions`,
       nextAction:c.unresolvedGuardianResponses?"Resolve guardian responses":"Review released grades, notifications and support actions",
       href:operations,suggestedRole:"Teacher / school registrar"},
-    {key:"operations",title:"Verify the one operational record",
+    {key:"operations",title:"Continue in the operating workspace",
       state:"review",
-      evidence:"Live counts are available. Cross-session browser acceptance is a separate release gate.",
-      nextAction:"Verify records and access in the actual school experience",
+      evidence:"Review current school-opening authority, staffing, admissions and academic activity in the operating workspace.",
+      nextAction:programActive&&program.siteId?"Open Site Today and review operating requirements":"Review the school’s operating requirements",
       href:operations,suggestedRole:"School registrar"},
   ];
 }
+
