@@ -176,7 +176,7 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
             ...(canReviewerOrganizations.length ? [inArray(s.programs.academicProviderOrganizationId, canReviewerOrganizations.map(org => org.id))] : [])),
           inArray(s.programs.status, ["draft", "launching", "ready"]),
           ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
-          ...(context.grantSiteId !== null && context.scope.programIds?.length
+          ...(context.scope.programIds?.length
             ? [inArray(s.programs.id, context.scope.programIds)] : []),
           ...(context.scope.siteIds?.length
             ? [inArray(s.programs.siteId, context.scope.siteIds)] : []),
