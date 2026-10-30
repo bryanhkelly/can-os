@@ -37,6 +37,7 @@ export type LaunchGuidanceTask = {
   latestReviewStatus?: string | null;
   latestReviewReason?: string | null;
   latestReviewAt?: string | null;
+  pendingEvidenceReview?: boolean;
   evidenceInstructions?: string | null;
   evidenceReviewRequired?: boolean;
   requiresRegistrarReview?: boolean;
@@ -98,6 +99,7 @@ export function buildLaunchGuidance(launch: LaunchGuidanceRecord) {
     evidenceStatementCount: requirement.evidence?.filter(item => item.kind === "launch_evidence_statement").length ?? 0,
     latestEvidenceStatementAt: (() => { const entry = [...(requirement.evidence ?? [])].reverse().find(item => item.kind === "launch_evidence_statement"); return typeof entry?.submittedAt === "string" ? entry.submittedAt : null; })(),
     reviewNoteCount: requirement.evidence?.filter(item => item.kind === "registrar_note").length ?? 0,
+    pendingEvidenceReview: (() => { const entries = requirement.evidence ?? []; const submitted = entries.findLastIndex(item => item.kind === "launch_evidence_statement"); const reviewed = entries.findLastIndex(item => item.kind === "launch_evidence_review"); return submitted >= 0 && submitted > reviewed && requirement.status !== "complete"; })(),
     rejectedReviewCount: requirement.evidence?.filter(item => (item.kind === "document_review" || item.kind === "launch_evidence_review") && item.status === "rejected").length ?? 0,
     latestReviewStatus: String(latestDocumentReview(requirement.evidence)?.status ?? "") || null,
     latestReviewReason: (() => { const review = latestDocumentReview(requirement.evidence); return typeof review?.reason === "string" ? review.reason : typeof review?.text === "string" ? review.text : null; })(),
