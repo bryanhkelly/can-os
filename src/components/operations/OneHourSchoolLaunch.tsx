@@ -242,6 +242,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
   const { launches, launch, unavailable } = resolveLaunchResume(allLaunches, {
     siteId: selectedSiteId, programId: selectedProgramId,
   });
+  const canReviewSelectedLaunch = canReviewEvidence && launch?.canReviewEvidence === true;
   if (unavailable) return <section role="alert" className="mt-8 rounded-2xl border bg-card p-6">
     <h2 className="font-serif text-2xl">This launch is unavailable</h2>
     <p className="mt-3 text-sm">The requested Program is no longer in your pre-opening launch scope.
@@ -417,7 +418,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         This depends on someone outside your school and CAN. Recorded waiting is not approval.
       </p>}
       <div className="mt-4"><TaskDestination launch={launch} task={next} /></div>
-      {canReviewEvidence && <InstitutionalEvidenceReview key={next.id} task={next} busy={busy} review={reviewEvidence} />}
+      {canReviewSelectedLaunch && <InstitutionalEvidenceReview key={next.id} task={next} busy={busy} review={reviewEvidence} />}
       <LaunchEvidenceStatement key={next.id} task={next} busy={busy} submit={submitEvidence} />
       <SchoolOwnedCompletion key={next.id} task={next} busy={busy} complete={complete} />
       {next.action === "orientation" && next.state === "needs_you" &&
@@ -456,7 +457,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             {task.state === "blocked" && <span className="max-w-48 text-right text-xs text-muted-foreground">Review the canonical requirement record to resolve the blocker.</span>}
             {task.state !== "complete" && task.action !== "opening" &&
               <TaskDestination launch={launch} task={task} />}
-            {canReviewEvidence && task.pendingEvidenceReview && <InstitutionalEvidenceReview key={task.id} task={task} busy={busy} review={reviewEvidence} />}
+            {canReviewSelectedLaunch && task.pendingEvidenceReview && <InstitutionalEvidenceReview key={task.id} task={task} busy={busy} review={reviewEvidence} />}
             {task.state !== "complete" && task.action === "orientation" &&
               <Link to="/operations/launch/$programId" params={{programId:launch.id}}
                 search={{siteId:launch.siteId??undefined,programId:undefined}}
