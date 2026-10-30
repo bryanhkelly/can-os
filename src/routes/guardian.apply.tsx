@@ -2,7 +2,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { Button } from "@/components/ui/button";
-import { EmptyState, StatusBadge, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { GuardianApplicationForm } from "@/components/enrollment/GuardianApplicationForm";
 import {
   getGuardianFamilyApplicationWorkspace,
@@ -10,9 +10,10 @@ import {
 } from "@/modules/enrollment/guardian-family-applications.functions";
 
 export const Route = createFileRoute("/guardian/apply")({
-  validateSearch: (search: Record<string, unknown>): { programId?: string; familyStart?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { programId?: string; familyStart?: string; application?: string } => ({
     programId: typeof search.programId === "string" ? search.programId : undefined,
     familyStart: typeof search.familyStart === "string" ? search.familyStart : undefined,
+    application: typeof search.application === "string" ? search.application : undefined,
   }),
   loader: safeLoader(getGuardianFamilyApplicationWorkspace, {
     authMessage: "Sign in with your verified family account to apply to a school.",
@@ -30,15 +31,17 @@ function GuardianApplyWorkspace({ data }: {
   data: Awaited<ReturnType<typeof getGuardianFamilyApplicationWorkspace>>;
 }) {
   const router = useRouter();
-  const { programId: requestedProgramId, familyStart } = Route.useSearch();
+  const { programId: requestedProgramId, familyStart, application: requestedApplicationId } = Route.useSearch();
 
   return <WorkspaceShell eyebrow="CAN OS · Family" title="Apply to a school"
     subtitle="Start a real academic application for an eligible CAN school. An application does not automatically approve enrollment or grant access to a child's records."
     actions={<Button asChild variant="outline"><Link to="/guardian">Family home →</Link></Button>}>
     <WorkspacePanel title="Your applications"
       description="Return to an existing application instead of creating a duplicate. The school controls identity verification and every later transition.">
+      {requestedApplicationId && !data.applications.some(app => app.applicationId === requestedApplicationId) &&
+        <WorkspaceNotice tone="danger">The requested application is unavailable to this family account. Contact admissions if your access has changed.</WorkspaceNotice>}
       {data.applications.length ? <div className="space-y-3">
-        {data.applications.map(app => <article className="rounded-xl border bg-background p-4" key={app.applicationId}>
+        {data.applications.map(app => <article className={`rounded-xl border bg-background p-4 ${app.applicationId === requestedApplicationId ? "border-primary ring-1 ring-primary" : ""}`} key={app.applicationId}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div><h3 className="font-semibold">{app.studentFirstName} {app.studentLastName}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{app.programName} · {app.stage.replaceAll("_", " ")}</p></div>
@@ -46,6 +49,7 @@ function GuardianApplyWorkspace({ data }: {
               {app.guardianVerified ? "Guardian verified" : "Verification pending"}
             </StatusBadge>
           </div>
+          {app.applicationId === requestedApplicationId && <p role="status" className="mt-2 text-sm font-semibold">Your saved application</p>}
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             {app.guardianVerified
               ? "Review your enrollment checklist and any offers. Verification does not itself activate enrollment."
@@ -66,10 +70,15 @@ function GuardianApplyWorkspace({ data }: {
       </Link></Button>
     </WorkspacePanel>
     <div className="mt-6">
-      <GuardianApplicationForm programs={data.programs} households={data.households}
+      <GuardianApplicationForm key={`${requestedProgramId ?? ""}:${familyStart ?? ""}`} programs={data.programs} households={data.households}
         students={data.students} requestedProgramId={requestedProgramId} familyStartRequestId={familyStart}
         onSubmit={input => startGuardianFamilyApplication({ data: input })}
-        onSubmitted={async () => { await router.invalidate(); }} />
+        onSubmitted={async applicationId => {
+          await router.navigate({ to: "/guardian/apply",
+            search: { programId: requestedProgramId, familyStart, application: applicationId } });
+          await router.invalidate();
+        }} />
     </div>
   </WorkspaceShell>;
 }
+

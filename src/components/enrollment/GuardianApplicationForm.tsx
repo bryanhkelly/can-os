@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { guardianApplicationSelection } from "@/domain/guardian-application-selection";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,19 +48,19 @@ export function GuardianApplicationForm({ programs, households, students = [], r
   requestedProgramId?: string;
   familyStartRequestId?: string;
   onSubmit: (input: GuardianApplicationSubmission) => Promise<{ applicationId: string }>;
-  onSubmitted?: () => Promise<void> | void;
+  onSubmitted?: (applicationId: string) => Promise<void> | void;
 }) {
   const id = useId();
   const feedbackRef = useRef<HTMLParagraphElement>(null);
   const requested = programs.find(item => item.id === requestedProgramId);
-  const [programId, setProgramId] = useState(requested?.id ?? programs[0]?.id ?? "");
-  useEffect(() => {
-    if (requestedProgramId && programs.some(program => program.id === requestedProgramId)) {
-      setProgramId(requestedProgramId);
-    }
-  }, [requestedProgramId, programs]);
-  const selectedProgram = programs.find(program => program.id === programId);
+  const [programId, setProgramId] = useState(
+    requestedProgramId ? requested?.id ?? "" : programs.length === 1 ? programs[0]!.id : "");
+
   const [schoolYearId, setSchoolYearId] = useState("");
+  const selection = guardianApplicationSelection(programs, {
+    requestedProgramId, familyStartRequestId, programId, schoolYearId,
+  });
+  const selectedProgram = selection.program;
   const [studentOptionId, setStudentOptionId] = useState("");
   const [studentProfileId, setStudentProfileId] = useState("");
   const [householdId, setHouseholdId] = useState(households[0]?.id ?? "");
@@ -92,15 +93,20 @@ export function GuardianApplicationForm({ programs, households, students = [], r
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
+    if (!selectedProgram || !selection.year || selection.unavailable) {
+      setError("Choose an available school and its configured academic year before submitting.");
+      return;
+    }
     setBusy(true);
     setError("");
     setNotice("");
     try {
       const result = await onSubmit({
-        requestId, programId, studentFirstName: firstName,
+        requestId, programId: selectedProgram.id, studentFirstName: firstName,
         studentLastName: lastName, gradeLevel: grade,
         ...(householdId ? { householdId } : {}),
-        ...(schoolYearId ? { schoolYearId } : {}),
+        schoolYearId: selection.year.id,
         ...(studentProfileId ? { studentProfileId } : {}),
         ...(familyStartRequestId ? { familyStartRequestId } : {}),
       });
@@ -110,7 +116,11 @@ export function GuardianApplicationForm({ programs, households, students = [], r
       setFirstName("");
       setLastName("");
       setGrade("");
-      await onSubmitted?.();
+      try {
+        await onSubmitted?.(result.applicationId);
+      } catch {
+        setError("Your application was saved, but its status could not be refreshed. Return to Your applications to continue; do not submit another application.");
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to submit application");
     } finally {
@@ -128,20 +138,24 @@ export function GuardianApplicationForm({ programs, households, students = [], r
     </div>}>
     {notice && <WorkspaceNotice ref={feedbackRef} tone="success" className="mb-5">{notice}</WorkspaceNotice>}
     {error && <WorkspaceNotice ref={feedbackRef} tone="danger" className="mb-5">{error}</WorkspaceNotice>}
-    {programs.length === 0 ? <WorkspaceNotice>
+    {selection.unavailable ? <WorkspaceNotice tone="danger">
+      The school linked to this invitation is unavailable to this verified account.
+      Contact that school's admissions team. No other school has been selected.
+    </WorkspaceNotice> : programs.length === 0 ? <WorkspaceNotice>
       No eligible school is currently available to this verified family account. Contact the school's admissions team about your invitation and application opening.
     </WorkspaceNotice> : <form onSubmit={event => void submit(event)} aria-busy={busy} className="grid gap-5 sm:grid-cols-2">
       <fieldset disabled={busy} className="contents">
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={`${id}-program`}>School and program</Label>
-          <Select id={`${id}-program`} name="programId" required value={programId}
+          <Select id={`${id}-program`} name="programId" required value={selectedProgram?.id ?? ""}
             onChange={event => { setProgramId(event.target.value); setSchoolYearId(""); setStudentProfileId(""); setStudentOptionId(""); }}>
-            {programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
+            <option value="">Choose a school and program</option>
+            {selection.programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
           </Select>
         </div>
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={`${id}-year`}>Application academic year</Label>
-          <Select id={`${id}-year`} name="schoolYearId" required value={schoolYearId}
+          <Select id={`${id}-year`} name="schoolYearId" required value={selection.year?.id ?? ""}
             onChange={event => setSchoolYearId(event.target.value)}>
             <option value="">Select an academic year</option>
             {selectedProgram?.schoolYears?.map(year => <option key={year.id} value={year.id}>{year.name}</option>)}
@@ -190,7 +204,7 @@ export function GuardianApplicationForm({ programs, households, students = [], r
           <p id={`${id}-grade-hint`} className="text-xs leading-5 text-muted-foreground">Use the grade the student is applying to enter.</p>
         </div>
         <div className="sm:col-span-2">
-          <Button type="submit" size="lg" disabled={busy || !programId || !schoolYearId} aria-busy={busy}>
+          <Button type="submit" size="lg" disabled={busy || !selectedProgram || !selection.year || selection.unavailable} aria-busy={busy}>
             {busy && <LoaderCircle aria-hidden="true" className="animate-spin" />}
             {busy ? "Submitting application…" : "Submit application"}
           </Button>
@@ -199,3 +213,4 @@ export function GuardianApplicationForm({ programs, households, students = [], r
     </form>}
   </GuidedSetupShell>;
 }
+
