@@ -274,9 +274,9 @@ export const gradeSubmission = createServerFn({ method: "POST" })
   // stored rubric; a client-sent total is never trusted.
   let finalScore = data.score;
   const feedback: Record<string, unknown> = { comment: data.feedbackComment.trim() };
-  if (data.rubricScores?.length) {
-   const criteria = readRubric(record.metadata?.rubricCriteria);
-   if (!criteria.length) throw new Error("This assessment has no rubric");
+  const criteria = readRubric(record.metadata?.rubricCriteria);
+  if (criteria.length) {
+   if (!data.rubricScores?.length) throw new Error("Score every rubric criterion before posting a grade");
    const result = scoreRubric(criteria, data.rubricScores);
    if (result.possible !== points) throw new Error(`Rubric total (${result.possible}) does not match the assessment point value (${points})`);
    finalScore = result.earned;
@@ -284,6 +284,8 @@ export const gradeSubmission = createServerFn({ method: "POST" })
     version: typeof record.metadata?.rubricVersion === "number" ? record.metadata.rubricVersion : 1,
     scores: data.rubricScores,
    };
+  } else if (data.rubricScores?.length) {
+   throw new Error("This assessment has no rubric");
   }
   if (finalScore === undefined) throw new Error("Enter a numeric score.");
   if (finalScore < 0 || finalScore > points) throw new Error(`Score must be from 0 to ${points}`);
