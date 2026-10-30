@@ -383,7 +383,7 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
    const [scope]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
     .from(programs).where(eq(programs.id,app.programId)).limit(1);
    if(!scope||!actor.scope.organizationIds?.includes(scope.organizationId)||
-    (scope.siteId!==null&&!actor.scope.siteIds?.includes(scope.siteId)))throw new AuthorizationError("admissions school and organization");
+    (scope.siteId!==null&&actor.scope.siteIds !== undefined&&!actor.scope.siteIds.includes(scope.siteId)))throw new AuthorizationError("admissions school and organization");
    const waitlisted=app.metadata.admissionsDisposition==="waitlisted";
    const expected:Record<string,string[]>={
     application:["inquiry"],eligibility:["application"],accept:["eligibility"],
