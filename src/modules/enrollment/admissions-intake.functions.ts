@@ -548,7 +548,7 @@ export const sendAdmissionsGuardianInvitation=createServerFn({method:"POST"})
    .where(eq(applications.id,data.applicationId)).limit(1);
   if(!application||(actor.scope.programIds!==undefined&&!actor.scope.programIds.includes(application.programId))||
     !actor.scope.organizationIds?.includes(application.organizationId)||
-    (application.siteId!==null&&actor.scope.siteIds!==undefined&&!actor.scope.siteIds.includes(application.siteId)))
+    (actor.scope.siteIds!==undefined&&(!application.siteId||!actor.scope.siteIds.includes(application.siteId))))
    throw new AuthorizationError("admissions invitation Program, school and site scope");
   const contactId=applicationGuardianContact(application.metadata,application.submittedByPersonId);
   const [contact]=await db.select({email:people.email})
