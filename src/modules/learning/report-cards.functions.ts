@@ -275,6 +275,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
 
       // Compare the due timestamp as a local school date. UTC midnight can
       // misclassify work due near the start/end of a grading period.
+      if (!section.siteId) throw new Error("Section must belong to a school site for grade finalization");
       const [schoolSite] = await tx.select({ timezone: s.sites.timezone })
         .from(s.sites).where(eq(s.sites.id, section.siteId)).limit(1);
       if (!schoolSite?.timezone) throw new Error("School timezone is required for grade finalization");

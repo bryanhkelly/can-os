@@ -52,7 +52,7 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
  }
  return <WorkspaceShell eyebrow="CAN OS · Teacher" title="Facilitate study groups"
   subtitle="Review requests and moderate groups you facilitate."
-  breadcrumbs={<Link to="/teacher" className="underline">Teacher Today</Link>}>
+  breadcrumbs={<Link to="/teacher" search={{gradeAction:undefined}} className="underline">Teacher Today</Link>}>
   <div className="space-y-6">
   {!enabled?<WorkspaceNotice>Study groups are currently unavailable.</WorkspaceNotice>:<>
   {error&&<WorkspaceNotice tone="danger">No change was completed. {error}</WorkspaceNotice>}
