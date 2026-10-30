@@ -281,6 +281,9 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
         throw new AuthorizationError("program launch evidence scope");
       if (row.status === "complete" || ["active", "complete", "cancelled"].includes(row.journeyStatus))
         throw new Error("This launch requirement is closed to evidence submissions");
+      const previousStatement = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_statement");
+      if (previousStatement?.text === data.statement && previousStatement?.submittedByPersonId === context.actorPersonId)
+        return { journeyRequirementId: row.id, submitted: true, duplicate: true };
       const now = new Date();
       await tx.update(s.journeyRequirements).set({
         evidence: [...row.evidence, {
