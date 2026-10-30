@@ -182,6 +182,17 @@ describe("canonical launch guidance", () => {
     expect(guidance.ready).toBe(false);
   });
 
+  it("does not route ordinary school evidence into institutional review", () => {
+    const guidance = buildLaunchGuidance(launch({
+      requirements: [{ id: "school", key: "room-setup", title: "Room setup", status: "needs_you",
+        blocking: true, evidence: [
+          { kind: "launch_evidence_statement", text: "Classroom arranged", submittedAt: "2026-10-30T10:00:00Z" },
+        ] }],
+    }));
+    expect(guidance.nextTask?.pendingEvidenceReview).toBe(false);
+    expect(guidance.ready).toBe(false);
+  });
+
   it("fails closed for an unrecognized persisted requirement state", () => {
     const guidance = buildLaunchGuidance(launch({
       requirements: [{ id: "unknown", key: "other", title: "Other", status: "unexpected", blocking: true }],
