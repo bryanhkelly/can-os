@@ -48,7 +48,7 @@ function SchoolOwnedCompletion({ task, busy, complete }: {
   complete: (requirementId: string) => Promise<void>;
 }) {
   const [confirmed, setConfirmed] = useState(false);
-  if (!task.requirementId || task.state !== "needs_you") return null;
+  if (!task.requirementId || task.state !== "needs_you" || task.requiresRegistrarReview) return null;
   return <details className="mt-4 rounded-xl border bg-background p-4">
     <summary className="cursor-pointer text-sm font-semibold">Record this school-owned requirement</summary>
     <p className="mt-3 text-sm text-muted-foreground">
