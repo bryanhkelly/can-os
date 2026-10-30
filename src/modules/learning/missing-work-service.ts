@@ -308,7 +308,7 @@ export async function gradeSubmission(
         id: submissions.id,
         status: submissions.status,
         timeliness: submissions.timeliness,
-        assessmentId: submissions.assessmentId,
+        assessmentId: submissions.assessmentId,pointsPossible:assessments.pointsPossible,
         studentProfileId: submissions.studentProfileId,
         sectionId: assessments.sectionId,
         programId: sections.programId,schoolYearId: terms.schoolYearId,
@@ -342,13 +342,20 @@ export async function gradeSubmission(
       throw new Error("Only submitted work can be graded");
     }
 
+    const possible = current.pointsPossible === null ? NaN : Number(current.pointsPossible);
+    const score = input.score.trim() === "" ? NaN : Number(input.score);
+    if (!Number.isFinite(possible) || possible <= 0)
+      throw new Error("Assessment has no valid point value");
+    if (!Number.isFinite(score) || score < 0 || score > possible)
+      throw new Error("Score must be from 0 to "+possible);
+
     const gradedAt = new Date();
 
     const graded = await tx
       .update(submissions)
       .set({
         status: "graded",
-        score: input.score,
+        score: String(score),
         feedback: input.feedback ?? {},
         graderPersonId: context.actorPersonId,
         gradedAt,
@@ -368,7 +375,7 @@ export async function gradeSubmission(
         assessmentId: current.assessmentId,
         studentProfileId: current.studentProfileId,
         sectionId: current.sectionId,
-        score: input.score,
+        score: String(score),
         timeliness: current.timeliness,
       },
     });
@@ -380,7 +387,7 @@ export async function gradeSubmission(
       resourceId: submissionId,
       scope: { sectionId: current.sectionId },
       before: { status: current.status },
-      after: { status: "graded", score: input.score },
+      after: { status: "graded", score: String(score) },
       context: { requestId: context.requestId ?? null },
     });
   });

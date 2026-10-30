@@ -11,7 +11,7 @@ vi.mock("@/db/client",()=>({db:{transaction:async(fn:(tx:unknown)=>unknown)=>fn(
     for(const name of ["from","innerJoin","where","limit"])chain[name]=()=>chain;
     chain.then=(resolve:(rows:unknown[])=>unknown)=>Promise.resolve([{
       id:"submission",status:"submitted",timeliness:"late",assessmentId:"assessment",
-      studentProfileId:"student",sectionId:"section",programId:"program",schoolYearId:"year",
+      pointsPossible:"10",studentProfileId:"student",sectionId:"section",programId:"program",schoolYearId:"year",
     }]).then(resolve);
     return chain;
   },update:state.update,
@@ -45,4 +45,17 @@ describe("grading requires the current student enrollment relationship",()=>{
     await expect(gradeSubmission(context,"submission",{score:"8"})).rejects.toThrow("delegation revoked");
     expect(state.update).not.toHaveBeenCalled();
   });
+});
+
+
+describe("canonical grading score bounds",()=>{
+ it.each(["", " ", "NaN", "Infinity", "-1", "10.01"])("rejects an invalid score from any caller: %s",async score=>{
+  await expect(gradeSubmission(context,"submission",{score})).rejects.toThrow("Score must be from 0 to 10");
+  expect(state.update).not.toHaveBeenCalled();
+  expect(state.event).not.toHaveBeenCalled();
+ });
+ it("accepts a real zero score",async()=>{
+  await gradeSubmission(context,"submission",{score:"0"});
+  expect(state.update).toHaveBeenCalledOnce();
+ });
 });
