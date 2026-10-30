@@ -421,7 +421,7 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
      const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId,metadata:programs.metadata})
       .from(programs).where(eq(programs.id,app.programId)).for("share").limit(1);
      if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
-       (program.siteId!==null&&!actor.scope.siteIds?.includes(program.siteId)))throw new AuthorizationError("enrollment school and organization");
+       (program.siteId!==null&&actor.scope.siteIds!==undefined&&!actor.scope.siteIds.includes(program.siteId)))throw new AuthorizationError("enrollment school and organization");
      await instantiateJourneyFromDefinition(tx,{definitionKey:enrollmentJourneyDefinitionKey(program.metadata),
       subjectType:"application",subjectId:app.id,programId:app.programId,ownerPersonId:actor.actorPersonId,
       organizationId:program.organizationId,siteId:program.siteId,
