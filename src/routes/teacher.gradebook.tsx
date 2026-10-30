@@ -67,6 +67,7 @@ function TeacherGradebookPage() {
  const reviewStudent=gradebook?.students.find(item=>item.studentProfileId===reviewCell?.studentProfileId);
  const reviewQueue=gradebook?.cells.filter(cell=>["submitted","graded","returned"].includes(cell.status))
   .sort((a,b)=>Number(b.status==="submitted")-Number(a.status==="submitted"))??[];
+ const pendingReviewCount=reviewQueue.filter(cell=>cell.status==="submitted").length;
  const reviewIndex=reviewQueue.findIndex(cell=>cell.submissionId===reviewCell?.submissionId);
  const previousReview=reviewQueue[reviewIndex-1],nextReview=reviewQueue[reviewIndex+1];
 
@@ -313,7 +314,7 @@ function TeacherGradebookPage() {
      <StatCard label="Assessments" value={gradebook.assessments.length}/>
      <StatCard label="Needs grading" value={gradebook.cells.filter(cell=>cell.status==="submitted").length}/>
     </div>
-    {!reviewCell&&reviewQueue.length>0&&<WorkspacePanel title="Submission queue" description="Choose student work to review or grade.">
+    {!reviewCell&&reviewQueue.length>0&&<WorkspacePanel title={`Submission queue · ${pendingReviewCount} awaiting grading`} description="Ungraded work appears first. Choose a student submission to review or grade.">
      <nav aria-label="Submission queue" className="grid max-h-96 gap-2 overflow-y-auto">
       {reviewQueue.map(cell=><Link key={cell.submissionId} to="/teacher/gradebook"
        search={{section:selected,assessment:cell.assessmentId,student:cell.studentProfileId}}
