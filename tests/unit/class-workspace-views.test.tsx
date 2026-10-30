@@ -34,7 +34,7 @@ vi.mock("@/modules/learning/discussion-post.functions", () => ({ postDiscussionM
 const workspace: ComponentProps<typeof ClassWorkspace>["data"] = {
   role: "student", section: { id: "english", title: "English", code: "ENG", description: "Read and revise.",
     subject: "English", versionId: "published-version", contentStatus: "published" },
-  teacherGuides: null, lessonCompletionCounts:[],
+  teacherGuides: null, lessonCompletionCounts:[],curriculumAccess:{available:true,reason:null},
   studentPersonId: "child", teachers: [{ personId: "teacher", name: "Taylor Teacher" }],
   content: classContentSchema.parse({
     version: 1, syllabus: "<script>unsafe()</script>",
@@ -117,6 +117,13 @@ describe("published class workspace", () => {
     const planning=renderToStaticMarkup(<ClassWorkspace data={{...data,role:"teacher"}} tab="planning"/>);
     expect(planning).toContain("Future outline");
     expect(planning).toContain("Outline only");
+  });
+  it("explains unavailable publisher content while keeping academic navigation available",()=>{
+    const data={...workspace,content:null,curriculumAccess:{available:false,reason:"An active publisher license is required."}};
+    const html=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons"/>);
+    expect(html).toContain("An active publisher license is required");
+    expect(html).toContain("academic records remain available");
+    expect(html).not.toContain("Mark lesson complete");
   });
   it("allows only students to mark a lesson and safely renders lesson text", () => {
     const student = renderToStaticMarkup(<ClassWorkspace data={workspace} tab="lessons" lessonId="evidence"/>);

@@ -206,6 +206,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
         {!data.teachers.length && <p className="text-sm text-muted-foreground">No teaching team is assigned.</p>}
       </WorkspacePanel>
     </div>}
+    {data.curriculumAccess?.available===false&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">
+      {data.curriculumAccess.reason} Your assignments and academic records remain available in their usual workspaces.
+    </p>}
     {tab === "lessons" && <div className="grid gap-5">
       {!data.content && <p role="status" className="rounded-xl border p-5 text-sm">No published learning content is configured for this class.</p>}
       {lessonId && !lesson && <p role="alert" className="rounded-xl border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
