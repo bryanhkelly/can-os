@@ -90,6 +90,8 @@ export const EventTypes = {
   SafeguardingConcernFiled: "SafeguardingConcernFiled",
   SafeguardingConcernAcknowledged: "SafeguardingConcernAcknowledged",
   SafeguardingConcernEscalated: "SafeguardingConcernEscalated",
+  SafeguardingCaseReviewAssigned: "SafeguardingCaseReviewAssigned",
+  SafeguardingCaseReviewCompleted: "SafeguardingCaseReviewCompleted",
   SafeguardingEvidenceAdded: "SafeguardingEvidenceAdded",
   SafeguardingExternalReportRecorded: "SafeguardingExternalReportRecorded",
   HealthComplianceUpdated: "HealthComplianceUpdated",

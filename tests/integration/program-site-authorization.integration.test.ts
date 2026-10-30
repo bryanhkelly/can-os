@@ -670,7 +670,7 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
           "Authorization request already reviewed; use the revocation or new-version workflow");
         await expect(revokeProgramSiteAuthorization(f.steward,{
           authorizationId:deniedId,reason:"A denied request was never approved authority.",
-        })).rejects.toThrow("Only a currently approved authorization can be revoked");
+        })).rejects.toThrow("Only a currently approved or suspended authorization can be revoked");
         // The host may submit a corrected replacement as a NEW version; the
         // denied row remains preserved as decision history.
         const replacement=await requestProgramSiteAuthorization(f.host,{
@@ -831,7 +831,10 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
       .where(eq(s.programSiteAuthorizations.id,authorizationId))).toHaveLength(0);
   },120_000);
 
-  it("supports CAN-initiated revocation with audit and event, and re-request after revocation", async () => {
+  it.each([
+    ["host", "approved"], ["steward", "approved"],
+    ["host", "suspended"], ["steward", "suspended"],
+  ] as const)("supports %s revocation of %s authority with history and a fresh replacement", async (revoker, status) => {
     const { db: realDb } = await vi.importActual<{ db: Database }>("@/db/client");
     const rollback = new Error("rollback-program-site-can-revocation");
     let complete = false;
@@ -844,7 +847,7 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
         const { asc, eq } = await import("drizzle-orm");
         const {
           requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
-          revokeProgramSiteAuthorization, requireCurrentProgramSiteAuthorization,
+          revokeProgramSiteAuthorization, suspendProgramSiteAuthorization, requireCurrentProgramSiteAuthorization,
         } = await import("@/modules/programs/program-site-authorization.server");
         const suffix = crypto.randomUUID().slice(0,8);
         const f = await createAuthorizationFixture(tx,suffix);
@@ -853,9 +856,9 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
         });
         revokedId=requested.authorizationId;
         // Race guard: a merely requested (never approved) row cannot be revoked.
-        await expect(revokeProgramSiteAuthorization(f.steward,{
+        await expect(revokeProgramSiteAuthorization(f[revoker],{
           authorizationId:revokedId,reason:"A pending request is not approved authority.",
-        })).rejects.toThrow("Only a currently approved authorization can be revoked");
+        })).rejects.toThrow("Only a currently approved or suspended authorization can be revoked");
         const evidence=await f.agreementEvidence();
         await reviewProgramSiteAuthorization(f.steward,{
           authorizationId:revokedId,decision:"approved",
@@ -873,8 +876,17 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
         await expect(requestProgramSiteAuthorization(f.host,{
           programId:f.launch.programId,services:f.services,
         })).rejects.toThrow("Revoke the current authorization before requesting a replacement");
-        // Either contracting party may withdraw; here the CAN steward revokes.
-        await expect(revokeProgramSiteAuthorization(f.steward,{
+        if (status === "suspended") await suspendProgramSiteAuthorization(f.steward,{
+          authorizationId:revokedId,reason:"CAN paused services for an independent compliance review.",
+        });
+        await expect(revokeProgramSiteAuthorization(f.unrelated,{
+          authorizationId:revokedId,reason:"An unrelated church cannot withdraw this agreement.",
+        })).rejects.toThrow("verified church-host registrar");
+        await expect(revokeProgramSiteAuthorization(f.foreignSteward,{
+          authorizationId:revokedId,reason:"Another CAN network cannot withdraw this agreement.",
+        })).rejects.toThrow("separate CAN institutional reviewer");
+        // Either contracting party can withdraw without first restoring services.
+        await expect(revokeProgramSiteAuthorization(f[revoker],{
           authorizationId:revokedId,
           reason:"CAN withdrew the operating relationship for this school.",
         })).resolves.toEqual({authorizationId:revokedId,status:"revoked"});
@@ -882,19 +894,26 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
           status:s.programSiteAuthorizations.status,
           revokedByPersonId:s.programSiteAuthorizations.revokedByPersonId,
           revocationReason:s.programSiteAuthorizations.revocationReason,
+          suspendedByPersonId:s.programSiteAuthorizations.suspendedByPersonId,
+          suspendedAt:s.programSiteAuthorizations.suspendedAt,
+          suspensionReason:s.programSiteAuthorizations.suspensionReason,
         }).from(s.programSiteAuthorizations)
           .where(eq(s.programSiteAuthorizations.id,revokedId));
         expect(revoked).toMatchObject({
-          status:"revoked",revokedByPersonId:f.stewardPerson.id,
+          status:"revoked",revokedByPersonId:f[revoker].actorPersonId,
+          suspendedByPersonId:null,suspendedAt:null,suspensionReason:null,
         });
         expect(revoked!.revocationReason).toMatch(/CAN withdrew/);
-        const revocationAudit=await tx.select({action:s.auditEvents.action})
+        const revocationAudit=await tx.select({action:s.auditEvents.action,before:s.auditEvents.before})
           .from(s.auditEvents).where(eq(s.auditEvents.resourceId,revokedId));
         expect(revocationAudit.map(x=>x.action)).toEqual(expect.arrayContaining([
           "program.site.authorization.request",
           "program.site.authorization.review",
           "program.site.authorization.revoke",
         ]));
+        expect(revocationAudit.find(x=>x.action==="program.site.authorization.revoke")?.before)
+          .toMatchObject({status, suspensionReason:status === "suspended"
+            ? "CAN paused services for an independent compliance review." : null});
         const revocationEvents=await tx.select({eventType:s.domainEvents.eventType})
           .from(s.domainEvents).where(eq(s.domainEvents.aggregateId,revokedId));
         expect(revocationEvents.map(x=>x.eventType)).toEqual(expect.arrayContaining([
@@ -949,7 +968,8 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
         const {
           requestProgramSiteAuthorization, reviewProgramSiteAuthorization,
           suspendProgramSiteAuthorization, resumeProgramSiteAuthorization,
-          requireCurrentProgramSiteAuthorization,
+          requireCurrentProgramSiteAuthorization, getHostProgramSiteAuthorization,
+          listCANOperatingAuthorizationDesk,
         } = await import("@/modules/programs/program-site-authorization.server");
         const suffix = crypto.randomUUID().slice(0,8);
         const f = await createAuthorizationFixture(tx,suffix);
@@ -1031,16 +1051,26 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
         ]));
         // A suspended row still occupies the current-version slot: the host
         // cannot request a replacement until it is resumed or revoked.
-        const blocked=await requestProgramSiteAuthorization(f.host,{
+        await expect(requestProgramSiteAuthorization(f.host,{
           programId:f.launch.programId,services:f.services,
-        }).then(
-          ()=>{throw new Error("new version request unexpectedly succeeded");},
-          (error:unknown)=>error,
-        );
-        // The real failure is the current-slot partial unique index, surfaced
-        // as the cause of Drizzle's query error.
-        expect(String((blocked as {cause?:unknown}).cause??blocked))
-          .toContain('duplicate key value violates unique constraint "program_site_authorization_current_uq"');
+        })).rejects.toThrow("Revoke the current authorization before requesting a replacement");
+        // A domain denial must not abort the transaction or mutate history.
+        const unchanged=await tx.select({
+          id:s.programSiteAuthorizations.id,status:s.programSiteAuthorizations.status,
+          version:s.programSiteAuthorizations.version,
+        }).from(s.programSiteAuthorizations)
+          .where(eq(s.programSiteAuthorizations.programId,f.launch.programId));
+        expect(unchanged).toEqual([{id:authorizationId,status:"suspended",version:1}]);
+        expect((await getHostProgramSiteAuthorization(f.host,f.launch.programId)).authorization)
+          .toMatchObject({status:"suspended",lapsed:false,
+            suspensionReason:"CAN paused delegated operations pending a compliance review."});
+        // Expiry is independent of suspension: both conditions must be visible.
+        await tx.update(s.programSiteAuthorizations).set({effectiveThrough:new Date(Date.now()-1000)})
+          .where(eq(s.programSiteAuthorizations.id,authorizationId));
+        expect((await getHostProgramSiteAuthorization(f.host,f.launch.programId)).authorization)
+          .toMatchObject({status:"suspended",lapsed:true});
+        expect((await listCANOperatingAuthorizationDesk(f.steward)).authorizations
+          .find(row=>row.id===authorizationId)).toMatchObject({status:"suspended",lapsed:true});
         complete=true;
         throw rollback;
       });

@@ -84,8 +84,9 @@ describe("operating agreement evidence metadata", () => {
     expectNoDocumentRead();
   });
   it.each([{ siteId: "other" }, { hostOrganizationId: "other" },
-    { institutionOrganizationId: "other" }, { status: "approved" }])(
-    "denies changed parties or reviewed requests: %j", async patch => {
+    { institutionOrganizationId: "other" }, { status: "suspended" },
+    { status: "denied" }, { status: "revoked" }])(
+    "denies changed parties or ineligible lifecycle states: %j", async patch => {
       arrange(patch);
       await expect(listOperatingAgreementEvidence(actor, input)).rejects.toThrow();
       expectNoDocumentRead();
@@ -113,4 +114,19 @@ describe("operating agreement evidence metadata", () => {
       await expect(listOperatingAgreementEvidence(actor, { ...input, effectiveThrough })).rejects.toThrow();
     expect(state.reads).toHaveLength(0);
   });
+  it("offers verified evidence for a live approved renewal only beyond its current window", async () => {
+    arrange({ status: "approved", effectiveThrough: new Date("2029-01-01") });
+    expect((await listOperatingAgreementEvidence(actor, input)).candidates)
+      .toEqual([expect.objectContaining({ id: "document" })]);
+  });
+  it("offers renewal evidence for a lapsed approved agreement", async () => {
+    arrange({ status: "approved", effectiveThrough: new Date("2025-01-01") });
+    expect((await listOperatingAgreementEvidence(actor, input)).candidates).toHaveLength(1);
+  });
+  it("rejects a non-extending renewal before reading documents", async () => {
+    arrange({ status: "approved", effectiveThrough: input.effectiveThrough });
+    await expect(listOperatingAgreementEvidence(actor, input)).rejects.toThrow("extends the current agreement window");
+    expectNoDocumentRead();
+  });
+
 });

@@ -90,7 +90,8 @@ export async function requestProgramSiteAuthorization(
         throw new Error("A different operating authorization request is already pending");
       return { authorizationId: last.id, status: "requested" as const, created: false };
     }
-    if (last?.status === "approved") throw new Error("Revoke the current authorization before requesting a replacement");
+    if (last?.status === "approved" || last?.status === "suspended")
+      throw new Error("Revoke the current authorization before requesting a replacement");
     const [created] = await tx.insert(programSiteAuthorizations).values({
       programId: identity.programId, siteId: identity.siteId!,
       hostOrganizationId: identity.hostOrganizationId,
@@ -336,19 +337,24 @@ export async function revokeProgramSiteAuthorization(
         identity.hostOrganizationId !== record.hostOrganizationId ||
         identity.institutionOrganizationId !== record.institutionOrganizationId)
       throw new AuthorizationError("unchanged contracting parties");
-    if (record.status !== "approved")
-      throw new Error("Only a currently approved authorization can be revoked");
+    if (record.status !== "approved" && record.status !== "suspended")
+      throw new Error("Only a currently approved or suspended authorization can be revoked");
     const now = new Date();
     await tx.update(programSiteAuthorizations).set({
+      // Suspension fields describe current state; immutable audits retain history.
       status: "revoked", revokedByPersonId: actor.actorPersonId,
       revokedAt: now, revocationReason: reason, updatedAt: now,
+      suspendedByPersonId: null, suspendedAt: null, suspensionReason: null,
     }).where(eq(programSiteAuthorizations.id, record.id));
     await writeAudit(tx, actor, {
       action: "program.site.authorization.revoke",
       entityType: "program_site_authorization", entityId: record.id,
       scope: { organizationId: identity.hostOrganizationId,
         siteId: identity.siteId, programId: identity.programId },
-      before: { status: "approved" }, after: { status: "revoked", reason },
+      before: { status: record.status, suspendedByPersonId: record.suspendedByPersonId,
+        suspendedAt: record.suspendedAt?.toISOString() ?? null,
+        suspensionReason: record.suspensionReason },
+      after: { status: "revoked", reason },
     });
     await emitEvent(tx, {
       eventType: EventTypes.ProgramSiteAuthorizationRevoked,
@@ -519,6 +525,9 @@ export async function renewProgramSiteAuthorization(
       record.requestedByPersonId, actor.actorPersonId!, input.effectiveThrough, now);
     await tx.update(programSiteAuthorizations).set({
       effectiveThrough: input.effectiveThrough,
+      // Current evidence is checked against this decision's independent reviewer
+      // on subsequent entitlement reads, not the historical initial approver.
+      reviewedByPersonId: actor.actorPersonId, reviewedAt: now,
       evidenceDocumentId: input.evidenceDocumentId, updatedAt: now,
     }).where(eq(programSiteAuthorizations.id, record.id));
     await writeAudit(tx, actor, {
@@ -527,9 +536,12 @@ export async function renewProgramSiteAuthorization(
       scope: { organizationId: identity.institutionOrganizationId,
         siteId: identity.siteId, programId: identity.programId },
       before: { effectiveThrough: record.effectiveThrough?.toISOString() ?? null,
-        evidenceDocumentId: record.evidenceDocumentId },
+        evidenceDocumentId: record.evidenceDocumentId,
+        reviewedByPersonId: record.reviewedByPersonId,
+        reviewedAt: record.reviewedAt?.toISOString() ?? null },
       after: { effectiveThrough: input.effectiveThrough.toISOString(),
-        evidenceDocumentId: input.evidenceDocumentId, reason },
+        evidenceDocumentId: input.evidenceDocumentId,
+        reviewedByPersonId: actor.actorPersonId, reviewedAt: now.toISOString(), reason },
     });
     await emitEvent(tx, {
       eventType: EventTypes.ProgramSiteAuthorizationRenewed,
@@ -677,6 +689,8 @@ export async function getHostProgramSiteAuthorization(
     effectiveThrough: programSiteAuthorizations.effectiveThrough,
     revokedAt: programSiteAuthorizations.revokedAt,
     reviewReason: programSiteAuthorizations.reviewReason,
+    suspendedAt: programSiteAuthorizations.suspendedAt,
+    suspensionReason: programSiteAuthorizations.suspensionReason,
   }).from(programSiteAuthorizations)
     .where(eq(programSiteAuthorizations.programId, programId))
     .orderBy(desc(programSiteAuthorizations.version)).limit(1);
@@ -690,7 +704,7 @@ export async function getHostProgramSiteAuthorization(
     canIssueCredit: identity.creditIssuingOrganizationId !== null,
     authorization: record ? {
       ...record,
-      lapsed: record.status === "approved" && record.effectiveThrough !== null &&
+      lapsed: (record.status === "approved" || record.status === "suspended") && record.effectiveThrough !== null &&
         record.effectiveThrough <= now,
     } : null,
   };
@@ -721,6 +735,8 @@ export async function listCANOperatingAuthorizationDesk(actor: AccessContext) {
     reviewedAt: programSiteAuthorizations.reviewedAt,
     effectiveFrom: programSiteAuthorizations.effectiveFrom,
     effectiveThrough: programSiteAuthorizations.effectiveThrough,
+    suspendedAt: programSiteAuthorizations.suspendedAt,
+    suspensionReason: programSiteAuthorizations.suspensionReason,
   }).from(programSiteAuthorizations)
     .innerJoin(programs, eq(programSiteAuthorizations.programId, programs.id))
     .innerJoin(organizations, eq(programSiteAuthorizations.hostOrganizationId, organizations.id))
@@ -733,7 +749,7 @@ export async function listCANOperatingAuthorizationDesk(actor: AccessContext) {
   return {
     authorizations: requests.map(request => ({
       ...request,
-      lapsed: request.status === "approved" && request.effectiveThrough !== null &&
+      lapsed: (request.status === "approved" || request.status === "suspended") && request.effectiveThrough !== null &&
         request.effectiveThrough <= now,
     })),
   };
@@ -760,8 +776,11 @@ export async function listOperatingAgreementEvidence(
       identity.institutionOrganizationId !== request.institutionOrganizationId ||
       actor.actorPersonId === request.requestedByPersonId)
     throw new AuthorizationError("independent reviewer of unchanged Program-Site parties");
-  if (request.status !== "requested")
-    throw new Error("Evidence selection requires a pending authorization request");
+  if (request.status !== "requested" && request.status !== "approved")
+    throw new Error("Evidence selection requires a pending request or approved authorization");
+  if (request.status === "approved" && request.effectiveThrough !== null &&
+      request.effectiveThrough > at && input.effectiveThrough <= request.effectiveThrough)
+    throw new Error("Renewal evidence requires an end date that extends the current agreement window");
   const rows = await db.select({
     id: documents.id, fileName: documents.fileName,
     subjectType: documents.subjectType, subjectId: documents.subjectId,

@@ -15,6 +15,8 @@ import { assertAcademicActionAuthority,assertAcademicActionStaff } from "@/modul
 import { openingHandoffType } from "@/modules/programs/opening-handoff.server";
 import { gradeResponseActionType } from "@/domain/grade-response-policy";
 import { prioritizeSchoolActions,schoolActionBacklog } from "@/domain/operations-action-triage";
+import { currentSiteDirectorPersonId } from "./site-local-delegation.server";
+import { assertLocalDelegationIssuer } from "@/domain/site-local-delegation-policy";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 
 async function operator() {
@@ -38,6 +40,11 @@ export const getOperationsActions=createServerFn({method:"GET"})
   status:actions.status,priority:actions.priority,dueAt:actions.dueAt,createdAt:actions.createdAt
  }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId)).where(and(inArray(actions.siteId,scoped.siteIds),inArray(actions.status,["open","in_progress","waiting"]),allowedPrograms,...(data.programId?[eq(actions.programId,data.programId)]:[]))).orderBy(sql`CASE ${actions.priority} WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END`,
    asc(actions.dueAt),desc(actions.createdAt)).limit(250);
+ const coverageGapOwners=new Map<string,string|null>();
+ for(const record of records){
+  if(record.type==="onsite_coverage_gap"&&record.programId&&!coverageGapOwners.has(record.programId))
+   coverageGapOwners.set(record.programId,await currentSiteDirectorPersonId(db,record.programId));
+ }
  const items=dedupeQueue(records.map(record=>({
   id:record.id,kind:"action" as const,
   title:record.type==="support_referral"?"Restricted student support referral":record.title,
@@ -55,13 +62,15 @@ export const getOperationsActions=createServerFn({method:"GET"})
   const record=records.find(record=>record.id===item.id);
   return {...item,type:record?.type??"operations",programId:record?.programId??null,
    siteId:record?.siteId??null,ownerPersonId:record?.ownerPersonId??null,
+   eligibleOwnerPersonId:record?.type==="onsite_coverage_gap"&&record.programId
+     ?coverageGapOwners.get(record.programId)??null:null,
    ownerName:record?.ownerFirstName&&record.ownerLastName?`${record.ownerFirstName} ${record.ownerLastName}`:null,
    dueAt:record?.dueAt?.toISOString()??null,status:record?.status??"open",
    priority:item.priority==="critical"?"critical" as const:
      item.priority==="high"?"high" as const:"normal" as const,
    managedBySupport:record?.type==="support_referral",openingHandoff:record?.type===openingHandoffType};
  }));
- const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor"])));
+ const assignees=await db.select({id:accountPersonGrants.personId,siteId:accountPersonGrants.siteId,role:accountPersonGrants.role,firstName:people.legalFirstName,lastName:people.legalLastName}).from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId)).where(and(inArray(accountPersonGrants.siteId,scoped.siteIds),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor","site_leader"])));
  const [siteChoices,programChoices]=await Promise.all([
   db.select({id:sites.id,name:sites.name}).from(sites).where(inArray(sites.id,actor.scope.siteIds!)),
   actor.scope.programIds?.length ? db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs).where(and(inArray(programs.id,actor.scope.programIds),isNotNull(programs.siteId),...(data.siteId?[eq(programs.siteId,data.siteId)]:[]))) : Promise.resolve([]),
@@ -82,6 +91,8 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
    if(record.type===openingHandoffType)throw new Error("Use the named-recipient opening handoff in Site Today");
+   if(record.type==="onsite_coverage_gap"&&data.status==="resolved")
+     throw new Error("The current assigned site director resolves coverage gaps in Site Today");
    const academic=record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId!==null;
    if(academic&&data.status==="resolved"){
     await resolveActionInTransaction(tx,actor,{actionId:record.id,resolutionNote:data.resolutionNote??""});
@@ -137,16 +148,29 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    if(record.type===openingHandoffType)throw new Error("Use the named-recipient opening handoff in Site Today");
    const academic=record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId!==null;
    if(academic)await assertAcademicActionAuthority(tx,actor,record);
-   if(data.ownerPersonId){
+   const coverageGap=record.type==="onsite_coverage_gap";
+   if(coverageGap){
+    if(!record.programId||!record.siteId||!record.organizationId)
+      throw new AuthorizationError("coverage gap requires a named school and program");
+    assertLocalDelegationIssuer(actor,{organizationId:record.organizationId,siteId:record.siteId,programId:record.programId});
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:"+record.programId}))`);
+    const eligibleOwner=await currentSiteDirectorPersonId(tx,record.programId);
+    if(data.ownerPersonId!==eligibleOwner)
+      throw new AuthorizationError("coverage gap owner must be the current eligible site director");
+   }
+   if(data.ownerPersonId&&!coverageGap){
     if(!record.siteId)throw new AuthorizationError("site-scoped action required for assignment");
     const [grant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants).where(and(eq(accountPersonGrants.personId,data.ownerPersonId),eq(accountPersonGrants.siteId,record.siteId!),eq(accountPersonGrants.active,true),inArray(accountPersonGrants.role,["registrar","teacher","specialist","counselor"]))).limit(1);
     if(!grant)throw new AuthorizationError("assignee must have active site membership");
     if(academic)await assertAcademicActionStaff(tx,data.ownerPersonId,record);
    }
-   if(record.ownerPersonId===data.ownerPersonId&&record.priority===data.priority)return {saved:true};
-   await tx.update(actions).set({ownerPersonId:data.ownerPersonId,priority:data.priority,updatedAt:new Date()}).where(eq(actions.id,record.id));
+   const priority=coverageGap&&!data.ownerPersonId?"urgent":data.priority;
+   if(record.ownerPersonId===data.ownerPersonId&&record.priority===priority&&
+      (!coverageGap||record.metadata.ownerEscalation===(data.ownerPersonId===null)))return {saved:true};
+   await tx.update(actions).set({ownerPersonId:data.ownerPersonId,priority,updatedAt:new Date(),
+     ...(coverageGap?{metadata:{...record.metadata,ownerEscalation:data.ownerPersonId===null}}:{})}).where(eq(actions.id,record.id));
    if(data.ownerPersonId&&data.ownerPersonId!==record.ownerPersonId)await notify(tx,{recipientPersonId:data.ownerPersonId,type:"operations_action_assigned",title:"Assigned action: "+record.title,body:"An action requires your attention.",resourceType:"action",resourceId:record.id});
-   await writeAudit(tx,actor,{action:"action.assignment.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{ownerPersonId:record.ownerPersonId,priority:record.priority},after:{ownerPersonId:data.ownerPersonId,priority:data.priority}});
+   await writeAudit(tx,actor,{action:"action.assignment.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{ownerPersonId:record.ownerPersonId,priority:record.priority},after:{ownerPersonId:data.ownerPersonId,priority}});
    return {saved:true};
   });
  });
@@ -235,6 +259,12 @@ export const resolveOwnedSiteOperationalAction=createServerFn({method:"POST"})
        throw new AuthorizationError("this Action is resolved in its owning workflow");
      if(record.ownerPersonId!==actor.actorPersonId)
        throw new AuthorizationError("only the assigned owner resolves this follow-up");
+     if(record.type==="onsite_coverage_gap"){
+       if(!record.programId)throw new AuthorizationError("coverage gap program required");
+       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:"+record.programId}))`);
+       if(await currentSiteDirectorPersonId(tx,record.programId)!==actor.actorPersonId)
+         throw new AuthorizationError("only the current eligible site director resolves this coverage gap");
+     }
      if(record.status==="resolved"&&record.resolutionNote===data.resolutionNote)
        return {saved:true};
      if(record.status==="cancelled"||record.status==="resolved")

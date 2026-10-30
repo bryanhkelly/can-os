@@ -1,10 +1,14 @@
+import { currentSafeguardingFallbacks } from "./safeguarding-routing.server";
 import { db } from "@/db/client";
 import {
+  accessAccounts,
+  accountPersonGrants,
   documents,
   enrollments,
   incidentAmendments,
   incidentEvidence,
   incidentNotifications,
+  incidentReviews,
   incidents,
   people,
   programs,
@@ -391,6 +395,10 @@ export async function acknowledgeSafeguardingConcern(actor: AccessContext, incid
     "safeguarding.respond",
   );
   return db.transaction(async (tx) => {
+    // Shared with the scheduled overdue processor: acknowledgment and routing
+    // cannot pass each other's unacknowledged check concurrently.
+    await tx.select({id:incidents.id}).from(incidents)
+      .where(eq(incidents.id,incidentId)).for("update").limit(1);
     const notifications = await tx.select().from(incidentNotifications).where(and(
       eq(incidentNotifications.incidentId, incidentId),
       eq(incidentNotifications.recipientPersonId, actor.actorPersonId!),
@@ -436,22 +444,39 @@ export async function acknowledgeSafeguardingConcern(actor: AccessContext, incid
 
 export async function escalateSafeguardingConcern(actor: AccessContext, incidentId: string) {
   const { incident } = await loadIncidentAndAssignment(actor, incidentId, "safeguarding.respond");
-  const { responderRows } = await loadPolicyAndResponders(incident.siteId);
-  const responders = new Map(responderRows.filter(row => row.active).map(row => [row.responsibility, row.personId]));
-  const candidates = (["deputy", "can_lead"] as const).filter(kind => responders.has(kind));
   return db.transaction(async (tx) => {
-    // The unique assignment is the idempotency boundary. Only rows won by
-    // this transaction receive notifications, events and audit entries.
-    const created = await tx.insert(safeguardingCaseAssignments).values(candidates.map(responsibility => ({
+    const [current] = await tx.select({ status: incidents.status }).from(incidents)
+      .where(eq(incidents.id, incidentId)).for("update").limit(1);
+    if (current?.status !== "filed") throw new Error("Only an open safeguarding case can be escalated");
+    const candidates = await currentSafeguardingFallbacks(tx, incident);
+    // A revoked case assignment remains revoked. Only new, currently eligible
+    // assignments receive a handoff; retries never duplicate notifications.
+    const created = candidates.length ? await tx.insert(safeguardingCaseAssignments).values(candidates.map(candidate => ({
       incidentId,
-      personId: responders.get(responsibility)!,
-      responsibility,
+      personId: candidate.personId,
+      responsibility: candidate.responsibility,
       assignedByPersonId: actor.actorPersonId,
     }))).onConflictDoNothing().returning({
       personId: safeguardingCaseAssignments.personId,
       responsibility: safeguardingCaseAssignments.responsibility,
-    });
-    if (!created.length) return { escalated: false, responsibilities: [] as string[] };
+    }) : [];
+    const active = candidates.length ? await tx.select({ personId: safeguardingCaseAssignments.personId,
+      responsibility: safeguardingCaseAssignments.responsibility,
+    }).from(safeguardingCaseAssignments).where(and(
+      eq(safeguardingCaseAssignments.incidentId, incidentId),
+      isNull(safeguardingCaseAssignments.revokedAt),
+    )) : [];
+    const unroutable = !candidates.some(candidate => active.some(assignment =>
+      assignment.personId === candidate.personId && assignment.responsibility === candidate.responsibility));
+    if (!created.length) {
+      if (unroutable) await writeAudit(tx, actor, {
+        action: "safeguarding.concern.escalation_unroutable",
+        entityType: "incident", entityId: incidentId,
+        scope: { organizationId: incident.organizationId, siteId: incident.siteId, programId: incident.programId },
+        after: { eligibleFallbackAssigned: false, emergencyServicesDispatched: false },
+      });
+      return { escalated: false, responsibilities: [] as string[], unroutable };
+    }
     await tx.insert(incidentNotifications).values(created.map(assignment => ({
       incidentId,
       recipientPersonId: assignment.personId,
@@ -489,7 +514,7 @@ export async function escalateSafeguardingConcern(actor: AccessContext, incident
       after: { routedResponsibilities: routed },
       contextExtras: { domainEventId: eventId },
     });
-    return { escalated: true, responsibilities: routed };
+    return { escalated: true, responsibilities: routed, unroutable: false };
   });
 }
 
@@ -513,6 +538,21 @@ export async function resolveSafeguardingConcern(
     "safeguarding.respond",
   );
   return db.transaction(async (tx) => {
+    const [current] = await tx.select().from(incidents)
+      .where(eq(incidents.id,incident.id)).for("update").limit(1);
+    if (current?.status === "closed") {
+      if (current.closedByPersonId !== actor.actorPersonId) {
+        throw new Error("This safeguarding case was already closed by another responder");
+      }
+      if (current.metadata?.safeguardingResolutionSummary !== summary) {
+        throw new Error("This case already has a different recorded resolution summary; closure retries cannot amend it");
+      }
+      return { incidentId: incident.id, closedAt: current.closedAt!, replayed: true };
+    }
+    if (current?.status !== "filed") throw new Error("Only an open safeguarding case can be closed");
+    const pendingReviews=await tx.select({id:incidentReviews.id}).from(incidentReviews)
+      .where(and(eq(incidentReviews.incidentId,incident.id),eq(incidentReviews.status,"pending"))).limit(1);
+    if(pendingReviews.length)throw new Error("Complete all assigned restricted case reviews before closure");
     const acknowledged = await tx.select({ id: incidentNotifications.id })
       .from(incidentNotifications).where(and(
         eq(incidentNotifications.incidentId, incident.id),
@@ -529,22 +569,12 @@ export async function resolveSafeguardingConcern(
       closedAt,
       closedByPersonId: actor.actorPersonId,
       updatedAt: closedAt,
-      metadata: { ...incident.metadata, safeguardingResolutionSummary: summary },
+      metadata: { ...current.metadata, safeguardingResolutionSummary: summary },
     }).where(and(
       eq(incidents.id, incident.id),
       eq(incidents.status, "filed"),
     )).returning({ id: incidents.id });
-    if (!changed.length) {
-      const [current] = await tx.select({
-        status: incidents.status,
-        closedAt: incidents.closedAt,
-        closedByPersonId: incidents.closedByPersonId,
-      }).from(incidents).where(eq(incidents.id, incident.id)).limit(1);
-      if (current?.status === "closed" && current.closedByPersonId === actor.actorPersonId) {
-        return { incidentId: incident.id, closedAt: current.closedAt ?? closedAt, replayed: true };
-      }
-      throw new Error("This safeguarding case was already closed by another responder");
-    }
+    if (!changed.length) throw new Error("The safeguarding case state changed; reload before closing");
     await tx.insert(incidentAmendments).values({
       incidentId: incident.id,
       amendedByPersonId: actor.actorPersonId!,
@@ -726,6 +756,9 @@ export async function claimOverdueSafeguardingResponse(actor: AccessContext, inc
   return db.transaction(async tx => {
     // Re-check inside the transaction: a concurrent acknowledgment between
     // the pre-checks and this write must cancel the takeover.
+    const [current] = await tx.select({status:incidents.status}).from(incidents)
+      .where(eq(incidents.id,incidentId)).for("update").limit(1);
+    if(current?.status!=="filed")throw new Error("This case is no longer awaiting a first response");
     const raced = await tx.select({ id: incidentNotifications.id })
       .from(incidentNotifications).where(and(
         eq(incidentNotifications.incidentId, incidentId),
@@ -1080,7 +1113,7 @@ export async function getSafeguardingCase(actor: AccessContext, incidentId: stri
     }).from(studentProfiles)
       .innerJoin(people, eq(people.id, studentProfiles.personId))
       .where(eq(studentProfiles.id, concern.studentProfileId)).limit(1) : [];
-    const [evidence, externalReports, assignments, notifications] = await Promise.all([
+    const [evidence, externalReports, assignments, notifications, reviews] = await Promise.all([
       tx.select().from(incidentEvidence).where(eq(incidentEvidence.incidentId, incidentId)).orderBy(asc(incidentEvidence.createdAt)),
       tx.select().from(safeguardingExternalReports).where(eq(safeguardingExternalReports.incidentId, incidentId)).orderBy(asc(safeguardingExternalReports.occurredAt)),
       tx.select({
@@ -1103,6 +1136,10 @@ export async function getSafeguardingCase(actor: AccessContext, incidentId: stri
         createdAt: incidentNotifications.createdAt,
         acknowledgedAt: incidentNotifications.acknowledgedAt,
       }).from(incidentNotifications).where(eq(incidentNotifications.incidentId, incidentId)),
+      tx.select({id:incidentReviews.id,reviewerPersonId:incidentReviews.reviewerPersonId,
+        level:incidentReviews.level,status:incidentReviews.status,notes:incidentReviews.notes,
+        decision:incidentReviews.decision,reviewedAt:incidentReviews.reviewedAt,
+      }).from(incidentReviews).where(eq(incidentReviews.incidentId,incidentId)).orderBy(asc(incidentReviews.createdAt)),
     ]);
     await writeAudit(tx, actor, {
       action: "safeguarding.case.read",
@@ -1141,6 +1178,99 @@ export async function getSafeguardingCase(actor: AccessContext, incidentId: stri
       externalReports,
       assignments,
       notifications,
+      reviews:reviews.map(review=>({...review,canComplete:incident.status==="filed"&&
+        review.status==="pending"&&review.reviewerPersonId===actor.actorPersonId})),
     };
+  });
+}
+
+/** Complete an existing canonical Incident review under restricted case access.
+ * An internal review outcome never attests that an outside legal duty ended.
+ */
+export async function completeSafeguardingCaseReview(actor:AccessContext,input:{
+  incidentId:string;reviewId:string;outcome:string;
+}){
+  const outcome=input.outcome.trim();
+  if(outcome.length<10||outcome.length>2000)throw new Error("Record a 10-2000 character factual review outcome");
+  const {incident}=await loadIncidentAndAssignment(actor,input.incidentId,"safeguarding.respond");
+  return db.transaction(async tx=>{
+    const [current]=await tx.select({status:incidents.status}).from(incidents)
+      .where(eq(incidents.id,incident.id)).for("update").limit(1);
+    const [review]=await tx.select().from(incidentReviews).where(and(
+      eq(incidentReviews.id,input.reviewId),eq(incidentReviews.incidentId,incident.id),
+    )).for("update").limit(1);
+    if(!review||review.reviewerPersonId!==actor.actorPersonId)
+      throw new AuthorizationError("only the named restricted case reviewer can complete this review");
+    if(review.status==="complete"){
+      if(review.decision===outcome)return {reviewId:review.id,replayed:true};
+      throw new Error("This review already has a recorded outcome");
+    }
+    if(current?.status!=="filed")throw new Error("This restricted case is closed");
+    const reviewedAt=new Date();
+    await tx.update(incidentReviews).set({status:"complete",decision:outcome,reviewedAt,updatedAt:reviewedAt})
+      .where(eq(incidentReviews.id,review.id));
+    const eventId=await emitEvent(tx,{
+      eventType:EventTypes.SafeguardingCaseReviewCompleted,aggregateType:"incident",aggregateId:incident.id,
+      actorPersonId:actor.actorPersonId,organizationId:incident.organizationId,siteId:incident.siteId,programId:incident.programId,
+      payload:{reviewId:review.id,classification:"safeguarding_restricted",outcomeRecorded:true,externalDutyCompleted:false},
+    });
+    await writeAudit(tx,actor,{action:"safeguarding.review.complete",entityType:"incident",entityId:incident.id,
+      scope:{organizationId:incident.organizationId,siteId:incident.siteId,programId:incident.programId},
+      before:{reviewId:review.id,status:"pending"},after:{reviewId:review.id,status:"complete",outcome},
+      contextExtras:{domainEventId:eventId}});
+    return {reviewId:review.id,replayed:false};
+  });
+}
+
+/** Assign a canonical review only within an already-authorized restricted case.
+ * The client-generated review ID is the retry boundary, never an access grant.
+ */
+export async function assignSafeguardingCaseReview(actor:AccessContext,input:{
+  incidentId:string;reviewId:string;reviewerPersonId:string;
+  kind:"protective_measure_review"|"external_reporting_review"|"follow_up_review";notes:string;
+}){
+  const notes=input.notes.trim();
+  if(notes.length<10||notes.length>2000||
+    !["protective_measure_review","external_reporting_review","follow_up_review"].includes(input.kind))
+    throw new Error("Choose a recognized internal review and describe the task in 10-2000 characters");
+  const {incident}=await loadIncidentAndAssignment(actor,input.incidentId,"safeguarding.respond");
+  return db.transaction(async tx=>{
+    const [current]=await tx.select({status:incidents.status}).from(incidents)
+      .where(eq(incidents.id,incident.id)).for("update").limit(1);
+    const [existing]=await tx.select().from(incidentReviews).where(eq(incidentReviews.id,input.reviewId)).limit(1);
+    if(existing){
+      if(existing.incidentId===incident.id&&existing.reviewerPersonId===input.reviewerPersonId&&
+        existing.level===input.kind&&existing.notes===notes)return {reviewId:existing.id,replayed:true};
+      throw new Error("This review identifier is already in use");
+    }
+    if(current?.status!=="filed")throw new Error("This restricted case is closed");
+    const [eligible]=await tx.select({id:safeguardingCaseAssignments.id}).from(safeguardingCaseAssignments)
+      .innerJoin(people,eq(people.id,safeguardingCaseAssignments.personId))
+      .innerJoin(accountPersonGrants,eq(accountPersonGrants.personId,people.id))
+      .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+      .where(and(eq(safeguardingCaseAssignments.incidentId,incident.id),
+        eq(safeguardingCaseAssignments.personId,input.reviewerPersonId),isNull(safeguardingCaseAssignments.revokedAt),
+        eq(people.active,true),eq(accountPersonGrants.active,true),eq(accessAccounts.disabled,false),
+        isNotNull(accessAccounts.emailVerifiedAt),eq(accountPersonGrants.organizationId,incident.organizationId!),
+        or(eq(accountPersonGrants.siteId,incident.siteId),isNull(accountPersonGrants.siteId)),
+        inArray(accountPersonGrants.role,["safeguarding_responder","safeguarding_lead"])))
+      .for("share",{of:[safeguardingCaseAssignments,people,accountPersonGrants,accessAccounts]}).limit(1);
+    if(!eligible)throw new AuthorizationError("reviewer must already have current restricted case access");
+    const [created]=await tx.insert(incidentReviews).values({id:input.reviewId,incidentId:incident.id,
+      reviewerPersonId:input.reviewerPersonId,level:input.kind,notes})
+      .onConflictDoNothing().returning({id:incidentReviews.id});
+    if(!created)throw new Error("This review identifier is already in use");
+    const eventId=await emitEvent(tx,{
+      eventType:EventTypes.SafeguardingCaseReviewAssigned,aggregateType:"incident",aggregateId:incident.id,
+      actorPersonId:actor.actorPersonId,organizationId:incident.organizationId,siteId:incident.siteId,programId:incident.programId,
+      payload:{reviewId:input.reviewId,classification:"safeguarding_restricted"},
+    });
+    await notifyMany(tx,[{recipientPersonId:input.reviewerPersonId,type:"safeguarding_response_required",
+      title:"Restricted case review assigned",body:"Open your assigned safeguarding workspace to review the internal task.",
+      resourceType:"safeguarding_concern",resourceId:incident.id,eventId}]);
+    await writeAudit(tx,actor,{action:"safeguarding.review.assign",entityType:"incident",entityId:incident.id,
+      scope:{organizationId:incident.organizationId,siteId:incident.siteId,programId:incident.programId},
+      after:{reviewId:input.reviewId,reviewerPersonId:input.reviewerPersonId,kind:input.kind},contextExtras:{domainEventId:eventId}});
+    return {reviewId:input.reviewId,replayed:false};
   });
 }

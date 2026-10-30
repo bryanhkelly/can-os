@@ -1,15 +1,19 @@
+import { escalateOverdueSafeguardingConcerns } from "@/modules/safeguarding/safeguarding-overdue.server";
 import { markOverdueSubmissionsMissing } from "@/modules/learning/missing-work-service";
 import { processSubscriptionReminders, processQueuedSubscriptionDeliveries, processWeeklyDigests, recoverSubscriptionEventMatches, escalateTerminalDeliveryFailures } from "@/platform/subscriptions";
 import { expireOutstandingSectionOffers } from "@/modules/programs/section-lifecycle-service";
 import { processPendingDomainEvents } from "./domain-event-worker";
 
 /**
- * Periodic maintenance for the transactional outbox. GF1 depends on this running:
+ * Existing periodic processor for restricted safeguarding handoffs and the outbox.
+ * Overdue unacknowledged cases are routed before unrelated maintenance. GF1 depends on this running:
  * overdue submissions are marked missing (emitting AssignmentBecameMissing) and
  * pending domain events are dispatched to their handlers (guardian notifications).
  * GF-A2 adds subscription reminder processing ("remind me if it's still missing").
  */
 export async function runScheduledJobs(): Promise<{
+  safeguardingEscalated: number;
+  safeguardingUnroutable: number;
   missing: number;
   processed: number;
   reminders: number;
@@ -19,6 +23,7 @@ export async function runScheduledJobs(): Promise<{
   escalated: number;
   expiredSectionOffers: number;
 }> {
+  const safeguarding = await escalateOverdueSafeguardingConcerns();
   const missing = await markOverdueSubmissionsMissing();
   const processed = await processPendingDomainEvents();
   const recovered = await recoverSubscriptionEventMatches();
@@ -27,5 +32,5 @@ export async function runScheduledJobs(): Promise<{
   const escalated = await escalateTerminalDeliveryFailures();
   const digests = await processWeeklyDigests();
   const expiredSectionOffers = await expireOutstandingSectionOffers();
-  return { missing, processed, recovered, reminders, deliveries, digests, escalated, expiredSectionOffers };
+  return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, recovered, reminders, deliveries, digests, escalated, expiredSectionOffers };
 }

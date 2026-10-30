@@ -60,19 +60,30 @@ export function ProgramSiteAuthorizationPanel({programId}:{programId:string}) {
       {status.authorization.lapsed&&<p role="status" className="mt-2">
         The agreement window has elapsed. Delegated CAN operations are blocked
         until the independent CAN steward renews the agreement under fresh evidence.
+        {status.authorization.status==="suspended"&&" The suspension must also be resolved by CAN before services can resume."}
       </p>}
       {status.authorization.status==="requested"&&<p role="status" className="mt-2">
         Awaiting independent CAN review of the agreement and its verified evidence.
         You can continue planning classes, but this request does not open admissions or the school.
       </p>}
+      {status.authorization.status==="suspended"&&<p role="status" className="mt-2">
+        CAN has suspended this agreement. Delegated services are blocked.
+        Contact your CAN steward for review and resumption, or revoke the agreement below.
+        School opening authorization remains a separate requirement.
+      </p>}
+      {status.authorization.status==="suspended"&&status.authorization.suspensionReason&&
+        <p className="mt-2 text-xs">CAN suspension reason: {status.authorization.suspensionReason}</p>}
+      {status.authorization.effectiveFrom&&<p className="mt-1 text-xs">
+        Term begins: {new Date(status.authorization.effectiveFrom).toLocaleString()}
+      </p>}
       <p className="mt-1 text-xs">Services: {status.authorization.services.join(", ")}</p>
       {status.authorization.effectiveThrough&&<p className="mt-1 text-xs">
-        Term ends: {new Date(status.authorization.effectiveThrough).toLocaleDateString()}
+        Term ends (exclusive): {new Date(status.authorization.effectiveThrough).toLocaleString()}
       </p>}
       {status.authorization.reviewReason&&<p className="mt-2 text-xs">
         Institutional review: {status.authorization.reviewReason}
       </p>}
-      {status.authorization.status==="approved"&&<form onSubmit={e=>{e.preventDefault();void revoke();}} className="mt-3 space-y-2">
+      {(status.authorization.status==="approved"||status.authorization.status==="suspended")&&<form onSubmit={e=>{e.preventDefault();void revoke();}} className="mt-3 space-y-2">
         <label className="block text-xs">Reason for withdrawing church-hosted authority
           <input className="mt-1 w-full rounded border bg-background p-2" value={revokeReason}
             onChange={e=>setRevokeReason(e.target.value)} minLength={10} maxLength={500} required/>
