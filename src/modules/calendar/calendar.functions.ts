@@ -196,6 +196,7 @@ async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>
       };
     });
 
+    let deadlinesTruncated = false;
     if (sectionIds.length) {
       const dueRows = await db
         .select({
@@ -214,8 +215,9 @@ async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>
           lt(schema.assessments.dueAt, rangeEnd),
         ))
         .orderBy(asc(schema.assessments.dueAt))
-        .limit(200);
-      for (const row of dueRows) {
+        .limit(201);
+      deadlinesTruncated = dueRows.length > 200;
+      for (const row of dueRows.slice(0, 200)) {
         if (!row.dueAt) continue;
         items.push({
           id: `assessment:${row.id}`,
@@ -234,7 +236,7 @@ async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>
     }
 
     items.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-    return { connected: true, viewerRole, items, truncated:events.length>200 };
+    return { connected: true, viewerRole, items, truncated:events.length>200 || deadlinesTruncated };
   }
 
 export const getCalendarMonth = createServerFn({ method: "GET" })

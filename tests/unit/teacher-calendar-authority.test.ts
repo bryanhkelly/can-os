@@ -63,6 +63,16 @@ describe("calendar authority for delegated academic teachers",()=>{
 
 
 describe("bounded calendar range",()=>{
+ it.each([200,201])("reports deadline truncation at the actual result boundary (%i rows)",async(count)=>{
+  state.results=[[],Array.from({length:count},(_,index)=>({
+   id:`assessment-${index}`,title:`Assignment ${index}`,dueAt:new Date("2026-10-29T12:00:00Z"),
+   sectionTitle:"English",sectionId:"delegated-section",
+  }))];
+  const invoke=getCalendarRange as unknown as (arg:unknown)=>Promise<{truncated:boolean;items:unknown[]}>;
+  const result=await invoke({data:{startsAt:"2026-10-29T00:00:00Z",endsAt:"2026-10-30T00:00:00Z"}});
+  expect(result.items).toHaveLength(200);
+  expect(result.truncated).toBe(count>200);
+ });
  it("uses the canonical calendar visibility for a daily read",async()=>{
   const invoke=getCalendarRange as unknown as (arg:unknown)=>Promise<unknown>;
   await expect(invoke({data:{startsAt:"2026-10-29T00:00:00Z",endsAt:"2026-10-30T00:00:00Z"}}))
