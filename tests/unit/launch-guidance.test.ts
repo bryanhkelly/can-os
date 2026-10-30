@@ -166,6 +166,22 @@ describe("canonical launch guidance", () => {
     expect(guidance.ready).toBe(false);
   });
 
+  it("returns a corrected submission to the institutional review queue", () => {
+    const guidance = buildLaunchGuidance(launch({
+      requirements: [{ id: "review", key: "safety", title: "Safety", status: "needs_can",
+        blocking: true, metadata: { evidenceReviewRequired: true }, evidence: [
+          { kind: "launch_evidence_statement", text: "First plan", submittedAt: "2026-10-30T10:00:00Z" },
+          { kind: "launch_evidence_review", status: "rejected", text: "Missing signature",
+            reviewedAt: "2026-10-30T11:00:00Z" },
+          { kind: "launch_evidence_statement", text: "Signed plan", submittedAt: "2026-10-30T12:00:00Z" },
+        ] }],
+    }));
+    expect(guidance.nextTask?.pendingEvidenceReview).toBe(true);
+    expect(guidance.nextTask?.evidenceReviewCorrectionPending).toBe(false);
+    expect(guidance.nextTask?.latestEvidenceStatement).toBe("Signed plan");
+    expect(guidance.ready).toBe(false);
+  });
+
   it("fails closed for an unrecognized persisted requirement state", () => {
     const guidance = buildLaunchGuidance(launch({
       requirements: [{ id: "unknown", key: "other", title: "Other", status: "unexpected", blocking: true }],
