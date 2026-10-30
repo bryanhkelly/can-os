@@ -47,12 +47,8 @@ async function visibleSectionIds(db: typeof import("@/db/client").db, schema: Sc
     return rows.map((row) => row.sectionId).filter((id): id is string => Boolean(id));
   }
   if (actor.role === "teacher") {
-    const rows = await db
-      .select({ sectionId: schema.sectionTeachers.sectionId })
-      .from(schema.sectionTeachers)
-      .innerJoin(schema.sections, eq(schema.sections.id, schema.sectionTeachers.sectionId))
-      .where(and(eq(schema.sectionTeachers.personId, actor.actorPersonId), inArray(schema.sections.siteId, sites), inArray(schema.sections.programId, actor.scope.programIds ?? [])));
-    return rows.map((row) => row.sectionId);
+    const { accessibleClasses } = await import("@/modules/learning/class-access.server");
+    return (await accessibleClasses(actor)).map(section=>section.id);
   }
   if (actor.role === "guardian") {
     const rows = await db
