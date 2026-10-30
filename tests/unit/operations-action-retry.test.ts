@@ -16,7 +16,7 @@ import { updateOperationsAction } from "@/modules/operations/action-workspace.fu
 beforeEach(()=>{
  vi.clearAllMocks();
  state.actor={role:"registrar",actorPersonId:"operator",scope:{siteIds:["site"],programIds:["program"]}};
- state.record={id:"action",type:"guardian_grade_follow_up",subjectType:"student_profile",
+ state.record={id:"action",type:"site_operational_follow_up",subjectType:"site",sectionId:null,
   siteId:"site",programId:"program",status:"resolved",resolutionNote:"The reviewed answer.",metadata:{}};
 });
 describe("closed school Action resolution retries",()=>{
