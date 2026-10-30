@@ -101,6 +101,18 @@ describe("canonical launch guidance", () => {
     expect(guidance.nextTask?.latestReviewReason).toBeNull();
   });
 
+  it("does not infer an approved requirement from an accepted evidence event", () => {
+    const guidance = buildLaunchGuidance(launch({
+      journey: { id: "journey", status: "ready" },
+      requirements: [{ id: "review", key: "safety-review", title: "Safety review",
+        status: "needs_can", blocking: true, metadata: { evidenceReviewRequired: true },
+        evidence: [{ kind: "document_review", status: "accepted", reviewedAt: "2026-10-30T12:00:00Z" }] }],
+    }));
+    expect(guidance.ready).toBe(false);
+    expect(guidance.pendingBlocking).toHaveLength(1);
+    expect(guidance.nextTask?.requiresRegistrarReview).toBe(true);
+  });
+
   it("fails closed for an unrecognized persisted requirement state", () => {
     const guidance = buildLaunchGuidance(launch({
       requirements: [{ id: "unknown", key: "other", title: "Other", status: "unexpected", blocking: true }],
