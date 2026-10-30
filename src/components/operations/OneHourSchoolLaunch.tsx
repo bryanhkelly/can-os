@@ -260,6 +260,21 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
           : guidance.ready ? "Journey ready" : "Review launch record"}
       </StatusBadge>
     </div>
+    <section aria-label="School opening readiness" className="mt-5 rounded-xl border bg-background p-4">
+      <h3 className="text-sm font-semibold">Opening authority</h3>
+      <p className="mt-2 text-sm">
+        {launch.status === "active"
+          ? "Opening recorded: the canonical activation command completed. Continue daily readiness and operating checks in Site Today."
+          : guidance.ready
+            ? "Launch Journey ready for activation review. The school is not yet open; CAN OS must still verify current academic, staffing, institutional, and receiving-operator authority."
+            : guidance.pendingBlocking.length > 0
+              ? `Not authorized to open: ${guidance.pendingBlocking.length} blocking requirement${guidance.pendingBlocking.length === 1 ? "" : "s"} remain incomplete in the Launch Journey.`
+              : "Opening not authorized: the Launch Journey has not reached ready status. Review the canonical launch record."}
+      </p>
+      {launch.status !== "active" && <p className="mt-2 text-xs text-muted-foreground">
+        School setup, published pages, family invitations, accepted applications, and active enrollments do not independently authorize opening.
+      </p>}
+    </section>
     {launches.length > 1 && <label className="mt-4 block max-w-md text-sm">Resume a school launch
       <select value={launch.id} onChange={event => {
         const selected = launches.find(item => item.id === event.target.value);
