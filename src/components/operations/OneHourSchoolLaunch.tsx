@@ -334,7 +334,15 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
               {task.blocking && task.state !== "complete" ? "Blocking opening · " : ""}{task.description}
             </p>
           </div>
-          <StatusBadge tone={taskTone(task)}>{launchOwnershipLabel(task.state)}</StatusBadge>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <StatusBadge tone={taskTone(task)}>{launchOwnershipLabel(task.state)}</StatusBadge>
+            {task.state !== "complete" && task.action !== "opening" &&
+              <TaskDestination launch={launch} task={task} />}
+            {task.state !== "complete" && task.action === "orientation" &&
+              <Link to="/operations/launch/$programId" params={{programId:launch.id}}
+                search={{siteId:launch.siteId??undefined,programId:undefined}}
+                className="text-xs font-semibold underline">Review orientation setup</Link>}
+          </div>
         </li>)}
       </ol>
     </details>
