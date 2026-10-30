@@ -406,9 +406,12 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
           ne(s.journeyRequirements.status, "complete"),
         ));
       const ready = incomplete.length === 0;
-      await tx.update(s.journeys).set({
-        status: ready ? "ready" : "in_progress", updatedAt: now,
-      }).where(eq(s.journeys.id, row.journeyId));
+      const nextJourneyStatus = ready ? "ready" : "in_progress";
+      if (row.journeyStatus !== nextJourneyStatus) {
+        await tx.update(s.journeys).set({
+          status: nextJourneyStatus, updatedAt: now,
+        }).where(eq(s.journeys.id, row.journeyId));
+      }
       await writeAudit(tx, context, {
         action: "journey.requirement.evidence.review",
         entityType: "journey_requirement", entityId: row.id,
