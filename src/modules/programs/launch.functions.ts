@@ -375,6 +375,8 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
         throw new Error("Evidence must be submitted before review");
       if (latestSubmission.submittedByPersonId === context.actorPersonId)
         throw new Error("A reviewer cannot approve or reject their own evidence");
+      if (!latestSubmission.submittedByPersonId)
+        throw new Error("Evidence without an attributable submitter cannot be institutionally approved");
       const latestDecision = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_review");
       if (latestDecision && row.evidence.lastIndexOf(latestDecision) > row.evidence.lastIndexOf(latestSubmission))
         throw new Error("This evidence submission has already been reviewed");
