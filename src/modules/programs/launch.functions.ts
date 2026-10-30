@@ -310,6 +310,87 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
     });
   });
 
+/**
+ * CAN institutional decision on a submitted program-opening evidence statement.
+ * Site-level registrar grants cannot approve their own launch evidence.
+ */
+export const reviewLaunchEvidence = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    journeyRequirementId: uuid,
+    decision: z.enum(["accepted", "rejected"]),
+    reason: z.string().trim().max(1000).default(""),
+  }).strict().refine(value => value.decision !== "rejected" || value.reason.length >= 5,
+    "A rejected submission requires a correction reason").parse(value))
+  .handler(async ({ data }) => {
+    const context = await registrarContext("program.activate");
+    if (!context.actorPersonId || context.grantSiteId !== null)
+      throw new AuthorizationError("CAN institutional evidence reviewer");
+    const [{ db }, s, { and, eq, ne }] = await Promise.all([
+      import("@/db/client"), import("@/db/schema"), import("drizzle-orm"),
+    ]);
+    return db.transaction(async tx => {
+      const [row] = await tx.select({
+        id: s.journeyRequirements.id, journeyId: s.journeyRequirements.journeyId,
+        status: s.journeyRequirements.status, evidence: s.journeyRequirements.evidence,
+        metadata: s.journeyRequirements.metadata, journeyStatus: s.journeys.status,
+        participantType: s.journeys.participantType, programId: s.journeys.programId,
+        organizationId: s.journeys.organizationId, siteId: s.journeys.siteId,
+      }).from(s.journeyRequirements)
+        .innerJoin(s.journeys, eq(s.journeys.id, s.journeyRequirements.journeyId))
+        .where(eq(s.journeyRequirements.id, data.journeyRequirementId))
+        .for("update").limit(1);
+      if (!row || row.participantType !== "program" || !row.programId)
+        throw new Error("Program launch requirement not found");
+      if (!context.scope.organizationIds?.includes(row.organizationId ?? "") ||
+          (context.scope.programIds && !context.scope.programIds.includes(row.programId)) ||
+          (context.scope.siteIds && (!row.siteId || !context.scope.siteIds.includes(row.siteId))))
+        throw new AuthorizationError("program launch review scope");
+      if (["active", "complete", "cancelled"].includes(row.journeyStatus) || row.status === "complete")
+        throw new Error("This launch requirement is closed to review");
+      if (!["needs_can", "needs_you"].includes(row.status))
+        throw new Error("Requirement is not awaiting review");
+      if (row.metadata.enrollmentForm !== undefined)
+        throw new Error("Enrollment forms require their dedicated review workflow");
+      const latestSubmission = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_statement");
+      if (!latestSubmission || typeof latestSubmission.submittedAt !== "string")
+        throw new Error("Evidence must be submitted before review");
+      if (latestSubmission.submittedByPersonId === context.actorPersonId)
+        throw new Error("A reviewer cannot approve or reject their own evidence");
+      const latestDecision = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_review");
+      if (latestDecision && row.evidence.lastIndexOf(latestDecision) > row.evidence.lastIndexOf(latestSubmission))
+        throw new Error("This evidence submission has already been reviewed");
+      const now = new Date();
+      const nextStatus = data.decision === "accepted" ? "complete" : "needs_you";
+      await tx.update(s.journeyRequirements).set({
+        status: nextStatus, completedAt: nextStatus === "complete" ? now : null,
+        evidence: [...row.evidence, {
+          kind: "launch_evidence_review", status: data.decision, text: data.reason,
+          reviewedAt: now.toISOString(), reviewedByPersonId: context.actorPersonId,
+          submissionAt: latestSubmission.submittedAt,
+        }],
+        updatedAt: now,
+      }).where(eq(s.journeyRequirements.id, row.id));
+      const incomplete = await tx.select({ id: s.journeyRequirements.id })
+        .from(s.journeyRequirements).where(and(
+          eq(s.journeyRequirements.journeyId, row.journeyId),
+          eq(s.journeyRequirements.blocking, true),
+          ne(s.journeyRequirements.status, "complete"),
+        ));
+      const ready = incomplete.length === 0;
+      await tx.update(s.journeys).set({
+        status: ready ? "ready" : "in_progress", updatedAt: now,
+      }).where(eq(s.journeys.id, row.journeyId));
+      await writeAudit(tx, context, {
+        action: "journey.requirement.evidence.review",
+        entityType: "journey_requirement", entityId: row.id,
+        scope: { organizationId: row.organizationId, siteId: row.siteId, programId: row.programId },
+        before: { status: row.status },
+        after: { status: nextStatus, decision: data.decision },
+      });
+      return { journeyRequirementId: row.id, decision: data.decision, journeyStatus: ready ? "ready" as const : "in_progress" as const };
+    });
+  });
+
 /** Activate a launched program; program-launch-service enforces the Launch Journey ready invariant. */
 export const activateLaunch = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ programId: uuid,recipientPersonId:uuid.optional() }).strict().parse(data))
