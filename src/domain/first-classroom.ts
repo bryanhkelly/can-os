@@ -34,7 +34,7 @@ export function recommendCourseOption(input: {
 }
 
 export type FirstClassBlocker = {
-  key: "inactive_section" | "missing_lesson" | "missing_assessment" | "missing_qualified_teacher" | "missing_students";
+  key: "inactive_section" | "curriculum_unavailable" | "missing_lesson" | "missing_assessment" | "missing_qualified_teacher" | "missing_students";
   message: string;
 };
 
@@ -50,12 +50,13 @@ export type FirstClassAssessment = {
 export function buildFirstClassroom(sectionId: string, input: {
   sectionActive: boolean;
   courseVersionPublished: boolean;
+  curriculumAccess: { available: boolean; reason: string | null };
   curriculum: Record<string, unknown>;
   qualifiedTeacher: boolean;
   activeStudentCount: number;
   publishedAssessments: readonly FirstClassAssessment[];
 }) {
-  const content = input.courseVersionPublished ? readClassContent(input.curriculum) : null;
+  const content = input.courseVersionPublished && input.curriculumAccess.available ? readClassContent(input.curriculum) : null;
   const lesson = content?.modules.flatMap(module => module.lessons).find(isLearnerFacingInstruction) ?? null;
   // The suggested first assignment must belong to the lesson the student is
   // told to study. Prefer the published assessment explicitly authored for
@@ -66,8 +67,10 @@ export function buildFirstClassroom(sectionId: string, input: {
     ?? (lesson ? submittable.find(item => item.curriculumLessonId === null) : undefined) ?? null;
   const blockers: FirstClassBlocker[] = [];
   if (!input.sectionActive) blockers.push({ key: "inactive_section", message: "Activate this class before beginning instruction." });
-  if (!lesson) blockers.push({ key: "missing_lesson", message: "Publish a learner-facing lesson with reading, practice or a resource." });
-  if (!assessment) blockers.push({ key: "missing_assessment", message: "Publish available work with student instructions linked to the first lesson, or an unlinked introductory assessment." });
+  if (!input.curriculumAccess.available) blockers.push({ key: "curriculum_unavailable",
+    message: input.curriculumAccess.reason ?? "Current curriculum delivery access is required." });
+  if (!lesson && input.curriculumAccess.available) blockers.push({ key: "missing_lesson", message: "Publish a learner-facing lesson with reading, practice or a resource." });
+  if (!assessment && input.curriculumAccess.available) blockers.push({ key: "missing_assessment", message: "Publish available work with student instructions linked to the first lesson, or an unlinked introductory assessment." });
   if (!input.qualifiedTeacher) blockers.push({ key: "missing_qualified_teacher", message: "Assign an eligible teacher whose verified qualifications and delivery cover the instructional window." });
   if (input.activeStudentCount < 1) blockers.push({ key: "missing_students", message: "Assign at least one actively enrolled student to this class for the same program and school year." });
   return {

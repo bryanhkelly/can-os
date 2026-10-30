@@ -15,6 +15,7 @@ const assessment = { id: "assessment-1", title: "First investigation", instructi
 const readyEvidence = {
   sectionActive: true,
   courseVersionPublished: true,
+  curriculumAccess:{available:true,reason:null},
   curriculum,
   qualifiedTeacher: true,
   activeStudentCount: 2,
@@ -106,4 +107,15 @@ describe("first classroom fallback boundaries", () => {
     expect(buildFirstClassroom("section-1", { ...readyEvidence, curriculum: emptyCurriculum,
       publishedAssessments: [{ ...assessment, curriculumLessonId: null }] }).firstWeek.assessment).toBeNull();
   });
+});
+
+
+describe("first classroom curriculum delivery access",()=>{
+ it("does not recommend published content or assignments after licensing is revoked",()=>{
+  const result=buildFirstClassroom("section-1",{...readyEvidence,
+   curriculumAccess:{available:false,reason:"An active institutional license is required."}});
+  expect(result.ready).toBe(false);
+  expect(result.firstWeek).toEqual({lesson:null,assessment:null});
+  expect(result.blockers).toEqual([{key:"curriculum_unavailable",message:"An active institutional license is required."}]);
+ });
 });
