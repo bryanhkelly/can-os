@@ -19,38 +19,30 @@ export async function resolveOperationsSelection(
   actor: AccessContext,
   selection: OperationsSelection,
 ): Promise<{ siteIds: string[]; programIds: string[] }> {
-  const authorizedSites = actor.scope.siteIds ?? [];
+  const authorizedSites = actor.scope.siteIds;
   const authorizedOrganizations = actor.scope.organizationIds ?? [];
-  const authorizedPrograms = actor.scope.programIds ?? [];
-  if (!authorizedSites.length && !authorizedOrganizations.length)
-    throw new AuthorizationError("operations organization or site membership");
-  if (selection.siteId && !authorizedSites.includes(selection.siteId)) {
+  const authorizedPrograms = actor.scope.programIds;
+  if (!authorizedOrganizations.length) throw new AuthorizationError("operations organization membership");
+  if (selection.siteId && authorizedSites && !authorizedSites.includes(selection.siteId))
     throw new AuthorizationError("selected school");
-  }
-  if (selection.programId && !authorizedPrograms.includes(selection.programId)) {
+  if (selection.programId && authorizedPrograms && !authorizedPrograms.includes(selection.programId))
     throw new AuthorizationError("selected program");
-  }
-  let selectedProgramSite: string | undefined;
-  if (selection.programId) {
-    const [program] = await db.select({ siteId: programs.siteId })
-      .from(programs).where(eq(programs.id, selection.programId)).limit(1);
-    if (!program || !program.siteId || !authorizedSites.includes(program.siteId) ||
-        (selection.siteId && selection.siteId !== program.siteId)) {
-      throw new AuthorizationError("program and school scope");
-    }
-    selectedProgramSite = program.siteId;
-  }
-  const siteIds = selection.siteId ? [selection.siteId] :
-    selectedProgramSite ? [selectedProgramSite] : authorizedSites;
-  // Selecting a school narrows BOTH scopes, not just the site filter. Other
-  // operations services can safely reuse this resolved selection.
-  const sitePrograms = selection.siteId && authorizedPrograms.length
-    ? await db.select({ id: programs.id }).from(programs)
-      .where(and(eq(programs.siteId, selection.siteId), inArray(programs.id, authorizedPrograms)))
-    : [];
+
+  const candidates = await db.select({
+    id: programs.id, siteId: programs.siteId, organizationId: programs.organizationId,
+  }).from(programs).where(and(
+    inArray(programs.organizationId, authorizedOrganizations),
+    ...(authorizedSites ? [inArray(programs.siteId, authorizedSites)] : []),
+    ...(authorizedPrograms ? [inArray(programs.id, authorizedPrograms)] : []),
+    ...(selection.siteId ? [eq(programs.siteId, selection.siteId)] : []),
+    ...(selection.programId ? [eq(programs.id, selection.programId)] : []),
+  ));
+  if (selection.programId && !candidates.some(program => program.id === selection.programId))
+    throw new AuthorizationError("selected program");
+  if (selection.siteId && !candidates.some(program => program.siteId === selection.siteId))
+    throw new AuthorizationError("selected school");
   return {
-    siteIds,
-    programIds: selection.programId ? [selection.programId] :
-      selection.siteId ? sitePrograms.map(program => program.id) : authorizedPrograms,
+    siteIds: [...new Set(candidates.map(program => program.siteId).filter((id): id is string => id !== null))],
+    programIds: candidates.map(program => program.id),
   };
 }
