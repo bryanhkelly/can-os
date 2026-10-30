@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { programs } from "@/db/schema";
+import { programs, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 
@@ -39,10 +39,14 @@ export async function resolveOperationsSelection(
   ));
   if (selection.programId && !candidates.some(program => program.id === selection.programId))
     throw new AuthorizationError("selected program");
-  if (selection.siteId && !candidates.some(program => program.siteId === selection.siteId))
-    throw new AuthorizationError("selected school");
+  if (selection.siteId) {
+    const [site] = await db.select({ id: sites.id }).from(sites).where(and(
+      eq(sites.id, selection.siteId), inArray(sites.organizationId, authorizedOrganizations),
+    )).limit(1);
+    if (!site) throw new AuthorizationError("selected school");
+  }
   return {
-    siteIds: [...new Set(candidates.map(program => program.siteId).filter((id): id is string => id !== null))],
+    siteIds: selection.siteId ? [selection.siteId] : [...new Set(candidates.map(program => program.siteId).filter((id): id is string => id !== null))],
     programIds: candidates.map(program => program.id),
   };
 }
