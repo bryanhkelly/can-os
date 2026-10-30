@@ -159,6 +159,7 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
         type: s.programs.type,
         status: s.programs.status,
         organizationId: s.programs.organizationId,
+        academicProviderOrganizationId: s.programs.academicProviderOrganizationId,
         siteId: s.programs.siteId,
         siteTimezone: s.sites.timezone,
         metadata: s.programs.metadata,
@@ -222,6 +223,7 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
             : null,
           journey: journey ?? null,
           requirements,
+          canReviewEvidence: canReviewEvidence && canReviewerOrganizations.some(org => org.id === program.academicProviderOrganizationId),
           openingOperators:await listOpeningOperators(program),
         };
       }),
