@@ -140,7 +140,7 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
   async () => {
     const context = await registrarContext("program.read");
     const organizationIds = context.scope.organizationIds ?? [];
-    if (!organizationIds.length) return { launches: [], canReviewEvidence: false };
+    if (!organizationIds.length) return { launches: [] };
     const [{ db }, s, { and, asc, eq, inArray, or }] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
@@ -150,7 +150,6 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
       ? await db.select({ id: s.organizations.id }).from(s.organizations)
           .where(and(inArray(s.organizations.id, organizationIds), eq(s.organizations.type, "can_network")))
       : [];
-    const canReviewEvidence = canReviewerOrganizations.length > 0;
     const programRows = await db
       .select({
         id: s.programs.id,
@@ -224,12 +223,12 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
             : null,
           journey: journey ?? null,
           requirements,
-          canReviewEvidence: canReviewEvidence && canReviewerOrganizations.some(org => org.id === program.academicProviderOrganizationId),
+          canReviewEvidence: canReviewerOrganizations.some(org => org.id === program.academicProviderOrganizationId),
           openingOperators:await listOpeningOperators(program),
         };
       }),
     );
-    return { launches, canReviewEvidence };
+    return { launches };
   },
 );
 
