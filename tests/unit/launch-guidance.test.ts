@@ -78,6 +78,17 @@ describe("canonical launch guidance", () => {
     expect(guidance.optionalSetupAvailable).toBe(true);
   });
 
+  it("shows canonical document-review correction text", () => {
+    const guidance = buildLaunchGuidance(launch({
+      requirements: [{ id: "review", key: "safety-review", title: "Safety review", status: "needs_you",
+        blocking: true, evidence: [{ kind: "document_review", status: "rejected",
+          text: "Provide the signed safety plan.", reviewedAt: "2026-10-30T10:00:00Z" }] }],
+    }));
+    expect(guidance.nextTask?.latestReviewReason).toBe("Provide the signed safety plan.");
+    expect(guidance.nextTask?.latestReviewStatus).toBe("rejected");
+    expect(guidance.nextTask?.requiresRegistrarReview).toBe(true);
+  });
+
   it("fails closed for an unrecognized persisted requirement state", () => {
     const guidance = buildLaunchGuidance(launch({
       requirements: [{ id: "unknown", key: "other", title: "Other", status: "unexpected", blocking: true }],
