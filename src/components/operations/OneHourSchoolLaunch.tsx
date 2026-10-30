@@ -125,7 +125,7 @@ function InstitutionalEvidenceReview({ task, busy, review }: {
       <textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={1000}
         rows={3} className="mt-1 block w-full rounded-lg border bg-card p-2" />
     </label>
-    <button type="submit" disabled={busy || (decision === "rejected" && reason.trim().length < 5)}
+    <button type="submit" disabled={busy || (decision === "rejected" ? reason.trim().length < 5 : reason.trim().length < 1)}
       className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
       Record institutional decision
     </button>
