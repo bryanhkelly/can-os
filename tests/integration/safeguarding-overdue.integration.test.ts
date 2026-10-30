@@ -103,6 +103,17 @@ integration("scheduled restricted safeguarding handoff",()=>{
       expect(reviewEvents).toHaveLength(1);
       expect(JSON.stringify(reviewEvents[0]!.payload)).not.toContain(complete.outcome);
       await expect(resolveSafeguardingConcern(actor,{incidentId:overdue.id,resolutionSummary:summary})).resolves.toMatchObject({incidentId:overdue.id});
+      const closedBeforeRetry=(await tx.select().from(s.incidents).where(eq(s.incidents.id,overdue.id)))[0]!;
+      expect(await resolveSafeguardingConcern(actor,{incidentId:overdue.id,resolutionSummary:summary})).toMatchObject({replayed:true});
+      await expect(resolveSafeguardingConcern(actor,{incidentId:overdue.id,resolutionSummary:"A different resolution must not silently replace the original."}))
+        .rejects.toThrow("different recorded resolution summary");
+      await expect(resolveSafeguardingConcern(otherActor,{incidentId:overdue.id,resolutionSummary:summary}))
+        .rejects.toThrow("already closed by another responder");
+      const closedAfterRetry=(await tx.select().from(s.incidents).where(eq(s.incidents.id,overdue.id)))[0]!;
+      expect(closedAfterRetry.closedAt).toEqual(closedBeforeRetry.closedAt);
+      expect(closedAfterRetry.metadata).toEqual(closedBeforeRetry.metadata);
+      const closureEvents=await tx.select().from(s.domainEvents).where(and(eq(s.domainEvents.aggregateId,overdue.id),eq(s.domainEvents.eventType,"IncidentClosed")));
+      expect(closureEvents).toHaveLength(1);
       expect(await tx.select().from(s.safeguardingExternalReports).where(eq(s.safeguardingExternalReports.incidentId,overdue.id))).toHaveLength(0);
 
       expect((await sweep(now,1)).routedRecipients).toBe(0);

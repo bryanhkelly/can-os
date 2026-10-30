@@ -538,8 +538,18 @@ export async function resolveSafeguardingConcern(
     "safeguarding.respond",
   );
   return db.transaction(async (tx) => {
-    await tx.select({id:incidents.id}).from(incidents)
+    const [current] = await tx.select().from(incidents)
       .where(eq(incidents.id,incident.id)).for("update").limit(1);
+    if (current?.status === "closed") {
+      if (current.closedByPersonId !== actor.actorPersonId) {
+        throw new Error("This safeguarding case was already closed by another responder");
+      }
+      if (current.metadata?.safeguardingResolutionSummary !== summary) {
+        throw new Error("This case already has a different recorded resolution summary; closure retries cannot amend it");
+      }
+      return { incidentId: incident.id, closedAt: current.closedAt!, replayed: true };
+    }
+    if (current?.status !== "filed") throw new Error("Only an open safeguarding case can be closed");
     const pendingReviews=await tx.select({id:incidentReviews.id}).from(incidentReviews)
       .where(and(eq(incidentReviews.incidentId,incident.id),eq(incidentReviews.status,"pending"))).limit(1);
     if(pendingReviews.length)throw new Error("Complete all assigned restricted case reviews before closure");
@@ -559,22 +569,12 @@ export async function resolveSafeguardingConcern(
       closedAt,
       closedByPersonId: actor.actorPersonId,
       updatedAt: closedAt,
-      metadata: { ...incident.metadata, safeguardingResolutionSummary: summary },
+      metadata: { ...current.metadata, safeguardingResolutionSummary: summary },
     }).where(and(
       eq(incidents.id, incident.id),
       eq(incidents.status, "filed"),
     )).returning({ id: incidents.id });
-    if (!changed.length) {
-      const [current] = await tx.select({
-        status: incidents.status,
-        closedAt: incidents.closedAt,
-        closedByPersonId: incidents.closedByPersonId,
-      }).from(incidents).where(eq(incidents.id, incident.id)).limit(1);
-      if (current?.status === "closed" && current.closedByPersonId === actor.actorPersonId) {
-        return { incidentId: incident.id, closedAt: current.closedAt ?? closedAt, replayed: true };
-      }
-      throw new Error("This safeguarding case was already closed by another responder");
-    }
+    if (!changed.length) throw new Error("The safeguarding case state changed; reload before closing");
     await tx.insert(incidentAmendments).values({
       incidentId: incident.id,
       amendedByPersonId: actor.actorPersonId!,
