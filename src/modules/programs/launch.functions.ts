@@ -352,10 +352,12 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
         .for("update").limit(1);
       if (!row || row.participantType !== "program" || !row.programId)
         throw new Error("Program launch requirement not found");
-      if (!context.scope.organizationIds?.includes(row.organizationId ?? "") ||
-          (context.scope.programIds && !context.scope.programIds.includes(row.programId)) ||
-          (context.scope.siteIds && (!row.siteId || !context.scope.siteIds.includes(row.siteId))))
+      if (context.scope.programIds && !context.scope.programIds.includes(row.programId))
         throw new AuthorizationError("program launch review scope");
+      const [reviewProgram] = await tx.select({ providerOrganizationId: s.programs.academicProviderOrganizationId })
+        .from(s.programs).where(eq(s.programs.id, row.programId)).limit(1);
+      if (!reviewProgram || !canOrganizations.some(org => org.id === reviewProgram.providerOrganizationId))
+        throw new AuthorizationError("CAN academic provider authority for program");
       if (["active", "complete", "cancelled"].includes(row.journeyStatus) || row.status === "complete")
         throw new Error("This launch requirement is closed to review");
       if (!["needs_can", "needs_you"].includes(row.status))
