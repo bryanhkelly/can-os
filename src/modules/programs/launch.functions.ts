@@ -323,7 +323,7 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
     "A rejected submission requires a correction reason").parse(value))
   .handler(async ({ data }) => {
     const context = await registrarContext("program.activate");
-    if (!context.actorPersonId || context.grantSiteId !== null)
+    if (!context.actorPersonId || context.grantSiteId !== null || context.scope.siteIds?.length)
       throw new AuthorizationError("CAN institutional evidence reviewer");
     const [{ db }, s, { and, eq, ne }] = await Promise.all([
       import("@/db/client"), import("@/db/schema"), import("drizzle-orm"),
