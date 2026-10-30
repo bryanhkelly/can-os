@@ -30,6 +30,8 @@ export type LaunchGuidanceTask = {
   requirementId?: string;
   ownerPersonId?: string | null;
   evidenceCount?: number;
+  evidenceStatementCount?: number;
+  latestEvidenceStatementAt?: string | null;
   reviewNoteCount?: number;
   rejectedReviewCount?: number;
   latestReviewStatus?: string | null;
@@ -93,6 +95,8 @@ export function buildLaunchGuidance(launch: LaunchGuidanceRecord) {
     evidenceInstructions: typeof requirement.metadata?.evidenceInstructions === "string" ? requirement.metadata.evidenceInstructions : null,
     evidenceReviewRequired: requirement.metadata?.evidenceReviewRequired === true,
     evidenceCount: requirement.evidence?.length ?? 0,
+    evidenceStatementCount: requirement.evidence?.filter(item => item.kind === "launch_evidence_statement").length ?? 0,
+    latestEvidenceStatementAt: (() => { const entry = [...(requirement.evidence ?? [])].reverse().find(item => item.kind === "launch_evidence_statement"); return typeof entry?.submittedAt === "string" ? entry.submittedAt : null; })(),
     reviewNoteCount: requirement.evidence?.filter(item => item.kind === "registrar_note").length ?? 0,
     rejectedReviewCount: requirement.evidence?.filter(item => item.kind === "document_review" && item.status === "rejected").length ?? 0,
     latestReviewStatus: String(latestDocumentReview(requirement.evidence)?.status ?? "") || null,
