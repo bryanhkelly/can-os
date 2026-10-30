@@ -14,6 +14,7 @@ import {
   activateLaunch,
   completeLaunchRequirement,
   submitLaunchEvidence,
+  reviewLaunchEvidence,
   scheduleLaunchOrientation,
   type listLaunches,
 } from "@/modules/programs/launch.functions";
@@ -94,6 +95,38 @@ function LaunchEvidenceStatement({ task, busy, submit }: {
     </label>
     <button type="submit" disabled={busy || statement.trim().length < 10}
       className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">Record evidence statement</button>
+  </form>;
+}
+
+function InstitutionalEvidenceReview({ task, busy, review }: {
+  task: LaunchGuidanceTask;
+  busy: boolean;
+  review: (id: string, decision: "accepted" | "rejected", reason: string) => Promise<boolean>;
+}) {
+  const [reason, setReason] = useState("");
+  const [decision, setDecision] = useState<"accepted" | "rejected">("rejected");
+  if (!task.requirementId || !task.pendingEvidenceReview || task.state === "complete") return null;
+  return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
+    event.preventDefault();
+    void review(task.requirementId!, decision, reason).then(saved => { if (saved) setReason(""); });
+  }}>
+    <p className="text-sm font-semibold">CAN institutional evidence review</p>
+    <p className="mt-2 text-xs text-muted-foreground">Review the submitted evidence in the canonical record before deciding. Approval completes this requirement, but does not independently authorize opening.</p>
+    <label className="mt-3 block text-sm">Decision
+      <select value={decision} onChange={event => setDecision(event.target.value as "accepted" | "rejected")}
+        className="mt-1 block w-full rounded-lg border bg-card p-2">
+        <option value="rejected">Request correction</option>
+        <option value="accepted">Accept evidence</option>
+      </select>
+    </label>
+    <label className="mt-3 block text-sm">Decision reason
+      <textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={1000}
+        rows={3} className="mt-1 block w-full rounded-lg border bg-card p-2" />
+    </label>
+    <button type="submit" disabled={busy || (decision === "rejected" && reason.trim().length < 5)}
+      className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+      Record institutional decision
+    </button>
   </form>;
 }
 
@@ -194,10 +227,11 @@ function OpeningTask({ launch, busy, open }: {
   </div>;
 }
 
-export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, selectedSiteId }: {
+export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, selectedSiteId, canReviewEvidence = false }: {
   launches: Launch[];
   selectedProgramId?: string;
   selectedSiteId?: string;
+  canReviewEvidence?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -268,6 +302,17 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     } finally {
       setBusy(false);
     }
+  }
+  async function reviewEvidence(requirementId: string, decision: "accepted" | "rejected", reason: string): Promise<boolean> {
+    setBusy(true); setError("");
+    try {
+      await reviewLaunchEvidence({ data: { journeyRequirementId: requirementId, decision, reason } });
+      await router.invalidate();
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to record evidence decision");
+      return false;
+    } finally { setBusy(false); }
   }
   async function saveOrientation(input: { title: string; startsAt: string; endsAt: string; timezone: string }) {
     await run(() => scheduleLaunchOrientation({ data: { programId: launch!.id, ...input } }));
@@ -370,6 +415,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         This depends on someone outside your school and CAN. Recorded waiting is not approval.
       </p>}
       <div className="mt-4"><TaskDestination launch={launch} task={next} /></div>
+      {canReviewEvidence && <InstitutionalEvidenceReview key={next.id} task={next} busy={busy} review={reviewEvidence} />}
       <LaunchEvidenceStatement key={next.id} task={next} busy={busy} submit={submitEvidence} />
       <SchoolOwnedCompletion key={next.id} task={next} busy={busy} complete={complete} />
       {next.action === "orientation" && next.state === "needs_you" &&
