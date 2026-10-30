@@ -291,7 +291,7 @@ export async function listFamilyInvitationWorkspace(
       assertOrganizationScope(context, candidate.organizationId);
       assertSiteScope(context, candidate.siteId);
       scopedPrograms.push(candidate);
-      if (candidate.status !== "active") continue;
+      if (!["draft", "launching", "ready", "active"].includes(candidate.status)) continue;
       const destination = await resolvePublishedFamilyStartDestination(db, candidate.id);
       eligible.push(destination);
     } catch (error) {
