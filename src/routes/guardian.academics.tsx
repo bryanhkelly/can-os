@@ -57,9 +57,9 @@ function GuardianAcademicsPage() {
   return () => { active = false; };
  }, [selected]);
 
- const summary = guardianAssignmentSummary(assignments, new Date());
  const classAssignments=assignments.filter(item=>!section||item.sectionId===section);
  const visible=classAssignments.filter(item=>!assessment||item.assessmentId===assessment);
+ const summary = guardianAssignmentSummary(visible, new Date());
 
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Guardian" title="Academic progress"
   subtitle="Review class assignments, instructions and released teacher feedback for your connected children."
