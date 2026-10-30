@@ -1,6 +1,7 @@
 import { FamilyInviteImporter } from "@/components/operations/FamilyInviteImporter";
 import { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
 import { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
+import { getAdmissionsDashboard } from "@/modules/enrollment/admissions-dashboard.functions";
 import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
@@ -30,12 +31,13 @@ export const Route = createFileRoute("/operations/launch/")({
         launches: await listLaunches(),
         familyInvitations: await listFamilyInvitations().catch(() => null),
         admissions: await listAdmissionsIntake().catch(() => null),
+        enrollmentOutcomes: await getAdmissionsDashboard({data:{}}).catch(() => null),
         // A pending migration for extended programs must not prevent core school launch.
         extendedPlanning: await listExtendedSeasonPlanning().catch(() => null),
         authError: "",
       };
     } catch {
-      return { options: null, launches: null, familyInvitations: null, admissions: null, extendedPlanning: null, authError: "Sign in with an authorized registrar account to manage program launches." };
+      return { options: null, launches: null, familyInvitations: null, admissions: null, enrollmentOutcomes: null, extendedPlanning: null, authError: "Sign in with an authorized registrar account to manage program launches." };
     }
   },
   component: LaunchWizardPage,
@@ -43,11 +45,12 @@ export const Route = createFileRoute("/operations/launch/")({
 
 function LaunchWizardPage() {
   const selection=Route.useSearch();
-  const { options, launches, familyInvitations, admissions, extendedPlanning, authError }: {
+  const { options, launches, familyInvitations, admissions, enrollmentOutcomes, extendedPlanning, authError }: {
     options: Awaited<ReturnType<typeof listLaunchOptions>> | null;
     launches: Awaited<ReturnType<typeof listLaunches>> | null;
     familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
     admissions: Awaited<ReturnType<typeof listAdmissionsIntake>> | null;
+    enrollmentOutcomes: Awaited<ReturnType<typeof getAdmissionsDashboard>> | null;
     extendedPlanning: Awaited<ReturnType<typeof listExtendedSeasonPlanning>> | null;
     authError: string;
   } = Route.useLoaderData();
@@ -250,6 +253,12 @@ function LaunchWizardPage() {
             <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!selection.programId||row.programId===selection.programId)&&(!selection.siteId||row.siteId===selection.siteId)&&row.stage==="accepted").length}</strong>Accepted applications</p>
             <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!selection.programId||row.programId===selection.programId)&&(!selection.siteId||row.siteId===selection.siteId)&&["inquiry","application","eligibility"].includes(row.stage)).length}</strong>Awaiting decision</p>
           </div>
+        </section>}
+        {launches.launches.length>0&&enrollmentOutcomes&&<section aria-label="Confirmed student enrollment" className="mt-3 rounded-xl border bg-card p-4">
+          <h2 className="text-sm font-semibold">Confirmed enrollment</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Active program enrollments associated with admissions records, not merely accepted applications or offers.</p>
+          <p className="mt-3 text-sm"><strong className="mr-2 text-2xl">{enrollmentOutcomes.filter(row=>(!selection.programId||row.programId===selection.programId)&&row.enrollments.length>0).length}</strong>Students with active program enrollment</p>
+          <Link to="/admissions" search={{siteId:selection.siteId,programId:selection.programId,application:undefined}} className="mt-2 inline-block text-sm font-semibold underline">Review enrollment records</Link>
         </section>}
         {launches.launches.length>0&&<nav aria-label="Family enrollment handoff" className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
           <span className="text-sm font-semibold">After inviting families</span>
