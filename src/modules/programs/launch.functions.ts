@@ -376,7 +376,7 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
       if (latestDecision && row.evidence.lastIndexOf(latestDecision) > row.evidence.lastIndexOf(latestSubmission))
         throw new Error("This evidence submission has already been reviewed");
       const now = new Date();
-      const nextStatus = data.decision === "accepted" ? "complete" : "needs_you";
+      const nextStatus = data.decision === "accepted" ? "complete" : row.status === "needs_can" ? "needs_can" : "needs_you";
       await tx.update(s.journeyRequirements).set({
         status: nextStatus, completedAt: nextStatus === "complete" ? now : null,
         evidence: [...row.evidence, {
