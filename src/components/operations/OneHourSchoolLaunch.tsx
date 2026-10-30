@@ -80,7 +80,7 @@ function LaunchEvidenceStatement({ task, busy, submit }: {
   submit: (requirementId: string, statement: string) => Promise<void>;
 }) {
   const [statement, setStatement] = useState("");
-  if (!task.requirementId || task.state === "complete") return null;
+  if (!task.requirementId || !["needs_you", "needs_can"].includes(task.state)) return null;
   return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
     event.preventDefault();
     if (statement.trim().length < 10) return;
