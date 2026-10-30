@@ -120,7 +120,7 @@ export function FamilyInviteImporter({
     <h2 className="mt-2 font-serif text-2xl">Invite families</h2>
     <p className="mt-2 text-sm text-muted-foreground">Paste up to {FAMILY_INVITATION_MAX_RECIPIENTS} addresses, review the recipients and message, then queue secure links directly to the published school application. Existing family identities are reused only after the recipient verifies their email and the existing account resolves to one Person.</p>
 
-    {!programs.length ? <p role="status" className="mt-5 rounded-lg border p-4 text-sm">The selected school has no published, active, admissions-authorized Program available for invitations. Publish the Site and Program and confirm operating authorization before inviting families.</p> : <>
+    {!programs.length ? <p role="status" className="mt-5 rounded-lg border p-4 text-sm">No invitation-eligible application is available for this selection. The current server policy requires a published Site and Program, an active Program, and authorized admissions services. Pre-opening recruitment remains blocked by that policy.</p> : <>
       <label className="mt-5 block text-sm font-semibold">Published school application
         <select value={selectedProgram?.id ?? ""} onChange={event => {
           const program = programs.find(item => item.id === event.target.value);
