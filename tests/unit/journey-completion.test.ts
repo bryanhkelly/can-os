@@ -61,6 +61,11 @@ describe("Journey completion transactions", () => {
     await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("registrar review workflow");
     expect(update).not.toHaveBeenCalled();
   });
+  it("rejects generic completion for explicitly reviewed evidence", async () => {
+    select.mockReturnValueOnce(query([{ ...current, metadata: { evidenceReviewRequired: true } }]));
+    await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("registrar review workflow");
+    expect(update).not.toHaveBeenCalled();
+  });
   it.each(["needs_can", "waiting_third_party"] as const)(
     "does not let a school-owned launch completion take over a %s requirement",
     async requirementStatus => {
