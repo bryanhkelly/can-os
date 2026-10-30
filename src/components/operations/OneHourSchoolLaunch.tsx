@@ -153,6 +153,9 @@ function siteLocalToIso(value: string, timezone: string) {
   }
   if (siteDateTime(new Date(instant), timezone) !== value)
     throw new Error("This local time does not exist in the Site timezone");
+  if (siteDateTime(new Date(instant - 60 * 60_000), timezone) === value ||
+      siteDateTime(new Date(instant + 60 * 60_000), timezone) === value)
+    throw new Error("This local time occurs twice in the Site timezone; choose an unambiguous time");
   return new Date(instant).toISOString();
 }
 
