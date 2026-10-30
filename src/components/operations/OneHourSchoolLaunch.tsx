@@ -336,6 +336,10 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <StatusBadge tone={taskTone(task)}>{launchOwnershipLabel(task.state)}</StatusBadge>
+            {task.state === "needs_can" && <span className="max-w-48 text-right text-xs text-muted-foreground">CAN must review and complete this requirement.</span>}
+            {task.state === "waiting_third_party" && <span className="max-w-48 text-right text-xs text-muted-foreground">Awaiting an external party; this is not approval.</span>}
+            {task.state === "needs_you" && <span className="max-w-48 text-right text-xs text-muted-foreground">School-owned work; confirm completion only after the underlying requirement is met.</span>}
+            {task.state === "blocked" && <span className="max-w-48 text-right text-xs text-muted-foreground">Review the canonical requirement record to resolve the blocker.</span>}
             {task.state !== "complete" && task.action !== "opening" &&
               <TaskDestination launch={launch} task={task} />}
             {task.state !== "complete" && task.action === "orientation" &&
