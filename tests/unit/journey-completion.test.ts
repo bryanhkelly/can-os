@@ -117,6 +117,14 @@ describe("Journey completion transactions", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it("allows an idempotent retry after reviewed evidence is already complete", async () => {
+    select.mockReturnValueOnce(query([{ ...current, journeyStatus: "ready", requirementStatus: "complete",
+      metadata: { evidenceReviewRequired: true }, evidence: [{ kind: "document_review", status: "accepted" }] }]))
+      .mockReturnValueOnce(query([]));
+    await expect(completeJourneyRequirement(context, "requirement")).resolves.toBe("ready");
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("does not duplicate completion events on a ready retry", async () => {
     select.mockReturnValueOnce(query([{ ...current, journeyStatus: "ready", requirementStatus: "complete" }]))
       .mockReturnValueOnce(query([]));
