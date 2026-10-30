@@ -12,6 +12,15 @@ type ViewRole="guardian"|"registrar";
 export function StudentLearningAccessHandoff({
  applicationId,role,
 }:{applicationId:string;role:ViewRole}){
+ // A different application or role gets a fresh state owner. Late mutation
+ // responses from the unmounted handoff cannot update the next child's view.
+ return <ApplicationLearningAccessHandoff key={`${role}:${applicationId}`}
+  applicationId={applicationId} role={role}/>;
+}
+
+function ApplicationLearningAccessHandoff({
+ applicationId,role,
+}:{applicationId:string;role:ViewRole}){
  const [status,setStatus]=useState("loading");
  const [email,setEmail]=useState("");
  const [busy,setBusy]=useState(false);
