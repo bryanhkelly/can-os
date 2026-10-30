@@ -245,6 +245,60 @@ export const completeLaunchRequirement = createServerFn({ method: "POST" })
     return { journeyRequirementId: data.journeyRequirementId, journeyStatus };
   });
 
+/**
+ * Submit a written evidence statement against a canonical program Launch Journey.
+ * Submission does not complete or approve the requirement.
+ */
+export const submitLaunchEvidence = createServerFn({ method: "POST" })
+  .validator((value: unknown) => z.object({
+    journeyRequirementId: uuid,
+    statement: z.string().trim().min(10).max(4000),
+  }).strict().parse(value))
+  .handler(async ({ data }) => {
+    const context = await registrarContext("journey.requirement.complete");
+    const [{ db }, s, { and, eq }] = await Promise.all([
+      import("@/db/client"), import("@/db/schema"), import("drizzle-orm"),
+    ]);
+    return db.transaction(async tx => {
+      const [row] = await tx.select({
+        id: s.journeyRequirements.id,
+        status: s.journeyRequirements.status,
+        evidence: s.journeyRequirements.evidence,
+        journeyStatus: s.journeys.status,
+        participantType: s.journeys.participantType,
+        programId: s.journeys.programId,
+      }).from(s.journeyRequirements)
+        .innerJoin(s.journeys, eq(s.journeys.id, s.journeyRequirements.journeyId))
+        .where(eq(s.journeyRequirements.id, data.journeyRequirementId))
+        .for("update").limit(1);
+      if (!row || row.participantType !== "program" || !row.programId)
+        throw new Error("Program launch requirement not found");
+      if (!context.scope.programIds?.includes(row.programId))
+        throw new AuthorizationError("program launch evidence scope");
+      if (row.status === "complete" || ["active", "complete", "cancelled"].includes(row.journeyStatus))
+        throw new Error("This launch requirement is closed to evidence submissions");
+      const now = new Date();
+      await tx.update(s.journeyRequirements).set({
+        evidence: [...row.evidence, {
+          kind: "launch_evidence_statement",
+          text: data.statement,
+          submittedAt: now.toISOString(),
+          submittedByPersonId: context.actorPersonId,
+        }],
+        updatedAt: now,
+      }).where(eq(s.journeyRequirements.id, row.id));
+      await writeAudit(tx, context, {
+        action: "journey.requirement.evidence.submit",
+        entityType: "journey_requirement",
+        entityId: row.id,
+        scope: { programId: row.programId },
+        before: { status: row.status },
+        after: { status: row.status, evidenceSubmitted: true },
+      });
+      return { journeyRequirementId: row.id, submitted: true };
+    });
+  });
+
 /** Activate a launched program; program-launch-service enforces the Launch Journey ready invariant. */
 export const activateLaunch = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ programId: uuid,recipientPersonId:uuid.optional() }).strict().parse(data))
