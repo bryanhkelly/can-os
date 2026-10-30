@@ -15,7 +15,7 @@ assertSectionScope,
 type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
-import { emitEvent,writeAudit } from "@/platform/mutation";
+import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { and,eq,lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -123,6 +123,7 @@ export async function markOverdueSubmissionsMissing(
         submissionId: submissions.id,
         assessmentId: assessments.id,
         studentProfileId: submissions.studentProfileId,
+        studentPersonId: studentProfiles.personId,
         sectionId: assessments.sectionId,
       })
       .from(submissions)
@@ -316,6 +317,7 @@ export async function gradeSubmission(
       })
       .from(submissions)
       .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
+      .innerJoin(studentProfiles,eq(studentProfiles.id,submissions.studentProfileId))
       .innerJoin(sections,eq(sections.id,assessments.sectionId))
       .innerJoin(terms,eq(terms.id,sections.termId))
       .where(eq(submissions.id, submissionId))
@@ -379,6 +381,16 @@ export async function gradeSubmission(
         score: String(score),
         timeliness: current.timeliness,
       },
+    });
+
+    await notify(tx, {
+      recipientPersonId: current.studentPersonId,
+      type: "assignment_feedback",
+      status: "unread",
+      title: "Assignment graded",
+      body: "Your teacher posted a grade. Open your assignment to review the score and feedback.",
+      resourceType: "submission",
+      resourceId: submissionId,
     });
 
     await writeAudit(tx, {
