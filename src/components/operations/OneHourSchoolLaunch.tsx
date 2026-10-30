@@ -132,9 +132,28 @@ function InstitutionalEvidenceReview({ task, busy, review }: {
   </form>;
 }
 
-function localDateTime(date: Date) {
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+function siteDateTime(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const value = (part: string) => parts.find(item => item.type === part)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}`;
+}
+
+function siteLocalToIso(value: string, timezone: string) {
+  const naive = Date.parse(value + ":00Z");
+  if (!Number.isFinite(naive)) throw new Error("Invalid orientation time");
+  let instant = naive;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const formatted = siteDateTime(new Date(instant), timezone);
+    const difference = naive - Date.parse(formatted + ":00Z");
+    if (difference === 0) break;
+    instant += difference;
+  }
+  if (siteDateTime(new Date(instant), timezone) !== value)
+    throw new Error("This local time does not exist in the Site timezone");
+  return new Date(instant).toISOString();
 }
 
 function OrientationTask({ launch, busy, save }: {
@@ -149,18 +168,19 @@ function OrientationTask({ launch, busy, save }: {
   function useRecommendation() {
     const start = new Date();
     start.setDate(start.getDate() + 7);
-    start.setHours(18, 0, 0, 0);
-    const end = new Date(start.getTime() + 45 * 60_000);
-    setStartsAt(localDateTime(start));
-    setEndsAt(localDateTime(end));
+    const siteDay = siteDateTime(start, timezone).slice(0, 10);
+    const suggestedStart = siteLocalToIso(`${siteDay}T18:00`, timezone);
+    const end = new Date(Date.parse(suggestedStart) + 45 * 60_000);
+    setStartsAt(`${siteDay}T18:00`);
+    setEndsAt(siteDateTime(end, timezone));
   }
   return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
     event.preventDefault();
     if (!startsAt || !endsAt) return;
     void save({
       title,
-      startsAt: new Date(startsAt).toISOString(),
-      endsAt: new Date(endsAt).toISOString(),
+      startsAt: siteLocalToIso(startsAt, timezone),
+      endsAt: siteLocalToIso(endsAt, timezone),
       timezone,
     });
   }}>
