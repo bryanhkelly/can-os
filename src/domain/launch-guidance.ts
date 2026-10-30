@@ -71,7 +71,7 @@ function nextOwnedTask(tasks: LaunchGuidanceTask[]) {
 }
 
 function latestDocumentReview(evidence: Record<string, unknown>[] = []) {
-  return evidence.filter(item => item.kind === "document_review" && typeof item.status === "string")
+  return evidence.filter(item => (item.kind === "document_review" || item.kind === "launch_evidence_review") && typeof item.status === "string")
     .reduce<Record<string, unknown> | null>((latest, item) => {
       if (!latest) return item;
       const currentAt = typeof item.reviewedAt === "string" ? Date.parse(item.reviewedAt) : NaN;
@@ -98,13 +98,13 @@ export function buildLaunchGuidance(launch: LaunchGuidanceRecord) {
     evidenceStatementCount: requirement.evidence?.filter(item => item.kind === "launch_evidence_statement").length ?? 0,
     latestEvidenceStatementAt: (() => { const entry = [...(requirement.evidence ?? [])].reverse().find(item => item.kind === "launch_evidence_statement"); return typeof entry?.submittedAt === "string" ? entry.submittedAt : null; })(),
     reviewNoteCount: requirement.evidence?.filter(item => item.kind === "registrar_note").length ?? 0,
-    rejectedReviewCount: requirement.evidence?.filter(item => item.kind === "document_review" && item.status === "rejected").length ?? 0,
+    rejectedReviewCount: requirement.evidence?.filter(item => (item.kind === "document_review" || item.kind === "launch_evidence_review") && item.status === "rejected").length ?? 0,
     latestReviewStatus: String(latestDocumentReview(requirement.evidence)?.status ?? "") || null,
     latestReviewReason: (() => { const review = latestDocumentReview(requirement.evidence); return typeof review?.reason === "string" ? review.reason : typeof review?.text === "string" ? review.text : null; })(),
-    latestReviewAt: (() => { const review = [...(requirement.evidence ?? [])].reverse().find(item => item.kind === "document_review" && typeof item.status === "string"); return typeof review?.reviewedAt === "string" ? review.reviewedAt : null; })(),
+    latestReviewAt: (() => { const review = latestDocumentReview(requirement.evidence); return typeof review?.reviewedAt === "string" ? review.reviewedAt : null; })(),
     requiresRegistrarReview: requirement.metadata?.evidenceReviewRequired === true ||
       requirement.metadata?.enrollmentForm !== undefined ||
-      requirement.evidence?.some(item => item.kind === "document_review") === true ||
+      requirement.evidence?.some(item => item.kind === "document_review" || item.kind === "launch_evidence_review") === true ||
       requirement.evidence?.some(item => item.kind === "registrar_note") === true,
     title: requirement.title,
     description: requirement.blocking
