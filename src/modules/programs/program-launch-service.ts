@@ -278,6 +278,8 @@ export async function createProgramOrientation(
 
     if (!program) throw new Error("Program not found");
     assertProgramScope(context, input.programId);
+    assertOrganizationScope(context, program.organizationId);
+    assertSiteScope(context, program.siteId);
 
     const projection = await createProjectionIfAbsent(tx, {
       type: "orientation",
