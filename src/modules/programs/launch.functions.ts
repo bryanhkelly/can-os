@@ -141,7 +141,7 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
     const context = await registrarContext("program.read");
     const organizationIds = context.scope.organizationIds ?? [];
     if (!organizationIds.length) return { launches: [], canReviewEvidence: false };
-    const [{ db }, s, { and, asc, eq, inArray }] = await Promise.all([
+    const [{ db }, s, { and, asc, eq, inArray, or }] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
