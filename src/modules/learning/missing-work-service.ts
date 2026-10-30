@@ -1,3 +1,4 @@
+import { currentSectionStudentIds } from "./current-section-enrollment.server";
 import { db } from "@/db/client";
 import {
 assessments,
@@ -310,9 +311,12 @@ export async function gradeSubmission(
         assessmentId: submissions.assessmentId,
         studentProfileId: submissions.studentProfileId,
         sectionId: assessments.sectionId,
+        programId: sections.programId,schoolYearId: terms.schoolYearId,
       })
       .from(submissions)
       .innerJoin(assessments, eq(assessments.id, submissions.assessmentId))
+      .innerJoin(sections,eq(sections.id,assessments.sectionId))
+      .innerJoin(terms,eq(terms.id,sections.termId))
       .where(eq(submissions.id, submissionId))
       .limit(1);
 
@@ -329,6 +333,11 @@ export async function gradeSubmission(
     } else {
       assertSectionScope(context, current.sectionId);
     }
+    const enrolled = await currentSectionStudentIds(tx, {
+      id: current.sectionId,programId: current.programId,schoolYearId: current.schoolYearId,
+    }, current.studentProfileId);
+    if (!enrolled.includes(current.studentProfileId))
+      throw new Error("Student must have current Program and Section enrollment to receive a grade");
     if (current.status !== "submitted") {
       throw new Error("Only submitted work can be graded");
     }
