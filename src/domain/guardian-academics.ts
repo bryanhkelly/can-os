@@ -22,7 +22,7 @@ export function priorReturnedGuardianFeedback<T extends {
  assessmentId: string; attemptNumber: number | null;
  submissionStatus: string | null;
 }>(rows: readonly T[], latest: T): T | undefined {
- if(latest.submissionStatus!=="assigned"&&latest.submissionStatus!=="submitted")
+ if(!["assigned","draft","submitted"].includes(latest.submissionStatus??""))
   return undefined;
  return rows.filter(row=>row.assessmentId===latest.assessmentId &&
   row.submissionStatus==="returned" &&
