@@ -292,7 +292,7 @@ function TeacherGradebookPage() {
 
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Teacher" title="Gradebook"
   subtitle="Review submitted work, apply the rubric and return meaningful feedback."
-  breadcrumbs={<><Link to="/teacher" search={{gradeAction:undefined}} className="underline">Teacher Today</Link><span>/</span><span>Gradebook</span></>}>
+  breadcrumbs={<><Link to="/teacher" search={{}} className="underline">Teacher Today</Link><span>/</span><span>Gradebook</span></>}>
    <WorkflowIntro eyebrow="Teaching · Assessment" title="Feedback that moves learning forward." description="Review submitted evidence, assess with the published rubric, and give each learner a clear next step. Grade changes stay in the authorized gradebook workflow." />
    {(search.assessment||search.student)&&<Link to="/teacher/gradebook" search={{section:selected||search.section}} className="mt-4 inline-block text-sm underline">View full section gradebook</Link>}
    {sections.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
