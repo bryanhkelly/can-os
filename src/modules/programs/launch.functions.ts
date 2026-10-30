@@ -419,6 +419,13 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
           actorPersonId: context.actorPersonId, payload: {},
         });
       }
+      if (ready && row.journeyStatus !== "ready") {
+        await writeAudit(tx, context, {
+          action: "journey.ready", entityType: "journey", entityId: row.journeyId,
+          scope: { organizationId: row.organizationId, siteId: row.siteId, programId: row.programId },
+          before: { status: row.journeyStatus }, after: { status: "ready" },
+        });
+      }
       await writeAudit(tx, context, {
         action: "journey.requirement.evidence.review",
         entityType: "journey_requirement", entityId: row.id,
