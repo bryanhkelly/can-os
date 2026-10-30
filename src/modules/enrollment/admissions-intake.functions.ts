@@ -275,7 +275,8 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
       .where(eq(applications.id,data.existingApplicationId)).limit(1);
      if(!prior||
       (actor.scope.programIds !== undefined && !actor.scope.programIds.includes(prior.programId))||
-      prior.organizationId!==program.organizationId)
+      prior.organizationId!==program.organizationId||
+      (actor.scope.siteIds!==undefined&&(!prior.siteId||!actor.scope.siteIds.includes(prior.siteId))))
       throw new AuthorizationError("existing family scope");
      const contactId=String(prior.metadata.contactPersonId??"");
      const [contact]=await tx.select({id:people.id,email:people.email})
