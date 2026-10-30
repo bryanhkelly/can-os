@@ -334,6 +334,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             <p className="mt-1 text-xs text-muted-foreground">
               {task.blocking && task.state !== "complete" ? "Blocking opening · " : ""}{task.description}
             </p>
+            {task.requirementId && <p className="mt-1 text-xs text-muted-foreground">Requirement reference: <code className="select-all">{task.requirementId}</code></p>}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <StatusBadge tone={taskTone(task)}>{launchOwnershipLabel(task.state)}</StatusBadge>
