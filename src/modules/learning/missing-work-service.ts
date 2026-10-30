@@ -1,3 +1,4 @@
+import { latestSubmissionCondition } from "./latest-submission.server";
 import { currentSectionStudentIds } from "./current-section-enrollment.server";
 import { db } from "@/db/client";
 import {
@@ -361,10 +362,10 @@ export async function gradeSubmission(
         gradedAt,
         updatedAt: gradedAt,
       })
-      .where(and(eq(submissions.id, submissionId), eq(submissions.status, "submitted")))
+      .where(and(eq(submissions.id, submissionId), eq(submissions.status, "submitted"),latestSubmissionCondition(tx)))
       .returning({ id: submissions.id });
 
-    if (!graded.length) throw new Error("Submission grading was already processed");
+    if (!graded.length) throw new Error("Submission grading was already processed or a newer attempt exists");
 
     await emitEvent(tx, {
       eventType: EventTypes.GradePosted,
