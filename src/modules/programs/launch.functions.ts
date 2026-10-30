@@ -140,7 +140,7 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
   async () => {
     const context = await registrarContext("program.read");
     const organizationIds = context.scope.organizationIds ?? [];
-    if (!organizationIds.length) return { launches: [] };
+    if (!organizationIds.length) return { launches: [], canReviewEvidence: false };
     const [{ db }, s, { and, asc, eq, inArray }] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
