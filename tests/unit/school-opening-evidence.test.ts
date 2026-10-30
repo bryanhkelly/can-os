@@ -21,7 +21,7 @@ const state=vi.hoisted(()=>({
 vi.mock("@/db/client",()=>({db:{
   select:(..._args:unknown[])=>tx.select(),transaction:(callback:(tx:unknown)=>unknown)=>state.transaction(callback),
 }}));
-vi.mock("@/platform/mutation",()=>({writeAudit:state.audit,emitEvent:state.event}));
+vi.mock("@/platform/mutation",()=>({writeAudit:state.audit,emitEvent:state.event,notifyMany:vi.fn()}));
 vi.mock("@/platform/storage/r2",()=>({
   verifyPrivateObject:state.verifyObject,createPrivateUploadUrl:vi.fn(),signPrivateObjectUrl:vi.fn(),
 }));
