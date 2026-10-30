@@ -92,13 +92,15 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
     }
     setBusy(true); setError(""); setNotice("");
     try {
-      await correctSectionGrade({ data: {
+      const result = await correctSectionGrade({ data: {
         sectionGradeId: grade.id,
         ...(percentage ? { percentage: Number(percentage) } : {}),
         ...(letter ? { letterGrade: letter } : {}),
         reason,
       } });
-      setNotice(`Corrected the finalized grade for ${grade.studentName}. The correction is recorded in the grade history and the student and guardians are notified; already-issued transcripts keep their original snapshot.`);
+      setNotice(result.corrected
+        ? `Corrected the finalized grade for ${grade.studentName}. The correction is recorded in the grade history and the student and guardians are notified; already-issued transcripts keep their original snapshot.`
+        : "The finalized grade already has these values. No new correction or notifications were created.");
       setCorrectingId("");
       setCorrectionPercentage("");
       setCorrectionLetter("");
@@ -116,8 +118,8 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
   return <section aria-label="Grading period finalization" className="mt-8 rounded-xl border bg-card p-5">
     <h2 className="text-lg font-semibold">Close grading period / finalize grades</h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      Finalizing a grading period computes each enrolled student&apos;s percentage from their latest graded
-      submission for every published or closed assessment due inside the period window, converts it to a letter
+      Finalizing a grading period computes each enrolled student&apos;s percentage from their latest submission, when graded,
+      for each published or closed assessment due inside the period window, converts it to a letter
       grade with the school&apos;s active grade scale, and publishes the result to report cards and transcripts.
       Students with no graded work in the window are skipped. Finalized grades are immutable: re-running
       finalization never recomputes them, and later changes go through a recorded correction instead.

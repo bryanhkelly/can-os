@@ -3,6 +3,8 @@ assertCapability,
 AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
+import { latestSubmissionCondition } from "./latest-submission.server";
+import { currentSectionStudentIds } from "./current-section-enrollment.server";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { gradeLabelForPercentage,isPassingGrade } from "@/domain/grade-scale-policy";
@@ -192,7 +194,7 @@ export type FinalizedGradeRow = Awaited<ReturnType<typeof finalizedGradeRows>>[n
 
 /**
  * Teacher finalizes grades for one of their sections in a grading period.
- * Percentage is computed from each student's latest graded submission per
+ * Percentage is computed from each student's latest submission, when graded, per
  * published/closed assessment due inside the grading-period window; students
  * with no graded work are skipped. Already-finalized rows are immutable and
  * skipped, making re-runs idempotent.
@@ -215,6 +217,13 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
     const actorPersonId = context.actorPersonId;
 
     return db.transaction(async (tx) => {
+      // Serialize even the first finalization, when no grade row exists yet
+      // to lock. Parallel retries then observe the prior immutable result.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(
+        hashtext('section_grade_finalization'),
+        hashtext(${data.sectionId + ":" + data.gradingPeriodId})
+      )`);
+
       const [section] = await tx
         .select({
           id: s.sections.id,
@@ -264,10 +273,11 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
        .from(s.gradeScales).where(eq(s.gradeScales.id,period.gradeScaleId)).limit(1);
       if(!gradeScale?.configuration.entries.length)throw new Error("Active school grade scale is required");
 
-      // Window is [startsOn, endsOn] inclusive in the school-year timezone's dates.
-      const windowStart = new Date(`${period.startsOn}T00:00:00.000Z`);
-      const windowEnd = new Date(`${period.endsOn}T00:00:00.000Z`);
-      windowEnd.setUTCDate(windowEnd.getUTCDate() + 1);
+      // Compare the due timestamp as a local school date. UTC midnight can
+      // misclassify work due near the start/end of a grading period.
+      const [schoolSite] = await tx.select({ timezone: s.sites.timezone })
+        .from(s.sites).where(eq(s.sites.id, section.siteId)).limit(1);
+      if (!schoolSite?.timezone) throw new Error("School timezone is required for grade finalization");
 
       const assessmentsInWindow = await tx
         .select({
@@ -280,23 +290,15 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
             eq(s.assessments.sectionId, section.id),
             inArray(s.assessments.status, ["published", "closed"]),
             isNotNull(s.assessments.dueAt),
-            sql`${s.assessments.dueAt} >= ${windowStart.toISOString()}::timestamptz`,
-            sql`${s.assessments.dueAt} < ${windowEnd.toISOString()}::timestamptz`,
+            sql`(${s.assessments.dueAt} AT TIME ZONE ${schoolSite.timezone})::date >= ${period.startsOn}::date`,
+            sql`(${s.assessments.dueAt} AT TIME ZONE ${schoolSite.timezone})::date <= ${period.endsOn}::date`,
           ),
         );
       const assessmentIds = assessmentsInWindow.map((row) => row.id);
 
-      const enrolled = await tx
-        .select({ studentProfileId: s.enrollments.studentProfileId })
-        .from(s.enrollments)
-        .where(
-          and(
-            eq(s.enrollments.kind, "section"),
-            eq(s.enrollments.status, "active"),
-            eq(s.enrollments.sectionId, section.id),
-          ),
-        );
-      const studentIds = enrolled.map((row) => row.studentProfileId);
+      const studentIds = await currentSectionStudentIds(tx, {
+        id: section.id, programId: section.programId, schoolYearId: period.schoolYearId,
+      });
       if (!assessmentIds.length || !studentIds.length) {
         return { finalized: 0, skipped: studentIds.length };
       }
@@ -313,30 +315,38 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           and(
             inArray(s.submissions.assessmentId, assessmentIds),
             inArray(s.submissions.studentProfileId, studentIds),
+            latestSubmissionCondition(tx),
             eq(s.submissions.status, "graded"),
             isNotNull(s.submissions.score),
           ),
         )
         .orderBy(desc(s.submissions.attemptNumber));
 
-      // Latest graded attempt per assessment/student.
-      const latest = new Map<string, (typeof graded)[number]>();
-      for (const row of graded) {
-        const key = `${row.assessmentId}:${row.studentProfileId}`;
-        if (!latest.has(key)) latest.set(key, row);
-      }
+      // The query chooses the latest attempt across ALL statuses before
+      // accepting a grade. Older evidence stays in history, never in this total.
       const pointsByAssessment = new Map(
         assessmentsInWindow.map((row) => [row.id, Number(row.pointsPossible ?? 0)]),
       );
       const totals = new Map<string, { earned: number; possible: number }>();
-      for (const row of latest.values()) {
+      const gradedAssessments = new Map<string, Set<string>>();
+      for (const row of graded) {
         const possible = pointsByAssessment.get(row.assessmentId) ?? 0;
         if (possible <= 0) continue;
         const total = totals.get(row.studentProfileId) ?? { earned: 0, possible: 0 };
         total.earned += Number(row.score ?? 0);
         total.possible += possible;
         totals.set(row.studentProfileId, total);
+        const completed = gradedAssessments.get(row.studentProfileId) ?? new Set<string>();
+        completed.add(row.assessmentId);
+        gradedAssessments.set(row.studentProfileId, completed);
       }
+      // A provisional average over completed work is NOT an official period
+      // grade. Until missing/excused/returned-work policy is represented by
+      // canonical evidence, fail closed rather than silently omit assignments.
+      const requiredAssessmentCount = [...pointsByAssessment.values()]
+        .filter(possible => possible > 0).length;
+      const completeTotals = new Map([...totals].filter(([studentProfileId]) =>
+        gradedAssessments.get(studentProfileId)?.size === requiredAssessmentCount));
 
       const existing = await tx
         .select({
@@ -357,9 +367,10 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
 
       const now = new Date();
       let finalized = 0;
-      let skipped = 0;
+      // Include active learners with no graded, scoreable work in the receipt.
+      let skipped = studentIds.length - completeTotals.size;
       const published: { studentProfileId: string; gradeId: string; letterGrade: string }[] = [];
-      for (const [studentProfileId, total] of totals) {
+      for (const [studentProfileId, total] of completeTotals) {
         const prior = existingByStudent.get(studentProfileId);
         // Finalized grades are immutable; corrections are a separate append-only flow.
         if (prior?.status === "finalized") {
@@ -608,6 +619,14 @@ export const correctSectionGrade = createServerFn({ method: "POST" })
           ? gradeLabelForPercentage(data.percentage, scaleEntries)
           : grade.letterGrade);
 
+      // PostgreSQL numeric values retain scale ("84.00"); compare their
+      // values before treating an identical network retry as a new correction.
+      const samePercentage = newPercentage === grade.percentage ||
+        (newPercentage !== null && grade.percentage !== null &&
+          Number(newPercentage) === Number(grade.percentage));
+      if (samePercentage && newLetterGrade === grade.letterGrade)
+        return { corrected: false };
+
       const priorCorrections = Array.isArray(grade.metadata?.corrections)
         ? (grade.metadata.corrections as GradeCorrection[])
         : [];
@@ -776,13 +795,10 @@ export const getSectionGradeFinalization = createServerFn({ method: "GET" })
         .from(s.schoolYears)
         .where(eq(s.schoolYears.id, authorized.section.schoolYearId))
         .limit(1),
-      db.select({ studentProfileId: s.enrollments.studentProfileId })
-        .from(s.enrollments)
-        .where(and(
-          eq(s.enrollments.kind, "section"),
-          eq(s.enrollments.status, "active"),
-          eq(s.enrollments.sectionId, section.id),
-        )),
+      currentSectionStudentIds(db, {
+        id: section.id, programId: authorized.section.programId,
+        schoolYearId: authorized.section.schoolYearId,
+      }),
       db.select({
         id: s.sectionGrades.id,
         studentProfileId: s.sectionGrades.studentProfileId,

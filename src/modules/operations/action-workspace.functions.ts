@@ -1,5 +1,5 @@
 import { db } from "@/db/client";
-import { accountPersonGrants,actions,guardianRelationships,people,programs,sites,studentProfiles } from "@/db/schema";
+import { accountPersonGrants,actions,people,programs,sites } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { dedupeQueue,notificationSummary } from "@/domain/notification-triage";
@@ -17,7 +17,6 @@ import { gradeResponseActionType } from "@/domain/grade-response-policy";
 import { prioritizeSchoolActions,schoolActionBacklog } from "@/domain/operations-action-triage";
 import { currentSiteDirectorPersonId } from "./site-local-delegation.server";
 import { assertLocalDelegationIssuer } from "@/domain/site-local-delegation-policy";
-import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 
 async function operator() {
  const actor=await getCommandContext(getRequest());
@@ -93,7 +92,8 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    if(record.type===openingHandoffType)throw new Error("Use the named-recipient opening handoff in Site Today");
    if(record.type==="onsite_coverage_gap"&&data.status==="resolved")
      throw new Error("The current assigned site director resolves coverage gaps in Site Today");
-   const academic=record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId!==null;
+   const academic=(record.type==="academic_intervention"||record.type===gradeResponseActionType)&&record.subjectType==="student_profile"&&record.sectionId!==null;
+   if(record.type===gradeResponseActionType&&!academic)throw new AuthorizationError("academic grade follow-up scope");
    if(academic&&data.status==="resolved"){
     await resolveActionInTransaction(tx,actor,{actionId:record.id,resolutionNote:data.resolutionNote??""});
     return {saved:true};
@@ -109,28 +109,6 @@ export const updateOperationsAction=createServerFn({method:"POST"})
    await tx.update(actions).set({status:data.status,resolvedAt:data.status==="resolved"?now:null,resolutionNote:data.status==="resolved"?data.resolutionNote?.trim():record.resolutionNote,updatedAt:now}).where(eq(actions.id,record.id));
    await writeAudit(tx,actor,{action:"action.status.change",entityType:"action",entityId:record.id,scope:{siteId:record.siteId,programId:record.programId},before:{status:record.status},after:{status:data.status}});
    if(data.status==="resolved")await emitEvent(tx,{eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:record.id,actorPersonId:actor.actorPersonId,payload:{subjectType:record.subjectType,subjectId:record.subjectId}});
-   // A resolved school-owned guardian question closes the response loop.
-   // Re-check the current academic relationship before notifying: a revoked
-   // guardian must not receive information about this student's progress.
-   if(data.status==="resolved" && record.type===gradeResponseActionType &&
-      record.subjectType==="student_profile" &&
-      typeof record.metadata.requestedByGuardianPersonId==="string"){
-    const guardianPersonId=record.metadata.requestedByGuardianPersonId;
-    const [related]=await tx.select({id:guardianRelationships.id})
-      .from(guardianRelationships).innerJoin(studentProfiles,
-        eq(studentProfiles.personId,guardianRelationships.studentPersonId))
-      .where(and(eq(studentProfiles.id,record.subjectId),
-        guardianRelationshipPredicate({
-          guardianPersonId,studentPersonId:studentProfiles.personId,access:"academic",
-        }))).limit(1);
-    if(related)await notify(tx,{
-      recipientPersonId:guardianPersonId,
-      type:"guardian_grade_follow_up_resolved",
-      title:"Your school responded to your academic question",
-      body:"Review the school's resolution in your child's academic progress.",
-      resourceType:"action",resourceId:record.id,
-    });
-   }
    return {saved:true};
   });
  });
@@ -146,7 +124,8 @@ export const assignOperationsAction=createServerFn({method:"POST"})
    if(record.programId&&!(actor.scope.programIds??[]).includes(record.programId))throw new AuthorizationError("action program scope");
    if(record.type==="support_referral")throw new Error("Use the referral lifecycle");
    if(record.type===openingHandoffType)throw new Error("Use the named-recipient opening handoff in Site Today");
-   const academic=record.type==="academic_intervention"&&record.subjectType==="student_profile"&&record.sectionId!==null;
+   const academic=(record.type==="academic_intervention"||record.type===gradeResponseActionType)&&record.subjectType==="student_profile"&&record.sectionId!==null;
+   if(record.type===gradeResponseActionType&&!academic)throw new AuthorizationError("academic grade follow-up scope");
    if(academic)await assertAcademicActionAuthority(tx,actor,record);
    const coverageGap=record.type==="onsite_coverage_gap";
    if(coverageGap){

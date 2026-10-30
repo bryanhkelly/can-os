@@ -6,7 +6,7 @@ import { guardianAssignmentSummary } from "@/domain/guardian-academics";
 import { WorkspaceShell, WorkspacePanel, StatusBadge, StatCard } from "@/components/workspace";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
-import { GuardianGradeResponse } from "@/components/learning/GuardianGradeResponse";
+import { GuardianGradeResponseHistory } from "@/components/learning/GuardianGradeResponse";
 
 export const Route = createFileRoute("/guardian/academics")({
  validateSearch:(search:Record<string,unknown>):{student?:string;section?:string;assessment?:string}=>({
@@ -102,7 +102,7 @@ function GuardianAcademicsPage() {
       {item.revisionFeedbackSubmissionId&&<SubmissionAnnotations key={item.revisionFeedbackSubmissionId}
        submissionId={item.revisionFeedbackSubmissionId}/>}
       <AssignmentConversation key={`${selected}:${item.assessmentId}`} assessmentId={item.assessmentId} studentPersonId={selected}/>
-      {item.submissionId && item.status === "graded" && <GuardianGradeResponse key={item.submissionId} submissionId={item.submissionId}/>} 
+      <GuardianGradeResponseHistory attempts={item.releasedAttempts} currentSubmissionId={item.submissionId}/>
      </>}
     </section>)}
    </div>}

@@ -65,3 +65,21 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
     {notice && <p className="mt-3 text-sm" role="status">{notice}</p>}
   </section>;
 }
+
+function PreviousGradeResponse({ submissionId, attemptNumber }: { submissionId: string; attemptNumber: number }) {
+  const [open, setOpen] = useState(false);
+  return <details className="mt-4 rounded-lg border p-3" onToggle={event=>setOpen(event.currentTarget.open)}>
+    <summary className="cursor-pointer text-sm font-semibold">School follow-up for released attempt {attemptNumber}</summary>
+    {open && <GuardianGradeResponse submissionId={submissionId}/>}
+  </details>;
+}
+
+/** Keep accountable answers available after a revision creates a newer attempt. */
+export function GuardianGradeResponseHistory({ attempts, currentSubmissionId }: {
+  attempts: readonly { submissionId: string; attemptNumber: number }[];
+  currentSubmissionId: string | null;
+}) {
+  return <>{attempts.map(attempt=>attempt.submissionId===currentSubmissionId
+    ? <GuardianGradeResponse key={attempt.submissionId} submissionId={attempt.submissionId}/>
+    : <PreviousGradeResponse key={attempt.submissionId} {...attempt}/>)}</>;
+}

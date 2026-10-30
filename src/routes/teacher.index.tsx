@@ -1,3 +1,4 @@
+import { TeacherGradeResponsesPanel } from "@/components/learning/TeacherGradeResponsesPanel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowUpRight, BookOpen, ClipboardCheck, GraduationCap } from "lucide-react";
@@ -7,11 +8,17 @@ import { TeacherLearningFollowUpForm } from "@/components/learning/TeacherLearni
 import { TeacherLearningFollowUpsPanel } from "@/components/learning/TeacherLearningFollowUpsPanel";
 import { TeacherConferencePanel } from "@/components/teacher/TeacherConferencePanel";
 import { TeacherFirstWeekCard } from "@/components/teacher/TeacherFirstWeekCard";
+import { TeacherDaySchedule } from "@/components/teacher/TeacherDaySchedule";
 import { WorkspaceShell, StatCard, EmptyState, QueryState } from "@/components/workspace";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
 import { buildTeacherAttention } from "@/domain/daily-operations";
 
-export const Route = createFileRoute("/teacher/")({ component: TeacherTodayPage });
+export const Route = createFileRoute("/teacher/")({
+ validateSearch:(search:Record<string,unknown>)=>({
+  gradeAction:typeof search.gradeAction==="string"?search.gradeAction:undefined,
+ }),
+ component: TeacherTodayPage,
+});
 
 type Today = Awaited<ReturnType<typeof getTeacherToday>>;
 type Evidence = Awaited<ReturnType<typeof getTeacherLearningEvidence>>;
@@ -22,6 +29,7 @@ function greeting() {
 }
 
 function TeacherTodayPage() {
+ const {gradeAction}=Route.useSearch();
  const [data, setData] = useState<Today | null>(null);
  const [activity, setActivity] = useState<Evidence | null>(null);
  const [activityError, setActivityError] = useState("");
@@ -72,6 +80,8 @@ function TeacherTodayPage() {
      <Link to="/teacher/missing-work"><StatCard label="Missing work" value={data.missingWork.length} /></Link>
     </div>
 
+    <TeacherDaySchedule sections={data.sections} />
+
     <section className="mt-10">
      <p className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">My sections</p>
      {data.sections.length === 0 && <EmptyState className="mt-4" title="No currently authorized teaching sections." description="A named delegation, Section assignment, required qualification or school agreement may be missing, revoked or expired. Contact your school administrator. Historical grades and issued transcripts are unchanged." />}
@@ -112,6 +122,8 @@ function TeacherTodayPage() {
         <p className="mt-3 text-sm">Use existing <Link to="/teacher/missing-work" className="underline">missing-work follow-up</Link> and authorized support referrals for human-reviewed interventions.</p>
       </>}
     </section>
+
+    <TeacherGradeResponsesPanel selectedAction={gradeAction}/>
 
     <TeacherLearningFollowUpsPanel />
 

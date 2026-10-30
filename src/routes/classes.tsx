@@ -68,7 +68,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const teacherGuides = data.role === "teacher" ? data.teacherGuides : null;
   const assessmentEvidence = data.assessmentEvidence ?? [];
   const assessmentSummary = data.assessmentEvidenceSummary;
-  const lessons = data.content?.modules.flatMap(module => module.lessons) ?? [];
+  const lessons = data.content?.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction) ?? [];
   // The student home can link directly to a real published lesson without
   // predicting the publisher's IDs. Empty shell lessons are not first-day
   // instruction, even if they precede the first authored lesson.
@@ -80,7 +80,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   const nextLesson=lessonIndex>=0&&lessonIndex<lessons.length-1?lessons[lessonIndex+1]:null;
   const relatedWork = lesson ? assessmentEvidence.filter(item => item.curriculumLessonId === lesson.id) : [];
 
-  const completed = new Set(data.progress.filter(item => item.completedAt).map(item => item.lessonId));
+  const completed = new Set(data.progress.filter(item => item.completedAt && lessons.some(lesson=>lesson.id===item.lessonId)).map(item => item.lessonId));
   const nextSteps = deriveClassNextSteps({
     lessonIds: lessons.map(item => item.id),
     completedLessonIds: [...completed],
@@ -206,6 +206,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
         {!data.teachers.length && <p className="text-sm text-muted-foreground">No teaching team is assigned.</p>}
       </WorkspacePanel>
     </div>}
+    {data.curriculumAccess?.available===false&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">
+      {data.curriculumAccess.reason} Your assignments and academic records remain available in their usual workspaces.
+    </p>}
     {tab === "lessons" && <div className="grid gap-5">
       {!data.content && <p role="status" className="rounded-xl border p-5 text-sm">No published learning content is configured for this class.</p>}
       {lessonId && !lesson && <p role="alert" className="rounded-xl border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
@@ -309,8 +312,8 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
           sectionId: data.section.id, versionId: data.section.versionId, lessonId: lesson.id, completed: !completed.has(lesson.id),
         } }), completed.has(lesson.id) ? "Lesson marked incomplete." : "Lesson completion saved.")}
           className="mt-5 rounded-lg border px-4 py-2 text-sm disabled:opacity-50">{completed.has(lesson.id) ? "Mark incomplete" : "Mark lesson complete"}</button>}
-      </WorkspacePanel> : data.content?.modules.map(module => <WorkspacePanel key={module.id} title={module.title}>
-        <ul className="divide-y">{module.lessons.map(item => <li key={item.id} className="flex items-center justify-between gap-3 py-3">
+      </WorkspacePanel> : data.content?.modules.filter(module=>module.lessons.some(isLearnerFacingInstruction)).map(module => <WorkspacePanel key={module.id} title={module.title}>
+        <ul className="divide-y">{module.lessons.filter(isLearnerFacingInstruction).map(item => <li key={item.id} className="flex items-center justify-between gap-3 py-3">
           <Link to="/classes" search={{ ...search, tab: "lessons", lesson: item.id }} className="text-sm underline">{item.title}</Link>
           {data.role !== "teacher" && <StatusBadge tone={completed.has(item.id) ? "success" : "neutral"}>{completed.has(item.id) ? "Complete" : "Not completed"}</StatusBadge>}
         </li>)}</ul>
@@ -339,10 +342,10 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
               <div><p className="font-medium">{item.title}</p>
                 <p className="text-xs text-muted-foreground">{assigned.length} linked released assignments · {marked}/{data.roster.length} learners self-reported complete</p>
               </div>
-              <div className="flex flex-wrap gap-3 text-sm">
+              {isLearnerFacingInstruction(item)?<div className="flex flex-wrap gap-3 text-sm">
                 <Link to="/classes" search={{...search,tab:"lessons",lesson:item.id}} className="underline">View lesson</Link>
                 <Link to="/teacher/gradebook" search={{section:data.section.id,lesson:item.id,kind:"classwork"}} className="underline">Create classwork</Link>
-              </div>
+              </div>:<p className="text-xs text-muted-foreground">Outline only — publisher instruction is not available yet.</p>}
             </div>
             {assigned.length>0&&<div className="flex flex-wrap gap-2">{assigned.map(work=>
               <Link key={work.id} to="/teacher/gradebook" search={{section:data.section.id,assessment:work.id}}

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq, desc, and, inArray, isNull, or } from "drizzle-orm";
+import { eq, desc, and, inArray, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -198,18 +198,25 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const gradeActionIds=rows.filter(n=>n.resourceType==="action"&&
   n.resourceId&&["guardian_grade_follow_up_requested","guardian_grade_follow_up_resolved"].includes(n.type))
   .map(n=>n.resourceId as string);
+ const teacherGradeSections=context.role==="teacher"&&gradeActionIds.length
+  ?(await (await import("@/modules/learning/class-access.server")).accessibleClasses(
+    context as import("@/modules/identity/actors.server").Actor)).map(row=>row.id):[];
  const gradeActions=gradeActionIds.length?await db.select({
    id:s.actions.id,sectionId:s.actions.sectionId,siteId:s.actions.siteId,
    programId:s.actions.programId,organizationId:s.actions.organizationId,
    subjectId:s.actions.subjectId,metadata:s.actions.metadata,
-   studentPersonId:s.studentProfiles.personId,
+   studentPersonId:s.studentProfiles.personId,assessmentId:s.submissions.assessmentId,
  }).from(s.actions).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.actions.subjectId))
+ .innerJoin(s.submissions,and(eq(sql<string>`${s.submissions.id}::text`,sql<string>`${s.actions.metadata}->>'submissionId'`),
+   eq(s.submissions.studentProfileId,s.actions.subjectId),inArray(s.submissions.status,["graded","returned"])))
+ .innerJoin(s.assessments,and(eq(s.assessments.id,s.submissions.assessmentId),eq(s.assessments.sectionId,s.actions.sectionId)))
  .where(and(inArray(s.actions.id,gradeActionIds),
    eq(s.actions.type,"guardian_grade_follow_up"),
    eq(s.actions.subjectType,"student_profile"),
-   inArray(s.actions.siteId,context.scope.siteIds??[]),
-   inArray(s.actions.programId,context.scope.programIds??[]),
-   inArray(s.actions.organizationId,context.scope.organizationIds??[]))) : [];
+   ...(context.role==="teacher" ? [inArray(s.actions.sectionId,teacherGradeSections)] : [
+     inArray(s.actions.siteId,context.scope.siteIds??[]),
+     inArray(s.actions.programId,context.scope.programIds??[]),
+     inArray(s.actions.organizationId,context.scope.organizationIds??[])]))) : [];
  const gradeActionsById=new Map(gradeActions.map(a=>[a.id,a]));
  const verifiedGradeActions = new Map<string,string>();
  if(gradeActions.length){
@@ -222,18 +229,13 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
      for(const action of gradeActions)if(permitted.has(action.studentPersonId)&&
        action.metadata.requestedByGuardianPersonId===personId)
        verifiedGradeActions.set(action.id,
-         `/guardian/academics?student=${encodeURIComponent(action.studentPersonId)}`);
+         `/guardian/academics?student=${encodeURIComponent(action.studentPersonId)}&section=${encodeURIComponent(action.sectionId??"")}&assessment=${encodeURIComponent(action.assessmentId)}`);
    }else if(context.role==="registrar"){
      for(const action of gradeActions)if((context.scope.organizationIds??[]).length)
        verifiedGradeActions.set(action.id,`/operations?action=${encodeURIComponent(action.id)}`);
    }else if(context.role==="teacher"){
-     const teacherSections=await db.select({sectionId:s.sectionTeachers.sectionId})
-       .from(s.sectionTeachers).where(and(
-         eq(s.sectionTeachers.personId,personId),
-         inArray(s.sectionTeachers.sectionId,gradeActions.map(a=>a.sectionId).filter((id):id is string=>!!id))));
-     const allowed=new Set(teacherSections.map(t=>t.sectionId));
-     for(const action of gradeActions)if(action.sectionId&&allowed.has(action.sectionId))
-       verifiedGradeActions.set(action.id,"/teacher/gradebook");
+     for(const action of gradeActions)if(action.sectionId&&teacherGradeSections.includes(action.sectionId))
+       verifiedGradeActions.set(action.id,`/teacher?gradeAction=${encodeURIComponent(action.id)}`);
    }
  }
  const bySubmission=new Map(submissions.map(x=>[x.id,x.assessmentId]));
@@ -314,7 +316,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
     n.resourceType==="application"?enrollmentStudent.has(n.resourceId):
     n.resourceType==="admission_offer"?permittedGuardianOffers.has(n.resourceId):
-    n.resourceType==="submission"?guardianSubmissionById.has(n.resourceId):true));
+    n.resourceType==="submission"?guardianSubmissionById.has(n.resourceId):
+    n.resourceType==="action"&&["guardian_grade_follow_up_requested","guardian_grade_follow_up_resolved"].includes(n.type)
+      ?verifiedGradeActions.has(n.resourceId):true));
  return visible.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
   date:n.createdAt.toISOString(),href:n.resourceType==="safeguarding_concern"&&n.resourceId&&permittedSafeguardingIds.has(n.resourceId)?
    `/safeguarding?case=${encodeURIComponent(n.resourceId)}`:

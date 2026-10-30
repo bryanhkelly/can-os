@@ -4,6 +4,8 @@ import { db } from "@/db/client";
 import {
   assessments, courseTemplateVersions, enrollments, sections, terms,
 } from "@/db/schema";
+import { readCurriculumDeliveryAccess } from "./curriculum-delivery-access.server";
+import { assessmentAvailability } from "@/domain/assessment-availability";
 import { buildFirstClassroom } from "@/domain/first-classroom";
 import { evaluateLaunchStaffing } from "@/modules/staffing/launch-staffing.server";
 
@@ -15,6 +17,7 @@ export async function readFirstClassrooms(
   sectionIds: readonly string[],
   qualifiedTeacherBySection?: ReadonlyMap<string, boolean>,
 ) {
+  const now = new Date();
   const ids = [...new Set(sectionIds)];
   if (!ids.length) return [];
   const rows = await db.select({
@@ -23,6 +26,7 @@ export async function readFirstClassrooms(
     programId: sections.programId,
     schoolYearId: terms.schoolYearId,
     versionStatus: courseTemplateVersions.status,
+    versionId:courseTemplateVersions.id,
     curriculum: courseTemplateVersions.curriculum,
   }).from(sections)
     .innerJoin(terms, eq(terms.id, sections.termId))
@@ -30,7 +34,7 @@ export async function readFirstClassrooms(
     .where(inArray(sections.id, ids));
 
   const activeProgram = alias(enrollments, "first_class_active_program");
-  const [assessmentRows, membershipRows, staffing] = await Promise.all([
+  const [assessmentRows, membershipRows, staffing, delivery] = await Promise.all([
     // Never direct a student to work that is unpublished, not yet released
     // (a future availableAt schedules the release) or closed.
     db.select({
@@ -38,6 +42,9 @@ export async function readFirstClassrooms(
       sectionId: assessments.sectionId,
       title: assessments.title,
       instructions: assessments.instructions,
+      status: assessments.status,
+      availableAt: assessments.availableAt,
+      closesAt: assessments.closesAt,
       curriculumLessonId: sql<string | null>`case
         when jsonb_typeof(${assessments.metadata}->'curriculumLessonId') = 'string'
         then ${assessments.metadata}->>'curriculumLessonId' end`,
@@ -45,7 +52,7 @@ export async function readFirstClassrooms(
       .where(and(
         inArray(assessments.sectionId, ids),
         eq(assessments.status, "published"),
-        or(isNull(assessments.availableAt), lte(assessments.availableAt, new Date())),
+        or(isNull(assessments.availableAt), lte(assessments.availableAt, now)),
       ))
       .orderBy(asc(assessments.createdAt)),
     db.select({
@@ -71,14 +78,18 @@ export async function readFirstClassrooms(
       .groupBy(enrollments.sectionId),
     Promise.all(rows.map(async row => [row.id, qualifiedTeacherBySection?.get(row.id) ??
       (await evaluateLaunchStaffing(row.id)).ready] as const)),
+    Promise.all(rows.map(async row=>[row.id,await readCurriculumDeliveryAccess(db,row)] as const)),
   ]);
 
   return rows.map(row => buildFirstClassroom(row.id, {
     sectionActive: row.active,
     courseVersionPublished: row.versionStatus === "published",
+    curriculumAccess:delivery.find(([id])=>id===row.id)?.[1] ?? {
+      available:false,reason:"Current curriculum delivery access could not be verified.",
+    },
     curriculum: row.curriculum,
     qualifiedTeacher: staffing.find(([sectionId]) => sectionId === row.id)?.[1] ?? false,
     activeStudentCount: Number(membershipRows.find(item => item.sectionId === row.id)?.studentCount ?? 0),
-    publishedAssessments: assessmentRows.filter(item => item.sectionId === row.id),
+    publishedAssessments: assessmentRows.filter(item => item.sectionId === row.id && assessmentAvailability(item, now).actionable),
   }));
 }

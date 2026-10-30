@@ -108,7 +108,7 @@ describe("gradebook section grade finalization panel", () => {
     await loaded();
     const html = renderToStaticMarkup(render());
     expect(html).toContain("Close grading period / finalize grades");
-    expect(html).toContain("latest graded");
+    expect(html).toContain("latest submission, when graded");
     expect(html).toContain("active grade scale");
     expect(html).toContain("Finalized grades are immutable");
     expect(html).toContain("Quarter 1");

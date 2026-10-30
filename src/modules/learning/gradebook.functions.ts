@@ -1,3 +1,5 @@
+import { assessmentAttemptLimit, assertAssessmentAttemptAllowed, MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
+import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { createAssessmentStatus } from "@/domain/assessment-publication";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { authorizeClass,accessibleClasses } from "./class-access.server";
@@ -56,6 +58,7 @@ async function submissionForReview(submissionId:string){
   id:s.submissions.id,assessmentId:s.submissions.assessmentId,studentProfileId:s.submissions.studentProfileId,
   studentPersonId:s.studentProfiles.personId,response:s.submissions.response,attemptNumber:s.submissions.attemptNumber,
   submittedAt:s.submissions.submittedAt,status:s.submissions.status,
+  score:s.submissions.score,feedback:s.submissions.feedback,
  }).from(s.submissions).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.submissions.studentProfileId))
   .where(eq(s.submissions.id,submissionId)).limit(1);
  if(!submission||!["submitted","graded","returned"].includes(submission.status))
@@ -88,6 +91,8 @@ export const getSubmissionReview=createServerFn({method:"GET"})
    .from(s.submissions).where(and(eq(s.submissions.assessmentId,submission.assessmentId),
     eq(s.submissions.studentProfileId,submission.studentProfileId))).orderBy(desc(s.submissions.attemptNumber));
   return {
+   score:submission.score,
+   feedbackComment:typeof submission.feedback?.comment==="string"?submission.feedback.comment:"",
    responseText:typeof submission.response.text==="string"?submission.response.text:"",
    attemptNumber:submission.attemptNumber,submittedAt:submission.submittedAt?.toISOString()??null,
    attachments:documents.map(document=>({id:document.id,fileName:document.fileName})),
@@ -218,6 +223,7 @@ export const getGradebook = createServerFn({ method: "GET" })
     dueAt: row.dueAt?.toISOString() ?? null,
     pointsPossible: row.pointsPossible,
     rubric: readRubric(row.metadata?.rubricCriteria),
+    maxAttempts:assessmentAttemptLimit(row.metadata),
     kind:typeof row.metadata?.assignmentKind==="string"?row.metadata.assignmentKind:"classwork",
     curriculumLessonId:typeof row.metadata?.curriculumLessonId==="string"?row.metadata.curriculumLessonId:null,
    })),
@@ -227,6 +233,7 @@ export const getGradebook = createServerFn({ method: "GET" })
     studentProfileId: row.studentProfileId,
     status: row.status,
     timeliness: row.timeliness,
+    attemptNumber:row.attemptNumber,
     score: row.score,
     feedbackComment: typeof row.feedback?.comment === "string" ? row.feedback.comment : "",
     feedbackRubric: readRubricScores(
@@ -306,6 +313,7 @@ export const createAssessment = createServerFn({ method: "POST" })
   assignmentKind:z.enum(["homework","classwork","quiz","test","project","discussion"]).optional().default("classwork"),
   curriculumLessonId:z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/).optional(),
   dueAt: z.string().refine(v => !Number.isNaN(new Date(v).getTime()), "dueAt must be an ISO date").optional(),
+  maxAttempts:z.number().int().min(1).max(MAX_ASSESSMENT_ATTEMPTS).optional(),
   publishNow:z.boolean().optional().default(false),
  }).strict().parse(value))
  .handler(async ({ data }) => {
@@ -341,6 +349,7 @@ export const createAssessment = createServerFn({ method: "POST" })
     metadata:{...(data.rubric?{rubric:data.rubric}:{}),
       ...(rubricCriteria.length?{rubricCriteria,rubricVersion:1}:{}),
       assignmentKind:data.assignmentKind,
+      ...(data.maxAttempts!==undefined?{maxAttempts:data.maxAttempts}:{}),
       publisherCourseVersionId:teachingSection.versionId,
       ...(data.curriculumLessonId?{curriculumLessonTitle:publisherLessonChoices(
         teachingSection.curriculum,teachingSection.status).find(lesson=>lesson.id===data.curriculumLessonId)?.title}:{}),
@@ -416,7 +425,7 @@ export const manageAssessment = createServerFn({method:"POST"})
    const [assessment]=await tx.select({
     id:s.assessments.id,sectionId:s.assessments.sectionId,
     status:s.assessments.status,dueAt:s.assessments.dueAt,
-    availableAt:s.assessments.availableAt,siteId:s.sections.siteId,
+    availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,siteId:s.sections.siteId,
     programId:s.sections.programId,schoolYearId:s.terms.schoolYearId
    }).from(s.assessments)
     .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
@@ -438,14 +447,17 @@ export const manageAssessment = createServerFn({method:"POST"})
    const dueAt=data.dueAt?new Date(data.dueAt):assessment.dueAt;
    if((data.action==="publish"||data.action==="reschedule")&&(!dueAt||dueAt<=now))
     throw new Error("A future due date is required");
-   if(data.action==="reopen"&&(!dueAt||dueAt<=now))
-    throw new Error("Set a future due date before reopening this closed assessment");
    const status=data.action==="publish"||data.action==="reopen"?"published":
     data.action==="close"?"closed":assessment.status;
+   const availableAt=data.action==="publish"||
+    (data.action==="reopen"&&(!assessment.availableAt||assessment.availableAt>now))
+     ?now:assessment.availableAt;
+   const closesAt=data.action==="reopen"?null:assessment.closesAt;
    const [updated]=await tx.update(s.assessments).set({
     status,
     ...(data.action==="publish"||data.action==="reschedule"||(data.action==="reopen"&&data.dueAt)?{dueAt}:{}),
-    ...(data.action==="publish"?{availableAt:now}:{}),
+    ...(data.action==="publish"?{availableAt}:{}),
+    ...(data.action==="reopen"?{availableAt,closesAt}:{}),
     updatedAt:now
    }).where(and(eq(s.assessments.id,assessment.id),eq(s.assessments.status,assessment.status)))
     .returning({id:s.assessments.id});
@@ -490,8 +502,10 @@ export const manageAssessment = createServerFn({method:"POST"})
     actorPersonId:context.actorPersonId,
     action:"assessment."+data.action,resourceType:"assessment",resourceId:assessment.id,
     scope:{siteId:assessment.siteId,programId:assessment.programId,sectionId:assessment.sectionId},
-    before:{status:assessment.status,dueAt:assessment.dueAt?.toISOString()??null},
-    after:{status,dueAt:dueAt?.toISOString()??null,assignedCount},
+    before:{status:assessment.status,dueAt:assessment.dueAt?.toISOString()??null,
+     availableAt:assessment.availableAt?.toISOString()??null,closesAt:assessment.closesAt?.toISOString()??null},
+    after:{status,dueAt:dueAt?.toISOString()??null,assignedCount,
+     availableAt:availableAt?.toISOString()??null,closesAt:closesAt?.toISOString()??null},
     context:{accountId:context.accountId,sessionId:context.sessionId}
    });
    return {assessmentId:assessment.id,status,assignedCount};
@@ -509,6 +523,7 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
    const [record]=await tx.select({
     id:s.submissions.id,status:s.submissions.status,
     assessmentStatus:s.assessments.status,
+    availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,metadata:s.assessments.metadata,
     assessmentId:s.assessments.id,sectionId:s.sections.id,
     studentProfileId:s.submissions.studentProfileId,attemptNumber:s.submissions.attemptNumber,
     studentPersonId:s.studentProfiles.personId,
@@ -531,6 +546,10 @@ export const returnSubmissionForRevision=createServerFn({method:"POST"})
    // student notified to revise something they cannot submit.
    if(record.assessmentStatus!=="published" || !record.sectionActive)
     throw new Error("Reopen the published assessment and active class before returning work");
+   assertAssessmentActionable({
+    status:record.assessmentStatus,availableAt:record.availableAt,closesAt:record.closesAt,
+   });
+   assertAssessmentAttemptAllowed(record.metadata,record.attemptNumber+1);
    const activeProgramMembership=alias(s.enrollments,"revision_return_program_membership");
    const [member]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
     .innerJoin(activeProgramMembership,and(

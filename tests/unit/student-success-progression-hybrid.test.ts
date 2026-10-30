@@ -31,7 +31,7 @@ describe("cross-class Student Success assignment priorities", () => {
     assessmentId: "assessment-1", sectionId: "section-a",
     title: "Practice problems", course: "Mathematics",
     dueAt: "2026-10-24T12:00:00.000Z",
-    status: null, timeliness: null, assessmentStatus: "published",
+    status: null, timeliness: null, assessmentStatus: "published",canEdit:true,
     ...overrides,
   });
 
@@ -76,6 +76,20 @@ describe("cross-class Student Success assignment priorities", () => {
     expect(plan.steps[0]?.kind).toBe("awaiting_feedback");
     expect(plan.overdue).toBe(0);
     expect(plan.revise).toBe(0);
+  });
+
+  it("never offers submission work when canonical availability or attempt policy disallows edits",()=>{
+    const plan=deriveStudentSuccessPriorities([
+      assignment({assessmentId:"scheduled",canEdit:false}),
+      assignment({assessmentId:"closed-by-date",status:"assigned",canEdit:false,timeliness:"missing"}),
+      assignment({assessmentId:"limit-reached",status:"returned",canEdit:false}),
+      assignment({assessmentId:"open-revision",status:"returned",canEdit:true}),
+    ],now);
+    expect(plan.steps.map(step=>[step.assessmentId,step.kind])).toEqual([
+      ["open-revision","revision"],["limit-reached","review_feedback"],
+    ]);
+    expect(plan.requiresAction).toBe(1);
+    expect(plan.overdue).toBe(0);
   });
 
   it("does not duplicate latest-attempt projections and uses deterministic bounded results", () => {

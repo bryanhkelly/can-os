@@ -15,6 +15,7 @@ const assessment = { id: "assessment-1", title: "First investigation", instructi
 const readyEvidence = {
   sectionActive: true,
   courseVersionPublished: true,
+  curriculumAccess:{available:true,reason:null},
   curriculum,
   qualifiedTeacher: true,
   activeStudentCount: 2,
@@ -87,4 +88,34 @@ describe("first classroom evidence", () => {
     expect(result.ready).toBe(true);
     expect(result.firstWeek.assessment).toEqual({ id: "assessment-4", title: "Opening task" });
   });
+});
+
+describe("first classroom fallback boundaries", () => {
+  it("never falls back to work linked to another lesson", () => {
+    const result = buildFirstClassroom("section-1", { ...readyEvidence,
+      publishedAssessments: [{ ...assessment, curriculumLessonId: "later" }] });
+    expect(result.firstWeek.assessment).toBeNull();
+    expect(result.blockers).toContainEqual(expect.objectContaining({ key: "missing_assessment" }));
+  });
+  it("finds genuinely unlinked work after unrelated work", () => {
+    const result = buildFirstClassroom("section-1", { ...readyEvidence,
+      publishedAssessments: [{ ...assessment, curriculumLessonId: "later" },
+        { ...assessment, id: "intro", curriculumLessonId: null }] });
+    expect(result.firstWeek.assessment?.id).toBe("intro");
+  });
+  it("does not recommend work without a real first lesson", () => {
+    expect(buildFirstClassroom("section-1", { ...readyEvidence, curriculum: emptyCurriculum,
+      publishedAssessments: [{ ...assessment, curriculumLessonId: null }] }).firstWeek.assessment).toBeNull();
+  });
+});
+
+
+describe("first classroom curriculum delivery access",()=>{
+ it("does not recommend published content or assignments after licensing is revoked",()=>{
+  const result=buildFirstClassroom("section-1",{...readyEvidence,
+   curriculumAccess:{available:false,reason:"An active institutional license is required."}});
+  expect(result.ready).toBe(false);
+  expect(result.firstWeek).toEqual({lesson:null,assessment:null});
+  expect(result.blockers).toEqual([{key:"curriculum_unavailable",message:"An active institutional license is required."}]);
+ });
 });

@@ -33,6 +33,7 @@ async function loadStudentToday() {
         status: item.status,
         timeliness: item.timeliness,
         assessmentStatus: item.assessmentStatus,
+        canEdit:item.canEdit,
       })), new Date());
     }
   } catch {

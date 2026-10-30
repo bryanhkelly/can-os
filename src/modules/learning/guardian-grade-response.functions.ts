@@ -66,7 +66,7 @@ async function visibleGradedSubmission(actor: Awaited<ReturnType<typeof guardian
     ))
     .where(and(
       eq(submissions.id, submissionId),
-      eq(submissions.status, "graded"),
+      inArray(submissions.status, ["graded", "returned"]),
       eq(sections.active,true),
       inArray(sections.siteId, actor.scope.siteIds ?? []),
       inArray(sections.programId, actor.scope.programIds ?? []),

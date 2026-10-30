@@ -5,7 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
-import { guardianFeedbackReleased, latestGuardianAttempts, priorReturnedGuardianFeedback } from "@/domain/guardian-academics";
+import { guardianFeedbackReleased, latestGuardianAttempts, priorReturnedGuardianFeedback, releasedGuardianAttempts } from "@/domain/guardian-academics";
 import { z } from "zod";
 import { readRubric } from "./rubric";
 
@@ -116,6 +116,7 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
     // returned predecessor, not the new private response text or draft.
     revisionFeedback:previous&&typeof previous.feedback?.comment==="string"?previous.feedback.comment:"",
     revisionFeedbackSubmissionId:previous?.submissionId??null,
+    releasedAttempts:releasedGuardianAttempts(rows,row.assessmentId),
    };
   }) };
  });

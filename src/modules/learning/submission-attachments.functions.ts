@@ -1,3 +1,5 @@
+import { assertAssessmentAttemptAllowed } from "@/domain/assessment-attempt-policy";
+import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -84,7 +86,7 @@ async function requireEnrolledAssessment(
   tx: Tx, s: DbSchema, assessmentId: string, studentId: string, actor: Actor,
   allowClosedForRead=false,
 ) {
-  const [assessment] = await tx.select({ id: s.assessments.id, sectionId: s.assessments.sectionId, metadata: s.assessments.metadata })
+  const [assessment] = await tx.select({ id: s.assessments.id, sectionId: s.assessments.sectionId, status: s.assessments.status, availableAt: s.assessments.availableAt, closesAt: s.assessments.closesAt, metadata: s.assessments.metadata })
     .from(s.assessments).innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
     .where(and(eq(s.assessments.id, assessmentId),
       allowClosedForRead?inArray(s.assessments.status,["published","closed"])
@@ -96,6 +98,7 @@ async function requireEnrolledAssessment(
   // all learning files, including short-lived download URL issuance.
   const enrollment=await authorizeClass(actor,assessment.sectionId,undefined,tx);
   if(enrollment.studentProfileId!==studentId)throw new AuthorizationError("current student learning scope");
+  if (!allowClosedForRead) assertAssessmentActionable(assessment);
   return assessment;
 }
 
@@ -192,6 +195,8 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
       const [latest] = await tx.select().from(s.submissions)
         .where(and(eq(s.submissions.assessmentId, assessment.id), eq(s.submissions.studentProfileId, studentId)))
         .orderBy(desc(s.submissions.attemptNumber)).limit(1).for("update");
+      if (!latest || latest.status === "assigned")
+        assertAssessmentAttemptAllowed(assessment.metadata, latest?.attemptNumber ?? 1);
       const mergeAttachments = (response: Record<string, unknown>): { response: Record<string, unknown>; already: boolean } => {
         const existing = Array.isArray(response.attachments)
           ? (response.attachments as unknown[]).filter((item): item is string => typeof item === "string")
@@ -200,16 +205,16 @@ export const attachDocumentToSubmission = createServerFn({ method: "POST" })
         return { response: { ...response, attachments: [...existing, document.id] }, already: false };
       };
       if (latest) {
-        // Submitted attempts still accept attachments: the submit flow overwrites
-        // response text wholesale, so the UI attaches right after submitting.
-        if (latest.status !== "assigned" && latest.status !== "submitted") {
-          throw new Error("This attempt can no longer accept attachments");
-        }
         const merged = mergeAttachments(latest.response);
+        // A retry for an already attached file is harmless; new evidence must
+        // be attached while the attempt is still a draft.
         if (merged.already) return { submissionId: latest.id, attached: true, alreadyAttached: true };
+        if (latest.status !== "assigned") {
+          throw new Error("Submitted attempts cannot accept new attachments");
+        }
         const [updated] = await tx.update(s.submissions)
           .set({ response: merged.response, updatedAt: new Date() })
-          .where(and(eq(s.submissions.id, latest.id), inArray(s.submissions.status, ["assigned", "submitted"])))
+          .where(and(eq(s.submissions.id, latest.id), eq(s.submissions.status, "assigned")))
           .returning({ id: s.submissions.id });
         if (!updated) throw new Error("Assignment changed in another tab; refresh before attaching");
         await writeAudit(tx, {

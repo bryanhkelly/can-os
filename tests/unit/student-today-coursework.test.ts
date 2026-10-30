@@ -31,6 +31,18 @@ describe("Student Today coursework currency", () => {
       submissionId: "sub-5", status: "submitted", timeliness: "on_time", dueAt: tomorrow, submittedAt: yesterday,
     }, dayStart)).toBe(true);
   });
+  it("keeps an overdue revision draft after the returned attempt becomes assigned", () => {
+    expect(isCurrentCoursework({
+      submissionId: "revision-draft", status: "assigned", timeliness: "on_time",
+      dueAt: lastWeek, submittedAt: null,
+    }, dayStart)).toBe(true);
+  });
+  it("keeps an undated draft until the student submits it", () => {
+    expect(isCurrentCoursework({
+      submissionId: "draft", status: "assigned", timeliness: "on_time",
+      dueAt: null, submittedAt: null,
+    }, dayStart)).toBe(true);
+  });
   it("drops stale submitted or graded work that needs nothing from the student", () => {
     expect(isCurrentCoursework({
       submissionId: "sub-6", status: "submitted", timeliness: "on_time", dueAt: lastWeek, submittedAt: lastWeek,

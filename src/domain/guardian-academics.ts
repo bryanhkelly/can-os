@@ -42,3 +42,14 @@ export function guardianAssignmentSummary(
   releasedGrades:assignments.filter(item=>item.score!==null).length,
  };
 }
+
+/** Links to already released attempt follow-ups, never draft grades or responses. */
+export function releasedGuardianAttempts(rows: readonly {
+ assessmentId: string; submissionId: string | null; attemptNumber: number | null;
+ submissionStatus: string | null;
+}[], assessmentId: string) {
+ return rows.filter(row=>row.assessmentId===assessmentId && row.submissionId &&
+   guardianFeedbackReleased(row.submissionStatus))
+  .sort((a,b)=>(b.attemptNumber??0)-(a.attemptNumber??0))
+  .map(row=>({submissionId:row.submissionId!,attemptNumber:row.attemptNumber??1}));
+}
