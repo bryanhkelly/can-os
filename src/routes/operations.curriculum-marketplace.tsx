@@ -147,7 +147,9 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
           </details>:<p className="mt-2 text-xs text-muted-foreground">Publisher course outline not yet available for review.</p>}
         </li>)}</ul>
        </details>
-       {pack.entitlement!=="active"?<>
+       {pack.entitlement && pack.entitlement!=="active"?
+        <p role="status" className="text-sm text-muted-foreground">License status: {pack.entitlement}. Publisher review is required to restore this organization's entitlement. Accepting terms again cannot reactivate it.</p>:
+        pack.entitlement!=="active"?<>
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={accepted[pack.id]??false}
          onChange={e=>setAccepted(old=>({...old,[pack.id]:e.target.checked}))}/>
          <span>I accept this pack's {pack.licenseCode} terms and understand that commercial or third-party rights require a verified agreement.</span>
@@ -158,6 +160,8 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
         <p className="text-sm font-medium">Release v{pack.version} adopted for {market.program.name}</p>:
         pack.adoption?.status==="active"?
         <p className="text-sm text-muted-foreground">Installed; a different release of this pack is already adopted. Upgrades must be reviewed to preserve class progress.</p>:
+        pack.adoption?
+        <p role="status" className="text-sm text-muted-foreground">Program adoption status: {pack.adoption.status}. An explicit adoption revision is required before this pack can be used again. Existing class version pins and local supplements are preserved.</p>:
         <section className="space-y-3 rounded border p-3" aria-label={"Review adoption for "+pack.name}>
          {adoptionReview!==pack.versionId?<button type="button" disabled={busy}
            className="rounded border px-3 py-2 text-sm" onClick={()=>setAdoptionReview(pack.versionId)}>Review adoption</button>:<>
