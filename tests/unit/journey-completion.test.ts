@@ -56,6 +56,14 @@ beforeEach(() => {
 });
 
 describe("Journey completion transactions", () => {
+  it("allows scoped school-owned program requirement completion", async () => {
+    select.mockReturnValueOnce(query([{ ...current, participantType: "program" }]))
+      .mockReturnValueOnce(query([]));
+    await expect(completeJourneyRequirement(context, "requirement", [{ fact: "confirmed" }], {
+      allowedCurrentStatuses: ["needs_you"],
+    })).resolves.toBe("ready");
+  });
+
   it("rejects program opening completion without an owner-specific workflow", async () => {
     select.mockReturnValueOnce(query([{ ...current, participantType: "program" }]));
     await expect(completeJourneyRequirement(context, "requirement")).rejects.toThrow("owner-specific workflow");
