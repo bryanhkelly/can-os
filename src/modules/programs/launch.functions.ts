@@ -386,6 +386,8 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
       const latestDecision = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_review");
       if (latestDecision && row.evidence.lastIndexOf(latestDecision) > row.evidence.lastIndexOf(latestSubmission))
         throw new Error("This evidence submission has already been reviewed");
+      if (data.decision === "accepted" && !data.reason.trim())
+        throw new Error("Institutional acceptance requires a recorded rationale");
       const now = new Date();
       const nextStatus = data.decision === "accepted" ? "complete" : row.status === "needs_can" ? "needs_can" : "needs_you";
       await tx.update(s.journeyRequirements).set({
