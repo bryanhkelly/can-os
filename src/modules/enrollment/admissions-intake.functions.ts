@@ -233,8 +233,9 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
       .innerJoin(applications,eq(applications.householdId,households.id))
       .innerJoin(programs,eq(programs.id,applications.programId))
       .where(and(
-        inArray(programs.id,actor.scope.programIds??[]),
         eq(programs.organizationId,program.organizationId),
+        ...(actor.scope.programIds ? [inArray(programs.id,actor.scope.programIds)] : []),
+        ...(actor.scope.siteIds ? [inArray(programs.siteId,actor.scope.siteIds)] : []),
         sql`lower(trim(${households.primaryEmail})) = ${normalizeAccessEmail(data.guardianEmail)}`,
       )).limit(1);
     if(priorHousehold)throw new Error(
