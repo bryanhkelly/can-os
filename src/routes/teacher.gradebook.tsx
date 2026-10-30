@@ -313,6 +313,16 @@ function TeacherGradebookPage() {
      <StatCard label="Assessments" value={gradebook.assessments.length}/>
      <StatCard label="Needs grading" value={gradebook.cells.filter(cell=>cell.status==="submitted").length}/>
     </div>
+    {!reviewCell&&reviewQueue.length>0&&<WorkspacePanel title="Submission queue" description="Choose student work to review or grade.">
+     <nav aria-label="Submission queue" className="grid max-h-96 gap-2 overflow-y-auto">
+      {reviewQueue.map(cell=><Link key={cell.submissionId} to="/teacher/gradebook"
+       search={{section:selected,assessment:cell.assessmentId,student:cell.studentProfileId}}
+       className="rounded-lg border p-3 text-sm hover:bg-muted">
+       <span className="block font-semibold">{gradebook.students.find(student=>student.studentProfileId===cell.studentProfileId)?.displayName??"Student"}</span>
+       <span className="mt-1 block text-xs text-muted-foreground">{gradebook.assessments.find(item=>item.id===cell.assessmentId)?.title??"Assessment"} · {cell.status}</span>
+      </Link>)}
+     </nav>
+    </WorkspacePanel>}
     {reviewCell&&reviewAssessment&&reviewStudent&&<div className="mt-6 grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
      <WorkspacePanel title="Submission queue" description="Select submitted or reviewed work.">
       <nav aria-label="Submission queue" className="grid max-h-96 gap-2 overflow-y-auto">{reviewQueue.map(cell=><Link key={cell.submissionId}
