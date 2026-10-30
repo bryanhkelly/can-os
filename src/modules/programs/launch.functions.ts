@@ -408,6 +408,13 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
           payload: { journeyId: row.journeyId },
         });
       }
+      if (data.decision === "accepted") {
+        await writeAudit(tx, context, {
+          action: "journey.requirement.complete", entityType: "journey_requirement", entityId: row.id,
+          scope: { organizationId: row.organizationId, siteId: row.siteId, programId: row.programId },
+          before: { status: row.status }, after: { status: "complete" },
+        });
+      }
       const incomplete = await tx.select({ id: s.journeyRequirements.id })
         .from(s.journeyRequirements).where(and(
           eq(s.journeyRequirements.journeyId, row.journeyId),
