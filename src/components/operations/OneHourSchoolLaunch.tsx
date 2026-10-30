@@ -337,7 +337,8 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
           search={{ siteId: launch.siteId ?? undefined, programId: launch.id }} className="underline">
           Prepare family intake
         </Link>}
-        <Link to="/messages" className="underline">Prepare family outreach</Link>
+        <a href="#invite-families" className="underline">Invite families to apply</a>
+        <Link to="/messages" className="underline">Other family communications</Link>
       </nav>
     </details>
   </section>;
