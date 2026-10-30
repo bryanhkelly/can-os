@@ -270,7 +270,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
     if(data.existingApplicationId){
      const [prior]=await tx.select({householdId:applications.householdId,
       metadata:applications.metadata,programId:applications.programId,
-      organizationId:programs.organizationId})
+      organizationId:programs.organizationId,siteId:programs.siteId})
       .from(applications).innerJoin(programs,eq(programs.id,applications.programId))
       .where(eq(applications.id,data.existingApplicationId)).limit(1);
      if(!prior||
