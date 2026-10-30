@@ -99,7 +99,9 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
   .innerJoin(programs,eq(programs.id,applications.programId))
   .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
   .innerJoin(people,eq(people.id,studentProfiles.personId))
-  .where(inArray(applications.programId,actor.scope.programIds!))
+  .where(and(inArray(programs.organizationId,actor.scope.organizationIds??[]),
+   ...(actor.scope.programIds ? [inArray(applications.programId,actor.scope.programIds)] : []),
+   ...(actor.scope.siteIds ? [inArray(programs.siteId,actor.scope.siteIds)] : [])))
   .orderBy(desc(applications.updatedAt)).limit(300);
  const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  const contactIds=[...new Set(rows.map(r=>applicationGuardianContact(r.metadata,r.submittedByPersonId))
