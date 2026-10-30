@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { familyInvitationProgress, familyInvitationRetryLabel } from "@/domain/family-invitation-progress";
 import { useRouter } from "@tanstack/react-router";
 import { familyInvitationLaunchScope } from "@/domain/family-invitation-launch-scope";
 import { parseFamilyContacts } from "@/domain/family-contact-import";
@@ -11,11 +12,11 @@ import {
   sendFamilyInvitations,
 } from "@/modules/enrollment/family-invitations.functions";
 
-function recipientStatus(status: FamilyInvitationWorkspace["batches"][number]["recipients"][number]["status"]) {
+function recipientStatus(status: FamilyInvitationWorkspace["batches"][number]["recipients"][number]["status"], outboxStatus: FamilyInvitationWorkspace["batches"][number]["outboxStatus"]) {
   switch (status) {
     case "responded": return "Application opened";
     case "provider_accepted": return "Provider accepted · inbox delivery not verified";
-    case "retrying": return "Retry needed";
+    case "retrying": return familyInvitationRetryLabel(outboxStatus);
     case "queued": return "Queued";
   }
 }
@@ -191,21 +192,22 @@ export function FamilyInviteImporter({
       <h3 className="font-serif text-xl">Invitation responses</h3>
       <p className="mt-1 text-xs text-muted-foreground">Provider acceptance is not inbox delivery. A response is recorded only when the recipient redeems the verified application link.</p>
       <div className="mt-3 space-y-3">{batches.map(batch => {
-        const retryable = batch.recipients.filter(recipient => recipient.status === "retrying").length;
+        const progress = familyInvitationProgress(batch);
         return <details key={batch.id} className="rounded-xl border p-4">
         <summary className="cursor-pointer text-sm font-semibold">{batch.subject} · {batch.programName} · {batch.recipients.length} recipients</summary>
-        <p className="mt-2 text-xs text-muted-foreground">Queued {new Date(batch.createdAt).toLocaleString()} · {batch.outboxStatus === "failed" ? "Automatic retries exhausted; operations alerted." : batch.status === "complete" ? "All recipients accepted by the provider." : "Outbox processing or retrying."}</p>
-        {retryable > 0 && <button type="button" disabled={busy} onClick={() => void retryFailed(batch.id)}
+        <p className="mt-2 text-xs text-muted-foreground">Queued {new Date(batch.createdAt).toLocaleString()} · {progress.label}</p>
+        {progress.canRetry && <button type="button" disabled={busy} onClick={() => void retryFailed(batch.id)}
           className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">
-          {busy ? "Queueing retry…" : `Retry ${retryable} failed recipient${retryable === 1 ? "" : "s"}`}
+          {busy ? "Queueing retry…" : `Retry ${progress.failedRecipients} failed recipient${progress.failedRecipients === 1 ? "" : "s"}`}
         </button>}
         <ul className="mt-3 space-y-2">{batch.recipients.map(recipient => <li key={recipient.email} className="flex flex-col gap-1 border-b pb-2 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="break-words">{[recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || "Name not supplied"} · {recipient.email}</span>
-          <span className="text-xs text-muted-foreground">{recipientStatus(recipient.status)}{recipient.respondedAt ? ` · ${new Date(recipient.respondedAt).toLocaleString()}` : ""}</span>
+          <span className="text-xs text-muted-foreground">{recipientStatus(recipient.status, batch.outboxStatus)}{recipient.respondedAt ? ` · ${new Date(recipient.respondedAt).toLocaleString()}` : ""}</span>
         </li>)}</ul>
       </details>;
       })}</div>
     </div>}
   </section>;
 }
+
 
