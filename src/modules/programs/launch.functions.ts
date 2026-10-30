@@ -168,8 +168,11 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
         and(
           inArray(s.programs.organizationId, organizationIds),
           inArray(s.programs.status, ["draft", "launching", "ready"]),
-          inArray(s.programs.id,context.scope.programIds??[]),
-          ...(context.scope.siteIds?.length?[inArray(s.programs.siteId,context.scope.siteIds)]:[]),
+          ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
+          ...(context.grantSiteId !== null && context.scope.programIds?.length
+            ? [inArray(s.programs.id, context.scope.programIds)] : []),
+          ...(context.scope.siteIds?.length
+            ? [inArray(s.programs.siteId, context.scope.siteIds)] : []),
         ),
       )
       .orderBy(asc(s.programs.createdAt));
@@ -328,14 +331,19 @@ export const getLaunchEntry = createServerFn({ method: "GET" })
     const [{ db }, s, { and, eq, inArray }] = await Promise.all([
       import("@/db/client"), import("@/db/schema"), import("drizzle-orm"),
     ]);
-    const records = context.scope.programIds?.length
-      ? await db.select({ id: s.programs.id, siteId: s.programs.siteId, status: s.programs.status })
-        .from(s.programs).where(and(
-          inArray(s.programs.id, context.scope.programIds),
-          inArray(s.programs.organizationId, options.organizations.map(org => org.id)),
-          ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
-        ))
-      : [];
+    // Organization-wide registrars can legitimately have no enumerated Program IDs.
+    // Discover existing Programs through the verified organization/Site grant, not
+    // through an optional list that would falsely signal a first-time launch.
+    const records = await db.select({
+      id: s.programs.id, siteId: s.programs.siteId, status: s.programs.status,
+    }).from(s.programs).where(and(
+      inArray(s.programs.organizationId, options.organizations.map(org => org.id)),
+      ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
+      ...(context.grantSiteId !== null && context.scope.programIds?.length
+        ? [inArray(s.programs.id, context.scope.programIds)] : []),
+      ...(context.scope.siteIds?.length
+        ? [inArray(s.programs.siteId, context.scope.siteIds)] : []),
+    ));
     return launchEntrySelection({ programs: records, sites: options.sites, selection: data });
   });
 
