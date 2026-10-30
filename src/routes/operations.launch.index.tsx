@@ -239,6 +239,13 @@ function LaunchWizardPage() {
         )}
         <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
 
+        {launches.launches.length>0&&<nav aria-label="Family enrollment handoff" className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
+          <span className="text-sm font-semibold">After inviting families</span>
+          <Link to="/admissions/intake" search={{siteId:selection.siteId,programId:selection.programId}}
+            className="text-sm font-semibold underline">Review inquiries and applications</Link>
+          <Link to="/admissions" search={{siteId:selection.siteId,programId:selection.programId,application:undefined}}
+            className="text-sm font-semibold underline">Manage offers and enrollment</Link>
+        </nav>}
         {launches.launches.length>0&&<details open className="mt-5 rounded-xl border bg-card p-5">
           <summary className="cursor-pointer text-sm font-semibold">Family invitations and outreach progress</summary>
           <FamilyInviteImporter key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} workspace={familyInvitations} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
