@@ -34,6 +34,7 @@ beforeEach(()=>{
   [{configuration:{entries:[{label:"A",minPercent:90,maxPercent:100}]}}],
   [{id:"assessment",pointsPossible:"10"}],
   [{assessmentId:"assessment",studentProfileId:"already-finalized",attemptNumber:1,score:"10"}],
+  [], // Correlated newer-attempt query builder.
   [{id:"grade",studentProfileId:"already-finalized",status:"finalized"}],
  ];
 });

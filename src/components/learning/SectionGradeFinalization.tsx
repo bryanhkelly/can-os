@@ -118,8 +118,8 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
   return <section aria-label="Grading period finalization" className="mt-8 rounded-xl border bg-card p-5">
     <h2 className="text-lg font-semibold">Close grading period / finalize grades</h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      Finalizing a grading period computes each enrolled student&apos;s percentage from their latest graded
-      submission for every published or closed assessment due inside the period window, converts it to a letter
+      Finalizing a grading period computes each enrolled student&apos;s percentage from their latest submission, when graded,
+      for each published or closed assessment due inside the period window, converts it to a letter
       grade with the school&apos;s active grade scale, and publishes the result to report cards and transcripts.
       Students with no graded work in the window are skipped. Finalized grades are immutable: re-running
       finalization never recomputes them, and later changes go through a recorded correction instead.

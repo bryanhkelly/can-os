@@ -3,6 +3,7 @@ assertCapability,
 AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
+import { latestSubmissionCondition } from "./latest-submission.server";
 import { currentSectionStudentIds } from "./current-section-enrollment.server";
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -193,7 +194,7 @@ export type FinalizedGradeRow = Awaited<ReturnType<typeof finalizedGradeRows>>[n
 
 /**
  * Teacher finalizes grades for one of their sections in a grading period.
- * Percentage is computed from each student's latest graded submission per
+ * Percentage is computed from each student's latest submission, when graded, per
  * published/closed assessment due inside the grading-period window; students
  * with no graded work are skipped. Already-finalized rows are immutable and
  * skipped, making re-runs idempotent.
@@ -313,23 +314,20 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           and(
             inArray(s.submissions.assessmentId, assessmentIds),
             inArray(s.submissions.studentProfileId, studentIds),
+            latestSubmissionCondition(tx),
             eq(s.submissions.status, "graded"),
             isNotNull(s.submissions.score),
           ),
         )
         .orderBy(desc(s.submissions.attemptNumber));
 
-      // Latest graded attempt per assessment/student.
-      const latest = new Map<string, (typeof graded)[number]>();
-      for (const row of graded) {
-        const key = `${row.assessmentId}:${row.studentProfileId}`;
-        if (!latest.has(key)) latest.set(key, row);
-      }
+      // The query chooses the latest attempt across ALL statuses before
+      // accepting a grade. Older evidence stays in history, never in this total.
       const pointsByAssessment = new Map(
         assessmentsInWindow.map((row) => [row.id, Number(row.pointsPossible ?? 0)]),
       );
       const totals = new Map<string, { earned: number; possible: number }>();
-      for (const row of latest.values()) {
+      for (const row of graded) {
         const possible = pointsByAssessment.get(row.assessmentId) ?? 0;
         if (possible <= 0) continue;
         const total = totals.get(row.studentProfileId) ?? { earned: 0, possible: 0 };
