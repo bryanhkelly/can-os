@@ -1,3 +1,4 @@
+import { launchOpeningDate } from "@/domain/launch-opening-date";
 import { db } from "@/db/client";
 import { academicCalendarDays,academicCalendars,gradeScales,gradingPeriods,organizations,programs,scheduleTemplatePeriods,scheduleTemplates,schoolYears,sites,terms } from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
@@ -65,9 +66,12 @@ export const getSchoolYearStudio = createServerFn({method:"GET"}).handler(async 
   return {...y,terms:termRows.map(t=>({...t,periods:periods.filter(p=>p.termId===t.id)})),
    calendars:calendarRows.map(cal=>({...cal,days:dayRows.filter(d=>d.academicCalendarId===cal.id)})),schedules:scheduleRows.map(s=>({...s,periods:schedulePeriods.filter(p=>p.scheduleTemplateId===s.id)}))};
  }));
- const programRows = actor.scope.programIds?.length ? await db.select({id:programs.id,name:programs.name,siteId:programs.siteId,organizationId:programs.organizationId})
+ const programRows = actor.scope.programIds?.length ? await db.select({id:programs.id,name:programs.name,siteId:programs.siteId,organizationId:programs.organizationId,metadata:programs.metadata})
   .from(programs).where(inArray(programs.id,actor.scope.programIds)) : [];
- return {sites:siteRows,years,gradeScales:scaleRows,programs:programRows};
+ return {sites:siteRows,years,gradeScales:scaleRows,programs:programRows.map(({metadata,...program})=>{
+  const targetOpeningDate=launchOpeningDate(metadata);
+  return {...program,...(targetOpeningDate?{targetOpeningDate}:{})};
+ })};
 });
 export const createStudioGradeScale=createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({organizationId:uuid,name:z.string().trim().min(2).max(80)}).parse(v))
@@ -267,3 +271,4 @@ export const populateStudioInstructionalDays=createServerFn({method:"POST"})
    return {processedDays:rows.length};
   });
  });
+

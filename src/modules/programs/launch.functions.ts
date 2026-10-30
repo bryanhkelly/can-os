@@ -11,6 +11,9 @@ import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { activateProgram,createProgramOrientation,startProgramLaunch } from "./program-launch-service";
 import { listOpeningOperators } from "./opening-handoff.server";
 
+import { isLaunchOpeningDate, launchOpeningDate } from "@/domain/launch-opening-date";
+import { launchEntrySelection } from "@/domain/launch-entry";
+
 const uuid = z.string().uuid();
 
 const startLaunchInput = z.object({
@@ -41,6 +44,7 @@ const startLaunchInput = z.object({
   creditIssuingOrganizationId: uuid.optional(),
   creditMode: z.enum(["credit_bearing", "non_credit"]).optional(),
   siteId: uuid.optional(),
+  targetOpeningDate: z.string().refine(isLaunchOpeningDate, "Choose a valid target opening date").optional(),
 });
 
 async function registrarContext(capability: string) {
@@ -152,6 +156,7 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
         organizationId: s.programs.organizationId,
         siteId: s.programs.siteId,
         siteTimezone: s.sites.timezone,
+        metadata: s.programs.metadata,
         publicSiteSlug: s.sitePublications.slug,
         publicSiteStatus: s.sitePublications.status,
         createdAt: s.programs.createdAt,
@@ -163,8 +168,11 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
         and(
           inArray(s.programs.organizationId, organizationIds),
           inArray(s.programs.status, ["draft", "launching", "ready"]),
-          inArray(s.programs.id,context.scope.programIds??[]),
-          ...(context.scope.siteIds?.length?[inArray(s.programs.siteId,context.scope.siteIds)]:[]),
+          ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
+          ...(context.grantSiteId !== null && context.scope.programIds?.length
+            ? [inArray(s.programs.id, context.scope.programIds)] : []),
+          ...(context.scope.siteIds?.length
+            ? [inArray(s.programs.siteId, context.scope.siteIds)] : []),
         ),
       )
       .orderBy(asc(s.programs.createdAt));
@@ -193,8 +201,11 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
               .where(eq(s.journeyRequirements.journeyId, journey.id))
               .orderBy(asc(s.journeyRequirements.createdAt))
           : [];
+        const { metadata, ...record } = program;
+        const targetOpeningDate = launchOpeningDate(metadata);
         return {
-          ...program,
+          ...record,
+          ...(targetOpeningDate ? { targetOpeningDate } : {}),
           createdAt: program.createdAt.toISOString(),
           // Re-read canonical Site publication state on every launch reload.
           publicSite: program.publicSiteSlug && isPublicSiteSlug(program.publicSiteSlug)
@@ -306,3 +317,34 @@ export const scheduleLaunchOrientation=createServerFn({method:"POST"})
    startsAt:start,endsAt:end,timezone:site?.timezone??data.timezone});
   return {eventId};
  });
+
+/** Read-only landing decision. Uses the same verified registrar/capability
+ * boundary as starting a launch; it never creates or completes records. */
+export const getLaunchEntry = createServerFn({ method: "GET" })
+  .validator((value: unknown) => z.object({
+    siteId: uuid.optional(), programId: uuid.optional(),
+  }).strict().parse(value))
+  .handler(async ({ data }) => {
+    const context = await registrarContext("program.launch.start");
+    const options = await listLaunchOptions();
+    if (!options.organizations.length) return null;
+    const [{ db }, s, { and, eq, inArray }] = await Promise.all([
+      import("@/db/client"), import("@/db/schema"), import("drizzle-orm"),
+    ]);
+    // Organization-wide registrars can legitimately have no enumerated Program IDs.
+    // Discover existing Programs through the verified organization/Site grant, not
+    // through an optional list that would falsely signal a first-time launch.
+    const records = await db.select({
+      id: s.programs.id, siteId: s.programs.siteId, status: s.programs.status,
+    }).from(s.programs).where(and(
+      inArray(s.programs.organizationId, options.organizations.map(org => org.id)),
+      ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
+      ...(context.grantSiteId !== null && context.scope.programIds?.length
+        ? [inArray(s.programs.id, context.scope.programIds)] : []),
+      ...(context.scope.siteIds?.length
+        ? [inArray(s.programs.siteId, context.scope.siteIds)] : []),
+    ));
+    return launchEntrySelection({ programs: records, sites: options.sites, selection: data });
+  });
+
+

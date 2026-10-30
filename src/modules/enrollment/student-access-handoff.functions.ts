@@ -9,6 +9,7 @@ import {
  studentProfiles, terms,
 } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { familyApplicationSchoolYearId } from "@/domain/family-application-handoff";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { staffedPublishedSectionIds } from "./instructional-section-readiness.server";
@@ -32,19 +33,22 @@ async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.tran
  const [app]=await tx.select({
   id:applications.id,programId:applications.programId,
   studentProfileId:applications.studentProfileId,stage:applications.stage,
+  applicationMetadata:applications.metadata,programStatus:programs.status,
   studentPersonId:studentProfiles.personId,
   siteId:programs.siteId,organizationId:programs.organizationId,
  }).from(applications)
   .innerJoin(programs,eq(programs.id,applications.programId))
   .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
   .where(eq(applications.id,applicationId)).limit(1);
- if(!app?.siteId||app.stage!=="accepted")
-  throw new AuthorizationError("accepted school application and active host Site");
+ if(!app?.siteId||app.stage!=="accepted"||app.programStatus!=="active")
+  throw new AuthorizationError("accepted school application and active school Program/Site");
+ const intendedYear=familyApplicationSchoolYearId(app.applicationMetadata);
  const active=await tx.select({schoolYearId:enrollments.schoolYearId})
   .from(enrollments).where(and(
    eq(enrollments.studentProfileId,app.studentProfileId),
    eq(enrollments.programId,app.programId),
    eq(enrollments.kind,"program"),eq(enrollments.status,"active"),
+   ...(intendedYear?[eq(enrollments.schoolYearId,intendedYear)]:[]),
   ));
  if(!active.length)throw new AuthorizationError("active accepted student enrollment");
  const sectionRows=await tx.select({
@@ -72,6 +76,7 @@ async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.tran
   row.sectionProgramId===app.programId &&
   row.sectionSiteId===app.siteId &&
   row.enrollmentYearId===row.sectionYearId &&
+  (!intendedYear||row.sectionYearId===intendedYear) &&
   active.some(a=>a.schoolYearId===row.sectionYearId))
   .map(row=>row.id);
  const ready=await staffedPublishedSectionIds(validIds,tx);
@@ -267,6 +272,16 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
   });
   // Email is never sent inside an open DB transaction. On delivery failure
   // the approved grant remains retryable through normal passwordless sign-in.
-  await requestOneTimeAccess(email);
-  return {status:"approved" as const};
+  try {
+    await requestOneTimeAccess(email);
+    // The passwordless API intentionally returns a generic acceptance result;
+    // it may enforce cooldowns. Never claim provider or inbox delivery here.
+    return {status:"approved" as const,signInRequest:"requested" as const};
+  } catch {
+    // The approval transaction already committed. Preserve that outcome so
+    // the registrar can retry the link without repeating identity approval.
+    return {status:"approved" as const,signInRequest:"failed" as const};
+  }
  });
+
+

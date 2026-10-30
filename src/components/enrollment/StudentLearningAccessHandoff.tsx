@@ -12,6 +12,15 @@ type ViewRole="guardian"|"registrar";
 export function StudentLearningAccessHandoff({
  applicationId,role,
 }:{applicationId:string;role:ViewRole}){
+ // A different application or role gets a fresh state owner. Late mutation
+ // responses from the unmounted handoff cannot update the next child's view.
+ return <ApplicationLearningAccessHandoff key={`${role}:${applicationId}`}
+  applicationId={applicationId} role={role}/>;
+}
+
+function ApplicationLearningAccessHandoff({
+ applicationId,role,
+}:{applicationId:string;role:ViewRole}){
  const [status,setStatus]=useState("loading");
  const [email,setEmail]=useState("");
  const [busy,setBusy]=useState(false);
@@ -46,13 +55,18 @@ export function StudentLearningAccessHandoff({
     setStatus("pending_review");
     setNotice("Student account request signed. Admissions must independently verify the identity and approve the invitation.");
    }else{
-    await provisionStudentLearningAccess({data:{
+    const result=await provisionStudentLearningAccess({data:{
       applicationId,
       ...(status==="pending_review"&&independentReviewConfirmed
         ?{confirmedIndependentIdentity:true as const,reviewMethod}:{}),
     }});
     setStatus("approved");
-    setNotice("Student access approved. A short-lived sign-in link was requested for the verified email address.");
+    setNotice("Student access approval is saved.");
+    if(result.signInRequest==="failed"){
+      setError("The sign-in link could not be requested. Wait at least a minute, then request it again below. Approval does not need to be repeated.");
+    }else{
+      setNotice("Student access approval is saved. A sign-in link was requested; email delivery is not verified.");
+    }
    }
   }catch(e){setError(e instanceof Error?e.message:"Student access handoff could not be completed");}
   finally{setBusy(false);}
@@ -115,7 +129,7 @@ export function StudentLearningAccessHandoff({
       separate short-lived email link, then opens their assigned classes.</p>
      {role==="registrar"&&<button disabled={busy}
        className="rounded border px-3 py-2 font-semibold disabled:opacity-50">
-       {busy?"Sending…":"Resend student sign-in link"}
+       {busy?"Requesting…":"Request student sign-in link again"}
      </button>}
     </>:<p>School enrollment and classroom access must be ready before an account
       invitation can be sent.</p>}
@@ -124,3 +138,4 @@ export function StudentLearningAccessHandoff({
   {error&&<p role="alert" className="mt-2">{error}</p>}
  </section>;
 }
+

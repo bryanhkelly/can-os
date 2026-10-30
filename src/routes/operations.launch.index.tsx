@@ -4,6 +4,8 @@ import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
 import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
+import { suggestedLaunchInstitutions } from "@/domain/launch-institution-defaults";
+import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
@@ -64,6 +66,7 @@ function LaunchWizardPage() {
   const [summerCreditBearing, setSummerCreditBearing] = useState(false);
   const creditMode = type === "summer_program" && summerCreditBearing ? "credit_bearing" : isExtendedLearningType(type) ? "non_credit" : "credit_bearing";
   const [name, setName] = useState("");
+  const [targetOpeningDate, setTargetOpeningDate] = useState(() => suggestedSchoolYear().startsOn);
   const [slug, setSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
   const [gradeMin, setGradeMin] = useState("K");
@@ -105,16 +108,36 @@ function LaunchWizardPage() {
   // leader to find records the system already knows. Selections stay editable.
   useEffect(() => {
     if (!options) return;
+    const selectedSite = options.sites.find(site => site.id === siteId);
+    if (!hostOrganizationId && selectedSite) {
+      setHostOrganizationId(selectedSite.organizationId);
+      return;
+    }
     const [onlyOrganization] = options.organizations;
     if (!hostOrganizationId && options.organizations.length === 1 && onlyOrganization) {
       setHostOrganizationId(onlyOrganization.id);
     }
-  }, [options, hostOrganizationId]);
+  }, [options, hostOrganizationId, siteId]);
   useEffect(() => {
     const [onlySite] = hostSites;
     if (siteId || !hostOrganizationId) return;
     if (hostSites.length === 1 && onlySite) setSiteId(onlySite.id);
   }, [hostSites, hostOrganizationId, siteId]);
+
+  useEffect(() => {
+    if (!options) return;
+    const suggested = suggestedLaunchInstitutions({
+      type, creditMode, providers: options.academicProviderOrganizations,
+      issuers: options.creditIssuingOrganizations,
+      selectedProviderId: academicProviderOrganizationId,
+    });
+    if (!academicProviderOrganizationId && suggested.providerId)
+      setAcademicProviderOrganizationId(suggested.providerId);
+    if (!creditIssuingOrganizationId && suggested.issuerId)
+      setCreditIssuingOrganizationId(suggested.issuerId);
+    if (!jurisdictionId && options.jurisdictions.length === 1)
+      setJurisdictionId(options.jurisdictions[0]!.id);
+  }, [options, type, creditMode, academicProviderOrganizationId, creditIssuingOrganizationId, jurisdictionId]);
 
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
@@ -125,6 +148,7 @@ function LaunchWizardPage() {
       const result = await startLaunch({
         data: {
           name,
+          targetOpeningDate,
           slug,
           type,
           gradeRange: { min: gradeMin, max: gradeMax },
@@ -213,11 +237,11 @@ function LaunchWizardPage() {
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
-        <OneHourSchoolLaunch launches={launches.launches} selectedProgramId={selection.programId}/>
+        <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
 
         {launches.launches.length>0&&<details className="mt-5 rounded-xl border bg-card p-5">
           <summary className="cursor-pointer text-sm font-semibold">Optional · Family outreach</summary>
-          <FamilyInviteImporter workspace={familyInvitations} selectedProgramId={selection.programId}/>
+          <FamilyInviteImporter key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} workspace={familyInvitations} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
         </details>}
 
         <details className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Advanced · Launch portfolio and detailed records</summary>
@@ -318,6 +342,12 @@ function LaunchWizardPage() {
                       setName(value);
                       if (!slugEdited) setSlug(suggestedLaunchSlug(value));
                     }} required maxLength={200} />
+                  </label>
+                  <label className="block text-xs">
+                    Target opening date
+                    <input aria-label="Target opening date" type="date" required value={targetOpeningDate}
+                      onChange={event => setTargetOpeningDate(event.target.value)} className={inputClass}/>
+                    <span className="mt-1 block text-muted-foreground">Planning only. Your school still needs independent opening approval.</span>
                   </label>
                   <label className="block text-xs">
                     Slug
@@ -487,3 +517,5 @@ function LaunchWizardPage() {
     </WorkspaceShell>
   );
 }
+
+
