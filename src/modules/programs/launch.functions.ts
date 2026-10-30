@@ -267,13 +267,17 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
         journeyStatus: s.journeys.status,
         participantType: s.journeys.participantType,
         programId: s.journeys.programId,
+        organizationId: s.journeys.organizationId,
+        siteId: s.journeys.siteId,
       }).from(s.journeyRequirements)
         .innerJoin(s.journeys, eq(s.journeys.id, s.journeyRequirements.journeyId))
         .where(eq(s.journeyRequirements.id, data.journeyRequirementId))
         .for("update").limit(1);
       if (!row || row.participantType !== "program" || !row.programId)
         throw new Error("Program launch requirement not found");
-      if (!context.scope.programIds?.includes(row.programId))
+      if (!context.scope.organizationIds?.includes(row.organizationId ?? "") ||
+          (context.scope.programIds && !context.scope.programIds.includes(row.programId)) ||
+          (context.scope.siteIds && (!row.siteId || !context.scope.siteIds.includes(row.siteId))))
         throw new AuthorizationError("program launch evidence scope");
       if (row.status === "complete" || ["active", "complete", "cancelled"].includes(row.journeyStatus))
         throw new Error("This launch requirement is closed to evidence submissions");
