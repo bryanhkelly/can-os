@@ -113,6 +113,7 @@ function InstitutionalEvidenceReview({ task, busy, review }: {
     <p className="text-sm font-semibold">CAN institutional evidence review</p>
     <p className="mt-2 text-xs text-muted-foreground">Approval completes this requirement, but does not independently authorize opening.</p>
     {task.latestEvidenceStatement && <blockquote className="mt-3 whitespace-pre-wrap rounded-lg border p-3 text-sm">{task.latestEvidenceStatement}</blockquote>}
+    {task.latestEvidenceStatementAt && <p className="mt-2 text-xs text-muted-foreground">Submitted: {task.latestEvidenceStatementAt}</p>}
     <label className="mt-3 block text-sm">Decision
       <select value={decision} onChange={event => setDecision(event.target.value as "accepted" | "rejected")}
         className="mt-1 block w-full rounded-lg border bg-card p-2">
