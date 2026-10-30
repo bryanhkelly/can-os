@@ -425,7 +425,7 @@ export const manageAssessment = createServerFn({method:"POST"})
    const [assessment]=await tx.select({
     id:s.assessments.id,sectionId:s.assessments.sectionId,
     status:s.assessments.status,dueAt:s.assessments.dueAt,
-    availableAt:s.assessments.availableAt,siteId:s.sections.siteId,
+    availableAt:s.assessments.availableAt,closesAt:s.assessments.closesAt,siteId:s.sections.siteId,
     programId:s.sections.programId,schoolYearId:s.terms.schoolYearId
    }).from(s.assessments)
     .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
@@ -447,14 +447,17 @@ export const manageAssessment = createServerFn({method:"POST"})
    const dueAt=data.dueAt?new Date(data.dueAt):assessment.dueAt;
    if((data.action==="publish"||data.action==="reschedule")&&(!dueAt||dueAt<=now))
     throw new Error("A future due date is required");
-   if(data.action==="reopen"&&(!dueAt||dueAt<=now))
-    throw new Error("Set a future due date before reopening this closed assessment");
    const status=data.action==="publish"||data.action==="reopen"?"published":
     data.action==="close"?"closed":assessment.status;
+   const availableAt=data.action==="publish"||
+    (data.action==="reopen"&&(!assessment.availableAt||assessment.availableAt>now))
+     ?now:assessment.availableAt;
+   const closesAt=data.action==="reopen"?null:assessment.closesAt;
    const [updated]=await tx.update(s.assessments).set({
     status,
     ...(data.action==="publish"||data.action==="reschedule"||(data.action==="reopen"&&data.dueAt)?{dueAt}:{}),
-    ...(data.action==="publish"?{availableAt:now}:{}),
+    ...(data.action==="publish"?{availableAt}:{}),
+    ...(data.action==="reopen"?{availableAt,closesAt}:{}),
     updatedAt:now
    }).where(and(eq(s.assessments.id,assessment.id),eq(s.assessments.status,assessment.status)))
     .returning({id:s.assessments.id});
@@ -499,8 +502,10 @@ export const manageAssessment = createServerFn({method:"POST"})
     actorPersonId:context.actorPersonId,
     action:"assessment."+data.action,resourceType:"assessment",resourceId:assessment.id,
     scope:{siteId:assessment.siteId,programId:assessment.programId,sectionId:assessment.sectionId},
-    before:{status:assessment.status,dueAt:assessment.dueAt?.toISOString()??null},
-    after:{status,dueAt:dueAt?.toISOString()??null,assignedCount},
+    before:{status:assessment.status,dueAt:assessment.dueAt?.toISOString()??null,
+     availableAt:assessment.availableAt?.toISOString()??null,closesAt:assessment.closesAt?.toISOString()??null},
+    after:{status,dueAt:dueAt?.toISOString()??null,assignedCount,
+     availableAt:availableAt?.toISOString()??null,closesAt:closesAt?.toISOString()??null},
     context:{accountId:context.accountId,sessionId:context.sessionId}
    });
    return {assessmentId:assessment.id,status,assignedCount};
