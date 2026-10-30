@@ -474,7 +474,7 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
    const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
     .from(programs).where(eq(programs.id,app.programId)).limit(1);
    if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
-    (actor.scope.siteIds?.length&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))
+    (actor.scope.siteIds!==undefined&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))
     throw new AuthorizationError("guardian membership scope");
    assertRecordWriteAllowed(app.metadata,"registrar");
    const contactId=applicationGuardianContact(app.metadata,app.submittedByPersonId);
