@@ -73,8 +73,9 @@ async function existingStudentChoices(database:Pick<Database,"selectDistinct">,
   .innerJoin(intakeGuardian,eq(intakeGuardian.id,guardianRelationships.guardianPersonId))
   .leftJoin(householdMemberships,eq(householdMemberships.personId,people.id))
   .leftJoin(guardianHousehold,eq(guardianHousehold.personId,intakeGuardian.id))
-  .where(and(inArray(programs.id,actor.scope.programIds!),inArray(programs.organizationId,actor.scope.organizationIds??[]),
-   or(isNull(programs.siteId),inArray(programs.siteId,actor.scope.siteIds??[])),
+  .where(and(inArray(programs.organizationId,actor.scope.organizationIds??[]),
+   ...(actor.scope.programIds ? [inArray(programs.id,actor.scope.programIds)] : []),
+   ...(actor.scope.siteIds ? [or(isNull(programs.siteId),inArray(programs.siteId,actor.scope.siteIds))] : []),
    eq(people.active,true),eq(intakeGuardian.active,true),
    or(eq(householdMemberships.householdId,guardianHousehold.householdId),
     and(isNull(householdMemberships.id),isNull(guardianHousehold.id))),
