@@ -111,7 +111,8 @@ function InstitutionalEvidenceReview({ task, busy, review }: {
     void review(task.requirementId!, decision, reason).then(saved => { if (saved) setReason(""); });
   }}>
     <p className="text-sm font-semibold">CAN institutional evidence review</p>
-    <p className="mt-2 text-xs text-muted-foreground">Review the submitted evidence in the canonical record before deciding. Approval completes this requirement, but does not independently authorize opening.</p>
+    <p className="mt-2 text-xs text-muted-foreground">Approval completes this requirement, but does not independently authorize opening.</p>
+    {task.latestEvidenceStatement && <blockquote className="mt-3 whitespace-pre-wrap rounded-lg border p-3 text-sm">{task.latestEvidenceStatement}</blockquote>}
     <label className="mt-3 block text-sm">Decision
       <select value={decision} onChange={event => setDecision(event.target.value as "accepted" | "rejected")}
         className="mt-1 block w-full rounded-lg border bg-card p-2">
