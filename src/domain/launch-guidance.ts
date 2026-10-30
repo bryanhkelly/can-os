@@ -15,6 +15,9 @@ export type LaunchGuidanceRecord = {
     title: string;
     status: string;
     blocking: boolean;
+    ownerPersonId?: string | null;
+    evidence?: Record<string, unknown>[];
+    metadata?: Record<string, unknown>;
   }>;
 };
 
@@ -25,6 +28,9 @@ export type LaunchGuidanceTask = {
   state: LaunchRequirementState;
   blocking: boolean;
   requirementId?: string;
+  ownerPersonId?: string | null;
+  evidenceCount?: number;
+  requiresRegistrarReview?: boolean;
   action: "academics" | "admissions" | "orientation" | "opening" | "review" | "none";
 };
 
@@ -63,6 +69,10 @@ export function buildLaunchGuidance(launch: LaunchGuidanceRecord) {
   const requirements = launch.requirements.map(requirement => ({
     id: `requirement:${requirement.id}`,
     requirementId: requirement.id,
+    ownerPersonId: requirement.ownerPersonId,
+    evidenceCount: requirement.evidence?.length ?? 0,
+    requiresRegistrarReview: requirement.metadata?.enrollmentForm !== undefined ||
+      requirement.evidence?.some(item => item.kind === "document_review") === true,
     title: requirement.title,
     description: requirement.blocking
       ? "Required before opening. Complete the underlying work; a checklist response is not independent approval."
