@@ -326,7 +326,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     </p>}
 
     <details className="mt-5 rounded-xl border bg-background p-4">
-      <summary className="cursor-pointer text-sm font-semibold">View the full saved launch path</summary>
+      <summary className="cursor-pointer text-sm font-semibold">View the full saved launch path ({guidance.pendingBlocking.length} opening blockers, {guidance.pending.length} outstanding requirements)</summary>
       <ol className="mt-4 space-y-3">
         {guidance.tasks.map((task, index) => <li key={task.id} className="flex items-start justify-between gap-3 rounded-lg border p-3">
           <div>
