@@ -469,7 +469,7 @@ export const provisionInquiryGuardianAccount=createServerFn({method:"POST"})
     id:applications.id,programId:applications.programId,studentProfileId:applications.studentProfileId,metadata:applications.metadata,
     submittedByPersonId:applications.submittedByPersonId,
    }).from(applications).where(eq(applications.id,data.applicationId)).limit(1);
-   if(!app||!actor.scope.programIds?.includes(app.programId))
+   if(!app||(actor.scope.programIds!==undefined&&!actor.scope.programIds.includes(app.programId)))
     throw new AuthorizationError("admissions guardian provisioning");
    const [program]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
     .from(programs).where(eq(programs.id,app.programId)).limit(1);
