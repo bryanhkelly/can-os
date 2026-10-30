@@ -1,5 +1,6 @@
 import { FamilyInviteImporter } from "@/components/operations/FamilyInviteImporter";
 import { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
+import { listAdmissionsIntake } from "@/modules/enrollment/admissions-intake.functions";
 import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
@@ -28,12 +29,13 @@ export const Route = createFileRoute("/operations/launch/")({
         options: await listLaunchOptions(),
         launches: await listLaunches(),
         familyInvitations: await listFamilyInvitations().catch(() => null),
+        admissions: await listAdmissionsIntake().catch(() => null),
         // A pending migration for extended programs must not prevent core school launch.
         extendedPlanning: await listExtendedSeasonPlanning().catch(() => null),
         authError: "",
       };
     } catch {
-      return { options: null, launches: null, familyInvitations: null, extendedPlanning: null, authError: "Sign in with an authorized registrar account to manage program launches." };
+      return { options: null, launches: null, familyInvitations: null, admissions: null, extendedPlanning: null, authError: "Sign in with an authorized registrar account to manage program launches." };
     }
   },
   component: LaunchWizardPage,
@@ -41,10 +43,11 @@ export const Route = createFileRoute("/operations/launch/")({
 
 function LaunchWizardPage() {
   const selection=Route.useSearch();
-  const { options, launches, familyInvitations, extendedPlanning, authError }: {
+  const { options, launches, familyInvitations, admissions, extendedPlanning, authError }: {
     options: Awaited<ReturnType<typeof listLaunchOptions>> | null;
     launches: Awaited<ReturnType<typeof listLaunches>> | null;
     familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
+    admissions: Awaited<ReturnType<typeof listAdmissionsIntake>> | null;
     extendedPlanning: Awaited<ReturnType<typeof listExtendedSeasonPlanning>> | null;
     authError: string;
   } = Route.useLoaderData();
@@ -239,6 +242,15 @@ function LaunchWizardPage() {
         )}
         <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
 
+        {launches.launches.length>0&&admissions&&<section aria-label="Admissions progress" className="mt-5 rounded-xl border bg-card p-4">
+          <h2 className="text-sm font-semibold">Admissions progress</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Current application records for the selected school; invitation responses are tracked separately.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!selection.programId||row.programId===selection.programId)&&(!selection.siteId||row.siteId===selection.siteId)).length}</strong>Applications recorded</p>
+            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!selection.programId||row.programId===selection.programId)&&(!selection.siteId||row.siteId===selection.siteId)&&row.stage==="accepted").length}</strong>Accepted applications</p>
+            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!selection.programId||row.programId===selection.programId)&&(!selection.siteId||row.siteId===selection.siteId)&&["inquiry","application","eligibility"].includes(row.stage)).length}</strong>Awaiting decision</p>
+          </div>
+        </section>}
         {launches.launches.length>0&&<nav aria-label="Family enrollment handoff" className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
           <span className="text-sm font-semibold">After inviting families</span>
           <Link to="/admissions/intake" search={{siteId:selection.siteId,programId:selection.programId}}
