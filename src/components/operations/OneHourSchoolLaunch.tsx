@@ -77,14 +77,14 @@ function SchoolOwnedCompletion({ task, busy, complete }: {
 function LaunchEvidenceStatement({ task, busy, submit }: {
   task: LaunchGuidanceTask;
   busy: boolean;
-  submit: (requirementId: string, statement: string) => Promise<void>;
+  submit: (requirementId: string, statement: string) => Promise<boolean>;
 }) {
   const [statement, setStatement] = useState("");
   if (!task.requirementId || !["needs_you", "needs_can"].includes(task.state)) return null;
   return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
     event.preventDefault();
     if (statement.trim().length < 10) return;
-    void submit(task.requirementId!, statement.trim()).then(() => setStatement(""));
+    void submit(task.requirementId!, statement.trim()).then(saved => { if (saved) setStatement(""); });
   }}>
     <p className="text-sm font-semibold">Submit evidence statement</p>
     <p className="mt-2 text-xs text-muted-foreground">Describe the completed work or supporting evidence. This records a statement for review; it does not approve the requirement or authorize opening.</p>
@@ -255,8 +255,19 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
   async function complete(requirementId: string) {
     await run(() => completeLaunchRequirement({ data: { journeyRequirementId: requirementId, confirmed: true } }));
   }
-  async function submitEvidence(requirementId: string, statement: string) {
-    await run(() => submitLaunchEvidence({ data: { journeyRequirementId: requirementId, statement } }));
+  async function submitEvidence(requirementId: string, statement: string): Promise<boolean> {
+    setBusy(true);
+    setError("");
+    try {
+      await submitLaunchEvidence({ data: { journeyRequirementId: requirementId, statement } });
+      await router.invalidate();
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to submit evidence");
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
   async function saveOrientation(input: { title: string; startsAt: string; endsAt: string; timezone: string }) {
     await run(() => scheduleLaunchOrientation({ data: { programId: launch!.id, ...input } }));
