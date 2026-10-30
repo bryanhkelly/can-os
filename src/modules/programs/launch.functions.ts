@@ -146,6 +146,11 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
       import("@/db/schema"),
       import("drizzle-orm"),
     ]);
+    const canReviewerOrganizations = context.grantSiteId === null && !context.scope.siteIds?.length && context.capabilities.has("program.activate")
+      ? await db.select({ id: s.organizations.id }).from(s.organizations)
+          .where(and(inArray(s.organizations.id, organizationIds), eq(s.organizations.type, "can_network")))
+      : [];
+    const canReviewEvidence = canReviewerOrganizations.length > 0;
     const programRows = await db
       .select({
         id: s.programs.id,
@@ -221,7 +226,7 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
         };
       }),
     );
-    return { launches };
+    return { launches, canReviewEvidence };
   },
 );
 
