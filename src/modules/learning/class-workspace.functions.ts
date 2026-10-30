@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { buildClassAssessmentEvidence, summarizeClassAssessmentEvidence } from "@/domain/class-assessment-evidence";
 import { z } from "zod";
+import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { classResources, readClassContent } from "@/domain/class-content";
 import { readClassTeacherGuides } from "@/domain/class-teacher-guides";
 import { AuthorizationError } from "@/domain/command-context";
@@ -142,7 +143,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
         or(eq(s.curriculumResourceBindings.courseTemplateVersionId,section.versionId),
            isNull(s.curriculumResourceBindings.courseTemplateVersionId))));
     const allSupplements=[...publisherRows.map(row=>({...row,source:"publisher" as const,canManage:false})),...supplements];
-    const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.map(lesson => lesson.id)) ?? []);
+    const lessonIds = new Set(content?.modules.flatMap(module => module.lessons.filter(isLearnerFacingInstruction).map(lesson => lesson.id)) ?? []);
     // Only the assigned teacher receives aggregate, student-reported completion counts.
     // No student identities, grades or mastery in this planning view.
     const completionGroups=new Map<string,Set<string>>();
@@ -185,8 +186,9 @@ export const setLessonCompletion = createServerFn({ method: "POST" })
         throw new Error("This published course version is no longer available. Reload your class.");
       }
       const content=readClassContent(section.curriculum);
-      if (!content?.modules.some(module => module.lessons.some(lesson => lesson.id === data.lessonId)))
-        throw new Error("Lesson unavailable in this published section release.");
+      const lesson=content?.modules.flatMap(module=>module.lessons).find(lesson=>lesson.id===data.lessonId);
+      if (!lesson || (data.completed && !isLearnerFacingInstruction(lesson)))
+        throw new Error("Instructional lesson unavailable in this published section release.");
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"lesson:"+section.id+":"+studentProfileId+":"+data.lessonId}))`);
       const [existing] = await tx.select().from(s.lessonProgress).where(and(
         eq(s.lessonProgress.sectionId, section.id), eq(s.lessonProgress.studentProfileId, studentProfileId),

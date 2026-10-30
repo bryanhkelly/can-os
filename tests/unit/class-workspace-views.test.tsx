@@ -99,6 +99,25 @@ describe("published class workspace", () => {
     expect(last).toContain("End of published course");
     expect(last).toContain("Navigation never marks lessons complete");
   });
+  it("skips empty outlines in lesson navigation, recommendations and completion totals",()=>{
+    const outline={id:"outline",title:"Future outline",body:" ",resources:[]};
+    const real=workspace.content!.modules[0]!.lessons[0]!;
+    const next={id:"next-real",title:"Next reading",body:"Read the next passage.",resources:[]};
+    const data={...workspace,content:{...workspace.content!,modules:[{
+      ...workspace.content!.modules[0]!,lessons:[real,outline,next],
+    }]},progress:[{lessonId:real.id,completedAt:"2026-10-29"},{lessonId:outline.id,completedAt:"2026-10-29"}]};
+    const overview=renderToStaticMarkup(<ClassWorkspace data={data}/>);
+    expect(overview).toContain("1 / 2 published lessons");
+    expect(overview).toContain('href="/classes?section=english&amp;tab=lessons&amp;lesson=next-real"');
+    const current=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId={real.id}/>);
+    expect(current).toContain("Lesson 1 of 2");
+    expect(current).not.toContain("lesson=outline");
+    const index=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons"/>);
+    expect(index).not.toContain("Future outline");
+    const planning=renderToStaticMarkup(<ClassWorkspace data={{...data,role:"teacher"}} tab="planning"/>);
+    expect(planning).toContain("Future outline");
+    expect(planning).toContain("Outline only");
+  });
   it("allows only students to mark a lesson and safely renders lesson text", () => {
     const student = renderToStaticMarkup(<ClassWorkspace data={workspace} tab="lessons" lessonId="evidence"/>);
     expect(student).toContain("Mark lesson complete");
