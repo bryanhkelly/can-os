@@ -41,7 +41,7 @@ const applicant=z.union([
 ]);
 export async function registrar(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.programIds?.length)throw new AuthorizationError("admissions registrar");
+ if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)throw new AuthorizationError("admissions registrar");
  assertCapability(actor,"enrollment.decide");
  return actor;
 }
@@ -134,11 +134,11 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
 export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((v:unknown)=>applicant.parse(v))
  .handler(async({data})=>{
   const actor=await registrar();
-  if(!actor.scope.programIds?.includes(data.programId))throw new AuthorizationError("admissions program");
+  if(actor.scope.programIds && !actor.scope.programIds.includes(data.programId))throw new AuthorizationError("admissions program");
   const [program]=await db.select({organizationId:programs.organizationId,siteId:programs.siteId}).from(programs)
    .where(eq(programs.id,data.programId)).limit(1);
   if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
-   (program.siteId!==null&&!actor.scope.siteIds?.includes(program.siteId)))throw new AuthorizationError("admissions school and organization");
+   (program.siteId!==null&&actor.scope.siteIds!==undefined&&!actor.scope.siteIds.includes(program.siteId)))throw new AuthorizationError("admissions school and organization");
   return db.transaction(async tx=>{
    let existingStudent:typeof studentProfiles.$inferSelect|undefined;
    let existingChoice:Awaited<ReturnType<typeof existingStudentChoices>>[number]|undefined;
