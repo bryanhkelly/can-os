@@ -30,6 +30,8 @@ export type LaunchGuidanceTask = {
   requirementId?: string;
   ownerPersonId?: string | null;
   evidenceCount?: number;
+  reviewNoteCount?: number;
+  rejectedReviewCount?: number;
   requiresRegistrarReview?: boolean;
   action: "academics" | "admissions" | "orientation" | "opening" | "review" | "none";
 };
@@ -71,6 +73,8 @@ export function buildLaunchGuidance(launch: LaunchGuidanceRecord) {
     requirementId: requirement.id,
     ownerPersonId: requirement.ownerPersonId,
     evidenceCount: requirement.evidence?.length ?? 0,
+    reviewNoteCount: requirement.evidence?.filter(item => item.kind === "registrar_note").length ?? 0,
+    rejectedReviewCount: requirement.evidence?.filter(item => item.kind === "document_review" && item.status === "rejected").length ?? 0,
     requiresRegistrarReview: requirement.metadata?.enrollmentForm !== undefined ||
       requirement.evidence?.some(item => item.kind === "document_review") === true,
     title: requirement.title,
