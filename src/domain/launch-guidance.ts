@@ -111,6 +111,17 @@ export function buildLaunchGuidance(launch: LaunchGuidanceRecord) {
   };
 }
 
+/** Human-readable responsibility derived only from the canonical requirement state. */
+export function launchResponsibility(state: LaunchRequirementState) {
+  switch (state) {
+    case "needs_you": return "School operator";
+    case "needs_can": return "CAN institutional team";
+    case "waiting_third_party": return "External party";
+    case "blocked": return "Unresolved — inspect requirement";
+    case "complete": return "Recorded complete";
+  }
+}
+
 export function launchOwnershipLabel(state: LaunchRequirementState) {
   switch (state) {
     case "needs_you": return "Needs you";
