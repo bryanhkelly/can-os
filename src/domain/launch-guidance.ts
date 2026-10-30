@@ -36,6 +36,7 @@ export type LaunchGuidanceTask = {
   latestReviewReason?: string | null;
   latestReviewAt?: string | null;
   evidenceInstructions?: string | null;
+  evidenceReviewRequired?: boolean;
   requiresRegistrarReview?: boolean;
   action: "academics" | "admissions" | "orientation" | "opening" | "review" | "none";
 };
@@ -77,6 +78,7 @@ export function buildLaunchGuidance(launch: LaunchGuidanceRecord) {
     requirementId: requirement.id,
     ownerPersonId: requirement.ownerPersonId,
     evidenceInstructions: typeof requirement.metadata?.evidenceInstructions === "string" ? requirement.metadata.evidenceInstructions : null,
+    evidenceReviewRequired: requirement.metadata?.evidenceReviewRequired === true,
     evidenceCount: requirement.evidence?.length ?? 0,
     reviewNoteCount: requirement.evidence?.filter(item => item.kind === "registrar_note").length ?? 0,
     rejectedReviewCount: requirement.evidence?.filter(item => item.kind === "document_review" && item.status === "rejected").length ?? 0,
