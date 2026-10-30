@@ -229,11 +229,10 @@ function OpeningTask({ launch, busy, open }: {
   </div>;
 }
 
-export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, selectedSiteId, canReviewEvidence = false }: {
+export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, selectedSiteId }: {
   launches: Launch[];
   selectedProgramId?: string;
   selectedSiteId?: string;
-  canReviewEvidence?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -242,7 +241,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
   const { launches, launch, unavailable } = resolveLaunchResume(allLaunches, {
     siteId: selectedSiteId, programId: selectedProgramId,
   });
-  const canReviewSelectedLaunch = canReviewEvidence && launch?.canReviewEvidence === true;
+  const canReviewSelectedLaunch = launch?.canReviewEvidence === true;
   if (unavailable) return <section role="alert" className="mt-8 rounded-2xl border bg-card p-6">
     <h2 className="font-serif text-2xl">This launch is unavailable</h2>
     <p className="mt-3 text-sm">The requested Program is no longer in your pre-opening launch scope.
