@@ -412,6 +412,13 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
           status: nextJourneyStatus, updatedAt: now,
         }).where(eq(s.journeys.id, row.journeyId));
       }
+      if (ready && row.journeyStatus !== "ready") {
+        await emitEvent(tx, {
+          eventType: EventTypes.JourneyReady,
+          aggregateType: "journey", aggregateId: row.journeyId,
+          actorPersonId: context.actorPersonId, payload: {},
+        });
+      }
       await writeAudit(tx, context, {
         action: "journey.requirement.evidence.review",
         entityType: "journey_requirement", entityId: row.id,
