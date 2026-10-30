@@ -188,6 +188,12 @@ export function FamilyInviteImporter({
     {error && <p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
     {result && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{result}</p>}
 
+    {batches.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-3" aria-label="Family invitation progress">
+      <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.length,0)}</strong>Invitation recipients</p>
+      <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.status==="responded").length,0)}</strong>Application links opened</p>
+      <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.status==="retrying").length,0)}</strong>Recipients needing retry</p>
+    </div>}
+
     {batches.length > 0 && <div className="mt-8">
       <h3 className="font-serif text-xl">Invitation responses</h3>
       <p className="mt-1 text-xs text-muted-foreground">Provider acceptance is not inbox delivery. A response is recorded only when the recipient redeems the verified application link.</p>
