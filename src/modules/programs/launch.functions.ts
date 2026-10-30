@@ -256,7 +256,7 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
   }).strict().parse(value))
   .handler(async ({ data }) => {
     const context = await registrarContext("journey.requirement.complete");
-    const [{ db }, s, { and, eq }] = await Promise.all([
+    const [{ db }, s, { eq }] = await Promise.all([
       import("@/db/client"), import("@/db/schema"), import("drizzle-orm"),
     ]);
     return db.transaction(async tx => {
@@ -275,7 +275,7 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
         .for("update").limit(1);
       if (!row || row.participantType !== "program" || !row.programId)
         throw new Error("Program launch requirement not found");
-      if (!context.scope.organizationIds?.includes(row.organizationId ?? "") ||
+      if (!context.actorPersonId || !context.scope.organizationIds?.includes(row.organizationId ?? "") ||
           (context.scope.programIds && !context.scope.programIds.includes(row.programId)) ||
           (context.scope.siteIds && (!row.siteId || !context.scope.siteIds.includes(row.siteId))))
         throw new AuthorizationError("program launch evidence scope");
