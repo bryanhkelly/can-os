@@ -108,6 +108,7 @@ function TeacherGradebookPage() {
   setLoading(true);
   setError("");
   setGradingKey("");
+  setDetailKey("");
   getGradebook({ data: { sectionId: selected } }).then(result => {
    if (active) {
     setGradebook(result); setLoading(false);
@@ -128,7 +129,7 @@ function TeacherGradebookPage() {
    if (active) { setGradebook(null); setError("Unable to load the gradebook for this section."); setLoading(false); }
   });
   return () => { active = false; };
- }, [selected]);
+ }, [selected, search.assessment, search.student]);
 
  const cellFor = (studentProfileId: string, assessmentId: string): Cell | undefined =>
   gradebook?.cells.find(cell => cell.studentProfileId === studentProfileId && cell.assessmentId === assessmentId);
