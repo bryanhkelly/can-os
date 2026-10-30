@@ -366,7 +366,7 @@ export const reviewLaunchEvidence = createServerFn({ method: "POST" })
         .from(s.programs).where(eq(s.programs.id, row.programId)).limit(1);
       if (!reviewProgram || !canOrganizations.some(org => org.id === reviewProgram.providerOrganizationId))
         throw new AuthorizationError("CAN academic provider authority for program");
-      if (row.journeyStatus === "ready" || ["active", "complete", "cancelled"].includes(row.journeyStatus) || row.status === "complete")
+      if (["active", "complete", "cancelled"].includes(row.journeyStatus) || row.status === "complete")
         throw new Error("This launch requirement is closed to review");
       if (!["needs_can", "needs_you"].includes(row.status))
         throw new Error("Requirement is not awaiting review");
