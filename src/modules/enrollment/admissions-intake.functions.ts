@@ -377,7 +377,7 @@ export const transitionAdmissionsStage=createServerFn({method:"POST"})
    await lockAdmissionsApplication(tx,data.applicationId);
    const [app]=await tx.select().from(applications).where(eq(applications.id,data.applicationId))
     .for("update").limit(1);
-   if(!app||!actor.scope.programIds?.includes(app.programId))
+   if(!app||(actor.scope.programIds !== undefined && !actor.scope.programIds.includes(app.programId)))
     throw new AuthorizationError("admissions application");
    assertRecordWriteAllowed(app.metadata,"registrar");
    const [scope]=await tx.select({organizationId:programs.organizationId,siteId:programs.siteId})
