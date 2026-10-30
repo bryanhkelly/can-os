@@ -357,7 +357,8 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
 
       const now = new Date();
       let finalized = 0;
-      let skipped = 0;
+      // Include active learners with no graded, scoreable work in the receipt.
+      let skipped = studentIds.length - totals.size;
       const published: { studentProfileId: string; gradeId: string; letterGrade: string }[] = [];
       for (const [studentProfileId, total] of totals) {
         const prior = existingByStudent.get(studentProfileId);
