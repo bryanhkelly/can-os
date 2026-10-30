@@ -1,9 +1,11 @@
-import { isLaunchOpeningDate } from "@/domain/launch-opening-date";
+import { matchesProgramLaunchReplay } from "@/domain/program-launch-replay";
+import { isLaunchOpeningDate, launchOpeningDate } from "@/domain/launch-opening-date";
 import { db } from "@/db/client";
 import { assertChurchHostedProviderIntent, assertChurchHostedActivationAuthorization } from "@/domain/church-hosted-provider";
 import { resolveProgramCreditMode, isExtendedLearningType, type ProgramType, type ProgramCreditMode } from "@/domain/program-offerings";
 import {
 journeys,
+journeyDefinitions,
 activities,
 activitySeasons,
 calendarEvents,
@@ -28,7 +30,7 @@ import { EventTypes } from "@/domain/event-types";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createProjectionIfAbsent } from "@/platform/calendar/projection";
-import { and,eq,inArray,isNull,or } from "drizzle-orm";
+import { and,eq,inArray,isNull,or,sql } from "drizzle-orm";
 import { evaluateSectionReadiness } from "./section-readiness-service";
 import { lockLaunchTeacherClaims } from "@/modules/staffing/launch-staffing.server";
 import { assertOpeningOperator,createOpeningHandoff,listOpeningHandoffs } from "./opening-handoff.server";
@@ -114,6 +116,44 @@ export async function startProgramLaunch(
         throw new Error("Site must belong to the host Organization");
       }
       launchSite = site;
+    }
+
+    // Serialize identical create attempts before the unique slug insert. A
+    // retry must reuse its canonical Program/Journey and emit no second start.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"program-launch:" + input.hostOrganizationId + ":" + input.slug}))`);
+    const [existing] = await tx.select().from(programs).where(and(
+      eq(programs.organizationId, input.hostOrganizationId), eq(programs.slug, input.slug),
+    )).for("update").limit(1);
+    if (existing) {
+      assertProgramScope(context, existing.id);
+      if (existing.siteId) assertSiteScope(context, existing.siteId);
+      const matches = matchesProgramLaunchReplay({
+        ...existing,
+        creditMode: typeof existing.metadata.creditMode === "string"
+          ? existing.metadata.creditMode : existing.creditIssuingOrganizationId ? "credit_bearing" : "non_credit",
+        targetOpeningDate: launchOpeningDate(existing.metadata),
+      }, {
+        ...input, creditMode,
+        creditIssuingOrganizationId: creditMode === "credit_bearing" ? input.creditIssuingOrganizationId : null,
+      });
+      if (!matches || !["draft", "launching", "ready", "active"].includes(existing.status))
+        throw new Error("This Program slug is already in use. Resume the existing launch or choose a different slug.");
+      const savedJourneys = await tx.select({
+        id: journeys.id, programId: journeys.programId, siteId: journeys.siteId,
+        organizationId: journeys.organizationId,
+      }).from(journeys).innerJoin(journeyDefinitions,
+        eq(journeyDefinitions.id, journeys.journeyDefinitionId)).where(and(
+        eq(journeys.participantType, "program"), eq(journeys.participantId, existing.id),
+        eq(journeyDefinitions.key, input.journeyDefinitionKey ?? "program-launch"),
+      )).limit(2);
+      const savedJourney = savedJourneys[0];
+      if (savedJourneys.length !== 1 || !savedJourney || savedJourney.programId !== existing.id ||
+          savedJourney.organizationId !== existing.organizationId || savedJourney.siteId !== existing.siteId)
+        throw new Error("The existing Program needs its canonical launch Journey reviewed. No duplicate launch was created.");
+      const draft = launchSite
+        ? await ensureExistingSitePublicationDraftForLaunch(tx, context, launchSite) : null;
+      return { programId: existing.id, journeyId: savedJourney.id,
+        publicSiteDraft: draft && launchSite ? { siteId: launchSite.id, ...draft } : null };
     }
 
     const [program] = await tx
@@ -497,4 +537,5 @@ export async function activateProgram(
     });
   });
 }
+
 
