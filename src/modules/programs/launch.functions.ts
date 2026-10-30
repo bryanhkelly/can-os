@@ -516,7 +516,8 @@ export const scheduleLaunchOrientation=createServerFn({method:"POST"})
   endsAt:z.string().datetime({offset:true}),timezone:z.string().min(3)}).parse(v))
  .handler(async({data})=>{
   const actor=await registrarContext("calendar.event.create");
-  if(!actor.scope.programIds?.includes(data.programId))throw new AuthorizationError("orientation program");
+  if(actor.scope.programIds && !actor.scope.programIds.includes(data.programId))
+   throw new AuthorizationError("orientation program");
   const start=new Date(data.startsAt),end=new Date(data.endsAt);
   if(end<=start)throw new Error("Orientation end must follow start");
   const [{db},s,{eq}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("drizzle-orm")]);
