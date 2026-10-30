@@ -35,7 +35,7 @@ export function FamilyInviteImporter({
     siteId: selectedSiteId, programId: selectedProgramId,
   });
   const [programId, setProgramId] = useState(initialProgram?.id ?? "");
-  const selectedProgram = programs.find(program => program.id === programId);
+  const selectedProgram = programs.find(program => program.id === programId) ?? (programs.length === 1 ? programs[0] : undefined);
   const [raw, setRaw] = useState("");
   const [subject, setSubject] = useState(`${initialProgram?.name ?? "Our school"} is welcoming families`);
   const [introduction, setIntroduction] = useState("We're excited to invite your family to learn about our school.");
