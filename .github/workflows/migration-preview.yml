@@ -1,0 +1,33 @@
+name: Migration Preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Generate incremental migration SQL
+        run: npm run db:generate
+
+      - name: Upload migration preview for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: drizzle-migration-preview
+          path: drizzle/
+          retention-days: 7

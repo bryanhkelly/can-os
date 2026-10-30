@@ -1,0 +1,2 @@
+import {describe,it,expect} from "vitest";import {programIndicators} from "../src/domain/program-indicators";
+describe("synthetic program evidence",()=>{it("never labels raw counts compliant or launch-ready",()=>{const values=programIndicators({sections:2,enrollments:0,teachers:1,calendarDays:0});expect(values.map(x=>x.state)).toEqual(["evidence_present","not_configured","evidence_present","not_configured"]);expect(JSON.stringify(values)).not.toContain("launchReady");});});

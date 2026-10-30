@@ -1,0 +1,68 @@
+name: CI
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit route fixture coverage
+        run: node scripts/check-route-fixture-coverage.mjs
+
+      - name: Enforce shared mutation evidence writers
+        run: node scripts/check-mutation-hygiene.mjs
+
+      - name: Check canonical route ownership contracts
+        run: node scripts/check-platform-route-contracts.mjs --check
+
+      - name: Admissions and authorization regressions
+        run: npx vitest run tests/unit/admissions-session-roles.test.ts tests/unit/admissions-offer-events.test.ts tests/unit/admissions-seat-occupancy.test.ts
+
+      - name: Build
+        run: npm run build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Validate incremental migration generation
+        run: |
+          npm run db:generate
+          echo "Drizzle migration generation succeeded from committed history."
+          if [ -n "$(git status --porcelain -- drizzle/)" ]; then
+            echo "::error::Drizzle generated uncommitted migration changes. Commit generated SQL and snapshots before merging."
+            git status --short -- drizzle/
+            exit 1
+          fi
+
+      - name: Upload generated migration for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drizzle-migration-review
+          path: drizzle/
+          retention-days: 7

@@ -1,0 +1,845 @@
+{
+  "schemaVersion": 1,
+  "description": "Route ownership and acceptance tracking. All 'pending' fields are unverified until source and role journey review; this inventory is not proof of safety.",
+  "generatedFromBranch": "main",
+  "routes": [
+    {
+      "file": "src/routes/__root.tsx",
+      "route": "<root>",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/access.index.tsx",
+      "route": "/access/",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/access.logout.ts",
+      "route": "/access/logout",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/access.request.ts",
+      "route": "/access/request",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/access.session.ts",
+      "route": "/access/session",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/access.sessions.ts",
+      "route": "/access/sessions",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "authenticated account holder lists and revokes own sessions; deny cross-account",
+      "readBoundary": "verified account owns all returned sessions; exclude secrets",
+      "writeBoundary": "same-origin and strict command; conditional account-owned revocation; audited"
+    },
+    {
+      "file": "src/routes/access.verify.tsx",
+      "route": "/access/verify",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/account.sessions.tsx",
+      "route": "/account/sessions",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "account holder reviews and revokes signed-in sessions",
+      "readBoundary": "verified account via /access/sessions API",
+      "writeBoundary": "delegated to account-owned authenticated session endpoint"
+    },
+    {
+      "file": "src/routes/actions.$actionId.tsx",
+      "route": "/actions/$actionId",
+      "owner": "actions",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admin.tsx",
+      "route": "/admin",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admissions.capacity.tsx",
+      "route": "/admissions/capacity",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admissions.families.tsx",
+      "route": "/admissions/families",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admissions.index.tsx",
+      "route": "/admissions/",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admissions.intake.tsx",
+      "route": "/admissions/intake",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admissions.transcripts.tsx",
+      "route": "/admissions/transcripts",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/admissions.tsx",
+      "route": "/admissions",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/api.jobs.ts",
+      "route": "/api/jobs",
+      "owner": "platform",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/ask.tsx",
+      "route": "/ask",
+      "owner": "agent",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/calendar-export.tsx",
+      "route": "/calendar-export",
+      "owner": "calendar",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/calendar.tsx",
+      "route": "/calendar",
+      "owner": "calendar",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/classes.tsx",
+      "route": "/classes",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/coach.tsx",
+      "route": "/coach",
+      "owner": "support",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/counselor.tsx",
+      "route": "/counselor",
+      "owner": "support",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/enrichment.tsx",
+      "route": "/enrichment",
+      "owner": "activities",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/family.join.tsx",
+      "route": "/family/join",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/groups.tsx",
+      "route": "/groups",
+      "owner": "study-groups",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.academics.tsx",
+      "route": "/guardian/academics",
+      "owner": "family",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.admission-offers.tsx",
+      "route": "/guardian/admission-offers",
+      "owner": "family",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.apply.tsx",
+      "route": "/guardian/apply",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.attendance.tsx",
+      "route": "/guardian/attendance",
+      "owner": "family",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "verified guardian attendance-excuse relationship and document scope; guardian.pickup.manage plus current verified pickup relationship, active enrollment and shared Household for pickup authorization and disputed-custody reports",
+      "readBoundary": "current verified guardian relationship scoped to authorized students and attendance cases; pickup workspace limited to guardian.pickup.manage, active scoped enrollments and matching Households"
+    },
+    {
+      "file": "src/routes/guardian.course-approvals.tsx",
+      "route": "/guardian/course-approvals",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.enrichment.tsx",
+      "route": "/guardian/enrichment",
+      "owner": "activities",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.experiences.tsx",
+      "route": "/guardian/experiences",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.field-trips.tsx",
+      "route": "/guardian/field-trips",
+      "owner": "field-trips",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.group-permissions.tsx",
+      "route": "/guardian/group-permissions",
+      "owner": "study-groups",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.index.tsx",
+      "route": "/guardian/",
+      "owner": "family",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.report-cards.tsx",
+      "route": "/guardian/report-cards",
+      "owner": "family",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.study-group-consent.tsx",
+      "route": "/guardian/study-group-consent",
+      "owner": "family",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.watching.tsx",
+      "route": "/guardian/watching",
+      "owner": "family",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/index.tsx",
+      "route": "/",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/messages.tsx",
+      "route": "/messages",
+      "owner": "communication",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/network-steward.tsx",
+      "route": "/network-steward",
+      "owner": "networks",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/network.tsx",
+      "route": "/network",
+      "owner": "networks",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/notifications.tsx",
+      "route": "/notifications",
+      "owner": "communication",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.course-policies.tsx",
+      "route": "/operations/course-policies",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.course-requests.tsx",
+      "route": "/operations/course-requests",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.curriculum-marketplace.tsx",
+      "route": "/operations/curriculum-marketplace",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.curriculum.tsx",
+      "route": "/operations/curriculum",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.field-trips.tsx",
+      "route": "/operations/field-trips",
+      "owner": "field-trips",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.insights.tsx",
+      "route": "/operations/insights",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.launch.$programId.tsx",
+      "route": "/operations/launch/$programId",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.launch.tsx",
+      "route": "/operations/launch",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.launch.index.tsx",
+      "route": "/operations/launch/",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.school-years.tsx",
+      "route": "/operations/school-years",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.tsx",
+      "route": "/operations",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.index.tsx",
+      "route": "/operations/",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/operations.workflows.tsx",
+      "route": "/operations/workflows",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/profiles.tsx",
+      "route": "/profiles",
+      "owner": "profiles",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/published-site.family-start.ts",
+      "route": "/published-site/family-start",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/published-site.inquiry.ts",
+      "route": "/published-site/inquiry",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/published-site.ts",
+      "route": "/published-site",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/readiness.tsx",
+      "route": "/readiness",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/safeguarding.tsx",
+      "route": "/safeguarding",
+      "owner": "safeguarding",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/site-website.tsx",
+      "route": "/site-website",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "Site-specific partner previews private website only; denies registrar and unrelated Site roles",
+      "readBoundary": "verified active Site grant + matching organization membership and explicit site website editor role assignment; approved public-safe catalog only",
+      "writeBoundary": "verified site.website.local.publish capability and same-Site role assignment only; immutable local content versions, protected claims held, audited rollback; CAN institutional fields never writable"
+    },
+    {
+      "file": "src/routes/site.day.tsx",
+      "route": "/site/day",
+      "owner": "attendance",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "active site-bound onsite role with organization/site/program scope; pickup roster exposes only current present/tardy enrollments, valid Household-linked authorizations, holds, release evidence and follow-up state",
+      "writeBoundary": "attendance and day-review authority remain separate; onsite.pickup.release plus active scope/delegation for custody holds, denied pickup, uncollected follow-up and staff-witnessed verified release; only site leaders resolve holds"
+    },
+    {
+      "file": "src/routes/sites.$siteId.publish.tsx",
+      "route": "/sites/$siteId/publish",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/sites.$siteId.tsx",
+      "route": "/sites/$siteId",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/sites.$siteId.index.tsx",
+      "route": "/sites/$siteId/",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/sites.index.tsx",
+      "route": "/sites/",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/staff.attendance.tsx",
+      "route": "/staff/attendance",
+      "owner": "staff",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/staff.students.$personId.tsx",
+      "route": "/staff/students/$personId",
+      "owner": "staff",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/staff.students.tsx",
+      "route": "/staff/students",
+      "owner": "staff",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/staff.students.index.tsx",
+      "route": "/staff/students/",
+      "owner": "staff",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/staff.teachers.tsx",
+      "route": "/staff/teachers",
+      "owner": "staff",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.assignments.tsx",
+      "route": "/student/assignments",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.courses.tsx",
+      "route": "/student/courses",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.discussions.tsx",
+      "route": "/student/discussions",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.experiences.tsx",
+      "route": "/student/experiences",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.index.tsx",
+      "route": "/student/",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.my-school.tsx",
+      "route": "/student/my-school",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "Student school community and upcoming conferences; student-only route-level authorization requires issued-session browser verification",
+      "readBoundary": "getSchoolExperiences uses a verified actor with scoped Sites, Programs and recipient notices; underlying service also permits guardian, teacher, and registrar roles, so student-only routing remains to verify",
+      "writeBoundary": "Read-only route; office-hour actions are delegated to guardian-authorized conference commands"
+    },
+    {
+      "file": "src/routes/student.notifications.tsx",
+      "route": "/student/notifications",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.report-card.tsx",
+      "route": "/student/report-card",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.settings.tsx",
+      "route": "/student/settings",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.study-groups.tsx",
+      "route": "/student/study-groups",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.support.tsx",
+      "route": "/student/support",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/student.tsx",
+      "route": "/student",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/support.tsx",
+      "route": "/support",
+      "owner": "support",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/teacher.discussions.tsx",
+      "route": "/teacher/discussions",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/teacher.gradebook.tsx",
+      "route": "/teacher/gradebook",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/teacher.index.tsx",
+      "route": "/teacher/",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/teacher.missing-work.tsx",
+      "route": "/teacher/missing-work",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/teacher.notices.tsx",
+      "route": "/teacher/notices",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/teacher.study-groups.tsx",
+      "route": "/teacher/study-groups",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    }
+  ],
+  "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
+}

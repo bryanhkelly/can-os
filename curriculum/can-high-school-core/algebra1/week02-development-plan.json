@@ -1,0 +1,120 @@
+{
+  "status": "planning_only",
+  "creditStatus": "not_credit_ready",
+  "releaseStatus": "not_published",
+  "courseCode": "CAN-ALG1",
+  "baseCourseVersion": "publisher_owned_course_release",
+  "unitKey": "algebra1-u01-w02",
+  "week": 2,
+  "unitId": "algebra1-u01",
+  "title": "Week 2: Multi-Step Equations and Literal Formulas",
+  "estimatedMinutesPerDay": 55,
+  "plannedDays": 5,
+  "standards": [
+    "HSA-REI.A.1",
+    "HSA-REI.B.3",
+    "HSA-CED.A.4",
+    "HSN-Q.A.1"
+  ],
+  "prerequisites": [
+    "Week 1 equivalents, equality-preserving transformations, solving one-variable equations",
+    "Sign arithmetic and distribution with positive/negative coefficients"
+  ],
+  "dailyPlan": [
+    {
+      "day": 1,
+      "topic": "Equations with fractions and rational coefficients",
+      "target": "Solve multi-step linear equations with fractions and explain each equivalent step.",
+      "diagnostic": "Compare 2(x/3+1)=8 and 2x/3+2=8 by substitution.",
+      "workedModel": "(3/4)x+5=11 gives (3/4)x=6 and x=8; verify by substitution.",
+      "guidedEvidence": "Complete three examples with different denominator signs and explain equivalence.",
+      "independentEvidence": "Solve and check five rational-coefficient equations.",
+      "exitTicket": "Solve (x-4)/3=5; explain a legal first transformation.",
+      "standards": [
+        "HSA-REI.A.1",
+        "HSA-REI.B.3"
+      ]
+    },
+    {
+      "day": 2,
+      "topic": "Solving literal equations for a specified variable",
+      "target": "Isolate one symbol in formulas with multiple letters and state any nonzero restrictions.",
+      "diagnostic": "Distinguish a solution for x from a formula describing x using other variables.",
+      "workedModel": "d=rt, where r≠0, yields t=d/r; P=2l+2w yields w=(P-2l)/2.",
+      "guidedEvidence": "Rearrange A=lw and y=mx+b with named target variables.",
+      "independentEvidence": "Derive, interpret, and check three formulas in context.",
+      "exitTicket": "Solve C=2πr for r and name the unit of r.",
+      "standards": [
+        "HSA-CED.A.4",
+        "HSN-Q.A.1"
+      ]
+    },
+    {
+      "day": 3,
+      "topic": "Equations with variables on both sides and denominator clearing",
+      "target": "Choose efficient legal transformations and detect restrictive or extraneous steps.",
+      "diagnostic": "Critique a solution where only one side of an equation is multiplied.",
+      "workedModel": "(x+2)/3=(2x-1)/4 → 4(x+2)=3(2x-1) → x=11/2.",
+      "guidedEvidence": "Solve three equations and verify each answer in the original equation.",
+      "independentEvidence": "Contrast clearing fractions versus using rational operations; explain which is more efficient.",
+      "exitTicket": "Solve (x+1)/2=(x+4)/3, then substitute to verify.",
+      "standards": [
+        "HSA-REI.A.1",
+        "HSA-REI.B.3"
+      ]
+    },
+    {
+      "day": 4,
+      "topic": "Multi-step modeling with physical quantities and units",
+      "target": "Build an equation from a real context, define a variable, and interpret the solution domain.",
+      "diagnostic": "Given a phone-plan fee and per-use cost, decide which quantities are fixed.",
+      "workedModel": "Fixed $18 plus $7 per visit totals $74: 18+7v=74, v=8 visits.",
+      "guidedEvidence": "Model two tuition or service pricing contexts and label units and constraints.",
+      "independentEvidence": "Solve and critique a constructed budget or distance problem with justified whole-number restrictions.",
+      "exitTicket": "State a feasible contextual solution and check it against the original statement.",
+      "standards": [
+        "HSA-CED.A.1",
+        "HSA-CED.A.4",
+        "HSN-Q.A.1"
+      ]
+    },
+    {
+      "day": 5,
+      "topic": "Transfer, formative checkpoint, and targeted reteaching",
+      "target": "Demonstrate solutions to equations and literal formulas independently with explanations and checks.",
+      "diagnostic": "Revisit recurring errors from the first four exit tickets.",
+      "workedModel": "Compare distinct solution strategies for a rational linear equation.",
+      "guidedEvidence": "Peer critique of a deliberately flawed multi-step equation derivation.",
+      "independentEvidence": "Teacher-scored problem set covering fractional equations, literal formulas, and contextual modeling.",
+      "exitTicket": "Written reflection: identify one error corrected and name evidence of improved reasoning.",
+      "standards": [
+        "HSA-REI.A.1",
+        "HSA-CED.A.4",
+        "HSN-Q.A.1"
+      ]
+    }
+  ],
+  "assessmentPlan": [
+    {
+      "key": "algebra1-u01-w02-practice",
+      "pointsPossible": 20,
+      "type": "formative",
+      "notes": "Four multi-step equation and literal formula tasks; teacher feedback before checkpoint."
+    },
+    {
+      "key": "algebra1-u01-w02-checkpoint",
+      "pointsPossible": 30,
+      "type": "teacher_scored",
+      "notes": "Ten points fractional equation solving, ten points formula rearrangement, ten points applied modeling with units and checking."
+    }
+  ],
+  "teacherReviewChecklist": [
+    "Verify every worked derivation and numerical answer",
+    "Confirm standard identifiers with a qualified mathematics educator",
+    "Review accessibility and accommodations for fraction notation",
+    "Provide protected scoring key and common misconceptions separately from student lessons",
+    "Confirm pacing, assigned instructor, student evidence and noncredit-ready policy",
+    "Publisher completes qualified content review and publishes the next controlled course version; the organization decides when to adopt that version through the normal course selection process"
+  ],
+  "publicationPolicy": "Planning only. The publisher may incorporate authored Week 2 lessons in a controlled course version after qualified review. A school adopts the publisher's course release, not an individual week. Teacher pacing, supplements, assignments, and existing student records are independent; this plan changes no current class."
+}

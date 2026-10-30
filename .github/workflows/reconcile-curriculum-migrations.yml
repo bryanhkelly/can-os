@@ -1,0 +1,10 @@
+name: Curriculum migration reconciliation (archived)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  notice:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "One-time Drizzle reconciliation completed on feature branch. No automated database writes."

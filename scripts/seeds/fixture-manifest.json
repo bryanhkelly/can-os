@@ -1,0 +1,1374 @@
+{
+  "version": 1,
+  "_doc": [
+    "Repeatable synthetic fixture manifest for every surfaced route (functional-completeness-audit P0).",
+    "baseSeeds establish the shared demo dataset (org/site/program, identities, enrollments); every fixtureRequired route is applied on top of them.",
+    "recordCounts are MINIMUM synthetic records the route needs to render its designed experience, keyed by table.",
+    "interactions are the operator-executable actions the seeded data must support; downstreamRecords are the canonical records those interactions must produce.",
+    "fixtureRequired:false marks pages that legitimately render without seeded domain data (rationale required).",
+    "Verification is STATIC_ONLY: this manifest proves declared coverage, not live execution. scripts/check-route-fixture-coverage.mjs enforces it in CI; unseeded routes are coverage failures."
+  ],
+  "baseSeeds": [
+    "student-s1-s4.sql",
+    "identity-demo-accounts.sql"
+  ],
+  "routes": {
+    "/actions/$actionId": {
+      "persona": "registrar, teacher, specialist, counselor",
+      "seeds": [
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "insights": 1
+      },
+      "interactions": [
+        "registrar opens an existing scoped operational Action by ID",
+        "accept an authorized academic insight and open the created Action",
+        "deny unrelated staff and direct private referral access"
+      ],
+      "downstreamRecords": []
+    },
+    "/counselor": {
+      "persona": "counselor",
+      "seeds": [
+        "gf41-support-referrals.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "support_referrals": 1
+      },
+      "interactions": [
+        "read scoped support caseload",
+        "open exact student context",
+        "log school-support outreach"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/support": {
+      "persona": "specialist, counselor",
+      "seeds": [
+        "gf41-support-referrals.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "support_referrals": 1
+      },
+      "interactions": [
+        "triage referral",
+        "save plan",
+        "schedule and complete service",
+        "review and close referral"
+      ],
+      "downstreamRecords": [
+        "support_plans",
+        "support_services",
+        "support_referral_stage_events",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/classes": {
+      "persona": "student, guardian, teacher",
+      "seeds": [
+        "class-participation.sql"
+      ],
+      "recordCounts": {
+        "sections": 1,
+        "course_template_versions": 1,
+        "enrollments": 1
+      },
+      "interactions": [
+        "read published lessons, syllabus and external resources",
+        "persist lesson completion and view it as the guardian or assigned teacher",
+        "publish and read a class announcement",
+        "open section-scoped classwork and discussions"
+      ],
+      "downstreamRecords": [
+        "lesson_progress",
+        "communication_threads",
+        "communication_messages",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/": {
+      "fixtureRequired": false,
+      "persona": "public",
+      "rationale": "Session-based application entry point; redirects to the user's verified active membership.",
+      "interactions": [
+        "resolve verified session",
+        "redirect to active workspace or access"
+      ],
+      "downstreamRecords": []
+    },
+    "/access": {
+      "persona": "public",
+      "seeds": [],
+      "recordCounts": {
+        "access_accounts": 4
+      },
+      "interactions": [
+        "request an access code for a synthetic account"
+      ],
+      "downstreamRecords": [
+        "access_tokens"
+      ]
+    },
+    "/access/verify": {
+      "persona": "public",
+      "seeds": [],
+      "recordCounts": {
+        "access_accounts": 4
+      },
+      "interactions": [
+        "verify an access code and land in the persona workspace"
+      ],
+      "downstreamRecords": [
+        "access_sessions"
+      ]
+    },
+    "/admin": {
+      "persona": "staff",
+      "seeds": [
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "insights": 1,
+        "actions": 1
+      },
+      "interactions": [
+        "review platform-level synthetic health and staff surfaces"
+      ],
+      "downstreamRecords": []
+    },
+    "/admissions": {
+      "persona": "registrar",
+      "seeds": [
+        "gf2-admissions-test.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "applications": 1,
+        "journeys": 1
+      },
+      "interactions": [
+        "review pipeline stages",
+        "open application detail",
+        "issue an admission offer"
+      ],
+      "downstreamRecords": [
+        "admission_offers",
+        "domainEvents:AdmissionOfferIssued",
+        "notifications:admission_offer_issued"
+      ]
+    },
+    "/admissions/transcripts": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_grades": 1
+      },
+      "interactions": [
+        "search authorized students with finalized academic records",
+        "issue an official transcript from the configured credit issuer"
+      ],
+      "downstreamRecords": [
+        "transcript_issuances",
+        "audit_events",
+        "domainEvents:TranscriptIssued"
+      ]
+    },
+    "/admissions/capacity": {
+      "persona": "registrar",
+      "seeds": [
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "admission_seat_pools": 1
+      },
+      "interactions": [
+        "review seat pool occupancy",
+        "preview capacity before issuing offers"
+      ],
+      "downstreamRecords": []
+    },
+    "/admissions/families": {
+      "persona": "registrar",
+      "seeds": [
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "households": 1,
+        "household_memberships": 2
+      },
+      "interactions": [
+        "review applicant household composition and readiness"
+      ],
+      "downstreamRecords": []
+    },
+    "/ask": {
+      "persona": "guardian",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "ask about a student's progress",
+        "request a missing-assignment watch",
+        "confirm or decline the prepared watch",
+        "view evidence-backed answer"
+      ],
+      "downstreamRecords": [
+        "conversations",
+        "conversation_messages",
+        "agent_runs",
+        "subscriptions"
+      ]
+    },
+    "/calendar": {
+      "persona": "staff",
+      "seeds": [
+        "staff-experiences-v1.sql",
+        "student-calendar-comms-office-hours.sql"
+      ],
+      "recordCounts": {
+        "calendar_events": 2
+      },
+      "interactions": [
+        "browse scheduled events",
+        "open event context"
+      ],
+      "downstreamRecords": []
+    },
+    "/calendar-export": {
+      "persona": "student",
+      "seeds": [
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "assessments": 1
+      },
+      "interactions": [
+        "export assignment deadlines as ICS"
+      ],
+      "downstreamRecords": []
+    },
+    "/coach": {
+      "persona": "specialist",
+      "seeds": [
+        "staff-experiences-v1.sql",
+        "gf41-support-referrals.sql"
+      ],
+      "recordCounts": {
+        "insights": 1,
+        "actions": 2,
+        "support_referrals": 1
+      },
+      "interactions": [
+        "review caseload",
+        "open referral",
+        "log outreach"
+      ],
+      "downstreamRecords": [
+        "auditEvents:coach.outreach"
+      ]
+    },
+    "/guardian": {
+      "persona": "guardian",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "households": 1,
+        "attendance_events": 1
+      },
+      "interactions": [
+        "view child status cards",
+        "open Needs You items"
+      ],
+      "downstreamRecords": []
+    },
+    "/guardian/academics": {
+      "persona": "guardian",
+      "seeds": [
+        "gf1-assignments-v2.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "assessments": 1,
+        "submissions": 1,
+        "section_grades": 1
+      },
+      "interactions": [
+        "review child assignments and grades"
+      ],
+      "downstreamRecords": []
+    },
+    "/guardian/admission-offers": {
+      "persona": "guardian",
+      "seeds": [
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "applications": 1
+      },
+      "interactions": [
+        "view issued offer",
+        "accept or decline offer"
+      ],
+      "downstreamRecords": [
+        "domainEvents:AdmissionOfferAccepted",
+        "domainEvents:AdmissionOfferDeclined"
+      ]
+    },
+    "/guardian/attendance": {
+      "persona": "guardian",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "attendance_events": 1
+      },
+      "interactions": [
+        "view absence",
+        "submit excuse with note"
+      ],
+      "downstreamRecords": [
+        "attendance_excuses",
+        "domainEvents:AttendanceExcuseSubmitted"
+      ]
+    },
+    "/guardian/report-cards": {
+      "persona": "guardian",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_grades": 1,
+        "grading_periods": 1
+      },
+      "interactions": [
+        "view finalized grades per grading period"
+      ],
+      "downstreamRecords": []
+    },
+    "/guardian/watching": {
+      "persona": "guardian",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "view watches",
+        "pause watch",
+        "resume watch",
+        "turn off watch"
+      ],
+      "downstreamRecords": [
+        "subscriptions"
+      ]
+    },
+    "/messages": {
+      "persona": "guardian",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "communication_threads": 1,
+        "communication_messages": 1
+      },
+      "interactions": [
+        "open contextual thread",
+        "reply to teacher"
+      ],
+      "downstreamRecords": [
+        "communication_messages",
+        "domainEvents:CommunicationMessageSent"
+      ]
+    },
+    "/operations": {
+      "persona": "staff",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "journeys": 1
+      },
+      "interactions": [
+        "review release health and program oversight"
+      ],
+      "downstreamRecords": []
+    },
+    "/operations/insights": {
+      "persona": "staff",
+      "seeds": [
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "insights": 1
+      },
+      "interactions": [
+        "triage insight",
+        "accept recommendation into an Action"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "domainEvents:ActionCreated"
+      ]
+    },
+    "/operations/launch": {
+      "persona": "staff",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "journey_definitions": 1
+      },
+      "interactions": [
+        "run launch wizard",
+        "track launch journey requirements"
+      ],
+      "downstreamRecords": [
+        "programs",
+        "journeys",
+        "journey_requirements"
+      ]
+    },
+    "/profiles": {
+      "persona": "authenticated",
+      "seeds": [],
+      "recordCounts": {
+        "people": 1
+      },
+      "interactions": [
+        "open own or relationship-authorized school profile",
+        "show initials without a verified photo",
+        "upload own JPEG or PNG through private storage"
+      ],
+      "downstreamRecords": [
+        "documents",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/readiness": {
+      "persona": "registrar",
+      "seeds": [
+        "gf2-admissions-test.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "journeys": 1,
+        "journey_requirements": 1
+      },
+      "interactions": [
+        "review enrollment readiness and blocking requirements"
+      ],
+      "downstreamRecords": []
+    },
+    "/staff/attendance": {
+      "persona": "staff",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "attendance_events": 1
+      },
+      "interactions": [
+        "mark attendance",
+        "review pending excuses"
+      ],
+      "downstreamRecords": [
+        "attendance_events",
+        "domainEvents:StudentMarkedAbsent"
+      ]
+    },
+    "/staff/students": {
+      "persona": "staff",
+      "seeds": [
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "student_profiles": 1
+      },
+      "interactions": [
+        "search student directory",
+        "open student record"
+      ],
+      "downstreamRecords": []
+    },
+    "/staff/students/$personId": {
+      "persona": "staff",
+      "seeds": [
+        "staff-experiences-v1.sql",
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "student_profiles": 1,
+        "submissions": 1
+      },
+      "interactions": [
+        "review student academics, attendance, and support context"
+      ],
+      "downstreamRecords": []
+    },
+    "/staff/teachers": {
+      "persona": "staff",
+      "seeds": [
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_teachers": 1
+      },
+      "interactions": [
+        "review teaching assignments"
+      ],
+      "downstreamRecords": []
+    },
+    "/student": {
+      "persona": "student",
+      "seeds": [
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "enrollments": 1,
+        "assessments": 1
+      },
+      "interactions": [
+        "view today schedule and due work"
+      ],
+      "downstreamRecords": []
+    },
+    "/student/assignments": {
+      "persona": "student",
+      "seeds": [
+        "gf1-assignments-v2.sql",
+        "gf1-rubric-v4.sql",
+        "gf40-rules-assignments.sql"
+      ],
+      "recordCounts": {
+        "assessments": 2,
+        "submissions": 2
+      },
+      "interactions": [
+        "view assignment with rubric",
+        "submit response",
+        "resubmit after feedback"
+      ],
+      "downstreamRecords": [
+        "submissions",
+        "domainEvents:SubmissionReceived"
+      ]
+    },
+    "/student/courses": {
+      "persona": "student",
+      "seeds": [
+        "gf40-course-registration.sql"
+      ],
+      "recordCounts": {
+        "course_templates": 1,
+        "sections": 1
+      },
+      "interactions": [
+        "browse catalog",
+        "request add/drop"
+      ],
+      "downstreamRecords": [
+        "enrollments",
+        "domainEvents"
+      ]
+    },
+    "/student/discussions": {
+      "persona": "student",
+      "seeds": [
+        "gf40-course-discussions.sql"
+      ],
+      "recordCounts": {
+        "communication_threads": 1,
+        "communication_messages": 2
+      },
+      "interactions": [
+        "read section discussion",
+        "reply to a post"
+      ],
+      "downstreamRecords": [
+        "communication_messages"
+      ]
+    },
+    "/student/experiences": {
+      "persona": "student",
+      "seeds": [
+        "student-calendar-comms-office-hours.sql"
+      ],
+      "recordCounts": {
+        "conference_series": 1,
+        "conference_slots": 1
+      },
+      "interactions": [
+        "book office hours",
+        "view upcoming events"
+      ],
+      "downstreamRecords": [
+        "conference_slot_registrations"
+      ]
+    },
+    "/student/my-school": {
+      "persona": "student",
+      "seeds": [
+        "student-calendar-comms-office-hours.sql"
+      ],
+      "recordCounts": {
+        "conference_series": 1,
+        "conference_slots": 1
+      },
+      "interactions": [
+        "view school announcements and upcoming local events",
+        "navigate to the school calendar, classes and study groups"
+      ],
+      "downstreamRecords": []
+    },
+    "/student/notifications": {
+      "fixtureRequired": false,
+      "persona": "authenticated",
+      "rationale": "Compatibility redirect to /notifications",
+      "interactions": [
+        "redirect to canonical notification center"
+      ],
+      "downstreamRecords": []
+    },
+    "/student/report-card": {
+      "persona": "student",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "section_grades": 1
+      },
+      "interactions": [
+        "view finalized grades"
+      ],
+      "downstreamRecords": []
+    },
+    "/student/settings": {
+      "persona": "student",
+      "seeds": [],
+      "recordCounts": {
+        "student_profiles": 1
+      },
+      "interactions": [
+        "update display preferences"
+      ],
+      "downstreamRecords": [
+        "student_profiles (preferences)"
+      ]
+    },
+    "/student/study-groups": {
+      "persona": "student",
+      "seeds": [
+        "gf26-study-groups.sql"
+      ],
+      "recordCounts": {
+        "study_groups": 2,
+        "study_group_sessions": 1
+      },
+      "interactions": [
+        "join group",
+        "post message",
+        "RSVP to session",
+        "report content"
+      ],
+      "downstreamRecords": [
+        "study_group_memberships",
+        "study_group_posts",
+        "study_group_reports"
+      ]
+    },
+    "/student/support": {
+      "persona": "student",
+      "seeds": [
+        "gf41-support-referrals.sql"
+      ],
+      "recordCounts": {
+        "actions": 1
+      },
+      "interactions": [
+        "view support plan status"
+      ],
+      "downstreamRecords": []
+    },
+    "/teacher": {
+      "persona": "teacher",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "sections": 1,
+        "assessments": 1
+      },
+      "interactions": [
+        "view today across sections"
+      ],
+      "downstreamRecords": []
+    },
+    "/teacher/discussions": {
+      "persona": "teacher",
+      "seeds": [
+        "gf40-course-discussions.sql"
+      ],
+      "recordCounts": {
+        "communication_threads": 1,
+        "communication_messages": 2
+      },
+      "interactions": [
+        "moderate reply",
+        "hide message",
+        "lock thread"
+      ],
+      "downstreamRecords": [
+        "communication_messages (moderation metadata)",
+        "auditEvents"
+      ]
+    },
+    "/teacher/gradebook": {
+      "persona": "teacher",
+      "seeds": [
+        "gf1-assignments-v2.sql",
+        "gf1-rubric-v4.sql",
+        "gf40-rules-assignments.sql"
+      ],
+      "recordCounts": {
+        "assessments": 2,
+        "submissions": 2
+      },
+      "interactions": [
+        "grade submission with rubric",
+        "create assessment",
+        "finalize section grades for a grading period",
+        "correct a finalized grade with a recorded reason"
+      ],
+      "downstreamRecords": [
+        "submissions (graded)",
+        "domainEvents:GradePosted",
+        "sectionGrades (finalized)",
+        "auditEvents:report_card.section_grade.finalize"
+      ]
+    },
+    "/teacher/missing-work": {
+      "persona": "teacher",
+      "seeds": [
+        "gf1-assignments-v2.sql"
+      ],
+      "recordCounts": {
+        "assessments": 1,
+        "submissions": 1
+      },
+      "interactions": [
+        "review overdue queue",
+        "create missing-work follow-up"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "notifications:missing_work_follow_up"
+      ]
+    },
+    "/teacher/notices": {
+      "fixtureRequired": false,
+      "persona": "teacher",
+      "rationale": "Backward-compatible redirect to shared authenticated /notifications",
+      "interactions": [
+        "redirect to canonical notification center"
+      ],
+      "downstreamRecords": []
+    },
+    "/teacher/study-groups": {
+      "persona": "teacher",
+      "seeds": [
+        "gf26-study-groups.sql"
+      ],
+      "recordCounts": {
+        "study_groups": 2,
+        "study_group_reports": 1
+      },
+      "interactions": [
+        "facilitate group",
+        "review reported content"
+      ],
+      "downstreamRecords": []
+    },
+    "/sites/$siteId": {
+      "persona": "staff",
+      "seeds": [
+        "staff-experiences-v1.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "programs": 1,
+        "actions": 1,
+        "calendar_events": 1
+      },
+      "interactions": [
+        "review Site Today indicators",
+        "review site actions and schedule",
+        "open related operating area"
+      ],
+      "downstreamRecords": []
+    },
+    "/admissions/intake": {
+      "persona": "registrar",
+      "seeds": [
+        "gf2-admissions-test.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "applications": 1,
+        "programs": 1
+      },
+      "interactions": [
+        "create family inquiry",
+        "advance admissions stage",
+        "provision guardian login"
+      ],
+      "downstreamRecords": [
+        "applications",
+        "access_accounts",
+        "account_person_grants"
+      ]
+    },
+    "/guardian/study-group-consent": {
+      "persona": "guardian",
+      "seeds": [
+        "gf26-study-groups.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "study_groups": 1
+      },
+      "interactions": [
+        "review study-group consent request",
+        "approve or decline participation"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "study_group_memberships"
+      ]
+    },
+    "/operations/launch/$programId": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "synthetic-profiles-compliance.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "sections": 1,
+        "section_teachers": 1
+      },
+      "interactions": [
+        "provision class",
+        "assign instructor"
+      ],
+      "downstreamRecords": [
+        "sections",
+        "section_teachers"
+      ]
+    },
+    "/operations/curriculum": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "curriculum-authoring.sql"
+      ],
+      "recordCounts": {
+        "memberships": 1,
+        "role_assignments": 1,
+        "course_templates": 1,
+        "course_template_versions": 1
+      },
+      "interactions": [
+        "deny authoring without an explicit curriculum publisher grant",
+        "edit and save syllabus, ordered modules and lesson reading",
+        "publish a validated release with confirmation and a reason",
+        "provision a new section from the release without changing existing classes"
+      ],
+      "downstreamRecords": [
+        "course_templates",
+        "course_template_versions",
+        "sections",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/operations/school-years": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "programs": 1
+      },
+      "interactions": [
+        "create school year",
+        "add terms and calendar",
+        "activate school year"
+      ],
+      "downstreamRecords": [
+        "school_years",
+        "terms",
+        "grading_periods",
+        "academic_calendars"
+      ]
+    },
+    "/sites": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "sites": 1,
+        "programs": 1
+      },
+      "interactions": [
+        "browse authorized school sites",
+        "open Site Today workspace"
+      ],
+      "downstreamRecords": []
+    },
+    "/operations/course-policies": {
+      "persona": "registrar",
+      "seeds": [
+        "gf40-course-registration.sql",
+        "gf40-rules-assignments.sql"
+      ],
+      "recordCounts": {
+        "sections": 2,
+        "enrollments": 1
+      },
+      "interactions": [
+        "review section registration rules",
+        "update enrollment capacity and deadlines",
+        "update prerequisites and credit limits"
+      ],
+      "downstreamRecords": [
+        "section_registration_policies",
+        "section_prerequisites",
+        "domainEvents:CourseRegistrationPolicyChanged"
+      ]
+    },
+    "/operations/workflows": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "journeys": 1,
+        "admission_offers": 1
+      },
+      "interactions": [
+        "review connected launch, admissions, intervention, and attendance workflows",
+        "activate a ready program",
+        "reconcile elapsed admission offers"
+      ],
+      "downstreamRecords": [
+        "audit_events"
+      ]
+    },
+    "/notifications": {
+      "persona": "authenticated",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "student-calendar-comms-office-hours.sql"
+      ],
+      "recordCounts": {
+        "notifications": 1
+      },
+      "interactions": [
+        "triage notification to its resource"
+      ],
+      "downstreamRecords": []
+    },
+    "/groups": {
+      "persona": "student",
+      "seeds": [
+        "gf26-study-groups.sql"
+      ],
+      "recordCounts": {
+        "study_groups": 1,
+        "study_group_memberships": 1
+      },
+      "interactions": [
+        "request study group membership",
+        "post to an approved group discussion",
+        "report a group post"
+      ],
+      "downstreamRecords": [
+        "study_group_memberships",
+        "study_group_posts",
+        "audit_events"
+      ]
+    },
+    "/guardian/group-permissions": {
+      "persona": "guardian",
+      "seeds": [
+        "gf26-study-groups.sql"
+      ],
+      "recordCounts": {
+        "study_groups": 1,
+        "actions": 1
+      },
+      "interactions": [
+        "approve or decline a study group participation request"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "study_group_memberships",
+        "audit_events"
+      ]
+    },
+    "/guardian/course-approvals": {
+      "persona": "guardian",
+      "seeds": [
+        "gf40-course-registration.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "sections": 1
+      },
+      "interactions": [
+        "approve or decline a course registration request"
+      ],
+      "downstreamRecords": [
+        "actions",
+        "enrollments",
+        "audit_events"
+      ]
+    },
+    "/operations/course-requests": {
+      "persona": "registrar",
+      "seeds": [
+        "gf40-course-registration.sql",
+        "gf40-rules-assignments.sql"
+      ],
+      "recordCounts": {
+        "actions": 1,
+        "sections": 2
+      },
+      "interactions": [
+        "approve or decline a pending course change request"
+      ],
+      "downstreamRecords": [
+        "enrollments",
+        "audit_events",
+        "domainEvents:CourseRegistrationRequested"
+      ]
+    },
+    "/operations/field-trips": {
+      "persona": "registrar",
+      "seeds": [
+        "new-experiences-v1.sql",
+        "staff-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "field_trips": 1,
+        "field_trip_participants": 1
+      },
+      "interactions": [
+        "create a field trip",
+        "invite an enrolled student",
+        "record departure and return checkpoints"
+      ],
+      "downstreamRecords": [
+        "field_trip_participants",
+        "field_trip_attendance",
+        "audit_events"
+      ]
+    },
+    "/guardian/field-trips": {
+      "persona": "guardian",
+      "seeds": [
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "field_trips": 1,
+        "field_trip_participants": 1
+      },
+      "interactions": [
+        "grant or decline field trip permission for a child"
+      ],
+      "downstreamRecords": [
+        "field_trip_participants",
+        "audit_events"
+      ]
+    },
+    "/operations/curriculum-marketplace": {
+      "persona": "registrar",
+      "seeds": [
+        "valor-curriculum-marketplace.sql"
+      ],
+      "recordCounts": {
+        "curriculum_packs": 1,
+        "curriculum_pack_versions": 1,
+        "curriculum_pack_items": 32,
+        "curriculum_entitlements": 1,
+        "curriculum_adoptions": 1
+      },
+      "interactions": [
+        "browse published pack releases in the verified organization",
+        "install the pack after accepting stated license",
+        "adopt the installed release for the authorized program",
+        "add an HTTPS resource to an adopted course scope"
+      ],
+      "downstreamRecords": [
+        "curriculum_entitlements",
+        "curriculum_adoptions",
+        "curriculum_overlays",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/network": {
+      "persona": "network_admin",
+      "fixtureRequired": false,
+      "rationale": "HQ network membership is not automatically seeded into the student demo; the authorized empty-state is supported, while a separate isolated network grant and end-to-end browser acceptance remain required.",
+      "interactions": [
+        "authorized denomination HQ administrator lists its directly owned locations",
+        "HQ creates a new location without student enrollment access",
+        "school registrar and unrelated HQ cannot create a denomination location"
+      ],
+      "downstreamRecords": [
+        "sites",
+        "domainEvents:SiteCreated",
+        "auditEvents:network.site.create"
+      ]
+    },
+    "/network-steward": {
+      "persona": "can_network_steward",
+      "fixtureRequired": false,
+      "rationale": "Steward onboarding needs independently verified contract/authority documents and bootstrap grant; synthetic fixture and browser acceptance remain pending.",
+      "interactions": [
+        "review externally verified agreement evidence",
+        "record effective term",
+        "authorize HQ officer with independently verified email-specific authority"
+      ],
+      "downstreamRecords": [
+        "network_agreements",
+        "account_person_grants",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/account/sessions": {
+      "persona": "authenticated account holder",
+      "seeds": [],
+      "recordCounts": {
+        "access_sessions": 1
+      },
+      "interactions": [
+        "list usable sessions only for the authenticated account, without exposing credentials or fabricated devices",
+        "revoke one owned session while other account sessions remain usable",
+        "sign out everywhere and verify current cookie clearing and revocation on the next authenticated request",
+        "deny cross-account revocation and indistinguishable unknown IDs"
+      ],
+      "downstreamRecords": [
+        "access_sessions",
+        "audit_events"
+      ]
+    },
+    "/enrichment": {
+      "persona": "public visitor",
+      "fixtureRequired": false,
+      "rationale": "Enrichment catalog depends on approved, publishable extended Program/Season and permission snapshots introduced in pending isolated migrations 0032-0034. Do not seed fictional approved offerings or imply live enrollment. A real synthetic catalog/browser fixture is required after schema convergence.",
+      "interactions": [
+        "review only publishable extended offerings and their approved windows",
+        "confirm no unapproved, draft, stale or closed offerings appear",
+        "open the guardian enrollment journey without revealing student information"
+      ],
+      "downstreamRecords": []
+    },
+    "/guardian/enrichment": {
+      "persona": "guardian",
+      "fixtureRequired": false,
+      "rationale": "Guardian enrollment needs independently verified household/child relationship, published Season and session-package permission/seat state. The pending 0032-0034 schema has not been migrated on the isolated FullFlow Neon branch, and no authenticated connected browser fixture verifies these transitions.",
+      "interactions": [
+        "select only children whose enrollment relationship is verified",
+        "review a published offer and accept the current permission version",
+        "register or waitlist within capacity and verify canonical activity registration and audit",
+        "deny unauthorized child and stale or unpublished offerings"
+      ],
+      "downstreamRecords": [
+        "activity_registrations",
+        "consent_records",
+        "audit_events"
+      ]
+    },
+    "/site/day": {
+      "persona": "site_leader, site_staff or room_facilitator",
+      "fixtureRequired": false,
+      "rationale": "Staff-specific original-site grants, active year, expected roster, delivery-arrangement coverage and current attendance corrections require a connected authenticated onsite-day fixture. Existing generic school seeds are not evidence of supervised-day readiness, release or safeguarding.",
+      "interactions": [
+        "resolve only the original granted site and its local expected roster",
+        "record arrival, absence and attendance corrections with reason",
+        "review instructional staffing duty acknowledgment and day-attendance reconciliation",
+        "deny unrelated site, unscheduled child, academic grade and child release authority"
+      ],
+      "downstreamRecords": [
+        "attendance_events",
+        "actions",
+        "audit_events"
+      ]
+    },
+    "/safeguarding": {
+      "persona": "onsite reporter or actively assigned safeguarding responder",
+      "fixtureRequired": false,
+      "rationale": "Restricted safeguarding intake requires a reviewed site policy, canonical jurisdiction, named responder roster, scoped grants and isolated synthetic records. No migration or connected browser/database acceptance is complete, so generic school seeds must not imply operational or legal readiness.",
+      "interactions": [
+        "submit an idempotent onsite concern and receive only the reporter acknowledgment and safety-instruction projection",
+        "route urgent concerns to named primary, deputy and CAN fallback responders with assignment-restricted access",
+        "record evidence and independent external-report attestations without inferring emergency dispatch or guardian notification"
+      ],
+      "downstreamRecords": [
+        "incidents",
+        "safeguarding_concerns",
+        "safeguarding_case_assignments",
+        "incident_evidence",
+        "safeguarding_external_reports",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/family/join": {
+      "persona": "public",
+      "seeds": [
+        "public-family-admissions-v1.sql"
+      ],
+      "recordCounts": {
+        "public_family_start_requests": 1,
+        "site_publications": 1,
+        "program_publications": 1
+      },
+      "interactions": [
+        "redeem the documented synthetic single-use email token for a published Site and active Program",
+        "replay the same token and verify single-use denial",
+        "deny expired and unknown tokens with an indistinguishable authorization error"
+      ],
+      "downstreamRecords": [
+        "access_accounts",
+        "people",
+        "account_person_grants",
+        "access_sessions",
+        "domainEvents:PublicFamilyStartVerified",
+        "auditEvents:family.public_start.verify"
+      ]
+    },
+    "/guardian/apply": {
+      "persona": "guardian",
+      "seeds": [
+        "public-family-admissions-v1.sql",
+        "gf2-admissions-test.sql"
+      ],
+      "recordCounts": {
+        "programs": 1,
+        "applications": 1,
+        "households": 1
+      },
+      "interactions": [
+        "submit a canonical family application as a verified-email guardian in scope",
+        "retry the same requestId and receive the same application idempotently",
+        "resume the pending application from the guardian workspace"
+      ],
+      "downstreamRecords": [
+        "applications",
+        "journeys",
+        "student_profiles",
+        "people",
+        "guardian_relationships",
+        "domain_events",
+        "audit_events"
+      ]
+    },
+    "/site-website": {
+      "persona": "site_website_editor",
+      "seeds": [
+        "site-website-editor-v1.sql"
+      ],
+      "recordCounts": {
+        "site_publications": 1,
+        "site_local_content_versions": 1,
+        "role_assignments": 1,
+        "memberships": 1
+      },
+      "interactions": [
+        "preview the public-safe Site draft with approved program listings",
+        "publish church-owned local content as a new revision",
+        "restore a previously published revision",
+        "deny an account without a matching Site website editor role assignment"
+      ],
+      "downstreamRecords": [
+        "site_local_content_versions",
+        "actions",
+        "audit_events",
+        "domain_events"
+      ]
+    },
+    "/sites/$siteId/publish": {
+      "persona": "authorized site registrar",
+      "fixtureRequired": false,
+      "rationale": "Public site publication needs an authorized original Site grant and canonical site/program publication rows from pending migrations 0035-0036. Public DNS/hostname routing is not yet deployed. Synthetic publishing and browser approval flows remain unverified.",
+      "interactions": [
+        "reserve a unique public slug without making a Site public",
+        "publish only reviewed, non-misleading program marketing after explicit approval",
+        "unpublish and confirm unauthenticated public catalog becomes unavailable",
+        "deny cross-site publisher, stale revision and claims of school being already operational"
+      ],
+      "downstreamRecords": [
+        "site_publications",
+        "program_publications",
+        "audit_events"
+      ]
+    },
+    "/guardian/experiences": {
+      "persona": "guardian",
+      "seeds": [
+        "student-calendar-comms-office-hours.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "conference_series": 1,
+        "conference_slots": 1,
+        "guardian_relationships": 1
+      },
+      "interactions": [
+        "book a teacher office-hour slot",
+        "reschedule an appointment",
+        "cancel an appointment"
+      ],
+      "downstreamRecords": [
+        "conference_bookings",
+        "audit_events",
+        "domainEvents:ConferenceBooked",
+        "domainEvents:ConferenceCancelled"
+      ]
+    }
+  }
+}
