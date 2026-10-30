@@ -64,7 +64,7 @@ export const listLaunchOptions = createServerFn({ method: "GET" }).handler(
     if (!organizationIds.length) {
       return { organizations: [], academicProviderOrganizations: [], creditIssuingOrganizations: [], sites: [], jurisdictions: [] };
     }
-    const [{ db }, s, { and, asc, eq, inArray }] = await Promise.all([
+    const [{ db }, s, { and, asc, eq, inArray, or }] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
@@ -172,7 +172,8 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
       .leftJoin(s.sitePublications, eq(s.sitePublications.siteId, s.programs.siteId))
       .where(
         and(
-          inArray(s.programs.organizationId, organizationIds),
+          or(inArray(s.programs.organizationId, organizationIds),
+            ...(canReviewerOrganizations.length ? [inArray(s.programs.academicProviderOrganizationId, canReviewerOrganizations.map(org => org.id))] : [])),
           inArray(s.programs.status, ["draft", "launching", "ready"]),
           ...(context.grantSiteId === null ? [] : [eq(s.programs.siteId, context.grantSiteId)]),
           ...(context.grantSiteId !== null && context.scope.programIds?.length
