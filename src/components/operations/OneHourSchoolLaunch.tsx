@@ -348,6 +348,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             <p className="mt-1 text-xs text-muted-foreground">
               {task.blocking && task.state !== "complete" ? "Blocking opening · " : ""}{task.description}
             </p>
+            {task.evidenceInstructions && <p className="mt-1 text-xs">Evidence requested: {task.evidenceInstructions}</p>}
             {task.ownerPersonId && <p className="mt-1 text-xs text-muted-foreground">Assigned owner ID: <code className="select-all">{task.ownerPersonId}</code></p>}
             {task.requirementId && <p className="mt-1 text-xs text-muted-foreground">Evidence entries on record: {task.evidenceCount ?? 0}</p>}
             {task.requiresRegistrarReview && <p className="mt-1 text-xs font-semibold">Registrar evidence review required — school self-completion is unavailable.</p>
