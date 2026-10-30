@@ -13,6 +13,7 @@ import { postLaunchOperationsDestination } from "@/domain/launch-operations-hand
 import {
   activateLaunch,
   completeLaunchRequirement,
+  submitLaunchEvidence,
   scheduleLaunchOrientation,
   type listLaunches,
 } from "@/modules/programs/launch.functions";
@@ -71,6 +72,29 @@ function SchoolOwnedCompletion({ task, busy, complete }: {
       Save school completion
     </button>
   </details>;
+}
+
+function LaunchEvidenceStatement({ task, busy, submit }: {
+  task: LaunchGuidanceTask;
+  busy: boolean;
+  submit: (requirementId: string, statement: string) => Promise<void>;
+}) {
+  const [statement, setStatement] = useState("");
+  if (!task.requirementId || task.state === "complete") return null;
+  return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
+    event.preventDefault();
+    if (statement.trim().length < 10) return;
+    void submit(task.requirementId!, statement.trim()).then(() => setStatement(""));
+  }}>
+    <p className="text-sm font-semibold">Submit evidence statement</p>
+    <p className="mt-2 text-xs text-muted-foreground">Describe the completed work or supporting evidence. This records a statement for review; it does not approve the requirement or authorize opening.</p>
+    <label className="mt-3 block text-sm">Evidence details
+      <textarea value={statement} onChange={event => setStatement(event.target.value)} maxLength={4000}
+        rows={3} className="mt-1 block w-full rounded-lg border bg-card p-2" />
+    </label>
+    <button type="submit" disabled={busy || statement.trim().length < 10}
+      className="mt-3 min-h-11 rounded-xl border px-4 py-2 text-sm font-semibold disabled:opacity-50">Record evidence statement</button>
+  </form>;
 }
 
 function localDateTime(date: Date) {
@@ -231,6 +255,9 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
   async function complete(requirementId: string) {
     await run(() => completeLaunchRequirement({ data: { journeyRequirementId: requirementId, confirmed: true } }));
   }
+  async function submitEvidence(requirementId: string, statement: string) {
+    await run(() => submitLaunchEvidence({ data: { journeyRequirementId: requirementId, statement } }));
+  }
   async function saveOrientation(input: { title: string; startsAt: string; endsAt: string; timezone: string }) {
     await run(() => scheduleLaunchOrientation({ data: { programId: launch!.id, ...input } }));
   }
@@ -331,6 +358,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
         This depends on someone outside your school and CAN. Recorded waiting is not approval.
       </p>}
       <div className="mt-4"><TaskDestination launch={launch} task={next} /></div>
+      <LaunchEvidenceStatement key={next.id} task={next} busy={busy} submit={submitEvidence} />
       <SchoolOwnedCompletion key={next.id} task={next} busy={busy} complete={complete} />
       {next.action === "orientation" && next.state === "needs_you" &&
         <OrientationTask launch={launch} busy={busy} save={saveOrientation} />}
