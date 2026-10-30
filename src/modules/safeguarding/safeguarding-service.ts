@@ -1,3 +1,4 @@
+import { currentSafeguardingFallbacks } from "./safeguarding-routing.server";
 import { db } from "@/db/client";
 import {
   accessAccounts,
@@ -443,22 +444,39 @@ export async function acknowledgeSafeguardingConcern(actor: AccessContext, incid
 
 export async function escalateSafeguardingConcern(actor: AccessContext, incidentId: string) {
   const { incident } = await loadIncidentAndAssignment(actor, incidentId, "safeguarding.respond");
-  const { responderRows } = await loadPolicyAndResponders(incident.siteId);
-  const responders = new Map(responderRows.filter(row => row.active).map(row => [row.responsibility, row.personId]));
-  const candidates = (["deputy", "can_lead"] as const).filter(kind => responders.has(kind));
   return db.transaction(async (tx) => {
-    // The unique assignment is the idempotency boundary. Only rows won by
-    // this transaction receive notifications, events and audit entries.
-    const created = await tx.insert(safeguardingCaseAssignments).values(candidates.map(responsibility => ({
+    const [current] = await tx.select({ status: incidents.status }).from(incidents)
+      .where(eq(incidents.id, incidentId)).for("update").limit(1);
+    if (current?.status !== "filed") throw new Error("Only an open safeguarding case can be escalated");
+    const candidates = await currentSafeguardingFallbacks(tx, incident);
+    // A revoked case assignment remains revoked. Only new, currently eligible
+    // assignments receive a handoff; retries never duplicate notifications.
+    const created = candidates.length ? await tx.insert(safeguardingCaseAssignments).values(candidates.map(candidate => ({
       incidentId,
-      personId: responders.get(responsibility)!,
-      responsibility,
+      personId: candidate.personId,
+      responsibility: candidate.responsibility,
       assignedByPersonId: actor.actorPersonId,
     }))).onConflictDoNothing().returning({
       personId: safeguardingCaseAssignments.personId,
       responsibility: safeguardingCaseAssignments.responsibility,
-    });
-    if (!created.length) return { escalated: false, responsibilities: [] as string[] };
+    }) : [];
+    const active = candidates.length ? await tx.select({ personId: safeguardingCaseAssignments.personId,
+      responsibility: safeguardingCaseAssignments.responsibility,
+    }).from(safeguardingCaseAssignments).where(and(
+      eq(safeguardingCaseAssignments.incidentId, incidentId),
+      isNull(safeguardingCaseAssignments.revokedAt),
+    )) : [];
+    const unroutable = !candidates.some(candidate => active.some(assignment =>
+      assignment.personId === candidate.personId && assignment.responsibility === candidate.responsibility));
+    if (!created.length) {
+      if (unroutable) await writeAudit(tx, actor, {
+        action: "safeguarding.concern.escalation_unroutable",
+        entityType: "incident", entityId: incidentId,
+        scope: { organizationId: incident.organizationId, siteId: incident.siteId, programId: incident.programId },
+        after: { eligibleFallbackAssigned: false, emergencyServicesDispatched: false },
+      });
+      return { escalated: false, responsibilities: [] as string[], unroutable };
+    }
     await tx.insert(incidentNotifications).values(created.map(assignment => ({
       incidentId,
       recipientPersonId: assignment.personId,
@@ -496,7 +514,7 @@ export async function escalateSafeguardingConcern(actor: AccessContext, incident
       after: { routedResponsibilities: routed },
       contextExtras: { domainEventId: eventId },
     });
-    return { escalated: true, responsibilities: routed };
+    return { escalated: true, responsibilities: routed, unroutable: false };
   });
 }
 

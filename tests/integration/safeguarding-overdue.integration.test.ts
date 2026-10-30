@@ -18,7 +18,7 @@ integration("scheduled restricted safeguarding handoff",()=>{
       state.tx=tx;
       const s=await import("@/db/schema");
       const {escalateOverdueSafeguardingConcerns:sweep}=await import("@/modules/safeguarding/safeguarding-overdue.server");
-      const {acknowledgeSafeguardingConcern,resolveSafeguardingConcern,completeSafeguardingCaseReview,getSafeguardingCase,assignSafeguardingCaseReview}=await import("@/modules/safeguarding/safeguarding-service");
+      const {acknowledgeSafeguardingConcern,resolveSafeguardingConcern,completeSafeguardingCaseReview,getSafeguardingCase,assignSafeguardingCaseReview,escalateSafeguardingConcern}=await import("@/modules/safeguarding/safeguarding-service");
       const suffix=crypto.randomUUID().slice(0,8);
       const [org]=await tx.insert(s.organizations).values({type:"christian_school",name:"Safeguarding sweep fixture",slug:"sg-sweep-"+suffix}).returning();
       const [site]=await tx.insert(s.sites).values({organizationId:org!.id,name:"Synthetic campus",slug:"sg-site-"+suffix,timezone:"UTC"}).returning();
@@ -135,6 +135,27 @@ integration("scheduled restricted safeguarding handoff",()=>{
       expect(await sweep(now,1)).toMatchObject({routedRecipients:0,unroutableCases:1});
       expect(await tx.select().from(s.safeguardingCaseAssignments).where(eq(s.safeguardingCaseAssignments.incidentId,blocked.id))).toHaveLength(0);
       expect((await tx.select({status:s.incidents.status}).from(s.incidents).where(eq(s.incidents.id,blocked.id)))[0]?.status).toBe("filed");
+      // Manual handoff follows the same live recipient rules as the sweep.
+      const manual=await concern("manual",new Date(now.getTime()+86_400_000));
+      await tx.insert(s.safeguardingCaseAssignments).values({incidentId:manual.id,personId:primary.person.id,responsibility:"primary"});
+      const primaryActor=resolveAccessContext({accountId:primary.account.id,activeGrantId:primary.grant.id,sessionId:"synthetic"},[primary.grant]);
+      primaryActor.scope.siteIds=[site!.id];primaryActor.scope.programIds=[];
+      expect(await escalateSafeguardingConcern(primaryActor,manual.id)).toMatchObject({escalated:false,unroutable:true});
+      expect(await tx.select().from(s.incidentNotifications).where(eq(s.incidentNotifications.incidentId,manual.id))).toHaveLength(0);
+      await tx.update(s.accessAccounts).set({disabled:false,emailVerifiedAt:null}).where(eq(s.accessAccounts.id,replacement.account.id));
+      expect(await escalateSafeguardingConcern(primaryActor,manual.id)).toMatchObject({unroutable:true});
+      await tx.update(s.accessAccounts).set({emailVerifiedAt:now}).where(eq(s.accessAccounts.id,replacement.account.id));
+      expect(await escalateSafeguardingConcern(primaryActor,manual.id)).toMatchObject({escalated:true,responsibilities:["deputy"],unroutable:false});
+      expect(await escalateSafeguardingConcern(primaryActor,manual.id)).toMatchObject({escalated:false,unroutable:false});
+      expect(await tx.select().from(s.incidentNotifications).where(eq(s.incidentNotifications.incidentId,manual.id))).toHaveLength(1);
+      await tx.update(s.safeguardingCaseAssignments).set({revokedAt:now,revocationReason:"Synthetic restriction"})
+        .where(and(eq(s.safeguardingCaseAssignments.incidentId,manual.id),eq(s.safeguardingCaseAssignments.personId,replacement.person.id)));
+      expect(await escalateSafeguardingConcern(primaryActor,manual.id)).toMatchObject({escalated:false,unroutable:true});
+      await tx.update(s.incidents).set({status:"closed",closedAt:now,closedByPersonId:primary.person.id}).where(eq(s.incidents.id,manual.id));
+      await expect(escalateSafeguardingConcern(primaryActor,manual.id)).rejects.toThrow("Only an open safeguarding case");
+      const unroutableAudit=await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.resourceId,manual.id),
+        eq(s.auditEvents.action,"safeguarding.concern.escalation_unroutable")));
+      expect(unroutableAudit).toHaveLength(3);
       checked=true;throw rollback;
     });}catch(error){if(error!==rollback)throw error;}finally{state.tx=undefined;}
     expect(checked).toBe(true);

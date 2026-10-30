@@ -1,8 +1,9 @@
-import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, notExists, or } from "drizzle-orm";
+import { currentSafeguardingFallbacks } from "./safeguarding-routing.server";
+import { and, asc, eq, gt, isNotNull, isNull, lt, notExists } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  accessAccounts, accountPersonGrants, incidentNotifications, incidents, people,
-  safeguardingCaseAssignments, safeguardingConcerns, safeguardingSiteResponders,
+  incidentNotifications, incidents,
+  safeguardingCaseAssignments, safeguardingConcerns,
 } from "@/db/schema";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
@@ -53,21 +54,7 @@ export async function escalateOverdueSafeguardingConcerns(now = new Date(), page
         if (humanAcknowledgment.length) return null;
         // Re-evaluate current Site appointments and actual account scope on
         // every attempt. An old intake snapshot is not a current routing grant.
-        const recipientRows = await tx.select({ personId: safeguardingSiteResponders.personId,
-          responsibility: safeguardingSiteResponders.responsibility,
-        }).from(safeguardingSiteResponders)
-          .innerJoin(people, eq(people.id, safeguardingSiteResponders.personId))
-          .innerJoin(accountPersonGrants, eq(accountPersonGrants.personId, people.id))
-          .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
-          .where(and(eq(safeguardingSiteResponders.siteId, incident.siteId),
-            inArray(safeguardingSiteResponders.responsibility, ["deputy", "can_lead"]),
-            eq(people.active, true), eq(accountPersonGrants.active, true),
-            eq(accountPersonGrants.organizationId, incident.organizationId!),
-            or(eq(accountPersonGrants.siteId, incident.siteId), isNull(accountPersonGrants.siteId)),
-            inArray(accountPersonGrants.role, ["safeguarding_responder", "safeguarding_lead"]),
-            eq(accessAccounts.disabled, false), isNotNull(accessAccounts.emailVerifiedAt)))
-          .for("share", { of: [safeguardingSiteResponders, people, accountPersonGrants, accessAccounts] });
-        const recipients = [...new Map(recipientRows.map(row => [row.personId+":"+row.responsibility,row])).values()];
+        const recipients = await currentSafeguardingFallbacks(tx, incident);
         if (!recipients.length) return { routed: 0, unroutable: true };
         const prior = await tx.select({ personId: incidentNotifications.recipientPersonId,
           responsibility: incidentNotifications.recipientLabel,

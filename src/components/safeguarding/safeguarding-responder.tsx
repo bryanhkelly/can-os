@@ -74,7 +74,10 @@ export function SafeguardingResponder({ workspace, initialCaseId, reload }: {
         setNotice("Your human acknowledgment is recorded. It is not an outside-agency report.");
       } else {
         const result = await escalateAssignedSafeguardingConcern({ data: { incidentId: selectedId } });
-        setNotice(result.escalated ? "Deputy and CAN fallback coverage has been assigned where not already active." : "Deputy and CAN fallback coverage is already assigned; no duplicate escalation was created.");
+        setNotice(result.unroutable
+          ? "No currently eligible deputy or CAN fallback can receive this handoff. The case remains open; use the configured offline escalation procedure and arrange authorized coverage."
+          : result.escalated ? "Currently eligible deputy and CAN fallback responders have been assigned where not already active."
+          : "Currently eligible fallback coverage is already assigned; no duplicate escalation was created.");
       }
       await refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The response update was not saved."); }
