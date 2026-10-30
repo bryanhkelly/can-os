@@ -141,7 +141,7 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
   const [program]=await db.select({organizationId:programs.organizationId,siteId:programs.siteId}).from(programs)
    .where(eq(programs.id,data.programId)).limit(1);
   if(!program||!actor.scope.organizationIds?.includes(program.organizationId)||
-   (program.siteId!==null&&actor.scope.siteIds!==undefined&&!actor.scope.siteIds.includes(program.siteId)))throw new AuthorizationError("admissions school and organization");
+   (actor.scope.siteIds!==undefined&&(!program.siteId||!actor.scope.siteIds.includes(program.siteId))))throw new AuthorizationError("admissions school and organization");
   return db.transaction(async tx=>{
    let existingStudent:typeof studentProfiles.$inferSelect|undefined;
    let existingChoice:Awaited<ReturnType<typeof existingStudentChoices>>[number]|undefined;
