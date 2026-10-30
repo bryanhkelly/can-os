@@ -102,6 +102,15 @@ describe("Journey completion transactions", () => {
     }));
   });
 
+  it("preserves existing evidence when recording school-owned completion", async () => {
+    select.mockReturnValueOnce(query([{ ...current, evidence: [{ kind: "previous", fact: "recorded" }] }]))
+      .mockReturnValueOnce(query([]));
+    await completeJourneyRequirement(context, "requirement", [{ fact: "school_confirmed" }]);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      evidence: [{ kind: "previous", fact: "recorded" }, { fact: "school_confirmed" }],
+    }));
+  });
+
   it("does not promote a Journey while blocking requirements remain", async () => {
     select.mockReturnValueOnce(query([current])).mockReturnValueOnce(query([{ id: "blocking" }]));
     await expect(completeJourneyRequirement(context, "requirement")).resolves.toBe("in_progress");
