@@ -101,7 +101,7 @@ export function assertPublishedFamilyInvitationDestination(input: {
   siteOrganizationId: string;
   publicationSiteId: string;
 }): void {
-  if (input.status !== "active" || !publishableAcademicProgram({
+  if (!["draft", "launching", "ready", "active"].includes(input.status) || !publishableAcademicProgram({
     type: input.type,
     status: input.status,
     siteId: input.programSiteId,
