@@ -460,6 +460,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
             {task.state !== "complete" && task.action !== "opening" &&
               <TaskDestination launch={launch} task={task} />}
             {canReviewSelectedLaunch && task.id !== next?.id && task.pendingEvidenceReview && <InstitutionalEvidenceReview key={task.id} task={task} busy={busy} review={reviewEvidence} />}
+            {task.id !== next?.id && task.evidenceReviewCorrectionPending && <LaunchEvidenceStatement key={task.id} task={task} busy={busy} submit={submitEvidence} />}
             {task.state !== "complete" && task.action === "orientation" &&
               <Link to="/operations/launch/$programId" params={{programId:launch.id}}
                 search={{siteId:launch.siteId??undefined,programId:undefined}}
