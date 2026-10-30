@@ -600,9 +600,9 @@ export const verifyAdmissionsGuardianRelationship=createServerFn({method:"POST"}
     organizationId:programs.organizationId,siteId:programs.siteId,
    }).from(applications).innerJoin(programs,eq(programs.id,applications.programId))
      .where(eq(applications.id,data.applicationId)).limit(1);
-   if(!app||!actor.scope.programIds?.includes(app.programId)||
+   if(!app||(actor.scope.programIds!==undefined&&!actor.scope.programIds.includes(app.programId))||
       !actor.scope.organizationIds?.includes(app.organizationId)||
-      (app.siteId!==null&&!actor.scope.siteIds?.includes(app.siteId)))
+      (app.siteId!==null&&actor.scope.siteIds!==undefined&&!actor.scope.siteIds.includes(app.siteId)))
     throw new AuthorizationError("guardian relationship verification Program, school and site scope");
    assertRecordWriteAllowed(app.metadata,"registrar");
    const contactId=applicationGuardianContact(app.metadata,app.submittedByPersonId);
