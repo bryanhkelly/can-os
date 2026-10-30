@@ -284,7 +284,7 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
       if (row.status !== "needs_you" && row.status !== "needs_can")
         throw new Error("Evidence submissions are only accepted for school or CAN-owned pending requirements");
       const previousStatement = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_statement");
-      const latestReview = [...row.evidence].reverse().find(item => item.kind === "document_review");
+      const latestReview = [...row.evidence].reverse().find(item => item.kind === "document_review" || item.kind === "launch_evidence_review");
       if (previousStatement?.text === data.statement && previousStatement?.submittedByPersonId === context.actorPersonId &&
           (!latestReview || row.evidence.lastIndexOf(previousStatement) > row.evidence.lastIndexOf(latestReview)))
         return { journeyRequirementId: row.id, submitted: true, duplicate: true };
