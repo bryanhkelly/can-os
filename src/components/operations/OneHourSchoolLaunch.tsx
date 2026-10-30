@@ -321,6 +321,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
       {next.requiresRegistrarReview && <p className="mt-2 text-sm font-semibold">This requirement needs the registrar evidence-review workflow; it cannot be self-certified.</p>}
       {Boolean(next.rejectedReviewCount) && <p role="alert" className="mt-2 text-sm font-semibold">{next.latestReviewStatus === "rejected" ? "Latest evidence review was rejected; follow up through the registrar workflow." : `${next.rejectedReviewCount} historical rejection(s); latest review: ${next.latestReviewStatus ?? "unknown"}.`}</p>}
       {Boolean(next.reviewNoteCount) && <p className="mt-1 text-xs text-muted-foreground">{next.reviewNoteCount} registrar review note(s) on record.</p>}
+      {next.latestReviewStatus === "rejected" && next.latestReviewReason && <p className="mt-2 rounded-lg border p-3 text-sm">Correction requested: {next.latestReviewReason}</p>}
       {next.requirementId && <p className="mt-1 text-xs text-muted-foreground">Saved requirement: <code className="select-all">{next.requirementId}</code></p>}
       {next.state === "needs_can" && <p className="mt-3 text-sm">
         CAN owns this work. Your school cannot mark it complete from this screen.
