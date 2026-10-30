@@ -5,7 +5,11 @@ const state=vi.hoisted(()=>({
   scope:{sectionIds:["delegated-section"]}} as Record<string,unknown>,
 }));
 vi.mock("@tanstack/react-start",()=>({
- createServerFn:()=>({validator:()=>({handler:(fn:unknown)=>fn}),handler:(fn:unknown)=>fn}),
+ createServerFn:()=>({
+  validator:(parse:(value:unknown)=>unknown)=>({handler:(fn:(arg:unknown)=>unknown)=>
+   async(input:{data:unknown})=>fn({data:parse(input.data)})}),
+  handler:(fn:unknown)=>fn,
+ }),
 }));
 vi.mock("@tanstack/react-start/server",()=>({setResponseHeader:vi.fn()}));
 vi.mock("@/modules/identity/actors.server",()=>({
@@ -24,7 +28,7 @@ vi.mock("@/db/client",()=>{
  const tx={select:query,update:state.writes};
  return {db:{...tx,transaction:async(fn:(tx:unknown)=>unknown)=>fn(tx)}};
 });
-import {getCalendarMonth} from "@/modules/calendar/calendar.functions";
+import {getCalendarMonth,getCalendarRange} from "@/modules/calendar/calendar.functions";
 import {reviseCalendarEventForActor} from "@/modules/calendar/calendar-events.server";
 beforeEach(()=>{
  vi.clearAllMocks();vi.stubEnv("DATABASE_URL","postgresql://isolated-mock");
@@ -54,5 +58,23 @@ describe("calendar authority for delegated academic teachers",()=>{
    {action:"edit",eventId:"event",title:"Updated class"},
   )).rejects.toThrow("delegation revoked");
   expect(state.writes).not.toHaveBeenCalled();
+ });
+});
+
+
+describe("bounded calendar range",()=>{
+ it("uses the canonical calendar visibility for a daily read",async()=>{
+  const invoke=getCalendarRange as unknown as (arg:unknown)=>Promise<unknown>;
+  await expect(invoke({data:{startsAt:"2026-10-29T00:00:00Z",endsAt:"2026-10-30T00:00:00Z"}}))
+   .resolves.toMatchObject({connected:true,items:[],truncated:false});
+  expect(state.classes).toHaveBeenCalledWith(state.actor);
+ });
+ it.each([
+  ["2026-10-30T00:00:00Z","2026-10-29T00:00:00Z"],
+  ["2026-10-29T00:00:00Z","2026-10-29T00:00:00Z"],
+  ["2026-10-29T00:00:00Z","2026-11-02T00:00:00Z"],
+ ])("rejects invalid or excessive calendar windows",async(startsAt,endsAt)=>{
+  const invoke=getCalendarRange as unknown as (arg:unknown)=>Promise<unknown>;
+  await expect(invoke({data:{startsAt,endsAt}})).rejects.toThrow("at most three days");
  });
 });
