@@ -41,15 +41,16 @@ const applicant=z.union([
 ]);
 export async function registrar(){
  const actor=await getCommandContext(getRequest());
- if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.programIds?.length)throw new AuthorizationError("admissions registrar");
+ if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)throw new AuthorizationError("admissions registrar");
  assertCapability(actor,"enrollment.decide");
  return actor;
 }
 export const listAdmissionsIntakePrograms=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await registrar();
  return db.select({id:programs.id,name:programs.name,siteId:programs.siteId}).from(programs)
-  .where(and(inArray(programs.id,actor.scope.programIds!),
-    inArray(programs.organizationId,actor.scope.organizationIds??[])))
+  .where(and(inArray(programs.organizationId,actor.scope.organizationIds??[]),
+    ...(actor.scope.programIds ? [inArray(programs.id,actor.scope.programIds)] : []),
+    ...(actor.scope.siteIds ? [inArray(programs.siteId,actor.scope.siteIds)] : [])))
   .orderBy(programs.name);
 });
 const intakeGuardian=alias(people,"intake_guardian");
