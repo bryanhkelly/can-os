@@ -7,7 +7,8 @@ export const getScopedPrograms=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await requireActor(["teacher","registrar"],"program.read");
  if(!actor.scope.organizationIds?.length)return [] as ProgramPreview[];
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
- const records=await db.select({id:s.programs.id,name:s.programs.name,status:s.programs.status,type:s.programs.type,gradeRange:s.programs.gradeRange,deliveryModel:s.programs.deliveryModel,metadata:s.programs.metadata,organizationName:s.organizations.name})
+ const records=await db.select({id:s.programs.id,name:s.programs.name,status:s.programs.status,type:s.programs.type,gradeRange:s.programs.gradeRange,deliveryModel:s.programs.deliveryModel,metadata:s.programs.metadata,organizationName:s.organizations.name,siteName:s.sites.name})
+ .leftJoin(s.sites,eq(s.programs.siteId,s.sites.id))
  .from(s.programs).innerJoin(s.organizations,eq(s.programs.organizationId,s.organizations.id))
  .where(and(inArray(s.programs.organizationId,actor.scope.organizationIds),
   ...(actor.scope.programIds?[inArray(s.programs.id,actor.scope.programIds)]:[]),
@@ -18,6 +19,6 @@ export const getScopedPrograms=createServerFn({method:"GET"}).handler(async()=>{
  const enrollments=await db.select({id:s.enrollments.id,programId:s.enrollments.programId}).from(s.enrollments).where(and(inArray(s.enrollments.programId,visibleIds),eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
  const sectionIds=sections.map(x=>x.id);
  const teachers=sectionIds.length?await db.select({sectionId:s.sectionTeachers.sectionId}).from(s.sectionTeachers).where(inArray(s.sectionTeachers.sectionId,sectionIds)):[];
- return records.map(p=>({id:p.id,name:p.name,status:p.status,type:p.type,organizationName:p.organizationName,siteName:null,gradeRange:p.gradeRange,deliveryModel:p.deliveryModel,counts:{sections:sections.filter(x=>x.programId===p.id).length,enrollments:enrollments.filter(x=>x.programId===p.id).length,teachers:teachers.filter(x=>sections.some(sec=>sec.id===x.sectionId&&sec.programId===p.id)).length,calendarDays:0}}));
+ return records.map(p=>({id:p.id,name:p.name,status:p.status,type:p.type,organizationName:p.organizationName,siteName:p.siteName,gradeRange:p.gradeRange,deliveryModel:p.deliveryModel,counts:{sections:sections.filter(x=>x.programId===p.id).length,enrollments:enrollments.filter(x=>x.programId===p.id).length,teachers:teachers.filter(x=>sections.some(sec=>sec.id===x.sectionId&&sec.programId===p.id)).length,calendarDays:0}}));
 });
 export const getSyntheticPrograms=getScopedPrograms;
