@@ -391,6 +391,10 @@ export async function acknowledgeSafeguardingConcern(actor: AccessContext, incid
     "safeguarding.respond",
   );
   return db.transaction(async (tx) => {
+    // Shared with the scheduled overdue processor: acknowledgment and routing
+    // cannot pass each other's unacknowledged check concurrently.
+    await tx.select({id:incidents.id}).from(incidents)
+      .where(eq(incidents.id,incidentId)).for("update").limit(1);
     const notifications = await tx.select().from(incidentNotifications).where(and(
       eq(incidentNotifications.incidentId, incidentId),
       eq(incidentNotifications.recipientPersonId, actor.actorPersonId!),
@@ -726,6 +730,9 @@ export async function claimOverdueSafeguardingResponse(actor: AccessContext, inc
   return db.transaction(async tx => {
     // Re-check inside the transaction: a concurrent acknowledgment between
     // the pre-checks and this write must cancel the takeover.
+    const [current] = await tx.select({status:incidents.status}).from(incidents)
+      .where(eq(incidents.id,incidentId)).for("update").limit(1);
+    if(current?.status!=="filed")throw new Error("This case is no longer awaiting a first response");
     const raced = await tx.select({ id: incidentNotifications.id })
       .from(incidentNotifications).where(and(
         eq(incidentNotifications.incidentId, incidentId),
