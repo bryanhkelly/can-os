@@ -291,6 +291,8 @@ export const submitLaunchEvidence = createServerFn({ method: "POST" })
         throw new Error("This launch requirement is closed to evidence submissions");
       if (row.status !== "needs_you" && row.status !== "needs_can")
         throw new Error("Evidence submissions are only accepted for school or CAN-owned pending requirements");
+      if (row.metadata.enrollmentForm !== undefined)
+        throw new Error("Enrollment form evidence belongs in the dedicated admissions review workflow");
       const previousStatement = [...row.evidence].reverse().find(item => item.kind === "launch_evidence_statement");
       const pendingDecision = row.evidence.findLastIndex(item => item.kind === "launch_evidence_statement") >
         row.evidence.findLastIndex(item => item.kind === "launch_evidence_review");
