@@ -209,6 +209,17 @@ describe("canonical launch guidance", () => {
     expect(guidance.ready).toBe(true);
   });
 
+  it("keeps enrollment-form review in its dedicated admissions workflow", () => {
+    const guidance = buildLaunchGuidance(launch({
+      requirements: [{ id: "enrollment", key: "enrollment-form", title: "Enrollment form",
+        status: "needs_can", blocking: true, metadata: { enrollmentForm: { title: "Application" }, evidenceReviewRequired: true },
+        evidence: [{ kind: "launch_evidence_statement", text: "Application attached", submittedAt: "2026-10-30T10:00:00Z" }] }],
+    }));
+    expect(guidance.nextTask?.pendingEvidenceReview).toBe(false);
+    expect(guidance.nextTask?.requiresRegistrarReview).toBe(true);
+    expect(guidance.ready).toBe(false);
+  });
+
   it("fails closed for an unrecognized persisted requirement state", () => {
     const guidance = buildLaunchGuidance(launch({
       requirements: [{ id: "unknown", key: "other", title: "Other", status: "unexpected", blocking: true }],
