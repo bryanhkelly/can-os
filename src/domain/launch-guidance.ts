@@ -34,6 +34,7 @@ export type LaunchGuidanceTask = {
   rejectedReviewCount?: number;
   latestReviewStatus?: string | null;
   latestReviewReason?: string | null;
+  latestReviewAt?: string | null;
   requiresRegistrarReview?: boolean;
   action: "academics" | "admissions" | "orientation" | "opening" | "review" | "none";
 };
@@ -79,6 +80,7 @@ export function buildLaunchGuidance(launch: LaunchGuidanceRecord) {
     rejectedReviewCount: requirement.evidence?.filter(item => item.kind === "document_review" && item.status === "rejected").length ?? 0,
     latestReviewStatus: String([...(requirement.evidence ?? [])].reverse().find(item => item.kind === "document_review" && typeof item.status === "string")?.status ?? "") || null,
     latestReviewReason: (() => { const review = [...(requirement.evidence ?? [])].reverse().find(item => item.kind === "document_review" && typeof item.status === "string"); return typeof review?.reason === "string" ? review.reason : null; })(),
+    latestReviewAt: (() => { const review = [...(requirement.evidence ?? [])].reverse().find(item => item.kind === "document_review" && typeof item.status === "string"); return typeof review?.reviewedAt === "string" ? review.reviewedAt : null; })(),
     requiresRegistrarReview: requirement.metadata?.enrollmentForm !== undefined ||
       requirement.evidence?.some(item => item.kind === "document_review") === true,
     title: requirement.title,
