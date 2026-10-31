@@ -29,14 +29,15 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const [courseCredits,setCourseCredits]=useState("");
  const [reviewTeacherId,setReviewTeacherId]=useState("");
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
- const mutation=useWorkspaceMutation({mutationFn: (operation:()=>Promise<unknown>)=>operation()});
- const busy=mutation.isPending;
+ const mutation=useWorkspaceMutation({mutationFn: (operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
+ const busy=mutation.isSubmitting;
  async function run(operation:()=>Promise<unknown>,message:string){
   setError("");setNotice("");
   try{
-   const result=await mutation.submit(operation);
-   if(result===undefined && mutation.isPending)return;
-   await router.invalidate();setNotice(message);
+   const submission=await mutation.submit(operation);
+   if(submission.status === "ignored") return;
+   if(submission.refreshError){setError("Saved successfully, but refresh failed. Reopen this workspace; do not resubmit.");return;}
+   setNotice(message);
   }catch(e){setError(e instanceof Error?e.message:"Unable to save launch setup");}
  }
  return <WorkspaceShell eyebrow="CAN OS · School launch" title={data.program.name+" · academic setup"}
