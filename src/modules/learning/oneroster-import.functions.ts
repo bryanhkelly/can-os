@@ -24,10 +24,11 @@ export const validateOneRosterCsvBundle=createServerFn({method:"POST"})
  .handler(async({data})=>{
   const actor=await requireActor(["registrar"],"curriculum.publish");
   await readMarketplace(actor,data.programId);
-  const [program]=await db.select({organizationId:programs.organizationId})
+  const [program]=await db.select({id:programs.id,organizationId:programs.organizationId,siteId:programs.siteId})
    .from(programs).where(eq(programs.id,data.programId)).limit(1);
-  if(!program||!actor.scope.organizationIds?.includes(program.organizationId))
-   throw new AuthorizationError("institutional OneRoster preview");
+  if(!program||!program.siteId||!actor.scope.organizationIds?.includes(program.organizationId)||
+     !actor.scope.siteIds?.includes(program.siteId)||!actor.scope.programIds?.includes(program.id))
+   throw new AuthorizationError("same-program institutional OneRoster preview");
   const report=previewOneRosterBundle(data.files);
   const digest=createHash("sha256").update(JSON.stringify(data.files)).digest("hex");
   const reconciliation=planOneRosterReconciliation(report.previews,new Map());
@@ -75,6 +76,40 @@ const classMappingInput=input.extend({
     sectionId:z.string().uuid(),
   }).strict()).min(1).max(500),
 }).strict();
+
+/** Read-only registrar review of explicit proposed Section mappings. No identity linking. */
+const reconciliationInput=input.extend({
+  classMappings:z.array(z.object({
+    sourcedId:z.string().trim().min(1).max(256),
+    sectionId:z.string().uuid(),
+  }).strict()).max(500),
+}).strict();
+export const previewOneRosterReconciliation=createServerFn({method:"POST"})
+ .validator((value:unknown)=>reconciliationInput.parse(value))
+ .handler(async({data})=>{
+   const actor=await requireActor(["registrar"],"curriculum.publish");
+   await readMarketplace(actor,data.programId);
+   const [program]=await db.select({id:programs.id,organizationId:programs.organizationId,
+     siteId:programs.siteId}).from(programs).where(eq(programs.id,data.programId)).limit(1);
+   if(!program||!program.siteId||!actor.scope.organizationIds?.includes(program.organizationId)||
+       !actor.scope.siteIds?.includes(program.siteId)||!actor.scope.programIds?.includes(program.id))
+     throw new AuthorizationError("same-program OneRoster reconciliation preview");
+   const report=previewOneRosterBundle(data.files);
+   const bySource=new Map(data.classMappings.map(m=>[m.sourcedId,m.sectionId]));
+   if(bySource.size!==data.classMappings.length)throw new Error("Duplicate external class mapping.");
+   const externalClasses=new Set(report.previews.find(p=>p.kind==="classes")?.rows.map(r=>r.sourcedId)??[]);
+   if(data.classMappings.some(m=>!externalClasses.has(m.sourcedId)))
+     throw new Error("Mapped sourcedId must occur in the supplied classes CSV.");
+   const ids=[...new Set(data.classMappings.map(m=>m.sectionId))];
+   if(ids.length){
+     const owned=await db.select({id:sections.id,active:sections.active}).from(sections)
+       .where(and(inArray(sections.id,ids),eq(sections.programId,program.id),eq(sections.siteId,program.siteId)));
+     if(owned.length!==ids.length||owned.some(s=>!s.active))
+       throw new AuthorizationError("active Section owned by the selected Program and Site");
+   }
+   return {valid:report.valid,errors:report.previews.flatMap(p=>p.errors),warnings:report.warnings,
+     reconciliation:planOneRosterReconciliation(report.previews,bySource)};
+ });
 
 export const applyOneRosterClassMappings=createServerFn({method:"POST"})
  .validator((value:unknown)=>classMappingInput.parse(value))
