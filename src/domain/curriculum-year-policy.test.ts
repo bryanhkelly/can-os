@@ -20,6 +20,17 @@ describe("annual adoption policy",()=>{
   expect(annualAdoptionEligible({...base,scope:{...scope,programId:"other"}})).toBe(false);
   expect(annualAdoptionEligible({...base,scope:{...scope,academicProviderOrganizationId:"other"}})).toBe(false);
  });
+ it("rejects another organization, site or school year without an annual grant",()=>{
+  expect(annualAdoptionEligible({...base,scope:{...scope,organizationId:"other-school"}})).toBe(false);
+  expect(annualAdoptionEligible({...base,scope:{...scope,siteId:"other-site"}})).toBe(false);
+  expect(annualAdoptionEligible({...base,scope:{...scope,academicYearId:"2028"}})).toBe(false);
+  expect(annualAdoptionEligible({...base,license:{...license,organizationId:"other-school"}})).toBe(false);
+ });
+ it("rejects license not yet effective, expired now or ending before the school year",()=>{
+  expect(annualAdoptionEligible({...base,license:{...license,startsAt:d("2027-08-02")}})).toBe(false);
+  expect(annualAdoptionEligible({...base,now:d("2029-01-01")})).toBe(false);
+  expect(annualAdoptionEligible({...base,license:{...license,endsAt:d("2028-06-29")}})).toBe(false);
+ });
  it("rejects superseded or rolled-back adoptions",()=>{
   expect(annualAdoptionEligible({...base,adoption:{...adoption,status:"rolled_back"}})).toBe(false);
   expect(annualAdoptionEligible({...base,adoption:{...adoption,supersededAt:d("2027-08-04")}})).toBe(false);
