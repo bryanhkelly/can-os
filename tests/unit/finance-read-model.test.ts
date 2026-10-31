@@ -22,6 +22,9 @@ describe("finance statements", () => {
     const result = await readFinanceStatement(store, identity(["house"]), "ob", true);
     expect(result?.settlement).toMatchObject({ netCents: 7000, churchCents: 1400, canCents: 5600 });
     expect(result?.state).toBe("paid");
+    expect(result?.accountBalanceCents).toBe(3000);
+    expect(result?.outstandingCents).toBe(0);
+    expect(result?.returnedCents).toBe(3000);
   });
   it("rejects household enumeration", async () => {
     await expect(readFinanceStatement(store, identity(["other"]), "ob", true)).rejects.toThrow();
