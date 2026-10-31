@@ -402,6 +402,9 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    issuerMatches:program?.issuerId===doc.issuerId,
   }))throw new AuthorizationError("Original transfer consent or guardian authority no longer valid");
   const pdf=academicDocumentPdf(doc);
+  // Rendering may cross the expiry boundary; the row remains locked against
+  // concurrent registrar revocation until the audited disclosure commits.
+  if(release.expiresAt<=new Date())throw new AuthorizationError("release expired during PDF rendering");
   await writeAudit(tx,context,{action:"academic_credential.release.download",entityType:"academic_credential_release_authorization",entityId:release.id,scope:{organizationId:release.issuingOrganizationId},after:{recipientPersonId:recipientPersonId,credentialId}});
   return {filename:`${kind}-${credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
   });
