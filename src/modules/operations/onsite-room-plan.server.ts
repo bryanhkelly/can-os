@@ -6,12 +6,15 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { siteDate } from "@/domain/expected-attendance";
 import { coversLocalSupervisionBlock } from "@/domain/onsite-supervision-coverage";
-import { roomPlanBlockSchema, submitRoomPlanSchema } from "@/domain/onsite-room-plan";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { roomPlanBlockSchema, submitRoomPlanSchema, reviewRoomPlanSchema } from "@/domain/onsite-room-plan";
+import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
-import { schoolIdentity, verifyChurchEvidenceSubmitter } from "./school-opening.server";
+import { schoolIdentity, verifyCANSchoolApprover, verifyChurchEvidenceSubmitter } from "./school-opening.server";
 import { requireCurrentSiteLocalDelegate } from "./site-local-delegation.server";
 import { ROOM_COVERAGE_DOCUMENT_CATEGORY } from "./onsite-block-room-plan.server";
+import { verifiedScheduledSectionFacilitators, scheduledBlockHasNamedFacilitator } from "./section-coverage-verification.server";
+import { requireCurrentOnsiteAdultSafety } from "./onsite-block-safety.server";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import type { z } from "zod";
 
 type Reader = Pick<typeof db, "select">;
@@ -75,6 +78,7 @@ export async function submitOnsiteRoomPlan(actor: AccessContext, value: z.infer<
     await tx.select({ id: programs.id }).from(programs).where(eq(programs.id, input.programId)).for("update");
     const { school, block } = await scheduledRoomBlock(tx, input);
     await authorizeRoomPlanHost(tx, actor, school);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-presence:"+school.siteId+":"+input.date+":"+input.sectionId+":"+input.periodId}))`);
     const [site] = await tx.select({ timezone: sites.timezone }).from(sites).where(eq(sites.id, school.siteId)).limit(1);
     const timezone = site!.timezone;
     const today = siteDate(new Date(), timezone);
@@ -114,5 +118,68 @@ export async function submitOnsiteRoomPlan(actor: AccessContext, value: z.infer<
     await writeAudit(tx, actor, { action: "onsite.room_plan.submitted", entityType: "document", entityId: input.documentId,
       scope, after: metadata, contextExtras: { domainEventId: eventId } });
     return { documentId: input.documentId, created: true };
+  });
+}
+
+/** Verification is independent CAN review of a staff plan, never a legal room
+ * inspection, school-opening decision, staff arrival or custody handoff. */
+export async function reviewOnsiteRoomPlan(actor: AccessContext, value: z.infer<typeof reviewRoomPlanSchema>) {
+  const input = reviewRoomPlanSchema.parse(value);
+  return db.transaction(async tx => {
+    await tx.select({ id: programs.id }).from(programs).where(eq(programs.id, input.programId)).for("update");
+    const { school, block } = await scheduledRoomBlock(tx, input);
+    verifyCANSchoolApprover(actor, school.institutionId);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:"+input.programId}))`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"onsite-presence:"+school.siteId+":"+input.date+":"+input.sectionId+":"+input.periodId}))`);
+    const [document] = await currentRoomPlan(tx, input);
+    if (!document || document.id !== input.documentId || document.metadata.isCurrent === false ||
+        document.metadata.siteId !== school.siteId || document.metadata.programId !== input.programId)
+      throw new Error("Room plan changed; review the current version");
+    if (document.uploadedByPersonId === actor.actorPersonId) throw new AuthorizationError("independent room plan reviewer other than the submitter");
+    const decision = input.decision === "approve" ? "approved" : "rejected";
+    if (document.metadata.reviewStatus !== "pending") {
+      if (document.metadata.reviewStatus === decision && document.metadata.reviewReason === input.reason &&
+          document.metadata.reviewedByPersonId === actor.actorPersonId)
+        return { documentId: document.id, changed: false };
+      throw new Error("This version was already reviewed; submit a corrected plan");
+    }
+    if (input.decision === "approve") {
+      const [site] = await tx.select({ timezone: sites.timezone }).from(sites).where(eq(sites.id, school.siteId)).limit(1);
+      const scope = { date: input.date, timeZone: site!.timezone, ...block };
+      const m = document.metadata;
+      if (m.startsAtLocal !== block.startsAtLocal || m.endsAtLocal !== block.endsAtLocal ||
+          !coversLocalSupervisionBlock({ ...scope, effectiveFrom: new Date(), effectiveThrough: document.expiresAt }))
+        throw new Error("The current schedule and full-block plan validity must match before approval");
+      const primary = m.primaryPersonId, backup = m.backupPersonId;
+      if (typeof primary !== "string" || typeof backup !== "string" || primary === backup)
+        throw new Error("Two distinct named adults are required");
+      await requireChurchHostedOperatingServices(tx, input.programId, ["onsite_supervision"]);
+      const appointments = await verifiedScheduledSectionFacilitators(tx,
+        { siteId: school.siteId, organizationId: school.organizationId },
+        [primary, backup].map(personId => ({ personId, programId: input.programId, sectionId: input.sectionId })));
+      for (const personId of [primary, backup]) {
+        if (!scheduledBlockHasNamedFacilitator(appointments, { personId, programId: input.programId, sectionId: input.sectionId, ...scope }))
+          throw new AuthorizationError("current primary and backup Section appointments for the entire block");
+        await requireCurrentOnsiteAdultSafety(tx, { personId, ...scope });
+      }
+    }
+    const now = new Date();
+    await tx.update(documents).set({ verifiedAt: decision === "approved" ? now : null,
+      verifiedByPersonId: decision === "approved" ? actor.actorPersonId : null,
+      metadata: { ...document.metadata, reviewStatus: decision, reviewReason: input.reason,
+        reviewedAt: now.toISOString(), reviewedByPersonId: actor.actorPersonId }, updatedAt: now,
+    }).where(eq(documents.id, document.id));
+    const scope = { organizationId: school.institutionId, siteId: school.siteId, programId: input.programId, sectionId: input.sectionId };
+    const eventId = await emitEvent(tx, { eventType: EventTypes.OnsiteRoomPlanReviewed,
+      aggregateType: "document", aggregateId: document.id, actorPersonId: actor.actorPersonId, ...scope,
+      payload: { date: input.date, periodId: input.periodId, decision: input.decision } });
+    await writeAudit(tx, actor, { action: "onsite.room_plan.reviewed", entityType: "document", entityId: document.id,
+      scope, before: { reviewStatus: "pending" }, after: { decision: input.decision, reason: input.reason },
+      contextExtras: { domainEventId: eventId } });
+    await notifyMany(tx, [{ recipientPersonId: document.uploadedByPersonId, type: "onsite_room_plan_reviewed",
+      title: decision === "approved" ? "Room coverage plan reviewed" : "Room coverage plan needs correction",
+      body: "Open the school supervision workspace for the current room-plan decision. This does not authorize opening or confirm staff arrival.",
+      resourceType: "program", resourceId: input.programId, eventId }]);
+    return { documentId: document.id, changed: true };
   });
 }

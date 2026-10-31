@@ -120,6 +120,7 @@ for (const eventType of [
   EventTypes.ChildPickupDenied,
   EventTypes.ChildUncollectedFollowUpCreated,
   EventTypes.OnsiteRoomPlanSubmitted,
+  EventTypes.OnsiteRoomPlanReviewed,
   EventTypes.IncidentFiled,
   EventTypes.IncidentAmended,
   EventTypes.IncidentReviewCompleted,

@@ -1,17 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
 import { submitRoomPlanSchema } from "@/domain/onsite-room-plan";
-import { submitOnsiteRoomPlan } from "@/modules/operations/onsite-room-plan.server";
+import { submitOnsiteRoomPlan, reviewOnsiteRoomPlan } from "@/modules/operations/onsite-room-plan.server";
 const state = vi.hoisted(() => ({ rows: [] as unknown[][], inserts: [] as Record<string, unknown>[],
-  updates: [] as Record<string, unknown>[], delegate: vi.fn() }));
+  updates: [] as Record<string, unknown>[], delegate: vi.fn(), reviewer: vi.fn(), safety: vi.fn(), appointed: true }));
 vi.mock("@/modules/operations/school-opening.server", () => ({
   schoolIdentity: async () => ({ programId:"program", siteId:"site", organizationId:"church", institutionId:"can" }),
-  verifyChurchEvidenceSubmitter: vi.fn(),
+  verifyChurchEvidenceSubmitter: vi.fn(), verifyCANSchoolApprover: state.reviewer,
 }));
 vi.mock("@/modules/operations/site-local-delegation.server", () => ({ requireCurrentSiteLocalDelegate: state.delegate }));
-vi.mock("@/platform/mutation", () => ({ emitEvent: async () => "event", writeAudit: vi.fn() }));
+vi.mock("@/platform/mutation", () => ({ emitEvent: async () => "event", writeAudit: vi.fn(), notifyMany: vi.fn() }));
+vi.mock("@/modules/operations/section-coverage-verification.server", () => ({
+  verifiedScheduledSectionFacilitators: async () => new Map(), scheduledBlockHasNamedFacilitator: () => state.appointed,
+}));
+vi.mock("@/modules/operations/onsite-block-safety.server", () => ({ requireCurrentOnsiteAdultSafety: state.safety }));
+vi.mock("@/modules/programs/program-site-authorization.server", () => ({ requireChurchHostedOperatingServices: vi.fn() }));
 vi.mock("@/db/client", () => {
   const tx = {
+    execute: vi.fn(),
     select: () => ({ from() { return this; }, innerJoin() { return this; }, where() { return this; },
       orderBy() { return this; }, for() { return this; },
       limit: async () => state.rows.shift() ?? [],
@@ -30,7 +36,7 @@ const input = () => ({ programId:id(1), sectionId:id(2), periodId:id(3), documen
   roomLabel:"Classroom A", roomCapacity:20, expiresAt:new Date(Date.now()+3*86400_000).toISOString(),
   rationale:"The local director has reviewed this room and named adult plan." });
 beforeEach(() => {
-  vi.clearAllMocks(); state.inserts=[]; state.updates=[];
+  vi.clearAllMocks(); state.inserts=[]; state.updates=[]; state.appointed=true;
   state.rows=[[{id:"program"}],[{ startsAtLocal:"09:00",endsAtLocal:"10:00",title:"Class" }],
     [{timezone:"UTC"}],[],[]];
 });
@@ -65,5 +71,44 @@ describe("room plan submission", () => {
     const value=input();
     expect(submitRoomPlanSchema.safeParse({...value,backupPersonId:value.primaryPersonId}).success).toBe(false);
     expect(submitRoomPlanSchema.safeParse({...value,date:"2026-02-30"}).success).toBe(false);
+  });
+});
+
+function prepareReview() {
+  const value=input();
+  const review={programId:value.programId,sectionId:value.sectionId,periodId:value.periodId,date:value.date,
+    documentId:value.documentId,decision:"approve" as const,reason:"Independent review of the named classroom coverage plan."};
+  const document={id:value.documentId,uploadedByPersonId:"director",expiresAt:new Date(value.expiresAt),metadata:{
+    ...value,siteId:"site",programId:value.programId,reviewStatus:"pending",startsAtLocal:"09:00",endsAtLocal:"10:00"}};
+  state.rows=[[{id:"program"}],[{startsAtLocal:"09:00",endsAtLocal:"10:00",title:"Class"}],[document],[{timezone:"UTC"}]];
+  return {review,document,can:{...actor(),role:"can_network_steward",actorPersonId:"reviewer"} as AccessContext};
+}
+describe("independent room plan review",()=>{
+  it("checks both adult appointments and safety before approving",async()=>{
+    const {review,can}=prepareReview();
+    expect(await reviewOnsiteRoomPlan(can,review)).toMatchObject({changed:true});
+    expect(state.safety).toHaveBeenCalledTimes(2);
+    expect(state.updates[0]).toMatchObject({verifiedByPersonId:"reviewer",metadata:expect.objectContaining({reviewStatus:"approved"})});
+  });
+  it("denies an unauthorized reviewer before mutation",async()=>{
+    const {review,can}=prepareReview();state.reviewer.mockImplementationOnce(()=>{throw new Error("CAN authority required");});
+    await expect(reviewOnsiteRoomPlan(can,review)).rejects.toThrow("CAN authority required");
+    expect(state.updates).toEqual([]);
+  });
+  it("denies self-review even when the actor has CAN authority",async()=>{
+    const {review,can}=prepareReview();
+    await expect(reviewOnsiteRoomPlan({...can,actorPersonId:"director"},review)).rejects.toThrow("other than the submitter");
+    expect(state.updates).toEqual([]);
+  });
+  it("denies approval when an adult appointment is no longer current",async()=>{
+    const {review,can}=prepareReview();state.appointed=false;
+    await expect(reviewOnsiteRoomPlan(can,review)).rejects.toThrow("primary and backup Section appointments");
+    expect(state.updates).toEqual([]);
+  });
+  it("allows rejection with a reason even if adult credentials have lapsed",async()=>{
+    const {review,can}=prepareReview();state.appointed=false;
+    expect(await reviewOnsiteRoomPlan(can,{...review,decision:"reject"})).toMatchObject({changed:true});
+    expect(state.safety).not.toHaveBeenCalled();
+    expect(state.updates[0]).toMatchObject({verifiedAt:null,metadata:expect.objectContaining({reviewStatus:"rejected"})});
   });
 });
