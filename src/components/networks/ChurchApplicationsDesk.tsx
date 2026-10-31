@@ -136,7 +136,7 @@ export function ChurchApplicationsDesk() {
           {!x.invitationAcceptedAt&&<button type="button" disabled={!!working} className="mt-2 rounded border px-2 py-1 text-xs disabled:opacity-50"
             onClick={async ()=>{
               setWorking(x.id);setError("");setNotice("");
-              try { const result=await resendApprovedChurchInvitation({data:x.id});setNotice(result.deliveryStatus==="dispatched" ? "Email accepted by the configured sender; leader acceptance is still pending." : result.deliveryStatus==="cooldown" ? "Recent access link still in cooldown; try again shortly." : "Access link not sent; review the account and pending invitation."); }
+              try { const result=await resendApprovedChurchInvitation({data:x.id});setNotice(result.deliveryStatus==="dispatched" ? "Email accepted by the configured sender; leader acceptance is still pending." : result.deliveryStatus==="cooldown" ? "Recent access link still in cooldown; try again shortly." : result.deliveryStatus==="already_accepted" ? "The leader has already accepted access; refresh the desk." : "Access link not sent; review the account and pending invitation."); }
               catch(cause){setError(cause instanceof Error?cause.message:"Unable to request access email.");}
               finally{setWorking(null);}
             }}>Resend access link</button>}
