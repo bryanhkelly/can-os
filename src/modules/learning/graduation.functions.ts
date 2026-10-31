@@ -85,7 +85,8 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
   if(documented.length){
     const evidence=institutional.find(row=>row.metadata?.graduationEntryCohort===documented[0]);
     const metadata=evidence?.metadata;
-    if(metadata?.graduationEntryCohortReason!=="transfer" ||
+    if(institutional.some(row=>row.metadata?.graduationEntryCohort!==undefined && row.metadata?.graduationEntryCohort!==documented[0]) ||
+       metadata?.graduationEntryCohortReason!=="transfer" ||
        typeof metadata.graduationEntryCohortEvidenceReference!=="string" ||
        metadata.graduationEntryCohortEvidenceReference.trim().length<12 ||
        typeof metadata.graduationEntryCohortConsentReference!=="string" ||
