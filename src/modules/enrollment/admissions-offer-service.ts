@@ -186,6 +186,13 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
   const [lookup]=await tx.select().from(admissionOffers).where(eq(admissionOffers.id,offerId)).limit(1);
   if(!lookup)throw new Error("Offer not found");
   await requireAdmissionsProgramScope(context,lookup.programId,tx);
+  // Families may apply and accept offers before opening, but an active
+  // enrollment is an operating-school record. Lock the Program state so a
+  // concurrent closure cannot race this enrollment activation.
+  const [openingProgram]=await tx.select({status:programs.status})
+   .from(programs).where(eq(programs.id,lookup.programId)).for("share").limit(1);
+  if(openingProgram?.status!=="active")
+   throw new Error("School must be activated before an accepted offer can become an active enrollment");
   const churchAuthorization=await requireChurchHostedOperatingServices(tx,lookup.programId,[
     "admissions","school_of_record","academic_instruction",
   ]);
