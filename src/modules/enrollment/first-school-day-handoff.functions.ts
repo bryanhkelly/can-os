@@ -59,8 +59,11 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
       .innerJoin(academicCalendars,eq(academicCalendars.id,academicCalendarDays.academicCalendarId))
       .innerJoin(schoolYears,eq(schoolYears.id,academicCalendars.schoolYearId))
       .where(and(eq(academicCalendars.siteId,app.siteId),eq(academicCalendars.active,true),
+        eq(schoolYears.organizationId,app.organizationId),
+        eq(schoolYears.siteId,app.siteId),
         eq(schoolYears.programId,app.programId),eq(schoolYears.status,"active"),
-        gte(academicCalendarDays.calendarDate,today)))
+        gte(academicCalendarDays.calendarDate,today),
+        gte(schoolYears.endsOn,today)))
       .orderBy(asc(academicCalendarDays.calendarDate)).limit(366);
     const dates = [...new Set(futureDays.filter(day=>["instructional","special","makeup"].includes(day.type))
       .map(day=>day.date))];
