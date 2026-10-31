@@ -64,7 +64,7 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
   const institutional=enrollments.filter(row=>row.issuer===transcript.issuingOrganizationId)
     .sort((x,y)=>x.yearStarts.localeCompare(y.yearStarts));
   if(!institutional.length) throw new AuthorizationError("Institutional entry cohort not established");
-  const documented=institutional.map(row=>row.metadata?.graduationEntryCohort).filter(Boolean);
+  const documented=institutional.map(row=>row.metadata?.graduationEntryCohort).filter(value=>value!==undefined && value!==null);
   if(documented.some(v=>typeof v!=="string") || new Set(documented).size>1)
     throw new AuthorizationError("Conflicting documented graduation cohort overrides");
   const entryCohort=(documented[0] as string|undefined) ?? institutional[0]!.yearStarts.slice(0,4);
@@ -91,7 +91,7 @@ export const approveGraduationRequirements = createServerFn({method:"POST"})
      // Serialize policy approvals for an issuer/year to prevent competing active
      // versions that cannot yet be assigned to an individual cohort.
      const {sql}=await import("drizzle-orm");
-     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${data.issuerId + ":" + data.academicYear}))`);
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${data.issuerId + ":graduation-policy"}))`);
      if(data.cohortStart>data.cohortEnd) throw new AuthorizationError("Invalid cohort window");
      const policies=await tx.select().from(s.graduationRequirementSets)
        .where(eq(s.graduationRequirementSets.issuingOrganizationId,data.issuerId));
