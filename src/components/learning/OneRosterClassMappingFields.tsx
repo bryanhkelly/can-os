@@ -1,4 +1,4 @@
-export interface OneRosterClassRow { sourcedId: string; title: string }
+export interface OneRosterClassRow { sourcedId: string; title?: string }
 export interface OneRosterSectionOption { id: string; code: string; title: string }
 
 export function OneRosterClassMappingFields({
@@ -17,7 +17,7 @@ export function OneRosterClassMappingFields({
   return <div className="space-y-3 rounded border p-3">
     <p className="text-sm font-medium">Match all {rows.length} external classes to the existing classes below.</p>
     {rows.map(row => <label key={row.sourcedId} className="block text-sm">
-      {row.title} ({row.sourcedId})
+      {row.title?.trim() || row.sourcedId} ({row.sourcedId})
       <select value={mappings[row.sourcedId] ?? ""} className="mt-1 block w-full rounded border bg-background p-2"
         onChange={event => onMappingChange(row.sourcedId, event.target.value)}>
         <option value="">Select CAN class</option>
