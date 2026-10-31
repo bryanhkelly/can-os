@@ -133,9 +133,15 @@ function MessagesPage() {
         setComposeRecipientId("");
         setComposeSubject("");
         setComposeBody("");
-        const list = await listMyThreads();
-        setThreads(list.threads);
+        // The message was committed; open its thread even if the inbox
+        // projection fails. A refresh error must not invite a duplicate send.
         openThread(threadId);
+        try {
+          const list = await listMyThreads();
+          setThreads(list.threads);
+        } catch {
+          setError("Message sent. The inbox list could not be refreshed; your new conversation is open.");
+        }
       })
       .catch(() => setComposeError("Your message could not be sent. Please try again."))
       .finally(() => setComposing(false));
