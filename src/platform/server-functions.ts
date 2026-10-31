@@ -4,6 +4,12 @@ import { z } from "zod";
 import type { AccessContext } from "@/domain/access-context";
 import { getCommandContext, withAuth } from "@/modules/identity/command-context.server";
 
+/** JSON-compatible result contract for server/client transport. */
+export type SerializableResult =
+  | string | number | boolean | null
+  | readonly SerializableResult[]
+  | { readonly [key: string]: SerializableResult };
+
 /**
  * Server-only factories. The authenticated identity always comes from the
  * verified request session, never from submitted input.
@@ -15,7 +21,7 @@ function privateResponse() {
   setResponseHeader("Cache-Control", "private, no-store");
 }
 
-export function authenticatedQuery<TSchema extends z.ZodTypeAny, TResult>(
+export function authenticatedQuery<TSchema extends z.ZodTypeAny, TResult extends SerializableResult>(
   schema: TSchema,
   handler: (context: AccessContext, input: z.output<TSchema>) => Promise<TResult>,
 ) {
@@ -28,7 +34,7 @@ export function authenticatedQuery<TSchema extends z.ZodTypeAny, TResult>(
     });
 }
 
-export function authenticatedCommand<TSchema extends z.ZodTypeAny, TResult>(
+export function authenticatedCommand<TSchema extends z.ZodTypeAny, TResult extends SerializableResult>(
   schema: TSchema,
   handler: (context: AccessContext, input: z.output<TSchema>) => Promise<TResult>,
 ) {
@@ -42,7 +48,7 @@ export function authenticatedCommand<TSchema extends z.ZodTypeAny, TResult>(
 }
 
 /** Capability is verified before resource guard and domain execution. */
-export function scopedQuery<TSchema extends z.ZodTypeAny, TResult>(
+export function scopedQuery<TSchema extends z.ZodTypeAny, TResult extends SerializableResult>(
   schema: TSchema,
   capability: string,
   resourceGuard: (context: AccessContext, input: z.output<TSchema>) => Promise<void>,
@@ -60,7 +66,7 @@ export function scopedQuery<TSchema extends z.ZodTypeAny, TResult>(
 }
 
 /** Deliberately does not bypass institutional decision services or audit. */
-export function institutionalDecision<TSchema extends z.ZodTypeAny, TResult>(
+export function institutionalDecision<TSchema extends z.ZodTypeAny, TResult extends SerializableResult>(
   schema: TSchema,
   capability: string,
   resourceGuard: (context: AccessContext, input: z.output<TSchema>) => Promise<void>,
