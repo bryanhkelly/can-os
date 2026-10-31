@@ -65,6 +65,10 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
   if(new Set(matching.map(row=>row.yearId)).size!==1 || !matching.length || enrollments.some(row=>row.issuer===transcript.issuingOrganizationId &&
       row.yearId!==matching[0]?.yearId))
     throw new AuthorizationError("No unambiguous applicable graduation academic-year policy for student");
+  // Historical transcript evidence must not be adjudicated against a school year
+  // that starts after the immutable transcript was issued.
+  if(matching[0] && new Date(matching[0].yearStarts).getTime()>transcript.issuedAt.getTime())
+    throw new AuthorizationError("Transcript predates the applicable graduation school year");
   const approved = await db.select({id:s.graduationRequirementSets.id})
     .from(s.graduationRequirementSets).where(and(
       eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId),
