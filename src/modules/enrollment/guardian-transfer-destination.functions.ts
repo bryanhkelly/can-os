@@ -116,6 +116,8 @@ export const requestTransferDestinationFamilyStart=createServerFn({method:"POST"
    throw new Error("This transfer already has a receiving-school application. Continue that application instead of requesting another invitation.");
   if(origin.programId===destination.programId||origin.siteId===destination.siteId)
    throw new Error("A transfer destination must be a different school Site, not another Program at the same school.");
+  if(actor.scope.programIds?.includes(destination.programId))
+   return {requested:false,alreadyHasAccess:true,destinationName:destination.programName};
   const result=await requestPublicFamilyStart(destination.slug,{
    requestId:data.requestId,
    programId:destination.programId,
@@ -151,5 +153,5 @@ export const requestTransferDestinationFamilyStart=createServerFn({method:"POST"
       familyStartRequestId:result.requestId},
    });
   });
-  return {requested:result.created,destinationName:destination.programName};
+  return {requested:result.created,alreadyHasAccess:false,destinationName:destination.programName};
  });
