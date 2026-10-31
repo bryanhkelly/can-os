@@ -177,6 +177,14 @@ export const applyOneRosterStudentMappings=createServerFn({method:"POST"})
    if(new Set(enrolled.map(e=>e.studentProfileId)).size!==profileIds.length)
     throw new Error("CAN student must have a current approved Program enrollment.");
    const identifiers=externalIds.map(id=>"user:"+data.externalSchoolSourcedId+":"+id);
+   const otherBindings=await tx.select({entityId:curriculumInteropMappings.entityId,
+     externalIdentifier:curriculumInteropMappings.externalIdentifier}).from(curriculumInteropMappings).where(and(
+       eq(curriculumInteropMappings.organizationId,program.organizationId),
+       eq(curriculumInteropMappings.format,"oneroster"),eq(curriculumInteropMappings.sourceSystem,data.sourceSystem),
+       eq(curriculumInteropMappings.entityType,"student_profile"),
+       inArray(curriculumInteropMappings.entityId,profileIds)));
+   if(otherBindings.some(b=>!identifiers.includes(b.externalIdentifier)))
+     throw new Error("CAN student is already bound to a different external identity under this issuer.");
    const previous=await tx.select({externalIdentifier:curriculumInteropMappings.externalIdentifier,
      entityType:curriculumInteropMappings.entityType,entityId:curriculumInteropMappings.entityId,
      metadata:curriculumInteropMappings.metadata}).from(curriculumInteropMappings).where(and(
