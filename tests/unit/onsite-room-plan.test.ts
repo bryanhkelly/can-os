@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccessContext } from "@/domain/access-context";
-import { submitRoomPlanSchema } from "@/domain/onsite-room-plan";
+import { submitRoomPlanSchema, effectiveRoomPrimary, assertRoomPrimaryChoice } from "@/domain/onsite-room-plan";
 import { submitOnsiteRoomPlan, reviewOnsiteRoomPlan, getOnsiteRoomPlanning } from "@/modules/operations/onsite-room-plan.server";
 const state = vi.hoisted(() => ({ rows: [] as unknown[][], inserts: [] as Record<string, unknown>[],
   updates: [] as Record<string, unknown>[], delegate: vi.fn(), reviewer: vi.fn(), safety: vi.fn(), appointed: true }));
@@ -38,7 +38,7 @@ const input = () => ({ programId:id(1), sectionId:id(2), periodId:id(3), documen
 beforeEach(() => {
   vi.clearAllMocks(); state.inserts=[]; state.updates=[]; state.appointed=true;
   state.rows=[[{id:"program"}],[{ startsAtLocal:"09:00",endsAtLocal:"10:00",title:"Class" }],
-    [{timezone:"UTC"}],[],[]];
+    [{timezone:"UTC"}],[{personId:id(5),from:null,through:null}],[],[]];
 });
 describe("room plan submission", () => {
   it("creates an unapproved structured plan without claiming physical presence or external evidence", async () => {
@@ -58,7 +58,7 @@ describe("room plan submission", () => {
     expect(state.inserts).toEqual([]);
   });
   it("does not overwrite a newer plan discovered after the form was loaded", async () => {
-    state.rows[4]=[{id:id(9)}];
+    state.rows[5]=[{id:id(9)}];
     await expect(submitOnsiteRoomPlan(actor(),input())).rejects.toThrow("Room plan changed");
     expect(state.inserts).toEqual([]); expect(state.updates).toEqual([]);
   });
@@ -80,7 +80,7 @@ function prepareReview() {
     documentId:value.documentId,decision:"approve" as const,reason:"Independent review of the named classroom coverage plan."};
   const document={id:value.documentId,uploadedByPersonId:"director",expiresAt:new Date(value.expiresAt),metadata:{
     ...value,siteId:"site",programId:value.programId,reviewStatus:"pending",startsAtLocal:"09:00",endsAtLocal:"10:00"}};
-  state.rows=[[{id:"program"}],[{startsAtLocal:"09:00",endsAtLocal:"10:00",title:"Class"}],[document],[{timezone:"UTC"}]];
+  state.rows=[[{id:"program"}],[{startsAtLocal:"09:00",endsAtLocal:"10:00",title:"Class"}],[document],[{timezone:"UTC"}],[{personId:value.primaryPersonId,from:null,through:null}]];
   return {review,document,can:{...actor(),role:"can_network_steward",actorPersonId:"reviewer"} as AccessContext};
 }
 describe("independent room plan review",()=>{
@@ -118,5 +118,24 @@ describe("room planning read boundary",()=>{
     const value=input();
     await expect(getOnsiteRoomPlanning({...actor(),role} as AccessContext,{programId:value.programId,date:value.date}))
       .rejects.toThrow("current local director");
+  });
+});
+
+describe("bounded reviewed onsite substitution",()=>{
+  it("uses only a replacement bound to the current scheduled primary",()=>{
+    expect(effectiveRoomPrimary("primary",{primaryPersonId:"substitute",substitutesForPersonId:"primary"})).toBe("substitute");
+    expect(effectiveRoomPrimary("changed-primary",{primaryPersonId:"substitute",substitutesForPersonId:"primary"})).toBe("changed-primary");
+    expect(effectiveRoomPrimary("primary",undefined)).toBe("primary");
+    expect(effectiveRoomPrimary(null,{primaryPersonId:"substitute",substitutesForPersonId:"primary"})).toBeNull();
+  });
+  it("requires an explicit current-primary reference for an alternate adult",()=>{
+    expect(()=>assertRoomPrimaryChoice(["primary"],"substitute","primary")).not.toThrow();
+    expect(()=>assertRoomPrimaryChoice(["primary"],"substitute")).toThrow("scheduled primary changed");
+    expect(()=>assertRoomPrimaryChoice(["primary","other"],"substitute","primary")).toThrow("single current scheduled primary");
+  });
+  it("records a pending substitution without rewriting the delivery arrangement",async()=>{
+    expect(await submitOnsiteRoomPlan(actor(),{...input(),primaryPersonId:id(7),substitutesForPersonId:id(5)})).toMatchObject({created:true});
+    expect(state.inserts[0]?.metadata).toMatchObject({primaryPersonId:id(7),substitutesForPersonId:id(5),reviewStatus:"pending"});
+    expect(state.updates).toEqual([]);
   });
 });

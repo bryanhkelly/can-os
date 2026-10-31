@@ -7,7 +7,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { siteDate } from "@/domain/expected-attendance";
 import { coversLocalSupervisionBlock } from "@/domain/onsite-supervision-coverage";
-import { roomPlanBlockSchema, submitRoomPlanSchema, reviewRoomPlanSchema } from "@/domain/onsite-room-plan";
+import { roomPlanBlockSchema, submitRoomPlanSchema, reviewRoomPlanSchema, assertRoomPrimaryChoice } from "@/domain/onsite-room-plan";
 import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
 import { EventTypes } from "@/domain/event-types";
 import { schoolIdentity, verifyCANSchoolApprover, verifyChurchEvidenceSubmitter, latestConfiguration } from "./school-opening.server";
@@ -84,6 +84,20 @@ export function currentRoomPlan(tx: Reader, input: BlockInput) {
   )).orderBy(desc(documents.createdAt), desc(documents.id)).limit(1);
 }
 
+async function checkPlannedPrimary(tx:Reader,input:BlockInput,block:{startsAtLocal:string;endsAtLocal:string},
+  timezone:string,primaryPersonId:string,substitutesForPersonId?:string){
+  const rows=await tx.select({personId:deliveryArrangements.facilitatorPersonId,
+    from:deliveryArrangements.effectiveFrom,through:deliveryArrangements.effectiveThrough,
+  }).from(deliveryArrangements).innerJoin(programs,eq(programs.id,input.programId))
+    .where(and(eq(deliveryArrangements.academicProviderOrganizationId,programs.academicProviderOrganizationId),
+    eq(deliveryArrangements.sectionId,input.sectionId),
+    eq(deliveryArrangements.status,"active"),inArray(deliveryArrangements.modality,["onsite","hybrid"]))).limit(201);
+  if(rows.length>200)throw new Error("Complete scheduled primary records are required");
+  const ids=rows.filter(row=>row.personId&&coversLocalSupervisionBlock({date:input.date,timeZone:timezone,...block,
+    effectiveFrom:row.from,effectiveThrough:row.through})).map(row=>row.personId!);
+  assertRoomPrimaryChoice(ids,primaryPersonId,substitutesForPersonId);
+}
+
 export async function submitOnsiteRoomPlan(actor: AccessContext, value: z.infer<typeof submitRoomPlanSchema>) {
   const input = submitRoomPlanSchema.parse(value);
   return db.transaction(async tx => {
@@ -100,9 +114,10 @@ export async function submitOnsiteRoomPlan(actor: AccessContext, value: z.infer<
     if (!coversLocalSupervisionBlock({ date: input.date, timeZone: timezone, ...block,
       effectiveFrom: new Date(), effectiveThrough: expiresAt }))
       throw new Error("Plan validity must cover the entire scheduled block");
+    await checkPlannedPrimary(tx,input,block,timezone,input.primaryPersonId,input.substitutesForPersonId);
     const metadata = { siteId: school.siteId, programId: input.programId, sectionId: input.sectionId,
       periodId: input.periodId, date: input.date, primaryPersonId: input.primaryPersonId,
-      backupPersonId: input.backupPersonId, roomLabel: input.roomLabel, roomCapacity: input.roomCapacity,
+      backupPersonId: input.backupPersonId, substitutesForPersonId:input.substitutesForPersonId??null, roomLabel: input.roomLabel, roomCapacity: input.roomCapacity,
       startsAtLocal: block.startsAtLocal, endsAtLocal: block.endsAtLocal,
       rationale: input.rationale, source: "staff_room_plan", reviewStatus: "pending", isCurrent: true };
     const [replay] = await tx.select().from(documents).where(eq(documents.id, input.documentId)).limit(1);
@@ -165,6 +180,8 @@ export async function reviewOnsiteRoomPlan(actor: AccessContext, value: z.infer<
       const primary = m.primaryPersonId, backup = m.backupPersonId;
       if (typeof primary !== "string" || typeof backup !== "string" || primary === backup)
         throw new Error("Two distinct named adults are required");
+      await checkPlannedPrimary(tx,input,block,site!.timezone,primary,
+        typeof m.substitutesForPersonId==="string"?m.substitutesForPersonId:undefined);
       await requireChurchHostedOperatingServices(tx, input.programId, ["onsite_supervision"]);
       const appointments = await verifiedScheduledSectionFacilitators(tx,
         { siteId: school.siteId, organizationId: school.organizationId },
@@ -251,7 +268,8 @@ export async function getOnsiteRoomPlanning(actor: AccessContext, value: Pick<Bl
         current:document?{id:document.id,submittedByPersonId:document.uploadedByPersonId,
           primaryPersonId:String(document.metadata.primaryPersonId??""),backupPersonId:String(document.metadata.backupPersonId??""),
           roomLabel:String(document.metadata.roomLabel??""),roomCapacity:Number(document.metadata.roomCapacity??0),
-          rationale:String(document.metadata.rationale??""),expiresAt:document.expiresAt?.toISOString()??null,
+          rationale:String(document.metadata.rationale??""),
+          substitutesForPersonId:typeof document.metadata.substitutesForPersonId==="string"?document.metadata.substitutesForPersonId:null,expiresAt:document.expiresAt?.toISOString()??null,
           status:document.metadata.isCurrent===false?"superseded":String(document.metadata.reviewStatus??"legacy"),
           reason:typeof document.metadata.reviewReason==="string"?document.metadata.reviewReason:null,
           canReview:canReview&&document.uploadedByPersonId!==actor.actorPersonId&&document.metadata.reviewStatus==="pending",

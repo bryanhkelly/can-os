@@ -57,7 +57,9 @@ integration("canonical room-plan lifecycle",()=>{
         await tx.insert(s.academicCalendarDays).values({academicCalendarId:calendar!.id,calendarDate:date,
           type:calendarVersion===1?"instructional":"closure",instructionalMinutes:calendarVersion===1?60:0});
       }
-      const people=await tx.insert(s.people).values(["host","reviewer","primary","backup"].map(label=>({legalFirstName:"Synthetic",legalLastName:label}))).returning();
+      const people=await tx.insert(s.people).values(["host","reviewer","primary","backup","replacement"].map(label=>({legalFirstName:"Synthetic",legalLastName:label}))).returning();
+      const [originalDelivery]=await tx.insert(s.deliveryArrangements).values({sectionId:section!.id,
+        academicProviderOrganizationId:can!.id,facilitatorPersonId:people[2]!.id,modality:"onsite",status:"active"}).returning();
       function actor(role:"registrar"|"can_network_steward",index:number):AccessContext{
         return {role,actorPersonId:people[index]!.id,grantSiteId:role==="registrar"?site!.id:null,
           capabilities:new Set(roleCapabilities[role]),scope:{organizationIds:[role==="registrar"?church!.id:can!.id],
@@ -85,11 +87,18 @@ integration("canonical room-plan lifecycle",()=>{
       expect(parseVerifiedRoomPlan(await read(replacement.documentId),scope)).toBeNull();
       await reviewOnsiteRoomPlan(reviewer,{...review,documentId:replacement.documentId,decision:"reject",reason:"The proposed room needs a corrected occupancy review."});
       expect((await read(replacement.documentId)).metadata.reviewStatus).toBe("rejected");
+      const substitute={...input,documentId:crypto.randomUUID(),expectedDocumentId:replacement.documentId,
+        primaryPersonId:people[4]!.id,substitutesForPersonId:people[2]!.id};
+      await submitOnsiteRoomPlan(host,substitute);
+      expect(parseVerifiedRoomPlan(await read(substitute.documentId),scope)).toBeNull();
+      await reviewOnsiteRoomPlan(reviewer,{...review,documentId:substitute.documentId});
+      expect(parseVerifiedRoomPlan(await read(substitute.documentId),scope)).toMatchObject({primaryPersonId:people[4]!.id,substitutesForPersonId:people[2]!.id});
+      expect((await tx.select().from(s.deliveryArrangements).where(eq(s.deliveryArrangements.id,originalDelivery!.id)))[0]?.facilitatorPersonId).toBe(people[2]!.id);
       const workspace=await getOnsiteRoomPlanning(reviewer,{programId:program!.id,date});
       expect(workspace.canReview).toBe(true);
       expect(workspace.canSubmit).toBe(false);
       expect(workspace.blocks).toHaveLength(1);
-      expect(workspace.blocks[0]?.current).toMatchObject({id:replacement.documentId,status:"rejected"});
+      expect(workspace.blocks[0]?.current).toMatchObject({id:substitute.documentId,status:"approved"});
       const events=await tx.select().from(s.domainEvents).where(and(eq(s.domainEvents.aggregateId,input.documentId),eq(s.domainEvents.eventType,"OnsiteRoomPlanReviewed")));
       expect(events).toHaveLength(1);
       checked=true;throw rollback;

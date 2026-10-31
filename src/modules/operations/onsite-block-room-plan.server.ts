@@ -11,6 +11,7 @@ export type VerifiedRoomPlan = {
   periodId:string;
   primaryPersonId:string;
   backupPersonId:string;
+  substitutesForPersonId:string|null;
   roomLabel:string;
   roomCapacity:number;
   verifiedAt:Date;
@@ -53,6 +54,7 @@ export function parseVerifiedRoomPlan(
      typeof m.primaryPersonId!=="string" ||
      typeof m.backupPersonId!=="string" ||
      m.primaryPersonId===m.backupPersonId ||
+     (m.substitutesForPersonId!=null && (typeof m.substitutesForPersonId!=="string" || m.substitutesForPersonId===m.primaryPersonId)) ||
      typeof m.roomLabel!=="string" || m.roomLabel.trim().length<2 ||
      m.roomLabel.length>120 ||
      typeof m.roomCapacity!=="number" || !Number.isInteger(m.roomCapacity) ||
@@ -61,7 +63,7 @@ export function parseVerifiedRoomPlan(
   return {
     id:doc.id,sectionId:scope.sectionId,programId:scope.programId,
     periodId:scope.periodId,primaryPersonId:m.primaryPersonId,
-    backupPersonId:m.backupPersonId,roomLabel:m.roomLabel.trim(),
+    backupPersonId:m.backupPersonId,substitutesForPersonId:typeof m.substitutesForPersonId==="string"?m.substitutesForPersonId:null,roomLabel:m.roomLabel.trim(),
     roomCapacity:m.roomCapacity,verifiedAt:doc.verifiedAt,expiresAt:doc.expiresAt,
   };
 }

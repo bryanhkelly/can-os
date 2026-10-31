@@ -1,3 +1,4 @@
+import { effectiveRoomPrimary } from "@/domain/onsite-room-plan";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { createHash } from "node:crypto";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -215,6 +216,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
     const candidates=arrangements.filter(row=>["onsite","hybrid"].includes(row.modality));
     const peopleIds=[...new Set([
       ...candidates.map(row=>row.facilitatorPersonId),
+      ...[...matchingPlan.values()].map(plan=>plan.primaryPersonId),
       ...[...matchingPlan.values()].map(plan=>plan.backupPersonId),
     ].filter((id):id is string=>!!id))];
     const [activePeople,staffGrants,adultSafety]=await Promise.all([
@@ -248,10 +250,9 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
           sectionId:row.sectionId,personId:row.facilitatorPersonId!,
         })),
       ...[...matchingPlan.values()].filter(plan=>independent.has(plan.programId))
-        .map(plan=>({
-          programId:plan.programId,sectionId:plan.sectionId,
-          personId:plan.backupPersonId,
-        })),
+        .flatMap(plan=>[plan.primaryPersonId,plan.backupPersonId].map(personId=>({
+          programId:plan.programId,sectionId:plan.sectionId,personId,
+        }))),
     ];
     const verifiedDelegations=await verifiedScheduledSectionFacilitators(db,
       {siteId:site.id,organizationId:site.organizationId},namedCandidates);
@@ -280,7 +281,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
           !candidates.some(row => row.sectionId === section.id &&
             row.facilitatorPersonId === actor.actorPersonId) &&
           ![...matchingPlan.values()].some(row=>row.sectionId===section.id &&
-            row.backupPersonId===actor.actorPersonId)) continue;
+            (row.backupPersonId===actor.actorPersonId||row.primaryPersonId===actor.actorPersonId))) continue;
       const templates=periodRows.filter(row=>
         row.templateId===section.scheduleTemplateId &&
         row.yearId===section.schoolYearId &&
@@ -293,7 +294,9 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         })):[];
         const uniqueIds=[...new Set(eligible.map(row=>row.facilitatorPersonId).filter(
           (id):id is string=>!!id))];
-        const personId=uniqueIds.length===1?uniqueIds[0]!:null;
+        const scheduledPrimary=uniqueIds.length===1?uniqueIds[0]!:null;
+        const reviewedRoom=period?matchingPlan.get(section.id+":"+period.periodId):undefined;
+        const personId=effectiveRoomPrimary(scheduledPrimary,reviewedRoom);
         const person=personId?peopleById.get(personId):null;
         const requiresSectionDelegation=independent.has(section.programId);
         const approved=!!person?.active && staffGrants.some(grant=>
