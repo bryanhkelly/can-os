@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
-import { approveGraduationRequirements, getApplicableGraduationPolicy, listGraduationCandidates, auditIssuedTranscript, decideGraduation, issueDiploma, listGraduationRequirements, listGraduationIssuers } from "@/modules/learning/graduation.functions";
+import { approveGraduationRequirements, getApplicableGraduationPolicy, listGraduationCandidates, auditIssuedTranscript, decideGraduation, issueDiploma, getDiplomaFreshness, revokeDiploma, listGraduationRequirements, listGraduationIssuers } from "@/modules/learning/graduation.functions";
 
 export const Route=createFileRoute("/admissions/graduation")({component:GraduationCloseout});
 
@@ -23,6 +23,9 @@ function GraduationCloseout(){
  const [requirementSetId,setRequirementSetId]=useState("");
  const [decisionId,setDecisionId]=useState("");
  const [decisionRationale,setDecisionRationale]=useState("");
+ const [issuedDiplomaId,setIssuedDiplomaId]=useState("");
+ const [diplomaStatus,setDiplomaStatus]=useState("");
+ const [revocationReason,setRevocationReason]=useState("");
  const [audit,setAudit]=useState<Awaited<ReturnType<typeof auditIssuedTranscript>>|null>(null);
  const [sets,setSets]=useState<Awaited<ReturnType<typeof listGraduationRequirements>>>([]);
  const [message,setMessage]=useState("");
@@ -77,7 +80,13 @@ function GraduationCloseout(){
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">3. Diploma issuance</h2>
     <p className="text-sm">{decisionId?"Graduation decision recorded. Diploma issuance is available below.":"Record an eligible graduation approval above before issuing a diploma."}</p>
-    <button disabled={busy||!decisionId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{await issueDiploma({data:{decisionId}});setDecisionId("");setMessage("Diploma credential recorded.")})}>Issue diploma</button>
+    <button disabled={busy||!decisionId} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await issueDiploma({data:{decisionId}});setIssuedDiplomaId(result.diplomaId);setDiplomaStatus("current");setDecisionId("");setMessage("Diploma credential recorded.")})}>Issue diploma</button>
+    {issuedDiplomaId&&<div className="space-y-2 rounded-lg border p-3">
+      <p className="text-sm">Issued diploma status: <strong>{diplomaStatus||"Review required"}</strong></p>
+      <button type="button" disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{const result=await getDiplomaFreshness({data:{diplomaId:issuedDiplomaId}});setDiplomaStatus(result.status)})}>Inspect diploma status</button>
+      {field("Revocation reason (required)",revocationReason,setRevocationReason)}
+      <button type="button" disabled={busy||diplomaStatus==="revoked"||revocationReason.trim().length<12} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{await revokeDiploma({data:{diplomaId:issuedDiplomaId,reason:revocationReason}});setDiplomaStatus("revoked");setMessage("Diploma revoked and audited.")})}>Revoke diploma</button>
+    </div>}
    </section>
   </div>
  </WorkspaceShell>;
