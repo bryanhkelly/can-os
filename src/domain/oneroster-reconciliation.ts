@@ -21,7 +21,9 @@ export type ReconciliationReason =
   | "EXTERNAL_ENROLLMENT_ROLE_MISMATCH"
   | "EXTERNAL_SESSION_MISSING"
   | "EXTERNAL_SCHOOL_NOT_FOUND"
-  | "DUPLICATE_ENROLLMENT_RELATION";
+  | "DUPLICATE_ENROLLMENT_RELATION"
+  | "EXTERNAL_ENROLLMENT_ROLE_NOT_STUDENT"
+  | "EXTERNAL_CLASS_SCHOOL_CONFLICT";
 
 export type ReconciliationRow = {
   kind: "user" | "class" | "enrollment";
@@ -92,12 +94,16 @@ export function planOneRosterReconciliation(
     if (!classMappings.has(enrollment.classSourcedId!)) reasons.push("EXTERNAL_CLASS_UNMAPPED");
     if (cls && cls.schoolSourcedId !== enrollment.schoolSourcedId)
       reasons.push("EXTERNAL_SCHOOL_MISMATCH");
+    if (enrollment.role?.toLowerCase() !== "student")
+      reasons.push("EXTERNAL_ENROLLMENT_ROLE_NOT_STUDENT");
     if (user && user.role?.toLowerCase() !== "student" && enrollment.role?.toLowerCase() === "student")
       reasons.push("EXTERNAL_USER_NOT_STUDENT");
     if (user && enrollment.role && user.role?.toLowerCase() !== enrollment.role.toLowerCase())
       reasons.push("EXTERNAL_ENROLLMENT_ROLE_MISMATCH");
     if (user?.orgSourcedIds && !user.orgSourcedIds.split(",").map(id => id.trim()).includes(enrollment.schoolSourcedId!))
       reasons.push("EXTERNAL_USER_SCHOOL_MISMATCH");
+    if (cls && user?.orgSourcedIds && !user.orgSourcedIds.split(",").map(id => id.trim()).includes(cls.schoolSourcedId!))
+      reasons.push("EXTERNAL_CLASS_SCHOOL_CONFLICT");
     if (orgs.size && !orgs.has(enrollment.schoolSourcedId!))
       reasons.push("EXTERNAL_SCHOOL_NOT_FOUND");
     const relationKey = JSON.stringify([enrollment.classSourcedId, enrollment.userSourcedId, enrollment.role]);
