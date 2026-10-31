@@ -17,6 +17,12 @@ type UploadInput = {
 export function ExtendedSeasonEvidencePanel({ seasonId, onChange }: {
   seasonId: string; onChange?: () => Promise<void> | void;
 }) {
+  return <ExtendedSeasonEvidenceWorkspace key={seasonId} seasonId={seasonId} onChange={onChange} />;
+}
+
+function ExtendedSeasonEvidenceWorkspace({ seasonId, onChange }: {
+  seasonId: string; onChange?: () => Promise<void> | void;
+}) {
   const [model, setModel] = useState<Model | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
