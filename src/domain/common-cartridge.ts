@@ -155,6 +155,8 @@ export function inspectCommonCartridgeZip(zip:Uint8Array):CartridgePreview {
  const decoder=new TextDecoder("utf-8",{fatal:true});
  let offset=dirOffset;
  let manifest:Uint8Array|null=null;
+ const archivePaths=new Set<string>();
+ let totalExpanded=0;
  for(let i=0;i<count;i++){
   if(offset+46>zip.length||view.getUint32(offset,true)!==0x02014b50)throw new Error("Invalid ZIP directory entry.");
   const flags=view.getUint16(offset+8,true),method=view.getUint16(offset+10,true);
@@ -165,6 +167,14 @@ export function inspectCommonCartridgeZip(zip:Uint8Array):CartridgePreview {
   if(offset+46+nameSize+extra+comment>zip.length)throw new Error("Truncated ZIP entry.");
   const path=decoder.decode(zip.subarray(offset+46,offset+46+nameSize));
   safePath(path.endsWith("/")?path.slice(0,-1):path);
+  if(archivePaths.has(path))throw new Error("Duplicate ZIP archive entry.");
+  archivePaths.add(path);
+  const unixMode=view.getUint32(offset+38,true)>>>16;
+  if((unixMode&0xf000)===0xa000)throw new Error("Symlink ZIP entry unsupported.");
+  totalExpanded+=expanded;
+  if(totalExpanded>50*1024*1024||expanded>20*1024*1024||
+    expanded>Math.max(1,compressed)*100)
+    throw new Error("ZIP archive expansion limit exceeded.");
   if(flags&1||compressed===0xffffffff||expanded===0xffffffff||local===0xffffffff)
     throw new Error("Encrypted and ZIP64 cartridges are not supported.");
   if(path==="imsmanifest.xml"){
