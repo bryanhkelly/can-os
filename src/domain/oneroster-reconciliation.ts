@@ -16,7 +16,12 @@ export type ReconciliationReason =
   | "EXTERNAL_ROW_WITHDRAWN"
   | "SCHOOL_YEAR_UNVERIFIED"
   | "ACADEMIC_SESSION_UNVERIFIED"
-  | "EXTERNAL_REFERENCE_MISSING";
+  | "EXTERNAL_REFERENCE_MISSING"
+  | "EXTERNAL_USER_SCHOOL_MISMATCH"
+  | "EXTERNAL_ENROLLMENT_ROLE_MISMATCH"
+  | "EXTERNAL_SESSION_MISSING"
+  | "EXTERNAL_SCHOOL_NOT_FOUND"
+  | "DUPLICATE_ENROLLMENT_RELATION";
 
 export type ReconciliationRow = {
   kind: "user" | "class" | "enrollment";
@@ -44,6 +49,8 @@ export function planOneRosterReconciliation(
   const orgs = new Set(get("orgs").map(r => r.sourcedId));
   const userById = new Map(users.map(r => [r.sourcedId, r]));
   const classById = new Map(classes.map(r => [r.sourcedId, r]));
+  const sessions = new Set(get("academicSessions").map(r => r.sourcedId));
+  const seenEnrollmentRelations = new Set<string>();
   const rows: ReconciliationRow[] = [];
   const withdrawn = (r: OneRosterRow) =>
     r.status?.toLowerCase() === "tobedeleted" || r.enabledUser?.toLowerCase() === "false";
@@ -63,7 +70,9 @@ export function planOneRosterReconciliation(
     const reasons: ReconciliationReason[] = [];
     if (!sectionId) reasons.push("EXTERNAL_CLASS_UNMAPPED");
     if (withdrawn(cls)) reasons.push("EXTERNAL_ROW_WITHDRAWN");
-    if (orgs.size && !orgs.has(cls.schoolSourcedId!)) reasons.push("EXTERNAL_SCHOOL_MISMATCH");
+    if (orgs.size && !orgs.has(cls.schoolSourcedId!)) reasons.push("EXTERNAL_SCHOOL_NOT_FOUND");
+    if (sessions.size && cls.termSourcedIds?.split(",").some(id => !sessions.has(id.trim())))
+      reasons.push("EXTERNAL_SESSION_MISSING");
     if (!cls.schoolYear) reasons.push("SCHOOL_YEAR_UNVERIFIED");
     if (!cls.termSourcedIds) reasons.push("ACADEMIC_SESSION_UNVERIFIED");
     rows.push({
@@ -85,6 +94,15 @@ export function planOneRosterReconciliation(
       reasons.push("EXTERNAL_SCHOOL_MISMATCH");
     if (user && user.role?.toLowerCase() !== "student" && enrollment.role?.toLowerCase() === "student")
       reasons.push("EXTERNAL_USER_NOT_STUDENT");
+    if (user && enrollment.role && user.role?.toLowerCase() !== enrollment.role.toLowerCase())
+      reasons.push("EXTERNAL_ENROLLMENT_ROLE_MISMATCH");
+    if (user?.orgSourcedIds && !user.orgSourcedIds.split(",").map(id => id.trim()).includes(enrollment.schoolSourcedId!))
+      reasons.push("EXTERNAL_USER_SCHOOL_MISMATCH");
+    if (orgs.size && !orgs.has(enrollment.schoolSourcedId!))
+      reasons.push("EXTERNAL_SCHOOL_NOT_FOUND");
+    const relationKey = JSON.stringify([enrollment.classSourcedId, enrollment.userSourcedId, enrollment.role]);
+    if (seenEnrollmentRelations.has(relationKey)) reasons.push("DUPLICATE_ENROLLMENT_RELATION");
+    seenEnrollmentRelations.add(relationKey);
     if (withdrawn(enrollment) || (user && withdrawn(user)) || (cls && withdrawn(cls)))
       reasons.push("EXTERNAL_ROW_WITHDRAWN");
     if (!cls?.schoolYear) reasons.push("SCHOOL_YEAR_UNVERIFIED");
