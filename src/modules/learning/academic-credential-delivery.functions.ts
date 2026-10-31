@@ -14,7 +14,7 @@ async function resources(){const [{db},s]=await Promise.all([import("@/db/client
 async function registrar(){
  const context=await getCommandContext(getRequest());
  assertCapability(context,"enrollment:manage");
- if(context.role!=="registrar"||!context.actorPersonId)throw new AuthorizationError("issuer registrar");
+ if(context.role!=="registrar"||!context.actorPersonId||context.demoFacilitator)throw new AuthorizationError("verified issuer registrar");
  return context;
 }
 async function documentData(db:Awaited<ReturnType<typeof resources>>["db"],s:Awaited<ReturnType<typeof resources>>["s"],kind:"transcript"|"diploma",credentialId:string){
@@ -113,6 +113,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    .from(s.people).where(eq(s.people.id,context.actorPersonId)).limit(1);
   if(!canDownloadAuthorizedCredential({actorPersonId:context.actorPersonId,recipientPersonId:release.recipientPersonId,recipientEmail:release.recipientEmail,accountEmail:recipient?.email??null,recipientActive:recipient?.active??false,expiresAt:release.expiresAt,revokedAt:release.revokedAt,now:new Date(),demoFacilitator:!!context.demoFacilitator}))
    throw new AuthorizationError("recipient identity or release validity mismatch");
+  if(!context.accountId||!context.sessionId||!context.grantId)throw new AuthorizationError("verified active recipient session");
   const [verifiedAccount]=await db.select({id:s.accessAccounts.id})
    .from(s.accessAccounts)
    .innerJoin(s.accountPersonGrants,eq(s.accountPersonGrants.accountId,s.accessAccounts.id))
