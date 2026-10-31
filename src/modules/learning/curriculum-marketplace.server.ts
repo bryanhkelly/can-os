@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
- curriculumAdoptions, curriculumEntitlements, curriculumOverlays, curriculumPackItems,
+ curriculumAdoptions, curriculumAnnualAdoptions, schoolYears, curriculumEntitlements, curriculumOverlays, curriculumPackItems,
  curriculumPacks, curriculumPackVersions, curriculumResources, courseTemplates, courseTemplateVersions,
  organizations, programs, sections,
 } from "@/db/schema";
@@ -74,6 +74,10 @@ export async function readMarketplace(actor: Actor, programId: string) {
   .orderBy(asc(curriculumPackItems.position)) : [];
  const entitlements=await db.select().from(curriculumEntitlements)
   .where(eq(curriculumEntitlements.organizationId,program.organizationId));
+ const annualAdoptions=await db.select().from(curriculumAnnualAdoptions)
+  .where(eq(curriculumAnnualAdoptions.programId,program.id));
+ const years=program.siteId?await db.select({id:schoolYears.id,name:schoolYears.name,status:schoolYears.status})
+  .from(schoolYears).where(eq(schoolYears.siteId,program.siteId)):[];
  const adoptions=await db.select().from(curriculumAdoptions)
   .where(eq(curriculumAdoptions.programId,program.id));
  const overlayRows=await db.select({
@@ -96,6 +100,7 @@ export async function readMarketplace(actor: Actor, programId: string) {
   .from(sections).where(eq(sections.programId,program.id)).orderBy(asc(sections.title));
  return {
   program:{id:program.id,name:program.name,siteId:program.siteId},canPublish,
+  academicYears:years,annualAdoptions:annualAdoptions.map(a=>({id:a.id,academicYearId:a.academicYearId,packId:a.packId,packVersionId:a.packVersionId,status:a.status})),
   packs:packs.map(pack=>({
    ...pack,courses:items.filter(item=>item.packVersionId===pack.versionId).map(({curriculum,...course})=>({
     ...course,preview:schoolCourseOutline(curriculum),
