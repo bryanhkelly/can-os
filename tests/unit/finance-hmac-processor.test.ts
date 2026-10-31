@@ -1,5 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { ingestSignedWebhook } from "../../src/modules/finance/finance-service";
+import type { FinanceStore } from "../../src/modules/finance/finance-service";
 import { HmacFinanceProcessor } from "../../src/modules/finance/finance-hmac-processor";
 const secret = "a".repeat(64);
 const event = { provider: "configured-provider", eventId: "event-1", kind: "payment_succeeded", obligationId: "obligation-1", providerPaymentId: "payment-1", amount: { currency: "USD", cents: 10000 } };
@@ -33,5 +35,15 @@ describe("signed finance processor", () => {
   });
   it("requires a strong explicit secret", () => {
     expect(() => new HmacFinanceProcessor({ provider: "x", webhookSecret: "short" })).toThrow();
+  });
+});
+
+describe("server-side webhook ingestion", () => {
+  it("never calls persistence for a bad signature", async () => {
+    let writes = 0;
+    const store = { postVerifiedEvent: async () => { writes++; throw new Error("not expected"); } } as unknown as FinanceStore;
+    const processor = new HmacFinanceProcessor({ provider: "configured-provider", webhookSecret: secret });
+    await expect(ingestSignedWebhook(store, processor, JSON.stringify(event), "0".repeat(64))).rejects.toThrow("signature");
+    expect(writes).toBe(0);
   });
 });
