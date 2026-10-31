@@ -25,7 +25,7 @@ export const getAdmissionOfferOptions=createServerFn({method:"GET"})
  .handler(async({data})=>{
  const actor=await getCommandContext(getRequest());
  setResponseHeader("Cache-Control","private, no-store");
- if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.programIds?.length)throw new AuthorizationError("registrar offer options");
+ if(actor.role!=="registrar"||!actor.actorPersonId||!actor.scope.organizationIds?.length)throw new AuthorizationError("registrar offer options");
  assertCapability(actor,"enrollment.decide");
  const scoped=await resolveOperationsSelection(actor,data);
  if(!process.env.DATABASE_URL)return [];
