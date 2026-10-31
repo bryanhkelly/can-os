@@ -239,7 +239,7 @@ describe("application contextual navigation",()=>{
 
   it("keeps the selected Admissions intake application when resolving an offer exception",()=>{
     state.search={application:"application"};
-    successful({programs:[],existingStudents:[],publicInterests:[],records:[
+    successful({programs:[],existingStudents:[],publicInterests:{items:[],nextCursor:null},linkedInterest:null,records:[
       {id:"application",studentFirst:"Selected",studentLast:"Applicant",programId:"program",siteId:"school",
         programName:"Academy",stage:"eligibility",disposition:"waitlisted",updatedAt:"2030-01-01"},
       {id:"other",studentFirst:"Unrelated",studentLast:"Applicant",programId:"program",
@@ -254,7 +254,7 @@ describe("application contextual navigation",()=>{
 
   it("offers existing students only from the selected intake program without replacing new-student intake",()=>{
     state.search={programId:"program"};
-    successful({programs:[{id:"program",name:"Academy",siteId:"school"}],records:[],publicInterests:[],existingStudents:[
+    successful({programs:[{id:"program",name:"Academy",siteId:"school"}],records:[],publicInterests:{items:[],nextCursor:null},linkedInterest:null,existingStudents:[
       {programId:"program",studentProfileId:"existing",guardianPersonId:"guardian",householdId:"household",
         studentFirstName:"Existing",studentLastName:"Learner",guardianFirstName:"Managing",guardianLastName:"Guardian"},
       {programId:"program",studentProfileId:"unlinked",guardianPersonId:"unlinked-guardian",householdId:null,
