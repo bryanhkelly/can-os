@@ -786,6 +786,28 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         await fresh.context.close();
       }
 
+      // Onsite attendance and custody are separate from online learning.
+      // A family account must never be granted the staff-only school-day
+      // roster or physical release controls merely by knowing the Site IDs.
+      await goto(guardian.page, "/site/day");
+      await expect(guardian.page.getByText(
+        "Sign in with a room facilitator, site staff or site leader membership for this site.",
+      )).toBeVisible();
+      await expect(guardian.page.getByRole("button", { name: /record.*present|mark present/i })).toHaveCount(0);
+      await goto(unrelatedGuardian.page, "/site/day");
+      await expect(unrelatedGuardian.page.getByText(
+        "Sign in with a room facilitator, site staff or site leader membership for this site.",
+      )).toBeVisible();
+
+      // The guardian attendance endpoint must not disclose the enrolled
+      // child's cases to an unrelated guardian supplied the exact person ID.
+      await goto(unrelatedGuardian.page,
+        `/guardian/attendance?student=${fixture.studentPersonId}`);
+      await expect(unrelatedGuardian.page.getByRole("alert")).toBeVisible();
+      await expect(unrelatedGuardian.page.getByText(
+        `${fixture.studentFirstName} ${fixture.studentLastName}`,
+      )).toHaveCount(0);
+
       // A separate, authenticated guardian must not access another family's
       // graded work even when supplied the precise student/Section/assessment IDs.
       await goto(
