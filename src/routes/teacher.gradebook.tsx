@@ -72,6 +72,13 @@ function TeacherGradebookPage() {
  const previousReview=reviewIndex>0?reviewQueue[reviewIndex-1]:undefined;
  const nextReview=reviewIndex>=0?reviewQueue[reviewIndex+1]:undefined;
 
+ useEffect(()=>{
+  const draft=reviewCell?.gradingDraft;
+  setScore(draft?.score??"");
+  setComment(draft?.comment??"");
+  setRubricInputs(Object.fromEntries((draft?.rubricScores??[]).map(item=>[item.id,String(item.points)])));
+ },[reviewCell?.submissionId]);
+
  useEffect(() => {
   let active = true;
   getGradebookSections().then(result => {
@@ -136,11 +143,12 @@ function TeacherGradebookPage() {
  const cellFor = (studentProfileId: string, assessmentId: string): Cell | undefined =>
   gradebook?.cells.find(cell => cell.studentProfileId === studentProfileId && cell.assessmentId === assessmentId);
 
- const submitGrade = async (cell: Cell, assessment: Assessment) => {
-  const payload: { submissionId: string; score?: number; feedbackComment: string; rubricScores?: CriterionGrade[] } = {
+ const submitGrade = async (cell: Cell, assessment: Assessment, draftOnly=false) => {
+  const payload: { submissionId: string; score?: number; feedbackComment: string; rubricScores?: CriterionGrade[]; draftOnly?:boolean } = {
    submissionId: cell.submissionId,
    feedbackComment: comment,
   };
+  if(draftOnly)payload.draftOnly=true;
   if (assessment.rubric.length) {
    if(assessment.rubric.some(criterion=>!rubricInputs[criterion.id]?.trim())){
     setNotice("Enter a score for every rubric criterion.");return;
@@ -162,6 +170,10 @@ function TeacherGradebookPage() {
   setNotice("");
   try {
    await gradeSubmission({ data: payload });
+   if(draftOnly){
+    setNotice("Grading draft saved. The score and feedback have not been released to the student or family.");
+    return;
+   }
    setNotice("Grade posted.");
    setGradingKey("");
    setDetailKey("");
@@ -186,7 +198,7 @@ function TeacherGradebookPage() {
     }
    }
   } catch (cause) {
-   setNotice(cause instanceof Error ? cause.message : "Unable to post the grade.");
+   setNotice(cause instanceof Error ? cause.message : draftOnly?"Unable to save grading draft.":"Unable to post the grade.");
   } finally {
    setBusy(false);
   }
@@ -372,7 +384,10 @@ function TeacherGradebookPage() {
         <input className="mt-2 block w-28 rounded-lg border bg-background p-2" type="number" min={0} max={Number(reviewAssessment.pointsPossible??0)} value={score} onChange={event=>setScore(event.target.value)}/>
        </label>}
        <label className="text-sm font-semibold">Feedback comment<textarea rows={4} maxLength={4000} value={comment} onChange={event=>setComment(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-       <div className="flex gap-3"><button type="button" disabled={busy} onClick={()=>submitGrade(reviewCell,reviewAssessment)}
+       <div className="flex flex-wrap gap-3">
+        <button type="button" disabled={busy} onClick={()=>submitGrade(reviewCell,reviewAssessment,true)}
+         className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Save grading draft</button>
+        <button type="button" disabled={busy} onClick={()=>submitGrade(reviewCell,reviewAssessment)}
         className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Post grade</button>
         <Link to="/teacher/gradebook" search={{section:selected}} className="rounded-lg border px-4 py-2 text-sm">Close review</Link></div>
       </div>:<div className="space-y-3 text-sm">
