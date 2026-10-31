@@ -702,6 +702,42 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
     });
 
     // ------------------------------------------------------------------
+    await test.step("stage 5b: finalize grade, guardian/student report cards, and issue official transcript", async () => {
+      const tp = teacher.page;
+      await goto(tp, `/teacher/gradebook?section=${fixture.sectionId}`);
+      await expect(tp.getByRole("button", { name: "Finalize grades" })).toBeEnabled();
+      await tp.getByRole("button", { name: "Finalize grades" }).click();
+      await expect(tp.getByText(/Finalized 1 grade/)).toBeVisible();
+      const finalGrade = await singleRow(sql,
+        `select id, letter_grade, percentage from section_grades
+         where section_id = $1 and student_profile_id = $2 and status = 'finalized'`,
+        [fixture.sectionId!, fixture.studentProfileId!],
+      );
+      expect(Number(finalGrade.percentage)).toBe(90);
+
+      await goto(guardian.page, `/guardian/report-cards?student=${fixture.studentPersonId}`);
+      await expect(guardian.page.getByText(fixture.courseTitle).first()).toBeVisible();
+      await goto(studentPage!, "/student/report-card");
+      await expect(studentPage!.getByText(fixture.courseTitle).first()).toBeVisible();
+
+      await goto(operator.page,
+        `/admissions/transcripts?query=${encodeURIComponent(fixture.studentLastName)}`,
+      );
+      await expect(operator.page.getByText(
+        `${fixture.studentFirstName} ${fixture.studentLastName}`,
+      )).toBeVisible();
+      await operator.page.getByRole("button", { name: "Issue official transcript" }).click();
+      await expect(operator.page.getByText(/Official transcript issued for/)).toBeVisible();
+      await expect.poll(() => rowCount(sql,
+        "select id from transcript_issuances where student_profile_id = $1",
+        [fixture.studentProfileId!],
+      )).toBe(1);
+      await guardian.page.reload();
+      await waitForAppHydration(guardian.page);
+      await expect(guardian.page.getByText(fixture.courseTitle).first()).toBeVisible();
+    });
+
+    // ------------------------------------------------------------------
     await test.step("stage 6: operations record, reload, fresh session, negative checks, revocation", async () => {
       const page = operator.page;
       await goto(page, `/operations?siteId=${fixture.siteId}&programId=${fixture.programId}`);
