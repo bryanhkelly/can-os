@@ -100,9 +100,10 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
  const schoolworkItems=visibleChildren.flatMap(child=>child.workToReview.map(work=>({
   id:child.studentPersonId+":"+work.assessmentId,
   kind:"schoolwork",
-  type:"assignment_action",
+  type:work.revisionLimitReached?"assignment_revision_limit":"assignment_action",
   title:child.displayName+": "+work.title,
-  detail:work.status==="returned"?"Teacher returned this work for revision.":
+  detail:work.revisionLimitReached?"Revision attempts are exhausted. Review the teacher's feedback and contact the school.":
+   work.status==="returned"?"Teacher returned this work for revision.":
    work.status==="draft"?"Student has work in progress to finish.":"Student has an assignment to complete.",
   href:"/guardian/academics?student="+encodeURIComponent(child.studentPersonId)+
    "&section="+encodeURIComponent(work.sectionId)+"&assessment="+encodeURIComponent(work.assessmentId),
@@ -225,7 +226,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
        <p className="text-sm font-semibold">Schoolwork to review · {child.workNeedsAttentionCount}</p>
        <ul className="mt-2 space-y-2">{child.workToReview.map(work=><li key={work.assessmentId} className="text-sm">
         <Link to="/guardian/academics" search={{student:child.studentPersonId,section:work.sectionId,assessment:work.assessmentId}} className="font-semibold underline">{work.title}</Link>
-        <span className="ml-2 text-xs text-muted-foreground">{work.status==="returned"?"Revision requested":work.status==="draft"?"Draft in progress":"Not submitted"}</span>
+        <span className="ml-2 text-xs text-muted-foreground">{work.revisionLimitReached?"School follow-up needed · no revision attempts remain":work.status==="returned"?"Revision requested":work.status==="draft"?"Draft in progress":"Not submitted"}</span>
        </li>)}</ul>
       </div>}
       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
