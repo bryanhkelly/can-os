@@ -131,7 +131,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  for(const row of pickupHolds)pickupStudents.set("pickup_custody_hold:"+row.id,row.studentPersonId);
  for(const row of pickupActions)pickupStudents.set("action:"+row.id,row.studentPersonId);
  const enrollmentApplicationIds=rows.filter(row=>row.resourceType==="application"&&
-  ["enrollment_document_requested","enrollment_document_rejected","enrollment_form_rejected","admissions_stage_changed"].includes(row.type)&&row.resourceId).map(row=>row.resourceId!);
+  ["enrollment_document_requested","enrollment_document_rejected","enrollment_form_rejected","admissions_stage_changed","student_access_approved"].includes(row.type)&&row.resourceId).map(row=>row.resourceId!);
  const enrollmentApplications=enrollmentApplicationIds.length&&context.role==="guardian"?
   await db.select({id:s.applications.id,studentPersonId:s.studentProfiles.personId,stage:s.applications.stage,metadata:s.applications.metadata}).from(s.applications)
    .innerJoin(s.programs,eq(s.programs.id,s.applications.programId))
