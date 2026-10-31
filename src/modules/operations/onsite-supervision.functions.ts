@@ -1,3 +1,4 @@
+import { assertSchoolDayPreparation } from "@/domain/onsite-day-preparation";
 import { effectiveRoomPrimary } from "@/domain/onsite-room-plan";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { createHash } from "node:crypto";
@@ -54,7 +55,7 @@ export type OnsiteOperationalSupervisionPlan=Omit<OnsiteSupervisionPlan,"blocks"
 
 /** Internal projection for callers that already authorized this actor and Site. */
 export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:AccessContext,data:{
-  date:string;siteId?:string;
+  date:string;siteId?:string;preparation?:boolean;
 }):Promise<OnsiteOperationalSupervisionPlan>=>{
     setResponseHeader("Cache-Control","private, no-store");
     const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,
@@ -67,7 +68,8 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
       throw new Error("Invalid school-local date");
     const today=siteDate(new Date(),site.timezone);
     const oldest=siteDate(new Date(Date.now()-30*86400_000),site.timezone);
-    if(data.date>today || data.date<oldest)
+    if(data.preparation)assertSchoolDayPreparation(actor,site,data.date);
+    else if(data.date>today || data.date<oldest)
       throw new AuthorizationError("onsite supervision day limited to last 30 days");
 
     const sectionsAtSite=await db.select({
@@ -84,7 +86,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         eq(programs.organizationId,site.organizationId),
         eq(schoolYears.siteId,site.id),eq(schoolYears.organizationId,site.organizationId),
         eq(schoolYears.status,"active"),eq(sections.active,true),
-        eq(programs.status,"active"),
+        data.preparation?inArray(programs.status,["launching","ready","active"]):eq(programs.status,"active"),
         sql`${programs.deliveryModel} ->> 'onsite' = 'true'`,
         lte(schoolYears.startsOn,data.date),gte(schoolYears.endsOn,data.date),
         lte(terms.startsOn,data.date),gte(terms.endsOn,data.date),

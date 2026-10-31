@@ -1,3 +1,5 @@
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { assertSchoolDayPreparation } from "@/domain/onsite-day-preparation";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
@@ -78,7 +80,7 @@ function siteDayStart(date: string, timeZone: string): Date {
   return new Date(instant);
 }
 
-async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, siteId?: string) {
+async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, siteId?: string, preparation=false) {
   // The inner join on sites guarantees a non-null site for every row.
   const rows = (await db.select({
     id: programs.id, name: programs.name, organizationId: programs.organizationId,
@@ -87,7 +89,7 @@ async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, s
   }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
     .where(and(
       inArray(programs.organizationId, actor.scope.organizationIds!),
-      eq(programs.status,"active"),
+      preparation?inArray(programs.status,["launching","ready","active"]):eq(programs.status,"active"),
       ...(actor.scope.programIds!==undefined?[inArray(programs.id,actor.scope.programIds)]:[]),
       ...(actor.scope.siteIds!==undefined?[inArray(programs.siteId,actor.scope.siteIds)]:[]),
       ...(isOnsiteAttendanceRole(actor.role) ? [eq(programs.siteId, actor.grantSiteId!)] : []),
@@ -131,17 +133,17 @@ async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, s
 
 /** One server-authorized program/student/date entitlement, used for reads and writes. */
 async function resolveExpectedRoster(actor: AccessContext,
-  date: string, programId?: string, studentId?: string, siteId?: string) {
-  const programsAtSite = await scopedOnsitePrograms(actor, programId, siteId);
+  date: string, programId?: string, studentId?: string, siteId?: string, preparation=false) {
+  const programsAtSite = await scopedOnsitePrograms(actor, programId, siteId, preparation);
   const expectedIds = new Map<string, Set<string>>();
   const coverage = await loadExpectedAttendanceCoverage(programsAtSite, [], new Date(), 1,
     { date, studentIds: expectedIds });
-  const activePrograms = programsAtSite.filter(p => siteDate(new Date(), p.timezone) >= date);
+  const activePrograms = programsAtSite.filter(p => preparation || siteDate(new Date(), p.timezone) >= date);
 
   // A registrar can manage a program roster. A teacher can only mark a
   // student in an active section they are actually assigned to teach.
   const permittedIds = activePrograms.map(p => p.id);
-  if (!permittedIds.length) return { roster: [], coverage, programsAtSite };
+  if (!permittedIds.length) return { roster: [], sectionMemberships: [], unplacedStudents: [], coverage, programsAtSite };
 
   // A child is expected at an independently church-hosted CAN school
   // only after placement in a real instructional Section. A Program-only
@@ -242,7 +244,23 @@ async function resolveExpectedRoster(actor: AccessContext,
       siteId: row.siteId!, sectionId: old?.sectionId ?? row.sectionId,
     });
   }
-  return { roster: [...byKey.values()], coverage, programsAtSite };
+  const memberships=new Map<string,{studentProfileId:string;studentName:string;programId:string;sectionId:string;sectionTitle:string}>();
+  for(const row of sectionsAtSite){
+    if(!expectedIds.get(row.programId)?.has(row.studentProfileId))continue;
+    const host=activePrograms.find(program=>program.id===row.programId);
+    if(!host||host.siteId!==row.siteId)continue;
+    memberships.set(row.programId+":"+row.sectionId+":"+row.studentProfileId,{
+      studentProfileId:row.studentProfileId,studentName:row.preferredName??row.firstName+" "+row.lastName,
+      programId:row.programId,sectionId:row.sectionId,sectionTitle:row.sectionTitle,
+    });
+  }
+  const unplacedStudents=preparation?[...new Map(programRoster.filter(row=>row.programId&&
+    independentPrograms.has(row.programId)&&expectedIds.get(row.programId)?.has(row.studentProfileId)&&
+    !byKey.has(row.programId+":"+row.studentProfileId)).map(row=>[row.programId+":"+row.studentProfileId,{
+      studentProfileId:row.studentProfileId,programId:row.programId!,
+      studentName:row.preferredName??row.firstName+" "+row.lastName,
+    }])).values()]:[];
+  return { roster: [...byKey.values()], sectionMemberships:[...memberships.values()], unplacedStudents, coverage, programsAtSite };
 }
 
 /** Localized date and verified site identity for room facilitators. */
@@ -260,6 +278,8 @@ export const getOnsiteStaffDayContext = createServerFn({ method: "GET" })
     return {
       siteId: site.id, siteName: site.name, timeZone: site.timezone,
       date: siteDate(new Date(), site.timezone),
+      canPrepareSchoolDays:actor.role==="site_leader"&&!actor.demoFacilitator,
+      preparationThrough:siteDate(new Date(Date.now()+30*86400_000),site.timezone),
       note: "Staff-recorded onsite attendance. Online activity does not establish physical presence or departure.",
     };
   });
@@ -301,6 +321,24 @@ export const loadExpectedOnsiteRosterForActor=createServerOnlyFn(async (actor:Ac
       };
     }).sort((a, b) => a.studentName.localeCompare(b.studentName) ||
       a.programName.localeCompare(b.programName)),
+  };
+});
+
+/** Same canonical enrollment/calendar resolver as today's roster. No attendance
+ * events are read or projected as observations for a preparation date. */
+export const loadExpectedSchoolDayPreparation=createServerOnlyFn(async(actor:AccessContext,data:{date:string})=>{
+  const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,timezone:sites.timezone,name:sites.name})
+    .from(sites).where(eq(sites.id,actor.grantSiteId!)).limit(1);
+  if(!site)throw new AuthorizationError("original school preparation Site");
+  assertSchoolDayPreparation(actor,site,data.date);
+  const {roster,sectionMemberships,unplacedStudents,coverage,programsAtSite}=await resolveExpectedRoster(actor,data.date,undefined,undefined,site.id,true);
+  return {site,date:data.date,
+    programs:programsAtSite.map(program=>({id:program.id,name:program.name,
+      configuration:coverage.get(program.id)?.configuration??"not_onsite",
+      expectedDays:coverage.get(program.id)?.expectedDays??0,
+      missingCalendarDates:coverage.get(program.id)?.daysWithoutCalendarConfiguration??0})),
+    students:roster.map(row=>({studentProfileId:row.studentProfileId,studentName:row.studentName,programId:row.programId})),
+    sectionMemberships,unplacedStudents,
   };
 });
 
