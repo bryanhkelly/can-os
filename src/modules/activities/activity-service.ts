@@ -26,10 +26,11 @@ import { emitEvent,writeAudit } from "@/platform/mutation";
 import { and,count,eq,inArray } from "drizzle-orm";
 import {
   assertSeasonRegistrationOpen, assertLegacyActivityRegistrationAllowed,
-  assertVerifiedExtendedSeasonOpening, unavailableExtendedSeasonApprovals,
+  assertVerifiedExtendedSeasonOpening,
 } from "./registration-policy";
 import { assertEnrichmentRegistrationPublished } from "@/domain/enrichment-publication";
 import { isExtendedLearningType } from "@/domain/program-offerings";
+import { readExtendedSeasonOpeningApprovals } from "./extended-season-opening-evidence.server";
 import { readEnrichmentPackages, selectEnrichmentPackages,
   sessionOccupancy, selectedSessionWaitlisted } from "@/domain/enrichment-packages";
 
@@ -188,6 +189,8 @@ export async function registerForActivity(
         programType: programs.type,
         programStatus: programs.status,
         programSiteId: programs.siteId,
+        organizationId: programs.organizationId,
+        academicProviderOrganizationId: programs.academicProviderOrganizationId,
         creditIssuerId: programs.creditIssuingOrganizationId,
         activityStatus: activities.status,
         activityMetadata: activities.metadata,
@@ -205,12 +208,17 @@ export async function registerForActivity(
     // statement do not prove current screening, safety or release readiness.
     // Guard before any identity, consent, seat or financial-obligation writes.
     if (record.programType && isExtendedLearningType(record.programType)) {
+      const approvals = await readExtendedSeasonOpeningApprovals(tx, {
+        seasonId: record.seasonId, siteId: record.siteId,
+        programId: record.programId!, organizationId: record.organizationId!,
+        academicProviderOrganizationId: record.academicProviderOrganizationId,
+      });
       assertVerifiedExtendedSeasonOpening({
         programStatus: record.programStatus,
         seasonStatus: record.seasonStatus,
         siteMatchesProgram: record.programSiteId === record.siteId,
         capacity: record.capacity,
-        ...unavailableExtendedSeasonApprovals,
+        ...approvals,
       }, "register");
     }
     const publication = record.programType && isExtendedLearningType(record.programType)
