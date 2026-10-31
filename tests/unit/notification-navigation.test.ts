@@ -13,7 +13,7 @@ vi.mock("@/modules/identity/command-context.server",()=>({
   getCommandContext:async()=>({role:state.role,actorPersonId:"actor",
     scope:{organizationIds:["organization"],siteIds:["school"],programIds:["program"]}}),
 }));
-vi.mock("@/db/client",()=>({db:{select:state.select}}));
+vi.mock("@/db/client",()=>({db:{select:state.select,selectDistinct:state.select}}));
 vi.mock("@neondatabase/serverless",()=>({Pool:class {}}));
 vi.mock("drizzle-orm/neon-serverless",()=>({drizzle:()=>({select:state.select})}));
 
