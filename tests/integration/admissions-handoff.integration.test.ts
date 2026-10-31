@@ -175,6 +175,21 @@ integration("cross-persona admissions through active classes",()=>{
     await tx.update(s.journeyDefinitions).set({configuration:{requirements:[]}}).where(eq(s.journeyDefinitions.key,key));
     const staff=act("registrar",registrar.id);
     const issuance={applicationId,schoolYearId:time.schoolYear.id};
+    // Real institution-wide registrar grants do not enumerate Program IDs.
+    // Exercise the same commands as the actual admissions handoff, not a
+    // synthetic permission helper, while the Journey is still incomplete.
+    state.actor={...staff,scope:{organizationIds:[org.id]}};
+    expect((await getAdmissionsDashboard({data:{programId:program.id}})).map(row=>row.id))
+     .toContain(applicationId);
+    expect((await offers.getAdmissionOfferOptions({data:{programId:program.id}}))
+     .find(row=>row.applicationId===applicationId)?.years.map(year=>year.id))
+     .toContain(time.schoolYear.id);
+    await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("Journey must be ready");
+    // A registrar limited to a different Site must not reach this application.
+    state.actor={...staff,scope:{organizationIds:[org.id],siteIds:[crypto.randomUUID()]}};
+    await expect(offers.issueAdmissionOffer({data:issuance}))
+     .rejects.toThrow("admissions program membership");
+    state.actor=staff;
     await expect(offers.issueAdmissionOffer({data:{...issuance,applicationId:"not-a-uuid"}})).rejects.toThrow();
     await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("Journey must be ready");
     await setFamilyRequirement({data:{applicationId,requirementId:requirement.id,complete:true}});
