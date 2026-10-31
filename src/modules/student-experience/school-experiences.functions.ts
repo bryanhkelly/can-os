@@ -16,7 +16,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
   const sites=actorSiteIds(actor);
   const viewerRole=actor.role as "student"|"guardian"|"registrar"|"teacher";
   if(!process.env.DATABASE_URL) return {connected:false,viewerRole,events:[],notices:[],slots:[],bookings:[]};
-  const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const [{db},schema,{getNotifications}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("@/modules/communication/notification-center.functions")]);
   const [events,notices,slots,bookings]=await Promise.all([
     db.select().from(schema.calendarEvents)
       .innerJoin(schema.scheduledOccurrences,eq(schema.calendarEvents.scheduledOccurrenceId,schema.scheduledOccurrences.id))
@@ -27,7 +27,8 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
         startsAt:row.scheduled_occurrences.startsAt,
         timezone:row.scheduled_occurrences.timezone,
       }))),
-    db.select().from(schema.notifications).where(eq(schema.notifications.recipientPersonId,actor.actorPersonId)),
+    // Reuse the current guardian/student permission filtering on title and body.
+    getNotifications(),
     viewerRole==="guardian" ? db.select({id:schema.conferenceSlots.id,seriesId:schema.conferenceSlots.conferenceSeriesId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status})
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
       .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
