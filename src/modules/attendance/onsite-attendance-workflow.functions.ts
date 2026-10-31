@@ -83,6 +83,7 @@ async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, s
   // The inner join on sites guarantees a non-null site for every row.
   const rows = (await db.select({
     id: programs.id, name: programs.name, organizationId: programs.organizationId,
+    academicProviderOrganizationId:programs.academicProviderOrganizationId,
     siteId: programs.siteId, deliveryModel: programs.deliveryModel,
     timezone: sites.timezone,
   }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
@@ -358,13 +359,14 @@ export const loadExpectedFirstDayPreparationForActor=createServerOnlyFn(async(ac
     .from(sectionTeachers)
     .innerJoin(people,eq(people.id,sectionTeachers.personId))
     .innerJoin(accountPersonGrants,and(eq(accountPersonGrants.personId,sectionTeachers.personId),
-      eq(accountPersonGrants.role,"teacher"),eq(accountPersonGrants.organizationId,site.organizationId),
+      eq(accountPersonGrants.role,"teacher"),
+      eq(accountPersonGrants.organizationId,program.academicProviderOrganizationId),
       eq(accountPersonGrants.active,true),eq(accountPersonGrants.isSynthetic,false)))
     .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
     .where(and(eq(sectionTeachers.sectionId,matched.sectionId),
       eq(sectionTeachers.role,"teacher"),eq(people.active,true),
       eq(accessAccounts.disabled,false),isNotNull(accessAccounts.emailVerifiedAt),
-      eq(accountPersonGrants.siteId,data.siteId)))
+      ))
     .limit(1):[];
   return {qualifiedTeacherAssigned:qualifiedTeachers.length>0,
     date:data.date,program:{id:program.id,name:program.name,
