@@ -5,6 +5,9 @@ import { Route } from "@/routes/operations.launch.$programId";
 import type { getLaunchAcademicSetup } from "@/modules/programs/launch-academics.functions";
 
 const state = vi.hoisted(() => ({ data: null as unknown }));
+// Static presentation tests never open a database connection.
+vi.mock("@/db/client", () => ({ db: {} }));
+vi.mock("@/hooks/useWorkspaceMutation", () => ({ useWorkspaceMutation: () => ({ isSubmitting: false, submit: vi.fn() }) }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => ({ options, useLoaderData: () => state.data }),
   Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
@@ -23,9 +26,10 @@ type Snapshot = Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
 const snapshot: Snapshot = {
   program: { id: "program", name: "School", status: "launching", organizationId: "org",
     academicProviderOrganizationId: "org", siteId: "site", deliveryModel: { onsite: true } },
-  years: [], terms: [], catalog: [], teachingStaff: [{ personId: "teacher", first: "Alex", last: "Teacher" }],
-  qualificationCatalog: [{ key: "license", title: "Teaching license" }], policyPublished: false,canAuthorCatalog:false,
+  years: [], terms: [], catalog: [], scheduleOptions: [], teachingStaff: [{ personId: "teacher", first: "Alex", last: "Teacher" }],
+  qualificationCatalog: [{ key: "license", title: "Teaching license" }], policyPublished: false,canAuthorCatalog:false,canPublishTeacherPolicy:true,
   teacherPolicies: [], canReviseTeacherPolicy: false,
+  academicAuthority: { teacherAssignment: true, creditConfiguration: true },
   sections: [{
     id: "section", title: "Science", code: "SCI", termId: "term", active: true, teachers: [],
     candidates: [{ personId: "teacher", eligible: false, reasons: ["Qualification policy not configured."],
@@ -33,6 +37,9 @@ const snapshot: Snapshot = {
     readiness: { sectionId: "section", ready: false,
       items: [{ key: "launch_staffing", state: "blocked", message: "Qualification policy not configured." }],
       metrics: { enrollmentCapacity: 30, activeEnrollment: 0, expectedDemand: null, reservedInstructionalSeats: 0 } },
+    classroom: { sectionId: "section", ready: false, activeStudentCount: 0,
+      blockers: [{ key: "missing_qualified_teacher", message: "Assign an eligible teacher." }],
+      firstWeek: { lesson: null, assessment: null } },
   }],
 };
 function render(data: Snapshot) {
@@ -53,6 +60,12 @@ describe("launch staffing presentation", () => {
     expect(html).toContain('disabled=""');
     expect(html).toContain("Add instructor");
     expect(html).not.toContain("Instructor assigned.");
+  });
+  it("hides initial publication without an explicit institutional publisher grant", () => {
+    const html = render({...snapshot,canPublishTeacherPolicy:false});
+    expect(html).toContain("verified, program-scoped institutional staffing-policy publisher");
+    expect(html).not.toContain("Publish reviewed requirements");
+    expect(html).not.toContain("I confirm these requirements are reviewed");
   });
   it("shows published status without suggesting that publication verifies a teacher", () => {
     const html = render({ ...snapshot, policyPublished: true });
@@ -102,4 +115,16 @@ describe("launch staffing presentation", () => {
     expect(html).toContain("opening is blocked");
     expect(html).toContain("Publish policy revision");
   });
+  it("keeps planning and history visible while disabling new delegated academic acts",()=>{
+    const html=render({...snapshot,academicAuthority:{teacherAssignment:false,creditConfiguration:false}});
+    expect(html).toContain("Current academic authority is incomplete");
+    expect(html).toContain("Existing assignments, credits and official records remain visible");
+    expect(html).toContain("Planning and revocation remain available");
+    expect(html).toContain('aria-label="Credit units for new section"');
+    expect(html).toContain('disabled=""');
+  });
 });
+
+// Child staffing panels have their own query and authorization tests.
+vi.mock("@/components/operations/LocalSiteDelegationPanel",()=>({LocalSiteDelegationPanel:()=>null}));
+vi.mock("@/components/operations/SectionFacilitatorPanel",()=>({SectionFacilitatorPanel:()=>null}));

@@ -1,6 +1,11 @@
 import { db } from "@/db/client";
 import {
+accessAccounts,
+accountPersonGrants,
 guardianRelationships,
+enrollments,
+people,
+programs,
 healthComplianceItems,
 healthOfficeVisits,
 healthProfiles,
@@ -15,8 +20,37 @@ assertSiteScope,
 type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
-import { and,eq } from "drizzle-orm";
+import { and,eq,inArray,isNull,or } from "drizzle-orm";
+import { AuthorizationError } from "@/domain/command-context";
+
+type HealthTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Medical authority is student + active Program + real Site, never a bare role. */
+async function assertCurrentHealthStudentScope(
+  tx: HealthTx, context: CommandContext, studentProfileId: string, siteId?: string,
+) {
+  if (!context.actorPersonId || !context.scope.siteIds?.length ||
+      !context.scope.programIds?.length || !context.scope.organizationIds?.length)
+    throw new AuthorizationError("current school medical membership");
+  if (siteId && !context.scope.siteIds.includes(siteId))
+    throw new AuthorizationError("school health Site");
+  const [match] = await tx.select({siteId:programs.siteId}).from(enrollments)
+    .innerJoin(programs,eq(programs.id,enrollments.programId))
+    .where(and(
+      eq(enrollments.studentProfileId,studentProfileId),
+      eq(enrollments.kind,"program"),eq(enrollments.status,"active"),
+      eq(programs.status,"active"),
+      inArray(programs.id,context.scope.programIds),
+      inArray(programs.siteId,context.scope.siteIds),
+      inArray(programs.organizationId,context.scope.organizationIds),
+      ...(siteId?[eq(programs.siteId,siteId)]:[]),
+    )).limit(1);
+  if(!match)throw new AuthorizationError("current student enrollment at authorized health Site");
+  return match.siteId;
+}
+
 
 export async function ensureHealthProfile(
   context: CommandContext,
@@ -25,6 +59,7 @@ export async function ensureHealthProfile(
   assertCapability(context, "health.manage");
 
   return db.transaction(async (tx) => {
+    await assertCurrentHealthStudentScope(tx, context, studentProfileId);
     const [existing] = await tx
       .select({ id: healthProfiles.id })
       .from(healthProfiles)
@@ -61,6 +96,7 @@ export async function setHealthCompliance(
   assertCapability(context, "health.compliance.manage");
 
   return db.transaction(async (tx) => {
+    await assertCurrentHealthStudentScope(tx, context, input.studentProfileId);
     const [existing] = await tx
       .select({ id: healthComplianceItems.id, status: healthComplianceItems.status })
       .from(healthComplianceItems)
@@ -157,39 +193,35 @@ export async function createMedicationAuthorization(
     throw new Error("Medication authorization expiry must be after start");
   }
 
-  const [authorization] = await db
-    .insert(medicationAuthorizations)
-    .values({
-      studentProfileId: input.studentProfileId,
-      medicationName: input.medicationName,
-      instructions: input.instructions,
-      status: "active",
-      startsOn: input.startsOn,
-      expiresOn: input.expiresOn,
-      authorizationDocumentId: input.authorizationDocumentId,
-      guardianConsentDocumentId: input.guardianConsentDocumentId,
-      emergencyOnly: input.emergencyOnly ?? false,
-    })
-    .returning({ id: medicationAuthorizations.id });
-
-  if (!authorization) {
-    throw new Error("Failed to create medication authorization");
-  }
-
-  await writeAudit(db, context, {
-    action: "medication.authorization.create",
-    entityType: "medication_authorization",
-    entityId: authorization.id,
-    after: {
-      studentProfileId: input.studentProfileId,
-      medicationName: input.medicationName,
-      startsOn: input.startsOn,
-      expiresOn: input.expiresOn ?? null,
-    },
-    contextExtras: { classification: "medical" },
+  return db.transaction(async tx => {
+    await assertCurrentHealthStudentScope(tx, context, input.studentProfileId);
+    const [authorization] = await tx.insert(medicationAuthorizations)
+      .values({
+        studentProfileId: input.studentProfileId,
+        medicationName: input.medicationName,
+        instructions: input.instructions,
+        status: "active",
+        startsOn: input.startsOn,
+        expiresOn: input.expiresOn,
+        authorizationDocumentId: input.authorizationDocumentId,
+        guardianConsentDocumentId: input.guardianConsentDocumentId,
+        emergencyOnly: input.emergencyOnly ?? false,
+      }).returning({ id: medicationAuthorizations.id });
+    if (!authorization) throw new Error("Failed to create medication authorization");
+    await writeAudit(tx, context, {
+      action: "medication.authorization.create",
+      entityType: "medication_authorization",
+      entityId: authorization.id,
+      after: {
+        studentProfileId: input.studentProfileId,
+        medicationName: input.medicationName,
+        startsOn: input.startsOn,
+        expiresOn: input.expiresOn ?? null,
+      },
+      contextExtras: { classification: "medical" },
+    });
+    return authorization.id;
   });
-
-  return authorization.id;
 }
 
 export async function administerMedication(
@@ -216,6 +248,9 @@ export async function administerMedication(
       .limit(1);
 
     if (!authorization) throw new Error("Medication authorization not found");
+    // A valid medication authorization is not permission to administer it
+    // at an unrelated campus or after the student's withdrawal.
+    await assertCurrentHealthStudentScope(tx, context, authorization.studentProfileId, input.siteId);
     if (authorization.status !== "active") {
       throw new Error("Medication authorization is not active");
     }
@@ -298,6 +333,7 @@ export async function recordHealthOfficeVisit(
   const actorPersonId = context.actorPersonId;
 
   return db.transaction(async (tx) => {
+    await assertCurrentHealthStudentScope(tx, context, input.studentProfileId, input.siteId);
     const [visit] = await tx
       .insert(healthOfficeVisits)
       .values({
@@ -325,15 +361,47 @@ export async function recordHealthOfficeVisit(
 
       if (!student) throw new Error("StudentProfile not found");
 
+      // Medical notifications require a CURRENT verified guardian and an
+      // active Program enrollment at this health-office Site. Do not notify
+      // an unverified applicant or someone whose child has transferred away.
       const guardians = await tx
         .select({ personId: guardianRelationships.guardianPersonId })
         .from(guardianRelationships)
-        .where(eq(guardianRelationships.studentPersonId, student.personId));
+        .innerJoin(enrollments, and(
+          eq(enrollments.studentProfileId, input.studentProfileId),
+          eq(enrollments.kind, "program"),
+          eq(enrollments.status, "active"),
+        ))
+        .innerJoin(programs, and(
+          eq(programs.id, enrollments.programId),
+          eq(programs.siteId, input.siteId),
+          eq(programs.status, "active"),
+        ))
+        .innerJoin(accountPersonGrants, and(
+          eq(accountPersonGrants.personId,guardianRelationships.guardianPersonId),
+          eq(accountPersonGrants.role,"guardian"),
+          eq(accountPersonGrants.active,true),
+          eq(accountPersonGrants.isSynthetic,false),
+          eq(accountPersonGrants.organizationId,programs.organizationId),
+          or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,input.siteId)),
+        ))
+        .innerJoin(accessAccounts,and(
+          eq(accessAccounts.id,accountPersonGrants.accountId),
+          eq(accessAccounts.disabled,false),
+        ))
+        .innerJoin(people,and(
+          eq(people.id,guardianRelationships.guardianPersonId),
+          eq(people.active,true),
+        ))
+        .where(guardianRelationshipPredicate({
+          studentPersonId: student.personId,
+          access: "enrollment",
+        }));
 
       if (guardians.length > 0) {
         await notifyMany(
           tx,
-          guardians.map(({ personId }) => ({
+          [...new Set(guardians.map(row => row.personId))].map(personId => ({
             recipientPersonId: personId,
             type: "student_sent_home_ill",
             title: "Health office update",
@@ -410,6 +478,7 @@ export async function clearReturnToSchool(
       .limit(1);
 
     if (!current) throw new Error("Return-to-school clearance not found");
+    await assertCurrentHealthStudentScope(tx, context, current.studentProfileId);
     if (current.status === "cleared") return;
 
     const clearedAt = new Date();
@@ -454,6 +523,7 @@ export async function getHealthCase(
   assertCapability(context, "health.read");
 
   return db.transaction(async (tx) => {
+    await assertCurrentHealthStudentScope(tx, context, studentProfileId);
     const [profile] = await tx
       .select()
       .from(healthProfiles)

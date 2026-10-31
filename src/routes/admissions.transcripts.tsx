@@ -87,8 +87,18 @@ function TranscriptIssuanceView({
       eyebrow="CAN OS · Registrar"
       title="Official transcripts"
       subtitle="Search finalized academic records in your authorized school scope and issue a point-in-time transcript from the credit issuer of record."
-      actions={<Link to="/admissions" className="rounded-lg border px-3 py-2 text-sm">Admissions</Link>}
+      actions={<div className="flex flex-wrap gap-2">
+        <Link to="/operations/transfer-records" className="rounded-lg border px-3 py-2 text-sm">Complete records handoffs</Link>
+        <Link to="/admissions/credential-delivery" className="rounded-lg border px-3 py-2 text-sm">Deliver official credentials</Link>
+        <Link to="/admissions" className="rounded-lg border px-3 py-2 text-sm">Admissions</Link>
+      </div>}
     >
+      <p className="mt-4 rounded-lg border p-4 text-sm text-muted-foreground">
+        An official transcript records finalized coursework, grades, and recorded credits.
+        Courses without recorded credit units remain part of the transcript with credits marked
+        Not recorded. Missing credits do not block issuance, and issuing a transcript does
+        not certify graduation or award a diploma.
+      </p>
       {error && <p role="alert" className="mt-4 rounded-lg border border-red-400 p-3 text-sm">{error}</p>}
       {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
       <form onSubmit={submitSearch} className="mt-6 flex flex-wrap items-end gap-3">

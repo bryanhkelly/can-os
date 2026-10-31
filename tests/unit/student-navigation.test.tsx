@@ -17,7 +17,8 @@ const state = vi.hoisted(() => ({
     { assessmentId: "graded", title: "Graded essay", course: "English", status: "graded", timeliness: "on_time", dueAt: null },
     { assessmentId: "returned", title: "Returned essay", course: "English", status: "returned", timeliness: "late", dueAt: null },
   ].map(item=>({...item,responseText:`Saved draft for ${item.title}`,assessmentStatus:"published",
-    metadata:{rubric:""},attempts:[],pointsPossible:100})),
+    metadata:{rubric:"",maxAttempts:null,criteria:[]},attempts:[],pointsPossible:100,
+    workAvailability:{actionable:true,reason:null},canEdit:true,attemptNumber:1})),
 }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
@@ -58,9 +59,38 @@ describe("Student Today summary navigation", () => {
       generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
       sections: [], coursework: [], events: [], openActions: [], recoveryCandidates: [],
     }} />);
-    expect(html).toMatch(/<a href="\/student\/courses"[^>]*><p[^>]*>Classes<\/p>/);
-    expect(html).toMatch(/<a href="\/student\/assignments"[^>]*><p[^>]*>Upcoming assignments<\/p>/);
+    expect(html).toMatch(/<a href="\/student\/courses"[^>]*>[\s\S]*?Classes<\/p>/);
+    expect(html).toMatch(/<a href="\/student\/assignments"[^>]*>[\s\S]*?Upcoming assignments<\/p>/);
     expect(html).toMatch(/<a href="\/student\/assignments\?filter=missing"[^>]*><p[^>]*>Missing work<\/p>/);
+  });
+
+  it("shows student-owned support tasks exactly once in Student Today without staff case data", () => {
+    const html = renderToStaticMarkup(<StudentExperience
+      liveData={{
+        student: { studentProfileId: "student", personId: "person",
+          firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+        generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+        sections: [], coursework: [], events: [], recoveryCandidates: [],
+        openActions: [{
+          id: "support-task", title: "Meet your academic tutor",
+          description: "Your owned action", dueAt: null, priority: "normal",
+          subjectType: "student_profile", subjectId: "student",
+        }],
+      }}
+      support={{
+        tasks: [{
+          id: "support-task", title: "Meet your academic tutor",
+          type: "student_support", status: "open", dueAt: null,
+          destination: "action", destinationId: "support-task",
+        }],
+        total: 1, truncated: false,
+      }}
+    />);
+    expect(html.match(/Meet your academic tutor/g)).toHaveLength(1);
+    expect(html).toContain('href="/student/experiences?action=support-task"');
+    expect(html).toContain("No additional actions outside your learning support list.");
+    expect(html).not.toContain("Private counselor");
+    expect(html).not.toContain("safeguarding");
   });
 
   it("opens assessment actions in the assignment and other actions individually", () => {
@@ -76,6 +106,38 @@ describe("Student Today summary navigation", () => {
     expect(html).toContain('href="/student/assignments?assessment=returned"');
     expect(html).toContain('href="/student/experiences?action=help"');
     expect(html).not.toContain('href="/student/experiences?action=revision"');
+  });
+
+  it("hands an enrolled student into actual first-week lesson and submission work", () => {
+    const html = renderToStaticMarkup(<StudentExperience liveData={{
+      student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+      generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+      sections: [{ sectionId: "section-1", sectionTitle: "Biology", siteId: "site", programId: "program", schoolYearId: "year" }],
+      firstWeek: [{ sectionId: "section-1", ready: true, blockers: [], activeStudentCount: 1,
+        firstWeek: { lesson: { id: "investigate", title: "Investigate cells" }, assessment: { id: "assessment-1", title: "Cell observations" } } }],
+      coursework: [], events: [], openActions: [], recoveryCandidates: [],
+    }} />);
+    expect(html).toContain("Start first-week work");
+    expect(html).toContain('href="/student/assignments?section=section-1&amp;assessment=assessment-1"');
+    expect(html).toContain('href="/classes?section=section-1&amp;tab=lessons&amp;lesson=investigate"');
+    expect(html).toContain("Investigate cells");
+    expect(html).toContain("Cell observations");
+  });
+
+  it("does not offer a false start when an enrolled class has no submittable assessment", () => {
+    const html = renderToStaticMarkup(<StudentExperience liveData={{
+      student: { studentProfileId: "student", personId: "person", firstName: "Jordan", preferredName: null, gradeLevel: "9" },
+      generatedAt: new Date(), dayStartUtc: new Date(), dayEndUtc: new Date(),
+      sections: [{ sectionId: "section-1", sectionTitle: "Biology", siteId: "site", programId: "program", schoolYearId: "year" }],
+      firstWeek: [{ sectionId: "section-1", ready: false, activeStudentCount: 1,
+        blockers: [{ key: "missing_assessment", message: "Publish an assessment with student instructions so learners can submit real work." }],
+        firstWeek: { lesson: { id: "investigate", title: "Investigate cells" }, assessment: null } }],
+      coursework: [], events: [], openActions: [], recoveryCandidates: [],
+    }} />);
+    expect(html).not.toContain("Start first-week work");
+    expect(html).toContain("View my classes");
+    expect(html).toContain("Publish an assessment with student instructions");
+    expect(html).not.toContain('assessment=undefined');
   });
 });
 

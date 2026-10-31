@@ -1,122 +1,41 @@
-import { and, desc, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, or } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import {
-  complianceFrameworkVersions, compliancePolicyApplicability, compliancePolicyRules,
-  deliveryArrangements, jurisdictions, people, programs, qualificationClaims, qualificationDefinitions,
-  qualificationVerificationEvents, roleAssignments, schoolYears, sections, sectionTeachers, terms,
-  staffingEligibilityEvaluations,
+  deliveryArrangements, qualificationClaims, sectionTeachers, staffingEligibilityEvaluations,
 } from "@/db/schema";
-import { credentialStatusFromDecision } from "@/domain/credential-workflow";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import { emitEvent, notify, writeAudit } from "@/platform/mutation";
-import { evaluateQualificationCoverage, instructionalWindow, type CoveragePolicy } from "./qualification-coverage";
+import {
+  evaluateTeachingEligibility, teachingStaffingContext, type TeachingEligibilityReader,
+} from "./teaching-eligibility.server";
+import { evaluateInstructionalCoverage } from "./instructional-coverage.server";
+import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 
-type Reader = Pick<Database, "select" | "selectDistinctOn">;
+import { EventTypes } from "@/domain/event-types";
+export { teachingRolePredicate as launchTeacherRolePredicate } from "./teaching-eligibility.server";
+type Reader=TeachingEligibilityReader;
 
-export async function launchStaffingContext(sectionId: string, executor: Reader = db) {
-  const [section] = await executor.select({
-    id: sections.id, programId: sections.programId, siteId: sections.siteId, active: sections.active,
-    organizationId: programs.organizationId, providerId: programs.academicProviderOrganizationId,
-    programSiteId: programs.siteId, yearOrganizationId: schoolYears.organizationId,
-    yearSiteId: schoolYears.siteId, yearProgramId: schoolYears.programId,
-    jurisdictionId: programs.jurisdictionId, deliveryModel: programs.deliveryModel,
-    startsAt: sections.startsAt, endsAt: sections.endsAt,
-    startsOn: terms.startsOn, endsOn: terms.endsOn, timezone: schoolYears.timezone,
-  }).from(sections).innerJoin(programs, eq(programs.id, sections.programId))
-    .innerJoin(terms, eq(terms.id, sections.termId))
-    .innerJoin(schoolYears, eq(schoolYears.id, terms.schoolYearId))
-    .where(eq(sections.id, sectionId)).limit(1);
-  if (!section) throw new Error("Launch section not found");
-  if (!section.siteId) throw new Error("Launch staffing requires a school site");
-  if (section.siteId !== section.programSiteId || section.yearSiteId !== section.siteId ||
-    section.yearOrganizationId !== section.organizationId ||
-    (section.yearProgramId && section.yearProgramId !== section.programId)) {
-    throw new Error("Section, program and school-year scope must match for launch staffing");
-  }
-  return { ...section, siteId: section.siteId, window: instructionalWindow(section) };
+export async function launchStaffingContext(sectionId:string,executor:Reader=db){
+  const section=await teachingStaffingContext(sectionId,executor);
+  if(!section.siteId)throw new Error("Launch staffing requires a school site");
+  return {...section,siteId:section.siteId};
 }
-
-export async function evaluateLaunchTeacher(sectionId: string, personId: string, executor: Reader = db) {
-  const section = await launchStaffingContext(sectionId, executor);
-  const [role] = await executor.select({ id: roleAssignments.id }).from(roleAssignments)
-    .innerJoin(people,eq(people.id,roleAssignments.personId)).where(and(
-    eq(roleAssignments.personId, personId), eq(roleAssignments.roleKey, "teacher"),
-    eq(people.active,true),
-    inArray(roleAssignments.organizationId, [section.organizationId, section.providerId]),
-    or(isNull(roleAssignments.siteId), eq(roleAssignments.siteId, section.siteId)),
-    or(isNull(roleAssignments.programId), eq(roleAssignments.programId, section.programId)),
-  )).orderBy(roleAssignments.id).limit(1);
-  if (!role) return { eligible: false, reasons: ["Teacher role is not granted for this program and site."],
-    policyRuleIds: [], claimIds: [], verificationEventIds: [], roleAssignmentId: null, window: section.window };
-
-  const policies = await executor.select({
-    id: compliancePolicyRules.id, code: compliancePolicyRules.code,
-    expression: compliancePolicyRules.expression, evidencePolicy: compliancePolicyRules.evidencePolicy,
-    versionFrom: complianceFrameworkVersions.effectiveFrom, versionThrough: complianceFrameworkVersions.effectiveThrough,
-    appliesFrom: compliancePolicyApplicability.effectiveFrom, appliesThrough: compliancePolicyApplicability.effectiveThrough,
-  }).from(compliancePolicyApplicability)
-    .innerJoin(complianceFrameworkVersions, eq(complianceFrameworkVersions.id, compliancePolicyApplicability.frameworkVersionId))
-    .leftJoin(compliancePolicyRules, eq(compliancePolicyRules.frameworkVersionId, complianceFrameworkVersions.id))
-    .where(and(eq(complianceFrameworkVersions.status, "published"),
-      or(isNull(compliancePolicyApplicability.organizationId), eq(compliancePolicyApplicability.organizationId, section.organizationId)),
-      or(isNull(compliancePolicyApplicability.siteId), eq(compliancePolicyApplicability.siteId, section.siteId)),
-      or(isNull(compliancePolicyApplicability.programId), eq(compliancePolicyApplicability.programId, section.programId)),
-      or(isNull(compliancePolicyApplicability.jurisdictionId), eq(compliancePolicyApplicability.jurisdictionId, section.jurisdictionId)),
-      or(isNull(compliancePolicyApplicability.roleKey), eq(compliancePolicyApplicability.roleKey, "teacher")),
-    ));
-  for (const policy of policies) {
-    if ((policy.versionFrom && policy.versionThrough && policy.versionFrom >= policy.versionThrough) ||
-      (policy.appliesFrom && policy.appliesThrough && policy.appliesFrom >= policy.appliesThrough)) {
-      throw new Error(`Qualification policy ${policy.code ?? "empty-framework"} has an invalid effective window`);
-    }
-  }
-  const bounded: CoveragePolicy[] = policies.map(policy => ({
-    ...policy,
-    id: policy.id ?? "missing-rule", code: policy.code ?? "empty-framework",
-    expression: policy.expression ?? {}, evidencePolicy: policy.evidencePolicy ?? {},
-    from: new Date(Math.max(section.window.from.getTime(), policy.versionFrom?.getTime() ?? -Infinity, policy.appliesFrom?.getTime() ?? -Infinity)),
-    through: new Date(Math.min(section.window.through.getTime(), policy.versionThrough?.getTime() ?? Infinity, policy.appliesThrough?.getTime() ?? Infinity)),
-  })).filter(policy => policy.from < policy.through);
-  const claims = await executor.selectDistinctOn([qualificationClaims.id], {
-    id: qualificationClaims.id, type: qualificationDefinitions.key, issuer: qualificationClaims.issuerName,
-    jurisdiction: jurisdictions.code, issuedAt: qualificationClaims.issuedAt, expiresAt: qualificationClaims.expiresAt,
-    decision: qualificationVerificationEvents.decision,
-    verificationEventId: qualificationVerificationEvents.id,
-  }).from(qualificationClaims)
-    .innerJoin(qualificationDefinitions, eq(qualificationDefinitions.id, qualificationClaims.definitionId))
-    .leftJoin(jurisdictions, eq(jurisdictions.id, qualificationClaims.jurisdictionId))
-    .leftJoin(qualificationVerificationEvents, eq(qualificationVerificationEvents.claimId, qualificationClaims.id))
-    .where(eq(qualificationClaims.personId, personId))
-    .orderBy(qualificationClaims.id, desc(qualificationVerificationEvents.sequence));
-  const evidence = claims.map(claim => ({
-    type: claim.type, issuer: claim.issuer ?? undefined, jurisdiction: claim.jurisdiction ?? undefined,
-    verified: credentialStatusFromDecision(claim.decision) === "verified",
-    validFrom: claim.issuedAt, expiresAt: claim.expiresAt,
-  }));
-  return { ...evaluateQualificationCoverage(section.window, bounded, evidence),
-    claimIds: claims.map(claim => claim.id),
-    verificationEventIds: claims.map(claim => claim.verificationEventId).filter((id): id is string => id !== null),
-    roleAssignmentId: role.id, window: section.window };
+export function evaluateLaunchTeacher(sectionId:string,personId:string,executor:Reader=db){
+  return evaluateTeachingEligibility(sectionId,personId,executor,{
+    horizon:"instructional_window",requireAssignment:false,requireSite:true,
+  });
 }
 
 export async function evaluateLaunchStaffing(sectionId: string, executor: Reader = db) {
   const section = await launchStaffingContext(sectionId, executor);
-  const arrangements = await executor.select({
-    id: deliveryArrangements.id, instructorId: deliveryArrangements.instructorPersonId,
-    from: deliveryArrangements.effectiveFrom, through: deliveryArrangements.effectiveThrough,
-  }).from(deliveryArrangements).where(and(eq(deliveryArrangements.sectionId, sectionId), eq(deliveryArrangements.status, "active")));
-  const teachers = await executor.select({ personId: sectionTeachers.personId }).from(sectionTeachers)
-    .where(eq(sectionTeachers.sectionId, sectionId));
+  const coverage = await evaluateInstructionalCoverage(sectionId, executor);
   const reasons: string[] = [];
   const instructors: {personId: string; policyRuleIds: string[]; verificationEventIds: string[]}[] = [];
-  if (!arrangements.some(arrangement => arrangement.instructorId &&
-    teachers.some(teacher => teacher.personId === arrangement.instructorId) &&
-    (!arrangement.from || arrangement.from <= section.window.from) &&
-    (!arrangement.through || arrangement.through >= section.window.through))) {
+  if (!coverage.covered) {
     reasons.push("No assigned instructor delivery arrangement covers the full instructional window.");
   }
-  for (const personId of new Set(teachers.map(teacher => teacher.personId))) {
+  for (const personId of coverage.assignedTeacherIds) {
     const result = await evaluateLaunchTeacher(sectionId, personId, executor);
     if (!result.eligible) reasons.push(...result.reasons);
     instructors.push({personId,policyRuleIds:result.policyRuleIds,verificationEventIds:result.verificationEventIds});
@@ -150,12 +69,19 @@ export async function assignLaunchInstructor(
   }
   if (section.siteId !== initial.siteId) throw new Error("Section site changed; reload launch setup before assigning");
   if (!section.active) throw new Error("Cannot assign an instructor to an inactive section");
+  // Host launch scope permits planning, but a new academic relationship also
+  // requires the live contracted instruction and curriculum services. Recheck
+  // inside this transaction so expiry/revocation cannot race the assignment.
+  await requireChurchHostedOperatingServices(tx, section.programId, [
+    "academic_instruction", "curriculum",
+  ]);
   await lockLaunchTeacherClaims(tx, [input.teacherPersonId]);
   const eligibility = await evaluateLaunchTeacher(input.sectionId, input.teacherPersonId, tx);
   if (!eligibility.eligible) throw new Error("Instructor is not eligible: " + eligibility.reasons.join(" "));
   const [existing] = await tx.select({ id: deliveryArrangements.id }).from(deliveryArrangements).where(and(
     eq(deliveryArrangements.sectionId, section.id),
     eq(deliveryArrangements.instructorPersonId, input.teacherPersonId),
+    eq(deliveryArrangements.academicProviderOrganizationId, section.providerId),
     eq(deliveryArrangements.status, "active"),
     or(isNull(deliveryArrangements.effectiveFrom), lte(deliveryArrangements.effectiveFrom, section.window.from)),
     or(isNull(deliveryArrangements.effectiveThrough), gte(deliveryArrangements.effectiveThrough, section.window.through)),
@@ -187,7 +113,7 @@ export async function assignLaunchInstructor(
     resourceType: "section", resourceId: section.id,
   });
   await emitEvent(tx, {
-    eventType: "DeliveryArrangementActivated", aggregateType: "delivery_arrangement",
+    eventType: EventTypes.DeliveryArrangementActivated, aggregateType: "delivery_arrangement",
     aggregateId: arrangement.id, actorPersonId: context.actorPersonId,
     organizationId: section.organizationId, siteId: section.siteId, programId: section.programId,
     sectionId: section.id, payload: { instructorPersonId: input.teacherPersonId, eligibilityEvaluationIds:evaluations.map(row=>row.id) },

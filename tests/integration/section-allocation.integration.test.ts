@@ -5,6 +5,8 @@ import * as s from "@/db/schema";
 import { activateSectionEnrollment } from "@/modules/enrollment/section-allocation.service";
 import { replaceSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
 import { createAcademicTimeFixture } from "./helpers/academic-time";
+import { evaluateLaunchTeacher, evaluateLaunchStaffing } from "@/modules/staffing/launch-staffing.server";
+import { verifiedTeacherSectionIds } from "@/modules/enrollment/verified-section-teachers.server";
 
 describe("section allocation prerequisites", () => {
   it("rejects an explicitly failing D and accepts a custom passing label from the linked scale", async () => {
@@ -41,7 +43,8 @@ describe("section allocation prerequisites", () => {
       owningOrganizationId: org!.id, code: `${title}-${suffix}`, title, subject: "Science",
     }))).returning();
     const versions = await db.insert(s.courseTemplateVersions).values(courses.map(course => ({
-      courseTemplateId: course.id, version: 1,
+      courseTemplateId: course.id, version: 1, status:"published" as const,
+      curriculum:{learning:{version:1,modules:[{id:"intro",title:"Introduction",lessons:[{id:"first",title:"Welcome to science",body:"Read the introduction and compare examples.",resources:[]}]}]}},
     }))).returning();
     const sections = await db.insert(s.sections).values(versions.map((version, index) => ({
       programId: program!.id, siteId: site!.id, termId: time.term.id,
@@ -49,6 +52,34 @@ describe("section allocation prerequisites", () => {
     }))).returning();
     const introductory = sections[0]!;
     const advanced = sections[1]!;
+    // Classroom placement needs a real active teaching assignment and an
+    // independently verified school role, not just a Section shell.
+    const [instructor]=await db.insert(s.people).values({
+      legalFirstName:"Verified",legalLastName:"Instructor",
+    }).returning();
+    const [account]=await db.insert(s.accessAccounts).values({
+      emailNormalized:`teacher-${suffix}@example.invalid`,
+      emailVerifiedAt:new Date(),
+    }).returning();
+    await db.insert(s.accountPersonGrants).values({
+      accountId:account!.id,personId:instructor!.id,role:"teacher",
+      organizationId:org!.id,siteId:site!.id,
+    });
+    await db.insert(s.sectionTeachers).values({
+      sectionId:advanced.id,personId:instructor!.id,
+    });
+    await db.insert(s.roleAssignments).values({
+      personId:instructor!.id,organizationId:org!.id,siteId:site!.id,
+      programId:program!.id,roleKey:"teacher",
+    });
+    const [delivery]=await db.insert(s.deliveryArrangements).values({
+      sectionId:advanced.id,academicProviderOrganizationId:org!.id,
+      instructorPersonId:instructor!.id,modality:"onsite",status:"active",
+    }).returning();
+    const {createTeachingQualificationFixture}=await import("./helpers/teaching-qualification");
+    await createTeachingQualificationFixture(db,{
+      sectionId:advanced.id,personId:instructor!.id,verifierPersonId:person!.id,
+    });
     await replaceSectionRegistrationPolicy(db, {
       sectionId: advanced.id, enrollmentCapacity: 10, prerequisites: [courses[0]!.code],
       addDropEndsOn: time.term.endsOn, withdrawalEndsOn: time.term.endsOn,
@@ -66,6 +97,39 @@ describe("section allocation prerequisites", () => {
         scope: { organizationIds: [org!.id], siteIds: [site!.id], programIds: [program!.id] },
       },
     };
+    // Cross-consumer regression: launch and placement must revoke the same
+    // teacher when verified account authority changes, without cached readiness.
+    expect((await evaluateLaunchTeacher(advanced.id, instructor!.id)).eligible).toBe(true);
+    expect((await evaluateLaunchStaffing(advanced.id)).ready).toBe(true);
+    expect(await verifiedTeacherSectionIds([advanced.id])).toEqual(new Set([advanced.id]));
+        // A Section teacher link cannot turn disabled, unverified or synthetic
+    // accounts into a "staffed" class for a newly admitted student.
+    await db.update(s.accessAccounts).set({disabled:true}).where(eq(s.accessAccounts.id,account!.id));
+    expect((await evaluateLaunchTeacher(advanced.id, instructor!.id)).eligible).toBe(false);
+    expect((await evaluateLaunchStaffing(advanced.id)).ready).toBe(false);
+    expect(await verifiedTeacherSectionIds([advanced.id])).toEqual(new Set());
+    await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
+      .rejects.toThrow("Assign an active teacher");
+    await db.update(s.accessAccounts).set({disabled:false,emailVerifiedAt:null})
+      .where(eq(s.accessAccounts.id,account!.id));
+    await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
+      .rejects.toThrow("Assign an active teacher");
+    await db.update(s.accessAccounts).set({emailVerifiedAt:new Date()})
+      .where(eq(s.accessAccounts.id,account!.id));
+    await db.update(s.accountPersonGrants).set({isSynthetic:true})
+      .where(eq(s.accountPersonGrants.accountId,account!.id));
+    await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
+      .rejects.toThrow("Assign an active teacher");
+    await db.update(s.accountPersonGrants).set({isSynthetic:false})
+      .where(eq(s.accountPersonGrants.accountId,account!.id));
+    // Qualification and assignment alone are insufficient when instructional
+    // delivery has been withdrawn. Restore the same arrangement afterward.
+    await db.update(s.deliveryArrangements).set({status:"completed"})
+      .where(eq(s.deliveryArrangements.id,delivery!.id));
+    await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
+      .rejects.toThrow("delivery coverage");
+    await db.update(s.deliveryArrangements).set({status:"active"})
+      .where(eq(s.deliveryArrangements.id,delivery!.id));
     await expect(db.transaction(tx => activateSectionEnrollment(tx, input)))
       .rejects.toThrow("Unmet prerequisites");
     expect(await db.select().from(s.enrollments).where(and(

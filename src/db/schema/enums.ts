@@ -18,6 +18,8 @@ export const programType = pgEnum("program_type", [
   "hybrid_program",
   "homeschool_cohort",
   "summer_enrichment",
+  "summer_program",
+  "after_school_enrichment",
 ]);
 
 export const programStatus = pgEnum("program_status", [
@@ -217,7 +219,7 @@ export const courseTemplateVersionStatus = pgEnum("course_template_version_statu
 
 export const activityStatus = pgEnum("activity_status", ["active"]);
 
-export const activitySeasonStatus = pgEnum("activity_season_status", ["registration"]);
+export const activitySeasonStatus = pgEnum("activity_season_status", ["registration", "draft"]);
 
 export const activityRegistrationStatus = pgEnum("activity_registration_status", [
   "pending",
@@ -271,6 +273,7 @@ export const conferenceBookingStatus = pgEnum("conference_booking_status", [
   "booked",
   "held",
   "no_show",
+  "cancelled",
 ]);
 
 export const fieldTripStatus = pgEnum("field_trip_status", [
@@ -281,6 +284,7 @@ export const fieldTripStatus = pgEnum("field_trip_status", [
 export const fieldTripParticipantStatus = pgEnum("field_trip_participant_status", [
   "invited",
   "permission_complete",
+  "declined",
 ]);
 
 export const fieldTripAttendanceStatus = pgEnum("field_trip_attendance_status", [
@@ -324,7 +328,7 @@ export const insightStatus = pgEnum("insight_status", [
   "dismissed",
 ]);
 
-export const schoolConfigurationStatus = pgEnum("school_configuration_status", ["draft"]);
+export const schoolConfigurationStatus = pgEnum("school_configuration_status", ["draft", "approved", "suspended"]);
 
 export const complianceFrameworkVersionStatus = pgEnum("compliance_framework_version_status", [
   "draft",

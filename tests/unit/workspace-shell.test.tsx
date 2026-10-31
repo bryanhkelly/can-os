@@ -72,8 +72,10 @@ describe("persistent server-initialized workspace shell", () => {
     expect(html).toContain('aria-label="Workspace sidebar"');
     expect(html).toContain("Test Learner");
     expect(html).toContain("Test School");
-    expect(html).toContain("Sign out");
+    expect(html).toContain('aria-label="Account menu"');
     expect(html).toContain("Ask CAN");
+    expect(html.match(/<button[^>]*aria-label="Switch workspace"/g)).toHaveLength(1);
+    expect(html).not.toContain("Switcher mode");
     expect(html).not.toContain("Loading account");
     expect(html).not.toContain("/teacher/gradebook");
     await Promise.all([
@@ -102,7 +104,7 @@ describe("persistent server-initialized workspace shell", () => {
       ...signedIn, session: { ...signedIn.session, demoFacilitator: true },
     });
     const html = view.markup();
-    expect(html).toContain('aria-label="Demo user"');
+    expect(html).toContain('aria-label="Account menu"');
     expect(html).toContain("Demo admin session: acting as Test Learner (student)");
     expect(html).not.toContain("/admissions");
     expect(html).not.toContain('aria-label="Active membership"');

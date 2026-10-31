@@ -4,6 +4,66 @@ CAN OS uses Neon PostgreSQL as the production system of record.
 
 ## Environments
 
+## Admissions and GF1 CI acceptance (FullFlow)
+
+Both `Admissions Neon Acceptance` and `GF1 Neon Acceptance` run against
+a **separate, nonproduction** Neon branch. They share a GitHub Actions
+concurrency group so migrations and synthetic fixtures cannot race each other.
+The jobs require the `integration-test` GitHub Actions environment to have:
+
+- Secret `CAN_ADMISSIONS_TEST_DATABASE_URL`: the PostgreSQL connection
+  string for an isolated Neon test branch in CAN OS project
+  `sweet-hall-62441909`; **never** the production branch or production URL.
+- Environment variable `CAN_APPLICATION_DB_HOST`: the hostname of the
+  production/application database endpoint (no protocol, credentials, port,
+  or database path; pooled and direct names are normalized).
+- Environment variable `CAN_ADMISSIONS_TEST_BRANCH_ID`: the test branch's
+  actual Neon `br-...` ID, taken from Neon, not a human-readable name.
+  Production branch `br-restless-sea-ar9ooo55` is prohibited.
+
+Set these at **GitHub → repository Settings → Environments →
+integration-test**. A repository-level variable can also be used when the
+environment does not override it. Treat the connection string as a secret;
+never add it to Git, docs, tests, comments, or Actions output.
+
+Neon's project currently has a limited branch quota. If a new dedicated
+admissions test branch cannot be created, obtain approval before retiring a
+stale branch or increasing the quota. Do not silently repurpose production,
+delete another team's branch, or force admissions acceptance onto the shared
+FullFlow branch. Once an isolated branch exists, configure the settings and
+manually dispatch **Admissions Neon Acceptance** on `FullFlow`, followed by
+**GF1 Neon Acceptance**. Only successful migration, integration, and
+authenticated browser steps constitute these acceptance results.
+
+The workflows call `scripts/verify-admissions-neon-branch.mjs` *before*
+migration. The test wrappers also verify identity before executing database
+fixtures or browser tests. The check is read-only SQL using Neon-reported
+`neon.project_id` and `neon.branch_id`, and refuses missing settings,
+another project or branch, and the known production branch. Offline
+`--preflight` is only a URL/hostname separation check, not proof of actual
+Neon branch identity. Never bypass this online check to make a job green.
+
+
+**FullFlow branch-specific safety (2026-10-23):** For FullFlow use the single
+approved disposable branch `fullflow-e2e-20261022` (ID
+`br-proud-pine-arfju8h2`, project `sweet-hall-62441909`).
+Only the `full-flow` mode of `scripts/run-integration-tests.mjs` and
+`scripts/verify-fullflow-schema.mjs` require a real SQL identity check
+against Postgres settings `neon.project_id` and `neon.branch_id`.
+Matching URL hostnames or a caller-supplied branch label are NOT sufficient.
+An offline `--preflight` checks only endpoint separation; it does not verify
+actual Neon branch identity. The recommended protected migration command is
+`npm run db:migrate:fullflow -- --preflight` (read-only connection check), then
+`npm run db:migrate:fullflow` after migration review. Both require
+`TEST_DATABASE_URL`, `CAN_TEST_DB_WRITES_ENABLED=true`, a distinct
+`CAN_APPLICATION_DB_HOST`, and a nonproduction Node environment. The
+migration wrapper passes the database-attested URL to the existing Drizzle
+`db:migrate` command. Other independent admissions/GF1/curriculum test
+suites retain their existing separate test branch configurations and must not
+be forced onto the FullFlow branch. Never run unrestricted `db:push` or
+`db:migrate` against the application database as a way of fixing drift.
+
+
 Use separate Neon branches for:
 
 - production
@@ -12,6 +72,60 @@ Use separate Neon branches for:
 - pull-request / Golden Flow integration tests
 
 Never point integration tests at production.
+
+## Current isolated acceptance configuration (2026-10-31)
+
+The `integration-test` GitHub environment needs secrets scoped to its
+specific Neon branches, not production credentials:
+
+| Workflow | Database secret | Attested branch setting |
+| --- | --- | --- |
+| Admissions and GF1 | `CAN_ADMISSIONS_TEST_DATABASE_URL` | `CAN_ADMISSIONS_TEST_BRANCH_ID` (environment variable) |
+| Curriculum browser and curriculum journey | `CAN_CURRICULUM_TEST_DATABASE_URL` or the workflow's `CURRICULUM_TEST_DATABASE_URL` | `CAN_CURRICULUM_TEST_BRANCH_ID` (environment variable) |
+| FullFlow connected release | `CAN_FULLFLOW_TEST_DATABASE_URL` | Pinned `br-proud-pine-arfju8h2` in code; no caller-provided override |
+
+All require the `CAN_APPLICATION_DB_HOST` environment variable as an
+independent application-endpoint comparison. Other integration runners require
+`CAN_INTEGRATION_TEST_BRANCH_ID` or an applicable suite-specific branch ID.
+Browser configurations now verify the Postgres-reported Neon branch **even
+when Playwright is called directly**, not only when launched by an npm wrapper.
+Offline `--preflight` checks are not database identity or migration proof.
+
+The CAN OS Neon project reached its branch limit during acceptance setup.
+Request a higher limit or explicitly authorize retirement of unused test
+branches before creating a new dedicated admissions/curriculum branch. Never
+delete branches, use production, or silently co-opt the FullFlow release branch
+to satisfy an unrelated acceptance job. GitHub does not expose secrets through
+the configured connector, so these values require environment administration.
+
+## Scheduled delivery and safety monitoring
+
+The Netlify scheduled functions
+`netlify/functions/scheduled-jobs.ts` (every five minutes) and
+`netlify/functions/school-family-alerts.ts` (every minute) **throw** when
+`URL` or `CAN_JOB_SECRET` is absent, or when the authenticated app
+endpoint returns a failure. Configure alerts for failed/missed scheduled
+invocations in Netlify monitoring and verify recent successful invocation
+timestamps against the deployment before opening a school. Application
+outbox health also needs review for terminal events/notifications.
+A build or a deployed schedule definition does not prove delivery.
+Do not include raw family emails, student details or access tokens in logs.
+
+## Network onboarding acceptance mode
+
+Run `node scripts/run-integration-tests.mjs network-onboarding --preflight` to
+check the disposable database endpoint guard without writing. Then run
+`npm run test:integration:network-onboarding` against that same isolated,
+migrated database, using `TEST_DATABASE_URL`,
+`CAN_TEST_DB_WRITES_ENABLED=true`, and a distinct `CAN_APPLICATION_DB_HOST`.
+This mode runs both denomination-affiliation and CAN agreement/HQ-provision
+synthetic integration files. They use rollback transactions and must not be
+pointed at production. CI unit tests alone do not execute these fixtures.
+
+The synthetic signed-contract and HQ authorization evidence are fabricated
+records in the disposable transaction only. A passing test cannot certify a
+real contract, true signer authority, production email delivery, or deployed
+browser behavior.
 
 ## Golden Flow integration tests
 

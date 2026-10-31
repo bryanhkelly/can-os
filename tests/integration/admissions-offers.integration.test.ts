@@ -48,6 +48,13 @@ integration("synthetic admissions offer concurrency",()=>{
    await db.update(s.journeys).set({status:"ready"}).where(eq(s.journeys.id,row.journeyId));
    records.push(row);
   }
+  // The child relationship created by application intake is prospective.
+  // Model a separate verified school review before exercising real offer
+  // acceptance and activation in this synthetic integration fixture.
+  await db.update(s.guardianRelationships).set({
+    canViewAcademics:true,canManageEnrollment:true,canSubmitAttendanceExcuse:true,
+    metadata:{verification:"verified",source:"synthetic_independent_review"},
+  }).where(eq(s.guardianRelationships.guardianPersonId,guardian.id));
   expect(new Set(records.map(r=>r.householdId)).size).toBe(1);
   expect(new Set(records.map(r=>r.studentProfileId)).size).toBe(2);
   const [outsider]=await db.insert(s.people).values({legalFirstName:"Synthetic",legalLastName:"Outsider"}).returning();

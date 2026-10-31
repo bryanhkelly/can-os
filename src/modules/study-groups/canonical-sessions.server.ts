@@ -7,6 +7,7 @@ import { cancelProjection,rescheduleProjection } from "@/platform/calendar/proje
 import { and,eq } from "drizzle-orm";
 import { facilitatedGroup } from "./canonical-membership.server";
 
+import { EventTypes } from "@/domain/event-types";
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function notifyMembers(tx: Tx, groupId: string, title: string, body: string, sessionId: string) {
@@ -77,7 +78,7 @@ export async function reviseGroupSessionForActor(actor: Actor, data: ReviseGroup
       },
     });
     await emitEvent(tx, {
-      eventType: data.action === "cancel" ? "StudyGroupSessionCancelled" : "StudyGroupSessionRescheduled",
+      eventType: data.action === "cancel" ? EventTypes.StudyGroupSessionCancelled : EventTypes.StudyGroupSessionRescheduled,
       aggregateType: "study_group_session", aggregateId: session.id,
       actorPersonId: actor.actorPersonId, payload: { groupId: group.id, calendarEventId: event.id },
     });

@@ -1,4 +1,4 @@
-import {createFileRoute} from "@tanstack/react-router";
+import {createFileRoute,Link} from "@tanstack/react-router";
 import {useState} from "react";
 import {LOCAL_DEMO_ACCOUNTS} from "@/domain/local-demo-access";
 export const Route=createFileRoute("/access/")({component:AccessPage});
@@ -13,13 +13,17 @@ function AccessPage(){
   try{
    if(isLocalDemoEmail){
     const response=await fetch("/access/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,code})});
+    if(response.status===429){setStatus("Sign-in requests are temporarily limited. Please try again shortly.");return;}
+    if(response.status===503){setStatus("Sign-in is temporarily unavailable. Please try again shortly.");return;}
     if(!response.ok){setStatus("The access code is invalid or local demo sign-in is disabled.");return;}
     const body=await response.json() as {role?:string};
-    const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/coach",counselor:"/counselor"};
+    const home:Record<string,string>={student:"/student",teacher:"/teacher/missing-work",guardian:"/guardian",registrar:"/admissions",specialist:"/coach",counselor:"/counselor"};
     window.location.replace(home[body.role??""]??"/access");
     return;
    }
    const response=await fetch("/access/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
+   if(response.status===429){setStatus("Too many sign-in requests right now. Please try again shortly.");return;}
+   if(response.status===503){setStatus("Sign-in is temporarily unavailable. Please try again shortly.");return;}
    if(!response.ok){setStatus("Unable to send a link. Please check your email address or try again.");return;}
    setStatus("If this email has a CAN OS account, a one-time access link has been sent.");
   }catch{setStatus("Unable to send a link right now.");}finally{setBusy(false);}
@@ -33,6 +37,7 @@ function AccessPage(){
    <button disabled={busy} type="submit" className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">{isLocalDemoEmail?"Sign in":"Email me an access link"}</button>
   </form>
   <p role="status">{status}</p>
+  <p className="text-sm"><Link to="/church/apply" className="font-semibold underline">Church leader? Request to launch a school →</Link></p>
   <p className="text-sm text-muted-foreground">For demonstrations, use only synthetic accounts and data. Shared changes may be visible to other participants.</p>
  </main>;
 }

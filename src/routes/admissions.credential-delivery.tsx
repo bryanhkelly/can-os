@@ -1,0 +1,45 @@
+import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { WorkspaceShell } from "@/components/workspace";
+import { listAcademicCredentialDeliveries,renderAcademicCredential } from "@/modules/learning/academic-credential-delivery.functions";
+
+export const Route=createFileRoute("/admissions/credential-delivery")({component:CredentialDeliveryPage});
+type Delivery=Awaited<ReturnType<typeof listAcademicCredentialDeliveries>>[number];
+function CredentialDeliveryPage(){
+ const [kind,setKind]=useState<"transcript"|"diploma">("transcript");
+ const [credentialId,setCredentialId]=useState("");
+ const [history,setHistory]=useState<Delivery[]>([]);
+ const [busy,setBusy]=useState(false);
+ const [message,setMessage]=useState("");
+ async function run(fn:()=>Promise<void>){setBusy(true);setMessage("");try{await fn()}catch(e){setMessage(e instanceof Error?e.message:"Unable to process credential")}finally{setBusy(false)}}
+ function download(base64:string,filename:string){
+  const bytes=Uint8Array.from(atob(base64),char=>char.charCodeAt(0));
+  const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
+  const link=document.createElement("a");link.href=url;link.download=filename;link.click();URL.revokeObjectURL(url);
+ }
+ const field=(label:string,value:string,set:(v:string)=>void)=><label className="block text-sm font-medium">{label}<input className="mt-1 block w-full rounded-lg border bg-background p-2" value={value} onChange={e=>set(e.target.value)}/></label>;
+ return <WorkspaceShell eyebrow="CAN OS · Registrar" title="Official credential delivery" subtitle="Download issued documents and inspect historical delivery receipts. External release is currently disabled.">
+  <div className="space-y-5 py-6">
+   <p className="text-sm">Documents are generated from issued transcript snapshots or approved, active diploma records. Email acceptance does not prove delivery to the recipient's inbox.</p>
+   {message&&<p role="status" className="rounded-lg border p-3">{message}</p>}
+   <section className="space-y-3 rounded-xl border p-4">
+    <label className="block text-sm font-medium">Credential type<select className="mt-1 block w-full rounded-lg border bg-background p-2" value={kind} onChange={e=>{setKind(e.target.value as "transcript"|"diploma");setCredentialId("");setHistory([])}}><option value="transcript">Official transcript</option><option value="diploma">Diploma</option></select></label>
+    {field("Issued credential ID",credentialId,value=>{setCredentialId(value);setHistory([])})}
+    <div className="flex flex-wrap gap-2">
+     <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{const result=await renderAcademicCredential({data:{kind,credentialId}});download(result.base64,result.filename);setMessage("Document generated for download.")})}>Download official PDF</button>
+     <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{setHistory(await listAcademicCredentialDeliveries({data:{kind,credentialId}}))})}>Refresh delivery history</button>
+    </div>
+   </section>
+   <section className="space-y-3 rounded-xl border p-4">
+    <h2 className="font-semibold">Official records release</h2>
+    <p className="text-sm">External release is temporarily unavailable until verified release instructions, authorized recipient selection, consent evidence and secure access are implemented. Official PDFs must not be emailed as attachments.</p>
+   </section>
+   <section className="space-y-3 rounded-xl border p-4">
+    <h2 className="font-semibold">Delivery history</h2>
+    {history.map(row=><article key={row.id} className="rounded-lg border p-3 text-sm"><strong>{row.recipientName}</strong> · {row.recipientEmail}<p>Status: {row.status} · Requested: {new Date(row.createdAt).toLocaleString()}</p>{row.providerMessageId&&<p>Provider receipt: {row.providerMessageId}</p>}{row.lastError&&<p role="alert">{row.lastError}</p>}</article>)}
+    {!history.length&&<p className="text-sm text-muted-foreground">No delivery receipts loaded.</p>}
+   </section>
+   <Link to="/admissions/graduation" className="underline">Return to graduation closeout</Link>
+  </div>
+ </WorkspaceShell>;
+}

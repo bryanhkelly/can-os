@@ -13,6 +13,7 @@ CAN OS stores document bytes in a private Cloudflare R2 bucket and metadata in t
 | `CAN_R2_DEMO_UPLOADS_ENABLED=true` | Enables document uploads on explicitly synthetic enrollment records only |
 | `CAN_R2_LIVE_UPLOADS_ENABLED=true` | Explicitly enables authenticated live enrollment document uploads |
 | `CAN_R2_QUALIFICATION_UPLOADS_ENABLED=true` | Separately enables authenticated teacher qualification evidence uploads after operational review |
+| `CAN_R2_SCHOOL_OPENING_UPLOADS_ENABLED=true` | Separately enables authenticated church school-opening evidence uploads after operational review |
 
 **All upload switches default to false.** Demo uploads also require the separate `CAN_DEMO_WRITES_ENABLED` gate. They must never be used as replacements for role and resource authorization. Use a token with access restricted to one private bucket, never put credentials in `VITE_` variables, and restrict CORS to approved application origins and the exact upload headers/methods. CORS does not confer authorization.
 
@@ -53,6 +54,31 @@ the form; a registrar reviews it. A required form cannot be satisfied by
 uploading a signed PDF or approving another document through these APIs.
 No external signature provider, legal certification or live-storage acceptance
 is implied by the in-app signature record.
+
+## Church school-opening evidence
+
+The launch workspace and CAN authorization desk use the same five canonical
+Program-bound opening-evidence categories. A verified church registrar with the
+exact Organization/Site/Program relationship can submit a private PDF, JPEG or
+PNG against the current SchoolConfigurationVersion. The server rechecks that
+relationship and configuration while holding the Program lock, verifies the
+private object, increments the category version, and preserves every superseded
+Document and review reason. Conditional creation prevents an upload retry from
+replacing bytes at the same key; finish retries are idempotent.
+
+A separately verified CAN steward reviews the current submitted version. The
+uploader cannot verify their own document, and the final opening approver must
+also differ from the evidence verifier. Approval and rejection record a reason,
+transactional AuditEvent and DomainEvent/outbox fact. A rejected, expired or
+newly pending latest version blocks opening and subsequent guarded onsite
+presence without deleting prior evidence. The read model identifies the precise
+category status, responsible owner and next action; short-lived downloads are
+reauthorized and audited for both church and CAN readers.
+
+Uploads use `school-opening/{programId}/{uuid}` keys and the separate default-off
+switch above. Live R2, bucket CORS/conditional writes, malware quarantine and
+authenticated multi-role browser/Neon acceptance remain unverified. Enabling the
+switch does not certify jurisdiction-specific legal compliance or school opening.
 
 ## Learning and attendance attachments
 

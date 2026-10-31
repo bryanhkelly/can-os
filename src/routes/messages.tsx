@@ -103,12 +103,17 @@ function MessagesPage() {
       .then(async () => {
         setReply("");
         setSentNotice(true);
-        const [updated, list] = await Promise.all([
-          getThread({ data: { threadId: selectedId } }),
-          listMyThreads(),
-        ]);
-        setDetail(updated);
-        setThreads(list.threads);
+        try {
+          const [updated, list] = await Promise.all([
+            getThread({ data: { threadId: selectedId } }),
+            listMyThreads(),
+          ]);
+          setDetail(updated);
+          setThreads(list.threads);
+        } catch {
+          // The write succeeded; failure to refresh is not a failed send.
+          setError("Message sent, but the conversation could not be refreshed. Reopen it to see the reply.");
+        }
       })
       .catch(() => setError("Your message could not be sent. Please try again."))
       .finally(() => setSending(false));
@@ -128,15 +133,21 @@ function MessagesPage() {
         setComposeRecipientId("");
         setComposeSubject("");
         setComposeBody("");
-        const list = await listMyThreads();
-        setThreads(list.threads);
+        // The message was committed; open its thread even if the inbox
+        // projection fails. A refresh error must not invite a duplicate send.
         openThread(threadId);
+        try {
+          const list = await listMyThreads();
+          setThreads(list.threads);
+        } catch {
+          setError("Message sent. The inbox list could not be refreshed; your new conversation is open.");
+        }
       })
       .catch(() => setComposeError("Your message could not be sent. Please try again."))
       .finally(() => setComposing(false));
   };
 
-  if (error && !threads.length) {
+  if (error && !threads.length && !thread) {
     return (
       <main className="min-h-screen bg-background px-6 py-10 text-foreground">
         <div className="mx-auto max-w-5xl">
@@ -252,10 +263,10 @@ function MessagesPage() {
           </section>
         )}
         {loading && <p className="mt-8 text-sm" role="status">Loading messages…</p>}
-        {!loading && threads.length === 0 && (
+        {!loading && threads.length === 0 && !thread && (
           <p className="mt-8 text-sm">No conversations yet.</p>
         )}
-        {!loading && threads.length > 0 && (
+        {!loading && (threads.length > 0 || Boolean(thread)) && (
           <div className="mt-8 grid gap-4 md:grid-cols-[300px_1fr]">
             <nav aria-label="Conversations" className="grid content-start gap-2">
               {threads.map((thread) => (
@@ -282,6 +293,7 @@ function MessagesPage() {
             </nav>
             <section className="rounded-xl border bg-card p-5" aria-label="Conversation">
               {loadingThread && <p className="text-sm" role="status">Loading conversation…</p>}
+              {!loadingThread && !detail && error && <p role="alert" className="text-sm">{error}</p>}
               {!loadingThread && detail && (
                 <>
                   <h2 className="text-lg font-semibold">{detail.thread.subject}</h2>

@@ -235,7 +235,7 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
           <div key={participant.id} className="rounded-lg border p-3 text-sm">
             <p className="font-medium">{participant.name}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {participant.status === "permission_complete" ? "Permission received" : "Awaiting permission"}
+              {participant.status === "permission_complete" ? "Permission received" : participant.status === "declined" ? "Guardian declined — NOT authorized to board" : "Awaiting permission"}
               {trip.feeAmountCents > 0 &&
                 (participant.feeObligationCreated ? " · Fee due in finance" : " · Fee needs finance review")}
             </p>

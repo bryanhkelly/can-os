@@ -18,7 +18,9 @@ import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray,sql } from "drizzle-orm";
 import { currentCapacityReservationFilter } from "@/modules/staffing/reservation-policy";
 import { assignLaunchInstructor } from "@/modules/staffing/launch-staffing.server";
+import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 
+import { EventTypes, type EventType } from "@/domain/event-types";
 type LifecycleContext = CommandContext & { actorPersonId: string };
 async function authorizedSection(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], context: LifecycleContext, sectionId: string) {
   // Acquire the attendance configuration lock BEFORE row FOR UPDATE. The
@@ -43,7 +45,7 @@ async function authorizedSection(tx: Parameters<Parameters<typeof db.transaction
   assertSiteScope(context, row.siteId);
   return row;
 }
-async function journal(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], context: LifecycleContext, section: Awaited<ReturnType<typeof authorizedSection>>, action: string, before: Record<string,unknown>, after: Record<string,unknown>) {
+async function journal(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], context: LifecycleContext, section: Awaited<ReturnType<typeof authorizedSection>>, action: EventType, before: Record<string,unknown>, after: Record<string,unknown>) {
   await writeAudit(tx, {
     actorPersonId: context.actorPersonId, action, resourceType:"section", resourceId: section.id,
     scope:{organizationId:section.organizationId,siteId:section.siteId,programId:section.programId},
@@ -117,7 +119,7 @@ export async function changeSectionSchedule(context: LifecycleContext, input: {s
       if(reservations.length)throw new Error("Release or replace committed capacity before changing this section's schedule");
     }
     await tx.update(sections).set({scheduleTemplateId:input.scheduleTemplateId,startsAt:input.startsAt,endsAt:input.endsAt,updatedAt:new Date()}).where(eq(sections.id,section.id));
-    await journal(tx,context,section,"SectionScheduleChanged",
+    await journal(tx,context,section,EventTypes.SectionScheduleChanged,
       {scheduleTemplateId:section.scheduleTemplateId,startsAt:section.startsAt?.toISOString()??null,endsAt:section.endsAt?.toISOString()??null},
       {scheduleTemplateId:input.scheduleTemplateId,startsAt:input.startsAt?.toISOString()??null,endsAt:input.endsAt?.toISOString()??null,reason:input.reason.trim()});
   });
@@ -141,7 +143,7 @@ export async function changeSectionState(context: LifecycleContext, sectionId:st
           inArray(actions.status,["open","waiting","in_progress"])));
     }
     await tx.update(sections).set({active,updatedAt:new Date(),metadata:{...section.metadata,lastLifecycleReason:reason.trim()}}).where(eq(sections.id,section.id));
-    await journal(tx,context,section,active?"SectionReopened":"SectionClosed",{active:section.active},{active,reason:reason.trim()});
+    await journal(tx,context,section,active?EventTypes.SectionReopened:EventTypes.SectionClosed,{active:section.active},{active,reason:reason.trim()});
   });
 }
 export async function replaceSectionTeacher(context: LifecycleContext, input:{sectionId:string;oldPersonId:string;newPersonId:string;reason:string}) {
@@ -155,6 +157,7 @@ export async function replaceSectionTeacher(context: LifecycleContext, input:{se
     if(!old)throw new Error("Outgoing instructor is not assigned");
     const [eligible]=await tx.select({id:roleAssignments.id}).from(roleAssignments).where(and(
       eq(roleAssignments.personId,input.newPersonId),eq(roleAssignments.roleKey,"teacher"),
+      activeRoleAssignmentPredicate(),
       inArray(roleAssignments.organizationId,[section.organizationId,...(section.providerOrganizationId ? [section.providerOrganizationId] : [])]))).limit(1);
     if(!eligible)throw new AuthorizationError("replacement instructor must hold a teacher role");
     const capacity=await tx.select({id:instructionalCapacityReservations.id}).from(instructionalCapacityReservations)
@@ -177,7 +180,7 @@ export async function replaceSectionTeacher(context: LifecycleContext, input:{se
       recipientPersonId:input.newPersonId,type:"teaching_assignment",title:"New teaching assignment",
       body:"You have been assigned to "+section.title,resourceType:"section",resourceId:section.id,
     });
-    await journal(tx,context,section,"SectionTeacherReplaced",
+    await journal(tx,context,section,EventTypes.SectionTeacherReplaced,
       {personId:input.oldPersonId},{personId:input.newPersonId,reason:input.reason.trim()});
   });
 }
@@ -197,7 +200,7 @@ export async function changeSectionEnrollment(context: LifecycleContext,input:{e
     if(!record||record.kind!=="section"||!record.sectionId||record.status!=="active")throw new Error("Active section enrollment not found");
     const section=await authorizedSection(tx,context,record.sectionId);
     await tx.update(enrollments).set({status:input.status,endedAt:new Date(),metadata:{...record.metadata,lifecycleReason:input.reason.trim()},updatedAt:new Date()}).where(eq(enrollments.id,record.id));
-    await journal(tx,context,section,"SectionEnrollmentChanged",{enrollmentId:record.id,status:"active"},
+    await journal(tx,context,section,EventTypes.SectionEnrollmentChanged,{enrollmentId:record.id,status:"active"},
       {enrollmentId:record.id,status:input.status,reason:input.reason.trim()});
   });
 }
@@ -228,7 +231,7 @@ export async function addSectionWaitlist(context: LifecycleContext,input:{sectio
       description:input.reason.trim()||"Pending an available instructional seat",
       metadata:{requestedAt:new Date().toISOString()},
     });
-    await journal(tx,context,section,"SectionWaitlistAdded",{}, {studentProfileId:input.studentProfileId});
+    await journal(tx,context,section,EventTypes.SectionWaitlistAdded,{}, {studentProfileId:input.studentProfileId});
   });
 }
 export async function resolveSectionWaitlist(context: LifecycleContext, actionId:string, reason:string) {
@@ -239,7 +242,7 @@ export async function resolveSectionWaitlist(context: LifecycleContext, actionId
     const section=await authorizedSection(tx,context,record.sectionId);
     if(!["open","waiting"].includes(record.status))return;
     await tx.update(actions).set({status:"resolved",resolvedAt:new Date(),resolutionNote:reason.trim()||"Reviewed",updatedAt:new Date()}).where(eq(actions.id,record.id));
-    await journal(tx,context,section,"SectionWaitlistResolved",{}, {waitlistActionId:record.id,reason:reason.trim()});
+    await journal(tx,context,section,EventTypes.SectionWaitlistResolved,{}, {waitlistActionId:record.id,reason:reason.trim()});
   });
 }
 
@@ -306,7 +309,7 @@ export async function transferSectionEnrollment(context: LifecycleContext,input:
       sectionId:destination.id,studentProfileId:sourceEnrollment.studentProfileId,
       startedAt:now,metadata:{transferredFromEnrollmentId:sourceEnrollment.id,reason:input.reason.trim()},
     }).returning({id:enrollments.id});
-    await journal(tx,context,source,"SectionStudentTransferred",
+    await journal(tx,context,source,EventTypes.SectionStudentTransferred,
       {enrollmentId:sourceEnrollment.id},{destinationSectionId:destination.id,newEnrollmentId:newEnrollment!.id,reason:input.reason.trim()});
     return {newEnrollmentId:newEnrollment!.id};
   });
@@ -341,7 +344,7 @@ export async function promoteSectionWaitlist(context: LifecycleContext, actionId
      status:"resolved",resolvedAt:new Date(),resolutionNote:"Promoted to active enrollment",
      updatedAt:new Date(),
    }).where(eq(actions.id,item.id));
-   await journal(tx,context,section,"SectionWaitlistPromoted",{},
+   await journal(tx,context,section,EventTypes.SectionWaitlistPromoted,{},
      {waitlistActionId:item.id,enrollmentId:record!.id,studentProfileId:item.subjectId});
    return {enrollmentId:record!.id};
  });
@@ -362,7 +365,7 @@ export async function offerWaitlistSeat(context: LifecycleContext,actionId:strin
   await tx.update(actions).set({status:"in_progress",dueAt:expiresAt,
     metadata:{...item.metadata,offerIssuedAt:new Date().toISOString(),offerExpiresAt:expiresAt.toISOString()},
     updatedAt:new Date()}).where(eq(actions.id,item.id));
-  await journal(tx,context,section,"SectionWaitlistSeatOffered",{},
+  await journal(tx,context,section,EventTypes.SectionWaitlistSeatOffered,{},
     {actionId:item.id,studentProfileId:item.subjectId,expiresAt:expiresAt.toISOString()});
   return {actionId:item.id,expiresAt:expiresAt.toISOString()};
  });
@@ -388,7 +391,7 @@ export async function expireWaitlistOffers(context: LifecycleContext,programId:s
    await tx.update(actions).set({status:"waiting",dueAt:null,
     metadata:{...current.metadata,offerExpiredAt:new Date().toISOString()},updatedAt:new Date()})
     .where(eq(actions.id,current.id));
-   await journal(tx,context,section,"SectionWaitlistOfferExpired",{}, {actionId:current.id});
+   await journal(tx,context,section,EventTypes.SectionWaitlistOfferExpired,{}, {actionId:current.id});
    count++;
   });
  }

@@ -11,6 +11,7 @@ import { z } from "zod";
 import { resolveCourseGuardianConsent } from "./course-guardian-consent";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
 
+import { EventTypes } from "@/domain/event-types";
 async function studentProfileFor(actor: Actor) {
  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
  const [profile] = await db.select({ id: s.studentProfiles.id }).from(s.studentProfiles).where(eq(s.studentProfiles.personId, actor.actorPersonId)).limit(1);
@@ -132,7 +133,7 @@ export const requestCourseChange = createServerFn({ method:"POST" })
         })));
       }
       await recordAudit(tx,actor,{action:"course_registration.request",resourceType:"action",resourceId:request.id,after:{operation:data.operation,sectionId:section.id},scope:{programId:section.programId,siteId:section.siteId}});
-      await emitEvent(tx, {eventType:"CourseRegistrationRequested",aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId:studentId,sectionId:section.id,programId:section.programId,operation:data.operation}});
+      await emitEvent(tx, {eventType:EventTypes.CourseRegistrationRequested,aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId:studentId,sectionId:section.id,programId:section.programId,operation:data.operation}});
       return {requestId:request.id};
     });
   });
@@ -221,7 +222,7 @@ export const decideCourseChange = createServerFn({method:"POST"})
           await tx.update(s.enrollments).set({status:operation==="drop"?"cancelled":"withdrawn",endedAt:new Date(),updatedAt:new Date(),
             metadata:{...membership.metadata,withdrawalNotation:operation==="withdraw"?"W":null,changeRequestId:request.id}
           }).where(eq(s.enrollments.id,membership.id));
-          await emitEvent(tx, {eventType:operation==="drop"?"SectionEnrollmentDropped":"SectionEnrollmentWithdrawn",
+          await emitEvent(tx, {eventType:operation==="drop"?EventTypes.SectionEnrollmentDropped:EventTypes.SectionEnrollmentWithdrawn,
             aggregateType:"enrollment",aggregateId:membership.id,actorPersonId:actor.actorPersonId,
             payload:{studentProfileId,sectionId,programId,schoolYearId,transcriptNotation:operation==="withdraw"?"W":null}});
           await writeAudit(tx, {actorPersonId:actor.actorPersonId,
@@ -250,7 +251,7 @@ export const decideCourseChange = createServerFn({method:"POST"})
        }
       }
       await recordAudit(tx,actor,{action:data.approve?"course_registration.approve":"course_registration.decline",resourceType:"action",resourceId:request.id,before:{status:"open"},after:{status:data.approve?"resolved":"cancelled",operation:String(operation)},scope:{programId,siteId}});
-      await emitEvent(tx, {eventType:"CourseRegistrationDecided",aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId,sectionId,programId,operation,approved:data.approve}});
+      await emitEvent(tx, {eventType:EventTypes.CourseRegistrationDecided,aggregateType:"action",aggregateId:request.id,actorPersonId:actor.actorPersonId,payload:{studentProfileId,sectionId,programId,operation,approved:data.approve}});
       return {approved:data.approve};
     });
   });

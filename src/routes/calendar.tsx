@@ -290,6 +290,7 @@ function CalendarPage() {
             </select>
           </label>
           {search.section&&<><span className="text-sm">Selected class only</span><Link to="/calendar" search={{...search,section:undefined,event:undefined}} className="text-sm underline">Show all classes</Link></>}
+          {data?.viewerRole==="student"&&<Link to="/calendar-export" className="text-sm underline">Export deadlines (.ics)</Link>}
         </div>
 
         {error && <p role="alert" className="mt-4 rounded-lg border border-red-300 p-3 text-sm">{error}</p>}

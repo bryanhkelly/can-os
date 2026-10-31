@@ -1,35 +1,18 @@
 import type { ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { WorkspaceShell } from "@/components/workspace";
+import { LoaderErrorState, type LoaderErrorStateProps } from "./loader-error-state";
 
-import { WorkspaceShell, QueryState } from "@/components/workspace";
-
-export interface LoaderFailureProps {
+export interface LoaderFailureProps extends LoaderErrorStateProps {
   title: ReactNode;
   eyebrow?: ReactNode;
-  outcome: { authError: string | null; message: string };
 }
 
-/** Failure state for loaders wrapped in safeLoader: sign-in prompt for auth
- *  errors, a generic role="alert" error state for anything else. */
-function LoaderFailure({ title, eyebrow, outcome }: LoaderFailureProps) {
+/** Page-level shell around the reusable loader error body. */
+function LoaderFailure({ title, eyebrow, ...state }: LoaderFailureProps) {
   return (
     <WorkspaceShell eyebrow={eyebrow} title={title}>
-      <QueryState
-        error={
-          outcome.authError ? (
-            <>
-              {outcome.authError}{" "}
-              <Link to="/access" className="font-semibold underline">
-                Sign in or request access →
-              </Link>
-            </>
-          ) : (
-            outcome.message
-          )
-        }
-      />
+      <LoaderErrorState {...state} />
     </WorkspaceShell>
   );
 }
-
 export { LoaderFailure };

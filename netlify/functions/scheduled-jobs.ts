@@ -10,8 +10,7 @@ export default async () => {
   const base = process.env.URL;
   const secret = process.env.CAN_JOB_SECRET;
   if (!base || !secret) {
-    console.error("scheduled-jobs: URL or CAN_JOB_SECRET is not configured; skipping run");
-    return;
+    throw new Error("scheduled-jobs: URL and CAN_JOB_SECRET are required; scheduled maintenance was NOT executed");
   }
   const response = await fetch(`${base}/api/jobs`, {
     method: "POST",
@@ -20,7 +19,8 @@ export default async () => {
   if (!response.ok) {
     throw new Error(`scheduled-jobs: /api/jobs responded ${response.status}`);
   }
-  console.log("scheduled-jobs:", await response.text());
+  // Timestamped successful completion is monitorable independently of scheduler invocation.
+  console.info("scheduled-jobs: completed", new Date().toISOString(), await response.text());
 };
 
 export const config = { schedule: "*/5 * * * *" };

@@ -1,12 +1,14 @@
 import { db } from "@/db/client";
-import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants } from "@/db/schema";
+import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
-import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader } from "@/domain/access-tokens";
+import { AuthorizationError } from "@/domain/command-context";
+import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { listDemoFacilitatorGrants } from "./demo-facilitator.server";
-import { writeAudit } from "@/platform/mutation";
-import { and,eq,gt,isNull,lt,sql } from "drizzle-orm";
+import { recordSessionSecurityEvent } from "./session-security-audit.server";
+import { and,desc,eq,gt,inArray,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
+import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 
 const CHALLENGE_LIFETIME_MS=10*60*1000;
 const REQUEST_COOLDOWN_MS=60*1000;
@@ -22,15 +24,21 @@ function publicOrigin():string {
  if(!origin || new URL(origin).protocol!=="https:") throw new Error("HTTPS access origin must be configured");
  return new URL(origin).origin;
 }
-/** Deliberately never provisions arbitrary accounts from an unverified email. */
-export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSender=sendAccessLinkViaResend):Promise<typeof genericResult> {
+/** Internal server-only dispatch outcome. Never expose eligibility/cooldown
+ * distinctions through the public passwordless request endpoint. */
+type AccessDispatchOutcome = "dispatched" | "cooldown" | "ineligible";
+async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender):Promise<AccessDispatchOutcome> {
  const email=normalizeAccessEmail(rawEmail);
  const [account]=await db.select({id:accessAccounts.id}).from(accessAccounts)
   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false))).limit(1);
- if(!account || email.endsWith(".invalid"))return genericResult;
+ if(!account || email.endsWith(".invalid"))return "ineligible";
  const memberships=await db.select({role:accountPersonGrants.role}).from(accountPersonGrants)
-  .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)));
- if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role)))return genericResult;
+  .innerJoin(people,eq(people.id,accountPersonGrants.personId))
+  .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
+   eq(accountPersonGrants.isSynthetic,false),eq(people.active,true)));
+ const pendingInvitations=memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))
+  ?[]:await listPendingStaffInvitations(db,account.id);
+ if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length)return "ineligible";
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
  // Serialize concurrent requests for the same account before enforcing cooldown.
@@ -47,7 +55,7 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
   });
   return token;
  });
- if(!issued)return genericResult;
+ if(!issued)return "cooldown";
  try {
   await sender({to:email,accessUrl:accessOrigin+"/access/verify#token="+encodeURIComponent(issued)});
  }catch(error){
@@ -56,10 +64,21 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
   // The link remains unusable unless the provider actually delivered it.
   throw error;
  }
+ return "dispatched";
+}
+/** Public API remains deliberately indistinguishable for unknown accounts,
+ * ineligible users, throttled retries and successfully dispatched mail. */
+export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSender=sendAccessLinkViaResend):Promise<typeof genericResult> {
+ await issueOneTimeAccess(rawEmail,sender);
  return genericResult;
 }
+/** This privileged status is for already-authorized onboarding staff only.
+ * Dispatched means the configured sender accepted the message, not inbox delivery. */
+export async function requestOneTimeAccessWithDeliveryStatus(rawEmail:string):Promise<AccessDispatchOutcome> {
+ return issueOneTimeAccess(rawEmail,sendAccessLinkViaResend);
+}
 /** A token is atomically consumed by its hash, allowing only one successful redemption. */
-export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string}> {
+export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string}> {
  if(!/^[A-Za-z0-9_-]{40,}$/.test(rawToken))throw new Error("Invalid or expired access link");
  const hash=hashAccessSecret(rawToken,secretPepper()),now=new Date();
  return db.transaction(async tx=>{
@@ -74,9 +93,48 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    .where(and(eq(accessAccounts.id,claimed.accountId),eq(accessAccounts.disabled,false))).limit(1);
   if(!account)throw new Error("Account unavailable");
   const grants=await tx.select({id:accountPersonGrants.id,role:accountPersonGrants.role}).from(accountPersonGrants)
-   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)));
-  const activeGrant=grants.find(g=>Object.hasOwn(roleCapabilities,g.role));
+   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
+   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
+    eq(accountPersonGrants.isSynthetic,false),eq(people.active,true)));
+  const pending=await listPendingStaffInvitations(tx,account.id);
+  const accepted=await acceptStaffInvitations(tx,account.id,pending,now);
+  // A newly accepted church-onboarding grant takes priority over an older
+  // membership so the first sign-in lands in that church's own setup workspace.
+  const onboarding = accepted.length ? await tx.select({
+    siteId: churchOnboardingRequests.siteId,
+    invitationGrantId: churchOnboardingRequests.invitationGrantId,
+  }).from(churchOnboardingRequests).where(and(
+    eq(churchOnboardingRequests.status, "approved"),
+    inArray(churchOnboardingRequests.invitationGrantId, accepted.map(invitation => invitation.id)),
+  )).limit(1) : [];
+  const onboardingInvitation = accepted.find(invitation =>
+    invitation.id === onboarding[0]?.invitationGrantId);
+  // The same leader may sign in again before completing setup. Prefer the
+  // existing approved church grant over unrelated memberships, and resume that
+  // exact Site rather than dropping them into a generic admissions workspace.
+  const activeRegistrarIds = grants.filter(grant=>grant.role==="registrar").map(grant=>grant.id);
+  const returningOnboarding = !onboardingInvitation && activeRegistrarIds.length
+    ? await tx.select({
+        siteId: churchOnboardingRequests.siteId,
+        invitationGrantId: churchOnboardingRequests.invitationGrantId,
+      }).from(churchOnboardingRequests).where(and(
+        eq(churchOnboardingRequests.status, "approved"),
+        inArray(churchOnboardingRequests.invitationGrantId, activeRegistrarIds),
+      )).orderBy(desc(churchOnboardingRequests.approvedAt)).limit(1)
+    : [];
+  const returningGrant = grants.find(grant =>
+    grant.id === returningOnboarding[0]?.invitationGrantId);
+  const activeGrant=onboardingInvitation??returningGrant??
+    grants.find(g=>Object.hasOwn(roleCapabilities,g.role))??accepted[0];
   if(!activeGrant)throw new Error("No supported CAN OS membership");
+  const candidateLaunchSiteId=onboarding[0]?.siteId??returningOnboarding[0]?.siteId;
+  // After the school becomes active, ordinary sign-in need not keep redirecting
+  // the administrator through setup. Opening status is read, never inferred.
+  const existingOpenSchool = candidateLaunchSiteId
+    ? await tx.select({ id: programs.id }).from(programs)
+        .where(and(eq(programs.siteId,candidateLaunchSiteId),eq(programs.status,"active"))).limit(1)
+    : [];
+  const launchSiteId=existingOpenSchool.length?undefined:candidateLaunchSiteId;
   const secret=issueOpaqueSecret();
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,secretHash:hashAccessSecret(secret,secretPepper()),
@@ -86,8 +144,14 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   await tx.update(accessAccounts).set({emailVerifiedAt:now,updatedAt:now}).where(eq(accessAccounts.id,account.id));
   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
   if(!member)throw new Error("Membership unavailable");
-  await writeAudit(tx, {actorPersonId:member.personId,action:"identity.session.started",resourceType:"account",resourceId:account.id,context:{method:"email_link",sessionId:session.id,grantId:activeGrant.id}});
-  return {accountId:account.id,role:activeGrant.role,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
+  await recordSessionSecurityEvent(tx,{
+   action:"identity.session.started",actorPersonId:member.personId,
+   accountId:account.id,sessionId:session.id,grantId:activeGrant.id,
+   role:activeGrant.role,method:"email_link",
+  });
+  return {accountId:account.id,role:activeGrant.role,
+   ...(launchSiteId ? {launchSiteId} : {}),
+   setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
 /** Local/test-only sign-in for the seeded synthetic demo accounts. */
@@ -115,7 +179,8 @@ export async function redeemLocalDemoAccess(
    role:accountPersonGrants.role,
    isSynthetic:accountPersonGrants.isSynthetic,
   }).from(accountPersonGrants)
-   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)));
+   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
+   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),eq(people.active,true)));
   const grant=account.id===LOCAL_DEMO_ADMIN.accountId
    ?(await listDemoFacilitatorGrants(tx)).find(candidate=>candidate.id===LOCAL_DEMO_ADMIN.grantId)
    :grants.find(candidate=>candidate.isSynthetic&&Object.hasOwn(roleCapabilities,candidate.role));
@@ -128,14 +193,10 @@ export async function redeemLocalDemoAccess(
    expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
   }).returning({id:accessSessions.id});
   if(!session)throw new Error("Unable to establish session");
-  await writeAudit(tx,{
-   actorPersonId:grant.personId,
-   action:"identity.session.started",
-   resourceType:"account",
-   resourceId:account.id,
-   context:{method:"local_demo_code",sessionId:session.id,grantId:grant.id,
-    ...(account.id===LOCAL_DEMO_ADMIN.accountId?{demoFacilitator:LOCAL_DEMO_ADMIN.personId}:{}),
-   },
+  await recordSessionSecurityEvent(tx,{
+   action:"identity.session.started",actorPersonId:grant.personId,
+   accountId:account.id,sessionId:session.id,grantId:grant.id,
+   role:grant.role,method:"local_demo_code",
   });
   return {
    accountId:account.id,
@@ -149,8 +210,13 @@ export async function revokeAccessSession(sessionId:string,accountId:string):Pro
   const [row]=await tx.update(accessSessions).set({revokedAt:new Date(),updatedAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),isNull(accessSessions.revokedAt))).returning({activeGrantId:accessSessions.activeGrantId});
   if(row?.activeGrantId){
-   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,row.activeGrantId)).limit(1);
-   if(member)await writeAudit(tx, {actorPersonId:member.personId,action:"identity.session.revoked",resourceType:"account",resourceId:accountId,context:{sessionId}});
+   const [member]=await tx.select({
+    personId:accountPersonGrants.personId,role:accountPersonGrants.role,
+   }).from(accountPersonGrants).where(eq(accountPersonGrants.id,row.activeGrantId)).limit(1);
+   await recordSessionSecurityEvent(tx,{
+    action:"identity.session.revoked",actorPersonId:member?.personId??null,
+    accountId,sessionId,grantId:row.activeGrantId,role:member?.role??null,
+   });
   }
  });
  return clearSessionCookieHeader();
@@ -161,17 +227,37 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
   const delegated=accountId===LOCAL_DEMO_ADMIN.accountId?(await listDemoFacilitatorGrants(tx)).find(grant=>grant.id===grantId):undefined;
   if(accountId===LOCAL_DEMO_ADMIN.accountId&&!delegated)throw new Error("Demo user unavailable");
   const [grant]=delegated?[delegated]:await tx.select({id:accountPersonGrants.id,personId:accountPersonGrants.personId,role:accountPersonGrants.role})
-   .from(accountPersonGrants)
-   .where(and(eq(accountPersonGrants.id,grantId),eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true))).limit(1);
+   .from(accountPersonGrants).innerJoin(people,eq(people.id,accountPersonGrants.personId))
+   .where(and(eq(accountPersonGrants.id,grantId),eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true),eq(people.active,true))).limit(1);
   if(!grant || !Object.hasOwn(roleCapabilities,grant.role))throw new Error("Membership unavailable");
   const [changed]=await tx.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
     isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,new Date())))
    .returning({id:accessSessions.id});
   if(!changed)throw new Error("Session expired");
-  await writeAudit(tx, {actorPersonId:grant.personId,action:"identity.membership.selected",
-   resourceType:"account",resourceId:accountId,context:{sessionId,grantId,
-    ...(accountId===LOCAL_DEMO_ADMIN.accountId?{demoFacilitator:LOCAL_DEMO_ADMIN.personId}:{}),
-   }});
+  await recordSessionSecurityEvent(tx,{
+   action:"identity.membership.selected",actorPersonId:grant.personId,
+   accountId,sessionId,grantId,role:grant.role,
+  });
  });
+}
+
+
+/**
+ * An explicit, same-origin user interaction refreshes ONLY the server's idle
+ * deadline, not the 12-hour absolute expiration. Never invoke on GET,
+ * background polling, focus or visibility events.
+ *
+ * Use the existing access_sessions.updated_at for this first incremental bite;
+ * login initializes it and membership selection is also a meaningful action.
+ * A dedicated session-activity timestamp can follow with device inventory.
+ */
+export async function recordMeaningfulSessionActivity(sessionId:string,accountId:string):Promise<void> {
+ const now=new Date();
+ const [updated]=await db.update(accessSessions).set({updatedAt:now})
+  .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
+    isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
+    gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
+  .returning({id:accessSessions.id});
+ if(!updated)throw new AuthorizationError("Session expired or revoked");
 }

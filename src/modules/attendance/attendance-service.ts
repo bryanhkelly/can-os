@@ -14,9 +14,13 @@ import {
   assertCapability,
   assertProgramScope,
   assertSiteScope,
+  AuthorizationError,
   type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import type { AccessContext } from "@/domain/access-context";
 import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 import {
   emailNotificationRecipients,
@@ -82,7 +86,9 @@ export async function recordAttendance(
       const guardians = await tx
         .select({ personId: guardianRelationships.guardianPersonId })
         .from(guardianRelationships)
-        .where(eq(guardianRelationships.studentPersonId, student.personId));
+        .where(guardianRelationshipPredicate({
+          studentPersonId:student.personId,access:"attendance-excuse",
+        }));
 
       await emitEvent(tx, {
         eventType: EventTypes.StudentMarkedAbsent,
@@ -184,9 +190,11 @@ export async function submitAttendanceExcuse(
       .from(guardianRelationships)
       .where(
         and(
-          eq(guardianRelationships.guardianPersonId, actorPersonId),
-          eq(guardianRelationships.studentPersonId, student.personId),
-          eq(guardianRelationships.canSubmitAttendanceExcuse, true),
+          guardianRelationshipPredicate({
+            guardianPersonId:actorPersonId,
+            studentPersonId:student.personId,
+            access:"attendance-excuse",
+          }),
         ),
       )
       .limit(1);
@@ -545,7 +553,17 @@ export async function recordAttendanceRevision(
   /** Validated inside the same locked transaction as the canonical revision. */
   requireExpectedOnsiteDate?:string;
  }):Promise<string>{
- assertCapability(context,"attendance.write");
+ // Staff observers receive ONLY a scheduled site-day write path, scoped to
+ // their verified single-site membership even inside the shared data layer.
+ const onsite=isOnsiteAttendanceRole((context as AccessContext).role??"");
+ if(onsite){
+  assertOnsiteAttendanceScope(context as AccessContext,input.siteId);
+  if(!input.requireExpectedOnsiteDate ||
+     input.occurrenceKey!==input.requireExpectedOnsiteDate+":site-day")
+   throw new AuthorizationError("onsite staff may only record scheduled site-day attendance");
+ }else{
+  assertCapability(context,"attendance.write");
+ }
  assertProgramScope(context,input.programId);
  assertSiteScope(context,input.siteId);
  if(!context.actorPersonId)throw new Error("Attendance actor required");
@@ -553,6 +571,33 @@ export async function recordAttendanceRevision(
  return db.transaction(async tx=>{
   const key="attendance:"+input.studentProfileId+":"+input.occurrenceKey;
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+  // Site/role grants are not operational delegation. Recheck the named,
+  // time-bounded Program responsibility INSIDE this write transaction, even
+  // for replayed mutation IDs. The same lock serializes appointment/revocation.
+  const siteActor = context as AccessContext;
+  // Defense in depth: prohibit a generic site_staff grant at independently
+  // church-hosted CAN schools. A staff member needs the named site director
+  // or Section facilitator role. Check BEFORE idempotent mutation replay.
+  if(onsite && siteActor.role==="site_staff"){
+    const {requiresIndependentChurchLocalDelegation}=await import(
+      "@/modules/operations/site-local-delegation.server");
+    if(await requiresIndependentChurchLocalDelegation(tx,input.programId))
+      throw new AuthorizationError("independent church attendance requires named local delegation");
+  }
+  if (onsite && (siteActor.role === "site_leader" || siteActor.role === "room_facilitator")) {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"local-site-delegation:" + input.programId}))`);
+    const { requireCurrentSiteLocalDelegate,
+      requiresIndependentChurchLocalDelegation } = await import(
+      "@/modules/operations/site-local-delegation.server");
+    if (siteActor.role === "site_leader") {
+      await requireCurrentSiteLocalDelegate(tx, siteActor, input.programId, "site_director");
+    } else if (await requiresIndependentChurchLocalDelegation(tx, input.programId)) {
+      if (!input.sectionId) throw new AuthorizationError("named Section for facilitator attendance");
+      const { requireCurrentSectionFacilitator } = await import(
+        "@/modules/operations/site-section-facilitators.server");
+      await requireCurrentSectionFacilitator(tx, siteActor, input.programId, input.sectionId);
+    }
+  }
   const sourceKey="manual-revision:"+input.mutationId;
   const [repeat]=await tx.select({
    id:attendanceEvents.id,studentProfileId:attendanceEvents.studentProfileId,
@@ -616,7 +661,9 @@ export async function recordAttendanceRevision(
     .from(studentProfiles).where(eq(studentProfiles.id,input.studentProfileId)).limit(1);
    if(student){
     const guardians=await tx.select({personId:guardianRelationships.guardianPersonId})
-     .from(guardianRelationships).where(eq(guardianRelationships.studentPersonId,student.personId));
+     .from(guardianRelationships).where(guardianRelationshipPredicate({
+      studentPersonId:student.personId,access:"attendance-excuse",
+    }));
     for(const guardian of guardians){
      await notify(tx,{recipientPersonId:guardian.personId,type:"student_absent",
       title:"Attendance needs your attention",

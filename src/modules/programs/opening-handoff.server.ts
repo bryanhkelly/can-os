@@ -7,6 +7,7 @@ import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 import type { Actor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 
+import { EventTypes } from "@/domain/event-types";
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Reader = Pick<typeof db, "select">;
 type ProgramScope = { id: string; organizationId: string; siteId: string | null };
@@ -45,7 +46,9 @@ export async function createOpeningHandoff(tx: Transaction, context: CommandCont
   const { program } = input;
   const [created] = await tx.insert(actions).values({
     type: openingHandoffType, title: program.name + " - opening handoff",
-    description: "Review the opening record, school-year setup, classes and daily operations, then acknowledge receipt. This acknowledgment is not regulatory approval.",
+    description: input.sectionIds.length
+      ? "Review the opening record, school-year setup, classes and daily operations, then acknowledge receipt. This acknowledgment is not regulatory approval."
+      : "Review the opening record, program schedule, onsite facilitators and daily operations, then acknowledge receipt. This acknowledgment is not regulatory approval.",
     organizationId: program.organizationId, siteId: program.siteId, programId: program.id,
     subjectType: "program", subjectId: program.id, ownerPersonId: input.recipientPersonId,
     priority: "high",
@@ -60,12 +63,12 @@ export async function createOpeningHandoff(tx: Transaction, context: CommandCont
       openedAt: input.openedAt.toISOString(), sectionIds: input.sectionIds },
   });
   await emitEvent(tx, {
-    eventType: "ProgramOpeningHandoffCreated", aggregateType: "action", aggregateId: created.id,
+    eventType: EventTypes.ProgramOpeningHandoffCreated, aggregateType: "action", aggregateId: created.id,
     actorPersonId: context.actorPersonId, ...scope,
     payload: { recipientPersonId: input.recipientPersonId, journeyId: input.journeyId },
   });
   await emitEvent(tx, {
-    eventType: "ActionCreated", aggregateType: "action", aggregateId: created.id,
+    eventType: EventTypes.ActionCreated, aggregateType: "action", aggregateId: created.id,
     actorPersonId: context.actorPersonId, ...scope,
     payload: { subjectType: "program", subjectId: program.id, source: openingHandoffType },
   });
@@ -137,7 +140,7 @@ export async function transferOpeningHandoff(actor: Actor, input: {
     await writeAudit(tx,actor,{action:"program.opening.handoff.transfer",entityType:"action",entityId:action.id,
       scope,before:{ownerPersonId:action.ownerPersonId,revision:recovery.revision},
       after:{ownerPersonId:input.recipientPersonId,revision,...lastTransfer,confirmed:true}});
-    await emitEvent(tx,{eventType:"ProgramOpeningHandoffTransferred",aggregateType:"action",aggregateId:action.id,
+    await emitEvent(tx,{eventType:EventTypes.ProgramOpeningHandoffTransferred,aggregateType:"action",aggregateId:action.id,
       actorPersonId:actor.actorPersonId,...scope,payload:{...lastTransfer,revision}});
     await notify(tx,{recipientPersonId:input.recipientPersonId,type:openingHandoffType,
       title:program.name+" - opening handoff transferred to you",
@@ -180,11 +183,11 @@ export async function acknowledgeOpeningHandoff(context: CommandContext, input: 
       before: { status: action.status }, after: { status: "resolved", resolutionNote: note, acknowledgedAt: now.toISOString() },
     });
     await emitEvent(tx, {
-      eventType: "ProgramOpeningHandoffAcknowledged", aggregateType: "action", aggregateId: action.id,
+      eventType: EventTypes.ProgramOpeningHandoffAcknowledged, aggregateType: "action", aggregateId: action.id,
       actorPersonId: context.actorPersonId, ...scope, payload: { acknowledgedAt: now.toISOString() },
     });
     await emitEvent(tx, {
-      eventType: "ActionResolved", aggregateType: "action", aggregateId: action.id,
+      eventType: EventTypes.ActionResolved, aggregateType: "action", aggregateId: action.id,
       actorPersonId: context.actorPersonId, ...scope, payload: { subjectType: "program", subjectId: program.id },
     });
     return { actionId: action.id, acknowledged: true as const };

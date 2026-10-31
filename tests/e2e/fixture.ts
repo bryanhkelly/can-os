@@ -11,12 +11,17 @@
  * academic-time.ts, academics.ts, identity.ts, access.ts, work.ts).
  */
 import type { NeonQueryFunction } from "@neondatabase/serverless";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { createAccessSession } from "./helpers/authenticated-persona";
 import {
-  accessSessionCookie,
-  hashAccessSecret,
-} from "../../src/domain/access-tokens";
-import { TEST_ACCESS_TOKEN_PEPPER } from "./env";
+  createCanonicalSection,
+  createHighSchoolExtensionProgram,
+  createOrganization,
+  createSite,
+  createSyntheticPersonaGrant,
+  createVerifiedAccessAccount,
+  insertFixtureId,
+} from "./helpers/canonical-fixture";
 
 export type Sql = NeonQueryFunction<false, false>;
 
@@ -48,28 +53,25 @@ export interface Gf1Fixture {
   teacherGrantId: string;
   guardianGrantId: string;
   specialistGrantId: string;
+  /** Non-synthetic provider-wide teacher grant required by teaching eligibility. */
+  teacherProviderGrantId: string;
+  /** Provider-owned Program teacher delegation required by teaching eligibility. */
+  teacherRoleAssignmentId: string;
+  complianceFrameworkId: string;
+  complianceFrameworkVersionId: string;
+  policyRuleId: string;
+  policyApplicabilityId: string;
+  qualificationDefinitionId: string;
+  qualificationClaimId: string;
+  qualificationVerificationEventId: string;
+  /** Active delivery arrangement covering the whole instructional window. */
+  deliveryArrangementId: string;
   /** Raw session secrets — the browser only ever sees these, never the hashes. */
   studentSecret: string;
   teacherSecret: string;
   guardianSecret: string;
   specialistSecret: string;
   assessmentTitle: string;
-}
-
-/** Opaque session secret; 43 base64url chars satisfies /^[A-Za-z0-9_-]{40,}$/. */
-function newSessionSecret(): string {
-  return randomBytes(32).toString("base64url");
-}
-
-async function insertId(
-  sql: Sql,
-  text: string,
-  params: readonly unknown[],
-): Promise<string> {
-  const rows = (await sql.query(text, [...params])) as Array<{ id: string }>;
-  const row = rows[0];
-  if (!row) throw new Error(`Insert returned no id: ${text}`);
-  return row.id;
 }
 
 /**
@@ -89,57 +91,42 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
 
   const fixture: Partial<Gf1Fixture> = { suffix };
   try {
-    fixture.jurisdictionId = await insertId(
+    fixture.jurisdictionId = await insertFixtureId(
       sql,
       `insert into jurisdictions (code, name, configuration)
        values ($1, $2, '{}'::jsonb) returning id`,
       [`e2e-${suffix}`, "E2E Golden Flow"],
     );
 
-    fixture.canOrgId = await insertId(
-      sql,
-      `insert into organizations (type, name, slug, metadata)
-       values ('can_network', $1, $2, '{}'::jsonb) returning id`,
-      [`E2E CAN Network ${suffix}`, `e2e-can-${suffix}`],
-    );
+    fixture.canOrgId = await createOrganization(sql, {
+      type: "can_network",
+      name: `E2E CAN Network ${suffix}`,
+      slug: `e2e-can-${suffix}`,
+    });
 
-    fixture.hostOrgId = await insertId(
-      sql,
-      `insert into organizations (type, name, slug, metadata)
-       values ('christian_school', $1, $2, '{}'::jsonb) returning id`,
-      [`E2E Host School ${suffix}`, `e2e-host-${suffix}`],
-    );
+    fixture.hostOrgId = await createOrganization(sql, {
+      type: "christian_school",
+      name: `E2E Host School ${suffix}`,
+      slug: `e2e-host-${suffix}`,
+    });
 
-    fixture.siteId = await insertId(
-      sql,
-      `insert into sites (organization_id, name, slug, metadata)
-       values ($1, $2, $3, '{}'::jsonb) returning id`,
-      [fixture.hostOrgId, "E2E Campus", `e2e-campus-${suffix}`],
-    );
+    fixture.siteId = await createSite(sql, {
+      organizationId: fixture.hostOrgId,
+      name: "E2E Campus",
+      slug: `e2e-campus-${suffix}`,
+    });
 
-    fixture.programId = await insertId(
-      sql,
-      `insert into programs (
-         organization_id, site_id, jurisdiction_id, type, status, name, slug,
-         grade_range, delivery_model, host_organization_id,
-         academic_provider_organization_id, credit_issuing_organization_id, metadata
-       ) values ($1, $2, $3, 'high_school_extension', 'active', $4, $5,
-         '{"min":"9","max":"12"}'::jsonb,
-         '{"onsite":true,"asynchronous":true,"liveOnline":true,"onsiteDaysPerWeek":2}'::jsonb,
-         $6, $7, $8, '{}'::jsonb) returning id`,
-      [
-        fixture.hostOrgId,
-        fixture.siteId,
-        fixture.jurisdictionId,
-        "E2E High School",
-        `e2e-hs-${suffix}`,
-        fixture.hostOrgId,
-        fixture.canOrgId,
-        fixture.canOrgId,
-      ],
-    );
+    fixture.programId = await createHighSchoolExtensionProgram(sql, {
+      hostOrganizationId: fixture.hostOrgId,
+      siteId: fixture.siteId,
+      jurisdictionId: fixture.jurisdictionId,
+      academicProviderOrganizationId: fixture.canOrgId,
+      creditIssuingOrganizationId: fixture.canOrgId,
+      name: "E2E High School",
+      slug: `e2e-hs-${suffix}`,
+    });
 
-    fixture.gradeScaleId = await insertId(
+    fixture.gradeScaleId = await insertFixtureId(
       sql,
       `insert into grade_scales (owning_organization_id, name, version, configuration, effective_from)
        values ($1, $2, 1, $3::jsonb, '2026-08-01') returning id`,
@@ -158,7 +145,7 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
       ],
     );
 
-    fixture.schoolYearId = await insertId(
+    fixture.schoolYearId = await insertFixtureId(
       sql,
       `insert into school_years (
          organization_id, program_id, site_id, key, name, status,
@@ -174,71 +161,66 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
       ],
     );
 
-    fixture.termId = await insertId(
+    fixture.termId = await insertFixtureId(
       sql,
       `insert into terms (school_year_id, key, name, sequence, starts_on, ends_on)
        values ($1, $2, 'Fall Semester', 1, '2026-08-16', '2026-12-18') returning id`,
       [fixture.schoolYearId, `fall-${suffix}`],
     );
 
-    fixture.courseTemplateId = await insertId(
+    fixture.courseTemplateId = await insertFixtureId(
       sql,
       `insert into course_templates (owning_organization_id, code, title, subject, metadata)
        values ($1, $2, 'E2E Logic II', 'Logic', '{}'::jsonb) returning id`,
       [fixture.canOrgId, `E2E-LOGIC-${suffix}`],
     );
 
-    fixture.courseTemplateVersionId = await insertId(
+    fixture.courseTemplateVersionId = await insertFixtureId(
       sql,
       `insert into course_template_versions (course_template_id, version, status, curriculum, published_at)
        values ($1, 1, 'published', '{}'::jsonb, now()) returning id`,
       [fixture.courseTemplateId],
     );
 
-    fixture.sectionId = await insertId(
-      sql,
-      `insert into sections (
-         program_id, site_id, course_template_version_id, code, title, term_id, metadata
-       ) values ($1, $2, $3, $4, 'E2E Logic II', $5, '{}'::jsonb) returning id`,
-      [
-        fixture.programId,
-        fixture.siteId,
-        fixture.courseTemplateVersionId,
-        `E2E-SEC-${suffix}`,
-        fixture.termId,
-      ],
-    );
+    fixture.sectionId = await createCanonicalSection(sql, {
+      programId: fixture.programId,
+      siteId: fixture.siteId,
+      courseTemplateVersionId: fixture.courseTemplateVersionId,
+      code: `E2E-SEC-${suffix}`,
+      title: "E2E Logic II",
+      termId: fixture.termId,
+    });
 
     // People. The student (and peers) must carry metadata.synthetic=true: the
     // teacher missing-work queue and the synthetic assignment mutations only
     // touch explicitly synthetic records.
     const synthetic = JSON.stringify({ synthetic: true, fixture: "gf1-e2e" });
-    fixture.teacherPersonId = await insertId(
+    fixture.teacherPersonId = await insertFixtureId(
       sql,
       `insert into people (legal_first_name, legal_last_name, email, metadata)
        values ('E2E Riley', $1, $2, $3::jsonb) returning id`,
       [`Teacher-${suffix}`, `e2e-teacher-${suffix}@can-os.invalid`, synthetic],
     );
-    fixture.studentPersonId = await insertId(
+    fixture.studentPersonId = await insertFixtureId(
       sql,
       `insert into people (legal_first_name, legal_last_name, preferred_name, email, metadata)
        values ('E2E Jordan', $1, 'Jordan', $2, $3::jsonb) returning id`,
       [`Student-${suffix}`, `e2e-student-${suffix}@can-os.invalid`, synthetic],
     );
-    fixture.guardianPersonId = await insertId(
+    fixture.guardianPersonId = await insertFixtureId(
       sql,
       `insert into people (legal_first_name, legal_last_name, email, metadata)
        values ('E2E Morgan', $1, $2, $3::jsonb) returning id`,
       [`Guardian-${suffix}`, `e2e-guardian-${suffix}@can-os.invalid`, synthetic],
     );
-    fixture.specialistPersonId = await insertId(
+    fixture.specialistPersonId = await insertFixtureId(
       sql,
       `insert into people (legal_first_name, legal_last_name, email, metadata)
        values ('E2E Casey', $1, $2, $3::jsonb) returning id`,
       [`Specialist-${suffix}`, `e2e-specialist-${suffix}@can-os.invalid`, synthetic],
     );
 
-    fixture.studentProfileId = await insertId(
+    fixture.studentProfileId = await insertFixtureId(
       sql,
       `insert into student_profiles (person_id, grade_level, metadata)
        values ($1, '10', '{}'::jsonb) returning id`,
@@ -259,6 +241,19 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
       [fixture.sectionId, fixture.teacherPersonId],
     );
 
+    // Canonical enrollments: an active Program membership (section_id NULL)
+    // AND the active Section membership. Class access requires both.
+    await sql.query(
+      `insert into enrollments (
+         student_profile_id, kind, status, organization_id, program_id, section_id, school_year_id, metadata
+       ) values ($1, 'program', 'active', $2, $3, null, $4, '{}'::jsonb)`,
+      [
+        fixture.studentProfileId,
+        fixture.hostOrgId,
+        fixture.programId,
+        fixture.schoolYearId,
+      ],
+    );
     await sql.query(
       `insert into enrollments (
          student_profile_id, kind, status, organization_id, program_id, section_id, school_year_id, metadata
@@ -273,7 +268,7 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
     );
 
     fixture.assessmentTitle = `E2E Problem Set ${suffix}`;
-    fixture.assessmentId = await insertId(
+    fixture.assessmentId = await insertFixtureId(
       sql,
       `insert into assessments (
          section_id, title, instructions, status, points_possible,
@@ -290,7 +285,7 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
       ],
     );
 
-    fixture.submissionId = await insertId(
+    fixture.submissionId = await insertFixtureId(
       sql,
       `insert into submissions (
          assessment_id, student_profile_id, status, timeliness, response, feedback
@@ -299,47 +294,110 @@ export async function createGf1Fixture(sql: Sql): Promise<Gf1Fixture> {
     );
 
     // Passwordless accounts + grants, mirroring scripts/seeds/identity-demo-accounts.sql.
-    const accountFor = async (email: string) =>
-      insertId(
-        sql,
-        `insert into access_accounts (email_normalized, email_verified_at)
-         values ($1, now()) returning id`,
-        [email],
-      );
+    const accountFor = async (email: string) => createVerifiedAccessAccount(sql, email);
     fixture.studentAccountId = await accountFor(`e2e-student-${suffix}@can-os.invalid`);
     fixture.teacherAccountId = await accountFor(`e2e-teacher-${suffix}@can-os.invalid`);
     fixture.guardianAccountId = await accountFor(`e2e-guardian-${suffix}@can-os.invalid`);
     fixture.specialistAccountId = await accountFor(`e2e-specialist-${suffix}@can-os.invalid`);
 
     const grantFor = async (accountId: string, personId: string, role: string) =>
-      insertId(
-        sql,
-        `insert into account_person_grants (
-           account_id, person_id, role, organization_id, site_id, active, is_synthetic
-         ) values ($1, $2, $3, $4, $5, true, true) returning id`,
-        [accountId, personId, role, fixture.hostOrgId, fixture.siteId],
-      );
+      createSyntheticPersonaGrant(sql, {
+        accountId,
+        personId,
+        role,
+        organizationId: fixture.hostOrgId!,
+        siteId: fixture.siteId!,
+      });
     fixture.studentGrantId = await grantFor(fixture.studentAccountId, fixture.studentPersonId, "student");
     fixture.teacherGrantId = await grantFor(fixture.teacherAccountId, fixture.teacherPersonId, "teacher");
     fixture.guardianGrantId = await grantFor(fixture.guardianAccountId, fixture.guardianPersonId, "guardian");
     fixture.specialistGrantId = await grantFor(fixture.specialistAccountId, fixture.specialistPersonId, "specialist");
 
-    // Sessions: only the SHA-256 hash of secret+pepper is stored, exactly like
-    // the real verify-challenge flow in src/modules/identity.
-    const sessionFor = async (accountId: string, grantId: string) => {
-      const secret = newSessionSecret();
-      await sql.query(
-        `insert into access_sessions (account_id, secret_hash, active_grant_id, expires_at)
-         values ($1, $2, $3, $4)`,
-        [
-          accountId,
-          hashAccessSecret(secret, TEST_ACCESS_TOKEN_PEPPER),
-          grantId,
-          sessionExpiresAt.toISOString(),
-        ],
-      );
-      return secret;
-    };
+    // Canonical teaching-eligibility stack (mirrors
+    // scripts/seeds/synthetic-profiles-compliance.sql plus the role-assignment
+    // pattern in algebra1-classroom.spec.ts). requireTeachingEligibility needs:
+    // a provider-owned Program teacher role assignment, a NON-synthetic
+    // provider-wide teacher grant on a verified account, a published compliance
+    // policy the teacher's verified qualification satisfies across the whole
+    // instructional window, and active delivery coverage for that window.
+    fixture.teacherRoleAssignmentId = await insertFixtureId(
+      sql,
+      `insert into role_assignments (person_id, organization_id, site_id, program_id, role_key, capabilities)
+       values ($1, $2, $3, $4, 'teacher', '["academic_instruction","curriculum"]'::jsonb) returning id`,
+      [fixture.teacherPersonId, fixture.canOrgId, fixture.siteId, fixture.programId],
+    );
+    fixture.teacherProviderGrantId = await insertFixtureId(
+      sql,
+      `insert into account_person_grants (account_id, person_id, role, organization_id, site_id, active, is_synthetic)
+       values ($1, $2, 'teacher', $3, null, true, false) returning id`,
+      [fixture.teacherAccountId, fixture.teacherPersonId, fixture.canOrgId],
+    );
+
+    fixture.qualificationDefinitionId = await insertFixtureId(
+      sql,
+      `insert into qualification_definitions (key, kind, title)
+       values ($1, 'license', 'E2E Teaching License') returning id`,
+      [`e2e-teaching-license-${suffix}`],
+    );
+    fixture.qualificationClaimId = await insertFixtureId(
+      sql,
+      `insert into qualification_claims (person_id, definition_id, issuer_name, jurisdiction_id, issued_at, expires_at, details)
+       values ($1, $2, 'E2E Synthetic Issuer', $3, null, null, '{"synthetic":true}'::jsonb) returning id`,
+      [fixture.teacherPersonId, fixture.qualificationDefinitionId, fixture.jurisdictionId],
+    );
+    fixture.qualificationVerificationEventId = await insertFixtureId(
+      sql,
+      `insert into qualification_verification_events (claim_id, sequence, decision, actor_person_id)
+       values ($1, 1, 'approve', $2) returning id`,
+      [fixture.qualificationClaimId, fixture.teacherPersonId],
+    );
+
+    fixture.complianceFrameworkId = await insertFixtureId(
+      sql,
+      `insert into compliance_frameworks (key, name, authority)
+       values ($1, 'E2E Staff Readiness', 'CAN E2E Only') returning id`,
+      [`e2e-staff-readiness-${suffix}`],
+    );
+    fixture.complianceFrameworkVersionId = await insertFixtureId(
+      sql,
+      `insert into compliance_framework_versions (framework_id, version, status)
+       values ($1, '1', 'published') returning id`,
+      [fixture.complianceFrameworkId],
+    );
+    fixture.policyRuleId = await insertFixtureId(
+      sql,
+      `insert into compliance_policy_rules (framework_version_id, code, description, expression, evidence_policy)
+       values ($1, 'E2E-LICENSE', 'E2E teaching license for synthetic browser runs', $2::jsonb, '{}'::jsonb) returning id`,
+      [
+        fixture.complianceFrameworkVersionId,
+        JSON.stringify({ op: "credential", type: `e2e-teaching-license-${suffix}` }),
+      ],
+    );
+    fixture.policyApplicabilityId = await insertFixtureId(
+      sql,
+      `insert into compliance_policy_applicability (
+         framework_version_id, organization_id, site_id, program_id, jurisdiction_id, role_key
+       ) values ($1, null, null, null, null, 'teacher') returning id`,
+      [fixture.complianceFrameworkVersionId],
+    );
+
+    fixture.deliveryArrangementId = await insertFixtureId(
+      sql,
+      `insert into delivery_arrangements (
+         section_id, academic_provider_organization_id, instructor_person_id,
+         modality, status, effective_from, effective_through, metadata
+       ) values ($1, $2, $3, 'hybrid', 'active', '2026-08-01', '2027-06-30', $4::jsonb) returning id`,
+      [
+        fixture.sectionId,
+        fixture.canOrgId,
+        fixture.teacherPersonId,
+        JSON.stringify({ synthetic: true, fixture: "gf1-e2e" }),
+      ],
+    );
+
+    // Sessions use the same helper as independently provisioned browser personas.
+    const sessionFor = async (accountId: string, grantId: string) =>
+      createAccessSession(sql, { accountId, activeGrantId: grantId, expiresAt: sessionExpiresAt });
     fixture.studentSecret = await sessionFor(fixture.studentAccountId, fixture.studentGrantId);
     fixture.teacherSecret = await sessionFor(fixture.teacherAccountId, fixture.teacherGrantId);
     fixture.guardianSecret = await sessionFor(fixture.guardianAccountId, fixture.guardianGrantId);
@@ -378,7 +436,8 @@ export async function destroyGf1Fixture(
     ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId, fixture.specialistAccountId].map(
       (id) => one(`delete from access_sessions where account_id = $1`, id),
     ),
-    ...[fixture.studentGrantId, fixture.teacherGrantId, fixture.guardianGrantId, fixture.specialistGrantId].map(
+    ...[fixture.studentGrantId, fixture.teacherGrantId, fixture.guardianGrantId, fixture.specialistGrantId,
+      fixture.teacherProviderGrantId].map(
       (id) => one(`delete from account_person_grants where id = $1`, id),
     ),
     ...[fixture.studentAccountId, fixture.teacherAccountId, fixture.guardianAccountId, fixture.specialistAccountId].map(
@@ -388,7 +447,10 @@ export async function destroyGf1Fixture(
     one(`delete from submissions where id = $1`, fixture.submissionId),
     one(`delete from assessments where id = $1`, fixture.assessmentId),
     one(`delete from section_teachers where section_id = $1`, fixture.sectionId),
-    one(`delete from enrollments where section_id = $1`, fixture.sectionId),
+    // Both the Program (section_id NULL) and Section memberships belong to
+    // this profile; deleting by section alone would leak the Program row.
+    one(`delete from enrollments where student_profile_id = $1`, fixture.studentProfileId),
+    one(`delete from delivery_arrangements where id = $1`, fixture.deliveryArrangementId),
     one(`delete from sections where id = $1`, fixture.sectionId),
     one(`delete from course_template_versions where id = $1`, fixture.courseTemplateVersionId),
     one(`delete from course_templates where id = $1`, fixture.courseTemplateId),
@@ -402,6 +464,15 @@ export async function destroyGf1Fixture(
         : undefined,
     ],
     one(`delete from student_profiles where id = $1`, fixture.studentProfileId),
+    // Teaching-eligibility graph, children before parents.
+    one(`delete from qualification_verification_events where id = $1`, fixture.qualificationVerificationEventId),
+    one(`delete from qualification_claims where id = $1`, fixture.qualificationClaimId),
+    one(`delete from compliance_policy_applicability where id = $1`, fixture.policyApplicabilityId),
+    one(`delete from compliance_policy_rules where id = $1`, fixture.policyRuleId),
+    one(`delete from compliance_framework_versions where id = $1`, fixture.complianceFrameworkVersionId),
+    one(`delete from compliance_frameworks where id = $1`, fixture.complianceFrameworkId),
+    one(`delete from qualification_definitions where id = $1`, fixture.qualificationDefinitionId),
+    one(`delete from role_assignments where id = $1`, fixture.teacherRoleAssignmentId),
     ...[fixture.teacherPersonId, fixture.studentPersonId, fixture.guardianPersonId, fixture.specialistPersonId].map(
       (id) => one(`delete from people where id = $1`, id),
     ),
@@ -419,5 +490,3 @@ export async function destroyGf1Fixture(
     await sql.query(text, params);
   }
 }
-
-export { accessSessionCookie };

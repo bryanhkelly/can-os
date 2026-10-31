@@ -10,6 +10,7 @@ import {decideCanonicalGroupMembership} from "@/modules/study-groups/canonical-m
 import {getFacilitatorStudyGroups} from "@/modules/study-groups/facilitator-query.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
+import {EmptyState,WorkspaceNotice,WorkspaceShell} from "@/components/workspace";
 const loadFacilitatorStudyGroups=async()=>{
  const {enabled,writesEnabled,membershipEnabled,creationEnabled,moderationEnabled}=await getStudyGroupAvailability();
  if(!enabled)return {enabled,writesEnabled,membershipEnabled,creationEnabled,moderationEnabled,queue:[],reports:[],groups:[],scopes:[]};
@@ -49,24 +50,26 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
   catch(e){setError(e instanceof Error?e.message:"Unable to save study group change");}
   finally{setBusy(false);}
  }
- return <main className="mx-auto max-w-5xl space-y-6 px-6 py-10">
-  <header><h1 className="font-serif text-4xl">Facilitate study groups</h1><p className="mt-2 text-muted-foreground">Review requests and moderate groups you facilitate.</p></header>
-  {!enabled?<p role="status">Study groups are currently unavailable.</p>:<>
-  {error&&<p role="alert" className="rounded-lg border p-3">{error}</p>}
+ return <WorkspaceShell eyebrow="CAN OS · Teacher" title="Facilitate study groups"
+  subtitle="Review requests and moderate groups you facilitate."
+  breadcrumbs={<Link to="/teacher" search={{gradeAction:undefined}} className="underline">Teacher Today</Link>}>
+  <div className="space-y-6">
+  {!enabled?<WorkspaceNotice>Study groups are currently unavailable.</WorkspaceNotice>:<>
+  {error&&<WorkspaceNotice tone="danger">No change was completed. {error}</WorkspaceNotice>}
   {search.group&&<Link to="/teacher/study-groups" search={{}} className="inline-block text-sm underline">All facilitated study groups</Link>}
-  {search.group&&!visibleGroups.length&&<p role="alert" className="rounded-lg border p-3">This study group is unavailable in your current facilitator workspace.</p>}
-  {search.session&&!visibleGroups.some(group=>group.sessions.some(session=>session.id===search.session))&&<p role="alert" className="rounded-lg border p-3">This session is unavailable in the selected study group.</p>}
-  <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Membership requests</h2>
+  {search.group&&!visibleGroups.length&&<WorkspaceNotice tone="danger">This study group is unavailable in your current facilitator workspace.</WorkspaceNotice>}
+  {search.session&&!visibleGroups.some(group=>group.sessions.some(session=>session.id===search.session))&&<WorkspaceNotice tone="danger">This session is unavailable in the selected study group.</WorkspaceNotice>}
+  <section className="space-y-3 rounded-xl border bg-card p-5"><h2 className="text-xl font-semibold">Membership requests</h2>
    {visibleQueue.map(m=><div className="flex items-center justify-between gap-3 border-b py-3" key={m.groupId+m.personId}><span>{m.personName} · <Link to="/teacher/study-groups" search={{group:m.groupId}} className="underline">{m.groupTitle}</Link></span><div className="flex gap-2">
     <button disabled={busy||!membershipEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>decideCanonicalGroupMembership({data:{groupId:m.groupId,studentPersonId:m.personId,approve:true}}))}>Approve</button>
     <button disabled={busy||!membershipEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>decideCanonicalGroupMembership({data:{groupId:m.groupId,studentPersonId:m.personId,approve:false}}))}>Decline</button>
-   </div></div>)}{visibleQueue.length===0&&<p>No pending membership requests.</p>}
+   </div></div>)}{visibleQueue.length===0&&<EmptyState title="No pending membership requests."/>}
   </section>
-  <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Content moderation</h2>
+  <section className="space-y-3 rounded-xl border bg-card p-5"><h2 className="text-xl font-semibold">Content moderation</h2>
    {visibleReports.map(r=><div key={r.id} className="border-b py-3"><p className="text-xs font-semibold"><Link to="/teacher/study-groups" search={{group:r.groupId}} className="underline">{r.groupTitle}</Link></p><p className="mt-2 text-sm">Reason: {r.reason}</p><blockquote className="mt-2 rounded border bg-muted p-3 text-sm whitespace-pre-wrap">{r.postBody??"The reported post is unavailable."}</blockquote>{r.postHidden&&<p className="mt-1 text-xs text-muted-foreground">Post already hidden</p>}<div className="mt-2 flex gap-2">
     <button disabled={busy||!moderationEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>resolveStudyGroupReport({data:{reportId:r.id,hidePost:true}}))}>Hide and resolve</button>
     <button disabled={busy||!moderationEnabled} className="rounded border px-3 py-2" onClick={()=>run(()=>resolveStudyGroupReport({data:{reportId:r.id,hidePost:false}}))}>Resolve only</button>
-   </div></div>)}{visibleReports.length===0&&<p>No open content reports.</p>}
+   </div></div>)}{visibleReports.length===0&&<EmptyState title="No open content reports."/>}
   </section>
   <section className="space-y-3 rounded-xl border p-5"><h2 className="text-xl font-semibold">Sessions and attendance</h2>
     {visibleGroups.map(group=><div key={group.id} className="space-y-2 border-b py-3"><h3 className="font-semibold"><Link to="/teacher/study-groups" search={{group:group.id}} className="hover:underline">{group.title}</Link></h3>
@@ -100,5 +103,6 @@ function TeacherStudyGroupsView({data}:{data:Awaited<ReturnType<typeof loadFacil
    </select>
    <button disabled={busy||!creationEnabled||!siteId||(kind==="course"&&!programId)||title.trim().length<3} className="rounded border px-3 py-2 disabled:opacity-40" onClick={()=>run(async()=>{await createStudyGroup({data:{title,description,kind,maxMembers:20,siteId,...(programId?{programId}:{})}});setTitle("");setDescription("");})}>Create group</button>
   </section></>}
- </main>;
+  </div>
+ </WorkspaceShell>;
 }

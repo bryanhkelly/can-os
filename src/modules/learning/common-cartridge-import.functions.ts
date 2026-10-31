@@ -1,17 +1,18 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { curriculumImportJobs, programs } from "@/db/schema";
+import { curriculumImportJobs, curriculumInteropMappings, curriculumOverlays, curriculumResources, programs, sections } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { inspectCommonCartridgeZip } from "@/domain/common-cartridge";
+import { inspectCommonCartridgeZip, extractCommonCartridgeWebLink } from "@/domain/common-cartridge";
 import { requireActor } from "@/modules/identity/actors.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
 import { readMarketplace } from "./curriculum-marketplace.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
+import { EventTypes } from "@/domain/event-types";
 const context=z.object({programId:z.string().uuid()}).strict();
 const incoming=context.extend({
  fileName:z.string().trim().min(1).max(150).regex(/\.(imscc|zip)$/i),
@@ -65,7 +66,7 @@ export const validateCommonCartridgeImport=createServerFn({method:"POST"})
     scope:{organizationId:program.organizationId,programId:data.programId},
     after:{format:preview.profile,sha256:hash,resourceCount:preview.resources.length,
       noticeCount:preview.notices.length}});
-  await emitEvent(tx,{eventType:"CurriculumCartridgeValidated",
+  await emitEvent(tx,{eventType:EventTypes.CurriculumCartridgeValidated,
     aggregateType:"curriculum_import_job",aggregateId:job.id,
     actorPersonId:actor.actorPersonId,organizationId:program.organizationId,programId:data.programId});
   return {importId:job.id,status:"validated",preview:report,previouslyValidated:false};
@@ -87,3 +88,108 @@ export const listCommonCartridgeImports=createServerFn({method:"GET"})
   resourceCount:Array.isArray(j.report.resources)?j.report.resources.length:0,
   noticeCount:Array.isArray(j.report.notices)?j.report.notices.length:0}));
 });
+
+/** Publish only verified external web links into a chosen existing Section.
+ * QTI, LTI launch objects, HTML packages and binary content are deliberately
+ * excluded: treating those as ordinary links would silently lose semantics.
+ */
+const linkMappingInput=incoming.extend({
+  sectionId:z.string().uuid(),
+  linkIdentifiers:z.array(z.string().trim().min(1).max(256)).min(1).max(30),
+  rightsConfirmed:z.literal(true),
+}).strict();
+
+export const importCommonCartridgeSectionLinks=createServerFn({method:"POST"})
+ .validator((value:unknown)=>linkMappingInput.parse(value))
+ .handler(async({data})=>{
+   const {actor,program}=await authorize(data.programId);
+   if(!actor.actorPersonId||!program.siteId||!actor.scope.programIds?.includes(program.id)||
+      !actor.scope.siteIds?.includes(program.siteId))
+     throw new AuthorizationError("same-site institutional publisher");
+   const [section]=await db.select({id:sections.id,title:sections.title,
+     courseVersionId:sections.courseTemplateVersionId,active:sections.active})
+     .from(sections).where(and(eq(sections.id,data.sectionId),
+       eq(sections.programId,program.id),eq(sections.siteId,program.siteId))).limit(1);
+   if(!section?.active)throw new AuthorizationError("active Section of this Program and Site");
+   const bytes=Buffer.from(data.base64,"base64");
+   if(!bytes.length||bytes.length>2_000_000||bytes.toString("base64")!==data.base64)
+     throw new Error("Cartridge must be an exact base64 archive of at most 2 MB.");
+   const preview=inspectCommonCartridgeZip(bytes);
+   const digest=createHash("sha256").update(bytes).digest("hex");
+   const requested=new Set(data.linkIdentifiers);
+   if(requested.size!==data.linkIdentifiers.length)
+     throw new Error("Duplicate web-link identifier.");
+   const links=data.linkIdentifiers.map(identifier=>{
+     const resource=preview.resources.find(r=>r.identifier===identifier);
+     if(!resource||!/weblink|imswl/i.test(resource.type))
+       throw new Error("Only explicit IMS web-link resources can be imported as links.");
+     const href=resource.href??resource.files[0];
+     if(!href)throw new Error("Web-link descriptor file is required.");
+     return {identifier,...extractCommonCartridgeWebLink(bytes,href)};
+   });
+   return db.transaction(async tx=>{
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"cartridge-links:"+program.organizationId+":"+digest}))`);
+     const [job]=await tx.select({id:curriculumImportJobs.id,status:curriculumImportJobs.status,
+       metadata:curriculumImportJobs.metadata}).from(curriculumImportJobs)
+       .where(and(eq(curriculumImportJobs.organizationId,program.organizationId),
+         eq(curriculumImportJobs.format,preview.profile),eq(curriculumImportJobs.sha256,digest)))
+       .for("update").limit(1);
+     if(!job||job.status==="rejected"||job.metadata.programId!==program.id)
+       throw new Error("Validate this exact cartridge in the selected Program before import.");
+     const existing=await tx.select({externalIdentifier:curriculumInteropMappings.externalIdentifier,
+       entityId:curriculumInteropMappings.entityId,metadata:curriculumInteropMappings.metadata})
+       .from(curriculumInteropMappings).where(and(
+         eq(curriculumInteropMappings.organizationId,program.organizationId),
+         eq(curriculumInteropMappings.format,preview.profile),
+         eq(curriculumInteropMappings.sourceSystem,digest),
+         inArray(curriculumInteropMappings.externalIdentifier,data.linkIdentifiers)));
+     for(const previous of existing)if(previous.metadata.sectionId!==section.id)
+       throw new Error("A source link was already assigned to a different Section.");
+     const mapped=new Set(existing.map(row=>row.externalIdentifier));
+     let imported=0;
+     for(const link of links){
+       if(mapped.has(link.identifier))continue;
+       const [resource]=await tx.insert(curriculumResources).values({
+         ownerOrganizationId:program.organizationId,
+         kind:"link",title:link.title,url:link.url,
+         licenseCode:"LINK-ONLY",sourceUrl:link.url,
+         sourceFormat:preview.profile,sourceIdentifier:link.identifier,
+         metadata:{importJobId:job.id,programId:program.id,sectionId:section.id,
+           sourceHash:digest,rightsConfirmed:true,source:"common_cartridge_web_link"},
+       }).returning({id:curriculumResources.id});
+       if(!resource)throw new Error("Could not create canonical curriculum link.");
+       const [overlay]=await tx.insert(curriculumOverlays).values({
+         organizationId:program.organizationId,programId:program.id,
+         siteId:program.siteId,sectionId:section.id,
+         courseTemplateVersionId:section.courseVersionId,
+         title:link.title,kind:"link",resourceId:resource.id,
+         createdByPersonId:actor.actorPersonId,
+         metadata:{source:"common_cartridge",importJobId:job.id,
+           externalIdentifier:link.identifier,sourceHash:digest,scope:"section"},
+       }).returning({id:curriculumOverlays.id});
+       if(!overlay)throw new Error("Could not add imported link to Section.");
+       await tx.insert(curriculumInteropMappings).values({
+         organizationId:program.organizationId,importJobId:job.id,
+         format:preview.profile,sourceSystem:digest,
+         externalIdentifier:link.identifier,entityType:"curriculum_resource",
+         entityId:resource.id,
+         metadata:{programId:program.id,sectionId:section.id,overlayId:overlay.id,
+           sourceUrl:link.url},
+       });
+       imported++;
+     }
+     await tx.update(curriculumImportJobs).set({
+       status:"mapped",updatedAt:new Date(),
+       metadata:{...job.metadata,sectionId:section.id,
+         supportedMapping:"external_web_links",rightsConfirmed:true},
+     }).where(eq(curriculumImportJobs.id,job.id));
+     await writeAudit(tx,actor,{action:"curriculum.interop.cartridge.web_links.import",
+       entityType:"curriculum_import_job",entityId:job.id,
+       scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id,
+         sectionId:section.id},
+       after:{sourceHash:digest,requested:links.length,imported,
+         unsupportedTypesExcluded:true,rightsConfirmed:true}});
+     return {importId:job.id,status:"mapped" as const,imported,
+       linkedResources:links.length,sectionId:section.id};
+   });
+ });

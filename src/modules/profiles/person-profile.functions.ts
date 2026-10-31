@@ -18,7 +18,7 @@ const upload = z.object({
   size: z.number().int().min(16).max(2 * 1024 * 1024),
 });
 async function actor() {
-  return requireActor(["student", "guardian", "teacher", "registrar", "specialist", "counselor"]);
+  return requireActor(["student", "guardian", "teacher", "registrar", "specialist", "counselor", "room_facilitator", "site_leader", "site_staff"]);
 }
 async function authorizedProfile(viewer: Actor, personId: string) {
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);

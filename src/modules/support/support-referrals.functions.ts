@@ -4,14 +4,14 @@ import { actorSiteIds,recordAudit,requireActor,type Actor } from "@/modules/iden
 import { emitEvent,notify } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray } from "drizzle-orm";
+import { and,desc,eq,inArray,or,sql } from "drizzle-orm";
 import { z } from "zod";
 
 const stages = ["submitted","accepted","plan_created","in_service","review","closed"] as const;
 type Stage = typeof stages[number];
 const categories = ["academic","attendance","learning","personal","planning"] as const;
 const areas = ["academic","learning","counselor","planning"] as const;
-const destination: Record<string, typeof areas[number]> = { academic:"academic", attendance:"academic", learning:"learning", personal:"counselor", planning:"planning" };
+const destination: Record<typeof categories[number], typeof areas[number]> = { academic:"academic", attendance:"academic", learning:"learning", personal:"counselor", planning:"planning" };
 const stagePriority = (x: Stage) => stages.indexOf(x);
 function safeNote(input: string, max = 1500) { const s = input.trim(); if (s.length < 3 || s.length > max) throw new Error(`Notes must be 3-${max} characters`); return s; }
 async function context() { const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]); return { db, s }; }
@@ -28,20 +28,52 @@ async function taughtStudentIds(db: any, s: any, actor: Actor): Promise<string[]
   return [...new Set(rows.map((r: { studentProfileId: string }) => r.studentProfileId))] as string[];
 }
 
+/** A site role alone does not authorize reading or changing confidential cases.
+ * Case owners and explicitly delegated, unexpired sensitive-access grantees can act.
+ */
+function casePermission(s: any, actor: Actor, permission: "read" | "write") {
+  return or(
+    eq(s.actions.ownerPersonId, actor.actorPersonId),
+    sql`EXISTS (
+      SELECT 1 FROM sensitive_access_grants AS g
+      WHERE g.resource_type = 'support_referral'
+        AND g.resource_id = ${s.supportReferrals.id}
+        AND g.site_id = ${s.actions.siteId}
+        AND g.grantee_person_id = ${actor.actorPersonId}
+        AND g.classification = 'support_case'
+        AND g.allowed_fields @> ${JSON.stringify([permission])}::jsonb
+        AND g.revoked_at IS NULL
+        AND g.valid_from <= now()
+        AND g.valid_through > now()
+    )`,
+  );
+}
+
 async function loadReferral(tx: any, s: any, referralId: string, actor: Actor) {
   const [record] = await tx.select({ action: s.actions, referral: s.supportReferrals }).from(s.actions)
     .innerJoin(s.supportReferrals, eq(s.supportReferrals.actionId, s.actions.id))
-    .where(and(eq(s.actions.id, referralId), eq(s.actions.type, "support_referral"), inArray(s.actions.siteId, actor.scope.siteIds??[]),inArray(s.actions.programId,actor.scope.programIds??[])))
+    .where(and(eq(s.actions.id, referralId), eq(s.actions.type, "support_referral"), inArray(s.actions.siteId, actor.scope.siteIds??[]),inArray(s.actions.programId,actor.scope.programIds??[]),casePermission(s,actor,"write")))
     .for("update").limit(1);
-  if (!record) throw new AuthorizationError("referral at authorized site and program");
+  if (!record) throw new AuthorizationError("explicit support-case writer assignment");
   return record;
 }
 
-/** Specialists are routed site-wide until area-level routing attributes exist on grants. */
+/** One currently active site-scoped coordinator is assigned to each new case.
+ * This is routing, not proof of clinical qualification or site-wide case access.
+ */
 async function firstSpecialistAtSites(tx: any, s: any, sites: string[], area: string): Promise<string | null> {
-  const [owner] = await tx.select({ personId: s.accountPersonGrants.personId }).from(s.accountPersonGrants)
-    .where(and(eq(s.accountPersonGrants.role, area === "counselor" ? "counselor" : "specialist"), inArray(s.accountPersonGrants.siteId, sites), eq(s.accountPersonGrants.active, true)))
-    .orderBy(s.accountPersonGrants.createdAt).limit(1);
+  const [owner] = await tx.select({ personId: s.accountPersonGrants.personId })
+    .from(s.accountPersonGrants)
+    .innerJoin(s.accessAccounts,eq(s.accessAccounts.id,s.accountPersonGrants.accountId))
+    .innerJoin(s.people,eq(s.people.id,s.accountPersonGrants.personId))
+    .where(and(
+      eq(s.accountPersonGrants.role, area === "counselor" ? "counselor" : "specialist"),
+      inArray(s.accountPersonGrants.siteId, sites),
+      eq(s.accountPersonGrants.active, true),
+      eq(s.accountPersonGrants.isSynthetic, false),
+      eq(s.accessAccounts.disabled, false),
+      eq(s.people.active, true),
+    )).orderBy(s.accountPersonGrants.createdAt).limit(1);
   return owner?.personId ?? null;
 }
 
@@ -76,13 +108,18 @@ export const getSupportReferrals = createServerFn({ method: "GET" }).handler(asy
       inArray(s.actions.siteId, sites),
       inArray(s.actions.programId,actor.scope.programIds??[]),
       subjectIds ? inArray(s.actions.subjectId, subjectIds) : undefined,
+       actor.role === "teacher"
+         ? eq(s.supportReferrals.reporterPersonId, actor.actorPersonId)
+         : casePermission(s, actor, "read"),
     ))
     .orderBy(desc(s.actions.createdAt)).limit(100);
   const referrals = rows;
   const referralIds = referrals.map((x: { referralId: string }) => x.referralId);
   const [plans, services, owners] = await Promise.all([
-    referralIds.length ? db.select().from(s.supportPlans).where(inArray(s.supportPlans.referralId, referralIds)) : [],
-    referralIds.length ? db.select().from(s.supportServices).where(inArray(s.supportServices.referralId, referralIds)) : [],
+    actor.role !== "teacher" && referralIds.length
+      ? db.select().from(s.supportPlans).where(inArray(s.supportPlans.referralId, referralIds)) : [],
+    actor.role !== "teacher" && referralIds.length
+      ? db.select().from(s.supportServices).where(inArray(s.supportServices.referralId, referralIds)) : [],
     (() => { const ids = [...new Set(referrals.map((r: { ownerPersonId: string | null }) => r.ownerPersonId).filter((x: string | null): x is string => Boolean(x)))]; return ids.length ? db.select({ id: s.people.id, firstName: s.people.legalFirstName, lastName: s.people.legalLastName }).from(s.people).where(inArray(s.people.id, ids)) : []; })(),
   ]);
   const names = new Map(owners.map((w: { id: string; firstName: string; lastName: string }) => [w.id, `${w.firstName} ${w.lastName}`]));
@@ -92,8 +129,8 @@ export const getSupportReferrals = createServerFn({ method: "GET" }).handler(asy
       id: row.id, title: row.title, description: row.description ?? "", status: row.status,
       studentProfileId: row.studentProfileId, requestedArea: row.requestedArea,
       priority: row.priority, stage: row.stage, category: row.category,
-      notes: row.notes, academicRecommendation: row.academicRecommendation,
-      nextReview: row.nextReviewAt ? row.nextReviewAt.toISOString() : "",
+      notes: row.notes, academicRecommendation: actor.role === "teacher" ? null : row.academicRecommendation,
+      nextReview: actor.role === "teacher" ? "" : row.nextReviewAt ? row.nextReviewAt.toISOString() : "",
       plan: plan ? { goal: plan.goal, intervention: plan.intervention, targetDate: plan.targetDate.toISOString() } : null,
       services: services.filter((x: any) => x.referralId === row.referralId).map((x: any) => ({ id: x.id, kind: x.kind, scheduledAt: x.scheduledAt.toISOString(), status: x.status, outcome: x.outcome })),
       assignedTo: row.ownerPersonId ? names.get(row.ownerPersonId) ?? "Unassigned" : "Unassigned",
@@ -157,11 +194,14 @@ export const createSupportReferral = createServerFn({ method: "POST" })
          inArray(s.sections.programId,actor.scope.programIds??[])))
        .limit(1);
       if(!placement)throw new AuthorizationError("student enrollment in a taught section");
+       const coordinatorPersonId = await firstSpecialistAtSites(
+         tx, s, [placement.siteId], destination[data.category],
+       );
       const [action] = await tx.insert(s.actions).values({
         type: "support_referral", status: "open", priority: data.priority,
         title: `Student support · ${data.category}`, description: observations,
-        ownerPersonId: null,
-        organizationId: placement.organizationId,
+        ownerPersonId: coordinatorPersonId,
+         organizationId: placement.organizationId,
         siteId: placement.siteId,
         programId: placement.programId,
         subjectType: "student_profile", subjectId,
@@ -175,7 +215,7 @@ export const createSupportReferral = createServerFn({ method: "POST" })
       }).returning({ id: s.supportReferrals.id });
       await tx.insert(s.supportReferralStageEvents).values({ referralId: referral!.id, stage: "submitted", actorPersonId: actor.actorPersonId });
       await emitEvent(tx, {eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,actorPersonId:actor.actorPersonId,payload:{subjectType:"student_profile",subjectId,referralId:referral!.id}});
-      await recordAudit(tx, actor, { action: "support_referral.create", resourceType: "action", resourceId: action.id, after: { category: data.category, subjectId, stage: "submitted" }, scope: { siteId: placement.siteId,programId:placement.programId } });
+      await recordAudit(tx, actor, { action: "support_referral.create", resourceType: "action", resourceId: action.id, after: { category: data.category, subjectId, stage: "submitted", coordinatorPersonId }, scope: { siteId: placement.siteId,programId:placement.programId } });
       return action;
     });
     return { referralId: created.id };
@@ -228,7 +268,9 @@ export const advanceSupportReferral = createServerFn({ method: "POST" })
           recipientPersonId: referral.reporterPersonId,
           type: data.nextStage === "accepted" ? "support_referral_accepted" : "support_referral_update",
           title: data.nextStage === "accepted" ? "Student support referral accepted" : "Academic support update",
-          body: data.nextStage === "accepted" ? "A specialist has accepted your referral." : note.slice(0, 400),
+          body: data.nextStage === "accepted"
+            ? "A specialist has accepted your referral."
+            : "Your referral has been reviewed. Contact the coordinator for information approved for sharing.",
           resourceType: "action", resourceId: record.id,
         });
       }
@@ -264,7 +306,7 @@ export const saveSupportPlan = createServerFn({ method: "POST" })
       } else {
         await tx.update(s.supportReferrals).set({ nextReviewAt: date, updatedAt: new Date() }).where(eq(s.supportReferrals.id, referral.id));
       }
-      await recordAudit(tx, actor, { action: "support_plan.save", resourceType: "action", resourceId: record.id, after: { goal, targetDate: date.toISOString() }, scope: { siteId: record.siteId } });
+      await recordAudit(tx, actor, { action: "support_plan.save", resourceType: "action", resourceId: record.id, after: { referralId: referral.id, planUpdated: true, targetDate: date.toISOString() }, scope: { siteId: record.siteId } });
       await emitEvent(tx,{eventType:EventTypes.SupportPlanSaved,aggregateType:"action",aggregateId:record.id,
         actorPersonId:actor.actorPersonId,payload:{referralId:referral.id,targetDate:date.toISOString()}});
       return { saved: true };
@@ -308,7 +350,7 @@ export const completeSupportService = createServerFn({ method: "POST" })
         .where(and(eq(s.supportServices.id, data.serviceId), eq(s.supportServices.referralId, referral.id), eq(s.supportServices.status, "scheduled")))
         .returning({ id: s.supportServices.id });
       if (!updated) throw new Error("Scheduled service not found");
-      await recordAudit(tx, actor, { action: "support_service.complete", resourceType: "support_service", resourceId: updated.id, after: { outcome, referralId: referral.id }, scope: { siteId: record.siteId } });
+      await recordAudit(tx, actor, { action: "support_service.complete", resourceType: "support_service", resourceId: updated.id, after: { referralId: referral.id, serviceCompleted: true }, scope: { siteId: record.siteId } });
       await emitEvent(tx,{eventType:EventTypes.SupportServiceCompleted,aggregateType:"support_service",aggregateId:updated.id,
         actorPersonId:actor.actorPersonId,payload:{referralId:referral.id}});
       return { saved: true };

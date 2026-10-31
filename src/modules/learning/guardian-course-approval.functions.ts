@@ -1,19 +1,20 @@
 import { db } from "@/db/client";
 import {
-actions,consentRecords,
+accessAccounts,accountPersonGrants,actions,consentRecords,
 enrollments,guardianRelationships,
 people,programs,sections,studentProfiles,terms
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { actorSiteIds,recordAudit,requireActor,type Actor } from "@/modules/identity/actors.server";
-import { emitEvent,notify } from "@/platform/mutation";
+import { emitEvent,notify,notifyMany } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray,isNull } from "drizzle-orm";
+import { and,desc,eq,inArray,isNull,or } from "drizzle-orm";
 import { z } from "zod";
 import { getSectionRegistrationPolicy } from "./section-registration-policy-service";
 
+import { EventTypes } from "@/domain/event-types";
 const CONSENT_TYPE = "course_registration_add_decision";
 const CONSENT_SUBJECT = "course_registration_request";
 const CONSENT_VERSION = "course-registration/v1";
@@ -112,6 +113,7 @@ export const listGuardianCourseApprovals = createServerFn({ method: "GET" }).han
     if (today > policy.addDropEndsOn) return null;
     return {
       id: row.id,
+      studentPersonId: row.ownerPersonId,
       sectionTitle: row.sectionTitle,
       sectionCode: row.sectionCode,
       studentName: row.studentName + " " + row.studentLastName,
@@ -207,10 +209,29 @@ export const decideGuardianCourseApproval = createServerFn({ method: "POST" })
         after: { decision: data.approve ? "approve" : "decline", consentRecordId: decision.id },
       });
       await emitEvent(tx, {
-        eventType: "CourseRegistrationGuardianDecision", aggregateType: "action",
+        eventType: EventTypes.CourseRegistrationGuardianDecision, aggregateType: "action",
         aggregateId: request.id, actorPersonId: actor.actorPersonId,
         payload: { sectionId: section.id, studentProfileId: student.id, approved: data.approve },
       });
+      const registrars=await tx.selectDistinct({personId:accountPersonGrants.personId})
+        .from(accountPersonGrants)
+        .innerJoin(accessAccounts,and(
+          eq(accessAccounts.id,accountPersonGrants.accountId),
+          eq(accessAccounts.disabled,false),
+        ))
+        .where(and(
+          eq(accountPersonGrants.role,"registrar"),
+          eq(accountPersonGrants.active,true),eq(accountPersonGrants.isSynthetic,false),
+          eq(accountPersonGrants.organizationId,request.organizationId),
+          or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,request.siteId)),
+        )).limit(20);
+      await notifyMany(tx,registrars.map(registrar=>({
+        recipientPersonId:registrar.personId,status:"unread" as const,
+        type:"course_registration_guardian_decision_for_registrar",
+        title:data.approve?"Guardian approved a pending class request":"Guardian declined a pending class request",
+        body:"Review the existing course-registration Action and complete the school's schedule decision.",
+        resourceType:"action",resourceId:request.id,
+      })));
       await notify(tx, {
         recipientPersonId: request.ownerPersonId, status: "unread",
         type: "course_registration_guardian_decision",

@@ -43,7 +43,7 @@ export const createCanonicalGroupPost = createServerFn({ method: "POST" })
           characterCount: body.length },
       });
       await emitEvent(tx, {
-        eventType: "StudyGroupPostCreated", aggregateType: "study_group_post",
+        eventType: EventTypes.StudyGroupPostCreated, aggregateType: "study_group_post",
         aggregateId: post.id, actorPersonId: actor.actorPersonId,
         payload: { groupId: group.id },
       });
@@ -114,7 +114,7 @@ export const reportCanonicalGroupPost = createServerFn({ method: "POST" })
         after: { groupId: group.id, postId: post.id, actionId: action.id },
       });
       await emitEvent(tx, {
-        eventType: "StudyGroupPostReported", aggregateType: "study_group_report",
+        eventType: EventTypes.StudyGroupPostReported, aggregateType: "study_group_report",
         aggregateId: report.id, actorPersonId: actor.actorPersonId,
         payload: { groupId: group.id, postId: post.id },
       });
@@ -181,7 +181,7 @@ export const resolveCanonicalGroupReport = createServerFn({ method: "POST" })
         before: { status: "open" }, after: { status: "resolved", hidden: data.hidePost },
       });
       await emitEvent(tx, {
-        eventType: "StudyGroupReportResolved", aggregateType: "study_group_report",
+        eventType: EventTypes.StudyGroupReportResolved, aggregateType: "study_group_report",
         aggregateId: report.id, actorPersonId: actor.actorPersonId,
         payload: { groupId: group.id, postId: report.postId, hidden: data.hidePost },
       });

@@ -1,6 +1,6 @@
 import { describe,expect,it } from "vitest";
 import { deflateRawSync } from "node:zlib";
-import { inspectCommonCartridgeManifest,inspectCommonCartridgeZip } from "@/domain/common-cartridge";
+import { inspectCommonCartridgeManifest,inspectCommonCartridgeZip,extractCommonCartridgeWebLink } from "@/domain/common-cartridge";
 
 const xml=`<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns="http://www.imsglobal.org/xsd/imsccv1p3/imscp_v1p1">
@@ -49,6 +49,21 @@ describe("Common Cartridge bounded import preview",()=>{
  it("reads an actual deflated IMSCC ZIP manifest",()=>{
   const parsed=inspectCommonCartridgeZip(zipEntry("imsmanifest.xml",xml));
   expect(parsed.outline[1].title).toBe("Quiz");
+ });
+ it("only extracts integrity-checked HTTPS IMS web links",()=>{
+  const xmlLink='<webLink><title>Algebra &amp; practice</title><url href="https://example.org/lesson"/></webLink>';
+  const archive=zipEntry("links/lesson.xml",xmlLink);
+  expect(extractCommonCartridgeWebLink(archive,"links/lesson.xml")).toEqual({
+    title:"Algebra & practice",url:"https://example.org/lesson",
+  });
+  expect(()=>extractCommonCartridgeWebLink(archive,"links/missing.xml")).toThrow("missing");
+  expect(()=>extractCommonCartridgeWebLink(zipEntry("links/lesson.xml",
+    xmlLink.replace("https://","http://")),"links/lesson.xml")).toThrow("HTTPS");
+  expect(()=>extractCommonCartridgeWebLink(zipEntry("links/lesson.xml",
+    '<webLink><url href="https://127.0.0.1/admin"/></webLink>'),"links/lesson.xml")).toThrow("HTTPS");
+  const corrupted=archive.slice();
+  corrupted[35]^=1;
+  expect(()=>extractCommonCartridgeWebLink(corrupted,"links/lesson.xml")).toThrow();
  });
  it("rejects path traversal and external entity declarations",()=>{
   expect(()=>inspectCommonCartridgeManifest(xml.replace("content/index.html","../secrets"))).toThrow("Unsafe");

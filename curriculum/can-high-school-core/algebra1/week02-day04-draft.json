@@ -1,0 +1,73 @@
+{
+  "courseCode": "CAN-ALG1",
+  "unitId": "algebra1-u01",
+  "week": 2,
+  "status": "draft",
+  "readiness": "teacher_review_required",
+  "scope": "Publisher-owned draft instructional lesson; teacher review and institutional publication required before students see it.",
+  "title": "Week 2 · Multi-Step Equations and Literal Formulas",
+  "plannedInstructionalDays": 5,
+  "authoredDays": 1,
+  "suggestedMinutesPerDay": 55,
+  "lessons": [
+    {
+      "id": "u01-w02-d04",
+      "title": "Week 2 · Day 4 · Models, Units, and Feasible Solutions",
+      "body": "ALGEBRA I • UNIT 1 • WEEK 2 • DAY 4 OF 5\nLAUNCH · WHAT DOES THE ANSWER MEASURE? (5 min)\nA youth club has $90 for admission passes. Each pass costs $9, and the club must pay a one-time $18 processing fee. Define a variable, write an equation, and predict whether the answer will count people, dollars, or fees. Explain why counting passes requires a whole number.\n\nEXPLICIT INSTRUCTION AND WORKED MODELS (12 min)\nMODEL A. Define p = number of passes. All amounts are dollars. 18 + 9p = 90. Subtract 18 from both sides: 9p = 72. Divide by 9: p = 8 passes. Check: $18 + 9 dollars/pass × 8 passes = $90. A negative or fractional pass count would not be a valid solution in this setting. MODEL B. A community kitchen pays $24 for delivery plus $4 per meal. A $100 bill gives 24 + 4m = 100; m = 19 meals. Check the units: dollars + dollars per meal × meals = dollars. MODEL C. A church plans transportation with 14 seats per van and 9 students already traveling separately. To transport 51 students total, 14v + 9 ≥ 51 requires v ≥ 3; do not report 2.9 vans. Inequalities and whole-number restrictions can change the interpretation even when symbolic steps are correct.\n\nGUIDED MODELING (12 min)\n1. A camp charges $25 registration plus $8 per session. A family pays $81. Identify the units, solve for sessions, and check. 2. A book fair starts with 32 donated books, gains 7 per day, and reaches 81 books. Define day variable and solve. 3. Tickets cost $6 each plus a $10 reservation fee. A family has $51. Model the maximum whole number of tickets and explain why the equality solution is not itself a feasible ticket count. Share an independent substitution check.\n\nINDEPENDENT PRACTICE AND CRITIQUE (16 min)\nA. A tutor charges a $15 booking fee plus $20 per lesson. Total cost is $115. Find lessons and verify units. B. A fundraiser has $140 in fixed donations and raises $12 per shirt. It needs $320. Find shirts sold. C. A bus holds 24 students, with 5 seats reserved for adults. How many buses transport 62 students? Show an inequality and explain rounding. D. Two payment plans cost 18+7v and 30+5v dollars. Find the equal-cost number of visits; check with substitution. E. Error analysis: a classmate reports 3.4 students because 17÷5=3.4. Explain the missing domain restriction and whether to round up or down given at least 17 students per group of 5. F. Write a realistic equation that has no feasible solution, even though it has a valid real-number solution.\n\nEXIT TICKET · MODEL AND JUSTIFY (10 min)\nA mentoring program has a $16 fixed setup fee and spends $6 per participant. Its total budget is $88. Define p, write and solve the equation, check with units, and explain why your answer is meaningful. Submit your reasoning for teacher review. A completion click is not a grade.",
+      "resources": [],
+      "learningTargets": [
+        "I can name a variable and its units before writing a contextual equation.",
+        "I can solve linear equations involving fixed charges and rates and check the resulting units.",
+        "I can explain whether a numerical solution is feasible in the original situation."
+      ],
+      "standards": [
+        "A-CED.1",
+        "A-CED.4",
+        "N-Q.1"
+      ],
+      "estimatedMinutes": 55,
+      "activities": [
+        {
+          "id": "u01-w02-d04-a1",
+          "kind": "launch",
+          "title": "Launch · What does the answer measure?",
+          "estimatedMinutes": 5,
+          "evidence": "practice",
+          "instructions": "A youth club has $90 for admission passes. Each pass costs $9, and the club must pay a one-time $18 processing fee. Define a variable, write an equation, and predict whether the answer will count people, dollars, or fees. Explain why counting passes requires a whole number."
+        },
+        {
+          "id": "u01-w02-d04-a2",
+          "kind": "instruction",
+          "title": "Explicit instruction and worked models",
+          "estimatedMinutes": 12,
+          "evidence": "practice",
+          "instructions": "MODEL A. Define p = number of passes. All amounts are dollars. 18 + 9p = 90. Subtract 18 from both sides: 9p = 72. Divide by 9: p = 8 passes. Check: $18 + 9 dollars/pass × 8 passes = $90. A negative or fractional pass count would not be a valid solution in this setting. MODEL B. A community kitchen pays $24 for delivery plus $4 per meal. A $100 bill gives 24 + 4m = 100; m = 19 meals. Check the units: dollars + dollars per meal × meals = dollars. MODEL C. A church plans transportation with 14 seats per van and 9 students already traveling separately. To transport 51 students total, 14v + 9 ≥ 51 requires v ≥ 3; do not report 2.9 vans. Inequalities and whole-number restrictions can change the interpretation even when symbolic steps are correct."
+        },
+        {
+          "id": "u01-w02-d04-a3",
+          "kind": "guided_practice",
+          "title": "Guided modeling",
+          "estimatedMinutes": 12,
+          "evidence": "practice",
+          "instructions": "1. A camp charges $25 registration plus $8 per session. A family pays $81. Identify the units, solve for sessions, and check. 2. A book fair starts with 32 donated books, gains 7 per day, and reaches 81 books. Define day variable and solve. 3. Tickets cost $6 each plus a $10 reservation fee. A family has $51. Model the maximum whole number of tickets and explain why the equality solution is not itself a feasible ticket count. Share an independent substitution check."
+        },
+        {
+          "id": "u01-w02-d04-a4",
+          "kind": "independent_practice",
+          "title": "Independent practice and critique",
+          "estimatedMinutes": 16,
+          "evidence": "practice",
+          "instructions": "A. A tutor charges a $15 booking fee plus $20 per lesson. Total cost is $115. Find lessons and verify units. B. A fundraiser has $140 in fixed donations and raises $12 per shirt. It needs $320. Find shirts sold. C. A bus holds 24 students, with 5 seats reserved for adults. How many buses transport 62 students? Show an inequality and explain rounding. D. Two payment plans cost 18+7v and 30+5v dollars. Find the equal-cost number of visits; check with substitution. E. Error analysis: a classmate reports 3.4 students because 17÷5=3.4. Explain the missing domain restriction and whether to round up or down given at least 17 students per group of 5. F. Write a realistic equation that has no feasible solution, even though it has a valid real-number solution."
+        },
+        {
+          "id": "u01-w02-d04-a5",
+          "kind": "exit_ticket",
+          "title": "Exit ticket · model and justify",
+          "estimatedMinutes": 10,
+          "evidence": "teacher_review",
+          "instructions": "A mentoring program has a $16 fixed setup fee and spends $6 per participant. Its total budget is $88. Define p, write and solve the equation, check with units, and explain why your answer is meaningful. Submit your reasoning for teacher review. A completion click is not a grade."
+        }
+      ]
+    }
+  ]
+}

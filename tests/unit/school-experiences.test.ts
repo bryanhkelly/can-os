@@ -10,6 +10,7 @@ vi.mock("@/modules/identity/actors.server", () => ({
   actorSiteIds: (actor: { scope: { siteIds: string[] } }) => actor.scope.siteIds,
 }));
 vi.mock("@tanstack/react-start/server", () => ({ setResponseHeader }));
+vi.mock("@/modules/communication/notification-center.functions", () => ({ getNotifications: vi.fn().mockResolvedValue([]) }));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({
     validator() { return this; },

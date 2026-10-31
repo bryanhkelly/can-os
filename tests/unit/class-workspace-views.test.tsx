@@ -34,7 +34,7 @@ vi.mock("@/modules/learning/discussion-post.functions", () => ({ postDiscussionM
 const workspace: ComponentProps<typeof ClassWorkspace>["data"] = {
   role: "student", section: { id: "english", title: "English", code: "ENG", description: "Read and revise.",
     subject: "English", versionId: "published-version", contentStatus: "published" },
-  teacherGuides: null, lessonCompletionCounts:[],
+  teacherGuides: null, lessonCompletionCounts:[],curriculumAccess:{available:true,reason:null},
   studentPersonId: "child", teachers: [{ personId: "teacher", name: "Taylor Teacher" }],
   content: classContentSchema.parse({
     version: 1, syllabus: "<script>unsafe()</script>",
@@ -59,6 +59,29 @@ describe("published class workspace", () => {
     expect(html).not.toContain("Roster");
     expect(html).not.toMatch(/Create class|Edit lesson|Live room|Recording/);
   });
+  it("instruments only the real published lesson and resource controls for student telemetry", () => {
+    const source = { id: "source-1", title: "Evidence source", url: "https://www.loc.gov/" };
+    const lesson = {
+      ...workspace.content!.modules[0]!.lessons[0]!,
+      body: "Read the source and take notes.",
+      resources: [source],
+      activities: [{ id: "self-check", title: "Check your reasoning",
+        kind: "self_check" as const, instructions: "Write down two supporting examples." }],
+    };
+    const data = { ...workspace, content: { ...workspace.content!,
+      modules: [{ ...workspace.content!.modules[0]!, lessons: [lesson] }],
+    }};
+    const student = renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="evidence" />);
+    expect(student).toContain("Learning activity");
+    expect(student).toContain('data-learning-content="true"');
+    expect(student).toContain('data-learning-resource-id="source-1"');
+    expect(student).toContain("Evidence source");
+    const guardian = renderToStaticMarkup(<ClassWorkspace data={{ ...data, role: "guardian" }} tab="lessons" lessonId="evidence" />);
+    expect(guardian).not.toContain('aria-label="Learning activity"');
+    expect(guardian).toContain("Evidence source");
+    const overview = renderToStaticMarkup(<ClassWorkspace data={data} tab="overview" />);
+    expect(overview).not.toContain('aria-label="Learning activity"');
+  });
   it("supports first, middle, and final published lesson navigation without altering completion",()=>{
     const data={...workspace,content:{...workspace.content!,modules:[{...workspace.content!.modules[0]!,
      lessons:[...workspace.content!.modules[0]!.lessons,
@@ -75,6 +98,32 @@ describe("published class workspace", () => {
     const last=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId="final"/>);
     expect(last).toContain("End of published course");
     expect(last).toContain("Navigation never marks lessons complete");
+  });
+  it("skips empty outlines in lesson navigation, recommendations and completion totals",()=>{
+    const outline={id:"outline",title:"Future outline",body:" ",resources:[]};
+    const real=workspace.content!.modules[0]!.lessons[0]!;
+    const next={id:"next-real",title:"Next reading",body:"Read the next passage.",resources:[]};
+    const data={...workspace,content:{...workspace.content!,modules:[{
+      ...workspace.content!.modules[0]!,lessons:[real,outline,next],
+    }]},progress:[{lessonId:real.id,completedAt:"2026-10-29"},{lessonId:outline.id,completedAt:"2026-10-29"}]};
+    const overview=renderToStaticMarkup(<ClassWorkspace data={data}/>);
+    expect(overview).toContain("1 / 2 published lessons");
+    expect(overview).toContain('href="/classes?section=english&amp;tab=lessons&amp;lesson=next-real"');
+    const current=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons" lessonId={real.id}/>);
+    expect(current).toContain("Lesson 1 of 2");
+    expect(current).not.toContain("lesson=outline");
+    const index=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons"/>);
+    expect(index).not.toContain("Future outline");
+    const planning=renderToStaticMarkup(<ClassWorkspace data={{...data,role:"teacher"}} tab="planning"/>);
+    expect(planning).toContain("Future outline");
+    expect(planning).toContain("Outline only");
+  });
+  it("explains unavailable publisher content while keeping academic navigation available",()=>{
+    const data={...workspace,content:null,curriculumAccess:{available:false,reason:"An active publisher license is required."}};
+    const html=renderToStaticMarkup(<ClassWorkspace data={data} tab="lessons"/>);
+    expect(html).toContain("An active publisher license is required");
+    expect(html).toContain("academic records remain available");
+    expect(html).not.toContain("Mark lesson complete");
   });
   it("allows only students to mark a lesson and safely renders lesson text", () => {
     const student = renderToStaticMarkup(<ClassWorkspace data={workspace} tab="lessons" lessonId="evidence"/>);

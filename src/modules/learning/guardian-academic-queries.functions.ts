@@ -1,10 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
-import { guardianFeedbackReleased, latestGuardianAttempts } from "@/domain/guardian-academics";
+import { guardianFeedbackReleased, latestGuardianAttempts, priorReturnedGuardianFeedback, releasedGuardianAttempts } from "@/domain/guardian-academics";
+import { assessmentAvailability } from "@/domain/assessment-availability";
+import { assessmentAttemptLimit } from "@/domain/assessment-attempt-policy";
 import { z } from "zod";
 import { readRubric } from "./rubric";
 
@@ -17,6 +20,7 @@ import { readRubric } from "./rubric";
 export const getGuardianAssignments = createServerFn({ method: "GET" })
  .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1) }).parse(value))
  .handler(async ({ data }) => {
+  setResponseHeader("Cache-Control","private, no-store");
   const context = await getCommandContext(getRequest());
   assertCapability(context, "student:related-read");
   if (context.role !== "guardian" || !context.actorPersonId || !context.scope.siteIds?.length) {
@@ -37,13 +41,27 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
   const [profile] = await db.select({ id: s.studentProfiles.id })
    .from(s.studentProfiles).where(eq(s.studentProfiles.personId, data.studentPersonId)).limit(1);
   if (!profile) throw new AuthorizationError("student profile");
+  // A stale Section enrollment after withdrawal cannot authorize the
+  // child's grades. The independent Program enrollment, Section and Term
+  // must agree on student, Program, and school year.
+  const programMembership=alias(s.enrollments,"guardian_academic_program_enrollment");
   const active = await db.select({ sectionId: s.enrollments.sectionId })
    .from(s.enrollments)
    .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+   .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+   .innerJoin(programMembership,and(
+    eq(programMembership.studentProfileId,s.enrollments.studentProfileId),
+    eq(programMembership.programId,s.sections.programId),
+    eq(programMembership.schoolYearId,s.terms.schoolYearId),
+    eq(programMembership.kind,"program"),eq(programMembership.status,"active"),
+   ))
    .where(and(
     eq(s.enrollments.studentProfileId, profile.id),
     eq(s.enrollments.kind, "section"),
     eq(s.enrollments.status, "active"),
+    eq(s.enrollments.programId,s.sections.programId),
+    eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+    eq(s.sections.active,true),
     inArray(s.sections.siteId, context.scope.siteIds),
     inArray(s.sections.programId, context.scope.programIds??[]),
    ));
@@ -57,6 +75,9 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
    instructions: s.assessments.instructions,
    metadata: s.assessments.metadata,
    dueAt: s.assessments.dueAt,
+   assessmentStatus: s.assessments.status,
+   availableAt: s.assessments.availableAt,
+   closesAt: s.assessments.closesAt,
    pointsPossible: s.assessments.pointsPossible,
    submissionStatus: s.submissions.status,
    submissionId: s.submissions.id,
@@ -78,6 +99,13 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
    )).orderBy(desc(s.assessments.dueAt));
   return { assignments: latestGuardianAttempts(rows).map(row => {
    const released = guardianFeedbackReleased(row.submissionStatus);
+   const previous=priorReturnedGuardianFeedback(rows,row);
+   const availability=assessmentAvailability({
+    status:row.assessmentStatus,availableAt:row.availableAt,closesAt:row.closesAt,
+   });
+   const maxAttempts = assessmentAttemptLimit(row.metadata);
+   const revisionLimitReached = row.submissionStatus === "returned" &&
+    maxAttempts !== null && (row.attemptNumber ?? 1) >= maxAttempts;
    return {
     assessmentId: row.assessmentId,
     sectionId: row.sectionId,
@@ -89,17 +117,26 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
     timeliness: row.timeliness,
     dueAt: row.dueAt?.toISOString() ?? null,
     status: row.submissionStatus ?? "assigned",
+    workAvailabilityReason: availability.reason,
+    revisionLimitReached,
     submittedAt: row.submittedAt?.toISOString() ?? null,
     gradedAt: released ? row.gradedAt?.toISOString() ?? null : null,
     score: released ? row.score : null,
     pointsPossible: row.pointsPossible,
     feedback: released && typeof row.feedback?.comment === "string" ? row.feedback.comment : "",
+    // A revision's latest ungraded attempt has no current score. The
+    // guardian may continue seeing teacher feedback already released on the
+    // returned predecessor, not the new private response text or draft.
+    revisionFeedback:previous&&typeof previous.feedback?.comment==="string"?previous.feedback.comment:"",
+    revisionFeedbackSubmissionId:previous?.submissionId??null,
+    releasedAttempts:releasedGuardianAttempts(rows,row.assessmentId),
    };
   }) };
  });
 
 /** Child picker is derived from guardian relationships, never account-supplied IDs. */
 export const getGuardianStudents = createServerFn({ method: "GET" }).handler(async () => {
+ setResponseHeader("Cache-Control","private, no-store");
  const context = await getCommandContext(getRequest());
  assertCapability(context, "student:related-read");
  if (context.role !== "guardian" || !context.actorPersonId || !context.scope.siteIds?.length)
@@ -119,7 +156,9 @@ export const getGuardianStudents = createServerFn({ method: "GET" }).handler(asy
     guardianPersonId: context.actorPersonId,
     access: "academic",
    }),
-   inArray(s.enrollments.kind, ["program", "school_year", "section"]),
+   // The child picker can include a newly enrolled student before a Section
+   // is placed, but never use a Section-only orphan as proof of school access.
+   eq(s.enrollments.kind, "program"),
    eq(s.enrollments.status, "active"),
    inArray(s.programs.siteId, context.scope.siteIds),
    inArray(s.programs.id, context.scope.programIds??[]),

@@ -4,7 +4,7 @@ import { getStudent360 } from "@/modules/profiles/directory.functions";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, StatCard, StatusBadge, PersonMark } from "@/components/workspace";
 
-const tabs = ["overview", "academics", "attendance", "support", "relationships"] as const;
+const tabs = ["overview", "academics", "activity", "attendance", "support", "relationships"] as const;
 type ProfileTab = (typeof tabs)[number];
 export const Route = createFileRoute("/staff/students/$personId")({
   validateSearch: (search: Record<string, unknown>): { tab?: ProfileTab } => ({
@@ -67,6 +67,19 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
           <p className="mt-1 text-sm text-muted-foreground">Teaching team: {profile.sections.find(item => item.sectionId === section.sectionId)?.teacherNames.join(", ") || "Not recorded"}</p>
         </li>)}</ul>
         {!profile.academics.sections.length && <p className="text-sm text-muted-foreground">No active sections.</p>}
+      </WorkspacePanel>}
+      {(tab === "overview" || tab === "activity") && <WorkspacePanel title="Academic activity"
+       description="Chronological class-grade, recorded-attendance and academic-follow-up events from only your authorized school scope. Private case notes are excluded.">
+        <ol className="divide-y">
+         {profile.timeline.map(item=><li key={item.id} className="py-3 text-sm">
+           <div className="flex flex-wrap items-baseline justify-between gap-2">
+             <p className="font-semibold">{item.title}</p>
+             <time className="text-xs text-muted-foreground" dateTime={item.at}>{new Date(item.at).toLocaleString()}</time>
+           </div>
+           <p className="mt-1 text-muted-foreground">{item.detail}</p>
+         </li>)}
+        </ol>
+        {!profile.timeline.length&&<p className="text-sm text-muted-foreground">No academic activity has been recorded in the authorized view.</p>}
       </WorkspacePanel>}
       {(tab === "overview" || tab === "attendance") && <WorkspacePanel title="Attendance" description="Recent recorded events from the last 30 days.">
         <p className="text-sm">{profile.attendance.absenceCount} absence(s) · {profile.attendance.tardyCount} tardy event(s)</p>

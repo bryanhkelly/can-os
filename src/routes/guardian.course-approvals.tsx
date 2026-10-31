@@ -8,6 +8,9 @@ import {
 } from "@/modules/learning/guardian-course-approval.functions";
 
 export const Route = createFileRoute("/guardian/course-approvals")({
+  validateSearch: (search: Record<string, unknown>): { action?: string } => ({
+    action: typeof search.action === "string" ? search.action : undefined,
+  }),
   loader: safeLoader(() => listGuardianCourseApprovals(), {
     authMessage: "Sign in with an authorized guardian account to review class approvals.",
   }),
@@ -26,6 +29,7 @@ type Approval = Awaited<ReturnType<typeof listGuardianCourseApprovals>>[number];
 
 function CourseApprovalList({ items }: { items: Approval[] }) {
   const router = useRouter();
+  const { action } = Route.useSearch();
   const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
@@ -39,8 +43,9 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
       await decideGuardianCourseApproval({
         data: { requestId, approve, acknowledge: approve && acknowledged[requestId] === true },
       });
-      await router.invalidate();
-      setNotice(approve ? "Your approval was recorded." : "Your decision to decline was recorded.");
+      setNotice(approve ? "Your approval was recorded. The registrar must still finalize the schedule." : "Your decision to decline was recorded.");
+      try { await router.invalidate(); }
+      catch { setError("Your decision was saved, but the list could not refresh. Reopen this page rather than submitting it again."); }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save your decision.");
     } finally {
@@ -61,8 +66,11 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
     >
       {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
       {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+      {action && <Link to="/guardian/course-approvals" className="mt-5 inline-block text-sm underline">View all course approvals</Link>}
+      {action && !items.some(item=>item.id===action) &&
+        <p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This request is unavailable in your authorized course approvals.</p>}
       <div className="mt-7 space-y-4">
-        {items.map(item => (
+        {items.filter(item=>!action||item.id===action).map(item => (
           <article key={item.id} className="rounded-xl border bg-card p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               {item.studentName} · {item.sectionCode}
@@ -109,7 +117,7 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
             </div>
           </article>
         ))}
-        {items.length === 0 &&
+        {items.length === 0 && !action &&
           <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
             There are no pending course requests that need your approval.
           </p>}

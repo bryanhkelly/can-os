@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import { TEST_ACCESS_TOKEN_PEPPER } from "./tests/e2e/env";
 
 /**
@@ -16,6 +17,12 @@ if(process.env.APP_ENV!=="test"||process.env.NODE_ENV!=="test"||
  !TEST_ACCESS_TOKEN_PEPPER||TEST_ACCESS_TOKEN_PEPPER.length<32)
  throw new Error("Algebra I browser acceptance requires the isolated TEST_DATABASE_URL, distinct application DB host, APP_ENV=test, NODE_ENV=test and explicit write guard.");
 
+// Curriculum fixtures also write real database records; verify Postgres's
+// attested branch before the first browser or fixture launches.
+execFileSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
+ stdio:"inherit",env:{...process.env,
+ CAN_ADMISSIONS_TEST_BRANCH_ID:process.env.CAN_CURRICULUM_TEST_BRANCH_ID},
+});
 export default defineConfig({
  testDir:"./tests/e2e",
  testMatch:"algebra1-classroom.spec.ts",

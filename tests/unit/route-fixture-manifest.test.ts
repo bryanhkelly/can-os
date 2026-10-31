@@ -30,7 +30,14 @@ const pages = readdirSync("src/routes")
     (f) =>
       f.endsWith(".tsx") &&
       !f.startsWith("__") &&
-      !["student.tsx", "admissions.tsx"].includes(f),
+      ![
+        "student.tsx",
+        "admissions.tsx",
+        "operations.tsx",
+        "operations.launch.tsx",
+        "sites.$siteId.tsx",
+        "staff.students.tsx",
+      ].includes(f),
   )
   .map((file) => {
     const name = file.slice(0, -4);

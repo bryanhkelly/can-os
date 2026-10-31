@@ -6,10 +6,44 @@
 
 **Latest database evidence:** production reconciliation completed at **2026-10-19 06:40:10 UTC**, against committed migration source at `f013878`. See the rollout section below; it supersedes the historical drift findings, not the outstanding product acceptance gates.
 
+## FullFlow review addendum (2026-10-28)
+
+**Baseline reviewed:** local FullFlow HEAD `94a194c`. The results below are local/static evidence recorded for the broad GoldenFlow review. **No live Neon integration, no production migration, and no real authenticated browser run were executed in this environment.** Earlier dated sections below remain historical evidence with their own counts.
+
+Local validation at this snapshot:
+
+- `npm test -- --reporter=dot`: **219 files / 1284 tests** passed.
+- `npm run typecheck`: **0 diagnostics**.
+- `npm run build`: passed, with one pre-existing ineffective-dynamic-import warning; the first run hit an environmental `ENOTEMPTY` cleanup error and a clean retry passed.
+- `node scripts/check-route-fixture-coverage.mjs`: **75/75** fixture declarations, 0 unseeded; explicitly **STATIC_ONLY** (static manifest/file checks, not SQL execution or browser acceptance).
+- `node scripts/check-mutation-hygiene.mjs`: passed.
+- `node scripts/check-platform-route-contracts.mjs --check`: **86/86 routes, 0 issues**.
+- `npm run db:generate`: no schema changes; clean tree after restoring `drizzle/meta/0045_snapshot.json` parity and adding a parity guard. The migration review gate is re-baselined through journal 0046, and Drizzle tip snapshot parity is guarded.
+
+Patches included at this snapshot:
+
+- The Admissions workflow now runs the authenticated browser journey after isolated integration, with Playwright install and failure artifacts. Admissions CI still needs its isolated database secrets/vars before live acceptance.
+- The GF1 runbook continues to list fail-closed environment requirements; that text was not weakened.
+- Stale unit tests and submission-review fixtures were aligned with canonical staffing eligibility.
+- GF-B onsite/church-hosted typecheck diagnostics and the remaining nine non-GF-B diagnostics were closed without runtime authorization changes.
+- The declared seed chain (`student-s1-s4`, `identity-demo-accounts`, `new-experiences-v1`, `valor-curriculum-marketplace`) was made executable against the current schema and validated locally in disposable PGlite by the coder; **no committed CI seed executor exists yet**.
+- `section_teachers` assignment reads now filter `role='teacher'` in coverage, placement, and `requireAssignment` paths.
+- GF1/GF2 browser specs and fixtures were aligned with the current UI and now include program+section enrollments, the teacher eligibility/delivery stack, the first lesson, and executable guardian permissions; unit import-time `DATABASE_URL` failures are mocked narrowly. The specs are repaired and wired but were **not live-run** here.
+
+Remaining acceptance gaps (explicit; unchanged by this addendum):
+
+- FullFlow A continuous six-stage Neon + issued-session browser journey remains unexecuted.
+- Golden Flow B remains HOLD; safeguarding intake and custody/pickup workflows are missing product surface, not just tests.
+- Launch Studio/site-director real-session browser proof remains missing.
+- Most scenarios beyond GF1/GF2/curriculum slices lack dedicated workflows and browser/reload proof.
+- GF-A3 human-approved action is unimplemented.
+- `valor-algebra1-week01-upgrade.sql` (orphan/non-manifest fixture with stale identities) has been removed; it was never executable and is no longer in the tree.
+- No CI seed executor currently applies the manifest seed chain.
+
 ## Integrated source baseline
 
 - The main branch includes the development changes associated with Phases 1, 2 and 3. Phase 1 PR #120 is marked merged by GitHub. The Phase 2 and Phase 3 implementation work was integrated via commits on `main`; PRs #121 and #122 were closed without GitHub reporting them as merged. Do not use those original PR states as instructions for future branching.
-- `src/routes/` contains **66** TypeScript/TSX route source files, matching `docs/platform-route-contracts.json`. The registrar transcript route is owned by Learning, which supplies its canonical read and issuance commands. **Every route's verification, role journey, read boundary and write boundary remains `pending`.** Recording ownership is not acceptance. The separate fixture-coverage checker reports 59 route declarations; neither inventory is browser acceptance.
+- `src/routes/` currently passes **86/86** route contracts via `node scripts/check-platform-route-contracts.mjs --check`, with **75/75** static fixture declarations via `scripts/check-route-fixture-coverage.mjs` (see the 2026-10-28 FullFlow review addendum below; earlier dated entries record their own historical counts). The registrar transcript route is owned by Learning, which supplies its canonical read and issuance commands. **Every route's verification, role journey, read boundary and write boundary remains `pending`.** Recording ownership is not acceptance, and the fixture-coverage checker is static declaration, not browser acceptance.
 - Workspace entry uses server session grants (`src/routes/index.tsx`, `src/components/shell/WorkspaceNavigation.tsx`). Module-level authorization still requires code and negative-access tests.
 - Existing student/teacher group routes now call canonical creation, consent, posting, moderation, session, RSVP and attendance commands. The old combined `study-groups.functions.ts` mutation module was retired; retained read projections in `study-group-queries.functions.ts` preserve existing page shapes. Isolated integration tests cover interest groups, consent, duplicate reports, moderation, RSVP-independent attendance, and session reschedule/cancellation.
 - Admissions offer commands are present under `src/modules/enrollment/admissions-offer-service.ts` and related server functions; some paths still use `assertRecordWriteAllowed` or synthetic-prefixed compatibility names. Do not misreport them as uniformly provenance-neutral or production accepted.
@@ -37,6 +71,8 @@
 `CAN_DEMO_WRITES_ENABLED` is fail-closed in `src/modules/_demo/demo-write-gate.ts` (`=== "true"`). The flag is not an authorization policy.
 
 ## Verification and release status
+
+**Latest evidence:** the FullFlow review addendum (2026-10-28) above supersedes the counts and results in the dated entries below; those entries record their own historical snapshots.
 
 - Local verification on 2026-10-18: `npm test` passed **71 files / 350 tests**; `npm run test:integration` passed **29 files / 43 tests** using the protected isolated Neon runner. These are working-tree results, including concurrent calendar/transcript work, not a claim that every change belongs to this follow-up. Coverage includes academic Action denial/concurrency, school-year calendar-day audit history, program orientation audit, launch site/teacher evidence and duplicate assignment idempotency.
 - `npm run typecheck`, `npm run build`, mutation hygiene, route fixture coverage and `node scripts/check-platform-route-contracts.mjs --check` passed locally after the current evidence changes.

@@ -3,12 +3,17 @@ import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, asc, eq, inArray, gte, lt, ne, isNull, notExists, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { actions, attendanceEvents, calendarEvents, calendarEventParticipants, enrollments, organizations, programs, scheduledOccurrences, sites } from "@/db/schema";
+import { actions, calendarEvents, calendarEventParticipants, enrollments, organizations, people, programs, scheduledOccurrences, sites } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { loadOnsiteDayOperationalSnapshot } from "@/modules/operations/onsite-day-review.functions";
 import { AuthorizationError } from "@/domain/command-context";
+import { buildDailyOperationsAttention } from "@/domain/daily-operations";
+import { readFullFlowOperations } from "./full-flow-dashboard.server";
+import { getSchoolOperationsCommandCenter } from "./command-center-service";
 import { listOpeningHandoffs,listOpeningOperators } from "@/modules/programs/opening-handoff.server";
 import { openingHandoffManagerCapability } from "@/modules/programs/opening-handoff.server";
 import { hasInstitutionalProgramCapability } from "@/modules/identity/institutional-capability.server";
+import { readLocalSchoolOpeningStatus } from "@/modules/operations/school-opening.server";
 import type { Actor } from "@/modules/identity/actors.server";
 
 const requestSchema = z.object({ siteId: z.string().uuid() });
@@ -19,7 +24,7 @@ export const getSiteToday = createServerFn({ method: "GET" })
   .validator((input: unknown) => requestSchema.parse(input))
   .handler(async ({ data }) => {
     const actor = await getCommandContext(getRequest());
-    if (!actor.actorPersonId || actor.role !== "registrar" ||
+    if (!actor.actorPersonId || !["registrar","site_leader"].includes(actor.role) ||
         !actor.scope.siteIds?.includes(data.siteId)) {
       throw new AuthorizationError("site.today.read");
     }
@@ -49,6 +54,19 @@ export const getSiteToday = createServerFn({ method: "GET" })
         {...program,organizationId:site.organizationId,siteId:site.id},openingHandoffManagerCapability))
         managerPrograms.add(program.id);
     }
+    // Independently hosted church/CAN schools: surface the current opening
+    // authorization state (status + non-sensitive blocker categories only) so
+    // a suspension or lapsed prerequisite is visible beside the live school
+    // day. Registrars use the full school-opening desk instead; programs
+    // without an independent church/CAN identity produce no entry.
+    const schoolOpenings=[];
+    for(const program of scopedPrograms){
+      try{
+        schoolOpenings.push(await readLocalSchoolOpeningStatus(actor,program.id));
+      }catch(error){
+        if(!(error instanceof AuthorizationError))throw error;
+      }
+    }
     // Site-local day boundaries, including daylight-saving transitions.
     const now = new Date();
     const dayText = new Intl.DateTimeFormat("en-CA", {
@@ -66,12 +84,14 @@ export const getSiteToday = createServerFn({ method: "GET" })
     const hasParticipants = db.select({id:calendarEventParticipants.id})
       .from(calendarEventParticipants)
       .where(eq(calendarEventParticipants.calendarEventId,calendarEvents.id));
-    const [actionRows, eventRows, attendanceRows, enrolledRows] = await Promise.all([
+    const [actionRows, eventRows, enrolledRows, snapshot] = await Promise.all([
       db.select({
         id: actions.id, title: actions.title, description: actions.description,
         priority: actions.priority, status: actions.status, dueAt: actions.dueAt,
-        programId: actions.programId, type: actions.type,
-      }).from(actions)
+        createdAt: actions.createdAt, ownerPersonId: actions.ownerPersonId,
+        ownerFirstName: people.legalFirstName, ownerLastName: people.legalLastName,
+        programId: actions.programId, siteId: actions.siteId, type: actions.type,
+      }).from(actions).leftJoin(people,eq(people.id,actions.ownerPersonId))
         .where(and(eq(actions.siteId, site.id), inArray(actions.status, [...openStatuses]),
           or(isNull(actions.programId),inArray(actions.programId,programIds))))
         .orderBy(asc(actions.dueAt)).limit(100),
@@ -87,37 +107,51 @@ export const getSiteToday = createServerFn({ method: "GET" })
           programIds.length ? or(isNull(scheduledOccurrences.programId),inArray(scheduledOccurrences.programId,programIds)) : isNull(scheduledOccurrences.programId)))
         .orderBy(asc(scheduledOccurrences.startsAt)).limit(200),
       programIds.length ? db.select({
-        id: attendanceEvents.id, programId: attendanceEvents.programId,
-        studentProfileId: attendanceEvents.studentProfileId, status: attendanceEvents.status,
-        expectedAt: attendanceEvents.expectedAt, occurrenceKey: attendanceEvents.occurrenceKey,
-        recordedAt: attendanceEvents.recordedAt,
-      }).from(attendanceEvents)
-        .where(and(eq(attendanceEvents.siteId, site.id), inArray(attendanceEvents.programId, programIds),
-          gte(attendanceEvents.expectedAt, start), lt(attendanceEvents.expectedAt, end)))
-        .orderBy(asc(attendanceEvents.recordedAt)).limit(2000) : Promise.resolve([]),
-      programIds.length ? db.select({
         studentProfileId: enrollments.studentProfileId, programId: enrollments.programId,
       }).from(enrollments).where(and(inArray(enrollments.programId, programIds),
         eq(enrollments.status, "active"), ne(enrollments.kind, "section"))) : Promise.resolve([]),
+      loadOnsiteDayOperationalSnapshot(actor,site,dayText),
     ]);
 
     const filteredActions = actionRows.filter(row => !row.programId || permitted.has(row.programId));
+    const serializedActions = filteredActions.map(row => ({
+      ...row,
+      ownerName: row.ownerFirstName && row.ownerLastName ? `${row.ownerFirstName} ${row.ownerLastName}` : null,
+      createdAt: row.createdAt.toISOString(),
+      dueAt: row.dueAt?.toISOString() ?? null,
+    }));
+    // Only registrars receive student-free admissions and academic aggregates.
+    // A local church/site leader keeps opening, staffing and assigned work,
+    // without gaining broad family, document or intervention visibility.
+    const operationalActor = actor.role === "registrar" ? {...actor,scope:{...actor.scope,
+      siteIds:[site.id],programIds}} : null;
+    const [operationalRecord,staffingRecord] = operationalActor ? await Promise.all([
+      readFullFlowOperations(operationalActor),
+      getSchoolOperationsCommandCenter(operationalActor),
+    ]) : [null,null];
+    const attentionItems = buildDailyOperationsAttention({
+      role: actor.role as "registrar"|"site_leader",
+      actorPersonId: actor.actorPersonId,
+      actions: serializedActions.map(action => ({...action,
+        priority: action.priority === "urgent" ? "critical" : action.priority === "low" ? "normal" : action.priority,
+      })),
+      staffingIssues: staffingRecord?.issues ?? [],
+      programs: operationalRecord?.programs ?? [],
+    });
     const todayEvents = eventRows.filter(row =>
       (!row.programId || permitted.has(row.programId)) && localDate(row.startsAt) === dayText);
-    // Multiple revisions/section occurrences are not unique student attendance.
-    // Display event status counts as recorded observations, not an attendance percentage.
-    const todayAttendance = attendanceRows.filter(row => localDate(row.expectedAt) === dayText);
-    const latest = new Map<string, (typeof todayAttendance)[number]>();
-    for (const row of todayAttendance) {
-      const key = `${row.studentProfileId}:${row.programId}:${row.occurrenceKey}`;
-      const previous = latest.get(key);
-      if (!previous || row.recordedAt >= previous.recordedAt) latest.set(key, row);
-    }
-    const observations = [...latest.values()];
+    // Only effective staff-observed onsite day marks count as physical attendance.
+    const observations = snapshot.operational.students.filter(row=>
+      !["unmarked","expected"].includes(row.status));
     const enrollmentCount = new Set(enrolledRows.map(row => row.studentProfileId)).size;
     return {
       site, asOf: now.toISOString(), localDate: dayText,
+      canOpenOnsiteDay:actor.role==="site_leader",
+      viewerPersonId:actor.actorPersonId,
+      schoolDay:snapshot.operational,
       programs: scopedPrograms,
+      schoolOpenings,
+      attentionItems,
       openingHandoffs:handoffs.map(row=>({...row,createdAt:row.createdAt.toISOString(),
         resolvedAt:row.resolvedAt?.toISOString()??null,
         recipientEligible:openingOperators.some(operator=>operator.personId===row.ownerPersonId),
@@ -133,11 +167,9 @@ export const getSiteToday = createServerFn({ method: "GET" })
         present: observations.filter(row => row.status === "present").length,
         absent: observations.filter(row => row.status === "absent").length,
         tardy: observations.filter(row => row.status === "tardy").length,
-        note: "Latest event per student, program and occurrence today; not a percent of expected students",
+        note: "Effective staff-observed onsite marks per scheduled student-program entry; virtual learning is excluded",
       },
-      actions: filteredActions.map(row => ({
-        ...row, dueAt: row.dueAt?.toISOString() ?? null,
-      })),
+      actions: serializedActions,
       events: todayEvents.map(row => ({
         ...row, startsAt: row.startsAt.toISOString(), endsAt: row.endsAt?.toISOString() ?? null,
       })),

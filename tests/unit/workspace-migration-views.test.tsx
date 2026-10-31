@@ -10,6 +10,8 @@ import { getCourseRegistration } from "@/modules/learning/course-registration.fu
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
 
 const state = vi.hoisted(() => ({ search: {} as Record<string, unknown>, data: null as unknown }));
+// Static presentation tests never open a database connection.
+vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: object) => ({ options, useSearch: () => state.search, useLoaderData: () => state.data }),
   useRouter: () => ({ invalidate: vi.fn() }),
@@ -122,13 +124,30 @@ describe("family and student profiles", () => {
     const children: ComponentProps<typeof FamilyHomeView>["children"] = [{
       studentPersonId: "child-person", studentProfileId: "child-profile", displayName: "Jordan", lastName: "Sample",
       sectionCount: 2, awaitingSections: false, missingCount: 3, unexcusedAbsences: 0, nextDueAt: null, status: "needs_attention",
+      workToReview:[],workNeedsAttentionCount:0,
     }];
     const html = renderToStaticMarkup(<FamilyHomeView children={children} needs={[]} loading={false} error=""/>);
-    expect(html).toContain("3 assignment(s) need follow-through.");
+    expect(html).toContain("3 overdue assignment(s) need follow-through.");
     expect(html).toContain('href="/guardian/academics?student=child-person"');
     expect(html).toContain('href="/guardian/attendance?student=child-person"');
     expect(html).toContain('href="/guardian/report-cards?student=child-person"');
     expect(html).not.toContain("student=child-profile");
+  });
+  const consentNeed: ComponentProps<typeof FamilyHomeView>["needs"][number] = {
+    id: "consent-1", kind: "action", type: "study_group_consent", title: "Study group permission: Reading circle",
+    detail: "Review a student's group request.", href: "/guardian?action=consent-1",
+    priority: "normal", dueAt: null, createdAt: "2030-01-01T00:00:00.000Z",
+  };
+  it("links a selected action to its owning workspace instead of dead-ending", () => {
+    const html = renderToStaticMarkup(<FamilyHomeView children={[]} needs={[consentNeed]} loading={false} error="" action="consent-1"/>);
+    expect(html).toContain('href="/guardian/group-permissions?action=consent-1"');
+    expect(html).toContain("Review permission");
+  });
+  it("keeps unknown family actions out of the staff-only action detail route", () => {
+    const html = renderToStaticMarkup(<FamilyHomeView children={[]} loading={false} error="" action="other-1"
+      needs={[{ ...consentNeed, id: "other-1", type: "unknown_follow_up", href: "/guardian?action=other-1" }]}/>);
+    expect(html).toContain('href="/guardian?action=other-1"');
+    expect(html).not.toContain('href="/actions/other-1"');
   });
   const profile: ComponentProps<typeof Student360View>["profile"] = {
     viewerRole: "registrar",

@@ -16,7 +16,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
   const sites=actorSiteIds(actor);
   const viewerRole=actor.role as "student"|"guardian"|"registrar"|"teacher";
   if(!process.env.DATABASE_URL) return {connected:false,viewerRole,events:[],notices:[],slots:[],bookings:[]};
-  const [{db},schema]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const [{db},schema,{getNotifications}]=await Promise.all([import("@/db/client"),import("@/db/schema"),import("@/modules/communication/notification-center.functions")]);
   const [events,notices,slots,bookings]=await Promise.all([
     db.select().from(schema.calendarEvents)
       .innerJoin(schema.scheduledOccurrences,eq(schema.calendarEvents.scheduledOccurrenceId,schema.scheduledOccurrences.id))
@@ -27,7 +27,8 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
         startsAt:row.scheduled_occurrences.startsAt,
         timezone:row.scheduled_occurrences.timezone,
       }))),
-    db.select().from(schema.notifications).where(eq(schema.notifications.recipientPersonId,actor.actorPersonId)),
+    // Reuse the current guardian/student permission filtering on title and body.
+    getNotifications(),
     viewerRole==="guardian" ? db.select({id:schema.conferenceSlots.id,seriesId:schema.conferenceSlots.conferenceSeriesId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status})
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
       .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
@@ -35,7 +36,21 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
       .innerJoin(schema.conferenceSlots,eq(schema.conferenceSlots.id,schema.conferenceBookings.conferenceSlotId))
       .innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
       .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.id,schema.conferenceBookings.studentProfileId))
-      .where(and(eq(schema.conferenceBookings.guardianPersonId,actor.actorPersonId),eq(schema.conferenceBookings.status,"booked"),inArray(schema.conferenceSeries.siteId,sites),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(30) : Promise.resolve([]),
+      .innerJoin(schema.guardianRelationships,guardianRelationshipPredicate({
+        guardianPersonId:actor.actorPersonId,
+        studentPersonId:schema.studentProfiles.personId,
+        access:"academic",
+      }))
+      .innerJoin(schema.enrollments,and(
+        eq(schema.enrollments.studentProfileId,schema.studentProfiles.id),
+        eq(schema.enrollments.kind,"program"),eq(schema.enrollments.status,"active"),
+      ))
+      .innerJoin(schema.programs,and(
+        eq(schema.programs.id,schema.enrollments.programId),
+        eq(schema.programs.status,"active"),
+        eq(schema.programs.siteId,schema.conferenceSeries.siteId),
+      ))
+      .where(and(eq(schema.conferenceBookings.guardianPersonId,actor.actorPersonId),eq(schema.conferenceBookings.status,"booked"),inArray(schema.conferenceSeries.siteId,sites),inArray(schema.programs.id,actor.scope.programIds??[]),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(30) : Promise.resolve([]),
   ]);
   return {connected:true,viewerRole,
     events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:e.metadata.cancelled===true?"cancelled":"scheduled"})),
@@ -70,4 +85,14 @@ export const rescheduleOfficeHour=createServerFn({method:"POST"})
   const {rescheduleConferenceBooking}=await import("@/modules/conferences/conference-service");
   await rescheduleConferenceBooking(actor,{bookingId:data.bookingId,newSlotId:data.newSlotId});
   return {saved:true};
+ });
+
+/** Cancel a guardian-owned booking, freeing the slot for another family. */
+export const cancelOfficeHour=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({bookingId:z.string().uuid()}).parse(value))
+ .handler(async({data})=>{
+  const actor=await requireActor(["guardian"]);
+  const {cancelConferenceBooking}=await import("@/modules/conferences/conference-service");
+  await cancelConferenceBooking(actor,{bookingId:data.bookingId});
+  return {cancelled:true};
  });

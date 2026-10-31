@@ -10,7 +10,7 @@ export interface EmptyStateProps {
 
 function EmptyState({ title, description, className }: EmptyStateProps) {
   return (
-    <div className={cn("rounded-xl border p-5 text-sm text-muted-foreground", className)}>
+    <div className={cn("rounded-2xl border border-dashed bg-muted/20 p-7 text-sm leading-6 text-muted-foreground", className)}>
       <p>{title}</p>
       {description && <p className="mt-1">{description}</p>}
     </div>

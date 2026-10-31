@@ -44,7 +44,7 @@ describe("shared notification center history wiring", () => {
   it("keeps existing notifications available when history fails", async () => {
     state.history.mockRejectedValueOnce(new Error("Unavailable cursor"));
     expect(await state.options!.loader({ deps: {} })).toEqual({
-      ok: true, data: { notices: [{ id: "notice" }], history: { ok: false, authError: null, message: "Unavailable cursor" } },
+      ok: true, data: { notices: [{ id: "notice" }], history: { ok: false, authError: null, message: "An unexpected error occurred. Please try again.", kind: "unexpected", retryable: false } },
     });
   });
   it("rejects invalid pagination parameters instead of silently selecting another page", () => {

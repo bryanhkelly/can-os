@@ -1,7 +1,10 @@
 import { and, eq, or, isNull } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
-import { accountPersonGrants, enrollments, programs, sections, sectionTeachers } from "@/db/schema";
+import { accountPersonGrants, enrollments, programs, sections, sectionTeachers, terms } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { authorizeClass } from "@/modules/learning/class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type AcademicResource = {
@@ -19,16 +22,31 @@ export async function assertAcademicActionAuthority(
   resource: AcademicResource,
 ): Promise<void> {
   if (!context.actorPersonId || resource.subjectType !== "student_profile" ||
-      !resource.sectionId || !resource.programId || !resource.organizationId ||
-      !context.scope.organizationIds?.includes(resource.organizationId) ||
+      !resource.sectionId || !resource.programId || !resource.organizationId)
+    throw new AuthorizationError("academic Action scope");
+  if("role" in context && context.role==="teacher"){
+    // A CAN instructor holds the institution-wide original membership and
+    // an exact delegated Section, not the host church organization or Site.
+    // Recheck contract and assignment under this Action's transaction.
+    await authorizeClass(context as Actor,resource.sectionId,undefined,tx);
+  }else if(!context.scope.organizationIds?.includes(resource.organizationId) ||
       !context.scope.programIds?.includes(resource.programId) ||
       (resource.siteId !== null && !context.scope.siteIds?.includes(resource.siteId)) ||
-      (context.scope.sectionIds !== undefined && !context.scope.sectionIds.includes(resource.sectionId))) {
+      (context.scope.sectionIds !== undefined &&
+        !context.scope.sectionIds.includes(resource.sectionId))){
     throw new AuthorizationError("academic Action scope");
   }
+  const activeProgram=alias(enrollments,"action_active_program_enrollment");
   const [section] = await tx.select({ id: sections.id }).from(sections)
     .innerJoin(programs, eq(programs.id, sections.programId))
+    .innerJoin(terms,eq(terms.id,sections.termId))
     .innerJoin(enrollments, eq(enrollments.sectionId, sections.id))
+    .innerJoin(activeProgram,and(
+      eq(activeProgram.studentProfileId,enrollments.studentProfileId),
+      eq(activeProgram.kind,"program"),eq(activeProgram.status,"active"),
+      eq(activeProgram.programId,sections.programId),
+      eq(activeProgram.schoolYearId,terms.schoolYearId),
+    ))
     .where(and(
       eq(sections.id, resource.sectionId), eq(sections.active, true),
       eq(sections.programId, resource.programId),
@@ -37,6 +55,7 @@ export async function assertAcademicActionAuthority(
       eq(enrollments.studentProfileId, resource.subjectId),
       eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
       eq(enrollments.programId, resource.programId),
+      eq(enrollments.schoolYearId,terms.schoolYearId),
     )).limit(1);
   if (!section) throw new AuthorizationError("current academic Action student/section relationship");
   await assertAcademicActionStaff(tx, context.actorPersonId, resource);

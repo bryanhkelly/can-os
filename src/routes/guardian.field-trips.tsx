@@ -5,6 +5,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell } from "@/components/workspace";
 import {
   listGuardianFieldTripPermissions, signGuardianFieldTripPermission,
+  declineGuardianFieldTripPermission,
 } from "@/modules/field-trips/guardian-permissions.functions";
 
 export const Route = createFileRoute("/guardian/field-trips")({
@@ -36,13 +37,26 @@ function TripPermissions({ items }: { items: Trip[] }) {
       await signGuardianFieldTripPermission({
         data: { participantId, acknowledged: true },
       });
-      await router.invalidate();
       setNotice("Your field trip permission was recorded.");
+      try { await router.invalidate(); }
+      catch { setError("Your signature was saved, but the invitation list could not refresh. Reopen this page instead of signing again."); }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign permission.");
     } finally {
       setBusy("");
     }
+  }
+  async function decline(participantId:string,studentName:string){
+    if(busy)return;
+    if(!window.confirm("Decline or withdraw field-trip permission for "+studentName+"? The school will be notified and this child cannot board without valid permission. If your child has already boarded, contact the school immediately."))return;
+    setBusy(participantId);setNotice("");setError("");
+    try{
+      const result=await declineGuardianFieldTripPermission({data:{participantId,confirmed:true,note:""}});
+      setNotice(result.saved?"Your refusal was recorded and the school was notified.":"Your refusal was already recorded.");
+      try{await router.invalidate();}
+      catch{setError("Your decision was saved, but this list could not refresh. Reopen it before submitting again.");}
+    }catch(err){setError(err instanceof Error?err.message:"Unable to decline trip participation.");}
+    finally{setBusy("");}
   }
   const money = (cents: number) => new Intl.NumberFormat("en-US", {
     style: "currency", currency: "USD",
@@ -72,7 +86,15 @@ function TripPermissions({ items }: { items: Trip[] }) {
               <dd>{item.feeAmountCents ? money(item.feeAmountCents) : "No fee"}</dd></div>
           </dl>
           {item.status === "permission_complete"
-            ? <p className="mt-4 rounded-lg border p-3 text-sm">Permission recorded.</p>
+            ? <div className="mt-4 space-y-3 rounded-lg border p-3 text-sm">
+                <p>Permission recorded.</p>
+                {item.canDecline&&<button type="button" disabled={!!busy}
+                  className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                  onClick={()=>void decline(item.participantId,item.studentName)}>Withdraw permission before boarding</button>}
+                {!item.canDecline&&<p className="text-xs text-muted-foreground">Contact the school immediately if your plans change.</p>}
+              </div>
+            : item.status === "declined"
+              ? <p className="mt-4 rounded-lg border p-3 text-sm">Permission declined. The school was notified; this child is not authorized to board.</p>
             : item.permissionText
               ? <div className="mt-5">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -96,6 +118,9 @@ function TripPermissions({ items }: { items: Trip[] }) {
                         <button type="button" disabled={!!busy || !acknowledged[item.participantId]}
                           className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
                           onClick={() => void sign(item.participantId)}>Sign permission</button>
+                        {item.canDecline&&<button type="button" disabled={!!busy}
+                          className="ml-3 mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                          onClick={()=>void decline(item.participantId,item.studentName)}>Decline participation</button>}
                       </>}
                 </div>
               : <p className="mt-4 text-sm text-amber-700">

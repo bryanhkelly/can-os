@@ -100,6 +100,7 @@ integration("GF3 host / program launch", () => {
       actorPersonId: operator!.id,
       capabilities: new Set([
         "program.launch.start",
+        "program.read",
         "journey.requirement.complete",
         "calendar.event.create",
         "program.activate",
@@ -109,9 +110,15 @@ integration("GF3 host / program launch", () => {
       scope: {
         organizationIds: [hostId],
         ...(siteId ? { siteIds: [siteId] } : {}),
+        programIds: [] as string[],
       },
       requestId: `gf3-${suffix}`,
     });
+
+    const [unrelatedAcademicOrganization] = await db.insert(schema.organizations).values({
+      type: "christian_school", name: `Unrelated Academic School ${suffix}`,
+      slug: `unrelated-academic-${suffix}`,
+    }).returning();
 
     const scenarios = [
       {
@@ -158,9 +165,27 @@ integration("GF3 host / program launch", () => {
       const launchContext = {
         ...context,
         role: "registrar" as const,
+        grantSiteId: site.id,
         scope: { ...context.scope, programIds: [] as string[] },
       };
       launchState.context = launchContext;
+      const options = await launchFunctions.listLaunchOptions();
+      expect(options.organizations.map(org => org.id)).toContain(host.id);
+      expect(options.organizations.map(org => org.id)).not.toContain(canOrg.id);
+      expect(options.academicProviderOrganizations.map(org => org.id)).toContain(canOrg.id);
+      expect(options.creditIssuingOrganizations.map(org => org.id)).toContain(canOrg.id);
+      expect(options.academicProviderOrganizations.map(org => org.id)).not.toContain(unrelatedAcademicOrganization.id);
+
+      if (scenario.programType === "church_hosted_academy") {
+        await expect(programsModule.startProgramLaunch(context, {
+          hostOrganizationId: host.id, siteId: site.id, jurisdictionId: jurisdiction.id,
+          type: scenario.programType, name: "Unauthorized provider",
+          slug: `unauthorized-provider-${suffix}`, gradeRange: scenario.gradeRange,
+          deliveryModel: { onsite: true, onsiteDaysPerWeek: 5 },
+          academicProviderOrganizationId: unrelatedAcademicOrganization.id,
+          creditIssuingOrganizationId: unrelatedAcademicOrganization.id,
+        })).rejects.toThrow(/must be a CAN network organization/);
+      }
 
       const launch = await programsModule.startProgramLaunch(context, {
         hostOrganizationId: host.id,
@@ -180,6 +205,9 @@ integration("GF3 host / program launch", () => {
         academicProviderOrganizationId: canOrg.id,
         creditIssuingOrganizationId: canOrg.id,
       });
+      // The service caller and the mocked signed-in registrar must both use
+      // explicit, current Program scope; undefined is not a realistic grant.
+      context.scope.programIds = [launch.programId];
       launchContext.scope.programIds = [launch.programId];
 
       const [launchingProgram] = await db
@@ -192,9 +220,26 @@ integration("GF3 host / program launch", () => {
       expect(launchingProgram.hostOrganizationId).toBe(host.id);
       expect(launchingProgram.academicProviderOrganizationId).toBe(canOrg.id);
 
-      await expect(
-        programsModule.activateProgram(context, launch.programId),
-      ).rejects.toThrow("ready");
+      if (scenario.programType === "church_hosted_academy") {
+        // Authorization scope must be checked before exposing an unrelated
+        // organization's institutional agreement/opening decision.
+        await expect(
+          programsModule.activateProgram({
+            ...context, scope: {...context.scope,
+              organizationIds: [unrelatedAcademicOrganization.id]},
+          }, launch.programId),
+        ).rejects.toThrow("verified organization grant");
+        // Planning a church-owned campus with a CAN academic provider is
+        // allowed; without an independently approved institution/site
+        // agreement the Program must NOT be activated, even from draft.
+        await expect(
+          programsModule.activateProgram(context, launch.programId),
+        ).rejects.toThrow("independently verified Program-Site institutional authorization");
+      } else {
+        await expect(
+          programsModule.activateProgram(context, launch.programId),
+        ).rejects.toThrow("ready");
+      }
 
       const requirements = await db
         .select()
@@ -255,9 +300,52 @@ integration("GF3 host / program launch", () => {
       const [qualification] = await db.insert(schema.qualificationDefinitions).values({
         key: `gf3-license-${suffix}-${index}`, kind: "license", title: "Synthetic GF3 teaching qualification",
       }).returning();
+      // A verified membership and explicit publisher assignment—not the generic
+      // registrar capability—authorizes the institutional staffing policy.
+      await db.insert(schema.memberships).values({
+        personId: operator.id, organizationId: host.id,
+      }).onConflictDoNothing();
+      await db.insert(schema.roleAssignments).values({
+        personId: operator.id, organizationId: host.id, siteId: site.id,
+        programId: launch.programId, roleKey: "staffing_policy_publisher",
+        capabilities: ["staffing.policy.publish"],
+      });
       await launchAcademics.publishLaunchTeacherPolicy({ data: {
         programId: launch.programId, qualificationKeys: [qualification.key], confirmed: true,
       } });
+
+      // Selecting CAN as a provider must not expose every CAN-wide teacher.
+      // Only an explicitly program-delegated CAN teacher is a candidate.
+      const [networkWideTeacher,delegatedTeacher] = await db.insert(schema.people).values([
+        {legalFirstName:"CAN",legalLastName:"NetworkWide-"+suffix},
+        {legalFirstName:"CAN",legalLastName:"Delegated-"+suffix},
+      ]).returning();
+      await db.insert(schema.roleAssignments).values([
+        {personId:networkWideTeacher.id,organizationId:canOrg.id,roleKey:"teacher"},
+        {personId:delegatedTeacher.id,organizationId:canOrg.id,
+          programId:launch.programId,roleKey:"teacher"},
+      ]);
+      for (const person of [launchTeacher,networkWideTeacher,delegatedTeacher]) {
+        const [account]=await db.insert(schema.accessAccounts).values({
+          emailNormalized:"launch-provider-"+person.id+"@example.com",emailVerifiedAt:new Date(),
+        }).returning();
+        await db.insert(schema.accountPersonGrants).values({
+          accountId:account.id,personId:person.id,organizationId:canOrg.id,
+          siteId:null,role:"teacher",active:true,isSynthetic:false,
+        });
+      }
+      const teacherChoices=await launchAcademics.getLaunchAcademicSetup({data:{programId:launch.programId}});
+      const visibleTeacherIds=teacherChoices.teachingStaff.map(teacher=>teacher.personId);
+      expect(visibleTeacherIds).not.toContain(networkWideTeacher.id);
+      expect(visibleTeacherIds).not.toContain(launchTeacher.id);
+      expect(visibleTeacherIds).toContain(delegatedTeacher.id);
+      const candidateIds=teacherChoices.sections.flatMap(section=>section.candidates.map(candidate=>candidate.personId));
+      expect(candidateIds).not.toContain(networkWideTeacher.id);
+      expect(candidateIds).toContain(delegatedTeacher.id);
+
+      // A host role must not count as CAN instruction, even with a CAN account.
+      await db.update(schema.roleAssignments).set({organizationId:canOrg.id})
+        .where(eq(schema.roleAssignments.personId,launchTeacher.id));
       const [claim] = await db.insert(schema.qualificationClaims).values({
         personId: launchTeacher.id, definitionId: qualification.id,
         issuedAt: new Date("2027-01-01"), expiresAt: new Date("2028-01-01"),
@@ -333,14 +421,68 @@ integration("GF3 host / program launch", () => {
         eq(schema.auditEvents.action, "program.orientation.schedule"),
       ))).toHaveLength(1);
 
+      // A site-scoped membership cannot create another campus, even if its
+      // effective site list is empty. The verified grant remains authoritative.
       launchContext.scope.siteIds = [];
+      await expect(launchFunctions.createLaunchSite({ data: {
+        organizationId: host.id,
+        name: "Unauthorized Campus",
+        slug: `unauthorized-${suffix}-${index}`,
+        timezone: "America/Los_Angeles",
+      } })).rejects.toThrow("organization-wide site creation");
+      launchContext.scope.siteIds = [site.id];
+
+      // Organization-wide grant with expanded effective site IDs is still
+      // organization-wide; this is how production session resolution behaves.
+      const [wideGrant] = await db.insert(schema.accountPersonGrants).values({
+        accountId: operatorAccount.id, personId: operator.id, role: "registrar",
+        organizationId: host.id, siteId: null, active: true,
+      }).returning({id:schema.accountPersonGrants.id});
+      const wideContext = {
+        ...launchContext,
+        grantId: wideGrant.id,
+        grantSiteId: null,
+        scope: { ...launchContext.scope, siteIds: [site.id] },
+      };
+      launchState.context = wideContext;
       const extraSite = await launchFunctions.createLaunchSite({ data: {
         organizationId: host.id,
         name: "Additional Campus",
         slug: `additional-${suffix}-${index}`,
         timezone: "America/Los_Angeles",
       } });
-      launchContext.scope.siteIds = [site.id];
+      // Exercise the actual registrar handler for the expansion's program.
+      const extension = await launchFunctions.startLaunch({ data: {
+        hostOrganizationId: host.id,
+        siteId: extraSite.siteId,
+        jurisdictionId: jurisdiction.id,
+        type: "high_school_extension",
+        name: "Second Campus High School Extension",
+        slug: `extension-${suffix}-${index}`,
+        gradeRange: { min: "9", max: "12" },
+        deliveryModel: { onsite: true, asynchronous: true, onsiteDaysPerWeek: 2 },
+        academicProviderOrganizationId: canOrg.id,
+        creditIssuingOrganizationId: canOrg.id,
+      } });
+      const [extensionProgram] = await db.select().from(schema.programs)
+        .where(eq(schema.programs.id, extension.programId));
+      expect(extensionProgram.siteId).toBe(extraSite.siteId);
+      expect(extensionProgram.type).toBe("high_school_extension");
+      expect(extensionProgram.status).toBe("launching");
+      expect(extension.journeyId).toBeTruthy();
+      if (scenario.orgType === "church") {
+        // Switching a church-owned CAN site from church_hosted_academy to
+        // high_school_extension must not bypass institutional authorization.
+        await expect(programsModule.activateProgram({
+          ...context, scope: {
+            ...context.scope, siteIds: [site.id, extraSite.siteId],
+            programIds: [launch.programId, extension.programId],
+          },
+        }, extension.programId)).rejects.toThrow(
+          "independently verified Program-Site institutional authorization",
+        );
+      }
+      launchState.context = launchContext;
       expect(await db.select().from(schema.domainEvents).where(and(
         eq(schema.domainEvents.aggregateId, extraSite.siteId),
         eq(schema.domainEvents.eventType, "SiteCreated"),
@@ -357,29 +499,37 @@ integration("GF3 host / program launch", () => {
       ));
       expect(siteEvent.status).toBe("processed");
 
-      await programsModule.activateProgram(context, launch.programId,{recipientPersonId:operator.id});
       const {listOpeningHandoffs,acknowledgeOpeningHandoff}=await import("@/modules/programs/opening-handoff.server");
-      const handoffs=await listOpeningHandoffs([launch.programId]);
-      expect(handoffs).toHaveLength(1);
-      expect(handoffs[0]?.ownerPersonId).toBe(operator.id);
-      await acknowledgeOpeningHandoff(launchContext,{
-        actionId:handoffs[0]!.id,note:"As the opening and receiving operator, I reviewed and received daily operations.",
-      });
-      expect((await listOpeningHandoffs([launch.programId]))[0]?.status).toBe("resolved");
-
-      const [activeProgram] = await db
-        .select()
-        .from(schema.programs)
-        .where(eq(schema.programs.id, launch.programId));
-
-      expect(activeProgram.status).toBe("active");
-
-      const [journey] = await db
-        .select()
-        .from(schema.journeys)
-        .where(eq(schema.journeys.id, launch.journeyId));
-
-      expect(journey.status).toBe("active");
+      if (scenario.programType === "church_hosted_academy") {
+        // All local course/staffing and launch checklist work is complete,
+        // yet that evidence cannot silently substitute for CAN authorization.
+        await expect(
+          programsModule.activateProgram(context, launch.programId, {recipientPersonId:operator.id}),
+        ).rejects.toThrow("independently verified Program-Site institutional authorization");
+        expect(await listOpeningHandoffs([launch.programId])).toHaveLength(0);
+        const [blockedProgram] = await db.select().from(schema.programs)
+          .where(eq(schema.programs.id, launch.programId));
+        expect(blockedProgram.status).toBe("launching");
+        expect(await db.select().from(schema.domainEvents).where(and(
+          eq(schema.domainEvents.aggregateId, launch.programId),
+          eq(schema.domainEvents.eventType, "ProgramActivated"),
+        ))).toHaveLength(0);
+      } else {
+        await programsModule.activateProgram(context, launch.programId,{recipientPersonId:operator.id});
+        const handoffs=await listOpeningHandoffs([launch.programId]);
+        expect(handoffs).toHaveLength(1);
+        expect(handoffs[0]?.ownerPersonId).toBe(operator.id);
+        await acknowledgeOpeningHandoff(launchContext,{
+          actionId:handoffs[0]!.id,note:"As the opening and receiving operator, I reviewed and received daily operations.",
+        });
+        expect((await listOpeningHandoffs([launch.programId]))[0]?.status).toBe("resolved");
+        const [activeProgram] = await db.select().from(schema.programs)
+          .where(eq(schema.programs.id, launch.programId));
+        expect(activeProgram.status).toBe("active");
+        const [journey] = await db.select().from(schema.journeys)
+          .where(eq(schema.journeys.id, launch.journeyId));
+        expect(journey.status).toBe("active");
+      }
 
       const orientationRows = await db
         .select()

@@ -1,11 +1,12 @@
-import { and, eq, inArray, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, eq, inArray, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { guardianRelationships } from "@/db/schema/identity";
 
 export type GuardianRelationshipAccess =
   | "relationship"
   | "academic"
   | "enrollment"
-  | "attendance-excuse";
+  | "attendance-excuse"
+  | "pickup";
 
 type GuardianRelationshipSubjects =
   | { guardianPersonId: string | SQLWrapper; studentPersonId?: string | SQLWrapper; studentPersonIds?: never }
@@ -44,6 +45,17 @@ export function guardianRelationshipPredicate(
     case "attendance-excuse":
       conditions.push(eq(guardianRelationships.canSubmitAttendanceExcuse, true));
       break;
+    case "pickup":
+      conditions.push(eq(guardianRelationships.canManagePickup, true));
+      break;
+  }
+
+  // A boolean relationship capability is not proof that the school verified
+  // the adult's authority. This central predicate protects the academic,
+  // enrollment and attendance routes that share it, including bulk joins
+  // and notifications. Relationship-only discovery remains distinct.
+  if (filter.access && filter.access !== "relationship") {
+    conditions.push(sql`${guardianRelationships.metadata}->>'verification' = 'verified'`);
   }
 
   const predicate = and(...conditions);

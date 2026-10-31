@@ -6,10 +6,19 @@ import type { Actor } from "@/modules/identity/actors.server";
 
 type Transaction=Parameters<Parameters<Database["transaction"]>[0]>[0];
 const state=vi.hoisted(()=>({tx:undefined as Transaction|undefined,actor:undefined as Actor|undefined,
- verify:vi.fn(),sign:vi.fn(()=>"https://storage.example.invalid/signed"),failDocumentEvent:false,failStageEvent:false,failInquiryEvent:false}));
+ verify:vi.fn(),sign:vi.fn(()=>"https://storage.example.invalid/signed"),
+ studentInvite:vi.fn(async(_email:string)=>({accepted:true as const})),
+ studentLink:"",
+ failDocumentEvent:false,failStageEvent:false,failInquiryEvent:false}));
 vi.mock("@/modules/enrollment/r2-documents.server",async importOriginal=>{
  const original=await importOriginal<typeof import("@/modules/enrollment/r2-documents.server")>();
  return {...original,verifyDocumentObject:state.verify,signR2Object:state.sign,r2Config:vi.fn(()=>({}))};
+});
+// Delivery is mocked, but identity/consent/grant writes remain canonical
+// and part of the same rollback-only Neon acceptance journey.
+vi.mock("@/modules/identity/passwordless-access.server",async importOriginal=>{
+ const original=await importOriginal<typeof import("@/modules/identity/passwordless-access.server")>();
+ return {...original,requestOneTimeAccess:state.studentInvite};
 });
 vi.mock("@/platform/mutation",async importOriginal=>{
  const original=await importOriginal<typeof import("@/platform/mutation")>();
@@ -48,6 +57,8 @@ integration("cross-persona admissions through active classes",()=>{
   const {startFamilyApplication}=await import("@/modules/enrollment/enrollment-service");
   const offers=await import("@/modules/enrollment/admissions-offer.functions");
   const {getGuardianAdmissionOffers}=await import("@/modules/enrollment/guardian-admission-offers.functions");
+  const {getGuardianAssignments,getGuardianStudents}=await import("@/modules/learning/guardian-academic-queries.functions");
+  const {getGuardianGradeResponse}=await import("@/modules/learning/guardian-grade-response.functions");
   const {setFamilyRequirement,reviewRequirementDocument,addRequirementReviewNote}=await import("@/modules/enrollment/family-readiness.functions");
   const {getGuardianEnrollmentChecklist}=await import("@/modules/enrollment/guardian-enrollment-checklist.functions");
   const documentFlow=await import("@/modules/enrollment/r2-document-upload.functions");
@@ -56,9 +67,30 @@ integration("cross-persona admissions through active classes",()=>{
   const intake=await import("@/modules/enrollment/admissions-intake.functions");
   const {getAdmissionsDashboard}=await import("@/modules/enrollment/admissions-dashboard.functions");
   const {placeEnrolledStudent,listEnrollmentPlacements}=await import("@/modules/enrollment/course-placement.functions");
-  const {getFamilyHome}=await import("@/modules/family/family-home.functions");
+  const {getFamilyHome,getGuardianNeedsYou}=await import("@/modules/family/family-home.functions");
+  const {listExpectedOnsiteRoster,markExpectedOnsiteAttendance}
+   =await import("@/modules/attendance/onsite-attendance-workflow.functions");
   const {getMyStudentToday}=await import("@/modules/student-experience/student-today.functions");
   const {accessibleClasses,authorizeClass}=await import("@/modules/learning/class-access.server");
+  const {getClassWorkspace}=await import("@/modules/learning/class-workspace.functions");
+  const {
+   getGradebookSections,getGradebook,createAssessment,gradeSubmission,
+   manageAssessment,returnSubmissionForRevision,
+  }=await import("@/modules/learning/gradebook.functions");
+  const {
+   getAssignments,saveAssignmentResponse,saveAssignmentDraft,
+  }=await import("@/modules/student-experience/assignments.functions");
+  const {
+   createSubmissionAttachmentUpload,listSubmissionAttachments,
+  }=await import("@/modules/learning/submission-attachments.functions");
+  const {getTeacherToday}=await import("@/modules/learning/teacher-today.functions");
+  const access=await vi.importActual<typeof import("@/modules/identity/passwordless-access.server")>(
+   "@/modules/identity/passwordless-access.server");
+  const sessionAuth=await vi.importActual<typeof import("@/modules/identity/command-context.server")>(
+   "@/modules/identity/command-context.server");
+  const {
+   getStudentLearningHandoff,consentToStudentLearningAccount,provisionStudentLearningAccess,
+  }=await import("@/modules/enrollment/student-access-handoff.functions");
   const {getNotifications}=await import("@/modules/communication/notification-center.functions");
   const rollback=new Error("rollback-admissions-handoff");
   const suffix=crypto.randomUUID().slice(0,8);
@@ -66,6 +98,14 @@ integration("cross-persona admissions through active classes",()=>{
   let checked=false;
   try{
    vi.stubEnv("CAN_R2_LIVE_UPLOADS_ENABLED","true");
+   vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER","test-accepted-family-student-login-pepper-over-32-characters");
+   vi.stubEnv("CAN_ACCESS_PUBLIC_ORIGIN","https://app.can-os.com");
+   state.studentLink="";
+   state.studentInvite.mockImplementation((address:string)=>
+    access.requestOneTimeAccess(address,async message=>{
+     expect(message.to).toBe(address);
+     state.studentLink=message.accessUrl;
+    }));
    state.verify.mockReset().mockResolvedValue(undefined);
    await database.transaction(async tx=>{
     state.tx=tx;
@@ -85,7 +125,7 @@ integration("cross-persona admissions through active classes",()=>{
     const guardian=first(await tx.insert(s.people).values({legalFirstName:"Admissions",legalLastName:"Guardian"}).returning());
     const registrar=first(await tx.insert(s.people).values({legalFirstName:"Admissions",legalLastName:"Registrar"}).returning());
     const outsider=first(await tx.insert(s.people).values({legalFirstName:"Unrelated",legalLastName:"Guardian"}).returning());
-    function act(role:"guardian"|"registrar"|"student",personId:string):Actor{
+    function act(role:"guardian"|"registrar"|"student"|"teacher",personId:string):Actor{
      const actor:Actor={actorPersonId:personId,role,accountId:crypto.randomUUID(),sessionId:crypto.randomUUID(),
       grantId:crypto.randomUUID(),capabilities:new Set(roleCapabilities[role]),
       scope:{organizationIds:[org.id],siteIds:[site.id],programIds:[program.id]}};
@@ -101,11 +141,32 @@ integration("cross-persona admissions through active classes",()=>{
        fields:[{key:"contact_plan",label:"Contact plan",type:"text",required:true},
         {key:"school_contact",label:"May the school contact you?",type:"yes_no",required:true}]}}
      ]}});
+    // The student invitation must be authorized by a REAL verified adult
+    // account, not only the test's synthetic command-context role.
+    const [guardianAccount]=await tx.insert(s.accessAccounts).values({
+      emailNormalized:`parent-${suffix}@example.org`,
+      emailVerifiedAt:new Date(),
+    }).returning();
+    const [guardianGrant]=await tx.insert(s.accountPersonGrants).values({
+      accountId:guardianAccount!.id,personId:guardian.id,role:"guardian",
+      organizationId:org.id,siteId:site.id,active:true,isSynthetic:false,
+    }).returning();
     const family=act("guardian",guardian.id);
+    family.accountId=guardianAccount!.id;
+    family.grantId=guardianGrant!.id;
+    family.grantSiteId=site.id;
     const app=await startFamilyApplication(family,{programId:program.id,idempotencyKey:key,journeyDefinitionKey:key,
      student:{legalFirstName:"Accepted",legalLastName:"Learner",gradeLevel:"9"}});
     applicationId=app.applicationId;profileId=app.studentProfileId;
     const student=first(await tx.select().from(s.studentProfiles).where(eq(s.studentProfiles.id,profileId)));
+    // An unverified application never automatically establishes child-record
+    // access. This test explicitly simulates a separate authorized registrar
+    // identity check before proceeding to the guardian's enrollment forms.
+    await tx.update(s.guardianRelationships).set({
+      canViewAcademics:true,canManageEnrollment:true,canSubmitAttendanceExcuse:true,
+      metadata:{verification:"verified",source:"synthetic_independent_review"},
+    }).where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),
+      eq(s.guardianRelationships.studentPersonId,student.personId)));
     const requirement=first(await tx.select().from(s.journeyRequirements).where(and(
      eq(s.journeyRequirements.journeyId,app.journeyId),eq(s.journeyRequirements.key,"review"))));
     const formRequirement=first(await tx.select().from(s.journeyRequirements).where(and(
@@ -114,6 +175,21 @@ integration("cross-persona admissions through active classes",()=>{
     await tx.update(s.journeyDefinitions).set({configuration:{requirements:[]}}).where(eq(s.journeyDefinitions.key,key));
     const staff=act("registrar",registrar.id);
     const issuance={applicationId,schoolYearId:time.schoolYear.id};
+    // Real institution-wide registrar grants do not enumerate Program IDs.
+    // Exercise the same commands as the actual admissions handoff, not a
+    // synthetic permission helper, while the Journey is still incomplete.
+    state.actor={...staff,scope:{organizationIds:[org.id]}};
+    expect((await getAdmissionsDashboard({data:{programId:program.id}})).map(row=>row.id))
+     .toContain(applicationId);
+    expect((await offers.getAdmissionOfferOptions({data:{programId:program.id}}))
+     .find(row=>row.applicationId===applicationId)?.years.map(year=>year.id))
+     .toContain(time.schoolYear.id);
+    await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("Journey must be ready");
+    // A registrar limited to a different Site must not reach this application.
+    state.actor={...staff,scope:{organizationIds:[org.id],siteIds:[crypto.randomUUID()]}};
+    await expect(offers.issueAdmissionOffer({data:issuance}))
+     .rejects.toThrow("admissions program membership");
+    state.actor=staff;
     await expect(offers.issueAdmissionOffer({data:{...issuance,applicationId:"not-a-uuid"}})).rejects.toThrow();
     await expect(offers.issueAdmissionOffer({data:issuance})).rejects.toThrow("Journey must be ready");
     await setFamilyRequirement({data:{applicationId,requirementId:requirement.id,complete:true}});
@@ -226,7 +302,10 @@ integration("cross-persona admissions through active classes",()=>{
     for(const action of ["admissions.stage.waitlist","admissions.stage.restore"])
      expect(await tx.select().from(s.auditEvents).where(and(eq(s.auditEvents.resourceId,applicationId),eq(s.auditEvents.action,action)))).toHaveLength(1);
     expect(await tx.select().from(s.journeys).where(eq(s.journeys.participantId,applicationId))).toHaveLength(1);
+    // The successful offer must also work under the institution-wide grant.
+    state.actor={...staff,scope:{organizationIds:[org.id]}};
     const issued=await offers.issueAdmissionOffer({data:issuance});
+    state.actor=staff;
     withdrawnOfferId=issued.offerId;
     expect(await offers.issueAdmissionOffer({data:issuance})).toEqual(issued);
     for(const decision of ["waitlist","decline","withdraw"] as const)
@@ -387,7 +466,18 @@ integration("cross-persona admissions through active classes",()=>{
     await expect(offers.activateOfferedEnrollment({data:current})).rejects.toThrow("Guardian is not authorized");
     await tx.update(s.guardianRelationships).set({canManageEnrollment:true})
      .where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),eq(s.guardianRelationships.studentPersonId,student.personId)));
+    // An accepted offer may exist before school opening; active enrollment may not.
+    await tx.update(s.programs).set({status:"launching"}).where(eq(s.programs.id,program.id));
+    await expect(offers.activateOfferedEnrollment({data:current}))
+     .rejects.toThrow("School must be activated");
+    expect(await tx.select({id:s.enrollments.id}).from(s.enrollments).where(and(
+     eq(s.enrollments.studentProfileId,profileId),eq(s.enrollments.programId,program.id),
+     eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")))).toHaveLength(0);
+    await tx.update(s.programs).set({status:"active"}).where(eq(s.programs.id,program.id));
+    // Enrollment activation is the other half of the institutional handoff.
+    state.actor={...staff,scope:{organizationIds:[org.id]}};
     const activated=await offers.activateOfferedEnrollment({data:current});
+    state.actor=staff;
     enrollmentId=activated.enrollmentId;
     expect(await offers.activateOfferedEnrollment({data:current})).toEqual(activated);
     state.actor=family;
@@ -407,19 +497,458 @@ integration("cross-persona admissions through active classes",()=>{
     state.actor={...learner,scope:{...learner.scope,programIds:[]}};
     await expect(getMyStudentToday()).rejects.toThrow("active student membership");
     const course=first(await tx.insert(s.courseTemplates).values({owningOrganizationId:org.id,code:key,title:"Enrolled Science",subject:"Science"}).returning());
-    const version=first(await tx.insert(s.courseTemplateVersions).values({courseTemplateId:course.id,version:1,status:"published"}).returning());
+    const version=first(await tx.insert(s.courseTemplateVersions).values({courseTemplateId:course.id,version:1,status:"published",curriculum:{learning:{version:1,modules:[{id:"intro",title:"Science introduction",lessons:[{id:"first",title:"First science lesson",body:"Read the science introduction and discuss your observations.",resources:[]}]}]}}}).returning());
     const section=first(await tx.insert(s.sections).values({programId:program.id,siteId:site.id,termId:time.term.id,
      courseTemplateVersionId:version.id,code:key,title:"Enrolled Science"}).returning());
     await tx.insert(s.sectionRegistrationPolicies).values({sectionId:section.id,enrollmentCapacity:1,
      addDropEndsOn:"2099-01-01",withdrawalEndsOn:"2099-02-01"});
     state.actor=staff;
     expect((await listEnrollmentPlacements({data:{applicationId}})).active).toBe(true);
+    // An unstaffed Section shell must not satisfy the classroom handoff.
+    await expect(placeEnrolledStudent({data:{applicationId,sectionId:section.id}}))
+      .rejects.toThrow("Assign an active teacher");
+    const classTeacher=first(await tx.insert(s.people).values({
+      legalFirstName:"Assigned",legalLastName:"Instructor",
+    }).returning());
+    const teacherAccount=first(await tx.insert(s.accessAccounts).values({
+      emailNormalized:`instructor-${suffix}@example.invalid`,
+      emailVerifiedAt:new Date(),
+    }).returning());
+    await tx.insert(s.accountPersonGrants).values({
+      accountId:teacherAccount.id,personId:classTeacher.id,role:"teacher",
+      organizationId:org.id,siteId:site.id,
+    });
+    await tx.insert(s.sectionTeachers).values({sectionId:section.id,personId:classTeacher.id});
+    await tx.insert(s.roleAssignments).values({
+      personId:classTeacher.id,organizationId:org.id,siteId:site.id,
+      programId:program.id,roleKey:"teacher",
+    });
+    const {enablePublishedPolicyInRollback}=await import("./helpers/published-policy");
+    await enablePublishedPolicyInRollback(tx);
+    const {createTeachingQualificationFixture}=await import("./helpers/teaching-qualification");
+    const teacherQualification=await createTeachingQualificationFixture(tx,{
+      sectionId:section.id,personId:classTeacher.id,verifierPersonId:registrar.id,
+      issuedAt:new Date(Date.now()-86_400_000),
+    });
+
+    // The family-to-class preview and actual placement must agree on
+    // verified sign-in status, not merely the existence of a staff row.
+    await tx.update(s.accessAccounts).set({disabled:true})
+      .where(eq(s.accessAccounts.id,teacherAccount.id));
+    expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
+      .toEqual(expect.arrayContaining([expect.objectContaining({id:section.id,staffed:false,readyForPlacement:false})]));
+    await expect(placeEnrolledStudent({data:{applicationId,sectionId:section.id}}))
+      .rejects.toThrow("Assign an active teacher");
+    await tx.update(s.accessAccounts).set({disabled:false})
+      .where(eq(s.accessAccounts.id,teacherAccount.id));
+    expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
+      .toEqual(expect.arrayContaining([expect.objectContaining({
+        id:section.id,staffed:true,curriculumReady:true,readyForPlacement:true,
+      })]));
+    // Current account access cannot compensate for withdrawn qualification evidence.
+    await tx.insert(s.qualificationVerificationEvents).values({
+      claimId:teacherQualification.claimId,sequence:2,decision:"revoke",actorPersonId:registrar.id,
+    });
+    expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
+      .toEqual(expect.arrayContaining([expect.objectContaining({id:section.id,staffed:false,readyForPlacement:false})]));
+    await expect(placeEnrolledStudent({data:{applicationId,sectionId:section.id}}))
+      .rejects.toThrow("qualifications covering the instructional term");
+    await tx.insert(s.qualificationVerificationEvents).values({
+      claimId:teacherQualification.claimId,sequence:3,decision:"approve",actorPersonId:registrar.id,
+    });
+    // The same organization-wide registrar who issued the offer and
+    // activated enrollment must be able to finish classroom placement.
+    state.actor={...staff,scope:{organizationIds:[org.id]}};
+    expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
+     .toEqual(expect.arrayContaining([expect.objectContaining({id:section.id,readyForPlacement:true})]));
     await placeEnrolledStudent({data:{applicationId,sectionId:section.id}});
     expect(await placeEnrolledStudent({data:{applicationId,sectionId:section.id}})).toMatchObject({created:false});
+    state.actor={...staff,scope:{organizationIds:[org.id],siteIds:[crypto.randomUUID()]}};
+    await expect(placeEnrolledStudent({data:{applicationId,sectionId:section.id}}))
+     .rejects.toThrow("placement program scope");
+    state.actor=staff;
+    // Once the single-seat Section is occupied, the registrar must not
+    // advertise an extra seat even while teacher + curriculum remain valid.
+    expect((await listEnrollmentPlacements({data:{applicationId}})).sections)
+      .toEqual(expect.arrayContaining([expect.objectContaining({
+        id:section.id,enrolled:true,readyForPlacement:false,
+      })]));
+    // Same admitted learner, not a parallel synthetic attendance roster.
+    // A published SchoolYear calendar and onsite schedule determine whether
+    // the church expects the student on this particular date.
+    state.actor=staff;
+    vi.useFakeTimers({toFake:["Date"]});
+    vi.setSystemTime(new Date("2027-09-14T18:00:00Z"));
+    try{
+      state.actor={...staff,scope:{organizationIds:[org.id]}};
+      const scheduled=await listExpectedOnsiteRoster({data:{date:"2027-09-14"}});
+      expect(scheduled.students).toEqual(expect.arrayContaining([
+        expect.objectContaining({studentProfileId:profileId,programId:program.id}),
+      ]));
+      const present=await markExpectedOnsiteAttendance({data:{
+        studentProfileId:profileId,programId:program.id,date:"2027-09-14",
+        status:"present",mutationId:crypto.randomUUID(),
+        expectedPreviousEventId:null,note:"",
+      }});
+      expect(present.attendanceEventId).toBeTruthy();
+      state.actor={...staff,scope:{organizationIds:[org.id],siteIds:[crypto.randomUUID()]}};
+      await expect(listExpectedOnsiteRoster({data:{date:"2027-09-14"}}))
+       .resolves.toMatchObject({students:[]});
+      state.actor={...staff,scope:{organizationIds:[org.id]}};
+      const recorded=await listExpectedOnsiteRoster({data:{date:"2027-09-14"}});
+      expect(recorded.students).toEqual(expect.arrayContaining([
+        expect.objectContaining({studentProfileId:profileId,status:"present"}),
+      ]));
+    }finally{vi.useRealTimers();}
     state.actor=learner;
     expect((await getMyStudentToday()).sections.map(row=>row.sectionId)).toEqual([section.id]);
     expect((await accessibleClasses(learner)).map(row=>row.id)).toEqual([section.id]);
     await authorizeClass(learner,section.id);
+    const instructor=act("teacher",classTeacher.id);
+    expect((await accessibleClasses(instructor)).map(row=>row.id)).toEqual([section.id]);
+    await authorizeClass(instructor,section.id);
+    // The same just-activated Section and student must be usable by BOTH
+    // the newly placed learner and the teacher's gradebook, not only SIS.
+    expect((await getGradebookSections()).sections.map(row=>row.id)).toContain(section.id);
+    const gradebook=await getGradebook({data:{sectionId:section.id}});
+    expect(gradebook.students.map(row=>row.studentProfileId)).toContain(profileId);
+    const teacherClass=await getClassWorkspace({data:{sectionId:section.id}});
+    expect(teacherClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
+    expect(teacherClass.roster.some(row=>row.profileId===profileId)).toBe(true);
+    // Exercise today's grading queue with this same enrolled student.
+    const pendingReview=first(await tx.insert(s.assessments).values({
+      sectionId:section.id,title:"First lesson response",
+      status:"published",pointsPossible:"10",
+      instructions:"Write a response to the opening lesson.",
+      createdByPersonId:classTeacher.id,
+    }).returning());
+    await tx.insert(s.submissions).values({
+      assessmentId:pendingReview.id,studentProfileId:profileId,
+      status:"submitted",response:{text:"My first lesson response."},
+      submittedAt:new Date(),
+    });
+    const teacherToday=await getTeacherToday();
+    expect(teacherToday.sections.find(row=>row.id===section.id)?.studentCount).toBe(1);
+    expect(teacherToday.ungraded.some(row=>row.studentProfileId===profileId &&
+      row.assessmentId===pendingReview.id)).toBe(true);
+    // Teacher uses the real assessment command; the published assignment
+    // belongs to the exact class and admitted student from this journey.
+    const firstAssignment=await createAssessment({data:{
+      sectionId:section.id,title:"First learning activity",
+      instructions:"Write three sentences about the first lesson.",
+      curriculumLessonId:"first",pointsPossible:10,
+      dueAt:new Date(Date.now()+7*86400_000).toISOString(),
+      publishNow:true,
+    }});
+    expect(firstAssignment.status).toBe("published");
+    state.actor=learner;
+    const studentClass=await getClassWorkspace({data:{sectionId:section.id}});
+    expect(studentClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
+    // Last-mile P0: the same admitted child can receive a DIFFERENT verified
+    // student account only after their guardian consents and staff approves.
+    state.actor=family;
+    const email=`learner-${suffix}@example.org`;
+    // Never record an approved student login consent for an address to
+    // which the passwordless issuer intentionally cannot send a link.
+    await expect(consentToStudentLearningAccount({data:{
+      applicationId,studentEmail:`learner-${suffix}@can-os.invalid`,acknowledged:true,
+    }})).rejects.toThrow("deliverable student email");
+    expect((await getStudentLearningHandoff({data:{applicationId}})).status)
+      .toBe("not_requested");
+    const [realSectionEnrollment]=await tx.select({id:s.enrollments.id})
+      .from(s.enrollments).where(and(
+        eq(s.enrollments.studentProfileId,profileId),
+        eq(s.enrollments.kind,"section"),eq(s.enrollments.sectionId,section.id),
+        eq(s.enrollments.status,"active"),
+      ));
+    if(!realSectionEnrollment)throw new Error("Missing Section enrollment fixture");
+    await tx.update(s.enrollments).set({schoolYearId:null})
+      .where(eq(s.enrollments.id,realSectionEnrollment.id));
+    await expect(consentToStudentLearningAccount({data:{
+      applicationId,studentEmail:email,acknowledged:true,
+    }})).rejects.toThrow("actual ready classroom placement");
+    await tx.update(s.enrollments).set({schoolYearId:time.schoolYear.id})
+      .where(eq(s.enrollments.id,realSectionEnrollment.id));
+    await consentToStudentLearningAccount({data:{
+      applicationId,studentEmail:email,acknowledged:true,
+    }});
+    expect((await getStudentLearningHandoff({data:{applicationId}})).status)
+      .toBe("pending_review");
+    // The child's proposed email must be a DEDICATED learning login.
+    // Existing same-person teacher/guardian membership would cause generic
+    // passwordless redemption to choose the wrong first grant.
+    const sharedEmail=`mixed-student-${suffix}@example.org`;
+    const [sharedAccount]=await tx.insert(s.accessAccounts).values({
+      emailNormalized:sharedEmail,emailVerifiedAt:new Date(),
+    }).returning();
+    await tx.insert(s.accountPersonGrants).values({
+      accountId:sharedAccount!.id,personId:student.personId,
+      role:"teacher",organizationId:org.id,siteId:site.id,
+      active:true,isSynthetic:false,
+    });
+    // Synthetic fixtures with otherwise supported roles must not get a
+    // genuine email challenge. The demo-code path remains separate.
+    const [syntheticAccount]=await tx.insert(s.accessAccounts).values({
+      emailNormalized:`synthetic-student-${suffix}@example.org`,
+    }).returning();
+    await tx.insert(s.accountPersonGrants).values({
+      accountId:syntheticAccount!.id,personId:student.personId,
+      role:"student",organizationId:org.id,siteId:site.id,
+      active:true,isSynthetic:true,
+    });
+    const syntheticMail=vi.fn(async (_message:{to:string;accessUrl:string})=>{});
+    await access.requestOneTimeAccess(
+      `synthetic-student-${suffix}@example.org`,syntheticMail);
+    expect(syntheticMail).not.toHaveBeenCalled();
+    await consentToStudentLearningAccount({data:{
+      applicationId,studentEmail:sharedEmail,acknowledged:true,
+    }});
+    state.actor=staff;
+    await expect(provisionStudentLearningAccess({data:{
+      applicationId,confirmedIndependentIdentity:true,
+      reviewMethod:"institutional_school_record",
+    }})).rejects.toThrow("student-only account");
+    expect((await getStudentLearningHandoff({data:{applicationId}})).status)
+      .toBe("pending_review");
+    state.actor=family;
+    await consentToStudentLearningAccount({data:{
+      applicationId,studentEmail:email,acknowledged:true,
+    }});
+    state.actor=staff;
+    state.studentInvite.mockClear();
+    await expect(provisionStudentLearningAccess({data:{applicationId}}))
+      .rejects.toThrow("independent student identity verification");
+    expect(state.studentInvite).not.toHaveBeenCalled();
+    expect(await provisionStudentLearningAccess({data:{
+      applicationId,confirmedIndependentIdentity:true,
+      reviewMethod:"institutional_school_record",
+    }})).toMatchObject({status:"approved"});
+    expect(state.studentInvite).toHaveBeenCalledOnce();
+    expect(state.studentInvite).toHaveBeenCalledWith(email);
+    expect(state.studentLink).toContain("/access/verify#token=");
+    const approvalEvents=await tx.select({id:s.domainEvents.id}).from(s.domainEvents)
+      .where(eq(s.domainEvents.eventType,"StudentLearningAccessApproved"));
+    expect(approvalEvents).toHaveLength(1);
+    // Email resend can be retried without creating another institutional
+    // account approval event or changing the recorded reviewer decision.
+    expect(await provisionStudentLearningAccess({data:{applicationId}}))
+      .toMatchObject({status:"approved"});
+    expect(state.studentInvite).toHaveBeenCalledTimes(2);
+    // Registrar retry during cooldown cannot replace the initial student link.
+    const originalLink=state.studentLink;
+    expect(originalLink).toContain("/access/verify#token=");
+    expect(await tx.select({id:s.domainEvents.id}).from(s.domainEvents)
+      .where(eq(s.domainEvents.eventType,"StudentLearningAccessApproved")))
+      .toHaveLength(1);
+    const [studentAccount]=await tx.select().from(s.accessAccounts)
+      .where(eq(s.accessAccounts.emailNormalized,email));
+    if(!studentAccount)throw new Error("Student account was not provisioned");
+    const [studentGrant]=await tx.select().from(s.accountPersonGrants)
+      .where(and(eq(s.accountPersonGrants.accountId,studentAccount.id),
+        eq(s.accountPersonGrants.personId,student.personId),
+        eq(s.accountPersonGrants.role,"student")));
+    expect(studentGrant).toMatchObject({
+      active:true,isSynthetic:false,siteId:site.id,organizationId:org.id,
+    });
+    expect((await getStudentLearningHandoff({data:{applicationId}})).status)
+      .toBe("approved");
+    // The student's invitation generates a real passwordless challenge,
+    // DB-backed role session and cookie for this exact enrolled Person.
+    const token=new URL(originalLink).hash.slice("#token=".length);
+    const redeemed=await access.redeemOneTimeAccess(token);
+    expect(redeemed.role).toBe("student");
+    expect(redeemed.accountId).toBe(studentAccount.id);
+    await expect(access.redeemOneTimeAccess(token))
+      .rejects.toThrow("Invalid or expired access link");
+    const verifiedStudent=await sessionAuth.getCommandContext(
+     new Request("https://app.can-os.com/student",{
+      headers:{cookie:redeemed.setCookie.split(";")[0]!},
+     }));
+    expect(verifiedStudent).toMatchObject({
+     role:"student",actorPersonId:student.personId,
+     accountId:studentAccount.id,grantId:studentGrant!.id,grantSiteId:site.id,
+    });
+    expect(verifiedStudent.scope.programIds).toContain(program.id);
+    state.actor=verifiedStudent as Actor;
+    expect((await getMyStudentToday()).sections.map(row=>row.sectionId))
+     .toContain(section.id);
+    const signedInClass=await getClassWorkspace({data:{sectionId:section.id}});
+    expect(signedInClass.content?.modules[0]?.lessons[0]?.id).toBe("first");
+    // The ACTUAL passwordless-student persona sees the new teacher's
+    // assessment, submits work, and receives feedback from that same teacher.
+    const studentAssignments=await getAssignments();
+    expect(studentAssignments.assignments.find(row=>
+      row.assessmentId===firstAssignment.assessmentId)?.status).toBe("assigned");
+    const response=await saveAssignmentResponse({data:{
+      assessmentId:firstAssignment.assessmentId,
+      text:"My first lesson showed me how to compare expressions.",
+    }});
+    expect(response.submissionId).toBeTruthy();
+    expect((await getAssignments()).assignments.find(row=>
+      row.assessmentId===firstAssignment.assessmentId)?.status).toBe("submitted");
+    state.actor=instructor;
+    const feedback=await gradeSubmission({data:{
+      submissionId:response.submissionId,score:9,
+      feedbackComment:"Good first response. Explain your comparison next time.",
+    }});
+    expect(feedback.submissionId).toBe(response.submissionId);
+    state.actor=verifiedStudent as Actor;
+    const returned=first((await getAssignments()).assignments.filter(row=>
+      row.assessmentId===firstAssignment.assessmentId));
+    expect(returned.status).toBe("graded");
+    expect(Number(returned.score)).toBe(9);
+    expect(returned.feedbackText).toContain("Explain your comparison");
+
+    // P0 complete feedback loop: teacher returns a real graded attempt,
+    // learner drafts and submits attempt 2, same teacher grades revision.
+    state.actor=instructor;
+    await manageAssessment({data:{assessmentId:firstAssignment.assessmentId,action:"close"}});
+    await expect(returnSubmissionForRevision({data:{
+      submissionId:response.submissionId,
+    }})).rejects.toThrow("Reopen the published assessment");
+    await manageAssessment({data:{assessmentId:firstAssignment.assessmentId,action:"reopen"}});
+    await returnSubmissionForRevision({data:{submissionId:response.submissionId}});
+    await expect(returnSubmissionForRevision({data:{
+      submissionId:response.submissionId,
+    }})).rejects.toThrow("Only graded work");
+    state.actor=verifiedStudent as Actor;
+    const returnedWork=first((await getAssignments()).assignments.filter(row=>
+      row.assessmentId===firstAssignment.assessmentId));
+    expect(returnedWork.status).toBe("returned");
+    expect(returnedWork.feedbackText).toContain("Explain your comparison");
+    await saveAssignmentDraft({data:{
+      assessmentId:firstAssignment.assessmentId,
+      text:"This revision compares the two expressions.",
+    }});
+    const drafting=first((await getAssignments()).assignments.filter(row=>
+      row.assessmentId===firstAssignment.assessmentId));
+    expect(drafting.status).toBe("assigned");
+    expect(drafting.attemptNumber).toBe(2);
+    expect(drafting.revisionFeedbackText).toContain("Explain your comparison");
+    expect(drafting.revisionFeedbackSubmissionId).toBe(response.submissionId);
+    expect(drafting.score).toBeNull();
+    state.actor=family;
+    expect((await getGuardianStudents()).students.map(row=>row.studentPersonId))
+      .toContain(student.personId);
+    const guardianDraft=first((await getGuardianAssignments({data:{
+      studentPersonId:student.personId,
+    }})).assignments.filter(row=>row.assessmentId===firstAssignment.assessmentId));
+    expect(guardianDraft.status).toBe("assigned");
+    expect(guardianDraft.score).toBeNull();
+    expect(guardianDraft.feedback).toBe("");
+    expect(guardianDraft.revisionFeedback).toContain("Explain your comparison");
+    expect(guardianDraft.revisionFeedbackSubmissionId).toBe(response.submissionId);
+    // Guardian sees already released feedback, NEVER the private saved draft.
+    expect("responseText" in guardianDraft).toBe(false);
+    state.actor=verifiedStudent as Actor;
+    const revision=await saveAssignmentResponse({data:{
+      assessmentId:firstAssignment.assessmentId,
+      text:"This revision compares the two expressions by simplifying both sides.",
+    }});
+    expect(revision.submissionId).not.toBe(response.submissionId);
+    expect(first((await getAssignments()).assignments.filter(row=>
+      row.assessmentId===firstAssignment.assessmentId)).status).toBe("submitted");
+    state.actor=instructor;
+    await expect(returnSubmissionForRevision({data:{
+      submissionId:response.submissionId,
+    }})).rejects.toThrow("Only graded work");
+    await gradeSubmission({data:{
+      submissionId:revision.submissionId,score:10,
+      feedbackComment:"Excellent revision. Comparison is now clearly explained.",
+    }});
+    state.actor=verifiedStudent as Actor;
+    const revised=first((await getAssignments()).assignments.filter(row=>
+      row.assessmentId===firstAssignment.assessmentId));
+    expect(revised.status).toBe("graded");
+    expect(Number(revised.score)).toBe(10);
+    expect(revised.feedbackText).toContain("Excellent revision");
+    expect(revised.revisionFeedbackText).toBe("");
+    expect(revised.revisionFeedbackSubmissionId).toBeNull();
+    expect(revised.attempts.map(a=>a.attempt).sort()).toEqual([1,2]);
+    expect(revised.attempts.some(a=>a.attempt===1&&a.status==="returned")).toBe(true);
+    state.actor=family;
+    const guardianGrade=first((await getGuardianAssignments({data:{
+      studentPersonId:student.personId,
+    }})).assignments.filter(row=>row.assessmentId===firstAssignment.assessmentId));
+    expect(guardianGrade.status).toBe("graded");
+    expect(Number(guardianGrade.score)).toBe(10);
+    expect(guardianGrade.feedback).toContain("Excellent revision");
+    expect(guardianGrade.revisionFeedback).toBe("");
+    expect((await getGuardianGradeResponse({data:{
+      submissionId:revision.submissionId,
+    }})).response).toBeNull();
+    state.actor=learner;
+    // A withdrawn Program must remove learning access even when a stale
+    // active Section enrollment was left behind. Restore fixture state after
+    // proving the deny so remaining enrollment/guardian assertions can run.
+    const [activeProgram]=await tx.select({id:s.enrollments.id}).from(s.enrollments)
+      .where(and(eq(s.enrollments.studentProfileId,profileId),
+        eq(s.enrollments.programId,program.id),
+        eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
+    if(!activeProgram)throw new Error("Expected current Program enrollment");
+    await tx.update(s.enrollments).set({status:"withdrawn"})
+      .where(eq(s.enrollments.id,activeProgram.id));
+    state.actor=family;
+    expect((await getGuardianStudents()).students.map(row=>row.studentPersonId))
+      .not.toContain(student.personId);
+    expect((await getGuardianAssignments({data:{
+      studentPersonId:student.personId,
+    }})).assignments).toEqual([]);
+    await expect(getGuardianGradeResponse({data:{
+      submissionId:revision.submissionId,
+    }})).rejects.toThrow("related graded assignment");
+    state.actor=learner;
+    await expect(authorizeClass(learner,section.id)).rejects.toThrow("active class enrollment");
+    expect((await accessibleClasses(learner)).map(row=>row.id)).not.toContain(section.id);
+    await expect(getMyStudentToday()).rejects.toThrow("active student membership");
+    expect((await getAssignments()).assignments.map(row=>row.assessmentId))
+      .not.toContain(firstAssignment.assessmentId);
+    await expect(saveAssignmentDraft({data:{
+      assessmentId:firstAssignment.assessmentId,text:"Former student editing.",
+    }})).rejects.toThrow("active class enrollment");
+    await expect(createSubmissionAttachmentUpload({data:{
+      assessmentId:firstAssignment.assessmentId,
+      fileName:"orphan-section.pdf",contentType:"application/pdf",sizeBytes:1024,
+    }})).rejects.toThrow("active class enrollment");
+    expect((await listSubmissionAttachments({data:{
+      assessmentId:firstAssignment.assessmentId,
+    }})).attachments).toHaveLength(0);
+    state.actor=instructor;
+    await expect(returnSubmissionForRevision({data:{
+      submissionId:revision.submissionId,
+    }})).rejects.toThrow("active Program and Section enrollment");
+    state.actor=learner;
+    // The former child's class must also vanish from CURRENT teacher rosters
+    // without deleting historical assessments or their audit trail.
+    state.actor=instructor;
+    expect((await getClassWorkspace({data:{sectionId:section.id}})).roster
+      .some(row=>row.profileId===profileId)).toBe(false);
+    expect((await getGradebook({data:{sectionId:section.id}})).students
+      .some(row=>row.studentProfileId===profileId)).toBe(false);
+    // An active orphan Section row must not receive newly published work
+    // after the student's institutional Program membership is withdrawn.
+    const withdrawnClasswork=await createAssessment({data:{
+      sectionId:section.id,title:"New work after withdrawal",
+      instructions:"A later lesson exercise.",curriculumLessonId:"first",
+      pointsPossible:10,dueAt:new Date(Date.now()+7*86400_000).toISOString(),
+      publishNow:true,
+    }});
+    expect(await tx.select({id:s.submissions.id}).from(s.submissions).where(and(
+      eq(s.submissions.assessmentId,withdrawnClasswork.assessmentId),
+      eq(s.submissions.studentProfileId,profileId),
+    ))).toHaveLength(0);
+    const withdrawnToday=await getTeacherToday();
+    expect(withdrawnToday.sections.find(row=>row.id===section.id)?.studentCount).toBe(0);
+    expect(withdrawnToday.ungraded.some(row=>row.studentProfileId===profileId)).toBe(false);
+    state.actor=family;
+    expect((await getFamilyHome()).children).toEqual([]);
+    state.actor=learner;
+    await tx.update(s.enrollments).set({status:"active"})
+      .where(eq(s.enrollments.id,activeProgram.id));
+    expect((await getMyStudentToday()).sections.map(row=>row.sectionId)).toContain(section.id);
+    state.actor=instructor;
+    expect((await getTeacherToday()).ungraded.some(row=>
+      row.studentProfileId===profileId)).toBe(true);
     const unrelated=act("guardian",outsider.id);
     await expect(authorizeClass(unrelated,section.id,student.personId)).rejects.toThrow();
     state.actor=family;
@@ -435,6 +964,20 @@ integration("cross-persona admissions through active classes",()=>{
     expect(notices.some(row=>row.title==="Enrollment confirmed")).toBe(true);
     expect(notices.filter(row=>row.title==="Enrollment confirmed")).toHaveLength(1);
     expect(notices.filter(row=>row.title==="Enrollment offer withdrawn")).toHaveLength(1);
+    // Needs You must apply the same CURRENT verified-guardian rule as the
+    // notification center, including titles/bodies after revocation.
+    expect((await getGuardianNeedsYou()).items.some(row=>
+      row.kind==="notification"&&row.title==="Enrollment document requested")).toBe(true);
+    await tx.update(s.guardianRelationships).set({
+      canManageEnrollment:false,canViewAcademics:false,
+    }).where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),
+      eq(s.guardianRelationships.studentPersonId,student.personId)));
+    expect((await getGuardianNeedsYou()).items.some(row=>
+      row.title==="Enrollment document requested")).toBe(false);
+    await tx.update(s.guardianRelationships).set({
+      canManageEnrollment:true,canViewAcademics:true,
+    }).where(and(eq(s.guardianRelationships.guardianPersonId,guardian.id),
+      eq(s.guardianRelationships.studentPersonId,student.personId)));
     expect(notices.find(row=>row.title==="Enrollment offer withdrawn")?.href).toContain(`offer=${issued.offerId}`);
     expect(JSON.stringify(notices)).not.toContain(withdraw.reason);
     await tx.update(s.sections).set({active:false}).where(eq(s.sections.id,section.id));
@@ -657,7 +1200,7 @@ integration("cross-persona admissions through active classes",()=>{
     checked=true;throw rollback;
    });
   }catch(error){if(error!==rollback)throw error;}
-  finally{state.tx=undefined;state.actor=undefined;state.failDocumentEvent=false;state.failStageEvent=false;state.failInquiryEvent=false;vi.unstubAllEnvs();}
+  finally{state.tx=undefined;state.actor=undefined;state.failDocumentEvent=false;state.failStageEvent=false;state.failInquiryEvent=false;state.studentInvite.mockReset();state.studentLink="";vi.unstubAllEnvs();}
   expect(checked).toBe(true);
   expect(await database.select().from(s.applications).where(eq(s.applications.id,applicationId))).toEqual([]);
   expect(await database.select().from(s.studentProfiles).where(eq(s.studentProfiles.id,profileId))).toEqual([]);

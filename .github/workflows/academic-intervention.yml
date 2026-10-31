@@ -6,8 +6,10 @@ on:
 permissions:
   contents: read
 
+# Admissions and GF1 share the same configured test DB: never migrate or
+# mutate it from both workflows at the same time.
 concurrency:
-  group: academic-intervention-neon-acceptance
+  group: admissions-neon-acceptance
   cancel-in-progress: false
 
 jobs:
@@ -18,10 +20,11 @@ jobs:
     environment: integration-test
     env:
       APP_ENV: test
+      NODE_ENV: test
       CAN_TEST_DB_WRITES_ENABLED: "true"
       TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
-      DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
       CAN_APPLICATION_DB_HOST: ${{ vars.CAN_APPLICATION_DB_HOST }}
+      CAN_ADMISSIONS_TEST_BRANCH_ID: ${{ vars.CAN_ADMISSIONS_TEST_BRANCH_ID }}
       CAN_DEMO_WRITES_ENABLED: "true"
       CAN_ACCESS_TOKEN_PEPPER: "gf1-e2e-access-pepper-0123456789abcdef0"
       CAN_JOB_SECRET: "gf1-e2e-job-secret"
@@ -42,17 +45,27 @@ jobs:
             echo "::error::Configure CAN_APPLICATION_DB_HOST as a nonsecret environment variable identifying the production database host."
             exit 1
           fi
+          if [ -z "$CAN_ADMISSIONS_TEST_BRANCH_ID" ]; then
+            echo "::error::Configure CAN_ADMISSIONS_TEST_BRANCH_ID in the integration-test environment with the approved nonproduction Neon branch ID."
+            exit 1
+          fi
       - name: Install dependencies
         run: npm ci
       - name: Verify disposable database endpoint before any writes
         run: npm run test:integration:academic-intervention -- --preflight
+      - name: Verify actual nonproduction Neon branch before writes
+        run: node scripts/verify-admissions-neon-branch.mjs
       - name: Apply committed schema migrations to disposable Neon branch
+        env:
+          DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
         run: npm run db:migrate
       - name: Run GF1 integration acceptance
         run: npm run test:integration:academic-intervention
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Run GF1 cross-role browser flow
+        env:
+          DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
         run: npx playwright test tests/e2e/missing-assignment.spec.ts
       - name: Publish GF1 acceptance result
         if: always()

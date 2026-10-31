@@ -2,16 +2,22 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { OpeningHandoffs } from "@/components/operations/OpeningHandoffs";
-import { Route } from "@/routes/operations.launch";
+import { Route } from "@/routes/operations.launch.index";
 import type { getSiteToday } from "@/modules/operations/site-today.functions";
 
 const state=vi.hoisted(()=>({data:null as unknown}));
+// Static presentation tests never open a database connection.
+vi.mock("@/db/client", () => ({ db: {} }));
+vi.mock("@/hooks/useWorkspaceMutation", () => ({ useWorkspaceMutation: () => ({ isSubmitting: false, submit: vi.fn() }) }));
 vi.mock("@tanstack/react-router",()=>({
   createFileRoute:()=> (options:object)=>({options,useLoaderData:()=>state.data,useSearch:()=>({})}),
   Link:({children}: {children:ReactNode})=><a>{children}</a>,
   useRouter:()=>({invalidate:vi.fn()}),
 }));
 vi.mock("@/modules/programs/opening-handoff.functions",()=>({acknowledgeLaunchHandoff:vi.fn(),transferLaunchHandoff:vi.fn()}));
+vi.mock("@/modules/enrollment/family-invitations.functions",()=>({
+  listFamilyInvitations:vi.fn(),sendFamilyInvitations:vi.fn(),
+}));
 vi.mock("@/modules/programs/launch.functions",()=>({
   activateLaunch:vi.fn(),completeLaunchRequirement:vi.fn(),listLaunches:vi.fn(),listLaunchOptions:vi.fn(),
   startLaunch:vi.fn(),createLaunchSite:vi.fn(),scheduleLaunchOrientation:vi.fn(),
@@ -71,10 +77,10 @@ describe("opening handoff presentation",()=>{
     expect(html).not.toContain("Acknowledge receipt");
   });
   function renderLaunch(operators:{personId:string;firstName:string;lastName:string}[]){
-    state.data={authError:"",options:{organizations:[],sites:[],jurisdictions:[]},launches:{launches:[{
+    state.data={ok:true,data:{authError:"",extendedPlanning:null,options:{organizations:[],academicProviderOrganizations:[],creditIssuingOrganizations:[],sites:[],jurisdictions:[]},launches:{launches:[{
       id:"program",name:"Academy",siteId:"site",status:"ready",type:"full_school",
       journey:{id:"journey",status:"ready"},requirements:[],openingOperators:operators,
-    }]}};
+    }]} ,preparationPrograms:null,familyInvitations:null,admissionsCounts:null,enrollmentCounts:null}};
     const Page=Route.options.component;
     if(typeof Page!=="function")throw new Error("Missing launch page");
     return renderToStaticMarkup(<Page/>);

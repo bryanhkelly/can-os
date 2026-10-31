@@ -4,13 +4,14 @@ import type { ReactNode } from "react";
 import { LiveSchoolExperiences } from "@/components/student/LiveSchoolExperiences";
 
 vi.mock("@tanstack/react-router", () => ({
+  useSearch: () => ({}),
   useRouter: () => ({ invalidate: vi.fn() }),
   Link:({to,search,children,...props}:{to:string;search:Record<string,string>;children:ReactNode})=>
     <a href={to+"?"+new URLSearchParams(search)} {...props}>{children}</a>,
 }));
 vi.mock("@/modules/learning/guardian-academic-queries.functions", () => ({ getGuardianStudents: vi.fn() }));
 vi.mock("@/modules/student-experience/school-experiences.functions", () => ({
-  bookOfficeHour: vi.fn(), rescheduleOfficeHour: vi.fn(),
+  bookOfficeHour: vi.fn(), rescheduleOfficeHour: vi.fn(), cancelOfficeHour: vi.fn(),
 }));
 vi.mock("@/modules/communication/notification-center.functions", () => ({ readNotification: vi.fn() }));
 

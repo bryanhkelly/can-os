@@ -13,6 +13,7 @@ import { emitEvent, writeAudit } from "@/platform/mutation";
 import { createPrivateUploadUrl, verifyPrivateObject, resolveR2Config } from "@/platform/storage/r2";
 import { readMarketplace } from "./curriculum-marketplace.server";
 
+import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
 const keyPattern = /^learning\/supplements\/[0-9a-f-]{36}\/[0-9a-f-]{36}$/i;
 const maxPdf = 10 * 1024 * 1024;
@@ -146,7 +147,7 @@ export const finishCurriculumPdfUpload = createServerFn({method:"POST"})
         entityId:overlay.id,scope:{programId:data.programId,sectionId:data.sectionId??null},
         after:{resourceId:data.resourceId,documentId:doc.id,courseVersionId:data.courseVersionId,
           title:data.title,scope:data.scope,lessonId:data.lessonId??null}});
-      await emitEvent(tx,{eventType:"CurriculumSupplementAdded",aggregateType:"curriculum_overlay",
+      await emitEvent(tx,{eventType:EventTypes.CurriculumSupplementAdded,aggregateType:"curriculum_overlay",
         aggregateId:overlay.id,actorPersonId:actor.actorPersonId,programId:data.programId,
         siteId:market.program.siteId,payload:{resourceId:data.resourceId,kind:"pdf"}});
       return {supplementId:overlay.id,resourceId:data.resourceId};

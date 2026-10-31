@@ -6,6 +6,8 @@ import {
   sectionTeachers, sites, terms,
 } from "@/db/schema";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { assertOnsiteAttendanceScope, isOnsiteAttendanceRole } from "@/domain/onsite-attendance-access";
+import type { AccessContext } from "@/domain/access-context";
 import { siteDate, summarizeExpectedOnsiteAttendance } from "@/domain/expected-attendance";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 
@@ -37,9 +39,11 @@ export async function assertExpectedOnsiteMarkInTransaction(
   // CommandContext is the shared capability interface; the verified session
   // carries the active persona as an additional field.
   const role = (context as CommandContext & { role?: string }).role;
+  const onsite = isOnsiteAttendanceRole(role ?? "");
+  if (onsite) assertOnsiteAttendanceScope(context as AccessContext, input.siteId);
   if (input.occurrenceKey !== input.date + ":site-day" ||
       !input.siteId || !context.actorPersonId ||
-      !["registrar", "teacher"].includes(role ?? "") ||
+      !(onsite || ["registrar", "teacher"].includes(role ?? "")) ||
       !context.scope.programIds?.includes(input.programId) ||
       !context.scope.siteIds?.includes(input.siteId))
     throw new AuthorizationError("attendance occurrence, staff and site scope");
@@ -93,6 +97,16 @@ export async function assertExpectedOnsiteMarkInTransaction(
     y.startsOn <= input.date && y.endsOn >= input.date);
   if (!matchingYears.length) throw new AuthorizationError("active school year at program site");
 
+  // A confirmed Program enrollment without a classroom seat is not
+  // authorization to mark a child physically present at a church-hosted CAN
+  // school. Recheck inside this locked transaction for every actor role,
+  // including registrars and site directors (not just facilitators).
+  const { requiresIndependentChurchLocalDelegation } = await import(
+    "@/modules/operations/site-local-delegation.server");
+  const independentChurch=await requiresIndependentChurchLocalDelegation(tx,input.programId);
+  if(independentChurch && !input.sectionId)
+    throw new AuthorizationError("church school attendance requires enrolled instructional Section");
+
   if (input.sectionId || role === "teacher") {
     if (!input.sectionId) throw new AuthorizationError("teacher section assignment");
     const [section] = await tx.select({
@@ -109,6 +123,10 @@ export async function assertExpectedOnsiteMarkInTransaction(
         eq(enrollments.kind, "section"), eq(enrollments.status, "active"),
         eq(enrollments.studentProfileId, input.studentProfileId),
         eq(enrollments.sectionId, input.sectionId),
+        // Do not let an otherwise active but mis-keyed Section membership
+        // stand in for attendance at a different Program or school year.
+        eq(enrollments.programId, section.programId),
+        eq(enrollments.schoolYearId, section.schoolYearId),
       )).for("share").limit(1);
     if (!seat) throw new AuthorizationError("student not assigned to section");
     if (role === "teacher") {

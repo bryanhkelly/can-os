@@ -12,6 +12,15 @@ INSERT INTO household_memberships
 'f9000000-0000-4000-8000-000000000001',
 'f1000000-0000-4000-8000-000000000005','Student',false)
 ON CONFLICT (household_id,person_id) DO NOTHING;
+-- Morgan's guardian relationship must be canonically verified and
+-- enrollment-managing so the declared /guardian/admission-offers interactions
+-- (view issued offer, accept or decline) are executable. Same fixed ID as the
+-- calendar fixture keeps this idempotent whichever seed runs first.
+INSERT INTO guardian_relationships
+(id,guardian_person_id,student_person_id,relationship_label,can_view_academics,can_manage_enrollment,metadata) VALUES
+('f3000000-0000-4000-8000-000000000008','f3000000-0000-4000-8000-000000000007','f1000000-0000-4000-8000-000000000005','parent',true,true,
+'{"synthetic":true,"fixture":"gf2-test","verification":"verified"}'::jsonb)
+ON CONFLICT (id) DO NOTHING;
 INSERT INTO journey_definitions (id,key,version,audience,title) VALUES
 ('f9000000-0000-4000-8000-000000000002','gf2-synthetic-enrollment',1,'family','GF2 Test Enrollment') ON CONFLICT (id) DO NOTHING;
 INSERT INTO applications (id,household_id,student_profile_id,program_id,stage,idempotency_key,submitted_by_person_id,submitted_at,metadata) VALUES

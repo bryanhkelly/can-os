@@ -49,12 +49,13 @@ const application = {
   metadata: {},
 };
 const offer = { id: "offer", applicationId: application.id, programId: "program" };
+const scopedProgram = { organizationId: "organization", siteId: "site" };
 const input = { applicationId: application.id, schoolYearId: "year" };
 const registrar = {
   actorPersonId: "registrar",
   role: "registrar",
   capabilities: new Set(["enrollment.decide", "enrollment.activate"]),
-  scope: { programIds: ["program"] },
+  scope: { programIds: ["program"], organizationIds: ["organization"], siteIds: ["site"] },
 };
 const guardian = {
   actorPersonId: "guardian",
@@ -74,7 +75,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("canonical admission offer server functions", () => {
   it("preserves the existing idempotency key when retrying issuance", async () => {
-    select.mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([{
+    select.mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([scopedProgram])).mockReturnValueOnce(rows([{
       id: "offer", status: "issued", expiresAt: null, idempotencyKey: "existing-key",
     }]));
     await expect(issueAdmissionOffer({ data: input })).resolves.toEqual({ offerId: "offer" });
@@ -84,7 +85,7 @@ describe("canonical admission offer server functions", () => {
   });
 
   it("retains the historical key namespace for the next issuance attempt", async () => {
-    select.mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([{
+    select.mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([scopedProgram])).mockReturnValueOnce(rows([{
       id: "old-offer", status: "declined", expiresAt: null, idempotencyKey: "old-key",
     }]));
     await issueAdmissionOffer({ data: input });
@@ -99,7 +100,7 @@ describe("canonical admission offer server functions", () => {
     { ...registrar, scope: { programIds: [] } },
   ])("denies issuance without the required registrar grant: %j", async actor => {
     getCommandContext.mockResolvedValue(actor);
-    select.mockReturnValueOnce(rows([application]));
+    select.mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([scopedProgram]));
     await expect(issueAdmissionOffer({ data: input })).rejects.toThrow(AuthorizationError);
     expect(issue).not.toHaveBeenCalled();
   });
@@ -130,9 +131,16 @@ describe("canonical admission offer server functions", () => {
   });
 
   it("delegates registrar activation without changing its command boundary", async () => {
-    select.mockReturnValueOnce(rows([offer])).mockReturnValueOnce(rows([application]));
+    select.mockReturnValueOnce(rows([offer])).mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([scopedProgram]));
     await expect(activateOfferedEnrollment({ data: { offerId: "offer" } }))
       .resolves.toEqual({ enrollmentId: "enrollment" });
-    expect(activate).toHaveBeenCalledWith(registrar, "offer");
+    expect(activate).toHaveBeenCalledWith(registrar, "offer", undefined);
+  });
+
+  it("passes the optional sectionId through to activation", async () => {
+    select.mockReturnValueOnce(rows([offer])).mockReturnValueOnce(rows([application])).mockReturnValueOnce(rows([scopedProgram]));
+    await expect(activateOfferedEnrollment({ data: { offerId: "offer", sectionId: "section" } }))
+      .resolves.toEqual({ enrollmentId: "enrollment" });
+    expect(activate).toHaveBeenCalledWith(registrar, "offer", "section");
   });
 });
