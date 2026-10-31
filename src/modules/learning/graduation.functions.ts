@@ -262,6 +262,34 @@ export const decideGraduation = createServerFn({method:"POST"})
    });
  });
 
+/** Institution-owned diploma status, never a release authorization. B must additionally authorize the recipient. */
+export const getDiplomaFreshness=createServerFn({method:"GET"})
+ .validator((input:unknown)=>z.object({diplomaId:uuid}).parse(input))
+ .handler(async ({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   const context=await registrar();const {db,s}=await resources();
+   const [diploma]=await db.select().from(s.diplomaIssuances).where(eq(s.diplomaIssuances.id,data.diplomaId)).limit(1);
+   if(!diploma)throw new AuthorizationError("Diploma not found");
+   const [decision]=await db.select().from(s.graduationDecisions).where(eq(s.graduationDecisions.id,diploma.graduationDecisionId)).limit(1);
+   if(!decision)throw new AuthorizationError("Graduation decision unavailable");
+   issuerAuthorized(context,decision.issuingOrganizationId);
+   if(diploma.revokedAt) return {diplomaId:diploma.id,status:"revoked" as const};
+   const [latest]=await db.select({id:s.graduationDecisions.id}).from(s.graduationDecisions)
+     .where(and(eq(s.graduationDecisions.studentProfileId,decision.studentProfileId),eq(s.graduationDecisions.issuingOrganizationId,decision.issuingOrganizationId)))
+     .orderBy(desc(s.graduationDecisions.decidedAt),desc(s.graduationDecisions.id)).limit(1);
+   if(latest?.id!==decision.id || decision.decision!=="approved")return {diplomaId:diploma.id,status:"review_required" as const};
+   try {
+     const current=await transcriptAndRules(db,s,decision.transcriptIssuanceId,decision.requirementSetId);
+     const [newest]=await db.select({id:s.transcriptIssuances.id}).from(s.transcriptIssuances)
+       .where(and(eq(s.transcriptIssuances.studentProfileId,decision.studentProfileId),eq(s.transcriptIssuances.issuingOrganizationId,decision.issuingOrganizationId)))
+       .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id)).limit(1);
+     const audit=auditGraduationCredits(current.requirementSet.requirements as CreditRequirement[],current.evidence);
+     if(newest?.id!==decision.transcriptIssuanceId || audit.status!=="requirements_met" || JSON.stringify(audit)!==JSON.stringify(decision.audit))
+       return {diplomaId:diploma.id,status:"review_required" as const};
+   }catch{return {diplomaId:diploma.id,status:"review_required" as const};}
+   return {diplomaId:diploma.id,status:"current" as const};
+ });
+
 export const issueDiploma = createServerFn({method:"POST"})
  .validator((input:unknown) => z.object({decisionId:uuid}).parse(input))
  .handler(async ({data}) => {
