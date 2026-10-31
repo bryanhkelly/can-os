@@ -20,12 +20,34 @@ const slug=/^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$/;
 assert.match(domain,/^[a-z0-9.-]+$/);
 for(const name of [first,second,unpublished,unknown])assert.match(name,slug);
 assert.equal(new Set([first,second,unpublished,unknown]).size,4,"Use four distinct slugs");
+const MAX_RESPONSE_BYTES=1_000_000;
+async function readLimited(response){
+ const length=response.headers.get("content-length");
+ if(length!==null)assert.ok(Number.isFinite(Number(length))&&Number(length)<=MAX_RESPONSE_BYTES,"response length exceeds limit");
+ assert.ok(response.body,"missing response stream");
+ const reader=response.body.getReader();
+ const parts=[];
+ let size=0;
+ try{
+  while(true){
+   const {done,value}=await reader.read();
+   if(done)break;
+   size+=value.byteLength;
+   if(size>MAX_RESPONSE_BYTES)throw new Error("response body exceeds 1 MB limit");
+   parts.push(value);
+  }
+ }finally{
+  await reader.cancel().catch(()=>{});
+  reader.releaseLock();
+ }
+ return new TextDecoder("utf-8",{fatal:true}).decode(Buffer.concat(parts));
+}
 const evidence={checkedAt:new Date().toISOString(),domain,checks:[]};
 async function check(slug,path,expectedStatus,expectIdentity=null){
  const url=`https://${slug}.${domain}${path}`;
  const response=await fetch(url,{redirect:"manual",signal:AbortSignal.timeout(8000),headers:{Accept:"text/html"}});
  const type=response.headers.get("content-type")??"";
- const body=await response.text();
+ const body=await readLimited(response);
  assert.equal(response.status,expectedStatus,`${url}: unexpected HTTP status`);
  assert.ok(!response.headers.get("location"),`${url}: redirects forbidden`);
  if(expectIdentity){
@@ -35,9 +57,9 @@ async function check(slug,path,expectedStatus,expectIdentity=null){
   assert.ok(body.startsWith("<!doctype html>"),`${url}: missing standalone HTML`);
   assert.ok(body.includes(`<footer>${slug}.${domain} · Powered by CAN OS</footer>`),
     `${url}: wrong tenant identity`);
-  assert.ok(body.includes(expectIdentity),`${url}: missing expected public school name`);
+  assert.ok(body.includes(`<h1>${expectIdentity}</h1>`),`${url}: missing expected public school heading`);
   const other=expectIdentity===expectedA?expectedB:expectedA;
-  assert.ok(!body.includes(other),`${url}: cross-tenant content leaked`);
+  assert.ok(!body.includes(`<h1>${other}</h1>`),`${url}: cross-tenant school heading leaked`);
   assert.ok(!body.includes("__tanstack"),`${url}: app shell leaked`);
  }else{
   assert.ok(!body.includes("Powered by CAN OS"),`${url}: unpublished/unknown/private site disclosed`);
