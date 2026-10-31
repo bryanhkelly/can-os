@@ -312,6 +312,7 @@ export async function gradeSubmission(
         timeliness: submissions.timeliness,
         assessmentId: submissions.assessmentId,pointsPossible:assessments.pointsPossible,
         studentProfileId: submissions.studentProfileId,
+        studentPersonId: studentProfiles.personId,
         sectionId: assessments.sectionId,
         programId: sections.programId,schoolYearId: terms.schoolYearId,
       })
