@@ -165,6 +165,8 @@ export const decideGraduation = createServerFn({method:"POST"})
    return db.transaction(async tx => {
      const {transcript,requirementSet,evidence}=await transcriptAndRules(tx,s,data.transcriptId,data.requirementSetId);
      issuerAuthorized(context,transcript.issuingOrganizationId);
+     const {sql}=await import("drizzle-orm");
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${transcript.studentProfileId + ":" + transcript.issuingOrganizationId + ":graduation"}))`);
      const result=adjudicateGraduation({
        requirementSetId:requirementSet.id,transcriptIssuanceId:transcript.id,
        requirementIssuerId:requirementSet.issuingOrganizationId,transcriptIssuerId:transcript.issuingOrganizationId,
@@ -189,10 +191,26 @@ export const issueDiploma = createServerFn({method:"POST"})
      const [decision]=await tx.select().from(s.graduationDecisions).where(eq(s.graduationDecisions.id,data.decisionId)).limit(1);
      if (!decision || decision.decision!=="approved") throw new AuthorizationError("approved graduation decision required");
      issuerAuthorized(context,decision.issuingOrganizationId);
+     // Lock the student/issuer decision stream: a later adjudication cannot
+     // race with diploma issuance. A subsequent decision supersedes this one.
+     const {sql}=await import("drizzle-orm");
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${decision.studentProfileId + ":" + decision.issuingOrganizationId + ":graduation"}))`);
      const [prior]=await tx.select({id:s.graduationDecisions.id}).from(s.graduationDecisions)
        .where(and(eq(s.graduationDecisions.studentProfileId,decision.studentProfileId),eq(s.graduationDecisions.issuingOrganizationId,decision.issuingOrganizationId)))
-       .orderBy(desc(s.graduationDecisions.decidedAt)).limit(1);
+       .orderBy(desc(s.graduationDecisions.decidedAt),desc(s.graduationDecisions.createdAt),desc(s.graduationDecisions.id)).limit(1);
      if(prior?.id!==decision.id) throw new Error("Graduation decision was superseded");
+     // Re-resolve the applicable institution policy and re-audit immutable
+     // transcript evidence before issuing. Policy changes must fail closed.
+     const current=await transcriptAndRules(tx,s,decision.transcriptIssuanceId,decision.requirementSetId);
+     if(current.transcript.studentProfileId!==decision.studentProfileId || current.transcript.issuingOrganizationId!==decision.issuingOrganizationId)
+       throw new AuthorizationError("Graduation decision evidence mismatch");
+     const [latestTranscript]=await tx.select({id:s.transcriptIssuances.id}).from(s.transcriptIssuances)
+       .where(and(eq(s.transcriptIssuances.studentProfileId,decision.studentProfileId),eq(s.transcriptIssuances.issuingOrganizationId,decision.issuingOrganizationId)))
+       .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id)).limit(1);
+     if(latestTranscript?.id!==decision.transcriptIssuanceId) throw new Error("Graduation decision transcript was superseded");
+     const fresh=auditGraduationCredits(current.requirementSet.requirements as CreditRequirement[],current.evidence);
+     if(fresh.status!=="requirements_met" || JSON.stringify(fresh)!==JSON.stringify(decision.audit))
+       throw new Error("Graduation decision no longer matches eligible evidence");
      const [diploma]=await tx.insert(s.diplomaIssuances).values({graduationDecisionId:decision.id,issuedByPersonId:context.actorPersonId!}).onConflictDoNothing().returning({id:s.diplomaIssuances.id});
      if(!diploma) throw new Error("Diploma already issued for this decision");
      await writeAudit(tx,{actorPersonId:context.actorPersonId!,action:"diploma.issue",resourceType:"diploma_issuance",resourceId:diploma.id,scope:{organizationId:decision.issuingOrganizationId},after:{decisionId:decision.id},context:{requestId:context.requestId??null}});
