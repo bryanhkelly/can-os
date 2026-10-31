@@ -71,7 +71,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         eq(schoolYears.programId,app.programId),eq(schoolYears.status,"active"),
         gte(academicCalendarDays.calendarDate,today),
         gte(schoolYears.endsOn,today)))
-      .orderBy(asc(academicCalendarDays.calendarDate)).limit(366);
+      .orderBy(asc(academicCalendarDays.calendarDate)).limit(1464);
     // Use the latest active calendar version for each academic year; a stale
     // earlier version cannot re-open a canceled holiday or weekend.
     const versionByYear=new Map<string,number>();
