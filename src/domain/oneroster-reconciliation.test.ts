@@ -52,4 +52,29 @@ describe("OneRoster reconciliation is identity-untrusted", () => {
     expect(cls?.reasons).toContain("SCHOOL_YEAR_UNVERIFIED");
     expect(cls?.reasons).toContain("ACADEMIC_SESSION_UNVERIFIED");
   });
+
+  it("rejects cross-school user substitution even when external user ID exists", () => {
+    const schoolUsers = users.replace("sourcedId,enabledUser", "sourcedId,orgSourcedIds,enabledUser")
+      .replace("user-1,true", "user-1,school-2,true");
+    const bundle = previewOneRosterBundle({ users: schoolUsers, classes, enrollments });
+    const plan = planOneRosterReconciliation(bundle.previews, new Map([["class-1", "section-1"]]));
+    expect(plan.rows.find(r => r.kind === "enrollment")?.reasons)
+      .toContain("EXTERNAL_USER_SCHOOL_MISMATCH");
+  });
+
+  it("flags repeated enrollment relations rather than silently applying duplicates", () => {
+    const duplicate = enrollments + "\\nenrollment-2,class-1,school-1,user-1,student";
+    const bundle = previewOneRosterBundle({ users, classes, enrollments: duplicate });
+    const plan = planOneRosterReconciliation(bundle.previews, new Map([["class-1", "section-1"]]));
+    expect(plan.rows.find(r => r.sourcedId === "enrollment-2")?.reasons)
+      .toContain("DUPLICATE_ENROLLMENT_RELATION");
+  });
+
+  it("flags missing external academic sessions", () => {
+    const sessions = "sourcedId,title,type,startDate,endDate\\nterm-2,Fall,term,2026-08-01,2026-12-20";
+    const bundle = previewOneRosterBundle({ classes, academicSessions: sessions });
+    const plan = planOneRosterReconciliation(bundle.previews, new Map([["class-1", "section-1"]]));
+    expect(plan.rows.find(r => r.kind === "class")?.reasons)
+      .toContain("EXTERNAL_SESSION_MISSING");
+  });
 });
