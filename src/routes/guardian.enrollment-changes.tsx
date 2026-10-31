@@ -221,7 +221,9 @@ function GuardianEnrollmentChanges(){
       search={{application:item.destinationApplicationId}}
       className="mt-2 inline-block text-xs font-semibold underline">Review receiving-school application and offers →</Link>}
     {item.kind==="transfer"&&<p className="mt-1 text-sm">Academic records: {item.recordsHandoffStatus==="completed"?
-      "The records office reports an authorized secure handoff completed":
+      (item.recordsReleasedInternally?
+        "Official transcript released inside CAN OS to the authorized receiving school":
+        "The originating records office attested external secure delivery; CAN access is not automatic"):
       item.recordsHandoffStatus==="pending"?
       "Origin enrollment exited; verified transcript delivery is still pending":
       "Not yet completed — the origin school must review the transfer"}
