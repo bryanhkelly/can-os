@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, admissionOffers, applications, enrollments, programs, publicAdmissionsInterests, publicFamilyStartRequests, studentAccessConsents, studentProfiles } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -27,8 +27,23 @@ async function requireAdmissionsIntakeReader() {
  * Application until staff verifies student/guardian identity and follows
  * the existing createAdmissionsInquiry command.
  */
+const interestPageSize = 50;
+/** Stable keyset cursor: tie-break equal creation timestamps by immutable ID. */
+export function parseInterestPageCursor(cursor: string) {
+  const match = /^(\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z)\\|([0-9a-f-]{36})$/i.exec(cursor);
+  if (!match) throw new Error("Invalid admissions interest page cursor");
+  const date = new Date(match[1]!);
+  if (Number.isNaN(date.getTime()) || date.toISOString() !== match[1])
+    throw new Error("Invalid admissions interest page cursor");
+  return {createdAt:date,id:z.string().uuid().parse(match[2]!)};
+}
+
 export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
-  .handler(async () => {
+  .validator((value: unknown) => z.object({
+    cursor:z.string().max(80).optional(),
+    interestId:z.string().uuid().optional(),
+  }).strict().parse(value ?? {}))
+  .handler(async ({data}) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await requireAdmissionsIntakeReader();
     const rows = await db.select({
@@ -65,11 +80,27 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
         inArray(programs.organizationId, actor.scope.organizationIds),
         inArray(publicAdmissionsInterests.siteId, actor.scope.siteIds ?? []),
         eq(publicAdmissionsInterests.siteId, programs.siteId),
-      )).orderBy(desc(publicAdmissionsInterests.createdAt)).limit(200);
+        ...(data.interestId ? [eq(publicAdmissionsInterests.id,data.interestId)] : []),
+        ...(!data.interestId && data.cursor ? [(() => {
+          const cursor = parseInterestPageCursor(data.cursor!);
+          return or(
+            lt(publicAdmissionsInterests.createdAt,cursor.createdAt),
+            and(eq(publicAdmissionsInterests.createdAt,cursor.createdAt),
+              lt(publicAdmissionsInterests.id,cursor.id)),
+          )!;
+        })()] : []),
+      )).orderBy(desc(publicAdmissionsInterests.createdAt),
+        desc(publicAdmissionsInterests.id))
+        .limit(data.interestId ? 1 : interestPageSize+1);
+    const hasMore = !data.interestId && rows.length > interestPageSize;
+    const pageRows = hasMore ? rows.slice(0,interestPageSize) : rows;
+    const last = pageRows.at(-1);
+    const nextCursor = hasMore && last
+      ? last.createdAt.toISOString()+"|"+last.id : null;
     // Link the consented interest to the canonical enrollment and access
     // records, not an assumed outcome from the application or invitation.
-    const linkedApplicationIds = [...new Set(rows.flatMap(row => row.applicationId ? [row.applicationId] : []))];
-    const linkedStudentIds = [...new Set(rows.flatMap(row => row.studentProfileId ? [row.studentProfileId] : []))];
+    const linkedApplicationIds = [...new Set(pageRows.flatMap(row => row.applicationId ? [row.applicationId] : []))];
+    const linkedStudentIds = [...new Set(pageRows.flatMap(row => row.studentProfileId ? [row.studentProfileId] : []))];
     const [activeEnrollments, accessConsents, linkedOffers] = await Promise.all([
       linkedStudentIds.length ? db.select({
         studentProfileId: enrollments.studentProfileId,
@@ -126,11 +157,11 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
     // Admissions authority can change without affecting historical interest.
     // Resolve the canonical operating gate, not just Program status.
     const authorized = new Map<string, boolean>();
-    await Promise.all([...new Set(rows.map(row => row.programId))].map(async programId => {
+    await Promise.all([...new Set(pageRows.map(row => row.programId))].map(async programId => {
       try { await resolvePrivateFamilyStartDestination(db, programId); authorized.set(programId, true); }
       catch { authorized.set(programId, false); }
     }));
-    return rows.map(row => {
+    return {items:pageRows.map(row => {
       const programEnrollmentYears = new Set(activeEnrollments.filter(enrollment =>
         enrollment.studentProfileId === row.studentProfileId &&
         enrollment.programId === row.programId && enrollment.kind === "program" &&
@@ -174,7 +205,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       applicationSubmittedAt: row.applicationSubmittedAt?.toISOString() ?? null,
       admissionsAuthorized: authorized.get(row.programId) === true,
       };
-    });
+    }),nextCursor};
   });
 
 /** Send the canonical adult-only verified-email application entry. The public
