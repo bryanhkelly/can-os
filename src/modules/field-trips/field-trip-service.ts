@@ -902,7 +902,7 @@ export async function recordFieldTripAttendance(
     if (existing) return existing.id;
 
     const [trip] = await tx
-      .select({ siteId: fieldTrips.siteId, programId: fieldTrips.programId })
+      .select({ siteId: fieldTrips.siteId, programId: fieldTrips.programId, status:fieldTrips.status })
       .from(fieldTrips)
       .where(eq(fieldTrips.id, input.fieldTripId))
       .limit(1);
@@ -910,6 +910,37 @@ export async function recordFieldTripAttendance(
     if (!trip) throw new Error("Field Trip not found");
     assertSiteScope(context, trip.siteId);
     assertProgramScope(context, trip.programId);
+
+    // The compatibility writer must never bypass parent consent or enrollment
+    // for boarding and return records.
+    if(input.status==="boarded"||input.status==="returned"){
+      if(trip.status!=="approved")throw new Error("The field trip is not approved");
+      const [permission]=await tx.select({id:fieldTripParticipants.id})
+       .from(fieldTripParticipants)
+       .innerJoin(studentProfiles,eq(studentProfiles.id,fieldTripParticipants.studentProfileId))
+       .innerJoin(consentRecords,and(
+        eq(consentRecords.id,fieldTripParticipants.consentRecordId),
+        eq(consentRecords.subjectType,"field_trip_participant"),
+        eq(consentRecords.subjectId,fieldTripParticipants.id),
+        eq(consentRecords.consentType,"field_trip_permission"),
+        isNull(consentRecords.revokedAt),
+       ))
+       .innerJoin(guardianRelationships,guardianRelationshipPredicate({
+        guardianPersonId:consentRecords.signerPersonId,
+        studentPersonId:studentProfiles.personId,access:"enrollment",
+       }))
+       .where(and(eq(fieldTripParticipants.fieldTripId,input.fieldTripId),
+         eq(fieldTripParticipants.studentProfileId,input.studentProfileId),
+         eq(fieldTripParticipants.status,"permission_complete"))).limit(1);
+      if(!permission)throw new AuthorizationError("current verified field trip guardian permission");
+      const [enrolled]=await tx.select({id:enrollments.id})
+       .from(enrollments).innerJoin(programs,eq(programs.id,enrollments.programId))
+       .where(and(eq(enrollments.studentProfileId,input.studentProfileId),
+        eq(enrollments.kind,"program"),eq(enrollments.status,"active"),
+        eq(programs.siteId,trip.siteId),
+        trip.programId?eq(enrollments.programId,trip.programId):undefined)).limit(1);
+      if(!enrolled)throw new AuthorizationError("current field trip school enrollment");
+    }
 
     const [record] = await tx
       .insert(fieldTripAttendance)
