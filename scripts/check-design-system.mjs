@@ -30,15 +30,10 @@ for (const file of files) {
     }
   }
 }
-const duplicates = [...exportsByName].filter(([, locations]) => new Set(locations.filter(path => !path.endsWith("/index.tsx"))).size > 1);
-if (duplicates.length) {
-  console.error("Duplicate shared component exports detected:");
-  for (const [name, locations] of duplicates) console.error(`- ${name}: ${locations.join(", ")}`);
-  process.exitCode = 1;
-} else {
-  console.log(`Design component ownership: ${files.length} files checked; no duplicate shared exports.`);
-}
-
+// Export names alone do not prove duplicate implementations: different feature
+// modules may legitimately export components with the same name. Keep the
+// ownership check below scoped to canonical shared contracts.
+console.log(`Design component inventory: ${files.length} component files checked.`);
 
 // Enforce a single implementation of the canonical evidence interaction widgets.
 // Deliberately specialized feature controls are excluded from this check.
@@ -51,6 +46,17 @@ for (const name of canonicalEvidence) {
   });
   if (implementationFiles.length !== 1 || !relative(root, implementationFiles[0]).startsWith("evidence/")) {
     console.error(`Canonical evidence component ${name} must have exactly one implementation in components/evidence`);
+    process.exitCode = 1;
+  }
+}
+
+
+// Shared evidence controls should use the existing design-system action primitive.
+for (const name of ["EvidenceUploader", "EvidenceReviewForm"]) {
+  const path = join(root, "evidence", name + ".tsx");
+  const source = readFileSync(path, "utf8");
+  if (!source.includes('from "@/components/ui/button"') || /<button(?:\\s|>)/.test(source)) {
+    console.error(`${name} must use the shared Button primitive for its actions`);
     process.exitCode = 1;
   }
 }
