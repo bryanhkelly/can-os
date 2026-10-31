@@ -23,6 +23,15 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     expect(source).not.toContain("insert(attendanceEvents)");
     expect(source).not.toContain("recordAttendanceRevision");
   });
+  it("never reads a future attendance roster or future staffing as observed presence",()=>{
+    const source=read("src/modules/enrollment/first-school-day-handoff.functions.ts");
+    expect(source).toContain("const preview = date > today");
+    expect(source).toContain("!preview && candidate");
+    expect(source).toContain("const supervision = matched?.sectionId");
+    expect(source).toContain('future_roster_verification_required');
+    expect(source).not.toContain("insert(attendanceEvents)");
+    expect(source).not.toContain("markExpectedOnsiteAttendance");
+  });
   it("keeps active student grants distinct from historic approved guardian consent",()=>{
     const service=read("src/modules/enrollment/student-access-handoff.functions.ts");
     const statusRead=service.slice(
