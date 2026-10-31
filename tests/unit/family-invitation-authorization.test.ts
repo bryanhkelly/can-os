@@ -36,6 +36,7 @@ const input = {
   subject: "Welcome families",
   introduction: "Welcome to our school.",
   confirmed: true as const,
+  purpose: "application" as const,
 };
 const registrar = {
   actorPersonId: "registrar-person",
