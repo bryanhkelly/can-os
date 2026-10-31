@@ -68,6 +68,7 @@ export const financeProviderEvents = pgTable("finance_provider_events", {
   createdAt: createdAt(),
 }, t => [
   uniqueIndex("finance_provider_event_uq").on(t.provider, t.eventId),
+  uniqueIndex("finance_refund_identity_uq").on(t.provider, t.providerRefundId),
   index("finance_provider_invoice_idx").on(t.invoiceId, t.createdAt),
 ]);
 
