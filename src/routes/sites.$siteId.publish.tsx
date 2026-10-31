@@ -56,7 +56,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       } });
       setNotice(result.changed
         ? (action === "publish"
-            ? "Catalog approved. Public hostname routing is not yet active."
+            ? (data.hostingConfigured
+                 ? "Catalog approved. Hosting is configured; verify DNS/TLS and public reachability before announcing the URL."
+                 : "Catalog approved. Hosting is disabled until the production hostname and routing configuration is enabled.")
             : "Site catalog unpublished and no longer publicly readable.")
         : "No change was needed. The site is already in that state.");
       setReason(""); setContentReviewed(false);
@@ -73,7 +75,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       !["paused", "closed"].includes(program.status));
   const candidate = isPublicSiteSlug(slug) ? publicSiteHost(slug) : null;
   return <WorkspaceShell eyebrow="CAN OS · Site publishing" title={data.site.name + " · public site"}
-    subtitle="Reserve an address and approve or withdraw the catalog. Public hostname routing is not yet active."
+    subtitle="Reserve and publish your school address. Public hosting depends on separate DNS, TLS and deployment configuration."
     breadcrumbs={<><Link to="/sites/$siteId" params={{ siteId: data.site.id }} className="underline">Site Today</Link><span>/</span><span>Public site</span></>}>
     {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
@@ -108,13 +110,17 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           </p>
         </div>
         <span className="rounded-full border px-3 py-1 text-xs font-semibold">
-          {data.address?.status === "published" ? "Site approved · hosting disabled" : "Private draft"}
+          {data.address?.status === "published"
+            ? (data.hostingConfigured ? "Published · hosting configured (DNS not verified)" : "Published · hosting disabled")
+            : "Private draft"}
         </span>
       </div>
       {data.previewHtml ? <>
         <p className="mt-4 text-xs text-muted-foreground">
           Reserved address: <span className="font-mono">{data.address?.host}</span>.
-          The address is not an active public website.
+          {data.hostingConfigured && data.address?.status === "published"
+            ? "Hosting is enabled in the application; external DNS/TLS reachability must still be verified."
+            : "This is a private preview, not an active public website."}
         </p>
         <iframe title={`${data.site.name} private website draft preview`}
           srcDoc={data.previewHtml} sandbox="" referrerPolicy="no-referrer"
