@@ -1,3 +1,4 @@
+import { ClassAnnouncementFeed } from "@/components/learning/ClassAnnouncementFeed";
 import { ClassAnnouncementComposer } from "@/components/learning/ClassAnnouncementComposer";
 import { ClassCourseRoadmap } from "@/components/learning/ClassCourseRoadmap";
 import { ClassRosterPanel } from "@/components/learning/ClassRosterPanel";
@@ -410,10 +411,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
             setTitle("");setBody("");announcementId.current=null;
           },"Class announcement published.");
         }} />}
-      {data.announcements.slice().reverse().map(item => <WorkspacePanel key={item.id} title={item.title} description={new Date(item.createdAt).toLocaleString()}>
-        <p className="whitespace-pre-wrap text-sm leading-7">{item.body}</p>
-      </WorkspacePanel>)}
-      {!data.announcements.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">No class announcements yet.</p>}
+      <ClassAnnouncementFeed announcements={data.announcements} />
     </div>}
   </WorkspaceShell>;
 }
