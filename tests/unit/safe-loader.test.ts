@@ -17,8 +17,8 @@ describe("safeLoader", () => {
     const outcome = await loader();
     expect(outcome.ok).toBe(false);
     if (outcome.ok) return;
-    expect(outcome.authError).toBe("Sign in with an authorized student account.");
-    expect(outcome.message).toBe("Missing required capability or scope: assignments:read");
+    expect(outcome.authError).toBe("You do not have permission to view this page.");
+    expect(outcome.message).toBe("You do not have permission to view this page.");
   });
 
   it("uses a default auth message when none is provided", async () => {
@@ -26,13 +26,13 @@ describe("safeLoader", () => {
     const outcome = await loader();
     expect(outcome.ok).toBe(false);
     if (outcome.ok) return;
-    expect(outcome.authError).toBe("Sign in with an authorized account to view this page.");
+    expect(outcome.authError).toBe("You do not have permission to view this page.");
   });
 
   it("maps a generic Error to the non-auth error branch", async () => {
     const loader = safeLoader(async () => { throw new Error("database connection refused"); });
     const outcome = await loader();
-    expect(outcome).toEqual({ ok: false, authError: null, message: "database connection refused" });
+    expect(outcome).toEqual({ ok: false, authError: null, message: "An unexpected error occurred. Please try again.", kind: "unexpected", retryable: false });
   });
 
   it("still matches auth-shaped errors that lose their prototype across the wire", async () => {
@@ -50,6 +50,6 @@ describe("safeLoader", () => {
 
   it("never throws out of the wrapper, even for non-Error rejections", async () => {
     const loader = safeLoader(async () => { throw "plain string failure"; });
-    await expect(loader()).resolves.toEqual({ ok: false, authError: null, message: "plain string failure" });
+    await expect(loader()).resolves.toEqual({ ok: false, authError: null, message: "An unexpected error occurred. Please try again.", kind: "unexpected", retryable: false });
   });
 });
