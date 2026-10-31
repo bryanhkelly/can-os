@@ -12,11 +12,18 @@ import {
 } from "@/modules/identity/admin.functions";
 import { WorkspaceShell, QueryState } from "@/components/workspace";
 import { localStaffInviteRoles } from "@/domain/staff-onboarding-policy";
+import { launchStaffInvitationDefaults } from "@/domain/launch-staff-invitation";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, useZodForm } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const Route = createFileRoute("/admin")({ component: AdminConsolePage });
+export const Route = createFileRoute("/admin")({
+  validateSearch: (search: Record<string, unknown>): {siteId?: string; inviteRole?: string} => ({
+    siteId: typeof search.siteId === "string" ? search.siteId : undefined,
+    inviteRole: search.inviteRole === "registrar" || search.inviteRole === "site_website_editor" ? search.inviteRole : undefined,
+  }),
+  component: AdminConsolePage,
+});
 
 const roles = localStaffInviteRoles;
 
@@ -43,8 +50,12 @@ type Person = Awaited<ReturnType<typeof listPeople>>["people"][number];
 const authMessage = "Sign in with an authorized registrar account to manage access.";
 
 function AdminConsolePage() {
+  const selection = Route.useSearch();
+  return <ScopedAdminConsole key={JSON.stringify(selection)} selection={selection}/>;
+}
+
+function ScopedAdminConsole({selection}: {selection: {siteId?: string; inviteRole?: string}}) {
   const [sites, setSites] = useState<Site[]>([]);
-  const [requireSiteSelection,setRequireSiteSelection]=useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,9 +74,10 @@ function AdminConsolePage() {
       .then(([siteResult, accountResult, peopleResult]) => {
         if (!active) return;
         setSites(siteResult.sites);
-        setRequireSiteSelection(siteResult.requireSiteSelection);
-        if(siteResult.requireSiteSelection&&siteResult.sites.length===1)
-          form.setValue("siteId",siteResult.sites[0]?.id??"");
+        const defaults = launchStaffInvitationDefaults(siteResult.sites, selection);
+        form.setValue("siteId", defaults.siteId);
+        form.setValue("role", defaults.role);
+        if (defaults.unavailable) setError("The requested school is outside your available Sites. Choose a permitted school before inviting anyone.");
         setAccounts(accountResult.accounts);
         setPeople(peopleResult.people);
         setLoading(false);
@@ -113,7 +125,8 @@ function AdminConsolePage() {
         : result.emailSent
           ? `Invitation emailed to ${values.email}. Their exact-site role stays inactive until they accept the secure link.`
           : `Invitation recorded for ${values.email}, but email delivery was not confirmed. Retry the same invitation; no duplicate grant will be created.`);
-      form.reset({...inviteDefaults,siteId:requireSiteSelection&&sites.length===1?sites[0]?.id??"":""});
+      const defaults = launchStaffInvitationDefaults(sites, selection);
+      form.reset({...inviteDefaults,siteId:defaults.siteId,role:defaults.role});
       await refresh();
     } catch {
       setError("Unable to invite this staff member. Check the details and your permissions.");

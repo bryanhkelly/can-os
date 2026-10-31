@@ -234,6 +234,7 @@ function LaunchWizardPage() {
     );
   }
 
+  const invitationSiteId = selection.siteId ?? launches.launches.find(launch => launch.id === selection.programId)?.siteId ?? undefined;
   return (
     <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Open Your School"
       subtitle="Set up your school, invite families, publish your school page, and see exactly what remains before opening."
@@ -244,6 +245,15 @@ function LaunchWizardPage() {
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
         <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
+
+        <details className="mt-4 rounded-xl border bg-card p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Choose who helps prepare your school</summary>
+          <p className="mt-2 text-sm text-muted-foreground">An authorized administrator can invite a school registrar to complete setup, or a website editor to prepare church-owned content. Choose the exact Site in the invitation workspace. Access starts only after secure email acceptance; institutional approval remains separate.</p>
+          <nav aria-label="School launch staff invitations" className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
+            <Link to="/admin" search={{siteId:invitationSiteId,inviteRole:"registrar"}} className="underline">Invite a school setup lead</Link>
+            <Link to="/admin" search={{siteId:invitationSiteId,inviteRole:"site_website_editor"}} className="underline">Invite a church website editor</Link>
+          </nav>
+        </details>
 
         {launches.launches.length>0&&admissions&&<section aria-label="Admissions progress" className="mt-5 rounded-xl border bg-card p-4">
           <h2 className="text-sm font-semibold">Admissions progress</h2>
@@ -545,5 +555,3 @@ function LaunchWizardPage() {
     </WorkspaceShell>
   );
 }
-
-
