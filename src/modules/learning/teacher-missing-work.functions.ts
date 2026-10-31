@@ -48,7 +48,12 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
     eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
     inArray(s.enrollments.sectionId,sectionIds)));
  const eligible=roster;
- const submissions=await db.select({assessmentId:s.submissions.assessmentId,studentId:s.submissions.studentProfileId,status:s.submissions.status,attempt:s.submissions.attemptNumber}).from(s.submissions).where(inArray(s.submissions.assessmentId,due.map(x=>x.id)));
+ if(!eligible.length)return {connected:true,items:[]};
+ // Restrict the private submission read to students on the current authorized roster.
+ const submissions=await db.select({assessmentId:s.submissions.assessmentId,studentId:s.submissions.studentProfileId,status:s.submissions.status,attempt:s.submissions.attemptNumber}).from(s.submissions).where(and(
+  inArray(s.submissions.assessmentId,due.map(x=>x.id)),
+  inArray(s.submissions.studentProfileId,[...new Set(eligible.map(x=>x.studentId))]),
+ ));
  const latest=new Map<string,(typeof submissions)[number]>();
  for(const sub of submissions){const key=sub.assessmentId+":"+sub.studentId;const prev=latest.get(key);if(!prev||sub.attempt>prev.attempt)latest.set(key,sub);}
  const items=due.flatMap(a=>eligible.filter(student=>student.sectionId===a.sectionId).flatMap(student=>{
