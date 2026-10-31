@@ -120,7 +120,9 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
             ? "Active instructional class placement recorded"
             : "Class placement still required"}</li>}
           {row.activeEnrollment && <li>{row.studentAccessStatus === "approved"
-            ? "Separate student learning account approved"
+            ? "Separate student learning account approved with a current grant"
+            : row.studentAccessStatus === "access_unavailable"
+              ? "Student account was previously approved but the live login grant needs review"
             : row.studentAccessStatus === "pending_review"
               ? "Student access consent awaiting independent registrar review"
               : "Guardian student access authorization still required"}</li>}
@@ -135,8 +137,10 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
                   : "Continue the admissions review, eligibility requirements and offer decision. An inquiry is not an enrollment."}</p>
             : !row.placedInClass
               ? <p className="mt-1">Enrollment is active. Complete a staffed instructional class assignment before student learning access or onsite attendance.</p>
-              : row.studentAccessStatus !== "approved"
-                ? <p className="mt-1">Class placement is active. The guardian and registrar must complete separate student account consent and identity approval.</p>
+              : row.studentAccessStatus === "access_unavailable"
+                ? <p className="mt-1">Class placement is active, but previously approved student access is now revoked or unavailable. Admissions must review the student's real access grant.</p>
+                : row.studentAccessStatus !== "approved"
+                  ? <p className="mt-1">Class placement is active. The guardian and registrar must complete separate student account consent and identity approval.</p>
                 : <p className="mt-1">Learning access is approved. Confirm the child is expected on the scheduled onsite roster and record actual presence with authorized site staff; placement is not attendance.</p>}
           <div className="mt-2 flex flex-wrap gap-3">
             <Link to="/admissions" search={{siteId:row.siteId,programId:row.programId,application:row.applicationId}}
