@@ -68,7 +68,7 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
     } finally { setBusy(false); }
   };
   const field = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
-  return <WorkspaceShell eyebrow="CAN OS · Network partnerships" title="Contract and HQ onboarding"
+  return <WorkspaceShell eyebrow="CAN OS · Network partnerships" title="Church onboarding and partner contracts"
     subtitle="Only verified CAN stewards can record externally signed agreements and designate denomination HQ officers. Neither action grants access to student records.">
     <p className="mt-5 text-sm text-muted-foreground">Prerequisite: a separately reviewed, verified Document already exists with the correct organization subject and signed-agreement or HQ-authority category. Entering a document ID does not sign or verify a document.</p>
     {error && <p role="alert" className="mt-4 rounded-lg border p-3 text-sm">{error}</p>}
