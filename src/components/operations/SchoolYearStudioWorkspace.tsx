@@ -9,9 +9,8 @@ import { schoolYearStructure } from "@/domain/school-year-structure";
 import { WorkspaceShell } from "@/components/workspace";
 
 type Snapshot=Awaited<ReturnType<typeof getSchoolYearStudio>>;
-export function SchoolYearStudioWorkspace({data}:{data:Snapshot}){
+export function SchoolYearStudioWorkspace({data,selection}:{data:Snapshot;selection:{siteId?:string;programId?:string}}){
  const router=useRouter();
- const selection=Route.useSearch();
  const [siteId,setSiteId]=useState(selection.siteId??data.programs.find(p=>p.id===selection.programId)?.siteId??data.sites[0]?.id??"");
  const [programId,setProgramId]=useState(selection.programId??"");
  const [scaleId,setScaleId]=useState(()=>{
