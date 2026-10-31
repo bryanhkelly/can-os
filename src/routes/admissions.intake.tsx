@@ -12,9 +12,9 @@ import { AdmissionsInquiryForm } from "@/components/admissions/AdmissionsInquiry
 import { AdmissionsPageNavigation } from "@/components/admissions/AdmissionsPageNavigation";
 import { AdmissionsPipelineSummary,countAdmissionsStages } from "@/components/admissions/AdmissionsPipelineSummary";
 import { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
-const load=async(selection:{interest?:string;siteId?:string;programId?:string;page?:number;studentPage?:number;search?:string})=>{
+const load=async(selection:{interest?:string;siteId?:string;programId?:string;page?:number;studentPage?:number;search?:string;application?:string})=>{
  const [records,programs,existingStudentPage,publicInterests,selectedInterestPage]=await Promise.all([
-  listAdmissionsIntake({data:{siteId:selection.siteId,programId:selection.programId,page:selection.page??1,search:selection.search}}),
+  listAdmissionsIntake({data:{siteId:selection.siteId,programId:selection.programId,page:selection.page??1,search:selection.application?undefined:selection.search,applicationId:selection.application}}),
   listAdmissionsIntakePrograms(),
   listAdmissionsExistingStudentsPage({data:{siteId:selection.siteId,programId:selection.programId,page:selection.studentPage??1}}),
   listPublicAdmissionsInterests({data:{}}),
@@ -33,7 +33,7 @@ export const Route=createFileRoute("/admissions/intake")({
   programId:typeof search.programId==="string"?search.programId:undefined,
   interest:typeof search.interest==="string"?search.interest:undefined,
  }),
- loaderDeps:({search})=>({interest:search.interest,siteId:search.siteId,programId:search.programId,page:search.page,studentPage:search.studentPage,search:search.search}),
+ loaderDeps:({search})=>({interest:search.interest,siteId:search.siteId,programId:search.programId,page:search.page,studentPage:search.studentPage,search:search.search,application:search.application}),
  loader:({deps})=>safeLoader(()=>load(deps),{authMessage:"Sign in as a registrar to manage admissions."})(),
  component:IntakePage
 });
