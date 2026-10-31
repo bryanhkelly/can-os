@@ -423,6 +423,13 @@ export async function startFamilyApplication(
         },
         updatedAt:new Date(),
       }).where(eq(actions.id,originTransfer.actionId));
+      await writeAudit(tx,context,{
+        action:"application.transfer_origin_linked",
+        entityType:"application",entityId:application.id,
+        scope:{organizationId:program.organizationId,siteId:program.siteId,programId:input.programId},
+        after:{originTransferActionId:originTransfer.actionId,
+          destinationProgramId:input.programId,studentProfileId},
+      });
     }
 
     if (familyStart && program.siteId) {
@@ -483,6 +490,7 @@ export async function startFamilyApplication(
         schoolYearId: input.schoolYearId ?? null,
         source: source ?? null,
         studentIdentityReused: reusedVerifiedStudent,
+        originTransferActionId:originTransfer?.actionId??null,
         journeyId,
       },
     });
