@@ -292,6 +292,9 @@ export function extractCommonCartridgeStaticLesson(zip:Uint8Array,entry:Cartridg
   if(offset+46>eocd||view.getUint32(offset,true)!==0x02014b50)
     throw new Error("Malformed cartridge entry.");
   const flags=view.getUint16(offset+8,true),method=view.getUint16(offset+10,true);
+  const unixMode=view.getUint32(offset+38,true)>>>16;
+  if((unixMode&0xf000)===0xa000)throw new Error("Symlink ZIP entries are unsupported.");
+
   const crc=view.getUint32(offset+16,true),compressed=view.getUint32(offset+20,true);
   const expanded=view.getUint32(offset+24,true),nameSize=view.getUint16(offset+28,true);
   const extra=view.getUint16(offset+30,true),comment=view.getUint16(offset+32,true);
