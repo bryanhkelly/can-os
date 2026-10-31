@@ -1,3 +1,4 @@
+import { ClassTeachingTeam } from "@/components/learning/ClassTeachingTeam";
 import { PublishedLessonNavigation } from "@/components/learning/PublishedLessonNavigation";
 import { selectPublishedLesson } from "@/components/learning/lesson-navigation";
 import { StudentNextStepsPanel } from "@/components/learning/StudentNextStepsPanel";
@@ -188,9 +189,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
           </li>)}</ol>
         </details>
       </WorkspacePanel>}
-      <WorkspacePanel title="Teaching team"><ul className="space-y-2 text-sm">{data.teachers.map(teacher => <li key={teacher.personId}><Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link></li>)}</ul>
-        {!data.teachers.length && <p className="text-sm text-muted-foreground">No teaching team is assigned.</p>}
-      </WorkspacePanel>
+      <ClassTeachingTeam teachers={data.teachers} />
     </div>}
     {data.curriculumAccess?.available===false&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">
       {data.curriculumAccess.reason} Your assignments and academic records remain available in their usual workspaces.
