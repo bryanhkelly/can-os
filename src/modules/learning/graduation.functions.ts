@@ -99,6 +99,29 @@ export const listGraduationRequirements = createServerFn({method:"GET"})
    return db.select().from(s.graduationRequirementSets).where(eq(s.graduationRequirementSets.issuingOrganizationId,data.issuerId)).orderBy(desc(s.graduationRequirementSets.approvedAt));
  });
 
+/** Student-centered registrar choices: only institution-scoped issued records.
+ * IDs stay server-owned and are returned only as opaque options. */
+export const listGraduationCandidates=createServerFn({method:"GET"})
+ .validator((value:unknown)=>z.object({query:z.string().trim().min(2).max(100)}).parse(value))
+ .handler(async ({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const context=await registrar();const {db,s}=await resources();
+  const {ilike}=await import("drizzle-orm");
+  const issuerIds=context.scope.organizationIds??[];
+  if(!issuerIds.length)return [];
+  const {inArray}=await import("drizzle-orm");
+  return db.select({transcriptId:s.transcriptIssuances.id,
+    studentProfileId:s.studentProfiles.id,issuerId:s.transcriptIssuances.issuingOrganizationId,
+    firstName:s.people.legalFirstName,lastName:s.people.legalLastName,
+    issuedAt:s.transcriptIssuances.issuedAt})
+   .from(s.transcriptIssuances)
+   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.transcriptIssuances.studentProfileId))
+   .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
+   .where(and(inArray(s.transcriptIssuances.issuingOrganizationId,issuerIds),
+     ilike(s.people.legalFirstName,"%"+data.query+"%")))
+   .orderBy(desc(s.transcriptIssuances.issuedAt)).limit(40);
+ });
+
 export const auditIssuedTranscript = createServerFn({method:"GET"})
  .validator((input:unknown) => z.object({transcriptId:uuid,requirementSetId:uuid}).parse(input))
  .handler(async ({data}) => {
