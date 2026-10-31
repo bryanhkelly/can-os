@@ -72,6 +72,30 @@ describe("published Site HTTPS verification", () => {
     });
     expect(result.status).toBe("unreachable");
   });
+  it("stops consuming an oversized streaming response", async () => {
+    let pulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled++;
+        controller.enqueue(new Uint8Array(600_000));
+        if (pulled >= 5) controller.close();
+      },
+    });
+    const r = new Response(stream, { headers: { "content-type": "text/html" } });
+    const result = await checkPublishedSiteReachability({
+      host, published: true, hostingConfigured: true, fetcher: fetcher(r),
+    });
+    expect(result.status).toBe("unreachable");
+    expect(pulled).toBeLessThan(5);
+  });
+  it("rejects invalid UTF-8 HTML rather than accepting replacement characters", async () => {
+    const r = new Response(new Uint8Array([0xff, 0xfe]), {
+      headers: { "content-type": "text/html" },
+    });
+    expect((await checkPublishedSiteReachability({
+      host, published: true, hostingConfigured: true, fetcher: fetcher(r),
+    })).status).toBe("unreachable");
+  });
   it("does not report TLS, DNS or timeout failures as live", async () => {
     const f = vi.fn(async () => { throw new TypeError("fetch failed"); }) as unknown as typeof fetch;
     const result = await checkPublishedSiteReachability({ host, published: true, hostingConfigured: true, fetcher: f });
