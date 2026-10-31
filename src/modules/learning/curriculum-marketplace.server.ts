@@ -3,7 +3,7 @@ import { db } from "@/db/client";
 import {
  curriculumAdoptions, curriculumAnnualAdoptions, schoolYears, curriculumEntitlements, curriculumOverlays, curriculumPackItems,
  curriculumPacks, curriculumPackVersions, curriculumResources, courseTemplates, courseTemplateVersions,
- organizations, programs, sections,
+ organizations, programs, sections, terms,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { readClassContent } from "@/domain/class-content";
@@ -14,6 +14,7 @@ import type { Actor } from "@/modules/identity/actors.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
+import { listLaunchEligibleCourses } from "@/modules/programs/launch-curriculum-eligibility.server";
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const publishCapability = "curriculum.publish";
 export const adoptionCapability = "curriculum.adopt";
@@ -161,7 +162,7 @@ export async function adoptPack(_actor: Actor,_input:{programId:string;packId:st
 }
 
 export async function addCurriculumSupplement(actor:Actor,input:{
- programId:string;courseVersionId:string;sectionId?:string;lessonId?:string;
+ programId:string;courseVersionId:string;academicYearId?:string;sectionId?:string;lessonId?:string;
  scope:"program"|"site"|"section";title:string;kind:"link"|"video"|"pdf"|"image"|"audio"|"document";
  url:string;
 }){
@@ -169,15 +170,24 @@ export async function addCurriculumSupplement(actor:Actor,input:{
   const program=await authorizedProgram(actor,input.programId,tx);
   if(input.scope==="site" && !program.siteId)throw new Error("Site supplement requires a site.");
   if(input.scope==="section" && !input.sectionId)throw new Error("Section supplement requires a class.");
-  const adoptions=await tx.select({id:curriculumAdoptions.id}).from(curriculumAdoptions)
-   .innerJoin(curriculumEntitlements,and(
-      eq(curriculumEntitlements.packId,curriculumAdoptions.packId),
-      eq(curriculumEntitlements.organizationId,curriculumAdoptions.organizationId)))
-   .innerJoin(curriculumPackItems,eq(curriculumPackItems.packVersionId,curriculumAdoptions.packVersionId))
-   .where(and(eq(curriculumAdoptions.programId,program.id),eq(curriculumAdoptions.status,"active"),
-     eq(curriculumEntitlements.status,"active"),
-     eq(curriculumPackItems.courseTemplateVersionId,input.courseVersionId))).limit(1);
-  if(!adoptions.length)throw new AuthorizationError("adopted curriculum course");
+  // The historical Program-wide adoption table cannot authorize new publisher usage.
+  // A Section supplement derives the academic year from the existing Section's term.
+  // Program/Site supplements require an explicit target academic year.
+  let schoolYearId=input.academicYearId;
+  if(input.scope==="section"){
+   const [scopedSection]=await tx.select({termId:sections.termId}).from(sections)
+    .where(and(eq(sections.id,input.sectionId!),eq(sections.programId,program.id),eq(sections.siteId,program.siteId!))).limit(1);
+   if(!scopedSection?.termId)throw new AuthorizationError("Section with canonical term required");
+   const [sectionTerm]=await tx.select({schoolYearId:terms.schoolYearId}).from(terms)
+    .where(eq(terms.id,scopedSection.termId)).limit(1);
+   if(!sectionTerm)throw new AuthorizationError("Section term missing");
+   if(schoolYearId&&schoolYearId!==sectionTerm.schoolYearId)throw new AuthorizationError("requested year differs from Section");
+   schoolYearId=sectionTerm.schoolYearId;
+  }
+  if(!schoolYearId)throw new AuthorizationError("Select an academic year for this supplement");
+  const eligible=await listLaunchEligibleCourses({...program,schoolYearId},tx);
+  if(!eligible.some(course=>course.versionId===input.courseVersionId&&course.origin==="adopted"))
+   throw new AuthorizationError("current year-scoped licensed publisher course");
   if(input.scope==="section"){
    const [section]=await tx.select().from(sections).where(eq(sections.id,input.sectionId!)).limit(1);
    if(!section || section.programId!==program.id || section.siteId!==program.siteId ||
