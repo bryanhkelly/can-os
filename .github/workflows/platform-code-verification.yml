@@ -29,6 +29,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Generate TanStack route types
+        run: npx tsr generate
       - name: Typecheck
         run: npm run typecheck
       - name: Unit tests
