@@ -26,12 +26,16 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Verify route ownership contracts
+        run: node scripts/check-platform-route-contracts.mjs --check
       - name: Verify route fixture contracts
         run: node scripts/check-route-fixture-coverage.mjs
       - name: Lint
