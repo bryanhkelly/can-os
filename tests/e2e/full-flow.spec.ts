@@ -785,6 +785,15 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         await expect(denied.getByText(fixture.programName)).toHaveCount(0);
       }
 
+      // Verify that the negative authorization result survives a fresh browser
+      // session, rather than relying on stale client-side state.
+      await unrelatedGuardian.page.reload();
+      await waitForAppHydration(unrelatedGuardian.page);
+      await expect(unrelatedGuardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
+      await expect(
+        unrelatedGuardian.page.getByRole("button", { name: "Request school follow-up" }),
+      ).toHaveCount(0);
+
       await sql.query(
         "update access_sessions set revoked_at = now() where account_id = $1",
         [fixture.studentAccountId!],
