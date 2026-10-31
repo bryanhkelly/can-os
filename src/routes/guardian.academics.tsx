@@ -9,10 +9,11 @@ import { AssignmentConversation } from "@/components/learning/AssignmentConversa
 import { GuardianGradeResponseHistory } from "@/components/learning/GuardianGradeResponse";
 
 export const Route = createFileRoute("/guardian/academics")({
- validateSearch:(search:Record<string,unknown>):{student?:string;section?:string;assessment?:string}=>({
+ validateSearch:(search:Record<string,unknown>):{student?:string;section?:string;assessment?:string;submission?:string}=>({
   student:typeof search.student==="string"?search.student:undefined,
   section:typeof search.section==="string"?search.section:undefined,
   assessment:typeof search.assessment==="string"?search.assessment:undefined,
+  submission:typeof search.submission==="string"?search.submission:undefined,
  }),
  component:()=> <GuardianAcademicsPage key={Route.useSearch().student??"default"}/>,
 });
@@ -21,7 +22,7 @@ type Student = { studentPersonId: string; firstName: string; lastName: string };
 type Assignment = Awaited<ReturnType<typeof getGuardianAssignments>>["assignments"][number];
 
 function GuardianAcademicsPage() {
- const {student,section,assessment}=Route.useSearch();
+ const {student,section,assessment,submission}=Route.useSearch();
  const navigate=Route.useNavigate();
  const [students, setStudents] = useState<Student[]>([]);
  const [selected, setSelected] = useState("");
@@ -102,7 +103,8 @@ function GuardianAcademicsPage() {
       {item.revisionFeedbackSubmissionId&&<SubmissionAnnotations key={item.revisionFeedbackSubmissionId}
        submissionId={item.revisionFeedbackSubmissionId}/>}
       <AssignmentConversation key={`${selected}:${item.assessmentId}`} assessmentId={item.assessmentId} studentPersonId={selected}/>
-      <GuardianGradeResponseHistory attempts={item.releasedAttempts} currentSubmissionId={item.submissionId}/>
+      <GuardianGradeResponseHistory attempts={item.releasedAttempts} currentSubmissionId={item.submissionId}
+       focusSubmissionId={submission}/>
      </>}
     </section>)}
    </div>}
