@@ -7,6 +7,7 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox";
+import { AdmissionsPageNavigation } from "@/components/admissions/AdmissionsPageNavigation";
 import { AdmissionsPipelineSummary,countAdmissionsStages } from "@/components/admissions/AdmissionsPipelineSummary";
 import {getReceivingSchoolTransferTranscript} from "@/modules/enrollment/transfer-records-handoff.functions";
 import { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
@@ -65,15 +66,13 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  const [createHouseholdConfirmed,setCreateHouseholdConfirmed]=useState(false);
  const existingStudents=data.existingStudents.filter(student=>student.programId===programId);
  const [searchDraft,setSearchDraft]=useState(selected.search??"");
- const pageNavigation=<nav aria-label="Admissions record pages" className="my-4 flex flex-wrap items-center gap-3 text-sm">
+ const pageNavigation=<div className="my-4 flex flex-wrap items-center gap-3">
   <form onSubmit={e=>{e.preventDefault();void router.navigate({to:"/admissions/intake",search:{...selected,search:searchDraft||undefined,page:1}});}}>
    <input aria-label="Search admissions" className="rounded border bg-background px-2 py-1" value={searchDraft} onChange={e=>setSearchDraft(e.target.value)} placeholder="Student, program, application ID"/>
    <button className="ml-2 rounded border px-2 py-1" type="submit">Search</button>
   </form>
-  {Number(selected.page??1)>1&&<Link to="/admissions/intake" search={{...selected,page:(selected.page??1)-1}} className="underline">Previous</Link>}
-  <span>Page {selected.page??1}</span>
-  {data.records.length===40&&<Link to="/admissions/intake" search={{...selected,page:(selected.page??1)+1}} className="underline">Next</Link>}
- </nav>;
+  <AdmissionsPageNavigation selection={selected} hasMore={data.records.length===40} kind="applications"/>
+ </div>;
 
  const studentKey=(student:typeof existingStudents[number])=>
   `${student.studentProfileId}:${student.guardianPersonId}:${student.householdId??"new"}`;
@@ -158,11 +157,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
        {!student.householdId?" (new household required)":""}
       </option>)}
      </select>
-     <nav aria-label="Existing student directory pages" className="mt-2 flex gap-3 text-xs">
-      {(selected.studentPage??1)>1&&<Link to="/admissions/intake" search={{...selected,studentPage:(selected.studentPage??1)-1}} className="underline">Previous students</Link>}
-      <span>Student directory page {selected.studentPage??1}</span>
-      {data.existingStudentHasMore&&<Link to="/admissions/intake" search={{...selected,studentPage:(selected.studentPage??1)+1}} className="underline">Next students</Link>}
-     </nav>
+     <AdmissionsPageNavigation selection={selected} hasMore={data.existingStudentHasMore} kind="students"/>
      <span className="mt-1 block text-xs text-muted-foreground">
       Existing students reuse their identity and managing guardian. Existing households are preserved. Creating an inquiry does not activate enrollment.
      </span>
