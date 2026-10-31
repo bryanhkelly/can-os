@@ -89,6 +89,7 @@ function TranscriptIssuanceView({
       subtitle="Search finalized academic records in your authorized school scope and issue a point-in-time transcript from the credit issuer of record."
       actions={<div className="flex flex-wrap gap-2">
         <Link to="/operations/transfer-records" className="rounded-lg border px-3 py-2 text-sm">Complete records handoffs</Link>
+        <Link to="/admissions/credential-delivery" className="rounded-lg border px-3 py-2 text-sm">Deliver official credentials</Link>
         <Link to="/admissions" className="rounded-lg border px-3 py-2 text-sm">Admissions</Link>
       </div>}
     >
