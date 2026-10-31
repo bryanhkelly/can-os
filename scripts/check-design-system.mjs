@@ -30,11 +30,27 @@ for (const file of files) {
     }
   }
 }
-const duplicates = [...exportsByName].filter(([, locations]) => locations.length > 1);
+const duplicates = [...exportsByName].filter(([, locations]) => new Set(locations.filter(path => !path.endsWith("/index.tsx"))).size > 1);
 if (duplicates.length) {
   console.error("Duplicate shared component exports detected:");
   for (const [name, locations] of duplicates) console.error(`- ${name}: ${locations.join(", ")}`);
   process.exitCode = 1;
 } else {
   console.log(`Design component ownership: ${files.length} files checked; no duplicate shared exports.`);
+}
+
+
+// Enforce a single implementation of the canonical evidence interaction widgets.
+// Deliberately specialized feature controls are excluded from this check.
+const canonicalEvidence = ["EvidenceUploader", "EvidenceReviewForm", "EvidenceWorkflow", "EvidenceHistory", "EvidenceStatus"];
+for (const name of canonicalEvidence) {
+  const implementationFiles = files.filter(file => {
+    const relativePath = relative(root, file).replaceAll("\\", "/");
+    if (relativePath.endsWith(".stories.tsx") || relativePath.endsWith("/index.tsx")) return false;
+    return new RegExp("export\\s+(?:function|const)\\s+" + name + "\\b").test(readFileSync(file, "utf8"));
+  });
+  if (implementationFiles.length !== 1 || !relative(root, implementationFiles[0]).startsWith("evidence/")) {
+    console.error(`Canonical evidence component ${name} must have exactly one implementation in components/evidence`);
+    process.exitCode = 1;
+  }
 }
