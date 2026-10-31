@@ -91,6 +91,8 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
    endsOn:terms.endsOn,
   }).from(terms).where(inArray(terms.schoolYearId,years.map(y=>y.id)))
    .orderBy(asc(terms.startsOn)):[];
+  const scheduleOptions=years.length?await db.select({id:scheduleTemplates.id,name:scheduleTemplates.name,schoolYearId:scheduleTemplates.schoolYearId})
+   .from(scheduleTemplates).where(inArray(scheduleTemplates.schoolYearId,years.map(year=>year.id))):[];
   const catalog=await listLaunchEligibleCourses(program);
   // Reuse the assignment service's authority rule. A church choosing CAN as
   // provider is NOT entitled to list CAN's organization-wide faculty; the
@@ -130,7 +132,7 @@ export const getLaunchAcademicSetup=createServerFn({method:"GET"})
     section.readiness.items.find(item=>item.key==="launch_staffing")?.state==="ready"])));
   const classroomSections=sectionSnapshots.map(section=>({...section,
    classroom:classrooms.find(classroom=>classroom.sectionId===section.id)!}));
-  return {program,years,terms:termRows,catalog,teachingStaff,sections:classroomSections,
+  return {program,years,terms:termRows,scheduleOptions,catalog,teachingStaff,sections:classroomSections,
    qualificationCatalog,policyPublished:Boolean(publishedPolicy),canAuthorCatalog,teacherPolicies,
    canPublishTeacherPolicy,canReviseTeacherPolicy,academicAuthority};
  });
