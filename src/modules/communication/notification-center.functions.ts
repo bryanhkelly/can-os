@@ -147,10 +147,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    .where(and(inArray(s.actions.id,familyChangeNoticeIds),
      eq(s.actions.type,"guardian_enrollment_change_request"),
      eq(s.actions.subjectType,"student_profile"),
+     // This parent owns the completed request, even after losing the
+     // originating school's enrollment Program scope.
      sql`${s.actions.metadata}->>'requestedByGuardianPersonId' = ${personId}`,
-     inArray(s.actions.siteId,context.scope.siteIds??[]),
-     inArray(s.actions.programId,context.scope.programIds??[]),
-     inArray(s.actions.organizationId,context.scope.organizationIds??[]),
    )):[];
  const familyChangeChildByAction=new Map(familyChangeActions.map(row=>[row.id,row.studentPersonId]));
  const operatorChangeNoticeIds=rows.filter(n=>n.type==="guardian_enrollment_change_requested"&&
