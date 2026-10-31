@@ -580,6 +580,7 @@ integration("cross-persona admissions through active classes",()=>{
     vi.useFakeTimers({toFake:["Date"]});
     vi.setSystemTime(new Date("2027-09-14T18:00:00Z"));
     try{
+      state.actor={...staff,scope:{organizationIds:[org.id]}};
       const scheduled=await listExpectedOnsiteRoster({data:{date:"2027-09-14"}});
       expect(scheduled.students).toEqual(expect.arrayContaining([
         expect.objectContaining({studentProfileId:profileId,programId:program.id}),
@@ -590,6 +591,10 @@ integration("cross-persona admissions through active classes",()=>{
         expectedPreviousEventId:null,note:"",
       }});
       expect(present.attendanceEventId).toBeTruthy();
+      state.actor={...staff,scope:{organizationIds:[org.id],siteIds:[crypto.randomUUID()]}};
+      await expect(listExpectedOnsiteRoster({data:{date:"2027-09-14"}}))
+       .resolves.toMatchObject({students:[]});
+      state.actor={...staff,scope:{organizationIds:[org.id]}};
       const recorded=await listExpectedOnsiteRoster({data:{date:"2027-09-14"}});
       expect(recorded.students).toEqual(expect.arrayContaining([
         expect.objectContaining({studentProfileId:profileId,status:"present"}),
