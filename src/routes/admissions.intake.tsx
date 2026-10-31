@@ -1,3 +1,4 @@
+import { AdmissionsTransferStatus } from "@/components/admissions/AdmissionsTransferStatus";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { ArrowUpRight } from "lucide-react";
 import {useEffect,useState} from "react";
@@ -172,31 +173,9 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
      <p className="mt-1 text-xs text-muted-foreground">{r.programName} · {r.disposition??r.stage} · Last updated {new Date(r.updatedAt).toLocaleDateString()}</p></div>
      <span className="rounded-full border px-3 py-1 text-xs">{r.disposition??r.stage}</span>
     </div>
-    {r.transferOriginStatus&&<div className="mt-3 rounded-lg border p-3 text-sm">
-      <strong>Linked transfer application</strong>
-      <p className="mt-1">Origin school exit: {r.transferOriginStatus==="completed"?
-        "Institutionally completed":r.transferOriginStatus==="pending"?
-        "Pending — may review and issue an offer; activation must wait":"Requires review before placement"}.</p>
-      {r.transferNamedDestination&&<p className="mt-1">Family's named receiving school: {r.transferNamedDestination}.
-        Confirm that this application is for the intended destination.</p>}
-      <p className="mt-1">Origin academic records: <strong>{r.transferRecordsStatus==="available_in_can"?
-        "Official transcript released inside CAN — available below":
-        r.transferRecordsStatus==="released_externally"?
-        "External secure delivery attested — no automatic CAN transcript access":
-        r.transferRecordsStatus==="pending_release"?
-        "Secure transcript handoff pending":
-        r.transferRecordsStatus==="requires_review"?
-        "Origin record authorization requires review":
-        "Not yet started"}</strong>.</p>
-      <p className="mt-1 text-xs text-muted-foreground">An institutional records handoff is separate from receiving-school admission. This school must independently decide admission, confirm seat capacity, obtain guardian acceptance and activate a real Section.</p>
-      {r.transferRecordsStatus==="available_in_can"&&<ReceivingTransferTranscript
-        applicationId={r.id} consentRequested={r.destinationTranscriptConsentRecorded}/>}
-      {r.transferRecordsStatus==="available_in_can"&&!r.destinationTranscriptConsentRecorded&&
-        <p role="status" className="mt-2 font-medium">
-          This application predates specific receiving-school transcript consent.
-          Request authorization from the verified guardian before accessing the official record.
-        </p>}
-    </div>}
+    <AdmissionsTransferStatus applicationId={r.id} transferOriginStatus={r.transferOriginStatus}
+     transferNamedDestination={r.transferNamedDestination} transferRecordsStatus={r.transferRecordsStatus}
+     destinationTranscriptConsentRecorded={r.destinationTranscriptConsentRecorded}/>
     <AdmissionsGuardianActions applicationId={r.id} verified={r.guardianVerified}
      loginProvisioned={r.guardianLoginProvisioned} busy={busy}
      onVerify={applicationId=>{
