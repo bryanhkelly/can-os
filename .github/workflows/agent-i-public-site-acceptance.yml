@@ -34,6 +34,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Validate external acceptance script syntax
+        run: node --check scripts/smoke-public-tenant-hosting.mjs
       - name: Tenant routing and reachability unit tests
         run: npx vitest run tests/unit/public-host-reachability.test.ts tests/unit/public-site-host-routing.test.ts tests/unit/public-tenant-edge-origin-isolation.test.ts tests/unit/public-netlify-edge-function.test.ts tests/unit/public-site-renderer-identity-contract.test.ts
       - name: Generate TanStack route tree and build
