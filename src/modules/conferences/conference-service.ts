@@ -129,7 +129,9 @@ async function assertEnrollmentEligibility(
     .where(
       and(
         eq(enrollments.studentProfileId, input.studentProfileId),
+        eq(enrollments.kind, "program"),
         eq(enrollments.status, "active"),
+        eq(programs.status, "active"),
         eq(programs.siteId, input.siteId),
         inArray(programs.id, input.programIds),
       ),
