@@ -16,7 +16,7 @@ import {SchoolPreparationNavigation} from "@/components/operations/SchoolPrepara
 import {ProgramSiteAuthorizationPanel} from "@/components/operations/ProgramSiteAuthorizationPanel";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
-import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
+import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedLaunchInstitutions } from "@/domain/launch-institution-defaults";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -207,8 +207,6 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
     setOnsite(true); setAsynchronous(false); setLiveOnline(false);
     setOnsiteDaysPerWeek(offering === "after_school_enrichment" ? "3" : "5");
   }
-  const selectClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
-  const inputClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
 
   if (authError || !options || !launches) {
     return (
