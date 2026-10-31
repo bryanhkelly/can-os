@@ -92,7 +92,7 @@ const admissionsPageInput=z.object({
  pageSize:z.coerce.number().int().min(1).max(100).default(40),
 }).strict();
 export const listAdmissionsExistingStudentsPage=createServerFn({method:"GET"})
- .validator((value:unknown)=>admissionsPageInput.parse(value??{}))
+ .validator((value:unknown)=>admissionsPageInput.omit({cursor:true}).extend({page:z.coerce.number().int().min(1).max(10000).default(1)}).parse(value??{}))
  .handler(async({data})=>{
   const actor=await registrar();
   const rows=await db.selectDistinct({
@@ -116,14 +116,14 @@ export const listAdmissionsExistingStudentsPage=createServerFn({method:"GET"})
     eq(people.active,true),eq(intakeGuardian.active,true),
     or(eq(householdMemberships.householdId,guardianHousehold.householdId),
      and(isNull(householdMemberships.id),isNull(guardianHousehold.id))),
-    data.cursor?gt(studentProfiles.id,data.cursor):undefined,
     data.search?or(ilike(people.legalFirstName,"%"+data.search+"%"),
      ilike(people.legalLastName,"%"+data.search+"%"),
      ilike(intakeGuardian.legalLastName,"%"+data.search+"%"),
      z.string().uuid().safeParse(data.search).success?eq(studentProfiles.id,data.search):undefined):undefined))
-   .orderBy(asc(studentProfiles.id),asc(programs.id),asc(intakeGuardian.id)).limit(data.pageSize+1);
+   .orderBy(asc(studentProfiles.id),asc(programs.id),asc(intakeGuardian.id),asc(householdMemberships.householdId))
+   .limit(data.pageSize+1).offset((data.page-1)*data.pageSize);
   const items=rows.slice(0,data.pageSize);
-  return {items,nextCursor:rows.length>data.pageSize?items[items.length-1]?.studentProfileId??null:null};
+  return {items,nextPage:rows.length>data.pageSize?data.page+1:null};
  });
 export const listAdmissionsExistingStudents=createServerFn({method:"GET"}).handler(async()=>{
  return existingStudentChoices(db,await registrar());
