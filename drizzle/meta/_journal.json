@@ -393,13 +393,6 @@
       "when": 1793421600000,
       "tag": "0055_academic_credential_release_authorizations",
       "breakpoints": true
-    },
-    {
-      "idx": 56,
-      "version": "7",
-      "when": 1793425200000,
-      "tag": "0056_church_onboarding_evidence_statuses",
-      "breakpoints": true
     }
   ]
 }
