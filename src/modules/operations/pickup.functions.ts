@@ -468,6 +468,9 @@ export const revokePickupAuthorization = createServerFn({ method: "POST" })
       });
       if (existing.authorizedByPersonId !== actor.actorPersonId)
         throw new AuthorizationError("guardian who created this pickup authorization");
+      // A parent revocation and an onsite release must not both commit based
+      // on an old "active" authorization observed in separate transactions.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"pickup-safety:" + existing.studentProfileId + ":" + existing.programId}))`);
       if (existing.status === "revoked") {
         if (existing.revocationReason !== data.reason)
           throw new Error("Authorization was already revoked with a different reason");
