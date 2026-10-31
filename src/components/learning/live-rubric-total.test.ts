@@ -7,5 +7,7 @@ describe("live rubric preview", () => {
     expect(liveRubricTotal(rubric, {})).toBeNull();
     expect(liveRubricTotal(rubric, { clarity: "" })).toBeNull();
     expect(liveRubricTotal(rubric, { clarity: "3" })).toBe(3);
+    expect(liveRubricTotal(rubric, { clarity: "6" })).toBeNull();
+    expect(liveRubricTotal(rubric, { clarity: "not-a-number" })).toBeNull();
   });
 });
