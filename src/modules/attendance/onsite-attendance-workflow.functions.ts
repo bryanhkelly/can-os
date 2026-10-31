@@ -341,7 +341,8 @@ export const loadExpectedFirstDayPreparationForActor=createServerOnlyFn(async(ac
     throw new AuthorizationError("valid scoped school-day preparation identifiers");
   const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,
     timezone:sites.timezone}).from(sites).where(eq(sites.id,data.siteId)).limit(1);
-  if(!site || !actor.scope.organizationIds.includes(site.organizationId))
+  if(!site || !actor.scope.organizationIds.includes(site.organizationId) ||
+    (actor.grantSiteId && actor.grantSiteId!==site.id))
     throw new AuthorizationError("original registrar organization and Site");
   const today=siteDate(new Date(),site.timezone);
   if(data.date<today)throw new AuthorizationError("future first-day date cannot be in the past");
