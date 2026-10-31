@@ -39,7 +39,7 @@ import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
-import { and,desc,eq,inArray,isNotNull,isNull,sql } from "drizzle-orm";
+import { and,desc,eq,inArray,isNotNull,isNull,or,sql } from "drizzle-orm";
 
 /** Enrollment commands must never interpret an absent program grant as global access. */
 function requireEnrollmentProgramScope(context:CommandContext,programId:string):void {
@@ -229,11 +229,13 @@ export async function startFamilyApplication(
       }
     }
 
-    let familyStart: {id:string;email:string} | undefined;
+    let familyStart: {id:string;email:string;firstName:string;lastName:string} | undefined;
     if (input.familyStartRequestId) {
       if (!accountId || !program.siteId) throw new AuthorizationError("verified family account and Site");
       const [start] = await tx.select({id:publicFamilyStartRequests.id,
-        email:publicFamilyStartRequests.emailNormalized})
+        email:publicFamilyStartRequests.emailNormalized,
+        firstName:publicFamilyStartRequests.adultFirstName,
+        lastName:publicFamilyStartRequests.adultLastName})
         .from(publicFamilyStartRequests)
         .innerJoin(accessAccounts,and(
           eq(accessAccounts.id,accountId),
@@ -501,6 +503,12 @@ export async function startFamilyApplication(
           isNull(publicAdmissionsInterests.applicationId),
           isNotNull(publicAdmissionsInterests.contactConsentAt),
           sql`lower(btrim(${publicAdmissionsInterests.contactEmail})) = ${familyStart.email}`,
+          sql`lower(btrim(${publicAdmissionsInterests.contactFirstName})) = ${familyStart.firstName.trim().toLocaleLowerCase("en-US")}`,
+          sql`lower(btrim(${publicAdmissionsInterests.contactLastName})) = ${familyStart.lastName.trim().toLocaleLowerCase("en-US")}`,
+          // A different, still linked email challenge is not evidence that
+          // this verified account responded to that earlier outreach.
+          or(isNull(publicAdmissionsInterests.familyStartRequestId),
+             eq(publicAdmissionsInterests.familyStartRequestId,familyStart.id)),
         )).orderBy(
           sql`CASE WHEN ${publicAdmissionsInterests.familyStartRequestId} = ${familyStart.id} THEN 0 ELSE 1 END`,
           desc(publicAdmissionsInterests.createdAt),
