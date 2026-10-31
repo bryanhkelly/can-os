@@ -104,15 +104,11 @@ export function ChurchApplicationsDesk() {
                 <option value="independent_church_confirmation">Independent church officer confirmation</option>
               </select>
             </label>
-            <label className="block text-sm font-semibold">External evidence record or reference
-              <input required minLength={8} maxLength={500} className={field} value={evidenceReference[request.id] ?? ""}
-                onChange={e=>setEvidenceReference(previous=>({...previous,[request.id]:e.target.value}))} placeholder="Document vault reference or verified contact record" />
-            </label>
-            <button type="button" disabled={!!working||(evidenceReference[request.id] ?? "").trim().length<8}
-              onClick={()=>void act(request.id,"verify")}
-              className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-              Record independent verification
-            </button>
+            <p role="status" className="rounded border border-amber-500/50 p-3 text-sm">
+              Authority verification is paused until applicant-bound private evidence intake,
+              content screening, and independent inspection are deployed. Staff-entered vault
+              references or external links cannot authorize church onboarding.
+            </p>
           </div> : <div className="mt-4 space-y-3">
             <p className="text-sm">Authority recorded by the verifying steward. A different CAN steward must independently review this evidence before issuing access.</p>
             {request.authorityEvidence ? <div className="rounded-lg border bg-background p-3 text-sm">
