@@ -58,7 +58,7 @@ export function useWorkspaceMutation<TInput, TResult>(options: WorkspaceMutation
         // Never turn their failure into a command failure or invite a retry.
         failure ??= asError(error);
         setRefreshError(failure);
-        options.onRefreshError?.(failure);
+        try { options.onRefreshError?.(failure); } catch { /* Preserve committed command status. */ }
       }
       return { status: "completed", value, ...(failure ? { refreshError: failure } : {}) };
     } finally {
