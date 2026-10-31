@@ -1,6 +1,7 @@
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {useState,type FormEvent} from "react";
 import {WorkspaceShell} from "@/components/workspace";
+import {FamilyInvitationBatchList,FamilyInvitationFeedback} from "@/components/admissions/FamilyInvitationBatchList";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {
@@ -61,8 +62,7 @@ function FamilyInvitationsWorkspace({data}:{data:Data}){
  return <WorkspaceShell eyebrow="CAN OS · Admissions" title="Invite families to apply"
   subtitle="Send verified-email enrollment invitations to prospective families, including transfers from another school. The receiving-school registrar controls the invitation; no child identity or admissions decision is inferred."
   actions={<Link to="/admissions" className="rounded border px-3 py-2 text-sm">Admissions</Link>}>
-  {notice&&<p role="status" className="mt-5 rounded border p-4 text-sm">{notice}</p>}
-  {error&&<p role="alert" className="mt-5 rounded border p-4 text-sm">{error}</p>}
+  <FamilyInvitationFeedback notice={notice} error={error}/>
   {eligible.length>0?<form onSubmit={event=>void submit(event)} className="mt-6 max-w-3xl space-y-4 rounded-xl border bg-card p-5">
    <h2 className="font-semibold">Send a private receiving-school application invitation</h2>
    <label className="block text-sm font-medium">Authorized school Program
@@ -94,25 +94,6 @@ function FamilyInvitationsWorkspace({data}:{data:Data}){
   </form>:<p className="mt-6 rounded border p-4 text-sm">
     No operating school Programs with admissions authority are available to this registrar. Complete institutional authorization before sending application invitations.
   </p>}
-  <section className="mt-8 space-y-3">
-   <h2 className="text-lg font-semibold">Recent invitation batches</h2>
-   {data.batches.map(batch=><article key={batch.id} className="rounded-lg border bg-card p-4">
-     <p className="font-semibold">{batch.programName} · {batch.subject}</p>
-     <p className="mt-1 text-xs text-muted-foreground">
-       {new Date(batch.createdAt).toLocaleString()} · {batch.status} · {batch.outboxStatus??"Queued for dispatch"}
-     </p>
-     <p className="mt-2 text-sm">{batch.recipients.length} recipient(s):
-       {batch.recipients.filter(row=>row.status==="responded").length} verified a link;
-       {batch.recipients.filter(row=>row.status==="provider_accepted").length} provider accepted;
-       {batch.recipients.filter(row=>row.status==="retrying").length} require retry.</p>
-     {batch.recipients.some(row=>row.status==="retrying")&&<button type="button"
-       disabled={busy} onClick={()=>void retry(batch.id)}
-       className="mt-3 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50">
-       Retry unaccepted invitations
-     </button>}
-     <p className="mt-2 text-xs text-muted-foreground">Provider acceptance does not confirm inbox delivery. A verified email link is not proof of guardianship or admission.</p>
-   </article>)}
-   {!data.batches.length&&<p className="rounded-lg border p-4 text-sm">No invitations are recorded for your schools.</p>}
-  </section>
+  <FamilyInvitationBatchList batches={data.batches} busy={busy} onRetry={batchId=>void retry(batchId)}/>
  </WorkspaceShell>;
 }
