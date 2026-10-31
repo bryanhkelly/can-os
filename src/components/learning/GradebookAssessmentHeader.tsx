@@ -20,7 +20,7 @@ export function GradebookAssessmentHeader({
   onDueDateChange: (value: string) => void;
   onAction: (action: Action) => void;
   onDraftSaved: () => Promise<void>;
-  onScheduleSaved: () => Promise<unknown> | void;
+  onScheduleSaved: () => Promise<unknown>;
 }) {
   return (
     <th className="min-w-32 p-3 font-semibold">
