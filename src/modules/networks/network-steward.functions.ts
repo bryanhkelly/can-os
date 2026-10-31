@@ -123,3 +123,13 @@ export const declineChurchOnboardingRequest = createServerFn({ method: "POST" })
     ]);
     return declineChurchApplication(await getCommandContext(getRequest()), data.requestId, data.note);
   });
+
+export const resendApprovedChurchInvitation = createServerFn({ method: "POST" })
+  .validator((value: unknown) => uuid.parse(value))
+  .handler(async ({ data }) => {
+    const [{ getCommandContext }, { resendChurchInvitation }] = await Promise.all([
+      import("@/modules/identity/command-context.server"),
+      import("./church-applications.server"),
+    ]);
+    return resendChurchInvitation(await getCommandContext(getRequest()), data);
+  });
