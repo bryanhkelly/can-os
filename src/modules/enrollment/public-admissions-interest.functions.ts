@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { and, desc, eq, inArray, leftJoin } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { applications, programs, publicAdmissionsInterests, publicFamilyStartRequests } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
