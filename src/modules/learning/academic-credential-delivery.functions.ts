@@ -65,7 +65,10 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
     throw new AuthorizationError("Release expiry must be within 30 days");
   const [recipient]=await db.select({id:s.people.id}).from(s.people)
     .where(eq(s.people.id,data.recipientPersonId)).limit(1);
-  if(!recipient)throw new AuthorizationError("verified recipient identity required");
+  if(!recipient)throw new AuthorizationError("recipient identity not found");
+  // A person record is not proof of a verified email, release instruction or consent.
+  // Keep authorization fail-closed until independent evidence verification is wired.
+  throw new AuthorizationError("Independent recipient, consent and release-instruction verification is required before authorizing external disclosure");
   return db.transaction(async tx=>{
    const [row]=await tx.insert(s.academicCredentialReleaseAuthorizations).values({
     issuingOrganizationId:doc.issuerId,
