@@ -29,7 +29,7 @@ vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:asyn
 vi.mock("@/domain/access-tokens",()=>({normalizeAccessEmail:(email:string)=>email.trim().toLowerCase()}));
 vi.mock("@/modules/enrollment/instructional-section-readiness.server",()=>({staffedPublishedSectionIds:async(ids:string[])=>new Set(ids)}));
 vi.mock("@/modules/identity/passwordless-access.server",()=>({requestOneTimeAccess:state.sender}));
-vi.mock("@/platform/mutation",()=>({emitEvent:state.emit,writeAudit:state.audit}));
+vi.mock("@/platform/mutation",()=>({emitEvent:state.emit,writeAudit:state.audit,notify:vi.fn()}));
 vi.mock("@/domain/event-types",()=>({EventTypes:{StudentLearningAccessApproved:"StudentLearningAccessApproved"}}));
 import { provisionStudentLearningAccess } from "@/modules/enrollment/student-access-handoff.functions";
 const input={applicationId:"application",confirmedIndependentIdentity:true as const,reviewMethod:"institutional_school_record" as const};
@@ -93,4 +93,3 @@ describe("student approval and sign-in request outcomes",()=>{
   expect(state.sender).not.toHaveBeenCalled();
  });
 });
-

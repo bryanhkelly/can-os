@@ -37,14 +37,14 @@ beforeEach(()=>{
   vi.clearAllMocks();
   state.actor={actorPersonId:"guardian",role:"guardian",accountId:"account",capabilities:new Set(["enrollment.apply"]),
     scope:{programIds:["program"],siteIds:["site"],organizationIds:["church"]}};
-  state.rows=[[app],[{schoolYearId:"intended-year"}],[section],
-    [{canManage:true,metadata:{verification:"verified"}}],[{status:"approved",studentEmail:"child@example.test"}]];
+  state.rows=[[app],[{canManage:true,metadata:{verification:"verified"}}],
+    [{schoolYearId:"intended-year"}],[section],[{status:"pending_review",studentEmail:"child@example.test"}]];
   state.ready.mockImplementation(async(ids:string[])=>new Set(ids));
 });
 describe("student access uses the accepted application's Program and year",()=>{
   it("retains handoff for the current active Program and intended year",async()=>{
     expect(await getStudentLearningHandoff({data:{applicationId:"application"}})).toEqual({
-      status:"approved",studentEmail:"child@example.test",
+      status:"pending_review",studentEmail:"child@example.test",blocker:null,
     });
     expect(state.ready).toHaveBeenCalledWith(["section"],expect.anything());
   });
@@ -60,19 +60,36 @@ describe("student access uses the accepted application's Program and year",()=>{
     expect(state.ready).not.toHaveBeenCalled();
   });
   it("does not use another year's active class to authorize this application",async()=>{
-    state.rows=[[app],[{schoolYearId:"other-year"}],[{...section,sectionYearId:"other-year",enrollmentYearId:"other-year"}]];
-    await expect(getStudentLearningHandoff({data:{applicationId:"application"}})).rejects.toThrow("ready classroom");
-    expect(state.ready).toHaveBeenCalledWith([],expect.anything());
+    state.rows=[[app],[{canManage:true,metadata:{verification:"verified"}}],[{schoolYearId:"other-year"}],[{...section,sectionYearId:"other-year",enrollmentYearId:"other-year"}]];
+    expect(await getStudentLearningHandoff({data:{applicationId:"application"}})).toMatchObject({status:"blocked",blocker:{code:"placement_missing"}});
+    expect(state.ready).not.toHaveBeenCalled();
   });
   it("denies an application without active Program enrollment",async()=>{
-    state.rows=[[app],[]];
-    await expect(getStudentLearningHandoff({data:{applicationId:"application"}})).rejects.toThrow("active accepted student enrollment");
+    state.rows=[[app],[{canManage:true,metadata:{verification:"verified"}}],[]];
+    expect(await getStudentLearningHandoff({data:{applicationId:"application"}})).toMatchObject({status:"blocked",blocker:{code:"enrollment_missing"}});
     expect(state.ready).not.toHaveBeenCalled();
   });
   it("preserves legacy applications without an intended-year snapshot",async()=>{
-    state.rows=[[{...app,applicationMetadata:{}}],[{schoolYearId:"intended-year"}],[section],
-      [{canManage:true,metadata:{verification:"verified"}}],[]];
-    expect(await getStudentLearningHandoff({data:{applicationId:"application"}})).toEqual({status:"not_requested",studentEmail:null});
+    state.rows=[[{...app,applicationMetadata:{}}],[{canManage:true,metadata:{verification:"verified"}}],
+      [{schoolYearId:"intended-year"}],[section],[]];
+    expect(await getStudentLearningHandoff({data:{applicationId:"application"}})).toEqual({status:"not_requested",studentEmail:null,blocker:null});
+  });
+  it("explains current classroom readiness without marking the student ready",async()=>{
+    state.ready.mockResolvedValue(new Set());
+    expect(await getStudentLearningHandoff({data:{applicationId:"application"}})).toMatchObject({
+      status:"blocked",studentEmail:null,blocker:{code:"classroom_not_ready",target:"academic_setup",programId:"program"},
+    });
+  });
+  it("denies an unrelated school before exposing a readiness blocker",async()=>{
+    state.actor={actorPersonId:"registrar",role:"registrar",capabilities:new Set(["enrollment.activate"]),
+      scope:{organizationIds:["church"],siteIds:["other"],programIds:["program"]}};
+    state.rows=[[{...app,programStatus:"paused"}]];
+    await expect(getStudentLearningHandoff({data:{applicationId:"application"}})).rejects.toThrow("school membership");
+    expect(state.ready).not.toHaveBeenCalled();
+  });
+  it("denies an unverified family relationship before exposing readiness",async()=>{
+    state.rows=[[{...app,programStatus:"paused"}],[{canManage:true,metadata:{verification:"pending"}}]];
+    await expect(getStudentLearningHandoff({data:{applicationId:"application"}})).rejects.toThrow("verified family relationship");
+    expect(state.ready).not.toHaveBeenCalled();
   });
 });
-

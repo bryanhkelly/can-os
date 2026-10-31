@@ -23,6 +23,7 @@ function ApplicationLearningAccessHandoff({
  applicationId,role,
 }:{applicationId:string;role:ViewRole}){
  const [status,setStatus]=useState("loading");
+ const [blocker,setBlocker]=useState<Awaited<ReturnType<typeof getStudentLearningHandoff>>["blocker"]>(null);
  const [email,setEmail]=useState("");
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState("");
@@ -34,13 +35,13 @@ function ApplicationLearningAccessHandoff({
   let live=true;
   // Switching between children must not retain another child's email, review
   // confirmation or approval status while a new handoff request is in flight.
-  setStatus("loading");setEmail("");setError("");setNotice("");
+  setStatus("loading");setEmail("");setError("");setNotice("");setBlocker(null);
   setIndependentReviewConfirmed(false);
   setReviewMethod("institutional_school_record");
   void getStudentLearningHandoff({data:{applicationId}})
    .then(result=>{
     if(!live)return;
-    setStatus(result.status);setEmail(result.studentEmail??"");
+    setStatus(result.status);setEmail(result.studentEmail??"");setBlocker(result.blocker);
    })
    .catch(()=>{if(live)setStatus("not_available");});
   return ()=>{live=false;};
@@ -72,6 +73,15 @@ function ApplicationLearningAccessHandoff({
   }catch(e){setError(e instanceof Error?e.message:"Student access handoff could not be completed");}
   finally{setBusy(false);}
  }
+ if(status==="blocked"&&blocker)return <section aria-label="Student learning account" className="mt-4 rounded-lg border p-4 text-sm">
+  <h4 className="font-semibold">Student learning account · Next requirement</h4>
+  <p role="status" className="mt-2">{blocker.message}</p>
+  {role==="registrar"?(blocker.target==="academic_setup"
+   ?<Link to="/operations/launch/$programId" params={{programId:blocker.programId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>
+   :<Link to="/admissions" search={{siteId:blocker.siteId??undefined,programId:blocker.programId,application:blocker.applicationId}} className="mt-3 inline-block font-semibold underline">{blocker.nextAction} →</Link>)
+   :<Link to="/messages" className="mt-3 inline-block underline">Ask admissions to complete this requirement</Link>}
+  <button type="button" onClick={()=>setRetry(value=>value+1)} className="ml-3 rounded border px-3 py-2">Check again</button>
+ </section>;
  if(status==="not_available")return <section aria-label="Student learning account"
   className="mt-4 rounded-lg border p-4 text-sm">
   <h4 className="font-semibold">Student learning account</h4>
@@ -141,4 +151,3 @@ function ApplicationLearningAccessHandoff({
   {error&&<p role="alert" className="mt-2">{error}</p>}
  </section>;
 }
-

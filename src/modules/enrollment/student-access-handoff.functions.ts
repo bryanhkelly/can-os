@@ -29,7 +29,8 @@ const studentAccessReviewInput=idInput.extend({
 }).strict();
 const statement="I am this student's independently verified parent or legal guardian. I authorize CAN OS to send this student a separate school learning sign-in link to the email I provided. This does not grant my account student access.";
 
-async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.transaction>[0]>[0],applicationId:string){
+type HandoffReader=typeof db|Parameters<Parameters<typeof db.transaction>[0]>[0];
+async function readHandoffApplication(tx:HandoffReader,applicationId:string){
  const [app]=await tx.select({
   id:applications.id,programId:applications.programId,
   studentProfileId:applications.studentProfileId,stage:applications.stage,
@@ -40,8 +41,22 @@ async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.tran
   .innerJoin(programs,eq(programs.id,applications.programId))
   .innerJoin(studentProfiles,eq(studentProfiles.id,applications.studentProfileId))
   .where(eq(applications.id,applicationId)).limit(1);
- if(!app?.siteId||app.stage!=="accepted"||app.programStatus!=="active")
+ if(!app?.siteId)
   throw new AuthorizationError("accepted school application and active school Program/Site");
+ return app;
+}
+type HandoffApplication=Awaited<ReturnType<typeof readHandoffApplication>>;
+class StudentLearningBlocker extends AuthorizationError {
+ constructor(readonly code:"application_not_accepted"|"program_inactive"|"enrollment_missing"|"placement_missing"|"classroom_not_ready",
+  readonly messageForFamily:string,readonly nextAction:string,readonly target:"application"|"academic_setup",denial:string){
+  super(denial);
+ }
+}
+async function requireEligibleStudent(tx:HandoffReader,app:HandoffApplication){
+ if(app.stage!=="accepted")throw new StudentLearningBlocker("application_not_accepted",
+  "The application is not currently accepted.","Review the admissions decision","application","accepted school application required");
+ if(app.programStatus!=="active")throw new StudentLearningBlocker("program_inactive",
+  "The school Program is not active. Student access cannot be prepared yet.","Review the school's current operating status","academic_setup","active school Program/Site required");
  const intendedYear=familyApplicationSchoolYearId(app.applicationMetadata);
  const active=await tx.select({schoolYearId:enrollments.schoolYearId})
   .from(enrollments).where(and(
@@ -50,7 +65,8 @@ async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.tran
    eq(enrollments.kind,"program"),eq(enrollments.status,"active"),
    ...(intendedYear?[eq(enrollments.schoolYearId,intendedYear)]:[]),
   ));
- if(!active.length)throw new AuthorizationError("active accepted student enrollment");
+ if(!active.length)throw new StudentLearningBlocker("enrollment_missing",
+  "Active enrollment is missing for this application's school year.","Complete enrollment for the intended school year","application","active accepted student enrollment");
  const sectionRows=await tx.select({
   id:sections.id,
   sectionProgramId:sections.programId,sectionSiteId:sections.siteId,
@@ -79,9 +95,15 @@ async function eligibleStudent(tx:typeof db|Parameters<Parameters<typeof db.tran
   (!intendedYear||row.sectionYearId===intendedYear) &&
   active.some(a=>a.schoolYearId===row.sectionYearId))
   .map(row=>row.id);
+ if(!validIds.length)throw new StudentLearningBlocker("placement_missing",
+  "The student has no active class placement in the application's Program and school year.","Assign the student to a ready class","application","actual ready classroom placement");
  const ready=await staffedPublishedSectionIds(validIds,tx);
- if(!ready.size)throw new AuthorizationError("actual ready classroom placement");
+ if(!ready.size)throw new StudentLearningBlocker("classroom_not_ready",
+  "The assigned class does not currently meet instructional readiness requirements.","Review the class's curriculum, teacher and academic authority","academic_setup","actual ready classroom placement");
  return app;
+}
+async function eligibleStudent(tx:HandoffReader,applicationId:string){
+ return requireEligibleStudent(tx,await readHandoffApplication(tx,applicationId));
 }
 
 export const consentToStudentLearningAccount=createServerFn({method:"POST"})
@@ -153,7 +175,7 @@ export const getStudentLearningHandoff=createServerFn({method:"GET"})
   const actor=await getCommandContext(getRequest());
   if(!actor.actorPersonId || !["guardian","registrar"].includes(actor.role))
    throw new AuthorizationError("authorized student access handoff");
-  const app=await eligibleStudent(db,data.applicationId);
+  const app=await readHandoffApplication(db,data.applicationId);
   if(!actor.scope.programIds?.includes(app.programId)||
      !actor.scope.siteIds?.includes(app.siteId!)||
      !actor.scope.organizationIds?.includes(app.organizationId))
@@ -167,10 +189,19 @@ export const getStudentLearningHandoff=createServerFn({method:"GET"})
    if(!relation?.canManage||relation.metadata.verification!=="verified")
     throw new AuthorizationError("independently verified family relationship");
   }else assertCapability(actor,"enrollment.activate");
+  // Return actionable readiness only AFTER the actor's exact school scope and
+  // family relationship have passed. Mutations still enforce the same gate.
+  try{await requireEligibleStudent(db,app);}
+  catch(error){
+   if(!(error instanceof StudentLearningBlocker))throw error;
+   return {status:"blocked" as const,studentEmail:null,blocker:{code:error.code,
+    message:error.messageForFamily,nextAction:error.nextAction,target:error.target,
+    programId:app.programId,siteId:app.siteId,applicationId:app.id}};
+  }
   const [consent]=await db.select({status:studentAccessConsents.status,
    studentEmail:studentAccessConsents.studentEmail})
    .from(studentAccessConsents).where(eq(studentAccessConsents.applicationId,app.id)).limit(1);
-  return {status:consent?.status??"not_requested",studentEmail:consent?.studentEmail??null};
+  return {status:consent?.status??"not_requested",studentEmail:consent?.studentEmail??null,blocker:null};
  });
 
 export const provisionStudentLearningAccess=createServerFn({method:"POST"})
@@ -290,5 +321,3 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
     return {status:"approved" as const,signInRequest:"failed" as const};
   }
  });
-
-
