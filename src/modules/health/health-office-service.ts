@@ -1,7 +1,10 @@
 import { db } from "@/db/client";
 import {
+accessAccounts,
+accountPersonGrants,
 guardianRelationships,
 enrollments,
+people,
 programs,
 healthComplianceItems,
 healthOfficeVisits,
@@ -19,7 +22,7 @@ type CommandContext,
 import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
-import { and,eq,inArray } from "drizzle-orm";
+import { and,eq,inArray,isNull,or } from "drizzle-orm";
 import { AuthorizationError } from "@/domain/command-context";
 
 type HealthTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -373,6 +376,22 @@ export async function recordHealthOfficeVisit(
           eq(programs.id, enrollments.programId),
           eq(programs.siteId, input.siteId),
           eq(programs.status, "active"),
+        ))
+        .innerJoin(accountPersonGrants, and(
+          eq(accountPersonGrants.personId,guardianRelationships.guardianPersonId),
+          eq(accountPersonGrants.role,"guardian"),
+          eq(accountPersonGrants.active,true),
+          eq(accountPersonGrants.isSynthetic,false),
+          eq(accountPersonGrants.organizationId,programs.organizationId),
+          or(isNull(accountPersonGrants.siteId),eq(accountPersonGrants.siteId,input.siteId)),
+        ))
+        .innerJoin(accessAccounts,and(
+          eq(accessAccounts.id,accountPersonGrants.accountId),
+          eq(accessAccounts.disabled,false),
+        ))
+        .innerJoin(people,and(
+          eq(people.id,guardianRelationships.guardianPersonId),
+          eq(people.active,true),
         ))
         .where(guardianRelationshipPredicate({
           studentPersonId: student.personId,
