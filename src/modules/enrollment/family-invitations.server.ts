@@ -493,10 +493,18 @@ async function sendPreopeningFamilyInterestEmail(programId: string, batchId: str
   subject: string, metadata: FamilyInvitationBatchMetadata) {
   const school = await resolvePreopeningInterestDestination(db, programId);
   if (metadata.siteId !== school.siteId) throw new AuthorizationError("original pre-opening Site");
+  const configuredOrigin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
+  if (!configuredOrigin) throw new Error("Family interest response host is not configured");
+  const origin = new URL(configuredOrigin);
+  if (origin.protocol !== "https:" || origin.pathname !== "/" || origin.search || origin.hash)
+    throw new Error("Family interest response requires a secure platform origin");
+  const responseUrl = new URL("/family/interest", origin);
+  responseUrl.searchParams.set("invitationBatchId", batchId);
+  responseUrl.searchParams.set("invitationRecipientKey", recipient.key);
   const accepted = await sendNotificationEmail({
     to: recipient.email,
     subject,
-    text: `${metadata.introduction}\n\n${school.programName} is preparing to open. The school has not yet received opening authorization. This notice is not a school application, enrollment offer or confirmation of academic services. Please contact the inviting church directly for updates; no child information is requested by this email.`,
+    text: `${metadata.introduction}\n\n${school.programName} is preparing to open. The school has not yet received opening authorization. This notice is not a school application, enrollment offer or confirmation of academic services.\n\nIf you would like updates from the school, you can request them here: ${responseUrl.toString()}\n\nOnly an adult who wants follow-up should submit the form. No child details are requested; receiving this email alone does not opt you in.`,
   }, `${batchId}:${recipient.key}`);
   if (!accepted) throw new Error("Pre-opening family email was not accepted by the provider");
   return { requestId: recipient.key, created: true };
