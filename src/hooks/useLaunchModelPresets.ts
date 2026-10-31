@@ -25,11 +25,13 @@ export function useLaunchModelPresets(setters: {
     } as const;
     const choice=presets[model];
     setType(choice.type);setGradeMin(choice.min);setGradeMax(choice.max);
+    setSummerCreditBearing(false);
     setOnsite(true);setOnsiteDaysPerWeek(choice.days);setAsynchronous(choice.async);setLiveOnline(false);
   }
   function applyNinthGradeHybridPreset(){
     // Explicit form proposal only. No accreditation, staffing, credit issuer,
     // timetable, attendance or regulatory readiness is silently accepted.
+    setSummerCreditBearing(false);
     setType("high_school_extension");
     setGradeMin("9");setGradeMax("9");
     setOnsite(true);setOnsiteDaysPerWeek("2");
