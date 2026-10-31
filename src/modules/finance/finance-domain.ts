@@ -34,7 +34,7 @@ export function applyVerifiedEvent(record: FinanceRecord, event: ProviderEvent):
   const next = { ...record, seenEvents: [...record.seenEvents, key] };
   if (event.kind === "payment_succeeded") {
     if (record.providerPaymentId && record.providerPaymentId !== event.providerPaymentId) throw new Error("Payment identity conflict");
-    if (record.capturedCents !== 0 || event.amount.cents !== record.charge.amount.cents) throw new Error("Capture mismatch");
+    if (record.capturedCents + event.amount.cents > record.charge.amount.cents) throw new Error("Capture exceeds invoice");
     next.providerPaymentId = event.providerPaymentId;
     next.capturedCents = event.amount.cents;
   } else {
