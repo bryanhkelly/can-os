@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -191,6 +191,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     inArray(s.attendanceEvents.siteId,siteIds),
     inArray(s.attendanceEvents.programId,context.scope.programIds??[]),
     gte(s.attendanceEvents.expectedAt, absenceWindow),
+    lte(s.attendanceEvents.expectedAt, now),
    ));
   const currentAttendance = effectiveAttendanceEvents(attendance);
   const unexcusedAbsences = currentAttendance
@@ -213,9 +214,8 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
    unexcusedAbsences,
    unexcusedTardies,
    nextDueAt,
-   status: sectionIds.length === 0 ? "awaiting_courses" as const :
-    workToReview.length > 0 || missingCount > 0 || unexcusedAbsences > 0 || unexcusedTardies > 0 ?
-     "needs_attention" as const : "on_track" as const,
+   status: workToReview.length > 0 || missingCount > 0 || unexcusedAbsences > 0 || unexcusedTardies > 0 ?
+    "needs_attention" as const : sectionIds.length === 0 ? "awaiting_courses" as const : "on_track" as const,
   };
  }));
  return { children };
