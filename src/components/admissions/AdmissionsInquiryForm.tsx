@@ -41,7 +41,7 @@ export function AdmissionsInquiryForm({onSubmit,programs,programId,setProgramId,
        {!student.householdId?" (new household required)":""}
       </option>)}
      </select>
-     <AdmissionsPageNavigation selection={selected} hasMore={existingStudentHasMore} kind="students"/>
+     <AdmissionsPageNavigation selection={selection} hasMore={existingStudentHasMore} kind="students"/>
      <span className="mt-1 block text-xs text-muted-foreground">
       Existing students reuse their identity and managing guardian. Existing households are preserved. Creating an inquiry does not activate enrollment.
      </span>
