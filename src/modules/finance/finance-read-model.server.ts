@@ -16,6 +16,9 @@ export async function readFinanceStatement(
   if (!record) return null;
   authorizeFinance(identity, record.charge, "read");
   const totals = settlement(record);
+  const outstandingCents = record.charge.amount.cents - record.capturedCents;
+  const returnedCents = record.refundedCents + record.chargebackCents;
+  const accountBalanceCents = outstandingCents + returnedCents;
   return {
     obligationId: record.charge.obligationId,
     applicationId: record.charge.enrollmentId,
@@ -28,6 +31,9 @@ export async function readFinanceStatement(
     capturedCents: record.capturedCents,
     refundedCents: record.refundedCents,
     chargebackCents: record.chargebackCents,
+    outstandingCents,
+    returnedCents,
+    accountBalanceCents,
     settlement: totals,
     state: invoiceStatus(record, processorConfigured).state,
   };
