@@ -85,7 +85,11 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     setError("");
     try {
       await operation();
-      await router.invalidate();
+      try {
+        await router.invalidate();
+      } catch {
+        setError("The action was saved, but launch progress could not refresh. Reopen this school before repeating the action.");
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to save launch progress");
     } finally {
@@ -100,7 +104,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     setError("");
     try {
       await submitLaunchEvidence({ data: { journeyRequirementId: requirementId, statement } });
-      await router.invalidate();
+      try { await router.invalidate(); } catch { setError("Evidence was saved but the launch could not refresh. Reopen before submitting again."); }
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to submit evidence");
@@ -113,7 +117,7 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     setBusy(true); setError("");
     try {
       await reviewLaunchEvidence({ data: { journeyRequirementId: requirementId, decision, reason } });
-      await router.invalidate();
+      try { await router.invalidate(); } catch { setError("Evidence decision was saved but the launch could not refresh. Reopen before retrying."); }
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to record evidence decision");
