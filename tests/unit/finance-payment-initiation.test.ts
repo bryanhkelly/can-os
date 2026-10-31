@@ -41,7 +41,7 @@ describe("guardian payment intent", () => {
     const { store, processor } = fixture();
     store.reservePaymentAttempt = vi.fn(async () => ({ kind: "existing", status: "submitted", intentId: "pi_123" }));
     await expect(initiateGuardianPayment(store, processor, identity, "ob", "key1"))
-      .resolves.toEqual({ kind: "submitted", intentId: "pi_123" });
+      .resolves.toEqual({ kind: "unavailable", reason: "Existing payment intent requires server-side reconciliation before checkout" });
     expect(processor.requestPayment).not.toHaveBeenCalled();
   });
   it("rejects a guardian from a different household", async () => {
