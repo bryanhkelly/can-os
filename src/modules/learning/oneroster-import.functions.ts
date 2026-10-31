@@ -12,6 +12,7 @@ import { readMarketplace } from "./curriculum-marketplace.server";
 import { writeAudit,emitEvent } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
+import { activateSectionEnrollment } from "@/modules/enrollment/section-allocation.service";
 /** Stages a roster *validation report*, never syncs live enrollments. */
 const csv=z.string().min(1).max(500_000);
 const files=z.object({
@@ -328,4 +329,88 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
      return {importId:job.id,status:"mapped" as const,added:mapped,
        mappedClasses:classes.rows.length,policy:"existing_sections_only" as const};
    });
+ });
+
+/** Explicitly approved single-student placement, through CAN's canonical allocation
+ * service (teacher, curriculum, capacity, add/drop, schedule and prerequisites).
+ * Neither an external enrollment row nor an identity mapping grants access alone.
+ */
+const placementInput=input.extend({
+ sourceSystem:z.string().trim().min(2).max(100).regex(/^[A-Za-z0-9._:-]+$/),
+ externalSchoolSourcedId:z.string().trim().min(1).max(256),
+ externalEnrollmentSourcedId:z.string().trim().min(1).max(256),
+ externalClassSourcedId:z.string().trim().min(1).max(256),
+ externalUserSourcedId:z.string().trim().min(1).max(256),
+ studentProfileId:z.string().uuid(),
+ sectionId:z.string().uuid(),
+ approved:z.literal(true),
+}).strict();
+export const approveOneRosterSectionPlacement=createServerFn({method:"POST"})
+ .validator((value:unknown)=>placementInput.parse(value))
+ .handler(async({data})=>{
+  const actor=await requireActor(["registrar"],"curriculum.publish");
+  await readMarketplace(actor,data.programId);
+  const [program]=await db.select({id:programs.id,organizationId:programs.organizationId,siteId:programs.siteId})
+   .from(programs).where(eq(programs.id,data.programId)).limit(1);
+  if(!program||!program.siteId||!actor.scope.organizationIds?.includes(program.organizationId)||
+     !actor.scope.siteIds?.includes(program.siteId)||!actor.scope.programIds?.includes(program.id))
+    throw new AuthorizationError("same-program OneRoster placement approval");
+  const report=previewOneRosterBundle(data.files);
+  if(!report.valid)throw new Error("Invalid OneRoster bundle cannot activate placement.");
+  const get=(kind:string)=>report.previews.find(p=>p.kind===kind)?.rows??[];
+  const enrollment=get("enrollments").find(r=>r.sourcedId===data.externalEnrollmentSourcedId);
+  const user=get("users").find(r=>r.sourcedId===data.externalUserSourcedId);
+  const klass=get("classes").find(r=>r.sourcedId===data.externalClassSourcedId);
+  const school=get("orgs").find(r=>r.sourcedId===data.externalSchoolSourcedId);
+  if(!enrollment||!user||!klass||!school||
+     school.type?.toLowerCase()!=="school"||
+     enrollment.userSourcedId!==user.sourcedId||
+     enrollment.classSourcedId!==klass.sourcedId||
+     enrollment.schoolSourcedId!==school.sourcedId||
+     klass.schoolSourcedId!==school.sourcedId||
+     user.role?.toLowerCase()!=="student"||enrollment.role?.toLowerCase()!=="student"||
+     user.enabledUser?.toLowerCase()!=="true"||
+     (user.orgSourcedIds&&!user.orgSourcedIds.split(",").map(s=>s.trim()).includes(school.sourcedId!))||
+     [enrollment,user,klass,school].some(row=>row.status&&row.status.toLowerCase()!=="active"))
+    throw new Error("OneRoster student, class, school and enrollment must be active and consistent.");
+  const digest=bundleDigest(data.programId,data.files);
+  return db.transaction(async tx=>{
+   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"oneroster-place:"+program.organizationId+":"+data.sourceSystem}))`);
+   const [job]=await tx.select({id:curriculumImportJobs.id,status:curriculumImportJobs.status,metadata:curriculumImportJobs.metadata})
+    .from(curriculumImportJobs).where(and(eq(curriculumImportJobs.organizationId,program.organizationId),
+      eq(curriculumImportJobs.format,"oneroster"),eq(curriculumImportJobs.sha256,digest))).for("update").limit(1);
+   if(!job||job.status==="rejected"||job.metadata.programId!==program.id)
+    throw new Error("Validate this exact bundle before registrar placement approval.");
+   const identifiers=["user:"+data.externalSchoolSourcedId+":"+data.externalUserSourcedId,data.externalClassSourcedId];
+   const mapped=await tx.select({externalIdentifier:curriculumInteropMappings.externalIdentifier,
+     entityType:curriculumInteropMappings.entityType,entityId:curriculumInteropMappings.entityId,
+     metadata:curriculumInteropMappings.metadata}).from(curriculumInteropMappings).where(and(
+      eq(curriculumInteropMappings.organizationId,program.organizationId),
+      eq(curriculumInteropMappings.format,"oneroster"),eq(curriculumInteropMappings.sourceSystem,data.sourceSystem),
+      inArray(curriculumInteropMappings.externalIdentifier,identifiers)));
+   const identity=mapped.find(m=>m.externalIdentifier===identifiers[0]&&m.entityType==="student_profile"&&
+     m.entityId===data.studentProfileId&&m.metadata.programId===program.id&&m.metadata.siteId===program.siteId);
+   const section=mapped.find(m=>m.externalIdentifier===identifiers[1]&&m.entityType==="section"&&
+     m.entityId===data.sectionId&&m.metadata.programId===program.id&&m.metadata.siteId===program.siteId);
+   if(!identity||!section)throw new Error("Registrar-approved CAN student and Section mappings are required.");
+   const [canonical]=await tx.select({year:schoolYears.key,term:terms.key})
+    .from(sections).innerJoin(terms,eq(terms.id,sections.termId))
+    .innerJoin(schoolYears,eq(schoolYears.id,terms.schoolYearId))
+    .where(and(eq(sections.id,data.sectionId),eq(sections.programId,program.id),
+      eq(sections.siteId,program.siteId),eq(schoolYears.programId,program.id),
+      eq(schoolYears.status,"active"))).limit(1);
+   if(!canonical||klass.schoolYear!==canonical.year||
+      !klass.termSourcedIds?.split(",").map(v=>v.trim()).includes(canonical.term))
+    throw new Error("External year and term must match the active canonical Section.");
+   const placement=await activateSectionEnrollment(tx,{
+     actor,studentProfileId:data.studentProfileId,sectionId:data.sectionId,
+     source:"oneroster_registrar_approved",
+   });
+   await writeAudit(tx,actor,{action:"curriculum.interop.oneroster.placement.approve",
+    entityType:"enrollment",entityId:placement.enrollmentId,
+    scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
+    after:{sourceSystem:data.sourceSystem,importJobId:job.id,
+      externalEnrollmentSourcedId:data.externalEnrollmentSourcedId,created:placement.created}});
+   return {...placement,policy:"canonical_section_allocation" as const};
+  });
  });
