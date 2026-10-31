@@ -764,6 +764,17 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         await fresh.context.close();
       }
 
+      // A separate, authenticated guardian must not access another family's
+      // graded work even when supplied the precise student/Section/assessment IDs.
+      await goto(
+        unrelatedGuardian.page,
+        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+      );
+      await expect(unrelatedGuardian.page.getByText("Grade: 9 / 10")).toHaveCount(0);
+      await expect(
+        unrelatedGuardian.page.getByRole("button", { name: "Request school follow-up" }),
+      ).toHaveCount(0);
+
       await goto(unrelatedGuardian.page, `/guardian/admission-offers?application=${fixture.applicationId}`);
       await expect(unrelatedGuardian.page.getByRole("alert")).toBeVisible();
       await expect(unrelatedGuardian.page.getByRole("button", { name: "Accept" })).toHaveCount(0);
