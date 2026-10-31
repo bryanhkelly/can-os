@@ -361,6 +361,9 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   // Historical transcript release remains bound to its exact immutable issuance snapshot.
   if(kind!=="transcript"||release.releasePurpose!=="transfer")
    throw new AuthorizationError("Only guardian transfer transcript access is supported");
+  // The transfer action is not itself proof that a newer official transcript
+  // is valid. Until Agent A supplies a supersession contract, this exact
+  // issuance is the only credential eligible for this authorization.
   const [student]=await tx.select({personId:s.studentProfiles.personId})
    .from(s.studentProfiles).where(eq(s.studentProfiles.id,doc.studentProfileId)).limit(1);
   if(!student)throw new AuthorizationError("student identity");
