@@ -100,7 +100,9 @@ function GuardianEnrollmentChanges(){
        originTransferActionId:item.id,destinationProgramId:school.id,
        requestId:crypto.randomUUID(),confirmedDestination:true,
      }});
-     setNotice(result.requested
+     setNotice(result.alreadyHasAccess
+       ?"You already have receiving-school account access. Open Apply to school to reuse your verified student's identity and link this transfer."
+       :result.requested
        ?"Check your verified family email for a secure sign-in link to "+result.destinationName+". Open it to access the receiving school's application."
        :"A verification link was already requested recently. Check your email before requesting another.");
    }catch(e){setError(e instanceof Error?e.message:"Could not request a receiving-school verification link.");}
