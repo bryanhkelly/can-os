@@ -2,7 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { getTeacherGradeResponses, resolveTeacherGradeResponse } from "@/modules/learning/teacher-grade-response.functions";
 
-type Item = Awaited<ReturnType<typeof getTeacherGradeResponses>>["items"][number];
+export type TeacherGradeResponseItem = Awaited<ReturnType<typeof getTeacherGradeResponses>>["items"][number];
+type Item = TeacherGradeResponseItem;
 
 function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: () => void; selected: boolean }) {
   const [response, setResponse] = useState("");
@@ -41,13 +42,23 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: () =>
   </article>;
 }
 
-export function TeacherGradeResponsesPanel({ selectedAction }: { selectedAction?: string }) {
+export function TeacherGradeResponsesPanel({ selectedAction, onQuestionsChange }: {
+  selectedAction?: string;
+  onQuestionsChange?: (items: Item[] | null) => void;
+}) {
   const [data, setData] = useState<Awaited<ReturnType<typeof getTeacherGradeResponses>> | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(() => {
-    getTeacherGradeResponses().then(result => { setData(result); setError(""); })
-      .catch(() => setError("Unable to load guardian academic questions."));
-  }, []);
+    getTeacherGradeResponses().then(result => {
+      setData(result);
+      setError("");
+      onQuestionsChange?.(result.items);
+    }).catch(() => {
+      setData(null);
+      onQuestionsChange?.(null);
+      setError("Unable to load guardian academic questions.");
+    });
+  }, [onQuestionsChange]);
   useEffect(load, [load]);
   useEffect(() => {
     if (data && selectedAction)
@@ -55,6 +66,9 @@ export function TeacherGradeResponsesPanel({ selectedAction }: { selectedAction?
   }, [data, selectedAction]);
   return <section id="grade-follow-ups" aria-label="Guardian grade questions" className="mt-10">
     <h2 className="text-lg font-semibold">Guardian grade questions</h2>
+    {data && <p className="mt-2 text-sm text-muted-foreground">
+      {data.items.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length} awaiting your school's response
+    </p>}
     {!data && !error && <p role="status" className="mt-3 text-sm">Loading academic follow-ups…</p>}
     {error && <p role="alert" className="mt-3 text-sm">{error} <button type="button" onClick={load} className="underline">Retry</button></p>}
     {data && !data.items.length && <p className="mt-3 text-sm">No open or recently resolved guardian questions in your authorized classes.</p>}
