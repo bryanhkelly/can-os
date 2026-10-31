@@ -28,7 +28,16 @@ export type ChurchBootstrapInput = {
  * it neither activates an access grant nor creates an opening authorization.
  * The independent evidence must specifically identify the church and email.
  */
-export async function bootstrapVerifiedChurch(actor: AccessContext, data: ChurchBootstrapInput, options: { deferEmail?: boolean } = {}) {
+export type ChurchBootstrapResult = {
+  churchId: string; siteId: string; grantId: string; invitationPending: boolean; created: boolean;
+};
+type ChurchProvisioningTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export async function bootstrapVerifiedChurch(actor: AccessContext, data: ChurchBootstrapInput, options: {
+  deferEmail?: boolean;
+  /** Runs inside the same transaction as organization, Site, and invitation provisioning. */
+  onProvisioned?: (tx: ChurchProvisioningTransaction, result: ChurchBootstrapResult) => Promise<void>;
+} = {}) {
   if (actor.demoFacilitator || actor.grantSiteId !== null ||
       actor.scope.organizationIds?.length !== 1 || !actor.actorPersonId)
     throw new AuthorizationError("real organization-wide CAN steward");
@@ -42,6 +51,10 @@ export async function bootstrapVerifiedChurch(actor: AccessContext, data: Church
 
   const email = data.contactEmail.trim().toLowerCase();
   const created = await db.transaction(async tx => {
+    const complete = async (result: ChurchBootstrapResult) => {
+      await options.onProvisioned?.(tx, result);
+      return result;
+    };
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"church-bootstrap:" + data.churchSlug}))`);
     const [authority] = await tx.select({
       subjectType: documents.subjectType, subjectId: documents.subjectId,
@@ -137,15 +150,15 @@ export async function bootstrapVerifiedChurch(actor: AccessContext, data: Church
       eq(accountPersonGrants.role, "registrar"),
     )).limit(1);
     if (existingGrant?.active) {
-      return { churchId: church.id, siteId: site.id, grantId: existingGrant.id,
-        invitationPending: false, created: newChurch };
+      return complete({ churchId: church.id, siteId: site.id, grantId: existingGrant.id,
+        invitationPending: false, created: newChurch });
     }
     if (existingGrant) {
       const pending = await listPendingStaffInvitations(tx, account.id);
       if (!pending.some(invitation => invitation.id === existingGrant.id))
         throw new Error("Inactive administrator grant needs independent access review");
-      return { churchId: church.id, siteId: site.id, grantId: existingGrant.id,
-        invitationPending: true, created: newChurch };
+      return complete({ churchId: church.id, siteId: site.id, grantId: existingGrant.id,
+        invitationPending: true, created: newChurch });
     }
     const [grant] = await tx.insert(accountPersonGrants).values({
       accountId: account.id, personId, role: "registrar",
@@ -167,8 +180,8 @@ export async function bootstrapVerifiedChurch(actor: AccessContext, data: Church
       after: { authorityDocumentId: data.authorityDocumentId,
         personId, accountId: account.id, role: "registrar", active: false },
     });
-    return { churchId: church.id, siteId: site.id, grantId: grant.id,
-      invitationPending: true, created: newChurch };
+    return complete({ churchId: church.id, siteId: site.id, grantId: grant.id,
+      invitationPending: true, created: newChurch });
   });
 
   if (!created.invitationPending)
