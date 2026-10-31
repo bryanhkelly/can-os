@@ -347,5 +347,6 @@ export function extractCommonCartridgeStaticLesson(zip:Uint8Array,entry:Cartridg
  const titleMatch=raw.match(/<title>([^<>]{1,200})<\/title>/i)||
    raw.match(/<h1>([^<>]{1,200})<\/h1>/i);
  const title=titleMatch?.[1]?.trim()||entry.identifier;
+ if(title.length>200)throw new Error("Static HTML lesson title is too long.");
  return {title,html:raw,sourcePath:htmlPath};
 }
