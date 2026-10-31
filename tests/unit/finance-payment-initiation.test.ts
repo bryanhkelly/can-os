@@ -44,6 +44,13 @@ describe("guardian payment intent", () => {
       .resolves.toEqual({ kind: "unavailable", reason: "Existing payment intent requires server-side reconciliation before checkout" });
     expect(processor.requestPayment).not.toHaveBeenCalled();
   });
+  it("rejects unsafe projected outstanding cents", async () => {
+    const { store, processor } = fixture();
+    store.readInvoice = vi.fn(async () => ({ ...record, capturedCents: Number.NaN }));
+    await expect(initiateGuardianPayment(store, processor, identity, "ob", "key1"))
+      .rejects.toThrow("Invalid outstanding balance");
+    expect(processor.requestPayment).not.toHaveBeenCalled();
+  });
   it("rejects a guardian from a different household", async () => {
     const { store, processor } = fixture();
     await expect(initiateGuardianPayment(store, processor, {
