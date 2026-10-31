@@ -6,7 +6,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
 import { writeAudit } from "@/platform/mutation";
 import { bootstrapVerifiedChurch } from "./church-onboarding.server";
-import { requestOneTimeAccess } from "@/modules/identity/passwordless-access.server";
+import { requestOneTimeAccessWithDeliveryStatus } from "@/modules/identity/passwordless-access.server";
 
 export type ChurchApplication = {
   churchName: string;
@@ -173,8 +173,8 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
   // commit. A mail outage cannot change approval or activate the grant.
   if (!result.invitationPending) return { ...result, approved: true as const, emailSent: false };
   try {
-    await requestOneTimeAccess(request.contactEmail);
-    return { ...result, approved: true as const, emailSent: true };
+    const status = await requestOneTimeAccessWithDeliveryStatus(request.contactEmail);
+    return { ...result, approved: true as const, emailSent: status === "dispatched" };
   } catch {
     return { ...result, approved: true as const, emailSent: false };
   }
@@ -215,6 +215,6 @@ export async function resendChurchInvitation(actor: AccessContext, requestId: st
   }).from(churchOnboardingRequests).where(eq(churchOnboardingRequests.id, requestId)).limit(1);
   if (request?.status !== "approved" || !request.invitationGrantId)
     throw new AuthorizationError("approved church invitation");
-  await requestOneTimeAccess(request.contactEmail);
-  return { accepted: true as const };
+  const deliveryStatus = await requestOneTimeAccessWithDeliveryStatus(request.contactEmail);
+  return { accepted: true as const, deliveryStatus };
 }
