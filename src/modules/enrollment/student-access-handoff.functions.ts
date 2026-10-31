@@ -14,7 +14,7 @@ import { normalizeAccessEmail } from "@/domain/access-tokens";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { staffedPublishedSectionIds } from "./instructional-section-readiness.server";
 import { requestOneTimeAccess } from "@/modules/identity/passwordless-access.server";
-import { emitEvent, writeAudit } from "@/platform/mutation";
+import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
 const uuid=z.string().uuid();
@@ -253,11 +253,18 @@ export const provisionStudentLearningAccess=createServerFn({method:"POST"})
      // Only the first independently reviewed authorization emits the
      // institutional approval event. Passwordless resend is not a new
      // decision and must not duplicate official approval history.
-     await emitEvent(tx,{eventType:EventTypes.StudentLearningAccessApproved,
+     const approvalEventId=await emitEvent(tx,{eventType:EventTypes.StudentLearningAccessApproved,
        aggregateType:"student_access_consent",aggregateId:consent.id,
        actorPersonId:actor.actorPersonId,organizationId:app.organizationId,
        siteId:app.siteId!,programId:app.programId,
        payload:{applicationId:app.id,studentProfileId:app.studentProfileId}});
+     await notify(tx,{
+       recipientPersonId:consent.guardianPersonId,
+       type:"student_access_approved",
+       title:"Your student's CAN OS learning account was approved",
+       body:"Admissions approved the separate student sign-in. Your student can use their own email address to request a secure sign-in link. Email delivery is not guaranteed.",
+       resourceType:"application",resourceId:app.id,eventId:approvalEventId,
+     });
    }
    await writeAudit(tx,{actorPersonId:actor.actorPersonId,
      action:consent.status==="pending_review"
