@@ -4,6 +4,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { resolveGraduationPolicy } from "@/domain/graduation-policy";
 import { adjudicateGraduation } from "@/domain/graduation-adjudication";
 import { auditGraduationCredits, type CreditEvidence, type CreditRequirement } from "@/domain/graduation-credit-audit";
 import { writeAudit } from "@/platform/mutation";
@@ -48,38 +49,39 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
   const [requirementSet] = await db.select().from(s.graduationRequirementSets).where(eq(s.graduationRequirementSets.id,requirementSetId)).limit(1);
   if (!transcript || !requirementSet || transcript.issuingOrganizationId !== requirementSet.issuingOrganizationId)
     throw new AuthorizationError("matched transcript and approved requirements");
-  // A requirements version is applicable only if it is the sole approved
-  // version for the student's active institutional academic year. Fail closed
-  // on ambiguous enrollment years or competing approved versions.
+  // Resolve the earliest institutional program entry cohort, not the currently
+  // active academic year. Transfer overrides require documented institution
+  // records; undocumented overrides are deliberately not inferred.
   const enrollments = await db.select({yearId:s.schoolYears.id, yearName:s.schoolYears.name,
     yearKey:s.schoolYears.key, yearStarts:s.schoolYears.startsOn,
-    yearEnds:s.schoolYears.endsOn, issuer:s.programs.creditIssuingOrganizationId})
+    issuer:s.programs.creditIssuingOrganizationId, startedAt:s.enrollments.startedAt,
+    metadata:s.enrollments.metadata})
     .from(s.enrollments)
     .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.enrollments.schoolYearId))
     .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
     .where(and(eq(s.enrollments.studentProfileId,transcript.studentProfileId),
-      eq(s.enrollments.kind,"program"),inArray(s.enrollments.status,["active","graduated"])));
-  // Unrelated host programs must not disqualify an institutional graduate.
-  // Applicability is evaluated against the transcript issuing institution only.
-  const matching = enrollments.filter(row=>row.issuer===transcript.issuingOrganizationId &&
-    [row.yearName,row.yearKey,`${row.yearStarts.slice(0,4)}-${row.yearEnds.slice(0,4)}`].includes(requirementSet.academicYear));
-  if(new Set(matching.map(row=>row.yearId)).size!==1 || !matching.length)
-    throw new AuthorizationError("No unambiguous applicable graduation academic-year policy for student");
-  // Historical transcript evidence must not be adjudicated against a school year
-  // that starts after the immutable transcript was issued.
-  if(matching[0] && new Date(matching[0].yearStarts).getTime()>transcript.issuedAt.getTime())
-    throw new AuthorizationError("Transcript predates the applicable graduation school year");
-  const approved = await db.select({id:s.graduationRequirementSets.id})
-    .from(s.graduationRequirementSets).where(and(
-      eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId),
-      eq(s.graduationRequirementSets.academicYear,requirementSet.academicYear)));
-  if(approved.length!==1 || approved[0]?.id!==requirementSet.id)
-    throw new AuthorizationError("Graduation policy is not approved for this academic year");
+      eq(s.enrollments.kind,"program"),inArray(s.enrollments.status,["active","graduated","completed"])));
+  const institutional=enrollments.filter(row=>row.issuer===transcript.issuingOrganizationId)
+    .sort((x,y)=>x.yearStarts.localeCompare(y.yearStarts));
+  if(!institutional.length) throw new AuthorizationError("Institutional entry cohort not established");
+  const documented=institutional.map(row=>row.metadata?.graduationEntryCohort).filter(Boolean);
+  if(documented.some(v=>typeof v!=="string") || new Set(documented).size>1)
+    throw new AuthorizationError("Conflicting documented graduation cohort overrides");
+  const entryCohort=(documented[0] as string|undefined) ?? institutional[0]!.yearStarts.slice(0,4);
+  const policies=await db.select().from(s.graduationRequirementSets)
+    .where(eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId));
+  let applicable;
+  try { applicable=resolveGraduationPolicy(policies,entryCohort); }
+  catch { throw new AuthorizationError("No unambiguous applicable graduation cohort policy"); }
+  if(applicable.id!==requirementSet.id)
+    throw new AuthorizationError("Selected graduation policy does not apply to student cohort");
+  if(institutional[0] && new Date(institutional[0].yearStarts).getTime()>transcript.issuedAt.getTime())
+    throw new AuthorizationError("Transcript predates institutional enrollment");
   return { transcript, requirementSet, evidence: evidenceFromSnapshot(transcript.snapshot, transcript.issuingOrganizationId) };
 }
 
 export const approveGraduationRequirements = createServerFn({method:"POST"})
- .validator((input:unknown) => z.object({issuerId:uuid,academicYear:z.string().min(4).max(40),version:z.string().min(1).max(40),requirements:rules}).parse(input))
+ .validator((input:unknown) => z.object({issuerId:uuid,academicYear:z.string().min(4).max(40),version:z.string().min(1).max(40),cohortStart:z.string().regex(/^\\d{4}$/),cohortEnd:z.string().regex(/^\\d{4}$/),supersedesRequirementSetId:uuid.optional(),applicabilityReason:z.string().trim().min(12).max(1000),requirements:rules}).parse(input))
  .handler(async ({data}) => {
    const context = await registrar(); issuerAuthorized(context,data.issuerId);
    const checked = auditGraduationCredits(data.requirements,[]);
@@ -90,12 +92,23 @@ export const approveGraduationRequirements = createServerFn({method:"POST"})
      // versions that cannot yet be assigned to an individual cohort.
      const {sql}=await import("drizzle-orm");
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${data.issuerId + ":" + data.academicYear}))`);
-     const existing=await tx.select({id:s.graduationRequirementSets.id})
-       .from(s.graduationRequirementSets)
-       .where(and(eq(s.graduationRequirementSets.issuingOrganizationId,data.issuerId),eq(s.graduationRequirementSets.academicYear,data.academicYear))).limit(1);
-     if(existing.length)throw new AuthorizationError("An approved graduation policy already exists for this academic year. Cohort-specific policy versioning is required before another can be approved.");
+     if(data.cohortStart>data.cohortEnd) throw new AuthorizationError("Invalid cohort window");
+     const policies=await tx.select().from(s.graduationRequirementSets)
+       .where(eq(s.graduationRequirementSets.issuingOrganizationId,data.issuerId));
+     if(data.supersedesRequirementSetId){
+       const prior=policies.find(p=>p.id===data.supersedesRequirementSetId);
+       if(!prior)throw new AuthorizationError("Superseded policy must belong to issuer");
+       if(policies.some(p=>p.supersedesRequirementSetId===prior.id))throw new AuthorizationError("Policy version already superseded");
+       if(prior.cohortStart!==data.cohortStart || prior.cohortEnd!==data.cohortEnd)
+         throw new AuthorizationError("Policy revision must retain cohort bounds");
+     }
+     const active=policies.filter(p=>!policies.some(next=>next.supersedesRequirementSetId===p.id) && p.id!==data.supersedesRequirementSetId);
+     if(active.some(p=>!p.cohortStart || !p.cohortEnd || p.cohortStart<=data.cohortEnd && p.cohortEnd>=data.cohortStart))
+       throw new AuthorizationError("Overlapping or unclassified approved cohort policy");
      const [row]=await tx.insert(s.graduationRequirementSets).values({
        issuingOrganizationId:data.issuerId,academicYear:data.academicYear,version:data.version,
+       cohortStart:data.cohortStart,cohortEnd:data.cohortEnd,
+       supersedesRequirementSetId:data.supersedesRequirementSetId??null,applicabilityReason:data.applicabilityReason,
        requirements:data.requirements,approvedByPersonId:context.actorPersonId!,
      }).returning({id:s.graduationRequirementSets.id});
      await writeAudit(tx,{actorPersonId:context.actorPersonId!,action:"graduation.requirements.approve",resourceType:"graduation_requirement_set",resourceId:row!.id,scope:{organizationId:data.issuerId},after:data,context:{requestId:context.requestId??null}});
