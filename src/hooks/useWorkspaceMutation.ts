@@ -49,7 +49,7 @@ export function useWorkspaceMutation<TInput, TResult>(options: WorkspaceMutation
       } catch (error) {
         failure = asError(error);
         setRefreshError(failure);
-        options.onRefreshError?.(failure);
+        try { options.onRefreshError?.(failure); } catch { /* Preserve committed command status. */ }
       }
       try {
         await options.onSuccess?.(value, input);
