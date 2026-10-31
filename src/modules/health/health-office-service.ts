@@ -56,6 +56,7 @@ export async function ensureHealthProfile(
   assertCapability(context, "health.manage");
 
   return db.transaction(async (tx) => {
+    await assertCurrentHealthStudentScope(tx, context, studentProfileId);
     const [existing] = await tx
       .select({ id: healthProfiles.id })
       .from(healthProfiles)
@@ -92,6 +93,7 @@ export async function setHealthCompliance(
   assertCapability(context, "health.compliance.manage");
 
   return db.transaction(async (tx) => {
+    await assertCurrentHealthStudentScope(tx, context, input.studentProfileId);
     const [existing] = await tx
       .select({ id: healthComplianceItems.id, status: healthComplianceItems.status })
       .from(healthComplianceItems)
