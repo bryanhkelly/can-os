@@ -6,6 +6,7 @@ import {
   respondToSyntheticAdmissionOffer,
 } from "@/modules/enrollment/admissions-offer-service";
 import { acceptApplication, activateEnrollmentFromApplication, startFamilyApplication } from "@/modules/enrollment/enrollment-service";
+import { programs } from "@/db/schema";
 
 const { transaction, select, values, update } = vi.hoisted(() => ({
   transaction: vi.fn(),
@@ -36,20 +37,23 @@ function rows(data: unknown[]) {
     then: result.then.bind(result),
   };
 }
+// Keep explicit per-command rows for business assertions, while supplying
+// canonical Program authorization reads independently of the business query queue.
+const selectionQueue: unknown[][] = [];
 function selectRows(...data: unknown[][]) {
-  for (const value of data) select.mockReturnValueOnce(rows(value));
+  selectionQueue.push(...data);
 }
 const context = {
   actorPersonId: "actor",
   capabilities: new Set(["enrollment.decide", "enrollment.apply", "enrollment.activate"]),
-  scope: { programIds: ["program"] },
+  scope: { programIds: ["program"], organizationIds: ["organization"] },
 };
 const registrarContext = { ...context, role: "registrar" };
 const guardianContext = { ...context, role: "guardian" };
 const application = { id: "application", programId: "program", studentProfileId: "student", stage: "application", metadata: { synthetic: true } };
 const pool = { capacity: 2 };
 const year = { programId: "program", organizationId: "organization" };
-const program = { organizationId: "organization" };
+const program = { id: "program", organizationId: "organization", siteId: null, status: "active" };
 const journey = { id: "journey", status: "ready" };
 const programSite = { siteId: "f1000000-0000-4000-8000-000000000001", organizationId: "organization" };
 const offer = { id: "offer", programId: "program", schoolYearId: "year", applicationId: "application", status: "issued", expiresAt: null };
@@ -57,6 +61,18 @@ const input = { applicationId: "application", schoolYearId: "year", idempotencyK
 
 beforeEach(() => {
   vi.resetAllMocks();
+  selectionQueue.length = 0;
+  select.mockImplementation((fields?: Record<string, unknown>) => {
+    // New issuer-scoped commands verify live ownership before mutating offers;
+    // do not weaken production checks or consume a seat-pool fixture as scope.
+    if (fields?.organizationId === programs.organizationId &&
+      fields?.siteId === programs.siteId && Object.keys(fields).length === 2)
+      return rows([program]);
+    // Accepted offers must only activate after the actual Program is active.
+    if (fields?.status === programs.status && Object.keys(fields).length === 1)
+      return rows([{ status: "active" }]);
+    return rows(selectionQueue.shift() ?? []);
+  });
   const tx = {
     select,
     insert: vi.fn().mockReturnValue({ values }),
