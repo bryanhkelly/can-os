@@ -72,6 +72,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
     let placementMissing=false;
     let missingCalendar=false;
     let noSchedule=false;
+    let ambiguousPlacement=false;
     for(const candidate of dates.slice(0,180)){
       const projected=await loadExpectedFirstDayPreparationForActor(actor,{
         date:candidate,programId:app.programId,siteId:app.siteId,
@@ -87,20 +88,26 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         continue;
       }
       if(!projected.student.sectionId){placementMissing=true;continue;}
+      if(new Set(projected.sectionMemberships.map(row=>row.sectionId)).size!==1){
+        ambiguousPlacement=true;
+        continue;
+      }
       selected=projected;
       selectedDate=candidate;
       break;
     }
     if(!selected || !selectedDate){
       const date=dates[0]??today;
-      const blocker=missingCalendar?"calendar_not_ready":placementMissing?"placement_missing":
+      const blocker=missingCalendar?"calendar_not_ready":(placementMissing||ambiguousPlacement)?"placement_missing":
         noSchedule?"not_scheduled":"not_on_roster";
       return {date,preview:date>today,state:blocker,studentExpected:false,
         supervisionPlanned:false,attendanceRecorded:false,
-        outstandingGaps:[missingCalendar?"calendar_unverified":placementMissing?
+        outstandingGaps:[missingCalendar?"calendar_unverified":ambiguousPlacement?
+          "multiple_section_placements":placementMissing?
           "section_placement_missing":noSchedule?"schedule_missing":"student_not_expected"],
         sectionTitle:null as string|null,programName:null as string|null,
         message:!dates.length?"No published instructional day is available. Publish the school-year calendar.":
+          ambiguousPlacement?"This student has multiple active Section placements on a scheduled day. Resolve the conflicting placements before opening.":
           placementMissing?"This student has no active instructional Section on a scheduled school day. Complete Section placement.":
           missingCalendar?"The published instructional calendar is incomplete. Correct the calendar and schedule.":
           noSchedule?"No effective instructional timetable is available for this student. Configure the Section schedule.":
