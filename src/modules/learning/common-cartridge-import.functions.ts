@@ -239,6 +239,7 @@ export const beginCommonCartridgeStaticLessonImport=createServerFn({method:"POST
    throw new Error("Private curriculum uploads are not enabled.");
   resolveR2Config();
   const {lesson,digest,htmlBytes,htmlHash}=inspectHtmlInput(data);
+  if(htmlBytes.length<16)throw new Error("Static HTML lesson must contain at least 16 bytes.");
   const resourceId=randomUUID(),key=`learning/cartridge-static/${resourceId}/${randomUUID()}`;
   return {resourceId,key,content:htmlBytes.toString("base64"),contentType:"text/html",
    contentLength:htmlBytes.length,htmlSha256:htmlHash,cartridgeSha256:digest,
