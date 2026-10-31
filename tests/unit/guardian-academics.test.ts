@@ -29,6 +29,14 @@ describe("guardian assignment release policy", () => {
   ],now);
   expect(summary).toEqual({needsAction:2,overdue:2,releasedGrades:2});
  });
+ it("keeps saved revision drafts on the guardian needs-action list",()=>{
+  const now=new Date("2026-10-30T12:00:00Z");
+  expect(guardianAssignmentSummary([
+   {status:"draft",dueAt:"2026-10-20T12:00:00Z",score:null},
+   {status:"draft",dueAt:"2026-11-20T12:00:00Z",score:null},
+   {status:"submitted",dueAt:"2026-10-20T12:00:00Z",score:null},
+  ],now)).toEqual({needsAction:2,overdue:1,releasedGrades:0});
+ });
  it("keeps released prior feedback visible during a revision but never reuses its score",()=>{
   const history=[
    {assessmentId:"class-a",attemptNumber:1,submissionStatus:"returned",score:"8",feedback:"Explain reasoning"},
