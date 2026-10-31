@@ -313,7 +313,12 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
       </label>
       <label className="block text-sm">License code<input className="mt-1 block w-full rounded border p-2" value={htmlLicense} onChange={e=>setHtmlLicense(e.target.value)} maxLength={80} placeholder="Publisher license identifier" /></label>
       <label className="block text-sm">Publisher attribution<input className="mt-1 block w-full rounded border p-2" value={htmlAttribution} onChange={e=>setHtmlAttribution(e.target.value)} maxLength={500} /></label>
-      <p className="text-xs">Destination class: {market.sections.find(section=>section.id===cartridgeSection)?.title??"Select a destination class in the web-link section above."}</p>
+      <label className="block text-sm">Destination class
+       <select className="mt-1 block w-full rounded border p-2" value={cartridgeSection} onChange={e=>setCartridgeSection(e.target.value)}>
+        <option value="">Select a class</option>
+        {market.sections.map(section=><option key={section.id} value={section.id}>{section.code} · {section.title}</option>)}
+       </select>
+      </label>
       <label className="flex gap-2 text-sm"><input type="checkbox" checked={cartridgeRights} onChange={e=>setCartridgeRights(e.target.checked)}/>I confirm that the license permits distribution to this class.</label>
       <button type="button" className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
        disabled={busy||!cartridgeFile||!cartridgeSection||!htmlIdentifier||!cartridgeRights||htmlLicense.trim().length<2||!htmlAttribution.trim()}
