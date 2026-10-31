@@ -161,6 +161,27 @@ export const listGraduationCandidates=createServerFn({method:"GET"})
    .orderBy(desc(s.transcriptIssuances.issuedAt)).limit(40);
  });
 
+/** Server-owned applicable policy lookup; UI never chooses arbitrary requirement IDs. */
+export const getApplicableGraduationPolicy=createServerFn({method:"GET"})
+ .validator((input:unknown)=>z.object({transcriptId:uuid}).parse(input))
+ .handler(async ({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   const context=await registrar();const {db,s}=await resources();
+   const [transcript]=await db.select().from(s.transcriptIssuances)
+     .where(eq(s.transcriptIssuances.id,data.transcriptId)).limit(1);
+   if(!transcript)throw new AuthorizationError("Transcript not found");
+   issuerAuthorized(context,transcript.issuingOrganizationId);
+   const policies=await db.select().from(s.graduationRequirementSets)
+     .where(eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId));
+   const matches=[];
+   for(const policy of policies){
+     try{await transcriptAndRules(db,s,transcript.id,policy.id);matches.push(policy);}catch{/* incompatible policy */}
+   }
+   if(matches.length!==1)throw new AuthorizationError("No unambiguous applicable policy");
+   return {id:matches[0]!.id,academicYear:matches[0]!.academicYear,version:matches[0]!.version,
+     cohortStart:matches[0]!.cohortStart,cohortEnd:matches[0]!.cohortEnd};
+ });
+
 export const auditIssuedTranscript = createServerFn({method:"GET"})
  .validator((input:unknown) => z.object({transcriptId:uuid,requirementSetId:uuid}).parse(input))
  .handler(async ({data}) => {
