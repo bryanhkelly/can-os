@@ -66,20 +66,25 @@ export function GuardianGradeResponse({ submissionId }: { submissionId: string }
   </section>;
 }
 
-function PreviousGradeResponse({ submissionId, attemptNumber }: { submissionId: string; attemptNumber: number }) {
-  const [open, setOpen] = useState(false);
-  return <details className="mt-4 rounded-lg border p-3" onToggle={event=>setOpen(event.currentTarget.open)}>
+function PreviousGradeResponse({ submissionId, attemptNumber, focusSubmissionId }: {
+  submissionId: string; attemptNumber: number; focusSubmissionId?: string;
+}) {
+  const focused = submissionId === focusSubmissionId;
+  const [open, setOpen] = useState(focused);
+  useEffect(() => { if (focused) setOpen(true); }, [focused]);
+  return <details open={open} className="mt-4 rounded-lg border p-3" onToggle={event=>setOpen(event.currentTarget.open)}>
     <summary className="cursor-pointer text-sm font-semibold">School follow-up for released attempt {attemptNumber}</summary>
     {open && <GuardianGradeResponse submissionId={submissionId}/>}
   </details>;
 }
 
 /** Keep accountable answers available after a revision creates a newer attempt. */
-export function GuardianGradeResponseHistory({ attempts, currentSubmissionId }: {
+export function GuardianGradeResponseHistory({ attempts, currentSubmissionId, focusSubmissionId }: {
   attempts: readonly { submissionId: string; attemptNumber: number }[];
   currentSubmissionId: string | null;
+  focusSubmissionId?: string;
 }) {
   return <>{attempts.map(attempt=>attempt.submissionId===currentSubmissionId
     ? <GuardianGradeResponse key={attempt.submissionId} submissionId={attempt.submissionId}/>
-    : <PreviousGradeResponse key={attempt.submissionId} {...attempt}/>)}</>;
+    : <PreviousGradeResponse key={attempt.submissionId} {...attempt} focusSubmissionId={focusSubmissionId}/>)}</>;
 }
