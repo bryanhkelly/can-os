@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("@tanstack/react-router", () => ({ Link: ({ children }: { children: React.ReactNode }) => children }));
 import { renderToStaticMarkup } from "react-dom/server";
 import { GradebookScoringEditor } from "./GradebookScoringEditor";
 import type { getGradebook } from "@/modules/learning/gradebook.functions";
