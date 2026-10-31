@@ -30,6 +30,8 @@ async function check(slug,path,expectedStatus,expectIdentity=null){
  assert.ok(!response.headers.get("location"),`${url}: redirects forbidden`);
  if(expectIdentity){
   assert.match(type,/text\/html/i);
+  assert.match(response.headers.get("cache-control")??"",/no-store/i,`${url}: public tenant page must not be cached`);
+  assert.ok((response.headers.get("vary")??"").toLowerCase().split(",").map(x=>x.trim()).includes("host"),`${url}: missing Vary: Host`);
   assert.ok(body.startsWith("<!doctype html>"),`${url}: missing standalone HTML`);
   assert.ok(body.includes(`<footer>${slug}.${domain} · Powered by CAN OS</footer>`),
     `${url}: wrong tenant identity`);
