@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { canAuthorizeAcademicCredentialRelease,canDownloadAuthorizedCredential } from "./academic-credential-release";
+import { canAuthorizeAcademicCredentialRelease,canDownloadAuthorizedCredential,canRedeemTransferCredential } from "./academic-credential-release";
 
 const now=new Date("2026-10-31T12:00:00.000Z");
 const good={
@@ -24,5 +24,27 @@ describe("academic credential release policy",()=>{
   expect(canDownloadAuthorizedCredential({...recipient,accountEmail:"other@example.org"})).toBe(false);
   expect(canDownloadAuthorizedCredential({...recipient,expiresAt:now})).toBe(false);
   expect(canDownloadAuthorizedCredential({...recipient,revokedAt:now})).toBe(false);
+ });
+});
+
+describe("current transfer authority at disclosure",()=>{
+ const valid={
+  consentActive:true,consentMatchesStudent:true,consentMatchesGuardian:true,
+  consentMatchesAction:true,consentMatchesDestination:true,consentMatchesProgram:true,
+  relationshipActive:true,actionResolved:true,actionMatchesStudent:true,
+  actionMatchesGuardian:true,actionMatchesConsent:true,actionCompleted:true,
+  issuerMatches:true,
+ };
+ it("permits only a fully current authorization",()=>expect(canRedeemTransferCredential(valid)).toBe(true));
+ it.each(Object.keys(valid) as Array<keyof typeof valid>)("denies when %s changes",key=>{
+  expect(canRedeemTransferCredential({...valid,[key]:false})).toBe(false);
+ });
+ it("denies canceled or reopened transfer after approval",()=>{
+  expect(canRedeemTransferCredential({...valid,actionResolved:false})).toBe(false);
+  expect(canRedeemTransferCredential({...valid,actionCompleted:false})).toBe(false);
+ });
+ it("denies consent revocation and guardian privilege loss after approval",()=>{
+  expect(canRedeemTransferCredential({...valid,consentActive:false})).toBe(false);
+  expect(canRedeemTransferCredential({...valid,relationshipActive:false})).toBe(false);
  });
 });
