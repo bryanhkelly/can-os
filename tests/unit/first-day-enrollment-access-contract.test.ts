@@ -51,6 +51,8 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     expect(future).toContain("program.academicProviderOrganizationId");
     expect(attendance).toContain("lte(terms.startsOn,date),gte(terms.endsOn,date)");
     expect(attendance).toContain("effectiveSections=sectionsAtSite.filter");
+    expect(attendance).toContain("programStartsAt:activeProgramEnrollment.startedAt");
+    expect(attendance).toContain("programEndsAt:activeProgramEnrollment.endedAt");
     expect(future).not.toContain("recordAttendanceRevision");
     const staffing=read("src/modules/operations/onsite-supervision.functions.ts");
     expect(staffing).toContain("loadFirstDaySupervisionPreparationForActor");
