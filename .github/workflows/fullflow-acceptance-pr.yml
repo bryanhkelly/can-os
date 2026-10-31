@@ -1,0 +1,64 @@
+name: FullFlow Acceptance PR Static Gates
+
+on:
+  pull_request:
+    branches:
+      - FullFlow
+    paths:
+      - ".github/workflows/fullflow-acceptance-pr.yml"
+      - ".github/workflows/fullflow-release-acceptance.yml"
+      - "tests/**"
+      - "scripts/**"
+      - "src/**"
+      - "drizzle/**"
+      - "package.json"
+      - "package-lock.json"
+      - "playwright.fullflow.config.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: Validate acceptance code without database writes
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify route fixture contracts
+        run: node scripts/check-route-fixture-coverage.mjs
+      - name: Lint
+        run: npm run lint
+      - name: Build application and route graph
+        run: npm run build
+      - name: Typecheck acceptance tests and app
+        run: npm run typecheck
+      - name: Run isolated unit regressions
+        run: npm test
+      - name: Verify committed Drizzle migration consistency
+        run: npx drizzle-kit check
+      - name: Verify static checks did not mutate migration artifacts
+        shell: bash
+        run: |
+          if [[ -n "$(git status --porcelain -- drizzle/)" ]]; then
+            echo "::error::HOLD: migration artifacts changed during static verification."
+            exit 1
+          fi
+      - name: Record verification scope
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Acceptance PR static verification"
+            echo "- SHA: \`$GITHUB_SHA\`"
+            echo "- Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "- This job does not access Neon, migrate schemas, run authenticated browsers, or establish release readiness."
+            echo "- Connected release status remains HOLD until the separate FullFlow dispatch succeeds on the integrated SHA."
+          } >> "$GITHUB_STEP_SUMMARY"
