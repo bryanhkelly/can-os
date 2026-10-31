@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { familyInvitationProgress, familyInvitationRetryLabel } from "@/domain/family-invitation-progress";
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { familyInvitationLaunchScope } from "@/domain/family-invitation-launch-scope";
 import { parseFamilyContacts } from "@/domain/family-contact-import";
 import {
@@ -121,7 +121,7 @@ export function FamilyInviteImporter({
   return <section id="invite-families" className="mt-7 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Invite families">
     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Family outreach · School launch</p>
     <h2 className="mt-2 font-serif text-2xl">Invite families</h2>
-    <p className="mt-2 text-sm text-muted-foreground">Paste up to {FAMILY_INVITATION_MAX_RECIPIENTS} family contacts, preview your message, and queue school outreach. Before opening authorization, families receive an informational email only; there is no application or account creation. Once the school is active and admissions are authorized, invitations instead use a verified one-time application link. A public website is not required.</p>
+    <p className="mt-2 text-sm text-muted-foreground">Paste up to {FAMILY_INVITATION_MAX_RECIPIENTS} family contacts, preview your message, and queue school outreach. Before opening authorization, families receive an informational email with an optional interest-response link; no application or account is created. Only families who personally request updates are added to the inquiry inbox. Once the school is active and admissions are authorized, invitations use a verified one-time application link. A public website is not required.</p>
 
     {!programs.length ? <p role="status" className="mt-5 rounded-lg border p-4 text-sm">No authorized school is available for outreach. A draft, launching or ready academic Program can send pre-opening information; application invitations require an active Program with current admissions and school-of-record authorization.</p> : <>
       <label className="mt-5 block text-sm font-semibold">School outreach destination
@@ -138,7 +138,7 @@ export function FamilyInviteImporter({
         </select>
       </label>
       {selectedProgram && (selectedProgram.purpose === "interest"
-        ? <p className="mt-2 text-xs text-muted-foreground">The school is still preparing to open. The email is informational only and must not claim approved operation, enrollment or school-of-record status. Families can contact their inviting church for more information.</p>
+        ? <p className="mt-2 text-xs text-muted-foreground">The school is still preparing to open. The email states that opening has not been authorized and includes an optional request-updates link. Imported contacts are not considered opted in until they submit that form.</p>
         : <p className="mt-2 text-xs text-muted-foreground">After email verification: <a href={selectedProgram.privateApplicationUrl ?? selectedProgram.publishedSiteUrl} target="_blank" rel="noreferrer" className="underline">{selectedProgram.name} family application</a>. Each recipient receives a single-use verification link.</p>)}
 
       <label className="mt-5 block text-sm font-semibold">Paste families
@@ -186,7 +186,7 @@ export function FamilyInviteImporter({
         <p className="mt-2 font-semibold">{subject}</p>
         <p className="mt-4 whitespace-pre-wrap text-sm">{introduction}</p>
         <p className="mt-3 text-sm">{selectedProgram?.purpose === "interest"
-          ? "Each message is a pre-opening notice, not an application. The delivered email includes a standard opening-authorization disclaimer."
+          ? "Each message is a pre-opening notice, not an application. It includes an opening-authorization disclaimer and a link where the adult can explicitly request school updates."
           : `Each email includes a single-use, 10-minute link directly to ${selectedProgram?.name}\u0027s verified application.`}</p>
         <label className="mt-5 flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I reviewed the recipients and message and have a school-approved basis to contact these families.</label>
         <button type="button" disabled={!selectedProgram || !confirmed || busy} onClick={() => void send()}
@@ -197,15 +197,16 @@ export function FamilyInviteImporter({
     {error && <p role="alert" className="mt-4 rounded-lg border border-destructive p-3 text-sm">{error}</p>}
     {result && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{result}</p>}
 
-    {batches.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-3" aria-label="Family invitation progress">
+    {batches.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-4" aria-label="Family invitation progress">
       <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.length,0)}</strong>Invitation recipients</p>
-      <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.status==="responded").length,0)}</strong>Application links opened</p>
+      <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.interest?.consentedAt).length,0)}</strong>Family opt-ins</p>
+      <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.interest?.applicationId || recipient.status==="responded").length,0)}</strong>Admissions responses</p>
       <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{batches.reduce((total,batch)=>total+batch.recipients.filter(recipient=>recipient.status==="retrying").length,0)}</strong>Recipients needing retry</p>
     </div>}
 
     {batches.length > 0 && <div className="mt-8">
       <h3 className="font-serif text-xl">Invitation responses</h3>
-      <p className="mt-1 text-xs text-muted-foreground">Provider acceptance is not inbox delivery. Only formal application invitations produce verified application-link responses; pre-opening emails do not create Applications.</p>
+      <p className="mt-1 text-xs text-muted-foreground">Provider acceptance is not inbox delivery. Pre-opening contacts only become interested leads after the adult submits an explicit request for updates. CAN authorization is still required before a verified application invitation, and a verified link does not establish guardianship.</p>
       <div className="mt-3 space-y-3">{batches.map(batch => {
         const progress = familyInvitationProgress(batch);
         return <details key={batch.id} className="rounded-xl border p-4">
@@ -218,6 +219,20 @@ export function FamilyInviteImporter({
         <ul className="mt-3 space-y-2">{batch.recipients.map(recipient => <li key={recipient.email} className="flex flex-col gap-1 border-b pb-2 text-sm sm:flex-row sm:items-center sm:justify-between">
           <span className="break-words">{[recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || "Name not supplied"} · {recipient.email}</span>
           <span className="text-xs text-muted-foreground">{recipientStatus(recipient.status, batch.outboxStatus)}{recipient.respondedAt ? ` · ${new Date(recipient.respondedAt).toLocaleString()}` : ""}</span>
+          {recipient.interest && <div className="mt-2 w-full rounded-lg border bg-muted/30 p-3 text-xs" aria-label="Family relationship progress">
+            <p>Family requested updates · {new Date(recipient.interest.requestedAt).toLocaleString()} · {recipient.interest.status}</p>
+            <p className="mt-1">{recipient.interest.contactedAt
+              ? `Registrar contacted family · ${new Date(recipient.interest.contactedAt).toLocaleString()}`
+              : "Awaiting registrar follow-up"}</p>
+            {recipient.interest.verifiedEmailAt && <p className="mt-1">Application access email verified · {new Date(recipient.interest.verifiedEmailAt).toLocaleString()}</p>}
+            {recipient.interest.applicationId && <p className="mt-1">Admissions record linked · {recipient.interest.applicationStage ?? "Inquiry"}</p>}
+            <Link to="/admissions/intake" search={{
+              siteId: batch.siteId ?? undefined,
+              programId: batch.programId,
+              interest: recipient.interest.id,
+              application: undefined,
+            }} className="mt-2 inline-block font-semibold underline">View relationship in admissions</Link>
+          </div>}
         </li>)}</ul>
       </details>;
       })}</div>
