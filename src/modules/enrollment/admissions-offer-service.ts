@@ -223,7 +223,7 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
     if(!origin||origin.type!=="guardian_enrollment_change_request"||
        origin.subjectType!=="student_profile"||
        origin.subjectId!==app.studentProfileId||
-       origin.programId===app.programId||
+       !origin.programId||origin.programId===app.programId||
        origin.metadata.kind!=="transfer"||
        origin.metadata.requestedByGuardianPersonId!==app.submittedByPersonId||
        origin.metadata.destinationApplicationId!==app.id||
