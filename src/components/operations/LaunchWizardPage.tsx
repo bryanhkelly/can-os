@@ -1,3 +1,4 @@
+import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { LaunchSchoolModelPicker } from "@/components/operations/LaunchSchoolModelPicker";
 import { FamilyInviteImporter } from "@/components/operations/FamilyInviteImporter";
 import type { listFamilyInvitations } from "@/modules/enrollment/family-invitations.functions";
@@ -45,7 +46,9 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
 
   const { options, launches, preparationPrograms, familyInvitations, admissions, enrollmentCounts, extendedPlanning, authError } = data;
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const siteMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof createLaunchSite>[0]) => createLaunchSite(input) });
+  const launchMutation = useWorkspaceMutation({ mutationFn: (input: Parameters<typeof startLaunch>[0]) => startLaunch(input) });
+  const busy = siteMutation.isPending || launchMutation.isPending;
   const [error, setError] = useState("");
   const [created, setCreated] = useState<{
     programId: string;
@@ -82,15 +85,16 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
   const [newSiteTimezone,setNewSiteTimezone]=useState("America/Los_Angeles");
   async function addSite(){
     if(!hostOrganizationId)return;
-    setBusy(true);setError("");
+    setError("");
     try{
-      const result=await createLaunchSite({data:{organizationId:hostOrganizationId,name:newSiteName,
+      const result=await siteMutation.submit({data:{organizationId:hostOrganizationId,name:newSiteName,
         slug:newSiteSlug,timezone:newSiteTimezone}});
+      if (!result) return;
       setCreatedSiteDraft({siteId:result.siteId,host:result.publicSiteDraft.host});
       setSiteId(result.siteId);
       await router.invalidate();setNewSiteName("");setNewSiteSlug("");
     }catch(e){setError(e instanceof Error?e.message:"Unable to create site");}
-    finally{setBusy(false);}
+
   }
 
   const hostSites = options?.sites.filter((site) => site.organizationId === hostOrganizationId) ?? [];
@@ -137,11 +141,10 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
 
   async function submitLaunch(event: React.FormEvent) {
     event.preventDefault();
-    setBusy(true);
     setError("");
     setCreated(null);
     try {
-      const result = await startLaunch({
+      const result = await launchMutation.submit({
         data: {
           name,
           targetOpeningDate,
@@ -164,6 +167,7 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
           ...(siteId ? { siteId } : {}),
         },
       });
+      if (!result) return;
       setCreated({...result,programType:type});
       await router.invalidate();
       await router.navigate({
@@ -172,8 +176,6 @@ export function LaunchWizardPage({ selection, data }: { selection: {siteId?: str
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to start launch");
-    } finally {
-      setBusy(false);
     }
   }
 
