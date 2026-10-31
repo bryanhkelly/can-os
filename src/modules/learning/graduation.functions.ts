@@ -276,6 +276,7 @@ export const revokeDiploma=createServerFn({method:"POST"})
        .where(eq(s.graduationDecisions.id,diploma.graduationDecisionId)).limit(1);
      if(!decision)throw new AuthorizationError("Graduation decision unavailable");
      issuerAuthorized(context,decision.issuingOrganizationId);
+     if(diploma.revokedAt)throw new AuthorizationError("Diploma already revoked");
      const [updated]=await tx.update(s.diplomaIssuances)
        .set({revokedAt:new Date(),revocationReason:data.reason})
        .where(and(eq(s.diplomaIssuances.id,data.diplomaId),eq(s.diplomaIssuances.graduationDecisionId,decision.id)))
