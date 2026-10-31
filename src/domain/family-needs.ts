@@ -25,7 +25,7 @@ export function prioritizeFamilyNeeds<T extends FamilyNeed>(items: T[], now: num
   const rank = (item: FamilyNeed) => {
     if (item.dueAt && Date.parse(item.dueAt) < now) return 0;
     if (item.priority === "urgent" || item.priority === "high") return 1;
-    if (item.kind === "excuse") return 2;
+    if (item.kind === "excuse" || item.kind === "attendance_review") return 2;
     return item.kind === "action" ? 3 : 4;
   };
   return [...items].sort((a, b) => {
