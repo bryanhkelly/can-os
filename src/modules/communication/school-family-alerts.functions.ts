@@ -111,13 +111,32 @@ export const publishSchoolFamilyAlert=createServerFn({method:"POST"})
      siteId:program.siteId,programId:program.id,
      payload:{type:actionType,kind:data.kind,recipientCount:recipientRows.length},
    });
+   const prefs=recipientRows.length?await tx.select({
+     personId:s.notificationPreferences.personId,
+   }).from(s.notificationPreferences).where(and(
+     inArray(s.notificationPreferences.personId,recipientRows.map(row=>row.personId)),
+     eq(s.notificationPreferences.smsOptedIn,true),
+     sql`${s.notificationPreferences.smsVerifiedAt} IS NOT NULL`,
+     sql`${s.notificationPreferences.smsVerifiedPhone} IS NOT NULL`,
+   )):[];
+   const smsRecipients=new Set(prefs.map(row=>row.personId));
    for(let offset=0;offset<recipientRows.length;offset+=100){
-     await notifyMany(tx,recipientRows.slice(offset,offset+100).map(recipient=>({
+     const batch=recipientRows.slice(offset,offset+100);
+     const notificationIds=await notifyMany(tx,batch.map(recipient=>({
        recipientPersonId:recipient.personId,type:"school_family_alert",
        title:data.kind==="school_closure"?"School closure update: "+data.title:data.title,
        body:data.message,
        resourceType:"action",resourceId:action.id,eventId,
      })));
+     const outbound=notificationIds.flatMap((notificationId,index)=>{
+       const personId=batch[index]!.personId;
+       return [
+         {notificationId,channel:"email" as const},
+         ...(smsRecipients.has(personId)?[{notificationId,channel:"sms" as const}]:[]),
+       ];
+     });
+     if(outbound.length)await tx.insert(s.notificationOutboundDeliveries)
+       .values(outbound).onConflictDoNothing();
    }
    await writeAudit(tx,actor,{
      action:"school.family_alert.published",entityType:"action",entityId:action.id,
