@@ -5,6 +5,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { effectiveAttendanceEvents } from "@/domain/effective-attendance";
+import { guardianWorkNeedsAction } from "@/domain/guardian-academics";
 import { staffedPublishedSectionIds } from "@/modules/enrollment/instructional-section-readiness.server";
 
 /**
@@ -103,9 +104,15 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
   const sectionIds = await activeSectionIds(s, student.studentProfileId, siteIds,context.scope.programIds??[]);
   let missingCount = 0;
   let nextDueAt: string | null = null;
+  const workToReview: Array<{
+   assessmentId: string; sectionId: string; title: string;
+   status: string; dueAt: string | null;
+  }> = [];
   if (sectionIds.length) {
    const published = await db.select({
     assessmentId: s.assessments.id,
+    sectionId: s.assessments.sectionId,
+    title: s.assessments.title,
     dueAt: s.assessments.dueAt,
     submissionId: s.submissions.id,
     submissionStatus: s.submissions.status,
@@ -130,7 +137,17 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
       newest.set(row.assessmentId, row);
    }
    for (const row of newest.values()) {
-    const unsubmitted = !row.submissionId || row.submissionStatus === "assigned";
+    const status = row.submissionStatus ?? "assigned";
+    const unsubmitted = !row.submissionId || status === "assigned";
+    if (guardianWorkNeedsAction(status)) {
+     workToReview.push({
+      assessmentId: row.assessmentId,
+      sectionId: row.sectionId,
+      title: row.title,
+      status,
+      dueAt: row.dueAt?.toISOString() ?? null,
+     });
+    }
     if (!row.dueAt) continue;
     if (row.dueAt.getTime() < now.getTime() && unsubmitted) missingCount += 1;
     if (row.dueAt.getTime() >= now.getTime() && unsubmitted) {
@@ -167,9 +184,15 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
    sectionCount: sectionIds.length,
    awaitingSections: sectionIds.length === 0,
    missingCount,
+   workNeedsAttentionCount: workToReview.length,
+   // Already visible published assignments; not a new family task store.
+   workToReview: workToReview.sort((a,b) =>
+    (a.status === "returned" ? -1 : 0) - (b.status === "returned" ? -1 : 0) ||
+    (a.dueAt ?? "9999").localeCompare(b.dueAt ?? "9999")).slice(0,3),
    unexcusedAbsences,
    nextDueAt,
-   status: sectionIds.length === 0 ? "awaiting_courses" as const : missingCount > 0 || unexcusedAbsences > 0 ? "needs_attention" as const : "on_track" as const,
+   status: sectionIds.length === 0 ? "awaiting_courses" as const :
+    workToReview.length > 0 || missingCount > 0 || unexcusedAbsences > 0 ? "needs_attention" as const : "on_track" as const,
   };
  }));
  return { children };
