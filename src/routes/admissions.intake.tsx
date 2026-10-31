@@ -3,25 +3,26 @@ import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { ArrowUpRight } from "lucide-react";
 import {useEffect,useState} from "react";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
-import {createAdmissionsInquiry,listAdmissionsExistingStudentsPage,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
+import {createAdmissionsInquiry,getAdmissionsStageCounts,listAdmissionsExistingStudentsPage,listAdmissionsIntake,listAdmissionsIntakePrograms,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox";
 import { AdmissionsInquiryForm } from "@/components/admissions/AdmissionsInquiryForm";
 import { AdmissionsPageNavigation } from "@/components/admissions/AdmissionsPageNavigation";
-import { AdmissionsPipelineSummary,countAdmissionsStages } from "@/components/admissions/AdmissionsPipelineSummary";
+import { AdmissionsPipelineSummary } from "@/components/admissions/AdmissionsPipelineSummary";
 import { listPublicAdmissionsInterests } from "@/modules/enrollment/public-admissions-interest.functions";
 const load=async(selection:{interest?:string;siteId?:string;programId?:string;page?:number;studentPage?:number;search?:string;application?:string})=>{
- const [records,programs,existingStudentPage,publicInterests,selectedInterestPage]=await Promise.all([
+ const [records,programs,existingStudentPage,publicInterests,selectedInterestPage,stageCounts]=await Promise.all([
   listAdmissionsIntake({data:{siteId:selection.siteId,programId:selection.programId,page:selection.page??1,search:selection.application?undefined:selection.search,applicationId:selection.application}}),
   listAdmissionsIntakePrograms(),
   listAdmissionsExistingStudentsPage({data:{siteId:selection.siteId,programId:selection.programId,page:selection.studentPage??1}}),
   listPublicAdmissionsInterests({data:{}}),
   selection.interest?listPublicAdmissionsInterests({data:{interestId:selection.interest}}):Promise.resolve(null),
+  getAdmissionsStageCounts({data:{siteId:selection.siteId,programId:selection.programId,search:selection.search}}),
  ]);
  return {records,programs,existingStudents:existingStudentPage.items,existingStudentHasMore:existingStudentPage.nextPage!==null,publicInterests,
-  linkedInterest:selectedInterestPage?.items[0]??null};
+  linkedInterest:selectedInterestPage?.items[0]??null,stageCounts};
 };
 export const Route=createFileRoute("/admissions/intake")({
  validateSearch:(search:Record<string,unknown>):{application?:string;siteId?:string;programId?:string;interest?:string;page?:number;studentPage?:number;search?:string}=>({
@@ -162,7 +163,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     notes={notes} setNotes={setNotes} selection={selected} existingStudentHasMore={data.existingStudentHasMore}/>}
 
   </section>
-  <AdmissionsPipelineSummary counts={countAdmissionsStages(scopedRecords)}/>
+  <AdmissionsPipelineSummary counts={data.stageCounts}/>
   <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
    {selected.application&&<Link to="/admissions/intake" search={{application:undefined,siteId:selected.siteId,programId:selected.programId}} className="inline-block text-sm underline">Show all applicants</Link>}
    {records.map(r=><AdmissionsApplicantCard key={r.id} r={r} busy={busy}
