@@ -13,7 +13,7 @@ vi.mock("@/components/operations/FamilyInviteImporter", () => ({
 
 type Workspace = Awaited<ReturnType<typeof listFamilyInvitations>>;
 const batch = (programId:string, siteId:string): Workspace["batches"][number] => ({
-  id:programId+"-batch",programId,siteId,programName:"School",subject:"Welcome",
+  id:programId+"-"+siteId+"-batch",programId,siteId,programName:"School",subject:"Welcome",
   introduction:"Hello",createdAt:"2026-10-31T00:00:00.000Z",
   status:"complete" as const,purpose:"interest" as const,outboxStatus:"processed" as const,
   recipients:[{firstName:"Family",lastName:"One",email:"family@example.test",
