@@ -69,7 +69,8 @@ function TeacherGradebookPage() {
  const reviewQueue=gradebook?.cells.filter(cell=>cell.status==="submitted")??[];
  const pendingReviewCount=reviewQueue.length;
  const reviewIndex=reviewQueue.findIndex(cell=>cell.submissionId===reviewCell?.submissionId);
- const previousReview=reviewQueue[reviewIndex-1],nextReview=reviewQueue[reviewIndex+1];
+ const previousReview=reviewIndex>0?reviewQueue[reviewIndex-1]:undefined;
+ const nextReview=reviewIndex>=0?reviewQueue[reviewIndex+1]:undefined;
 
  useEffect(() => {
   let active = true;
