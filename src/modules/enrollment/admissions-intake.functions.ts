@@ -86,6 +86,11 @@ async function existingStudentChoices(database:Pick<Database,"selectDistinct">,
   .orderBy(people.legalLastName,people.legalFirstName,studentProfiles.id).limit(300);
 }
 /** Search active students and verified guardians without loading an unbounded directory. */
+const admissionsPageInput=z.object({
+ siteId:uuid.optional(),programId:uuid.optional(),cursor:uuid.optional(),
+ search:z.string().trim().max(100).optional(),
+ pageSize:z.coerce.number().int().min(1).max(100).default(40),
+}).strict();
 export const listAdmissionsExistingStudentsPage=createServerFn({method:"GET"})
  .validator((value:unknown)=>admissionsPageInput.parse(value??{}))
  .handler(async({data})=>{
@@ -123,11 +128,6 @@ export const listAdmissionsExistingStudentsPage=createServerFn({method:"GET"})
 export const listAdmissionsExistingStudents=createServerFn({method:"GET"}).handler(async()=>{
  return existingStudentChoices(db,await registrar());
 });
-const admissionsPageInput=z.object({
- siteId:uuid.optional(),programId:uuid.optional(),cursor:uuid.optional(),
- search:z.string().trim().max(100).optional(),
- pageSize:z.coerce.number().int().min(1).max(100).default(40),
-}).strict();
 /** Bounded, server-scoped admissions index. A cursor is never an authorization grant. */
 export const listAdmissionsIntakePage=createServerFn({method:"GET"})
  .validator((value:unknown)=>admissionsPageInput.parse(value??{}))
