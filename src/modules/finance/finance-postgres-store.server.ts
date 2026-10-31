@@ -136,6 +136,21 @@ export const postgresFinanceStore: FinanceStore = {
           .from(financeProviderEvents).where(eq(financeProviderEvents.invoiceId, invoice.id));
         return project(invoice, events.map(e => e.provider + ":" + e.eventId));
       }
+      if (event.kind === "refund_succeeded" && event.providerRefundId) {
+        const [sameRefund] = await tx.select().from(financeProviderEvents)
+          .where(and(eq(financeProviderEvents.provider, event.provider),
+            eq(financeProviderEvents.providerRefundId, event.providerRefundId))).limit(1);
+        if (sameRefund) {
+          if (sameRefund.invoiceId !== invoice.id || sameRefund.amountCents !== event.amount.cents ||
+              sameRefund.providerPaymentId !== event.providerPaymentId ||
+              sameRefund.eventKind !== "refund_succeeded")
+            throw new Error("Provider refund identity collision");
+          const priorEvents = await tx.select({ provider: financeProviderEvents.provider,
+            eventId: financeProviderEvents.eventId }).from(financeProviderEvents)
+            .where(eq(financeProviderEvents.invoiceId, invoice.id));
+          return project(invoice, priorEvents.map(e => e.provider + ":" + e.eventId));
+        }
+      }
       const events = await tx.select({ provider: financeProviderEvents.provider, eventId: financeProviderEvents.eventId })
         .from(financeProviderEvents).where(eq(financeProviderEvents.invoiceId, invoice.id));
       if (invoice.provider && invoice.provider !== event.provider) throw new Error("Processor identity conflict");
