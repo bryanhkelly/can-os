@@ -8,12 +8,16 @@ const evidence = {
   verifiedAt: new Date(when.getTime() - 3600000),
   verifiedByPersonId: "verifier",
   expiresAt: evidenceExpiresAt(when),
-  metadata: { churchRequestId: "request-a", churchSlug: "church-a", authorizedEmailNormalized: "leader@example.org" },
+  metadata: { provenance: "can_steward_independently_reviewed", churchRequestId: "request-a", churchSlug: "church-a", authorizedEmailNormalized: "leader@example.org" },
 };
 
 describe("church authority evidence policy", () => {
   it("accepts an application-bound reference for a different CAN approver", () => {
     expect(currentChurchAuthorityEvidence(evidence, request, "approver", when)).toBe(true);
+  });
+  it("rejects applicant-declared or missing independent review provenance", () => {
+    expect(currentChurchAuthorityEvidence({ ...evidence, metadata: { ...evidence.metadata, provenance: "applicant_declared" } }, request, "approver", when)).toBe(false);
+    expect(currentChurchAuthorityEvidence({ ...evidence, metadata: { churchRequestId: request.id } }, request, "approver", when)).toBe(false);
   });
   it("rejects approval by the verifying steward", () => {
     expect(currentChurchAuthorityEvidence(evidence, request, "verifier", when)).toBe(false);
