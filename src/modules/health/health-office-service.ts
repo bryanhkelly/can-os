@@ -376,7 +376,7 @@ export async function recordHealthOfficeVisit(
         ))
         .where(guardianRelationshipPredicate({
           studentPersonId: student.personId,
-          access: "academic",
+          access: "enrollment",
         }));
 
       if (guardians.length > 0) {
