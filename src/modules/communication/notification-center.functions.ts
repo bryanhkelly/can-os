@@ -96,6 +96,17 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
      inArray(s.actions.organizationId,context.scope.organizationIds??[]),
    )):[];
  const familyChangeChildByAction=new Map(familyChangeActions.map(row=>[row.id,row.studentPersonId]));
+ const operatorChangeNoticeIds=rows.filter(n=>n.type==="guardian_enrollment_change_requested"&&
+  n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
+ const operatorChangeActions=operatorChangeNoticeIds.length&&context.role==="registrar"?
+  await db.select({id:s.actions.id}).from(s.actions).where(and(
+   inArray(s.actions.id,operatorChangeNoticeIds),
+   eq(s.actions.type,"guardian_enrollment_change_request"),
+   inArray(s.actions.siteId,context.scope.siteIds??[]),
+   inArray(s.actions.programId,context.scope.programIds??[]),
+   inArray(s.actions.organizationId,context.scope.organizationIds??[]),
+  )):[];
+ const permittedOperatorChangeIds=new Set(operatorChangeActions.map(row=>row.id));
  const pickupRows=rows.filter(row=>pickupNotificationTypes.has(row.type)&&row.resourceId);
  const pickupReleaseIds=pickupRows.filter(row=>row.resourceType==="pickup_release_event").map(row=>row.resourceId!);
  const pickupHoldIds=pickupRows.filter(row=>row.resourceType==="pickup_custody_hold").map(row=>row.resourceId!);
@@ -383,6 +394,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
    n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
    n.type==="guardian_enrollment_change_updated"&&n.resourceType==="action"&&n.resourceId&&familyChangeChildByAction.has(n.resourceId)?`/guardian/enrollment-changes?student=${encodeURIComponent(familyChangeChildByAction.get(n.resourceId)!)}`:
+   n.type==="guardian_enrollment_change_requested"&&n.resourceType==="action"&&n.resourceId&&permittedOperatorChangeIds.has(n.resourceId)?`/operations?action=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="attendance_event"&&n.resourceId&&attendanceStudent.has(n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(attendanceStudent.get(n.resourceId)!)}&attendance=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="submission"&&n.resourceId&&
