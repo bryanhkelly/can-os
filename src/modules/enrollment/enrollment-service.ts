@@ -444,9 +444,35 @@ export async function startFamilyApplication(
       insertErrorLabel: "Enrollment",
     });
 
+    let destinationRecordsReleaseConsentId:string|null=null;
     if(originTransfer){
+      // A destination school's registrar may only receive this student's
+      // official records after an explicit, verified guardian release to the
+      // exact receiving Program. This is separate from the origin-school
+      // release to a free-form named destination.
+      const [consent]=await tx.insert(consentRecords).values({
+        subjectType:"application",subjectId:application.id,
+        consentType:"academic_records_destination_program_release",
+        signerPersonId:actorPersonId,version:"can-transfer-program-release-v1",
+        signatureEvidence:{
+          acknowledged:true,originTransferActionId:originTransfer.actionId,
+          destinationApplicationId:application.id,destinationProgramId:program.id,
+          destinationSiteId:program.siteId,
+          destinationOrganizationId:program.organizationId,
+          studentProfileId,guardianPersonId:actorPersonId,
+          scope:"official_transcript_only",
+        },
+      }).returning({id:consentRecords.id});
+      if(!consent)throw new Error("Could not save specific destination records authorization");
+      destinationRecordsReleaseConsentId=consent.id;
+      const [currentApp]=await tx.select({metadata:applications.metadata})
+        .from(applications).where(eq(applications.id,application.id)).limit(1);
+      await tx.update(applications).set({
+        metadata:{...currentApp?.metadata,destinationRecordsReleaseConsentId:consent.id},
+      }).where(eq(applications.id,application.id));
       await tx.update(actions).set({
         metadata:{...originTransfer.metadata,
+          destinationRecordsReleaseConsentId:consent.id,
           destinationApplicationId:application.id,
           destinationProgramId:input.programId,
           destinationApplicationSubmittedAt:new Date().toISOString(),
@@ -491,6 +517,7 @@ export async function startFamilyApplication(
             originTransferSiteId:originTransfer.siteId,
             originTransferDestinationSchoolName:originTransfer.destinationSchoolName,
             destinationConfirmedByGuardianPersonId:actorPersonId,
+            destinationRecordsReleaseConsentId,
           }:{}),
           ...(input.schoolYearId ? {schoolYearId:input.schoolYearId} : {}),
           publicFamilyStartRequestId:familyStart.id,publicInterestId:interest.id,
