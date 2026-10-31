@@ -75,6 +75,8 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
          !actor.scope.programIds?.includes(data.programId))
         throw new AuthorizationError("registrar first-day Site Program and Section scope");
       assertCapability(actor,"enrollment.activate");
+      if(actor.grantSiteId && actor.grantSiteId!==site.id)
+        throw new AuthorizationError("original registrar Site grant");
       if(data.date<today)throw new AuthorizationError("future first-day date");
     }else if(data.preparation)assertSchoolDayPreparation(actor,site,data.date);
     else if(data.date>today || data.date<oldest)
