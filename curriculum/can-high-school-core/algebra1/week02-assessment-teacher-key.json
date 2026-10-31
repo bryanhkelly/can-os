@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "courseCode": "CAN-ALG1",
+  "visibility": "teacher_only",
+  "units": [
+    {
+      "unitId": "algebra1-u01",
+      "reviewStatus": "draft",
+      "teacherOverview": "Week 2 assessment keys are publisher-controlled teacher-only drafts; never include in student package.",
+      "lessons": [],
+      "assessments": [
+        {
+          "assessmentKey": "algebra1-u01-w02-practice",
+          "workedAnswers": [
+            {
+              "prompt": "1",
+              "answer": "(2x+1)/3=5 => 2x+1=15 => x=7; substitution 15/3=5."
+            },
+            {
+              "prompt": "2",
+              "answer": "d=rt => t=d/r for r≠0."
+            },
+            {
+              "prompt": "3",
+              "answer": "3x−6=2x+7 => x=13; 3(11)=33 and 26+7=33."
+            },
+            {
+              "prompt": "4",
+              "answer": "18+7v=74 => v=8 visitors; 18+56=74 dollars."
+            }
+          ]
+        },
+        {
+          "assessmentKey": "algebra1-u01-w02-checkpoint",
+          "workedAnswers": [
+            {
+              "prompt": "1",
+              "answer": "5(x−1)=3(2x+1) => 5x−5=6x+3 => x=−8; original both sides −3."
+            },
+            {
+              "prompt": "2",
+              "answer": "6x−12=4x+10 => 2x=22 => x=11."
+            },
+            {
+              "prompt": "3",
+              "answer": "5x+7=5x+7; identity, all real numbers."
+            },
+            {
+              "prompt": "4",
+              "answer": "C=(5/9)(F−32)."
+            },
+            {
+              "prompt": "5",
+              "answer": "b=2A/h, h≠0."
+            },
+            {
+              "prompt": "6",
+              "answer": "18b≥50; b≥50/18; minimum 3 buses."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
