@@ -121,6 +121,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       item.siteId ? item.siteId===section.siteId : true,
     ).map(item=>({id:item.id,title:item.title,kind:item.kind,
       url:item.resourceId?attached.find(resource=>resource.id===item.resourceId)?.url??null:item.url,
+      resourceId:item.resourceId,
       lessonId:item.lessonId,
       source:item.metadata?.source==="teacher_supplement"?"teacher" as const:"organization" as const,
       canManage:actor.role==="teacher"&&item.metadata?.source==="teacher_supplement"&&
@@ -159,7 +160,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
       ?[...completionGroups].map(([lessonId,students])=>({lessonId,studentCount:students.size})):[];
     return {
       lessonCompletionCounts,
-      role: actor.role, section: { id: section.id, title: section.title, code: section.code, description: section.description,
+      role: actor.role, section: { id: section.id, programId: section.programId, title: section.title, code: section.code, description: section.description,
         subject: section.subject, versionId: section.versionId, contentStatus: section.contentStatus },
       studentPersonId, content, teacherGuides, curriculumAccess, supplements:allSupplements,
       assessmentEvidence, assessmentEvidenceSummary:summarizeClassAssessmentEvidence(assessmentEvidence),
