@@ -138,7 +138,7 @@ export function PublicInterestInbox({ items }: { items: readonly Row[] }) {
             {row.activeEnrollment && row.placedInClass &&
               <Link to="/staff/attendance" className="font-semibold underline">Scheduled school-day roster →</Link>}
           </div>
-        </div>
+        </div>}
         {row.familyStartRequestId && !row.emailVerifiedAt && !row.applicationId &&
           <p className="mt-2 text-xs text-muted-foreground">Awaiting family email verification or application. A sent invitation is not an accepted application.</p>}
         {!row.admissionsAuthorized && !row.applicationId && row.status !== "closed" &&
