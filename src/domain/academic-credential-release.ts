@@ -40,3 +40,17 @@ export function canAuthorizeAcademicCredentialRelease(input:CredentialReleaseRev
     input.expiresAt.getTime()>input.now.getTime() &&
     input.expiresAt.getTime()<=input.now.getTime()+30*86400000;
 }
+
+export type LiveTransferAuthority = {
+ consentActive:boolean; consentMatchesStudent:boolean;
+ consentMatchesGuardian:boolean; consentMatchesAction:boolean;
+ consentMatchesDestination:boolean; consentMatchesProgram:boolean;
+ relationshipActive:boolean; actionResolved:boolean;
+ actionMatchesStudent:boolean; actionMatchesGuardian:boolean;
+ actionMatchesConsent:boolean; actionCompleted:boolean;
+ issuerMatches:boolean;
+};
+export function canRedeemTransferCredential(input:LiveTransferAuthority):boolean {
+ return Object.values(input).every(value=>value===true);
+}
+export const EXTERNAL_SCHOOL_TO_SCHOOL_RELEASE_SUPPORTED=false as const;
