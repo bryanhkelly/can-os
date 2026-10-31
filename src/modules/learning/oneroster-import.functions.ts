@@ -189,7 +189,7 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
          eq(curriculumInteropMappings.sourceSystem,data.sourceSystem),
          inArray(curriculumInteropMappings.externalIdentifier,sourceIds)));
      for(const prior of previous)if(prior.entityType!=="section"||prior.entityId!==bySource.get(prior.externalIdentifier)||
-          prior.metadata.programId!==program.id)
+          prior.metadata.programId!==program.id||prior.metadata.siteId!==program.siteId||prior.metadata.sourceHash!==digest)
        throw new Error("Existing OneRoster sourcedId is bound to a different canonical Section.");
      const alreadyMapped=new Set(previous.map(p=>p.externalIdentifier));
      let mapped=0;
