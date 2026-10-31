@@ -13,7 +13,7 @@ export function validateChurchEvidenceReference(reference: string, method: strin
       /^(?:javascript|data|file|blob):/i.test(trimmed)) {
     throw new Error("A valid independent authority evidence reference and method are required");
   }
-  // A URL is a pointer, not proof of authority. Never allow untrusted schemes.
+  // A URL is a pointer, not proof of authority. Reject external records.
   if (/^vault:[a-z0-9][a-z0-9/_-]{6,}$/i.test(trimmed)) return trimmed;
   if (/^[a-z][a-z\d+.-]*:/i.test(trimmed)) {
     let parsed: URL;
@@ -26,8 +26,8 @@ export function validateChurchEvidenceReference(reference: string, method: strin
     throw new Error("External HTTPS links cannot establish independently inspected evidence");
   }
   // Bare strings and unknown URI schemes cannot be dereferenced or audited.
-  // Only a canonical internal vault reference or a verified HTTPS record is accepted.
-  throw new Error("Use an approved vault reference or an HTTPS evidence record");
+  // Only a canonical internal vault reference is accepted by this syntax check.
+  throw new Error("Use an approved internal vault reference");
 }
 
 export function evidenceExpiresAt(verifiedAt: Date): Date {
