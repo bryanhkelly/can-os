@@ -89,7 +89,14 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
    const classes=preview.previews.find(p=>p.kind==="classes");
    if(!classes||!classes.rows.length||classes.rows.length>500)
      throw new Error("Provide 1–500 valid OneRoster classes for canonical reconciliation.");
-   const sourceIds=classes.rows.map(row=>row.sourcedId);
+   // CSV rows are indexable records: require a concrete sourcedId before
+   // passing identifiers into Drizzle predicates and persisted mappings.
+   const validatedClasses=classes.rows.map(row=>{
+     const sourcedId=row.sourcedId;
+     if(!sourcedId)throw new Error("Every OneRoster class needs a sourcedId.");
+     return {...row,sourcedId};
+   });
+   const sourceIds=validatedClasses.map(row=>row.sourcedId);
    const bySource=new Map(data.classMappings.map(row=>[row.sourcedId,row.sectionId]));
    if(bySource.size!==data.classMappings.length||
        sourceIds.length!==bySource.size||sourceIds.some(id=>!bySource.has(id))||
@@ -124,7 +131,7 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
        throw new Error("Existing OneRoster sourcedId is bound to a different canonical Section.");
      const alreadyMapped=new Set(previous.map(p=>p.externalIdentifier));
      let mapped=0;
-     for(const row of classes.rows){
+     for(const row of validatedClasses){
        if(alreadyMapped.has(row.sourcedId))continue;
        const [inserted]=await tx.insert(curriculumInteropMappings).values({
          organizationId:program.organizationId,importJobId:job.id,
