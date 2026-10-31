@@ -1,0 +1,158 @@
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@/db/client";
+import * as s from "@/db/schema";
+import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { EventTypes } from "@/domain/event-types";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { emitEvent, notify, writeAudit } from "@/platform/mutation";
+
+const input=z.object({
+ actionId:z.string().uuid(),confirmInstitutionalReview:z.literal(true),
+ resolutionNote:z.string().trim().min(20).max(2000),
+}).strict();
+
+/** Institutional withdrawal/transfer completion, not a generic task close.
+ * One transaction closes the student's current school seats and their
+ * school-specific learning grant while retaining historical academic records.
+ * A transfer is an exit from the origin, NOT admission to the destination.
+ */
+export const completeRegistrarEnrollmentExit=createServerFn({method:"POST"})
+ .validator((value:unknown)=>input.parse(value))
+ .handler(async({data})=>{
+ const actor=await getCommandContext(getRequest());
+ if(actor.role!=="registrar"||!actor.actorPersonId||actor.demoFacilitator)
+   throw new AuthorizationError("real institution registrar");
+ assertCapability(actor,"enrollment.activate");
+ return db.transaction(async tx=>{
+   const [action]=await tx.select().from(s.actions)
+     .where(and(eq(s.actions.id,data.actionId),
+       eq(s.actions.type,"guardian_enrollment_change_request"),
+       eq(s.actions.subjectType,"student_profile")))
+     .for("update").limit(1);
+   const kind=action?.metadata.kind;
+   if(!action||!(kind==="withdrawal"||kind==="transfer")||
+      !action.siteId||!action.programId||!action.organizationId||
+      !actor.scope.siteIds?.includes(action.siteId)||
+      !actor.scope.organizationIds?.includes(action.organizationId)||
+      !actor.scope.programIds?.includes(action.programId))
+     throw new AuthorizationError("current registrar enrollment-exit Action scope");
+   if(action.status==="resolved"){
+     if(action.metadata.exitCompletedByRegistrar===true)
+       return {completed:false as const,alreadyCompleted:true as const};
+     throw new Error("This Action was closed without a recorded institutional enrollment exit. Escalate to admissions.");
+   }
+   if(action.status==="cancelled")throw new Error("The parent request is cancelled");
+   const [program]=await tx.select({id:s.programs.id,siteId:s.programs.siteId,
+     organizationId:s.programs.organizationId})
+     .from(s.programs).where(eq(s.programs.id,action.programId)).limit(1);
+   if(!program||program.siteId!==action.siteId||
+      program.organizationId!==action.organizationId)
+     throw new AuthorizationError("program and school ownership changed");
+   const [student]=await tx.select({personId:s.studentProfiles.personId})
+     .from(s.studentProfiles).where(eq(s.studentProfiles.id,action.subjectId)).limit(1);
+   if(!student)throw new AuthorizationError("current requested student");
+   const requestedBy=action.metadata.requestedByGuardianPersonId;
+   if(typeof requestedBy!=="string")throw new AuthorizationError("guardian request origin");
+   const [guardian]=await tx.select({id:s.guardianRelationships.id})
+     .from(s.guardianRelationships).where(guardianRelationshipPredicate({
+       guardianPersonId:requestedBy,studentPersonId:student.personId,access:"enrollment",
+     })).limit(1);
+   if(!guardian)throw new AuthorizationError("requesting guardian no longer verified for enrollment");
+
+   // A registrar must not end a child's school membership while a second
+   // process is provisioning access or changing their seats concurrently.
+   const active=await tx.select({id:s.enrollments.id,kind:s.enrollments.kind,
+     schoolYearId:s.enrollments.schoolYearId,sectionId:s.enrollments.sectionId})
+     .from(s.enrollments).where(and(
+       eq(s.enrollments.studentProfileId,action.subjectId),
+       eq(s.enrollments.programId,action.programId),
+       inArray(s.enrollments.kind,["program","section"]),
+       eq(s.enrollments.status,"active"),
+     )).for("update");
+   const programSeats=active.filter(row=>row.kind==="program");
+   if(!programSeats.length)
+     throw new Error("No active enrollment remains at this school. The school must reconcile this request.");
+
+   const now=new Date();
+   const nextStatus=kind==="transfer"?"transferred" as const:"withdrawn" as const;
+   const seatIds=active.map(row=>row.id);
+   const ended=await tx.update(s.enrollments).set({
+     status:nextStatus,endedAt:now,updatedAt:now,
+   }).where(inArray(s.enrollments.id,seatIds)).returning({id:s.enrollments.id});
+   if(ended.length!==seatIds.length)
+     throw new Error("The complete program and class enrollment could not be closed");
+
+   // A Site student login may cover several programs; do not revoke it if
+   // another actual active Program enrollment at the same Site remains.
+   const [otherSiteProgram]=await tx.select({id:s.enrollments.id})
+     .from(s.enrollments).innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+     .where(and(
+       eq(s.enrollments.studentProfileId,action.subjectId),
+       eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+       eq(s.programs.siteId,action.siteId),eq(s.programs.organizationId,action.organizationId),
+     )).limit(1);
+   let grantsRevoked=0;
+   let sessionsRevoked=0;
+   if(!otherSiteProgram){
+     const grants=await tx.select({id:s.accountPersonGrants.id,accountId:s.accountPersonGrants.accountId})
+       .from(s.accountPersonGrants).where(and(
+         eq(s.accountPersonGrants.personId,student.personId),
+         eq(s.accountPersonGrants.role,"student"),
+         eq(s.accountPersonGrants.organizationId,action.organizationId),
+         eq(s.accountPersonGrants.siteId,action.siteId),
+         eq(s.accountPersonGrants.active,true),
+       )).for("update");
+     if(grants.length){
+       const ids=grants.map(row=>row.id);
+       const deactivated=await tx.update(s.accountPersonGrants)
+         .set({active:false,updatedAt:now}).where(inArray(s.accountPersonGrants.id,ids))
+         .returning({id:s.accountPersonGrants.id});
+       grantsRevoked=deactivated.length;
+       const revoked=await tx.update(s.accessSessions)
+         .set({revokedAt:now,updatedAt:now})
+         .where(and(inArray(s.accessSessions.activeGrantId,ids),isNull(s.accessSessions.revokedAt)))
+         .returning({id:s.accessSessions.id});
+       sessionsRevoked=revoked.length;
+     }
+   }
+   const [resolved]=await tx.update(s.actions).set({
+     status:"resolved",resolutionNote:data.resolutionNote,
+     resolvedAt:now,updatedAt:now,
+     metadata:{...action.metadata,exitCompletedByRegistrar:true,
+       exitStatus:nextStatus,endedEnrollmentCount:ended.length,
+       studentGrantsRevoked:grantsRevoked,
+       completedByRegistrarPersonId:actor.actorPersonId},
+   }).where(eq(s.actions.id,action.id)).returning({id:s.actions.id});
+   if(!resolved)throw new Error("Could not close the institutional exit request");
+   await writeAudit(tx,actor,{
+     action:"enrollment."+nextStatus,entityType:"student_profile",entityId:action.subjectId,
+     scope:{organizationId:action.organizationId,siteId:action.siteId,programId:action.programId},
+     before:{activeEnrollmentIds:seatIds},
+     after:{status:nextStatus,endedEnrollmentIds:ended.map(row=>row.id),
+       grantsRevoked,sessionsRevoked,reason:data.resolutionNote,requestActionId:action.id},
+   });
+   await emitEvent(tx,{
+     eventType:"EnrollmentExited",aggregateType:"student_profile",aggregateId:action.subjectId,
+     actorPersonId:actor.actorPersonId,
+     organizationId:action.organizationId,siteId:action.siteId,programId:action.programId,
+     payload:{status:nextStatus,actionId:action.id,endedEnrollmentCount:ended.length},
+   });
+   await emitEvent(tx,{
+     eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:action.id,
+     actorPersonId:actor.actorPersonId,
+     payload:{subjectType:"student_profile",subjectId:action.subjectId},
+   });
+   await notify(tx,{
+     recipientPersonId:requestedBy,type:"guardian_enrollment_change_updated",
+     title:kind==="transfer"?"School transfer processed":"School withdrawal processed",
+     body:"The school has completed the origin-school enrollment change. Review the official school response. A transfer does not itself enroll your child at another school.",
+     resourceType:"action",resourceId:action.id,
+   });
+   return {completed:true as const,status:nextStatus,endedEnrollmentCount:ended.length,
+     grantsRevoked,sessionsRevoked};
+ });
+});
