@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { QueryState } from "@/components/workspace";
 import {
   correctSectionGrade,
@@ -8,6 +9,7 @@ import {
 
 type Model = Awaited<ReturnType<typeof getSectionGradeFinalization>>;
 type FinalizedGrade = Model["grades"][number];
+type Preview = Extract<Awaited<ReturnType<typeof finalizeSectionGrades>>, {preview:true}>;
 
 /**
  * Gradebook panel that closes a grading period (finalizeSectionGrades) and
@@ -20,6 +22,7 @@ export function SectionGradeFinalization({ sectionId }: { sectionId: string }) {
 }
 
 function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
+  const [preview,setPreview]=useState<Preview|null>(null);
   const [model, setModel] = useState<Model | null>(null);
   const [loading, setLoading] = useState(true);
   const [readError, setReadError] = useState("");
@@ -63,14 +66,25 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
     setBusy(true); setError(""); setNotice("");
     try {
       const result = await finalizeSectionGrades({ data: { sectionId, gradingPeriodId: periodId } });
+      setPreview(null);
       setNotice(`Finalized ${result.finalized} grade${result.finalized === 1 ? "" : "s"}; ` +
         `${result.skipped} enrolled student${result.skipped === 1 ? "" : "s"} skipped ` +
-        "(already finalized or no graded work in the period window). Finalized grades now appear on student and guardian report cards and transcripts.");
+        "(already finalized or unfinished scoreable work in the period window). Finalized grades now appear on student and guardian report cards and transcripts.");
       // A refresh error is shown separately; it must not imply finalization failed.
       await refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to finalize grades for this grading period.");
     } finally { setBusy(false); }
+  };
+
+  const reviewBlockers = async () => {
+    if(busy||loading||!periodId)return;
+    setBusy(true);setError("");setPreview(null);
+    try{
+      const result=await finalizeSectionGrades({data:{sectionId,gradingPeriodId:periodId,previewOnly:true}});
+      if("preview" in result && result.preview)setPreview(result);
+    }catch(cause){setError(cause instanceof Error?cause.message:"Unable to review grading-period work.");}
+    finally{setBusy(false);}
   };
 
   const correct = async (grade: FinalizedGrade) => {
@@ -121,7 +135,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
       Finalizing a grading period computes each enrolled student&apos;s percentage from their latest submission, when graded,
       for each published or closed assessment due inside the period window, converts it to a letter
       grade with the school&apos;s active grade scale, and publishes the result to report cards and transcripts.
-      Students with no graded work in the window are skipped. Finalized grades are immutable: re-running
+      Students with any unfinished scoreable work are skipped. Finalized grades are immutable: re-running
       finalization never recomputes them, and later changes go through a recorded correction instead.
     </p>
     {error && <p role="alert" className="mt-4 rounded-lg border p-3 text-sm">{error}</p>}
@@ -136,7 +150,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
         {periods.length > 0 && <div className="mt-4 flex flex-wrap items-end gap-3">
           <label className="min-w-64 text-sm font-semibold">Grading period
             <select aria-label="Grading period to finalize" value={periodId} disabled={busy}
-              onChange={(event) => setPeriodId(event.target.value)}
+              onChange={(event) => {setPeriodId(event.target.value);setPreview(null);}}
               className="mt-2 block w-full rounded-lg border bg-background p-3 font-normal">
               {periods.map((period) => <option key={period.id} value={period.id}>
                 {period.name} ({new Date(`${period.startsOn}T00:00:00`).toLocaleDateString()} – {new Date(`${period.endsOn}T00:00:00`).toLocaleDateString()})
@@ -144,11 +158,23 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
               </option>)}
             </select>
           </label>
+          <button type="button" disabled={busy||!periodId} onClick={()=>void reviewBlockers()}
+            className="rounded-lg border px-4 py-3 text-sm font-semibold disabled:opacity-50">Review unfinished work</button>
           <button type="button" disabled={busy || !periodId} onClick={() => void finalize()}
             className="rounded-lg bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-50">
             {busy ? "Working…" : "Finalize grades"}
           </button>
         </div>}
+        {preview&&<section aria-label="Grading period unfinished work" className="mt-4 rounded-lg border p-4 text-sm">
+          <p>{preview.eligible} students ready to finalize. Review is a current snapshot; finalization rechecks the records.</p>
+          {preview.blockers.length===0?<p className="mt-2">No unfinished scoreable assignments found for students awaiting finalization.</p>:
+            <ul className="mt-3 space-y-2">{preview.blockers.map(item=><li key={item.studentProfileId+":"+item.assessmentId}>
+              <Link to="/teacher/gradebook" search={{section:sectionId,student:item.studentProfileId,assessment:item.assessmentId}} className="underline">
+                {item.studentName} · {item.assessmentTitle}</Link>
+              {" · "+(item.status==="submitted"?"Awaiting grading":item.status==="returned"?"Awaiting revision":item.status==="graded"?"Score needs review":"Not submitted")}
+            </li>)}</ul>}
+          {preview.blockers.some(item=>item.status!=="submitted")&&<p className="mt-3"><Link to="/teacher/missing-work" className="underline">Open missing-work follow-up</Link></p>}
+        </section>}
         <h3 className="mt-6 text-sm font-semibold">Finalized grades for this section</h3>
         {grades.length === 0 && <p className="mt-2 text-sm text-muted-foreground">
           No finalized grades yet. Finalize a grading period above to publish report-card grades.

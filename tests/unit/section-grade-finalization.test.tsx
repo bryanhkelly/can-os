@@ -2,6 +2,8 @@ import { type EffectCallback, type ReactElement, type ReactNode, type SetStateAc
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SectionGradeFinalization } from "@/components/learning/SectionGradeFinalization";
+vi.mock("@tanstack/react-router",()=>({Link:({to,search,children}:{to:string;search?:Record<string,string>;children:ReactNode})=>
+  <a href={to+"?"+new URLSearchParams(search)}>{children}</a>}));
 
 const state = vi.hoisted(() => ({
   slots: [] as unknown[], cursor: 0, effects: [] as EffectCallback[],
@@ -116,6 +118,20 @@ describe("gradebook section grade finalization panel", () => {
     expect(html).toContain("Ada Lovelace");
     expect(html).toContain("B (84.00%)");
     expect(state.read).toHaveBeenCalledWith({ data: { sectionId } });
+  });
+
+  it("reviews unfinished assignments with an exact student and assessment link before finalizing",async()=>{
+    state.finalize.mockResolvedValue({preview:true,eligible:1,blockers:[{
+      studentProfileId:"profile-2",studentName:"Grace Hopper",assessmentId:"essay",assessmentTitle:"Essay",status:"submitted",
+    }]});
+    await loaded();
+    findButton("Review unfinished work")?.props.onClick?.();
+    await vi.waitFor(()=>expect(renderToStaticMarkup(render())).toContain("Grace Hopper"));
+    expect(state.finalize).toHaveBeenCalledWith({data:{sectionId,gradingPeriodId:periodId,previewOnly:true}});
+    const html=renderToStaticMarkup(render());
+    expect(html).toContain("Awaiting grading");
+    expect(html).toContain("student=profile-2&amp;assessment=essay");
+    expect(html).not.toContain("Finalized 1 grade");
   });
 
   it("finalizes the grading period selected by the teacher", async () => {
