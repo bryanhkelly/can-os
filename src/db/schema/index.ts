@@ -50,3 +50,4 @@ export * from "./public-family-starts";
 export * from "./student-access-consents";
 export * from "./church-onboarding";
 export * from "./graduation";
+export * from "./academic-credential-delivery";
