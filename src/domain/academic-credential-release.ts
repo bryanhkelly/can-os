@@ -17,3 +17,26 @@ export function canDownloadAuthorizedCredential(input:CredentialReleaseGate):boo
     input.accountEmail.trim().toLowerCase()===input.recipientEmail.trim().toLowerCase() &&
     input.expiresAt.getTime()>input.now.getTime() && !input.revokedAt;
 }
+
+export const RELEASE_PURPOSES = ["student_request","authorized_guardian","transfer","postsecondary_admission","employment_verification","legal_requirement"] as const;
+export type CredentialReleasePurpose = typeof RELEASE_PURPOSES[number];
+export type CredentialReleaseReview = {
+  issuerMatches:boolean;
+  studentMatches:boolean;
+  verifiedRecipient:boolean;
+  trustedInstructions:boolean;
+  validAuthorityEvidence:boolean;
+  registrarApproved:boolean;
+  demoActor:boolean;
+  purpose:CredentialReleasePurpose;
+  expiresAt:Date;
+  now:Date;
+};
+export function canAuthorizeAcademicCredentialRelease(input:CredentialReleaseReview):boolean {
+  return !input.demoActor && input.issuerMatches && input.studentMatches &&
+    input.verifiedRecipient && input.trustedInstructions &&
+    input.validAuthorityEvidence && input.registrarApproved &&
+    RELEASE_PURPOSES.includes(input.purpose) &&
+    input.expiresAt.getTime()>input.now.getTime() &&
+    input.expiresAt.getTime()<=input.now.getTime()+30*86400000;
+}
