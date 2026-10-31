@@ -5,7 +5,7 @@ import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { academicDocumentPdf } from "@/domain/academic-document-pdf.server";
-import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential, canRedeemTransferCredential } from "@/domain/academic-credential-release";
+import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential, canRedeemTransferCredential, isLatestTranscriptIssuance } from "@/domain/academic-credential-release";
 import { writeAudit } from "@/platform/mutation";
 
 const uuid=z.string().uuid();
@@ -221,7 +221,7 @@ async function assertLatestTranscriptIssuance(
    eq(s.transcriptIssuances.issuingOrganizationId,issuerId)))
   .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id))
   .limit(1);
- if(!latest||latest.id!==issuanceId)
+ if(!isLatestTranscriptIssuance(issuanceId,latest?.id??null))
   throw new AuthorizationError("Superseded or missing official transcript issuance");
 }
 
