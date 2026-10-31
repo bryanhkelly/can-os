@@ -110,12 +110,17 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
         <thead className="border-b bg-muted/50"><tr><th scope="col" className="p-4">Applicant</th><th scope="col" className="p-4">Program</th><th scope="col" className="p-4">Stage</th><th scope="col" className="p-4">Next step</th></tr></thead>
         <tbody className="divide-y">{rows.filter(row=>!selected.stage||row.stage===selected.stage).map(row=>{
          const offer=selectActionableOffer(row.offers);
-         const next=row.stage==="declined"||row.stage==="withdrawn"?"Review closed application":
+         const next=row.enrollments.length && row.activeSectionCount===0?"Assign staffed instructional class":
+          row.enrollments.length && row.studentAccessStatus==="pending_review"?"Review student sign-in request":
+          row.enrollments.length && row.studentAccessStatus==="not_requested"?"Await guardian student sign-in consent":
+          row.enrollments.length && row.studentAccessStatus==="approved"?"Prepare scheduled onsite school day":
+          row.enrollments.length?"Review student access":
+          row.stage==="declined"||row.stage==="withdrawn"?"Review closed application":
           row.disposition==="waitlisted"?"Restore waitlisted application to review":
           row.outstandingRequirements>0?`Review ${row.outstandingRequirements} blocking requirement(s)`:
           offer?.status==="issued"?"Awaiting family response":
           offer?.status==="accepted"&&!row.enrollments.some(enrollment=>enrollment.schoolYearId===offer.schoolYearId)?"Activate accepted enrollment":
-          row.enrollments.length?"Review class placement":row.stage==="accepted"?"Review offer eligibility":"Review application evidence";
+          row.stage==="accepted"?"Review offer eligibility":"Review application evidence";
          return <tr key={row.id} className="align-top hover:bg-muted/40">
           <th scope="row" className="p-4 font-semibold"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:row.id}} className="underline">{row.studentName??row.id}</Link><span className="mt-1 block text-xs font-normal text-muted-foreground">{row.submittedAt?`Submitted ${new Date(row.submittedAt).toLocaleDateString()}`:"Not submitted"}</span></th>
           <td className="p-4">{row.program}</td><td className="p-4"><StatusBadge tone={row.outstandingRequirements>0?"attention":"neutral"}>{row.disposition==="waitlisted"?"waitlisted":row.stage}</StatusBadge></td>
@@ -152,13 +157,25 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
                enrollmentActivated={activated} />}
           {activated&&<StudentLearningAccessHandoff applicationId={x.id} role="registrar"/>}
           {activated&&<div className="mt-3 rounded-lg border p-3 text-sm">
-            <p className="font-semibold">Connect the classroom to the supervised school day</p>
-            <p className="mt-1 text-muted-foreground">Check that this student appears on the expected onsite
-              attendance roster for an actual scheduled instructional day. Presence must be recorded by
-              authorized onsite staff; class enrollment alone does not mark attendance or certify supervision.</p>
-            <Link to="/staff/attendance" className="mt-2 inline-block font-semibold underline">
-              Review scheduled school attendance →
-            </Link>
+            <p className="font-semibold">Enrollment → learning → supervised school day</p>
+            <ol className="mt-2 space-y-1 text-muted-foreground" aria-label="School start handoff">
+              <li>1. School-year enrollment active.</li>
+              <li>2. {x.activeSectionCount>0
+                ? `${x.activeSectionCount} active instructional class assignment(s) recorded.`
+                : "Assign a staffed instructional class above before starting student learning access."}</li>
+              <li>3. {x.studentAccessStatus==="approved"
+                ? "Separate student learning account approved. The student signs in with their own email."
+                : x.studentAccessStatus==="pending_review"
+                  ? "Guardian consent received. Complete the independent registrar identity review above."
+                  : "Guardian must authorize a separate student account; registrar then verifies the student's identity."}</li>
+              <li>4. Site staff confirm an actual scheduled school day, expected onsite roster, supervision
+                and physical attendance. Enrollment never records presence automatically.</li>
+            </ol>
+            {x.activeSectionCount>0
+              ? <Link to="/staff/attendance" className="mt-2 inline-block font-semibold underline">
+                  Open expected school-day attendance →
+                </Link>
+              : <p className="mt-2 text-xs">The school-day attendance handoff opens after a class is assigned.</p>}
           </div>}
           <Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-3 inline-block text-xs font-semibold underline">Manage household readiness →</Link>
         </article>;
