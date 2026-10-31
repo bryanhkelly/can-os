@@ -430,8 +430,11 @@ export const listGuardianEffectiveAbsences = createServerFn({ method: "GET" })
       lastName: people.legalLastName,
     }).from(guardianRelationships)
       .innerJoin(people, eq(people.id, guardianRelationships.studentPersonId))
-      .where(and(eq(guardianRelationships.guardianPersonId, actor.actorPersonId!),
-        eq(guardianRelationships.canViewAcademics, true),
+      .where(and(
+        guardianRelationshipPredicate({
+          guardianPersonId: actor.actorPersonId!,
+          access: "academic",
+        }),
         ...(data.studentPersonId ?
           [eq(guardianRelationships.studentPersonId, data.studentPersonId)] : [])));
     if (!relationships.length) return { absences: [] };
@@ -533,9 +536,11 @@ export const submitEffectiveAttendanceExcuse = createServerFn({ method: "POST" }
       .from(studentProfiles).where(eq(studentProfiles.id, record.studentProfileId)).limit(1);
     const [relation] = profile ? await db.select({ id: guardianRelationships.id })
       .from(guardianRelationships).where(and(
-        eq(guardianRelationships.guardianPersonId, actor.actorPersonId!),
-        eq(guardianRelationships.studentPersonId, profile.personId),
-        eq(guardianRelationships.canViewAcademics, true),
+        guardianRelationshipPredicate({
+          guardianPersonId: actor.actorPersonId!,
+          studentPersonId: profile.personId,
+          access: "academic",
+        }),
         eq(guardianRelationships.canSubmitAttendanceExcuse, true))).limit(1) : [];
     if (!relation) throw new AuthorizationError("guardian cannot excuse this student");
 
