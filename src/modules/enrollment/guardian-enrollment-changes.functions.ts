@@ -149,3 +149,35 @@ export const listGuardianEnrollmentChanges=createServerFn({method:"GET"})
       createdAt:row.createdAt.toISOString(),updatedAt:row.updatedAt.toISOString(),
     }))};
  });
+
+/** Request choices come from verified relationships and current actual Program
+ * enrollments, never client-supplied school IDs or a stale class placement.
+ */
+export const getGuardianEnrollmentChangeOptions=createServerFn({method:"GET"})
+ .handler(async()=>{
+  const actor=await parent();
+  const rows=await db.select({
+    studentPersonId:s.studentProfiles.personId,
+    firstName:s.people.legalFirstName,lastName:s.people.legalLastName,
+    programId:s.programs.id,schoolName:s.programs.name,
+  }).from(s.guardianRelationships)
+   .innerJoin(s.studentProfiles,eq(s.studentProfiles.personId,s.guardianRelationships.studentPersonId))
+   .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
+   .innerJoin(s.enrollments,and(
+     eq(s.enrollments.studentProfileId,s.studentProfiles.id),
+     eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+   ))
+   .innerJoin(s.programs,and(
+     eq(s.programs.id,s.enrollments.programId),eq(s.programs.status,"active"),
+   ))
+   .where(and(
+     guardianRelationshipPredicate({guardianPersonId:actor.actorPersonId!,access:"enrollment"}),
+     inArray(s.programs.id,actor.scope.programIds??[]),
+     inArray(s.programs.siteId,actor.scope.siteIds??[]),
+     inArray(s.programs.organizationId,actor.scope.organizationIds??[]),
+   )).limit(100);
+  return [...new Map(rows.map(row=>[row.studentPersonId+":"+row.programId,{
+    studentPersonId:row.studentPersonId,studentName:row.firstName+" "+row.lastName,
+    programId:row.programId,schoolName:row.schoolName,
+  }])).values()];
+ });
