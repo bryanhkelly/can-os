@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, leftJoin, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   applications,
