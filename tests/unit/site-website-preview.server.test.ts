@@ -114,7 +114,7 @@ describe("read-only church partner website", () => {
     expect(Object.keys(result).sort()).toEqual([
       "approvedAcademicCount", "approvedEnrichmentCount", "canPublish",
       "currentRevision", "editingContent", "host", "localContentStatus",
-      "localHistory", "organizationName", "previewHtml", "siteName", "status",
+      "localHistory", "organizationName", "previewHtml", "siteId", "siteName", "status",
     ]);
     expect(state.catalogSiteIds).toEqual(["site-a", "site-a"]);
   });
