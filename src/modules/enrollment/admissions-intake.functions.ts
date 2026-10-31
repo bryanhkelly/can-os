@@ -1,5 +1,5 @@
 import { db,type Database } from "@/db/client";
-import { accessAccounts,accountPersonGrants,admissionOffers,applications,enrollments,guardianRelationships,householdMemberships,households,journeyRequirements,journeys,people,programs,publicAdmissionsInterests,studentProfiles } from "@/db/schema";
+import { accessAccounts,accountPersonGrants,admissionOffers,applications,actions,enrollments,guardianRelationships,householdMemberships,households,journeyRequirements,journeys,people,programs,publicAdmissionsInterests,studentProfiles } from "@/db/schema";
 import { lockAdmissionsApplication } from "@/domain/admissions-application-lock";
 import { offerHoldsSeat } from "@/domain/admissions-policy";
 import { normalizeAccessEmail } from "@/domain/access-tokens";
@@ -104,6 +104,16 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
    ...(actor.scope.siteIds ? [inArray(programs.siteId,actor.scope.siteIds)] : [])))
   .orderBy(desc(applications.updatedAt)).limit(300);
  const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+ const sourceIds=[...new Set(rows.map(r=>
+   typeof r.metadata.originTransferActionId==="string"?r.metadata.originTransferActionId:null
+  ).filter((id):id is string=>!!id))];
+ const transferOrigins=sourceIds.length?await db.select({
+   id:actions.id,status:actions.status,subjectId:actions.subjectId,
+   metadata:actions.metadata,
+ }).from(actions).where(and(
+   eq(actions.type,"guardian_enrollment_change_request"),
+   inArray(actions.id,sourceIds),
+ )):[];
  const contactIds=[...new Set(rows.map(r=>applicationGuardianContact(r.metadata,r.submittedByPersonId))
   .filter(id=>uuidPattern.test(id)))];
  const relations=rows.length?await db.select({
@@ -129,6 +139,17 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
    g.organizationId===r.organizationId&&(!g.siteId||g.siteId===r.siteId));
   return {
    ...rest,guardianVerified:verified,guardianLoginProvisioned:loginProvisioned,
+   transferOriginStatus:(()=>{
+     if(typeof metadata.originTransferActionId!=="string")return null;
+     const source=transferOrigins.find(item=>item.id===metadata.originTransferActionId);
+     if(!source||source.metadata.kind!=="transfer"||
+       source.metadata.requestedByGuardianPersonId!==r.submittedByPersonId)
+       return "requires_review" as const;
+     return source.status==="resolved"&&source.metadata.exitCompletedByRegistrar===true&&
+       source.metadata.exitStatus==="transferred"?"completed" as const:"pending" as const;
+   })(),
+   transferOriginSchool:typeof metadata.originTransferDestinationSchoolName==="string"?
+     metadata.originTransferDestinationSchoolName:null,
    createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString(),
    disposition:metadata.admissionsDisposition==="waitlisted"?"waitlisted":metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
   };
