@@ -31,7 +31,8 @@ function GraduationCloseout(){
    {message&&<p role="status" className="rounded-lg border p-3">{message}</p>}
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">1. Institution-approved requirements</h2>
-    {field("Credit-issuing organization ID",issuerId,setIssuerId)}
+    <p className="text-sm">Select an issued student transcript below to identify the issuing institution, or enter its ID when creating a new institutional policy.</p>
+    {field("Institution ID (policy administration)",issuerId,setIssuerId)}
     {field("Academic year",academicYear,setAcademicYear)}
     {field("Requirements version",version,setVersion)}
     <label className="block text-sm">Subject requirements (JSON)<textarea className="mt-1 block min-h-28 w-full rounded-lg border bg-background p-2" value={requirements} onChange={e=>setRequirements(e.target.value)}/></label>
