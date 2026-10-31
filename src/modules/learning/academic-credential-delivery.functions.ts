@@ -41,6 +41,7 @@ export const renderAcademicCredential=createServerFn({method:"GET"})
   const context=await registrar();const {db,s}=await resources();
   const doc=await documentData(db,s,data.kind,data.credentialId);
   if(!context.scope.organizationIds?.includes(doc.issuerId))throw new AuthorizationError("credential issuer");
+  if(data.kind==="transcript")await assertLatestTranscriptIssuance(db,s,doc.studentProfileId,doc.issuerId,data.credentialId);
   // Generating an official record is a privileged disclosure, even without email.
   // Do not cache or share the resulting response outside the authorized registrar session.
   const pdf=academicDocumentPdf(doc);
@@ -205,6 +206,24 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   });
  });
 
+
+/** Conservative local freshness guard. The A-owned authoritative invalidation
+ * adapter must replace this before release approval. A newer issuance makes
+ * an older snapshot ineligible for transfer disclosure. */
+async function assertLatestTranscriptIssuance(
+ db:Awaited<ReturnType<typeof resources>>["db"],
+ s:Awaited<ReturnType<typeof resources>>["s"],
+ studentProfileId:string,issuerId:string,issuanceId:string,
+){
+ const [latest]=await db.select({id:s.transcriptIssuances.id})
+  .from(s.transcriptIssuances)
+  .where(and(eq(s.transcriptIssuances.studentProfileId,studentProfileId),
+   eq(s.transcriptIssuances.issuingOrganizationId,issuerId)))
+  .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id))
+  .limit(1);
+ if(!latest||latest.id!==issuanceId)
+  throw new AuthorizationError("Superseded or missing official transcript issuance");
+}
 
 /** Verified account candidates are limited to the credential subject and
  * guardians with an existing academic-view relationship. This is NOT consent
@@ -380,6 +399,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    throw new AuthorizationError("Official transcript issuer or student invalid");
 
   if(doc.issuerId!==release.issuingOrganizationId)throw new AuthorizationError("credential issuer mismatch");
+  await assertLatestTranscriptIssuance(tx as unknown as typeof db,s,doc.studentProfileId,doc.issuerId,credentialId);
   // Diploma delivery is blocked until Agent A defines active/superseded issuance semantics.
   // Historical transcript release remains bound to its exact immutable issuance snapshot.
   if(kind!=="transcript"||release.releasePurpose!=="transfer")
