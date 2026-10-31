@@ -11,7 +11,7 @@ describe("launch orientation time conversion", () => {
   });
 
   it("rejects repeated fall-back local times", () => {
-    expect(() => unambiguousInstant("2026-11-01T01:30", "America/Los_Angeles")).toThrow(/twice/);
+    expect(() => unambiguousInstant("2026-11-01T01:30", "America/Los_Angeles")).toThrow(/ambiguous/);
   });
 
   it("converts valid times immediately after the fall transition", () => {
