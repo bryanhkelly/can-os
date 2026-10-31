@@ -147,6 +147,14 @@ function GuardianEnrollmentChanges(){
     <p className="font-semibold">{item.title} · {item.schoolName}</p>
     <p className="mt-1 text-sm">Status: {item.status.replaceAll("_"," ")} · {new Date(item.createdAt).toLocaleDateString()}</p>
     {item.destinationSchoolName&&<p className="mt-2 text-sm"><strong>Destination:</strong> {item.destinationSchoolName}{item.intendedLastDay?" · Requested last school day "+item.intendedLastDay:""}</p>}
+    {item.kind==="transfer"&&<p className="mt-2 text-sm"><strong>Receiving school enrollment:</strong> {item.destinationEnrollmentActivated?
+      "Activated in the receiving school's official academic program":
+      item.destinationApplicationId?
+      "Destination application exists; offer acceptance and actual placement are separate":
+      "No linked receiving-school enrollment yet"}</p>}
+    {item.destinationApplicationId&&!item.destinationEnrollmentActivated&&<Link to="/guardian/admission-offers"
+      search={{application:item.destinationApplicationId}}
+      className="mt-2 inline-block text-xs font-semibold underline">Review receiving-school application and offers →</Link>}
     {item.kind==="transfer"&&<p className="mt-1 text-sm">Academic records: {item.recordsHandoffStatus==="completed"?
       "The records office reports an authorized secure handoff completed":
       item.recordsHandoffStatus==="pending"?
