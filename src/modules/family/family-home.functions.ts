@@ -99,7 +99,8 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
  const students = await guardianStudents(s, context.actorPersonId!, siteIds,context.scope.programIds??[]);
  const now = new Date();
- const absenceWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+ // Mirror the attendance workspace's 45-day review window.
+ const absenceWindow = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
 
  const children = await Promise.all(students.map(async student => {
   const sectionIds = await activeSectionIds(s, student.studentProfileId, siteIds,context.scope.programIds??[]);
@@ -191,8 +192,11 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     inArray(s.attendanceEvents.programId,context.scope.programIds??[]),
     gte(s.attendanceEvents.expectedAt, absenceWindow),
    ));
-  const unexcusedAbsences = effectiveAttendanceEvents(attendance)
+  const currentAttendance = effectiveAttendanceEvents(attendance);
+  const unexcusedAbsences = currentAttendance
    .filter(row => row.status === "absent" && !row.excuseId).length;
+  const unexcusedTardies = currentAttendance
+   .filter(row => row.status === "tardy" && !row.excuseId).length;
   return {
    studentPersonId: student.studentPersonId,
    studentProfileId: student.studentProfileId,
@@ -207,9 +211,11 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     (a.status === "returned" ? -1 : 0) - (b.status === "returned" ? -1 : 0) ||
     (a.dueAt ?? "9999").localeCompare(b.dueAt ?? "9999")).slice(0,3),
    unexcusedAbsences,
+   unexcusedTardies,
    nextDueAt,
    status: sectionIds.length === 0 ? "awaiting_courses" as const :
-    workToReview.length > 0 || missingCount > 0 || unexcusedAbsences > 0 ? "needs_attention" as const : "on_track" as const,
+    workToReview.length > 0 || missingCount > 0 || unexcusedAbsences > 0 || unexcusedTardies > 0 ?
+     "needs_attention" as const : "on_track" as const,
   };
  }));
  return { children };
