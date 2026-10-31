@@ -17,6 +17,9 @@ describe("OneRoster class mappings", () => {
   it("rejects duplicate destinations", () => {
     expect(render({"external-a":"can-a","external-b":"can-a"})).toContain('disabled=""');
   });
+  it("rejects destinations outside the authorized class options", () => {
+    expect(render({"external-a":"can-a","external-b":"unavailable"})).toContain('disabled=""');
+  });
   it("allows complete unique mappings", () => {
     expect(render({"external-a":"can-a","external-b":"can-b"})).not.toContain('disabled=""');
   });
