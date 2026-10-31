@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { parseInterestPageCursor, makeInterestPageCursor } from "@/domain/public-admissions-interest";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
@@ -29,15 +30,6 @@ async function requireAdmissionsIntakeReader() {
  */
 const interestPageSize = 50;
 /** Stable keyset cursor: tie-break equal creation timestamps by immutable ID. */
-export function parseInterestPageCursor(cursor: string) {
-  const match = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z)\|([0-9a-f-]{36})$/i.exec(cursor);
-  if (!match) throw new Error("Invalid admissions interest page cursor");
-  const date = new Date(match[1]!);
-  if (Number.isNaN(date.getTime()) || date.toISOString() !== match[1])
-    throw new Error("Invalid admissions interest page cursor");
-  return {createdAt:date,id:z.string().uuid().parse(match[2]!)};
-}
-
 export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({
     cursor:z.string().max(80).optional(),
@@ -96,7 +88,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
     const pageRows = hasMore ? rows.slice(0,interestPageSize) : rows;
     const last = pageRows.at(-1);
     const nextCursor = hasMore && last
-      ? last.createdAt.toISOString()+"|"+last.id : null;
+      ? makeInterestPageCursor(last) : null;
     // Link the consented interest to the canonical enrollment and access
     // records, not an assumed outcome from the application or invitation.
     const linkedApplicationIds = [...new Set(pageRows.flatMap(row => row.applicationId ? [row.applicationId] : []))];
