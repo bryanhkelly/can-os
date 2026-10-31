@@ -572,7 +572,13 @@ export async function activateEnrollmentFromApplication(
       id: programs.id,
       organizationId: programs.organizationId,
       siteId: programs.siteId,
-    }).from(programs).where(eq(programs.id, application.programId)).limit(1);
+      status: programs.status,
+    }).from(programs).where(eq(programs.id, application.programId)).for("share").limit(1);
+    // The legacy path must honor the same school-opening boundary as
+    // accepted-offer activation. Recruiting before opening is permitted;
+    // creating an active student roster before opening is not.
+    if(programForYear?.status!=="active")
+      throw new Error("School must be activated before an accepted application can become an active enrollment");
     const [schoolYear] = await tx.select({
       id: schoolYears.id,
       organizationId: schoolYears.organizationId,
