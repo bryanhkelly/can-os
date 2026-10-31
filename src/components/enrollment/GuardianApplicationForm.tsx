@@ -158,7 +158,7 @@ export function GuardianApplicationForm({ programs, households, students = [], t
       setNotice(`Application received (${result.applicationId}). Review its real school-managed status, checklist and offers here.`);
       setRequestId(crypto.randomUUID());
       setStudentProfileId(""); setStudentOptionId("");
-      setOriginTransferActionId("");setConfirmedDestination(false);setAuthorizedDestinationRecords(false);setAuthorizedDestinationRecords(false);
+      setOriginTransferActionId("");setConfirmedDestination(false);setAuthorizedDestinationRecords(false);
       setFirstName("");
       setLastName("");
       setGrade("");
