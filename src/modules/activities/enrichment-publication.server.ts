@@ -11,6 +11,7 @@ import { enrichmentPublicationSchema, readEnrichmentPublication } from "@/domain
 import { verifyEnrichmentPackages, readEnrichmentPackages, type EnrichmentPackage } from "@/domain/enrichment-packages";
 import { listExtendedSessionStaff } from "./extended-learning-sessions.server";
 import { assertVerifiedExtendedSeasonOpening, unavailableExtendedSeasonApprovals } from "./registration-policy";
+import { readExtendedSeasonApprovals } from "./extended-season-approvals.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
@@ -50,6 +51,7 @@ export async function publishExtendedSeason(
       programId: programs.id, type: programs.type,
       programStatus: programs.status, creditIssuerId: programs.creditIssuingOrganizationId,
       organizationId: programs.organizationId, programSiteId: programs.siteId,
+      academicProviderOrganizationId: programs.academicProviderOrganizationId,
     }).from(activitySeasons)
       .innerJoin(activities, eq(activities.id, activitySeasons.activityId))
       .innerJoin(programs, eq(programs.id, activities.programId))
@@ -69,15 +71,22 @@ export async function publishExtendedSeason(
       .from(sites).where(eq(sites.id, season.programSiteId)).limit(1);
     if (!site || site.organizationId !== season.organizationId)
       throw new AuthorizationError("verified hosting site");
-    // The UI's readiness warning is not authorization. Fail closed in the
-    // mutation itself, including an otherwise idempotent published-season retry.
-    // These five approvals currently have no authoritative server-side source.
+    // Recheck unexpired independent approvals and live staffing inside the
+    // publication transaction; the browser's readiness display is not authority.
+    const approvals = (await readExtendedSeasonApprovals([{
+      seasonId: season.id, programId: season.programId,
+      siteId: season.programSiteId, organizationId: season.organizationId,
+      academicProviderOrganizationId: season.academicProviderOrganizationId,
+      programStatus: season.programStatus, seasonStatus: season.status,
+      siteMatchesProgram: season.programSiteId === season.activitySiteId,
+      capacity: season.capacity,
+    }], tx)).get(season.id) ?? unavailableExtendedSeasonApprovals;
     assertVerifiedExtendedSeasonOpening({
       programStatus: season.programStatus,
       seasonStatus: season.status,
       siteMatchesProgram: season.programSiteId === season.activitySiteId,
       capacity: season.capacity,
-      ...unavailableExtendedSeasonApprovals,
+      ...approvals,
     }, season.status === "registration" ? "register" : "publish");
     if (season.status === "registration") {
       const existing = readEnrichmentPublication(season.seasonMetadata) ??

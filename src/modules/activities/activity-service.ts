@@ -28,6 +28,7 @@ import {
   assertSeasonRegistrationOpen, assertLegacyActivityRegistrationAllowed,
   assertVerifiedExtendedSeasonOpening, unavailableExtendedSeasonApprovals,
 } from "./registration-policy";
+import { readExtendedSeasonApprovals } from "./extended-season-approvals.server";
 import { assertEnrichmentRegistrationPublished } from "@/domain/enrichment-publication";
 import { isExtendedLearningType } from "@/domain/program-offerings";
 import { readEnrichmentPackages, selectEnrichmentPackages,
@@ -188,6 +189,8 @@ export async function registerForActivity(
         programType: programs.type,
         programStatus: programs.status,
         programSiteId: programs.siteId,
+        organizationId: programs.organizationId,
+        academicProviderOrganizationId: programs.academicProviderOrganizationId,
         creditIssuerId: programs.creditIssuingOrganizationId,
         activityStatus: activities.status,
         activityMetadata: activities.metadata,
@@ -201,16 +204,26 @@ export async function registerForActivity(
       .for("update", { of: activitySeasons });
 
     if (!record) throw new Error("Activity season not found");
-    // A historical "registration" status and a signed guardian permission
-    // statement do not prove current screening, safety or release readiness.
-    // Guard before any identity, consent, seat or financial-obligation writes.
+    // Block before creating consent, registrations or charges if independently
+    // reviewed, current safety or onsite staffing evidence is missing.
     if (record.programType && isExtendedLearningType(record.programType)) {
+      if (!record.programId || !record.organizationId || !record.programSiteId ||
+          !record.academicProviderOrganizationId)
+        throw new Error("Extended-learning season lacks a verified host and institution");
+      const approvals = (await readExtendedSeasonApprovals([{
+        seasonId: record.seasonId, programId: record.programId,
+        siteId: record.siteId, organizationId: record.organizationId,
+        academicProviderOrganizationId: record.academicProviderOrganizationId,
+        programStatus: record.programStatus, seasonStatus: record.seasonStatus,
+        siteMatchesProgram: record.programSiteId === record.siteId,
+        capacity: record.capacity,
+      }], tx)).get(record.seasonId) ?? unavailableExtendedSeasonApprovals;
       assertVerifiedExtendedSeasonOpening({
         programStatus: record.programStatus,
         seasonStatus: record.seasonStatus,
         siteMatchesProgram: record.programSiteId === record.siteId,
         capacity: record.capacity,
-        ...unavailableExtendedSeasonApprovals,
+        ...approvals,
       }, "register");
     }
     const publication = record.programType && isExtendedLearningType(record.programType)

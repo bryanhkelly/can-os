@@ -5,6 +5,7 @@ import { readEnrichmentPublication } from "@/domain/enrichment-publication";
 import { readEnrichmentPackages, sessionOccupancy } from "@/domain/enrichment-packages";
 import { isExtendedLearningType } from "@/domain/program-offerings";
 import { extendedRegistrationOpeningReadiness, unavailableExtendedSeasonApprovals } from "./registration-policy";
+import { readExtendedSeasonApprovals } from "./extended-season-approvals.server";
 
 const extended = ["summer_enrichment", "summer_program", "after_school_enrichment"] as const;
 
@@ -31,6 +32,8 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
     programId: s.programs.id, programName: s.programs.name,
     programType: s.programs.type, programStatus: s.programs.status,
     programSiteId: s.programs.siteId,
+    organizationId: s.programs.organizationId,
+    academicProviderOrganizationId: s.programs.academicProviderOrganizationId,
     creditIssuerId: s.programs.creditIssuingOrganizationId,
     registrationOpensAt: s.activitySeasons.registrationOpensAt,
     registrationClosesAt: s.activitySeasons.registrationClosesAt,
@@ -50,18 +53,23 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
     )).orderBy(asc(s.activitySeasons.startsOn)).limit(200);
 
   const now = new Date();
+  const approvals = await readExtendedSeasonApprovals(rows.map(row => ({
+    seasonId: row.seasonId, programId: row.programId, siteId: row.siteId,
+    organizationId: row.organizationId,
+    academicProviderOrganizationId: row.academicProviderOrganizationId,
+    programStatus: row.programStatus, seasonStatus: row.status,
+    siteMatchesProgram: row.programSiteId === row.siteId, capacity: row.capacity,
+  })), executor, now);
   const published = rows.flatMap(row => {
     const permission = readEnrichmentPublication(row.seasonMetadata) ??
       readEnrichmentPublication(row.activityMetadata);
-    // The catalog must not advertise registration on historically published
-    // Seasons without independently verified CURRENT opening evidence.
-    // Authoritative approval sources are not yet implemented, so fail closed.
+    // Public discovery must agree with the guardian registration transaction.
     if (!extendedRegistrationOpeningReadiness({
       programStatus: row.programStatus,
       seasonStatus: "draft",
       siteMatchesProgram: row.programSiteId === row.siteId,
       capacity: row.capacity,
-      ...unavailableExtendedSeasonApprovals,
+      ...(approvals.get(row.seasonId) ?? unavailableExtendedSeasonApprovals),
     }).ready) return [];
     if (!permission || !isExtendedLearningType(row.programType) ||
       row.creditIssuerId !== null || row.programSiteId !== row.siteId ||

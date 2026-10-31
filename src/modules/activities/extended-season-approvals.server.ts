@@ -9,7 +9,7 @@ import {
   type ExtendedSeasonApprovalCategory, type ExtendedSeasonApprovalScope,
 } from "@/domain/extended-learning-approval";
 import { listExtendedSessionStaff } from "./extended-learning-sessions.server";
-import { unavailableExtendedSeasonApprovals, type ExtendedSeasonOpeningEvidence } from "./registration-policy";
+import type { ExtendedSeasonOpeningEvidence } from "./registration-policy";
 
 type Reader = Pick<typeof db, "select">;
 export type ExtendedSeasonApprovalRecord = ExtendedSeasonApprovalScope & {
@@ -50,7 +50,10 @@ export async function readExtendedSeasonApprovals(
   "approvedSafeguardingCoverage" | "verifiedOnsiteStaffing" |
   "emergencyResponsePlanApproved" | "pickupAndReleasePolicyApproved" |
   "datedSessionsAndCoverageVerified">>> {
-  const result = new Map<string, typeof unavailableExtendedSeasonApprovals>();
+  const result = new Map<string, Pick<ExtendedSeasonOpeningEvidence,
+    "approvedSafeguardingCoverage" | "verifiedOnsiteStaffing" |
+    "emergencyResponsePlanApproved" | "pickupAndReleasePolicyApproved" |
+    "datedSessionsAndCoverageVerified">();
   if (!seasons.length) return result;
   const ids = seasons.map(item => item.seasonId);
   const docs = await executor.select().from(documents).where(and(

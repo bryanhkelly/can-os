@@ -49,11 +49,12 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
   // Keep server-only DB and identity imports out of UI component/module evaluation.
   const [{ db }, { actions, activities, activitySeasons, calendarEvents, programs }, { requireActor },
     { listOpeningOperators }, { extendedLearningReadinessActionType },
-    { listExtendedSessionStaff }] = await Promise.all([
+    { listExtendedSessionStaff }, { readExtendedSeasonApprovals }] = await Promise.all([
     import("@/db/client"), import("@/db/schema"), import("@/modules/identity/actors.server"),
     import("@/modules/programs/opening-handoff.server"),
     import("@/domain/extended-learning-readiness-tasks"),
     import("./extended-learning-sessions.server"),
+    import("./extended-season-approvals.server"),
   ]);
   const actor = await requireActor(["registrar"], "program.read");
   const ids = actor.scope.programIds ?? [];
@@ -65,6 +66,7 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
   const rows = await db.select({
     id: programs.id, name: programs.name, type: programs.type,
     status: programs.status, siteId: programs.siteId, organizationId: programs.organizationId,
+    academicProviderOrganizationId: programs.academicProviderOrganizationId,
   }).from(programs).where(and(
     inArray(programs.id, ids), inArray(programs.siteId, siteIds),
     inArray(programs.organizationId, orgIds), inArray(programs.type, extendedTypes),
@@ -82,9 +84,17 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
     .where(and(inArray(activities.programId, rows.map(row => row.id)),
       inArray(activities.siteId, siteIds)))
     .orderBy(asc(activitySeasons.startsOn)).limit(300);
-  // The immutable facts are read server-side. Unimplemented safeguarding,
-  // staffing, emergency, and child-release approval sources FAIL CLOSED.
-  // No user checkbox or metadata value can currently open registration.
+  const approvals = await readExtendedSeasonApprovals(seasons.flatMap(season => {
+    const program = rows.find(item => item.id === season.programId);
+    return program?.siteId ? [{
+      seasonId: season.id, programId: program.id, siteId: season.siteId,
+      organizationId: program.organizationId,
+      academicProviderOrganizationId: program.academicProviderOrganizationId,
+      programStatus: program.status, seasonStatus: season.status,
+      siteMatchesProgram: program.siteId === season.siteId,
+      capacity: season.capacity,
+    }] : [];
+  }));
   const readiness = seasons.map(season => {
     const program = rows.find(p => p.id === season.programId);
     return {
@@ -94,7 +104,7 @@ export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).hand
         seasonStatus: season.status,
         siteMatchesProgram: !!program?.siteId && program.siteId === season.siteId,
         capacity: season.capacity,
-        ...unavailableExtendedSeasonApprovals,
+        ...(approvals.get(season.id) ?? unavailableExtendedSeasonApprovals),
       }),
     };
   });
