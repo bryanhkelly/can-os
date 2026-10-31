@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { submitEvidenceUpload } from "./evidence-upload";
 
 export type EvidenceMimeType = "application/pdf" | "image/jpeg" | "image/png";
@@ -23,9 +23,11 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
   const [expiry, setExpiry] = useState("");
   const [pending, setPending] = useState<{ key: string; input: T } | null>(null);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [error, setError] = useState("");
   async function upload() {
-    if (busy || disabled) return;
+    if (inFlight.current || disabled) return;
+    inFlight.current = true;
     setBusy(true); setError("");
     try {
       await submitEvidenceUpload(adapter, makeInput, file, expiry, pending, setPending);
@@ -38,7 +40,7 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Evidence upload was not recorded");
-    } finally { setBusy(false); }
+    } finally { inFlight.current = false; setBusy(false); }
   }
   return <div className="mt-3 rounded border p-3 text-xs">
     <div className="grid gap-2 sm:grid-cols-2">
