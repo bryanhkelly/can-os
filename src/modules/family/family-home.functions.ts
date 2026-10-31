@@ -239,6 +239,11 @@ export const getGuardianNeedsYou = createServerFn({ method: "GET" }).handler(asy
  }).from(s.actions)
   .where(and(
    eq(s.actions.ownerPersonId, actor),
+   // Ownership alone is not authority after a family changes or leaves schools.
+   // Apply the current school grant before loading titles or descriptions.
+   inArray(s.actions.siteId, siteIds),
+   inArray(s.actions.programId, context.scope.programIds??[]),
+   inArray(s.actions.organizationId, context.scope.organizationIds??[]),
    inArray(s.actions.status, ["open", "in_progress"]),
   ))
   .orderBy(desc(s.actions.createdAt))
