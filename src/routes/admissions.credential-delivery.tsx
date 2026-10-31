@@ -16,6 +16,7 @@ function CredentialDeliveryPage(){
  const [selectedRecipient,setSelectedRecipient]=useState("");
  const [transferActionId,setTransferActionId]=useState("");
  const [consentId,setConsentId]=useState("");
+ const [releaseAcknowledged,setReleaseAcknowledged]=useState(false);
  const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState("");
  async function run(fn:()=>Promise<void>){setBusy(true);setMessage("");try{await fn()}catch(e){setMessage(e instanceof Error?e.message:"Unable to process credential")}finally{setBusy(false)}}
@@ -43,7 +44,8 @@ function CredentialDeliveryPage(){
     <label className="block text-sm">Verified guardian<select className="mt-1 block w-full rounded-lg border bg-background p-2" value={selectedRecipient} onChange={e=>setSelectedRecipient(e.target.value)}><option value="">Select verified identity</option>{recipients.map(row=><option key={row.personId+row.email} value={row.personId+"|"+row.email}>{row.firstName} {row.lastName} ({row.email})</option>)}</select></label>
     {field("Completed transfer action ID",transferActionId,setTransferActionId)}
     {field("Signed transfer consent ID",consentId,setConsentId)}
-    <button disabled={busy||kind!=="transcript"||!selectedRecipient||!transferActionId||!consentId} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{
+    <label className="flex gap-2 text-sm"><input type="checkbox" checked={releaseAcknowledged} onChange={e=>setReleaseAcknowledged(e.target.checked)}/>I reviewed the completed transfer, signed consent, guardian authority and verified recipient. This grants guardian access, not delivery to an outside institution.</label>
+    <button disabled={busy||!releaseAcknowledged||kind!=="transcript"||!selectedRecipient||!transferActionId||!consentId} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{
      const [recipientPersonId,recipientEmail]=selectedRecipient.split("|");
      await authorizeAcademicCredentialRelease({data:{
       kind:"transcript",credentialId,recipientPersonId,recipientEmail,
@@ -64,7 +66,7 @@ function CredentialDeliveryPage(){
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">Release authorization status</h2>
-    <p className="text-sm">Only CAN registrars may revoke existing authorizations. New external releases remain disabled pending independent evidence verification.</p>
+    <p className="text-sm">Only CAN registrars may revoke existing authorizations. School-to-school delivery remains blocked; guardian-access authorizations are reviewed and revoked here.</p>
     <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void run(async()=>{setReleases(await listAcademicCredentialReleaseAuthorizations({data:{kind,credentialId}}))})}>Refresh release authorizations</button>
     {releases.map(row=>{
      const status=row.revokedAt?"Revoked":new Date(row.expiresAt)<=new Date()?"Expired":"Authorized";
