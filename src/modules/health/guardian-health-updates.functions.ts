@@ -140,6 +140,9 @@ export const listGuardianHealthReviews=createServerFn({method:"GET"})
     studentProfileId:s.actions.subjectId,siteId:s.actions.siteId,programId:s.actions.programId,
     studentName:s.people.legalFirstName,studentLastName:s.people.legalLastName,
     profile:s.healthProfiles.metadata,
+    currentAllergySummary:s.healthProfiles.allergySummary,
+    currentEmergencySummary:s.healthProfiles.emergencySummary,
+    currentAccommodationSummary:s.healthProfiles.accommodationSummary,
   }).from(s.actions)
    .innerJoin(s.healthProfiles,eq(s.healthProfiles.studentProfileId,s.actions.subjectId))
    .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.actions.subjectId))
@@ -163,6 +166,11 @@ export const listGuardianHealthReviews=createServerFn({method:"GET"})
      emergencyContactName:proposed.emergencyContactName,
      emergencyContactPhone:proposed.emergencyContactPhone,
      emergencyContactRelationship:proposed.emergencyContactRelationship,
+     currentAllergySummary:row.currentAllergySummary,
+     currentEmergencySummary:row.currentEmergencySummary,
+     currentAccommodationSummary:row.currentAccommodationSummary,
+     currentEmergencyContact:row.profile.approvedEmergencyContact as
+       {name:string;phone:string;relationship:string}|undefined,
    }];
   });
  });
