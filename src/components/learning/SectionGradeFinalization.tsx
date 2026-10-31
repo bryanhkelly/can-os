@@ -79,7 +79,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
 
   const reviewBlockers = async () => {
     if(busy||loading||!periodId)return;
-    setBusy(true);setError("");setPreview(null);
+    setBusy(true);setError("");setNotice("");setPreview(null);
     try{
       const result=await finalizeSectionGrades({data:{sectionId,gradingPeriodId:periodId,previewOnly:true}});
       if("preview" in result && result.preview)setPreview(result);
