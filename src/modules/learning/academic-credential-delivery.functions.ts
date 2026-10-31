@@ -121,6 +121,7 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
     eq(s.accessAccounts.disabled,false),
     isNotNull(s.accessAccounts.emailVerifiedAt),
     eq(s.accessAccounts.emailNormalized,release.recipientEmail.trim().toLowerCase()),
+    eq(s.accountPersonGrants.id,context.grantId),
     eq(s.accountPersonGrants.personId,context.actorPersonId),
     eq(s.accountPersonGrants.active,true),
     eq(s.accountPersonGrants.isSynthetic,false)))
