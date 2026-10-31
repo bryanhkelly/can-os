@@ -45,7 +45,7 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     expect(admissions).toContain("StudentLearningAccessHandoff");
     expect(admissions).toContain("Review revoked student access");
     const handoff=read("src/components/enrollment/FirstSchoolDayHandoff.tsx");
-    expect(handoff).toContain("The Program's official attendance roster");
+    expect(handoff).toContain("the Program's official attendance roster");
     expect(handoff).toContain('to="/site/day"');
     expect(handoff).toContain("not opening authorization");
   });
