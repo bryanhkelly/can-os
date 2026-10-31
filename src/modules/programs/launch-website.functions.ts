@@ -42,10 +42,14 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   // must never count as a successfully published CAN OS school website.
   let publicAvailability:"not_published"|"hosting_disabled"|"live"|"unreachable"="not_published";
   let checkedAt:string|null=null;
+  let hostingDiagnostic="Publish the site before attempting public reachability.";
+  if(address?.status==="published"&&!hostingConfigured)
+   hostingDiagnostic="Public hosting is disabled; DNS/TLS and Netlify edge configuration must be completed before enabling it.";
   if(address?.status==="published"){
    if(!hostingConfigured)publicAvailability="hosting_disabled";
    else if(host){
     checkedAt=new Date().toISOString();
+    hostingDiagnostic="Public HTTPS verification has not succeeded.";
     try{
      const response=await fetch(`https://${host}/`,{method:"GET",redirect:"manual",
       signal:AbortSignal.timeout(5000),headers:{"Accept":"text/html"}});
@@ -53,12 +57,12 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
      if(response.status===200&&response.headers.get("content-type")?.includes("text/html")&&length<=1_000_000){
       const html=await response.text();
       publicAvailability=html.includes("Powered by CAN OS")&&html.toLowerCase().includes("<!doctype html")?"live":"unreachable";
-     }else{publicAvailability="unreachable";await response.body?.cancel();}
-    }catch{publicAvailability="unreachable";}
+     }else{publicAvailability="unreachable";hostingDiagnostic=`HTTPS returned HTTP ${response.status} or an invalid content type/size.`;await response.body?.cancel();}
+    }catch{publicAvailability="unreachable";hostingDiagnostic="HTTPS request failed. Verify DNS, TLS certificate coverage, and deployment configuration.";}
    }
   }
   const base={siteId:school.siteId,programId:school.programId,programName:school.programName,
-   host,status:address?.status??null,hostingConfigured,publicAvailability,checkedAt};
+   host,status:address?.status??null,hostingConfigured,publicAvailability,checkedAt,hostingDiagnostic};
   if(!address)return {...base,previewHtml:null,includesSuggestions:false};
   const [approved,local,enrichment]=await Promise.all([
    readAcademicProgramCatalog(school.siteId),readCurrentLocalContent(school.siteId),readEnrichmentCatalog(school.siteId),
