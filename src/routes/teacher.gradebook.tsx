@@ -1,11 +1,10 @@
+import { GradebookScoringEditor } from "@/components/learning/GradebookScoringEditor";
 import { GradebookAssessmentComposer } from "@/components/learning/GradebookAssessmentComposer";
 import { GradebookReviewedFeedback } from "@/components/learning/GradebookReviewedFeedback";
-import { GradebookReviewActions } from "@/components/learning/GradebookReviewActions";
 import { GradebookAssessmentHeader } from "@/components/learning/GradebookAssessmentHeader";
 import { nextGradebookCell } from "@/components/learning/gradebook-grid-navigation";
 import { GradebookOverview } from "@/components/learning/GradebookOverview";
 import { GradebookReviewQueue } from "@/components/learning/GradebookReviewQueue";
-import { RubricScoreFields } from "@/components/learning/RubricScoreFields";
 import { MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -20,7 +19,7 @@ import {
 } from "@/modules/learning/gradebook.functions";
 import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
-import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
 import { liveRubricTotal } from "@/components/learning/live-rubric-total";
@@ -368,22 +367,14 @@ function TeacherGradebookPage() {
      </div>}>
       <SubmissionEvidence key={reviewCell.submissionId} submissionId={reviewCell.submissionId}/>
       <AssignmentConversation key={`conversation-${reviewCell.submissionId}`} assessmentId={reviewAssessment.id} studentPersonId={reviewStudent.personId}/>
-      {reviewCell.status==="submitted"?<div className="grid gap-4">
-       <StatusBadge>Ready for grading</StatusBadge>
-       {reviewAssessment.rubric.length>0?<RubricScoreFields
-        criteria={reviewAssessment.rubric}
-        values={rubricInputs}
-        onChange={(id,value)=>setRubricInputs(current=>({...current,[id]:value}))}
-        total={liveRubricScore(reviewAssessment)}
-        pointsPossible={reviewAssessment.pointsPossible}
-       />:<label className="text-sm font-semibold">Score (0–{reviewAssessment.pointsPossible??"—"})
-        <input className="mt-2 block w-28 rounded-lg border bg-background p-2" type="number" min={0} max={Number(reviewAssessment.pointsPossible??0)} value={score} onChange={event=>setScore(event.target.value)}/>
-       </label>}
-       <label className="text-sm font-semibold">Feedback comment<textarea rows={4} maxLength={4000} value={comment} onChange={event=>setComment(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-       <GradebookReviewActions busy={busy} sectionId={selected}
+      {reviewCell.status==="submitted"?<GradebookScoringEditor
+        assessment={reviewAssessment} score={score} comment={comment} rubricInputs={rubricInputs}
+        busy={busy} sectionId={selected} liveTotal={liveRubricScore(reviewAssessment)}
+        onScoreChange={setScore} onCommentChange={setComment}
+        onRubricChange={(id,value)=>setRubricInputs(current=>({...current,[id]:value}))}
         onSaveDraft={()=>void submitGrade(reviewCell,reviewAssessment,true)}
         onPostGrade={()=>void submitGrade(reviewCell,reviewAssessment)} />
-      </div>:<GradebookReviewedFeedback cell={reviewCell} assessment={reviewAssessment} busy={busy}
+      :<GradebookReviewedFeedback cell={reviewCell} assessment={reviewAssessment} busy={busy}
        onReturnForRevision={()=>void returnForRevision(reviewCell.submissionId)} />}
      </WorkspacePanel>
     </div>}
