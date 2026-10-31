@@ -157,6 +157,15 @@
       "verification": "pending"
     },
     {
+      "file": "src/routes/admissions.my-credentials.tsx",
+      "route": "/admissions/my-credentials",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "verified guardian receives signed-transfer transcript release",
+      "readBoundary": "verified account grant and live consent checked on download",
+      "writeBoundary": "recipient download audited; no outbound email"
+    },
+    {
       "file": "src/routes/admissions.transcripts.tsx",
       "route": "/admissions/transcripts",
       "owner": "learning",
