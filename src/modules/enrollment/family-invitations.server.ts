@@ -333,7 +333,8 @@ export async function listFamilyInvitationWorkspace(
       }
     } catch (error) {
       if (error instanceof AuthorizationError ||
-        (error instanceof Error && error.message === "School applications not open")) continue;
+        (error instanceof Error && ["School applications not open",
+          "School is not eligible for pre-opening family interest outreach"].includes(error.message))) continue;
       throw error;
     }
   }
