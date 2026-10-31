@@ -850,6 +850,7 @@ export const getSectionGradeFinalization = createServerFn({ method: "GET" })
 export const getStudentReportCard = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1).optional(), gradingPeriodId: z.string().min(1).optional() }).parse(value ?? {}))
   .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
     const { db, s } = await stores();
     if (data.gradingPeriodId && !UUID.test(data.gradingPeriodId)) {
       throw new AuthorizationError("grading period identifier");
@@ -904,6 +905,7 @@ async function withdrawalTranscriptRows(db:DbClient,s:Schema,viewer:Viewer){
 export const getStudentTranscript = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({ studentPersonId: z.string().min(1).optional() }).parse(value ?? {}))
   .handler(async ({ data }) => {
+    setResponseHeader("Cache-Control", "private, no-store");
     const { db, s } = await stores();
     const viewer = await resolveStudentViewer(db, s, data.studentPersonId);
     const rows = [...await finalizedGradeRows(db, s, viewer), ...await withdrawalTranscriptRows(db, s, viewer)];
