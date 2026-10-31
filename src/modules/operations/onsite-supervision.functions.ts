@@ -102,7 +102,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         lte(terms.startsOn,data.date),gte(terms.endsOn,data.date),
         inArray(sections.programId,actor.scope.programIds??[]),
         ...(data.registrarFirstDay ? [eq(sections.programId,data.programId!),
-          eq(sections.id,data.sectionId!)] : []))))
+          eq(sections.id,data.sectionId!)] : [])))
       .limit(251);
     const projectionTruncated=sectionsAtSite.length>250;
     const onsiteSections=sectionsAtSite.slice(0,250);
