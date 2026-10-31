@@ -188,12 +188,7 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
    occurrenceKey: s.attendanceEvents.occurrenceKey,
    recordedAt: s.attendanceEvents.recordedAt,
    status: s.attendanceEvents.status,
-   excuseId: s.attendanceExcuses.id,
   }).from(s.attendanceEvents)
-   .leftJoin(s.attendanceExcuses, and(
-    eq(s.attendanceExcuses.attendanceEventId, s.attendanceEvents.id),
-    inArray(s.attendanceExcuses.status, ["submitted", "approved"]),
-   ))
    .where(and(
     eq(s.attendanceEvents.studentProfileId, student.studentProfileId),
     inArray(s.attendanceEvents.siteId,siteIds),
@@ -202,10 +197,12 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
     lte(s.attendanceEvents.expectedAt, now),
    ));
   const currentAttendance = effectiveAttendanceEvents(attendance);
+  // Submitted excuses await review. Only an approved school correction
+  // changes the effective attendance fact to "excused".
   const unexcusedAbsences = currentAttendance
-   .filter(row => row.status === "absent" && !row.excuseId).length;
+   .filter(row => row.status === "absent").length;
   const unexcusedTardies = currentAttendance
-   .filter(row => row.status === "tardy" && !row.excuseId).length;
+   .filter(row => row.status === "tardy").length;
   return {
    studentPersonId: student.studentPersonId,
    studentProfileId: student.studentProfileId,
