@@ -147,9 +147,14 @@ function GuardianEnrollmentChanges(){
     <p className="font-semibold">{item.title} · {item.schoolName}</p>
     <p className="mt-1 text-sm">Status: {item.status.replaceAll("_"," ")} · {new Date(item.createdAt).toLocaleDateString()}</p>
     {item.destinationSchoolName&&<p className="mt-2 text-sm"><strong>Destination:</strong> {item.destinationSchoolName}{item.intendedLastDay?" · Requested last school day "+item.intendedLastDay:""}</p>}
-    {item.kind==="transfer"&&<p className="mt-1 text-xs text-muted-foreground">Records handoff: {item.recordsHandoffStatus==="not_started"?"Not yet completed":item.recordsHandoffStatus??"Not yet reported"}</p>}
+    {item.kind==="transfer"&&<p className="mt-1 text-sm">Academic records: {item.recordsHandoffStatus==="completed"?
+      "The records office reports an authorized secure handoff completed":
+      item.recordsHandoffStatus==="pending"?
+      "Origin enrollment exited; verified transcript delivery is still pending":
+      "Not yet completed — the origin school must review the transfer"}
+    </p>}
     {item.resolutionNote&&<p className="mt-3 text-sm"><strong>School response:</strong> {item.resolutionNote}</p>}
-    <p className="mt-2 text-xs text-muted-foreground">A closed request does not itself confirm that enrollment or academic records changed. Confirm with the school.</p>
+    <p className="mt-2 text-xs text-muted-foreground">Origin-school exit, destination enrollment and transcript release are distinct steps. A completed records handoff reflects a school-recorded secure transfer, not automatic admission or independent delivery verification.</p>
    </article>)}
    {!visibleRequests.length&&!loading&&<p className="rounded-lg border p-4 text-sm">No school change requests are recorded for this family selection.</p>}
   </section>
