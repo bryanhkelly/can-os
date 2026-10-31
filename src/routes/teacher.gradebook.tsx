@@ -1,3 +1,4 @@
+import { GradebookAssessmentComposer } from "@/components/learning/GradebookAssessmentComposer";
 import { GradebookReviewedFeedback } from "@/components/learning/GradebookReviewedFeedback";
 import { GradebookReviewActions } from "@/components/learning/GradebookReviewActions";
 import { GradebookAssessmentHeader } from "@/components/learning/GradebookAssessmentHeader";
@@ -386,100 +387,17 @@ function TeacherGradebookPage() {
        onReturnForRevision={()=>void returnForRevision(reviewCell.submissionId)} />}
      </WorkspacePanel>
     </div>}
-    <details className="mt-8 rounded-xl border bg-card p-5" open={search.lesson?true:undefined}>
-     <summary className="cursor-pointer text-lg font-semibold">Create an assessment</summary>
-     {search.lesson&&<p className="mt-2 text-sm text-muted-foreground">Creating {assignmentKind} from the selected publisher lesson. This activity belongs to your class, not the publisher's immutable course.</p>}
-     {search.lesson&&!gradebook.curriculumLessons.some(lesson=>lesson.id===search.lesson)&&
-      <p role="alert" className="mt-2 text-sm">This publisher lesson is unavailable in this class. Choose a listed lesson before creating the assessment.</p>}
-    <section className="mt-4" aria-label="New assessment">
-     <h2 className="text-lg font-semibold">New assessment</h2>
-     <div className="mt-4 grid gap-4 sm:grid-cols-3">
-      <label className="text-sm font-semibold">Title
-       <input className="mt-2 w-full rounded-lg border bg-background p-3" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} placeholder="e.g. Chapter 4 quiz" />
-      </label>
-      <label className="text-sm font-semibold">Points possible
-       <input className="mt-2 w-full rounded-lg border bg-background p-3" type="number" min={1} max={1000} value={points} onChange={event => setPoints(event.target.value)} />
-      </label>
-      <label className="text-sm font-semibold">Due date
-       <input className="mt-2 w-full rounded-lg border bg-background p-3" type="date" value={due} onChange={event => setDue(event.target.value)} />
-      </label>
-     </div>
-     <div className="mt-4 grid gap-4 sm:grid-cols-2">
-      <label className="text-sm font-semibold">Release date and time (optional)
-       <input type="datetime-local" value={releaseAt} onChange={event=>setReleaseAt(event.target.value)}
-        className="mt-2 w-full rounded-lg border bg-background p-3"/>
-      </label>
-      <label className="text-sm font-semibold">Close submissions (optional)
-       <input type="datetime-local" value={closeAt} onChange={event=>setCloseAt(event.target.value)}
-        className="mt-2 w-full rounded-lg border bg-background p-3"/>
-      </label>
-      <p className="text-xs text-muted-foreground sm:col-span-2">Times use your device timezone. Publishing without a release time opens work immediately. Work can be submitted after its due date until the close time; no close time leaves submissions open.</p>
-     </div>
-     <div className="mt-4 grid gap-4 sm:grid-cols-2">
-       <label className="text-sm font-semibold">Class activity type
-        <select aria-label="Class activity type" value={assignmentKind}
-          onChange={event=>setAssignmentKind(event.target.value as typeof assignmentKind)}
-          className="mt-2 w-full rounded-lg border bg-background p-3">
-          {(["homework","classwork","quiz","test","project","discussion"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
-        </select>
-       </label>
-       <label className="text-sm font-semibold">Publisher lesson (optional)
-        <select aria-label="Publisher lesson for assignment" value={curriculumLessonId}
-          onChange={event=>setCurriculumLessonId(event.target.value)}
-          className="mt-2 w-full rounded-lg border bg-background p-3">
-          <option value="">General class activity</option>
-          {gradebook.curriculumLessons.map(lesson=><option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
-        </select>
-       </label>
-     </div>
-     <label className="mt-4 block text-sm font-semibold">Maximum attempts (optional)
-      <input aria-label="Maximum assignment attempts" type="number" min={1} max={MAX_ASSESSMENT_ATTEMPTS} step={1}
-       value={maxAttempts} onChange={event=>setMaxAttempts(event.target.value)}
-       placeholder="No configured limit" className="mt-2 block w-48 rounded-lg border bg-background p-3"/>
-      <span className="mt-2 block text-xs font-normal text-muted-foreground">Includes the first submission. Each revision still requires a teacher to return the work.</span>
-     </label>
-     <label className="mt-4 block text-sm font-semibold">Student instructions
-      <textarea aria-label="Student assignment instructions" className="mt-2 w-full rounded-lg border bg-background p-3" rows={5} maxLength={20000}
-       value={instructions} onChange={event=>setInstructions(event.target.value)} placeholder="Directions, deliverables, submission requirements and allowed resources." />
-     </label>
-     <fieldset className="mt-4 rounded-lg border p-4">
-      <legend className="px-1 text-sm font-semibold">Scoring rubric (optional)</legend>
-      <p className="mb-3 text-xs text-muted-foreground">Add criteria for graded projects, tests, discussions or other work. Criterion points must sum to the assignment's points possible.</p>
-      {newRubric.map((criterion,index)=><div key={criterion.id} className="mb-3 grid gap-2 rounded-lg border p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
-       <label className="text-xs font-semibold">Criterion {index+1}
-        <input aria-label={"Criterion "+(index+1)+" name"} className="mt-1 w-full rounded border bg-background p-2"
-         value={criterion.label} maxLength={120} placeholder="e.g. Mathematical reasoning"
-         onChange={event=>setNewRubric(rows=>rows.map(row=>row.id===criterion.id?{...row,label:event.target.value}:row))}/>
-       </label>
-       <label className="text-xs font-semibold">Points
-        <input aria-label={"Criterion "+(index+1)+" points"} className="mt-1 w-full rounded border bg-background p-2"
-         type="number" min={0.01} step="0.01" max={1000} value={criterion.maxPoints}
-         onChange={event=>setNewRubric(rows=>rows.map(row=>row.id===criterion.id?{...row,maxPoints:event.target.value}:row))}/>
-       </label>
-       <button type="button" className="self-end rounded border px-3 py-2 text-xs" onClick={()=>setNewRubric(rows=>rows.filter(row=>row.id!==criterion.id))}>Remove</button>
-       <label className="text-xs font-semibold sm:col-span-3">Description (optional)
-        <textarea aria-label={"Criterion "+(index+1)+" description"} className="mt-1 w-full rounded border bg-background p-2"
-         rows={2} maxLength={1000} value={criterion.description}
-         onChange={event=>setNewRubric(rows=>rows.map(row=>row.id===criterion.id?{...row,description:event.target.value}:row))}/>
-       </label>
-      </div>)}
-      <button type="button" disabled={newRubric.length>=20} className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-       onClick={()=>setNewRubric(rows=>[...rows,{id:"criterion-"+(++rubricSequence.current),label:"",maxPoints:"",description:""}])}>Add rubric criterion</button>
-     </fieldset>
-     <p className="mt-2 text-xs text-muted-foreground">The assignment belongs to this teacher's class. Linking to a publisher lesson preserves the original curriculum.</p>
-     <p className="mt-3 text-xs text-muted-foreground">Due dates are planning information until you explicitly publish. Saving a draft never assigns work, even if it has a due date.</p>
-     <label className="mt-3 flex items-start gap-2 text-sm">
-       <input type="checkbox" checked={publishConfirmed} onChange={event=>setPublishConfirmed(event.target.checked)}
-        disabled={busy}/>
-       <span>I reviewed this assignment and understand Publish & assign makes it available to enrolled students now.</span>
-     </label>
-     <div className="mt-4 flex flex-wrap gap-3">
-       <button type="button" disabled={busy} onClick={()=>void submitAssessment(false)}
-        className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Save draft</button>
-       <button type="button" disabled={busy||!due||!publishConfirmed} onClick={()=>void submitAssessment(true)}
-        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Publish & assign</button>
-     </div>
-    </section></details>
+    <GradebookAssessmentComposer title={title} points={points} due={due}
+      releaseAt={releaseAt} closeAt={closeAt} assignmentKind={assignmentKind}
+      curriculumLessonId={curriculumLessonId} maxAttempts={maxAttempts} instructions={instructions}
+      newRubric={newRubric} publishConfirmed={publishConfirmed} busy={busy}
+      lessonContext={search.lesson} lessons={gradebook.curriculumLessons}
+      onTitleChange={setTitle} onPointsChange={setPoints} onDueChange={setDue}
+      onReleaseChange={setReleaseAt} onCloseChange={setCloseAt}
+      onKindChange={setAssignmentKind} onLessonChange={setCurriculumLessonId}
+      onAttemptsChange={setMaxAttempts} onInstructionsChange={setInstructions}
+      onRubricChange={setNewRubric} onPublishConfirmedChange={setPublishConfirmed}
+      onSubmit={publish=>void submitAssessment(publish)} />
 
     {gradebook.assessments.length === 0 && <p className="mt-8 text-sm">No assessments yet. Create one above to begin.</p>}
     {gradebook.assessments.length > 0 && <div ref={gridRef} className="mt-8 overflow-x-auto rounded-xl border bg-card">
