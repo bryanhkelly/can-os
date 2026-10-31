@@ -155,38 +155,6 @@ export async function adoptPack(actor: Actor,input:{programId:string;packId:stri
  throw new AuthorizationError("Use year-specific curriculum adoption. Select a school year and verify the publisher license before adopting.");
 }
 
-export async function legacyAdoptPackDisabled(actor: Actor,input:{programId:string;packId:string;versionId:string}) {
- return db.transaction(async tx=>{
-  const program=await authorizedProgram(actor,input.programId,tx);
-  const [entitlement]=await tx.select().from(curriculumEntitlements).where(and(
-    eq(curriculumEntitlements.organizationId,program.organizationId),eq(curriculumEntitlements.packId,input.packId),
-    eq(curriculumEntitlements.status,"active"))).limit(1);
-  if(!entitlement)throw new AuthorizationError("active curriculum pack entitlement");
-  const [release]=await tx.select().from(curriculumPackVersions).where(and(
-    eq(curriculumPackVersions.id,input.versionId),eq(curriculumPackVersions.packId,input.packId),
-    eq(curriculumPackVersions.status,"published"))).limit(1);
-  if(!release)throw new Error("A published release of this pack is required.");
-  const [existing]=await tx.select().from(curriculumAdoptions)
-    .where(and(eq(curriculumAdoptions.programId,program.id),eq(curriculumAdoptions.packId,input.packId))).limit(1);
-  if(existing){
-   if(existing.status==="active" && existing.packVersionId===release.id)return {adoptionId:existing.id,adopted:false};
-   throw new Error("Existing adoption is pinned. Changing or reactivating it requires an explicit revision workflow.");
-  }
-  const [row]=await tx.insert(curriculumAdoptions).values({
-    organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
-    packId:input.packId,packVersionId:release.id,adoptedByPersonId:actor.actorPersonId
-  }).returning({id:curriculumAdoptions.id});
-  if(!row)throw new Error("Unable to adopt curriculum pack.");
-  await writeAudit(tx,actor,{action:"curriculum.marketplace.adopt",entityType:"curriculum_adoption",
-   entityId:row.id,scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
-   after:{packId:input.packId,versionId:release.id}});
-  await emitEvent(tx,{eventType:EventTypes.CurriculumPackAdopted,aggregateType:"curriculum_adoption",
-   aggregateId:row.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,
-   siteId:program.siteId,programId:program.id});
-  return {adoptionId:row.id,adopted:true};
- });
-}
-
 export async function addCurriculumSupplement(actor:Actor,input:{
  programId:string;courseVersionId:string;sectionId?:string;lessonId?:string;
  scope:"program"|"site"|"section";title:string;kind:"link"|"video"|"pdf"|"image"|"audio"|"document";
