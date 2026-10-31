@@ -17,12 +17,14 @@ import {QualificationCatalog} from "@/components/profiles/QualificationCatalog";
 export type Snapshot=Awaited<ReturnType<typeof getLaunchAcademicSetup>>;
 export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const router=useRouter();
- const [termId,setTermId]=useState(data.terms[0]?.id??"");
+ const [termId,setTermId]=useState(data.terms.find(term=>data.scheduleOptions.some(schedule=>schedule.schoolYearId===term.schoolYearId))?.id??data.terms[0]?.id??"");
  const [versionId,setVersionId]=useState(data.catalog.find(course=>course.recommendation.recommended)?.versionId??data.catalog[0]?.versionId??"");
  const selectedTerm=data.terms.find(t=>t.id===termId);
  const selectedYear=data.years.find(y=>y.id===selectedTerm?.schoolYearId);
  const selectedCourse=data.catalog.find(course=>course.versionId===versionId);
  const [code,setCode]=useState(""),[title,setTitle]=useState("");
+ const matchingSection=data.sections.find(section=>section.code===(code.trim()||(selectedCourse?selectedCourse.code+"-A":"")));
+ const reviewedSectionAlreadyExists=Boolean(matchingSection);
  const [createdSectionId,setCreatedSectionId]=useState<string|null>(null);
  const [teacherId,setTeacherId]=useState("");
  const effectiveTeacherId=teacherId|| (data.teachingStaff.length===1?data.teachingStaff[0]!.personId:"");
@@ -107,6 +109,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
   <LaunchTeacherQualificationPolicy data={data} busy={busy} run={run}/>
   <section className="mt-7 rounded-xl border bg-card p-5">
    <h2 className="font-serif text-2xl">Set up your first classroom</h2>
+   {reviewedSectionAlreadyExists&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">A class with this code already exists. Review its saved classroom and instructor assignment below instead of submitting a duplicate.</p>}
    <p className="mt-2 text-sm">Choose a course, term and instructor together. This saves the real Section and teacher assignment; scheduling and first-week readiness remain explicit checks, not automatic approvals.</p>
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
     e.preventDefault();void run(async()=>{const result=await provisionLaunchSection({data:{
@@ -148,7 +151,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
       className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50"/>
      <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units are shown as Not recorded on transcripts and must be resolved separately for graduation decisions.</span>
     </label>
-    <button type="submit" disabled={busy||!termId||!versionId||!effectiveScheduleId||!effectiveTeacherId||(!selectedCourse?.recommendation.recommended||!selectedCourse?.recommendation.instructionReady)||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Save classroom and instructor</button>
+    <button type="submit" disabled={busy||reviewedSectionAlreadyExists||!termId||!versionId||!effectiveScheduleId||!effectiveTeacherId||(!selectedCourse?.recommendation.recommended||!selectedCourse?.recommendation.instructionReady)||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">{reviewedSectionAlreadyExists?"Class already saved":"Save classroom and instructor"}</button>
    </form>
   </section>
   {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm">
