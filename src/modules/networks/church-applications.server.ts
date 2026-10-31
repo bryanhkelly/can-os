@@ -83,9 +83,30 @@ export async function listChurchApplications(actor: AccessContext) {
   await requireCANSteward(actor);
   const requests = await db.select().from(churchOnboardingRequests)
     .orderBy(desc(churchOnboardingRequests.createdAt)).limit(100);
+  const evidenceIds = requests.flatMap(request =>
+    request.authorityDocumentId ? [request.authorityDocumentId] : []);
+  const evidence = evidenceIds.length ? await db.select({
+    id: documents.id, storageKey: documents.storageKey, metadata: documents.metadata,
+    verifiedAt: documents.verifiedAt, verifiedByPersonId: documents.verifiedByPersonId,
+  }).from(documents).where(inArray(documents.id, evidenceIds)) : [];
+  const evidenceById = new Map(evidence.map(document => [document.id, document]));
+  const withEvidence = requests.map(request => {
+    const document = request.authorityDocumentId
+      ? evidenceById.get(request.authorityDocumentId) : undefined;
+    return {
+      ...request,
+      authorityEvidence: document ? {
+        reference: document.storageKey,
+        method: typeof document.metadata.verificationMethod === "string"
+          ? document.metadata.verificationMethod : "unspecified",
+        verifiedAt: document.verifiedAt,
+        verifiedByPersonId: document.verifiedByPersonId,
+      } : null,
+    };
+  });
   const grantIds = requests.flatMap(request =>
     request.status === "approved" && request.invitationGrantId ? [request.invitationGrantId] : []);
-  if (!grantIds.length) return requests.map(request => ({ ...request, invitationAcceptedAt: null as Date | null }));
+  if (!grantIds.length) return withEvidence.map(request => ({ ...request, invitationAcceptedAt: null as Date | null }));
 
   // Derive acceptance from the real access grant AND immutable invitation
   // acceptance event. Application approval alone is never proof of sign-in.
@@ -101,7 +122,7 @@ export async function listChurchApplications(actor: AccessContext) {
   ]);
   const active = new Set(grants.filter(grant => grant.active).map(grant => grant.id));
   const acceptedAt = new Map(events.map(event => [event.grantId, event.occurredAt]));
-  return requests.map(request => ({
+  return withEvidence.map(request => ({
     ...request,
     invitationAcceptedAt: request.status === "approved" &&
       request.invitationGrantId && active.has(request.invitationGrantId)
