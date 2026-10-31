@@ -14,6 +14,21 @@ import { listOpeningOperators } from "./opening-handoff.server";
 import { isLaunchOpeningDate, launchOpeningDate } from "@/domain/launch-opening-date";
 import { launchEntrySelection } from "@/domain/launch-entry";
 
+/** Convert database JSONB's unknown-value index signatures to genuine
+ * serializable values before crossing a TanStack server-function boundary. */
+type SafeJson = string | number | boolean | null | SafeJson[] | {[key:string]:SafeJson};
+function safeJson(value:unknown):SafeJson {
+  if(value===null||typeof value==="string"||typeof value==="boolean")return value;
+  if(typeof value==="number")return Number.isFinite(value)?value:null;
+  if(Array.isArray(value))return value.map(safeJson);
+  if(typeof value==="object")return Object.fromEntries(
+    Object.entries(value).map(([key,entry])=>[key,safeJson(entry)]));
+  return null;
+}
+function safeJsonObject(value:Record<string,unknown>):Record<string,SafeJson>{
+  return Object.fromEntries(Object.entries(value).map(([key,entry])=>[key,safeJson(entry)]));
+}
+
 const uuid = z.string().uuid();
 
 const startLaunchInput = z.object({
@@ -222,7 +237,11 @@ export const listLaunches = createServerFn({ method: "GET" }).handler(
                 status: program.publicSiteStatus === "published" ? "published" as const : "draft" as const }
             : null,
           journey: journey ?? null,
-          requirements,
+          requirements:requirements.map(requirement=>({
+            ...requirement,
+            evidence:requirement.evidence.map(safeJsonObject),
+            metadata:safeJsonObject(requirement.metadata),
+          })),
           canReviewEvidence: canReviewerOrganizations.some(org => org.id === program.academicProviderOrganizationId),
           openingOperators:await listOpeningOperators(program),
         };
