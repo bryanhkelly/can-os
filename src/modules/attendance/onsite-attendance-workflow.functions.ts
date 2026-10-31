@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   attendanceEvents, attendanceExcuses, documents, enrollments, guardianRelationships,
-  people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
+  accountPersonGrants, accessAccounts, people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -83,6 +83,7 @@ async function scopedOnsitePrograms(actor: AccessContext, selectedId?: string, s
   // The inner join on sites guarantees a non-null site for every row.
   const rows = (await db.select({
     id: programs.id, name: programs.name, organizationId: programs.organizationId,
+    academicProviderOrganizationId:programs.academicProviderOrganizationId,
     siteId: programs.siteId, deliveryModel: programs.deliveryModel,
     timezone: sites.timezone,
   }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
@@ -187,6 +188,10 @@ async function resolveExpectedRoster(actor: AccessContext,
   const sectionsAtSite = await db.select({
     studentProfileId: enrollments.studentProfileId, programId: sections.programId,
     siteId: sections.siteId, sectionId: sections.id, sectionTitle: sections.title,
+    sectionStartsAt:sections.startsAt,sectionEndsAt:sections.endsAt,
+    membershipStartsAt:enrollments.startedAt,membershipEndsAt:enrollments.endedAt,
+    programStartsAt:activeProgramEnrollment.startedAt,
+    programEndsAt:activeProgramEnrollment.endedAt,
     preferredName: people.preferredName, firstName: people.legalFirstName,
     lastName: people.legalLastName,
   }).from(enrollments)
@@ -208,12 +213,25 @@ async function resolveExpectedRoster(actor: AccessContext,
       eq(enrollments.schoolYearId,terms.schoolYearId),
       eq(sections.active, true), eq(schoolYears.status, "active"),
       lte(schoolYears.startsOn, date), gte(schoolYears.endsOn, date),
+      lte(terms.startsOn,date),gte(terms.endsOn,date),
+      ...(siteId?[eq(sections.siteId,siteId),eq(schoolYears.siteId,siteId)]:[]),
       inArray(sections.programId, permittedIds),
       ...(actor.scope.siteIds!==undefined?[inArray(sections.siteId,actor.scope.siteIds)]:[]),
       ...(actor.role === "room_facilitator" ? [inArray(sections.id, [...sectionFilter])] : []),
       ...(actor.role === "teacher" ? [eq(sectionTeachers.personId, actor.actorPersonId!)] :
         []),
       ...(studentId ? [eq(enrollments.studentProfileId, studentId)] : [])));
+  // Keep effective Section and Section-membership dates distinct from the
+  // Program enrollment's own effective window. All dates use the school zone.
+  const effectiveSections=sectionsAtSite.filter(row=>{
+    const timeZone=activePrograms.find(program=>program.id===row.programId)?.timezone??"UTC";
+    return (!row.sectionStartsAt||siteDate(row.sectionStartsAt,timeZone)<=date) &&
+      (!row.sectionEndsAt||siteDate(row.sectionEndsAt,timeZone)>=date) &&
+      (!row.membershipStartsAt||siteDate(row.membershipStartsAt,timeZone)<=date) &&
+      (!row.membershipEndsAt||siteDate(row.membershipEndsAt,timeZone)>date) &&
+      (!row.programStartsAt||siteDate(row.programStartsAt,timeZone)<=date) &&
+      (!row.programEndsAt||siteDate(row.programEndsAt,timeZone)>date);
+  });
   const byKey = new Map<string, {
     studentProfileId: string; programId: string; studentName: string;
     sectionTitle: string | null; siteId: string; sectionId: string | null;
@@ -230,7 +248,7 @@ async function resolveExpectedRoster(actor: AccessContext,
       sectionTitle: null, siteId: host.siteId!, sectionId: null,
     });
   }
-  for (const row of sectionsAtSite) {
+  for (const row of effectiveSections) {
     if (!expectedIds.get(row.programId)?.has(row.studentProfileId)) continue;
     const host = activePrograms.find(p => p.id === row.programId);
     if (!host || host.siteId !== row.siteId) continue;
@@ -244,7 +262,7 @@ async function resolveExpectedRoster(actor: AccessContext,
     });
   }
   const memberships=new Map<string,{studentProfileId:string;studentName:string;programId:string;sectionId:string;sectionTitle:string}>();
-  for(const row of sectionsAtSite){
+  for(const row of effectiveSections){
     if(!expectedIds.get(row.programId)?.has(row.studentProfileId))continue;
     const host=activePrograms.find(program=>program.id===row.programId);
     if(!host||host.siteId!==row.siteId)continue;
@@ -325,6 +343,62 @@ export const loadExpectedOnsiteRosterForActor=createServerOnlyFn(async (actor:Ac
 
 /** Same canonical enrollment/calendar resolver as today's roster. No attendance
  * events are read or projected as observations for a preparation date. */
+/** Read-only student-specific future day. This does not load attendance events. */
+export const loadExpectedFirstDayPreparationForActor=createServerOnlyFn(async(actor:AccessContext,data:{
+  date:string;programId:string;siteId:string;studentProfileId:string;
+})=>{
+  if(actor.role!=="registrar" || !actor.actorPersonId || actor.demoFacilitator)
+    throw new AuthorizationError("verified registrar future first-day preparation");
+  assertCapability(actor,"enrollment.activate");
+  if(!actor.scope.organizationIds?.length ||
+    !actor.scope.siteIds?.includes(data.siteId) ||
+    !actor.scope.programIds?.includes(data.programId))
+    throw new AuthorizationError("original registrar Site and Program grant");
+  if(!dateField.safeParse(data.date).success || !uuid.safeParse(data.studentProfileId).success ||
+    !uuid.safeParse(data.programId).success || !uuid.safeParse(data.siteId).success)
+    throw new AuthorizationError("valid scoped school-day preparation identifiers");
+  const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,
+    timezone:sites.timezone}).from(sites).where(eq(sites.id,data.siteId)).limit(1);
+  if(!site || !actor.scope.organizationIds.includes(site.organizationId) ||
+    (actor.grantSiteId && actor.grantSiteId!==site.id))
+    throw new AuthorizationError("original registrar organization and Site");
+  const today=siteDate(new Date(),site.timezone);
+  if(data.date<today)throw new AuthorizationError("future first-day date cannot be in the past");
+  const {roster,sectionMemberships,unplacedStudents,coverage,programsAtSite}=
+    await resolveExpectedRoster(actor,data.date,data.programId,data.studentProfileId,data.siteId,true);
+  const program=programsAtSite.find(row=>row.id===data.programId &&
+    row.siteId===data.siteId && row.organizationId===site.organizationId);
+  if(!program)throw new AuthorizationError("active onsite registrar Program");
+  const matched=roster.find(row=>row.studentProfileId===data.studentProfileId &&
+    row.programId===data.programId);
+  // A Section assignment is not proof that a currently authorized CAN teacher exists.
+  const qualifiedTeachers=matched?.sectionId?await db.select({personId:sectionTeachers.personId})
+    .from(sectionTeachers)
+    .innerJoin(people,eq(people.id,sectionTeachers.personId))
+    .innerJoin(accountPersonGrants,and(eq(accountPersonGrants.personId,sectionTeachers.personId),
+      eq(accountPersonGrants.role,"teacher"),
+      eq(accountPersonGrants.organizationId,program.academicProviderOrganizationId),
+      eq(accountPersonGrants.active,true),eq(accountPersonGrants.isSynthetic,false)))
+    .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+    .where(and(eq(sectionTeachers.sectionId,matched.sectionId),
+      eq(sectionTeachers.role,"teacher"),eq(people.active,true),
+      eq(accessAccounts.disabled,false),isNotNull(accessAccounts.emailVerifiedAt)))
+    .limit(1):[];
+  return {qualifiedTeacherAssigned:qualifiedTeachers.length>0,
+    date:data.date,program:{id:program.id,name:program.name,
+      configuration:coverage.get(program.id)?.configuration??"not_onsite",
+      expectedDays:coverage.get(program.id)?.expectedDays??0,
+      missingCalendarDates:coverage.get(program.id)?.daysWithoutCalendarConfiguration??0},
+    student:matched?{studentProfileId:matched.studentProfileId,programId:matched.programId,
+      studentName:matched.studentName,sectionId:matched.sectionId,
+      sectionTitle:matched.sectionTitle,status:"unmarked" as const}:null,
+    sectionMemberships:sectionMemberships.filter(row=>row.studentProfileId===data.studentProfileId &&
+      row.programId===data.programId),
+    unplaced:unplacedStudents.some(row=>row.studentProfileId===data.studentProfileId &&
+      row.programId===data.programId),
+  };
+});
+
 export const loadExpectedSchoolDayPreparation=createServerOnlyFn(async(actor:AccessContext,data:{date:string})=>{
   const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,timezone:sites.timezone,name:sites.name})
     .from(sites).where(eq(sites.id,actor.grantSiteId!)).limit(1);

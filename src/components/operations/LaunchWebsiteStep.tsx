@@ -12,7 +12,7 @@ function WebsiteStep({programId}:{programId:string}){
  const [retry,setRetry]=useState(0);
  useEffect(()=>{let current=true;
   void getLaunchWebsitePreparation({data:{programId}}).then(result=>{if(current){setData(result);setError("");}})
-   .catch(()=>{if(current)setError("The private website preview could not be loaded. Check your school access and retry.");});
+   .catch(()=>{if(current){setData(null);setError("The private website preview could not be loaded. Check your school access and retry.");}});
   return()=>{current=false;};
  },[programId,retry]);
  return <section id="launch-website" aria-label="Prepare your school website" className="mt-5 rounded-xl border bg-card p-5">
@@ -20,16 +20,16 @@ function WebsiteStep({programId}:{programId:string}){
   <h2 className="mt-1 font-serif text-2xl">Your school website</h2>
   {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
   {data?<LaunchWebsitePreview data={data}/>:!error&&<p role="status" className="mt-3 text-sm">Preparing a private preview from the school's saved records…</p>}
-  <button type="button" onClick={()=>setRetry(value=>value+1)} className="mt-3 rounded border px-3 py-2 text-sm">Refresh preview after editing</button>
+  <button type="button" onClick={()=>{setData(null);setError("");setRetry(value=>value+1);}} className="mt-3 rounded border px-3 py-2 text-sm">Refresh verified website status</button>
  </section>;
 }
 export function LaunchWebsitePreview({data}:{data:Website}){
  return <>
   <p className="mt-2 text-sm">Review {data.programName}'s school page here. Church-owned welcome and community copy is edited by your assigned website editor; institutional claims follow their separate approval process.</p>
-  <p className="mt-2 text-sm">{data.host?`Reserved address: ${data.host}`:"No website address has been reserved for this school Site."} · {data.status==="published"?"Marketing approved":"Private draft"} · {data.hostingConfigured?"Hosting configured; public availability requires separate verification":"Public hosting disabled"}</p>
+  <p className="mt-2 text-sm">{data.host?`Reserved address: ${data.host}`:"No website address has been reserved for this school Site."} · {data.status==="published"?"Marketing approved":"Private draft"} · {data.hostingConfigured?"Server hosting flag enabled; DNS/TLS and edge deployment require independent verification":"Public hosting disabled"}</p>
   <p role="status" className="mt-2 rounded border p-3 text-sm">Public website: <strong>{data.publicAvailability==="live"?"Live — HTTPS verified":data.publicAvailability==="not_published"?"Not published":data.publicAvailability==="hosting_disabled"?"Hosting not configured":"Published but not reachable"}</strong>{data.checkedAt?` · Checked ${new Date(data.checkedAt).toLocaleString()}`:""}.</p>
   {data.host&&data.publicAvailability==="live"&&<a href={`https://${data.host}/`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm underline">Open verified public website</a>}
-  {data.publicAvailability==="unreachable"&&<p role="alert" className="mt-2 text-sm">Check DNS routing, TLS certificate and hosting deployment, then refresh verification. Publishing alone does not make the site live.</p>}
+  {data.publicAvailability!=="live"&&<p role="status" className="mt-2 rounded border p-3 text-sm"><strong>Next step: </strong>{data.hostingDiagnostic}{data.publicAvailability==="hosting_disabled"&&" Operator action: attach the approved wildcard domain to the Netlify target, verify wildcard DNS and certificate coverage, deploy the edge gate, then enable the separate server and edge flags. Production settings are not changed here."}</p>}
   {data.includesSuggestions&&<p className="mt-3 rounded border p-3 text-sm">This private preview includes suggested local welcome copy or a planned school listing. Suggestions are not saved editorial revisions or approved public claims.</p>}
   {data.previewHtml&&<iframe title={`${data.programName} private school website preview`} srcDoc={data.previewHtml}
    sandbox="" referrerPolicy="no-referrer" className="mt-4 h-[34rem] w-full rounded-lg border bg-white"/>}

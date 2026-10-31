@@ -12,7 +12,7 @@ import {
   scheduleTemplates, schoolYears, sections, sites, terms,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
-import { AuthorizationError } from "@/domain/command-context";
+import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
 import { siteDate } from "@/domain/expected-attendance";
 import { coversLocalSupervisionBlock, summarizeOnsiteSupervision, type SupervisionBlockInput } from "@/domain/onsite-supervision-coverage";
@@ -55,7 +55,7 @@ export type OnsiteOperationalSupervisionPlan=Omit<OnsiteSupervisionPlan,"blocks"
 
 /** Internal projection for callers that already authorized this actor and Site. */
 export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:AccessContext,data:{
-  date:string;siteId?:string;preparation?:boolean;
+  date:string;siteId?:string;preparation?:boolean;registrarFirstDay?:boolean;programId?:string;sectionId?:string;
 }):Promise<OnsiteOperationalSupervisionPlan>=>{
     setResponseHeader("Cache-Control","private, no-store");
     const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,
@@ -68,7 +68,17 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
       throw new Error("Invalid school-local date");
     const today=siteDate(new Date(),site.timezone);
     const oldest=siteDate(new Date(Date.now()-30*86400_000),site.timezone);
-    if(data.preparation)assertSchoolDayPreparation(actor,site,data.date);
+    if(data.registrarFirstDay){
+      if(!data.preparation || !data.programId || !data.sectionId ||
+         actor.role!=="registrar" || !actor.actorPersonId || actor.demoFacilitator ||
+         !actor.scope.siteIds?.includes(site.id) ||
+         !actor.scope.programIds?.includes(data.programId))
+        throw new AuthorizationError("registrar first-day Site Program and Section scope");
+      assertCapability(actor,"enrollment.activate");
+      if(actor.grantSiteId && actor.grantSiteId!==site.id)
+        throw new AuthorizationError("original registrar Site grant");
+      if(data.date<today)throw new AuthorizationError("future first-day date");
+    }else if(data.preparation)assertSchoolDayPreparation(actor,site,data.date);
     else if(data.date>today || data.date<oldest)
       throw new AuthorizationError("onsite supervision day limited to last 30 days");
 
@@ -90,8 +100,13 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         sql`${programs.deliveryModel} ->> 'onsite' = 'true'`,
         lte(schoolYears.startsOn,data.date),gte(schoolYears.endsOn,data.date),
         lte(terms.startsOn,data.date),gte(terms.endsOn,data.date),
-        inArray(sections.programId,actor.scope.programIds??[])))
+        inArray(sections.programId,actor.scope.programIds??[]),
+        ...(data.registrarFirstDay ? [eq(sections.programId,data.programId!)] : [])))
       .limit(251);
+    // Evaluate the whole authorized Program before narrowing the response to
+    // one Section. A shared adult or room double-booking must remain visible.
+    if(data.registrarFirstDay && !sectionsAtSite.some(row=>row.id===data.sectionId))
+      throw new AuthorizationError("original registrar Section not in authorized Program and Site");
     const projectionTruncated=sectionsAtSite.length>250;
     const onsiteSections=sectionsAtSite.slice(0,250);
     if(!onsiteSections.length){
@@ -428,6 +443,20 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
     }));
     return {date:data.date,siteId:site.id,
       projectionTruncated:!completeProjection,...projection,blocks};
+});
+
+/** Registrar-safe projection after the enrollment reader has independently
+ * authorized the exact student, Program and Section. No presence or custody APIs. */
+export const loadFirstDaySupervisionPreparationForActor=createServerOnlyFn(async(actor:AccessContext,data:{
+  date:string;siteId:string;programId:string;sectionId:string;
+})=>{
+  const plan=await loadOnsiteSupervisionPlanForActor(actor,{...data,preparation:true,registrarFirstDay:true});
+  return {date:plan.date,projectionTruncated:plan.projectionTruncated,
+    blocks:plan.blocks.filter(block=>block.programId===data.programId &&
+      block.sectionId===data.sectionId).map(block=>({
+        programId:block.programId,sectionId:block.sectionId,periodId:block.periodId,
+        assignedPlan:block.assignedPlan,gaps:block.gaps,
+      }))};
 });
 
 /** A staff-safe read of planned instruction coverage at ONE original grant site. */

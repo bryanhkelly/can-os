@@ -1,0 +1,121 @@
+import { describe, expect, it, vi } from "vitest";
+import { checkPublishedSiteReachability } from "@/modules/sites/public-host-reachability";
+
+const host = "vineyard.can-os.com";
+const goodHtml = `<!doctype html><html><body><footer>${host} · Powered by CAN OS</footer></body></html>`;
+const response = (body: string, status = 200, type = "text/html") =>
+  new Response(body, { status, headers: { "content-type": type, "cache-control": "private, no-store", vary: "Host" } });
+const fetcher = (result: Response) => vi.fn(async () => result) as unknown as typeof fetch;
+
+describe("published Site HTTPS verification", () => {
+  it("never fetches a draft or unreserved Site", async () => {
+    const f = fetcher(response(goodHtml));
+    expect((await checkPublishedSiteReachability({ host, published: false, hostingConfigured: true, fetcher: f })).status)
+      .toBe("not_published");
+    expect((await checkPublishedSiteReachability({ host: null, published: true, hostingConfigured: true, fetcher: f })).status)
+      .toBe("not_published");
+    expect(f).not.toHaveBeenCalled();
+  });
+  it("never fetches when tenant hosting is disabled", async () => {
+    const f = fetcher(response(goodHtml));
+    const result = await checkPublishedSiteReachability({ host, published: true, hostingConfigured: false, fetcher: f });
+    expect(result.status).toBe("hosting_disabled");
+    expect(f).not.toHaveBeenCalled();
+  });
+  it("rejects invalid, cross-origin, and nested tenant hostnames before fetching", async () => {
+    const f = fetcher(response(goodHtml));
+    for (const bad of ["evil.example", "a.b.can-os.com", "admin.can-os.com", "vineyard.can-os.com.evil.test"]) {
+      const result = await checkPublishedSiteReachability({ host: bad, published: true, hostingConfigured: true, fetcher: f });
+      expect(result.status).toBe("unreachable");
+      expect(result.url).toBeNull();
+    }
+    expect(f).not.toHaveBeenCalled();
+  });
+  it("accepts only the exact tenant's CAN HTML over HTTPS", async () => {
+    const f = fetcher(response(goodHtml));
+    const result = await checkPublishedSiteReachability({ host, published: true, hostingConfigured: true, fetcher: f });
+    expect(result.status).toBe("live");
+    expect(result.checkedAt).toBeTruthy();
+    expect(f).toHaveBeenCalledWith("https://vineyard.can-os.com/", expect.objectContaining({
+      redirect: "manual", method: "GET",
+    }));
+  });
+  it("rejects sibling tenant HTML and generic CAN pages", async () => {
+    for (const html of [goodHtml.replaceAll(host, "other.can-os.com"), "<!doctype html>Powered by CAN OS"]) {
+      const result = await checkPublishedSiteReachability({
+        host, published: true, hostingConfigured: true, fetcher: fetcher(response(html)),
+      });
+      expect(result.status).toBe("unreachable");
+    }
+  });
+  it("rejects redirects, error pages, invalid content types, and oversized bodies", async () => {
+    for (const r of [response("", 302), response("missing", 404), response(goodHtml, 200, "text/plain"),
+      response(goodHtml + "x".repeat(1_000_001))]) {
+      expect((await checkPublishedSiteReachability({
+        host, published: true, hostingConfigured: true, fetcher: fetcher(r),
+      })).status).toBe("unreachable");
+    }
+  });
+  it("rejects HTML where a tenant name appears outside the canonical footer", async () => {
+    const forged = `<!doctype html><html><body>${host}<footer>other.can-os.com · Powered by CAN OS</footer></body></html>`;
+    const result = await checkPublishedSiteReachability({
+      host, published: true, hostingConfigured: true, fetcher: fetcher(response(forged)),
+    });
+    expect(result.status).toBe("unreachable");
+  });
+  it("rejects UTF-8 bodies larger than one megabyte even without content-length", async () => {
+    const body = goodHtml + "é".repeat(600_000);
+    const r = response(body);
+    r.headers.delete("content-length");
+    const result = await checkPublishedSiteReachability({
+      host, published: true, hostingConfigured: true, fetcher: fetcher(r),
+    });
+    expect(result.status).toBe("unreachable");
+  });
+  it("stops consuming an oversized streaming response", async () => {
+    let pulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled++;
+        controller.enqueue(new Uint8Array(600_000));
+        if (pulled >= 5) controller.close();
+      },
+    });
+    const r = new Response(stream, { headers: { "content-type": "text/html", "cache-control": "private, no-store", vary: "Host" } });
+    const result = await checkPublishedSiteReachability({
+      host, published: true, hostingConfigured: true, fetcher: fetcher(r),
+    });
+    expect(result.status).toBe("unreachable");
+    expect(pulled).toBeLessThan(5);
+  });
+  it("rejects invalid UTF-8 HTML rather than accepting replacement characters", async () => {
+    const r = new Response(new Uint8Array([0xff, 0xfe]), {
+      headers: { "content-type": "text/html" },
+    });
+    expect((await checkPublishedSiteReachability({
+      host, published: true, hostingConfigured: true, fetcher: fetcher(r),
+    })).status).toBe("unreachable");
+  });
+  it("rejects cacheable or cross-tenant-cacheable public responses", async () => {
+    for (const headers of [
+      { "cache-control": "public, max-age=300", vary: "Host" },
+      { "cache-control": "private, no-store", vary: "Accept-Encoding" },
+      { "cache-control": "private, no-store", vary: "Host", "netlify-cdn-cache-control": "s-maxage=60" },
+    ]) {
+      const result = await checkPublishedSiteReachability({
+        host, published: true, hostingConfigured: true,
+        fetcher: fetcher(new Response(goodHtml, {
+          headers: { "content-type": "text/html", ...headers },
+        })),
+      });
+      expect(result.status).toBe("unreachable");
+    }
+  });
+  it("does not report TLS, DNS or timeout failures as live", async () => {
+    const f = vi.fn(async () => { throw new TypeError("fetch failed"); }) as unknown as typeof fetch;
+    const result = await checkPublishedSiteReachability({ host, published: true, hostingConfigured: true, fetcher: f });
+    expect(result.status).toBe("unreachable");
+    expect(result.checkedAt).toBeTruthy();
+    expect(result.diagnostic).toMatch(/DNS|TLS/);
+  });
+});

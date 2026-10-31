@@ -45,6 +45,8 @@ export function deriveFirstSchoolDayHandoff(input: {
     gaps: readonly string[];
   }[];
   projectionTruncated: boolean;
+  /** A future forecast is never an attendance observation. */
+  preparation?: boolean;
 }): FirstSchoolDayProjection {
   const base = {studentExpected:false,supervisionPlanned:false,
     attendanceRecorded:false,outstandingGaps:[] as string[]};
@@ -60,9 +62,9 @@ export function deriveFirstSchoolDayHandoff(input: {
     row.studentProfileId === input.studentProfileId && row.programId === input.programId);
   if (!student) {
     return { ...base,state:"not_on_roster",
-      message:"This enrolled student is not on today's expected onsite roster. Confirm the active school year, start date and instructional class placement." };
+      message:"This enrolled student is not on the selected day's expected onsite roster. Confirm the active school year, start date and instructional class placement." };
   }
-  const attendanceRecorded = ["present","tardy","absent","excused"].includes(student.status);
+  const attendanceRecorded = !input.preparation && ["present","tardy","absent","excused"].includes(student.status);
   if (!student.sectionId) {
     return { ...base,studentExpected:true,attendanceRecorded,state:"placement_missing",
       message:"The student is expected onsite but has no named instructional class. Resolve placement before relying on school-day preparation." };
@@ -82,5 +84,7 @@ export function deriveFirstSchoolDayHandoff(input: {
     state:attendanceRecorded?"attendance_recorded":"staffing_plan_ready",
     message:attendanceRecorded
       ? "An authorized onsite attendance observation is recorded. This does not prove an adult's physical presence or custody release."
-      : "The roster and staffing plan align for today. Authorized onsite staff must still attest their physical presence and record observed attendance."};
+      : input.preparation
+        ? "The future instructional roster and reviewed staffing plan align. No future attendance or physical presence has been observed."
+        : "The roster and staffing plan align for today. Authorized onsite staff must still attest their physical presence and record observed attendance."};
 }

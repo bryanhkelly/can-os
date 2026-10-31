@@ -53,6 +53,32 @@ describe("CAN OS partner hostname router", () => {
       "https://vineyard.can-os.com/published-site/inquiry", { method: "POST" }), true))
       .toBe("vineyard");
   });
+  it("routes application verification handoff only on the allowed POST paths", () => {
+    expect(classify("https://vineyard.can-os.com/apply", "POST")).toEqual({
+      kind: "site", slug: "vineyard", rewrite: true,
+    });
+    expect(classify("https://vineyard.can-os.com/published-site/family-start", "POST")).toEqual({
+      kind: "site", slug: "vineyard", rewrite: false,
+    });
+    for (const path of ["/apply", "/published-site/family-start"]) {
+      expect(classify("https://vineyard.can-os.com" + path, "GET")).toEqual({ kind: "deny" });
+      expect(classify("https://vineyard.can-os.com" + path, "POST", false)).toEqual({ kind: "deny" });
+    }
+    expect(slugForPublicSiteOrigin(new Request(
+      "https://vineyard.can-os.com/published-site/family-start", { method: "POST" }), true))
+      .toBe("vineyard");
+  });
+  it("does not treat a sibling tenant, reserved host or forwarded host as the tenant", () => {
+    expect(classify("https://admin.can-os.com/")).toEqual({ kind: "platform" });
+    expect(slugForPublicSiteOrigin(new Request(
+      "https://other.can-os.com/published-site", {
+        headers: { "x-forwarded-host": "vineyard.can-os.com" },
+      }), true)).toBe("other");
+    expect(slugForPublicSiteOrigin(new Request(
+      "https://vineyard.can-os.com/published-site", {
+        headers: { host: "other.can-os.com" },
+      }), true)).toBeNull();
+  });
   it("validates origin hostname independently, ignoring proxy-provided host claims", () => {
     expect(slugForPublicSiteOrigin(new Request("https://vineyard.can-os.com/published-site"), true))
       .toBe("vineyard");

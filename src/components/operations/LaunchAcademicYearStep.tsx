@@ -14,17 +14,17 @@ function AcademicYearStep({programId}:{programId:string}){
  useEffect(()=>{
   let current=true;
   void getLaunchAcademicYearPlan({data:{programId}}).then(value=>{if(current){setPlan(value);setError("");}})
-   .catch(()=>{if(current)setError("Academic setup could not be loaded. Check your school access, then retry.");});
+   .catch(()=>{if(current){setPlan(null);setError("Academic setup could not be loaded. Check your school access, then retry.");}});
   return()=>{current=false;};
  },[programId,attempt]);
  if(!plan)return <section id="launch-academic-year" aria-label="Prepare your academic year" className="mt-5 rounded-xl border bg-card p-5">
   <h2 className="font-semibold">Prepare your academic year</h2>
   {error?<><p role="alert" className="mt-2 text-sm">{error}</p><button type="button" onClick={()=>setAttempt(value=>value+1)} className="mt-3 rounded border px-3 py-2 text-sm">Retry academic setup</button></>:<p role="status" className="mt-2 text-sm">Loading the school's saved academic setup…</p>}
  </section>;
- return <ReviewAcademicYear plan={plan}/>;
+ return <ReviewAcademicYear key={`${programId}:${attempt}`} plan={plan} onReload={()=>{setPlan(null);setError("");setAttempt(value=>value+1);}}/>;
 }
 
-export function ReviewAcademicYear({plan}:{plan:Plan}){
+export function ReviewAcademicYear({plan,onReload}:{plan:Plan;onReload?:()=>void}){
  const router=useRouter();
  const [yearId,setYearId]=useState(plan.years.length===1?plan.years[0]!.id:"");
  const [scaleId,setScaleId]=useState(plan.gradeScales.length===1?plan.gradeScales[0]!.id:
@@ -46,7 +46,7 @@ export function ReviewAcademicYear({plan}:{plan:Plan}){
     structure,instructionalDays:{weekdays,instructionalMinutes:minutes},
    }});
    setSaved(true);
-   try{await router.invalidate();}catch{setError("Academic records are saved, but readiness could not be refreshed. Reload this launch to continue.");}
+   try{await router.invalidate();}catch{setError("The server accepted the academic setup command, but updated records could not be loaded. Reload the launch to verify the saved year; do not submit a duplicate.");}
   }catch(cause){setError(cause instanceof Error?cause.message:"Academic setup could not be saved. Retry to resume the same records.");}
   finally{setBusy(false);}
  }
@@ -78,7 +78,7 @@ export function ReviewAcademicYear({plan}:{plan:Plan}){
   </details>
   <p className="mt-3 text-xs text-muted-foreground">Existing calendar exceptions stay unchanged. Review local holidays and onsite schedules before activating the year. This preparation does not authorize school opening.</p>
   {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
-  {saved?<div role="status" className="mt-4 rounded border p-3 text-sm"><p>Academic records saved. You can return and resume this school year.</p><a href="#launch-website" className="mt-2 inline-block font-semibold underline">Continue to your private school website →</a></div>:
+  {saved?<div role="status" className="mt-4 rounded border p-3 text-sm"><p>Academic setup command accepted. Re-read the saved school-year and term records before continuing; this is not school opening approval.</p>{onReload&&<button type="button" onClick={onReload} className="mt-2 mr-3 rounded border px-3 py-2 font-semibold">Verify saved academic setup</button>}<a href="#launch-first-class" className="mt-2 inline-block font-semibold underline">Continue to your first classroom →</a></div>:
    <button type="button" disabled={busy||Boolean(plan.years.length&&!existing)||!weekdays.length||!Number.isInteger(minutes)||minutes<1||minutes>1440} onClick={()=>void prepare()} className="mt-4 rounded bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy?"Preparing your academic year…":existing?.status==="active"?"Use this active school year":"Save reviewed academic setup"}</button>}
   <Link to="/operations/school-years" search={{siteId:plan.siteId,programId:plan.programId}} className="ml-3 inline-block text-sm underline">Adjust dates, holidays or detailed settings</Link>
  </section>;
