@@ -26,13 +26,13 @@ async function documentData(db:Awaited<ReturnType<typeof resources>>["db"],s:Awa
   const [student]=await db.select({first:s.people.legalFirstName,last:s.people.legalLastName}).from(s.studentProfiles).innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId)).where(eq(s.studentProfiles.id,record.studentProfileId)).limit(1);
   const [org]=await db.select({name:s.organizations.name}).from(s.organizations).where(eq(s.organizations.id,record.issuingOrganizationId)).limit(1);
   const lines=(snapshot.rows as Array<{sectionTitle:string;letterGrade:string|null;creditsEarned:number|null;schoolYearName:string}>).map(row=>`${row.schoolYearName} | ${row.sectionTitle} | ${row.letterGrade??"N/A"} | Credits: ${row.creditsEarned??"Not recorded"}`);
-  return {issuerId:record.issuingOrganizationId,title:"OFFICIAL ACADEMIC TRANSCRIPT",issuer:org?.name??"",student:`${student?.first??""} ${student?.last??""}`,identifier:record.id,issuedAt:record.issuedAt.toISOString().slice(0,10),lines};
+  return {studentProfileId:record.studentProfileId,issuerId:record.issuingOrganizationId,title:"OFFICIAL ACADEMIC TRANSCRIPT",issuer:org?.name??"",student:`${student?.first??""} ${student?.last??""}`,identifier:record.id,issuedAt:record.issuedAt.toISOString().slice(0,10),lines};
  }
  const [record]=await db.select({id:s.diplomaIssuances.id,issuedAt:s.diplomaIssuances.issuedAt,revokedAt:s.diplomaIssuances.revokedAt,decision:s.graduationDecisions.decision,issuerId:s.graduationDecisions.issuingOrganizationId,studentId:s.graduationDecisions.studentProfileId}).from(s.diplomaIssuances).innerJoin(s.graduationDecisions,eq(s.graduationDecisions.id,s.diplomaIssuances.graduationDecisionId)).where(eq(s.diplomaIssuances.id,credentialId)).limit(1);
  if(!record||record.decision!=="approved"||record.revokedAt)throw new Error("No active diploma credential");
  const [student]=await db.select({first:s.people.legalFirstName,last:s.people.legalLastName}).from(s.studentProfiles).innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId)).where(eq(s.studentProfiles.id,record.studentId)).limit(1);
  const [org]=await db.select({name:s.organizations.name}).from(s.organizations).where(eq(s.organizations.id,record.issuerId)).limit(1);
- return {issuerId:record.issuerId,title:"DIPLOMA",issuer:org?.name??"",student:`${student?.first??""} ${student?.last??""}`,identifier:record.id,issuedAt:record.issuedAt.toISOString().slice(0,10),lines:["Has satisfied the institution's approved graduation requirements.","Issued by the school of record."]};
+ return {studentProfileId:record.studentId,issuerId:record.issuerId,title:"DIPLOMA",issuer:org?.name??"",student:`${student?.first??""} ${student?.last??""}`,identifier:record.id,issuedAt:record.issuedAt.toISOString().slice(0,10),lines:["Has satisfied the institution's approved graduation requirements.","Issued by the school of record."]};
 }
 export const renderAcademicCredential=createServerFn({method:"GET"})
  .validator((value:unknown)=>target.parse(value))
@@ -77,6 +77,41 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   throw new AuthorizationError("Credential release authorization requires a trusted institution evidence interface");
  });
 
+
+/** Verified account candidates are limited to the credential subject and
+ * guardians with an existing academic-view relationship. This is NOT consent
+ * for external disclosure. */
+export const listVerifiedCredentialRecipients=createServerFn({method:"GET"})
+ .validator((value:unknown)=>target.parse(value))
+ .handler(async ({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const context=await registrar();const {db,s}=await resources();
+  const doc=await documentData(db,s,data.kind,data.credentialId);
+  if(!context.scope.organizationIds?.includes(doc.issuerId))
+   throw new AuthorizationError("credential issuer");
+  const [student]=await db.select({personId:s.studentProfiles.personId})
+   .from(s.studentProfiles).where(eq(s.studentProfiles.id,doc.studentProfileId)).limit(1);
+  if(!student)throw new AuthorizationError("credential student");
+  const guardians=await db.select({personId:s.guardianRelationships.guardianPersonId})
+   .from(s.guardianRelationships)
+   .where(and(eq(s.guardianRelationships.studentPersonId,student.personId),
+    eq(s.guardianRelationships.canViewAcademics,true)));
+  const ids=[student.personId,...guardians.map(g=>g.personId)];
+  return db.selectDistinct({
+   personId:s.people.id,firstName:s.people.legalFirstName,
+   lastName:s.people.legalLastName,email:s.accessAccounts.emailNormalized,
+  }).from(s.people)
+   .innerJoin(s.accountPersonGrants,and(
+    eq(s.accountPersonGrants.personId,s.people.id),
+    eq(s.accountPersonGrants.active,true),
+    eq(s.accountPersonGrants.isSynthetic,false)))
+   .innerJoin(s.accessAccounts,and(
+    eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
+    eq(s.accessAccounts.disabled,false),
+    isNotNull(s.accessAccounts.emailVerifiedAt)))
+   .where(and(inArray(s.people.id,ids),eq(s.people.active,true)))
+   .orderBy(s.people.legalLastName,s.people.legalFirstName).limit(100);
+ });
 
 /** Issuer-scoped registrar release ledger, excluding private evidence contents. */
 export const listAcademicCredentialReleaseAuthorizations=createServerFn({method:"GET"})
