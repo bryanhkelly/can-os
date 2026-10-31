@@ -1,13 +1,6 @@
-import { dateTimeInputInTimezone, dateTimeInputValue } from "@/modules/calendar/timezone";
+import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
 
+/** Reject nonexistent and ambiguous site-local times before scheduling orientation. */
 export function unambiguousInstant(local: string, timezone: string): string {
-  const iso = dateTimeInputInTimezone(local, timezone);
-  const instant = Date.parse(iso);
-  for (const offset of [-3_600_000, 3_600_000]) {
-    if (dateTimeInputValue(new Date(instant + offset).toISOString(), timezone) === local) {
-      throw new Error("This local time occurs twice in the Site timezone; choose an unambiguous time");
-    }
-  }
-  return iso;
+  return siteLocalTimeToIso(local, timezone, "reject");
 }
-
