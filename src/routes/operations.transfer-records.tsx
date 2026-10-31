@@ -14,6 +14,7 @@ export const Route=createFileRoute("/operations/transfer-records")({
   component:TransferRecordsRoute,
 });
 type Items=Awaited<ReturnType<typeof listTransferRecordsHandoffs>>["items"];
+type DeliveryMethod="approved_secure_exchange"|"verified_secure_portal"|"physical_mail"|"can_internal_school_records";
 
 function TransferRecordsRoute(){
  const outcome=Route.useLoaderData();
@@ -26,15 +27,19 @@ function TransferRecordsWorkspace({items}:{items:Items}){
  const [busy,setBusy]=useState<string|null>(null);
  const [notice,setNotice]=useState(""),[error,setError]=useState("");
  const [selected,setSelected]=useState<Record<string,string>>({});
- const [methods,setMethods]=useState<Record<string,"approved_secure_exchange"|"verified_secure_portal"|"physical_mail">>({});
+ const [methods,setMethods]=useState<Record<string,DeliveryMethod>>({});
  const [receipts,setReceipts]=useState<Record<string,string>>({});
  const [verified,setVerified]=useState<Record<string,boolean>>({});
  const [delivered,setDelivered]=useState<Record<string,boolean>>({});
  async function complete(item:Items[number]){
    const issuanceId=selected[item.id]??item.issuances[0]?.id;
-   const receiptReference=(receipts[item.id]??"").trim();
+   const internal=methods[item.id]==="can_internal_school_records";
+   const receiptReference=internal?"CAN INTERNAL RECORDS":(receipts[item.id]??"").trim();
    if(!issuanceId||receiptReference.length<12||!verified[item.id]||!delivered[item.id]||busy)return;
-   if(!window.confirm("Confirm the named school's identity was independently verified and the selected official transcript was ACTUALLY transferred through an approved secure channel? This will record your signed institutional attestation."))return;
+   if(internal&&!item.destinationApplicationId)return;
+   if(!window.confirm(internal
+     ?"Release the selected official transcript INSIDE CAN OS to the exact linked receiving-school application under its signed guardian consent? The authorized receiving registrar will gain read-only access immediately."
+     :"Confirm the named school's identity was independently verified and the selected official transcript was ACTUALLY transferred through an approved secure channel? This will record your signed institutional attestation."))return;
    setBusy(item.id);setError("");setNotice("");
    try{
      const result=await completeTransferRecordsHandoff({data:{
@@ -44,7 +49,9 @@ function TransferRecordsWorkspace({items}:{items:Items}){
        receiptReference,confirmedRecipientVerified:true,confirmedSecureDelivery:true,
      }});
      setNotice(result.completed
-       ?"The official transcript handoff was recorded with evidence. The family was notified."
+       ?internal
+         ?"Official transcript released inside CAN OS to the verified receiving school. Access is scoped and audited; the family was notified."
+         :"The official transcript handoff was recorded with evidence. The family was notified."
        :"This handoff was already completed.");
      try{await router.invalidate();}
      catch{setError("The record was saved but the workspace did not refresh. Do not submit again.");}
@@ -52,7 +59,7 @@ function TransferRecordsWorkspace({items}:{items:Items}){
    finally{setBusy(null);}
  }
  return <WorkspaceShell eyebrow="CAN OS · Registrar" title="Transfer records coordination"
-   subtitle="Issue official records through the existing credit-issuer process, verify the destination and guardian authorization, then record evidence of an actual secure handoff. This screen does not send records."
+   subtitle="Issue official records through the credit issuer. Release securely within CAN to an authorized receiving school, or attest an externally completed secure transfer with delivery evidence."
    actions={<div className="flex flex-wrap gap-2">
      <Link to="/operations" className="rounded border px-3 py-2 text-sm">Operations</Link>
      <Link to="/admissions/transcripts" search={{query:""}} className="rounded border px-3 py-2 text-sm">Official transcripts</Link>
@@ -83,33 +90,45 @@ function TransferRecordsWorkspace({items}:{items:Items}){
         <label className="block text-sm font-medium">Actual records delivery method
           <select className="mt-2 w-full rounded-lg border bg-background p-3"
             value={methods[item.id]??"approved_secure_exchange"}
-            onChange={e=>setMethods(current=>({...current,[item.id]:e.target.value as "approved_secure_exchange"|"verified_secure_portal"|"physical_mail"}))}>
+            onChange={e=>setMethods(current=>({...current,[item.id]:e.target.value as DeliveryMethod}))}>
+            {item.destinationApplicationId&&<option value="can_internal_school_records">Release directly to verified CAN receiving school</option>}
             <option value="approved_secure_exchange">Approved secure records exchange</option>
             <option value="verified_secure_portal">Destination school's verified secure portal</option>
             <option value="physical_mail">Tracked physical mail</option>
           </select>
         </label>
-        <label className="block text-sm font-medium">External delivery receipt, tracking or verified exchange reference
+        {methods[item.id]!=="can_internal_school_records"&&<label className="block text-sm font-medium">External delivery receipt, tracking or verified exchange reference
           <input required minLength={12} maxLength={400} value={receipts[item.id]??""}
             onChange={e=>setReceipts(current=>({...current,[item.id]:e.target.value}))}
             placeholder="Unique secure-exchange confirmation or mailing tracking reference"
             className="mt-2 w-full rounded-lg border bg-background p-3"/>
-        </label>
+        </label>}
+        {methods[item.id]==="can_internal_school_records"&&<p className="rounded-lg border p-3 text-sm">
+          This is an immediate CAN-to-CAN release of the immutable, officially issued transcript.
+          The receiving Program and guardian's specific release consent are verified in the
+          same transaction. No external receipt or email attachment is used.
+        </p>}
         <label className="flex items-start gap-3 text-sm">
           <input type="checkbox" className="mt-1" checked={!!verified[item.id]}
             onChange={e=>setVerified(current=>({...current,[item.id]:e.target.checked}))}/>
-          <span>I independently verified the receiving school's identity and its authority to receive these records.</span>
+          <span>{methods[item.id]==="can_internal_school_records"?
+            "I confirm the linked receiving-school application is the intended CAN destination; CAN OS will independently verify current authorization and guardian consent.":
+            "I independently verified the receiving school's identity and its authority to receive these records."}</span>
         </label>
         <label className="flex items-start gap-3 text-sm">
           <input type="checkbox" className="mt-1" checked={!!delivered[item.id]}
             onChange={e=>setDelivered(current=>({...current,[item.id]:e.target.checked}))}/>
-          <span>The exact official transcript selected above has actually been transferred through the indicated approved secure channel.</span>
+          <span>{methods[item.id]==="can_internal_school_records"?
+            "I authorize CAN OS to release this exact official transcript electronically to the linked receiving-school registrar now.":
+            "The exact official transcript selected above has actually been transferred through the indicated approved secure channel."}</span>
         </label>
         <button type="button" disabled={busy!==null||!item.consentRecorded||!item.issuances.length||
-          (receipts[item.id]??"").trim().length<12||!verified[item.id]||!delivered[item.id]}
+          (methods[item.id]!=="can_internal_school_records"&&(receipts[item.id]??"").trim().length<12)||
+          !verified[item.id]||!delivered[item.id]}
           className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
           onClick={()=>void complete(item)}>
-          {busy===item.id?"Saving handoff…":"Record verified secure records handoff"}
+          {busy===item.id?"Saving handoff…":methods[item.id]==="can_internal_school_records"?
+            "Release official transcript inside CAN":"Record verified secure records handoff"}
         </button>
       </div>}
     </article>)}
