@@ -36,10 +36,10 @@ jobs:
       - run: npm ci
       - name: Tenant routing and reachability unit tests
         run: npx vitest run tests/unit/public-host-reachability.test.ts tests/unit/public-site-host-routing.test.ts tests/unit/public-tenant-edge-origin-isolation.test.ts
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Build
+      - name: Generate TanStack route tree and build
         run: npm run build
+      - name: Typecheck with generated routes
+        run: npm run typecheck
 
   deployed-read-only:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployed_acceptance }}
