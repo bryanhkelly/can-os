@@ -46,6 +46,40 @@ export const renderAcademicCredential=createServerFn({method:"GET"})
   return {filename:`${data.kind}-${data.credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
  });
 
+/** A registrar can authorize a release only to an existing verified person with
+ * a recorded consent reference and release instructions. This does NOT send it. */
+export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
+ .validator((value:unknown)=>target.extend({
+  recipientPersonId:uuid,recipientEmail:z.string().email().max(254),
+  releasePurpose:z.string().trim().min(5).max(300),
+  instructionReference:z.string().trim().min(5).max(500),
+  consentEvidenceReference:z.string().trim().min(5).max(500),
+  expiresAt:z.string().datetime(),
+ }).strict().parse(value))
+ .handler(async ({data})=>{
+  const context=await registrar();const {db,s}=await resources();
+  const doc=await documentData(db,s,data.kind,data.credentialId);
+  if(!context.scope.organizationIds?.includes(doc.issuerId))throw new AuthorizationError("credential issuer");
+  const expiry=new Date(data.expiresAt);
+  if(expiry.getTime()<=Date.now()||expiry.getTime()>Date.now()+30*86400000)
+    throw new AuthorizationError("Release expiry must be within 30 days");
+  const [recipient]=await db.select({id:s.people.id}).from(s.people)
+    .where(eq(s.people.id,data.recipientPersonId)).limit(1);
+  if(!recipient)throw new AuthorizationError("verified recipient identity required");
+  return db.transaction(async tx=>{
+   const [row]=await tx.insert(s.academicCredentialReleaseAuthorizations).values({
+    issuingOrganizationId:doc.issuerId,
+    ...(data.kind==="transcript"?{transcriptIssuanceId:data.credentialId}:{diplomaIssuanceId:data.credentialId}),
+    recipientPersonId:data.recipientPersonId,recipientEmail:data.recipientEmail,
+    releasePurpose:data.releasePurpose,instructionReference:data.instructionReference,
+    consentEvidenceReference:data.consentEvidenceReference,
+    authorizedByPersonId:context.actorPersonId!,expiresAt:expiry,
+   }).returning({id:s.academicCredentialReleaseAuthorizations.id});
+   await writeAudit(tx,{actorPersonId:context.actorPersonId!,action:"academic_credential.release.authorize",resourceType:"academic_credential_release_authorization",resourceId:row!.id,scope:{organizationId:doc.issuerId},after:{recipientPersonId:data.recipientPersonId,releasePurpose:data.releasePurpose,expiresAt:data.expiresAt},context:{requestId:context.requestId??null}});
+   return {authorizationId:row!.id,deliveryEnabled:false};
+  });
+ });
+
 /** Official records must never be mailed as plaintext attachments. Release is
  * disabled until a verified records-request and authenticated download workflow
  * exist. This server guard protects even stale clients and direct POST calls. */
