@@ -41,7 +41,7 @@ function GraduationCloseout(){
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">2. Credit audit and graduation decision</h2>
-    <p className="text-sm">First <Link to="/admissions/transcripts" className="underline">issue the student's official transcript</Link>, then enter the immutable issuance ID.</p>
+    <p className="text-sm">First <Link to="/admissions/transcripts" search={{query:""}} className="underline">issue the student's official transcript</Link>, then enter the immutable issuance ID.</p>
     {field("Transcript issuance ID",transcriptId,setTranscriptId)}
     {field("Approved requirements ID",requirementSetId,setRequirementSetId)}
     <button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>void perform(async()=>{setAudit(await auditIssuedTranscript({data:{transcriptId,requirementSetId}}))})}>Run credit audit</button>
