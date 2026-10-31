@@ -45,7 +45,7 @@ describe("shared evidence presentation", () => {
     const html = renderToStaticMarkup(<EvidenceReviewForm onReview={async () => {}}/>);
     expect(html).toContain("disabled");
     expect(html).toContain("Review rationale");
-    expect(html).toContain('minlength="10"');
+    expect(html).toContain('minLength="10"');
   });
 
   it("renders disabled upload controls when deployment disables private uploads", () => {
