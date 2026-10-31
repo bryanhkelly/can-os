@@ -145,7 +145,18 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
      eq(s.guardianRelationships.studentPersonId,student.personId),
      eq(s.guardianRelationships.guardianPersonId,data.recipientPersonId),
      eq(s.guardianRelationships.canManageEnrollment,true))).for("share").limit(1);
-   if(!liveConsent||liveConsent.revokedAt||!liveGuardian||
+   const [liveRecipientAccount]=await tx.select({id:s.accessAccounts.id})
+    .from(s.accessAccounts)
+    .innerJoin(s.accountPersonGrants,and(
+     eq(s.accountPersonGrants.accountId,s.accessAccounts.id),
+     eq(s.accountPersonGrants.personId,data.recipientPersonId),
+     eq(s.accountPersonGrants.active,true),
+     eq(s.accountPersonGrants.isSynthetic,false)))
+    .where(and(eq(s.accessAccounts.disabled,false),
+     isNotNull(s.accessAccounts.emailVerifiedAt),
+     eq(s.accessAccounts.emailNormalized,data.recipientEmail.trim().toLowerCase())))
+    .for("share").limit(1);
+   if(!liveConsent||liveConsent.revokedAt||!liveGuardian||!liveRecipientAccount||
       liveConsent.signerPersonId!==data.recipientPersonId||
       liveConsent.subjectId!==doc.studentProfileId||
       liveAction?.subjectId!==doc.studentProfileId||
