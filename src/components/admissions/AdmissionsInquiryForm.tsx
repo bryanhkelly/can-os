@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { AdmissionsPageNavigation } from "./AdmissionsPageNavigation";
 type InquiryFormProps={
  children?:never;
