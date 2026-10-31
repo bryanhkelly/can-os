@@ -116,7 +116,7 @@ export function ChurchApplicationsDesk() {
           <button type="button" disabled={!!working} className="ml-3 rounded border px-2 py-1 text-xs disabled:opacity-50"
             onClick={async ()=>{
               setWorking(x.id);setError("");setNotice("");
-              try { await resendApprovedChurchInvitation({data:x.id});setNotice("Access email request accepted. Delivery is subject to mail configuration and cooldown."); }
+              try { const result=await resendApprovedChurchInvitation({data:x.id});setNotice(result.deliveryStatus==="dispatched" ? "Email accepted by the configured sender." : result.deliveryStatus==="cooldown" ? "Recent access link still in cooldown; try again shortly." : "Access link not sent; review the account and pending invitation."); }
               catch(cause){setError(cause instanceof Error?cause.message:"Unable to request access email.");}
               finally{setWorking(null);}
             }}>Resend access link</button>
