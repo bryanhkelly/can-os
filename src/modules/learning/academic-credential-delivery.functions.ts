@@ -162,6 +162,16 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
     eq(s.accountPersonGrants.isSynthetic,false)))
    .limit(1);
   if(!verifiedAccount)throw new AuthorizationError("verified recipient account required");
+  // Recheck the live authorization immediately before generating the PDF.
+  // Revocation or expiry between initial lookup and rendering must deny access.
+  const [stillActive]=await db.select({id:s.academicCredentialReleaseAuthorizations.id})
+   .from(s.academicCredentialReleaseAuthorizations)
+   .where(and(eq(s.academicCredentialReleaseAuthorizations.id,release.id),
+    eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,context.actorPersonId),
+    isNull(s.academicCredentialReleaseAuthorizations.revokedAt)))
+   .limit(1);
+  if(!stillActive||release.expiresAt<=new Date())
+   throw new AuthorizationError("release no longer active");
   const kind=release.transcriptIssuanceId?"transcript":"diploma";
   const credentialId=release.transcriptIssuanceId??release.diplomaIssuanceId;
   if(!credentialId)throw new AuthorizationError("credential release target");
