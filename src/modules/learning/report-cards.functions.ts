@@ -40,10 +40,16 @@ type Viewer = {
   programIds: string[];
   /** Exact CAN Program + church Site pairs for official record issuing only. */
   delegatedPrograms?: Array<{programId:string;siteId:string}>;
+  /** Only the exact authenticated Student or independently verified academic Guardian
+   * can read that Student's archived records across former school memberships. */
+  historicalStudentAccess?: boolean;
 };
 
 /** Institutional pairs are query-local, never the account's global school scope. */
 function authorizedRecordSections(s: Schema, viewer: Viewer) {
+  // Every call to the grade/withdrawal readers also constrains the exact
+  // StudentProfile ID. This flag is never set on issuer/registrar viewers.
+  if(viewer.historicalStudentAccess)return sql`true`;
   const local=and(inArray(s.sections.siteId,viewer.siteIds),
     inArray(s.sections.programId,viewer.programIds));
   const delegated=(viewer.delegatedPrograms??[]).map(pair=>and(
@@ -78,7 +84,7 @@ async function resolveStudentViewer(
       .where(eq(s.studentProfiles.personId, context.actorPersonId))
       .limit(1);
     if (!profile) throw new AuthorizationError("student profile");
-    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds,programIds:context.scope.programIds??[] };
+    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds,programIds:context.scope.programIds??[],historicalStudentAccess:true };
   }
   if (context.role === "guardian") {
     assertCapability(context, "student:related-read");
@@ -104,7 +110,7 @@ async function resolveStudentViewer(
       .where(eq(s.studentProfiles.personId, studentPersonId))
       .limit(1);
     if (!profile) throw new AuthorizationError("student profile");
-    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds,programIds:context.scope.programIds??[] };
+    return { context, studentProfileId: profile.id, siteIds: context.scope.siteIds,programIds:context.scope.programIds??[],historicalStudentAccess:true };
   }
   throw new AuthorizationError("report card access");
 }
