@@ -199,6 +199,9 @@ export function GuardianApplicationForm({ programs, households, students = [], t
             </option>)}
           </Select>
           <p className="text-xs leading-5 text-muted-foreground">Existing students appear only through a verified managing relationship and shared household.</p>
+          {transferRequests.length>0&&<p role="status" className="mt-2 rounded-lg border p-3 text-sm">
+            Transferring an existing student? Select that student above instead of creating a new student identity. After selecting the student, link the original transfer request below.
+          </p>
         </div>
         {availableTransfers.length>0&&studentProfileId&&<div className="space-y-3 rounded-xl border p-4 sm:col-span-2">
           <Label htmlFor={`${id}-transfer`}>Connecting a move from another school?</Label>
