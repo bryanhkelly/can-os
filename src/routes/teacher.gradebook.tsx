@@ -1,3 +1,4 @@
+import { GradebookReviewQueue } from "@/components/learning/GradebookReviewQueue";
 import { RubricScoreFields } from "@/components/learning/RubricScoreFields";
 import { MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
@@ -360,24 +361,11 @@ function TeacherGradebookPage() {
      <p className="text-sm text-muted-foreground">There are no submitted assignments awaiting grading in this section. New student submissions will appear here.</p>
     </WorkspacePanel>}
     {!reviewCell&&reviewQueue.length>0&&<WorkspacePanel title={`Submission queue · ${pendingReviewCount} awaiting grading`} description="Choose a student submission to review and grade.">
-     <nav aria-label="Submission queue" className="grid max-h-96 gap-2 overflow-y-auto">
-      {reviewQueue.map(cell=><Link key={cell.submissionId} to="/teacher/gradebook"
-       search={{section:selected,assessment:cell.assessmentId,student:cell.studentProfileId}}
-       className="rounded-lg border p-3 text-sm hover:bg-muted">
-       <span className="block font-semibold">{gradebook.students.find(student=>student.studentProfileId===cell.studentProfileId)?.displayName??"Student"}</span>
-       <span className="mt-1 block text-xs text-muted-foreground">{gradebook.assessments.find(item=>item.id===cell.assessmentId)?.title??"Assessment"} · {cell.gradingDraft?"Draft saved · not released":cell.status}</span>
-      </Link>)}
-     </nav>
+     <GradebookReviewQueue cells={reviewQueue} students={gradebook.students} assessments={gradebook.assessments} sectionId={selected} />
     </WorkspacePanel>}
     {reviewCell&&reviewAssessment&&reviewStudent&&<div className="mt-6 grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
      <WorkspacePanel title="Submission queue" description="Select submitted or reviewed work.">
-      <nav aria-label="Submission queue" className="grid max-h-96 gap-2 overflow-y-auto">{reviewQueue.map(cell=><Link key={cell.submissionId}
-       to="/teacher/gradebook" search={{section:selected,assessment:cell.assessmentId,student:cell.studentProfileId}}
-       aria-current={cell.submissionId===reviewCell.submissionId?"page":undefined}
-       className={"rounded-lg border p-3 text-sm "+(cell.submissionId===reviewCell.submissionId?"bg-muted":"")}>
-       <span className="block font-semibold">{gradebook.students.find(student=>student.studentProfileId===cell.studentProfileId)?.displayName}</span>
-       <span className="mt-1 block text-xs text-muted-foreground">{gradebook.assessments.find(item=>item.id===cell.assessmentId)?.title} · {cell.gradingDraft?"Draft saved · not released":cell.status}</span>
-      </Link>)}</nav>
+      <GradebookReviewQueue cells={reviewQueue} students={gradebook.students} assessments={gradebook.assessments} sectionId={selected} activeSubmissionId={reviewCell.submissionId} />
      </WorkspacePanel>
      <WorkspacePanel title={`${reviewStudent.displayName} · ${reviewAssessment.title}`} actions={<div className="flex gap-3 text-sm">
       {previousReview&&<Link to="/teacher/gradebook" search={{section:selected,assessment:previousReview.assessmentId,student:previousReview.studentProfileId}} className="underline">Previous</Link>}
