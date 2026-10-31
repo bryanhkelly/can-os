@@ -7,7 +7,8 @@
 - Yearlong blueprint: 36 mapped instructional weeks, 9 units, 180 planned 55-minute lessons.
 - Week 1: 5 structured lessons, 2 assessments, teacher-only lesson guide.
 - Week 2: 5 structured draft lessons, 5 teacher-only daily guides, 2 separate draft assessments, 1 teacher-only assessment-key file.
-- Weeks 3–36: planning entries only. **170 of 180 planned daily lessons remain unwritten.**
+- Week 3: 5 original structured draft lessons and a teacher-only guide with worked answers.
+- Weeks 4–36: planning entries only. **165 of 180 planned daily lessons remain unwritten.**
 - None of these counts means the lessons have been professionally reviewed, published, adopted or taught.
 
 ## Prerequisite and dependency sequence
@@ -34,7 +35,7 @@ Run `node scripts/package-algebra1.mjs --report` to validate the existing author
 
 1. Qualified mathematics reviewer verifies each derivation, mathematical notation, contextual model, scoring key and standard alignment. Review the Week 2 bus and fraction problems especially carefully.
 2. Validate pacing and accessibility: readable equations, alternate representations, language scaffolds, screen-reader interpretation, individualized accommodations, and enrichment.
-3. Complete all missing Weeks 3–36 daily instruction, guided and independent practice, checks, standalone formative and mastery assessments, protected keys, teacher guides and reteaching plans.
+3. Complete all missing Weeks 4–36 daily instruction, guided and independent practice, checks, standalone formative and mastery assessments, protected keys, teacher guides and reteaching plans.
 4. Validate licensing of every external source and attached resource; current included instructional text is identified as original CAN-created material, with standards links used only for reference.
 5. Validate the assembled class-content v1 draft with canonical schemas, teacher-only guide mapping and real publisher import/preview. Verify student roles cannot access any answer-key artifacts.
 6. Obtain formal CAN academic approval and separate school adoption decisions before release. Preserve actual instructional records, student work, and assessment evidence through the existing CAN systems.
