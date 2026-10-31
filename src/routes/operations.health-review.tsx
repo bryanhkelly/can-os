@@ -62,12 +62,36 @@ function HealthReviewList({items,action}:{items:Item[];action?:string}){
    {visible.map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
     <h2 className="text-lg font-semibold">{item.studentName}</h2>
     <p className="mt-1 text-xs text-muted-foreground">Submitted {new Date(item.requestedAt).toLocaleString()} · Confidential medical review</p>
+    <p className="mt-3 text-sm text-muted-foreground">
+     Compare the existing school-approved record with the family's proposal before deciding.
+     Approval replaces every listed field, including a proposed blank value.
+    </p>
     <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-     <div><dt className="font-semibold">Proposed allergies</dt><dd className="mt-1 whitespace-pre-wrap">{item.allergySummary||"No instructions provided"}</dd></div>
-     <div><dt className="font-semibold">Proposed emergency instructions</dt><dd className="mt-1 whitespace-pre-wrap">{item.emergencySummary||"No instructions provided"}</dd></div>
-     <div><dt className="font-semibold">Proposed accommodations</dt><dd className="mt-1 whitespace-pre-wrap">{item.accommodationSummary||"No instructions provided"}</dd></div>
-     <div><dt className="font-semibold">Proposed emergency contact</dt>
-      <dd className="mt-1">{item.emergencyContactName||"Not supplied"} · {item.emergencyContactPhone||"No phone"} · {item.emergencyContactRelationship||"Relationship unspecified"}</dd>
+     <div className="rounded-lg border p-3">
+      <dt className="font-semibold">Allergy instructions</dt>
+      <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Current approved</span>{item.currentAllergySummary||"None recorded"}</dd>
+      <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Family proposal</span>{item.allergySummary||"Clear existing instructions"}</dd>
+     </div>
+     <div className="rounded-lg border p-3">
+      <dt className="font-semibold">Emergency instructions</dt>
+      <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Current approved</span>{item.currentEmergencySummary||"None recorded"}</dd>
+      <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Family proposal</span>{item.emergencySummary||"Clear existing instructions"}</dd>
+     </div>
+     <div className="rounded-lg border p-3">
+      <dt className="font-semibold">Accommodations</dt>
+      <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Current approved</span>{item.currentAccommodationSummary||"None recorded"}</dd>
+      <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Family proposal</span>{item.accommodationSummary||"Clear existing accommodations"}</dd>
+     </div>
+     <div className="rounded-lg border p-3">
+      <dt className="font-semibold">Emergency contact</dt>
+      <dd className="mt-2"><span className="block text-xs font-semibold text-muted-foreground">Current approved</span>
+       {item.currentEmergencyContact?.phone
+        ? `${item.currentEmergencyContact.name} · ${item.currentEmergencyContact.phone} · ${item.currentEmergencyContact.relationship}`
+        : "None recorded"}
+      </dd>
+      <dd className="mt-2"><span className="block text-xs font-semibold text-muted-foreground">Family proposal</span>
+       {item.emergencyContactName||"No name"} · {item.emergencyContactPhone||"No phone"} · {item.emergencyContactRelationship||"Relationship unspecified"}
+      </dd>
      </div>
     </dl>
     <label className="mt-5 block text-sm font-semibold">School verification and decision note
