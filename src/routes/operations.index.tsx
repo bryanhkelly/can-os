@@ -9,6 +9,7 @@ import {useState} from "react";
 import {createFileRoute,Link,useRouter,redirect} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
 import {getOperationsActions,updateOperationsAction,assignOperationsAction,setOperationsActionDeadline} from "@/modules/operations/action-workspace.functions";
+import {completeRegistrarEnrollmentExit} from "@/modules/enrollment/registrar-enrollment-exit.functions";
 import {AttentionQueue} from "@/components/operations/AttentionQueue";
 import {buildDailyOperationsAttention} from "@/domain/daily-operations";
 export const Route=createFileRoute("/operations/")({
@@ -51,6 +52,7 @@ function OperationsPage(){
  const router=useRouter();
  const [busy,setBusy]=useState<string|null>(null);
  const [error,setError]=useState("");
+ const [notice,setNotice]=useState("");
  const [dueDrafts,setDueDrafts]=useState<Record<string,string>>({});
  if(authError||!data||!health)return <WorkspaceShell width="wide" eyebrow="CAN OS · Operations" title="Needs You"
   subtitle="Review actions and launch readiness for an authorized school and program.">
@@ -60,6 +62,22 @@ function OperationsPage(){
   setBusy(id);setError("");
   try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim()){setBusy(null);return;}await updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}});await router.invalidate();}
   catch(e){setError(e instanceof Error?e.message:"Unable to update action");}
+  finally{setBusy(null);}
+ }
+
+ async function completeEnrollmentExit(id:string,kind:"withdrawal"|"transfer"){
+  const note=window.prompt("Record the institutional "+kind+" decision and academic records handoff (at least 20 characters):");
+  if(!note?.trim()||note.trim().length<20)return;
+  if(!window.confirm("Confirm the registrar verified this exit? Active Program and class memberships end immediately. The student login at this school may also be revoked."))return;
+  setBusy(id);setError("");setNotice("");
+  try{
+   const result=await completeRegistrarEnrollmentExit({data:{
+     actionId:id,confirmInstitutionalReview:true,resolutionNote:note.trim(),
+   }});
+   setNotice(result.completed?"Official "+kind+" recorded. Enrollment and student access were updated.":"This request was already completed.");
+   try{await router.invalidate();}
+   catch{setError("The institutional change was saved, but the list could not refresh. Do not submit it again; reopen the Action.");}
+  }catch(e){setError(e instanceof Error?e.message:"Unable to complete institutional enrollment change");}
   finally{setBusy(null);}
  }
 
@@ -97,6 +115,7 @@ function OperationsPage(){
  return <WorkspaceShell width="wide" eyebrow="CAN OS · School operations" title="Needs You"
   subtitle="Review actions and launch readiness for an authorized school and program. Operational actions remain subject to their existing permissions."
   actions={<div className="flex flex-wrap gap-2"><Link to="/operations/launch" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">School launches</Link><Link to="/operations/workflows" className="inline-flex min-h-11 items-center rounded-xl border bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Workflows</Link></div>}>
+  {notice&&<p role="status" className="mb-4 rounded-xl border p-4 text-sm">{notice}</p>}
   <section aria-label="Operations filters" className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
    <h2 className="text-sm font-semibold">Filter operational records</h2>
    <div className="mt-3 flex flex-wrap gap-4">
@@ -254,7 +273,12 @@ function OperationsPage(){
    onClick={()=>void changeDeadline(i.id,dueDrafts[i.id]??"")}>Save due date</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"in_progress")}>Start</button>
  <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"waiting")}>Waiting</button>
- {i.type==="onsite_coverage_gap"&&i.siteId?
+ {i.enrollmentChangeKind?
+  <button type="button" className="rounded border border-foreground px-3 py-1 text-xs font-semibold disabled:opacity-50"
+    disabled={busy!==null} onClick={()=>void completeEnrollmentExit(i.id,i.enrollmentChangeKind!)}>
+    Complete official {i.enrollmentChangeKind==="withdrawal"?"withdrawal":"transfer"} &amp; end school enrollment
+  </button>:
+  i.type==="onsite_coverage_gap"&&i.siteId?
   <Link to="/sites/$siteId" params={{siteId:i.siteId}} className="text-xs underline">Assigned director resolves in Site Today →</Link>:
   <button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null} onClick={()=>moveAction(i.id,"resolved")}>Resolve</button>}
  </>}</div></article>)}
