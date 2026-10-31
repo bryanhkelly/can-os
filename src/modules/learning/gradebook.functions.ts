@@ -1,6 +1,7 @@
 import { assessmentAttemptLimit, assertAssessmentAttemptAllowed, MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
 import { assertAssessmentActionable } from "@/domain/assessment-availability";
 import { createAssessmentStatus } from "@/domain/assessment-publication";
+import { assertAssessmentSchedule } from "@/domain/assessment-schedule";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { authorizeClass,accessibleClasses } from "./class-access.server";
 import type { Actor } from "@/modules/identity/actors.server";
@@ -337,6 +338,8 @@ export const createAssessment = createServerFn({ method: "POST" })
   assignmentKind:z.enum(["homework","classwork","quiz","test","project","discussion"]).optional().default("classwork"),
   curriculumLessonId:z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/).optional(),
   dueAt: z.string().refine(v => !Number.isNaN(new Date(v).getTime()), "dueAt must be an ISO date").optional(),
+  availableAt: z.string().datetime({offset:true}).optional(),
+  closesAt: z.string().datetime({offset:true}).optional(),
   maxAttempts:z.number().int().min(1).max(MAX_ASSESSMENT_ATTEMPTS).optional(),
   publishNow:z.boolean().optional().default(false),
  }).strict().parse(value))
@@ -345,6 +348,9 @@ export const createAssessment = createServerFn({ method: "POST" })
   assertCapability(context, "assignments:create");
   const rubricCriteria = validateAssessmentRubric(data.rubricCriteria ?? [], data.pointsPossible);
   const dueAt = data.dueAt ? new Date(data.dueAt) : null;
+  const availableAt = data.availableAt ? new Date(data.availableAt) : data.publishNow ? new Date() : null;
+  const closesAt = data.closesAt ? new Date(data.closesAt) : null;
+  assertAssessmentSchedule({availableAt,dueAt,closesAt});
   const intendedStatus=createAssessmentStatus(data.publishNow,dueAt);
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   return db.transaction(async tx => {
@@ -381,7 +387,8 @@ export const createAssessment = createServerFn({ method: "POST" })
     status,
     pointsPossible: String(data.pointsPossible),
     dueAt,
-    availableAt: data.publishNow ? new Date() : null,
+    availableAt,
+    closesAt,
     createdByPersonId: context.actorPersonId!,
    }).returning({ id: s.assessments.id });
    if (!assessment) throw new Error("Assessment could not be created");
@@ -473,7 +480,7 @@ export const manageAssessment = createServerFn({method:"POST"})
     throw new Error("A future due date is required");
    const status=data.action==="publish"||data.action==="reopen"?"published":
     data.action==="close"?"closed":assessment.status;
-   const availableAt=data.action==="publish"||
+   const availableAt=data.action==="publish" ? assessment.availableAt??now :
     (data.action==="reopen"&&(!assessment.availableAt||assessment.availableAt>now))
      ?now:assessment.availableAt;
    const closesAt=data.action==="reopen"?null:assessment.closesAt;
