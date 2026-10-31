@@ -125,9 +125,8 @@ export const listAdmissionsExistingStudentsPage=createServerFn({method:"GET"})
   const items=rows.slice(0,data.pageSize);
   return {items,nextPage:rows.length>data.pageSize?data.page+1:null};
  });
-export const listAdmissionsExistingStudents=createServerFn({method:"GET"}).handler(async()=>{
- return existingStudentChoices(db,await registrar());
-});
+/** Legacy endpoint: return a page contract, never silently cap at 300 records. */
+export const listAdmissionsExistingStudents=listAdmissionsExistingStudentsPage;
 /** Totals are computed against the authorized full dataset, never a visible page. */
 export const getAdmissionsStageCounts=createServerFn({method:"GET"})
  .validator((value:unknown)=>admissionsPageInput.pick({siteId:true,programId:true,search:true}).parse(value??{}))
