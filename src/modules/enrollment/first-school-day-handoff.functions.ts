@@ -65,12 +65,13 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
     const dates = [...new Set(futureDays.filter(day=>["instructional","special","makeup"].includes(day.type))
       .map(day=>day.date))];
     let date = today;
+    let eligibleDateFound = false;
     for(const candidate of dates){
       const projected=await loadExpectedOnsiteRosterForActor(actor,{
         date:candidate,programId:app.programId,siteId:app.siteId,
       });
       if(projected.students.some(student=>student.studentProfileId===app.studentProfileId &&
-        student.programId===app.programId)){date=candidate;break;}
+        student.programId===app.programId)){date=candidate;eligibleDateFound=true;break;}
     }
     const roster = await loadExpectedOnsiteRosterForActor(actor,{
       date,programId:app.programId,siteId:app.siteId,
@@ -94,5 +95,5 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         blocks:supervision?.blocks ?? [],
         projectionTruncated:supervision?.projectionTruncated ?? false,
       });
-    return {date,preview,...handoff,attendanceRecorded:preview?false:handoff.attendanceRecorded,state:preview&&handoff.state==="attendance_recorded"?"staffing_plan_ready":handoff.state};
+    return {date,preview,...handoff,attendanceRecorded:preview?false:handoff.attendanceRecorded,state:preview&&handoff.state==="attendance_recorded"?"staffing_plan_ready":handoff.state,...(!eligibleDateFound&&dates.length>0?{message:"No upcoming instructional day with this student on the expected onsite roster was found. Review placement and calendar dates."}:{})};
   });
