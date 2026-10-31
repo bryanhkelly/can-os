@@ -59,7 +59,13 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
   {application&&!applications.some(app=>app.applicationId===application)&&<WorkspaceNotice tone="danger">This enrollment application is unavailable in your current family workspace.</WorkspaceNotice>}
   {application&&<Link to="/guardian/admission-offers" search={{student}} className="inline-block text-sm underline">View all enrollment applications</Link>}
   {applications.filter(app=>(!application||app.applicationId===application)&&(!offer||app.offers.some(item=>item.id===offer))).map(app=><WorkspacePanel key={app.applicationId} title={app.studentName} description={app.program}>
-    {app.waitlisted&&<p role="status" className="mt-2 text-sm">Application waitlisted. Contact admissions about availability and next steps.</p>}
+    {app.transferOriginExited===false&&<WorkspaceNotice tone="info" className="mt-3">
+      Your original school has not completed the institutional transfer exit. You may continue your receiving-school application and review any offer, but enrollment and classroom placement cannot be activated yet.
+    </WorkspaceNotice>}
+    {app.transferOriginExited===true&&<p role="status" className="mt-2 text-sm">
+      Origin-school exit completed. Your receiving school still must complete the independent offer and class placement process.
+    </p>}
+    {app.waitlisted&&<p role="status" className="mt-2 text-sm">Application waitlisted. Contact admissions about availability and next steps.</p>
     {(app.applicationStage==="withdrawn"||app.applicationStage==="declined")&&<p role="status" className="mt-2 text-sm">Application {app.applicationStage}. Contact admissions if your plans change.</p>}
     <button type="button" aria-expanded={checklist===app.applicationId||application===app.applicationId}
       className="mt-3 rounded border px-3 py-2 text-sm" onClick={()=>setChecklist(app.applicationId)}>View enrollment checklist</button>
