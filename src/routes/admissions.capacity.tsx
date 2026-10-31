@@ -40,7 +40,11 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
  const [edits,setEdits]=useState<Record<string,string>>({});
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(""),[notice,setNotice]=useState("");
  async function save(id:string,current:number){
-  const value=Number(edits[id]??current);
+  const raw=edits[id]??String(current);
+  const value=Number(raw);
+  if(!raw.trim()||!Number.isSafeInteger(value)||value<1||value>100000){
+   setError("Enter a whole-number seat capacity between 1 and 100,000.");return;
+  }
   setBusy(id);setError("");setNotice("");
   try{await updateAdmissionsCapacity({data:{poolId:id,capacity:value}});await router.invalidate();setNotice("Seat capacity saved.");}
   catch(e){setError(e instanceof Error?e.message:"Unable to save capacity");}
