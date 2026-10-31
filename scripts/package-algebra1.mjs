@@ -27,6 +27,16 @@ if(lessons.length!==20)fail("Expected 20 genuinely authored lesson days through 
 if(week4.week!==4||week4.unitId!==blueprint.weeks[3].unitId||week4.lessons.length!==5)fail("Week 4 five-day content or unit mapping missing");
 if(week3.week!==3||week3.unitId!==blueprint.weeks[2].unitId||week3.lessons.length!==5||week3.authoredDays!==5)fail("Week 3 five-day content or unit mapping missing");
 if(week2.some(w=>w.lessons?.length!==1))fail("Each Week 2 draft must contain one actual lesson");
+const weeklyIds=[week1.lessons.map(l=>l.id),week2.flatMap(w=>w.lessons.map(l=>l.id)),week3.lessons.map(l=>l.id),week4.lessons.map(l=>l.id)];
+for(let wi=0;wi<weeklyIds.length;wi++){
+ if(weeklyIds[wi].length!==5)fail(`Week ${wi+1} must have exactly five distinct days`);
+ for(let di=0;di<5;di++){
+  const expected=wi===0?`u01-d0${di+1}`:`u01-w${String(wi+1).padStart(2,"0")}-d0${di+1}`;
+  if(weeklyIds[wi][di]!==expected)fail(`Week ${wi+1} Day ${di+1} ID mismatch: expected ${expected}`);
+ }
+}
+const allActivityIds=lessons.flatMap(l=>l.activities?.map(a=>a.id)||[]);
+if(new Set(allActivityIds).size!==allActivityIds.length)fail("Activity IDs must be unique for canonical class-content validation");
 for(const l of lessons){
  if(!l.id||ids.has(l.id))fail(`Missing/duplicate lesson ID: ${l.id}`);ids.add(l.id);
  if(!l.title?.trim()||!l.body?.trim()||prohibited.test(l.title+" "+l.body))fail(`Placeholder/noninstructional lesson: ${l.id}`);
@@ -55,7 +65,7 @@ const metadata=read("release-metadata.json");
 if(metadata.license!=="LicenseRef-CAN-Original"||metadata.sourceType!=="original")fail("Source/license metadata missing or unapproved");
 if(metadata.releaseStatus!=="review_required"||metadata.creditStatus!=="not_credit_ready")fail("Do not assert publication or credit readiness");
 if(metadata.externalSources?.length)fail("External source licensing must be reviewed before packaging");
-const summary={courseCode:"CAN-ALG1",targetWeeks:36,authoredWeeks:4,authoredLessons:lessons.length,plannedLessons:180,unwrittenLessons:160,reviewStatus:"teacher_review_required",creditStatus:"not_credit_ready",publisherAdoption:"not_authorized",assessmentGap:"Week 2 standalone assessments drafted but not teacher-approved; Weeks 3–36 assessments missing"};
+const summary={courseCode:"CAN-ALG1",yearlongComplete:false,releaseReady:false,targetWeeks:36,authoredWeeks:4,authoredLessons:lessons.length,plannedLessons:180,unwrittenLessons:160,reviewStatus:"teacher_review_required",creditStatus:"not_credit_ready",publisherAdoption:"not_authorized",assessmentGap:"Week 2 standalone assessments drafted but not teacher-approved; Weeks 3–36 assessments missing"};
 if(process.argv.includes("--report"))console.log(JSON.stringify(summary,null,2));
 else if(process.argv.includes("--write")){
  const output=process.argv[process.argv.indexOf("--write")+1];
