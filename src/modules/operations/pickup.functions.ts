@@ -556,6 +556,33 @@ export const createPickupCustodyHold = createServerFn({ method: "POST" })
         sourceKey,
       }).returning({ id: pickupCustodyHolds.id });
       if (!record) throw new Error("Unable to record custody hold");
+      // A guardian-reported dispute must reach the school's urgent operating
+      // queue even when the local site director is not yet assigned. The Action
+      // is evidence of follow-up, never a second source of release authority.
+      const ownerPersonId = await currentSiteDirectorPersonId(tx,data.programId,new Date());
+      const [followUp] = await tx.insert(actions).values({
+        type:"onsite_pickup_custody_hold",status:"open",priority:"urgent",
+        title:"Active custody or emergency hold needs site-leader review",
+        description:"All pickup releases are blocked. Review the restriction and resolve it through the onsite pickup workflow, not this Action.",
+        ownerPersonId,
+        organizationId:student.organizationId,siteId:student.siteId,programId:data.programId,
+        subjectType:"student_profile",subjectId:data.studentProfileId,
+        metadata:{holdId:record.id,kind:data.kind,sourceKey},
+      }).returning({id:actions.id});
+      if(!followUp)throw new Error("Unable to create school custody follow-up");
+      const actionEventId = await emitEvent(tx,{
+        eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:followUp.id,
+        actorPersonId:actor.actorPersonId,organizationId:student.organizationId,
+        siteId:student.siteId,programId:data.programId,
+        payload:{type:"onsite_pickup_custody_hold",holdId:record.id,ownerPersonId},
+      });
+      if(ownerPersonId)await notifyMany(tx,[{
+        recipientPersonId:ownerPersonId,
+        type:"pickup_custody_hold_staff_review",
+        title:"Urgent: pickup release restriction",
+        body:"A custody or emergency hold is active at your school. All release is blocked until the site leader reviews and resolves the hold.",
+        resourceType:"action",resourceId:followUp.id,eventId:actionEventId,
+      }]);
       const eventId = await emitEvent(tx, {
         eventType: EventTypes.PickupCustodyHoldCreated,
         aggregateType: "pickup_custody_hold", aggregateId: record.id,
