@@ -15,6 +15,7 @@ import {
 } from "@/domain/grade-response-policy";
 import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { requireTeachingEligibility } from "@/modules/staffing/teaching-eligibility.server";
 import { emitEvent, notifyMany, writeAudit } from "@/platform/mutation";
 
 const submissionInput = z.object({ submissionId: z.string().uuid() }).strict();
@@ -178,7 +179,7 @@ export const requestGuardianGradeResponse = createServerFn({ method: "POST" })
 
       const [teachers, registrars] = await Promise.all([
         tx.select({ personId: sectionTeachers.personId }).from(sectionTeachers)
-          .where(eq(sectionTeachers.sectionId, record.sectionId)),
+          .where(and(eq(sectionTeachers.sectionId, record.sectionId), eq(sectionTeachers.role, "teacher"))),
         tx.select({ personId: accountPersonGrants.personId })
           .from(accountPersonGrants)
           .innerJoin(accessAccounts, eq(accessAccounts.id, accountPersonGrants.accountId))
@@ -191,7 +192,21 @@ export const requestGuardianGradeResponse = createServerFn({ method: "POST" })
               isNull(accountPersonGrants.siteId)),
           )),
       ]);
-      const recipients = [...new Set([...teachers.map(t => t.personId),
+      // Only notify teachers who can currently teach this exact Section.
+      // Historic/assistant assignments or revoked qualifications must not
+      // receive a new guardian academic notification.
+      const eligibleTeacherIds: string[] = [];
+      for (const teacher of teachers) {
+        try {
+          await requireTeachingEligibility(record.sectionId, teacher.personId, tx, {
+            horizon: "current", requireAssignment: true,
+          });
+          eligibleTeacherIds.push(teacher.personId);
+        } catch (error) {
+          if (!(error instanceof AuthorizationError)) throw error;
+        }
+      }
+      const recipients = [...new Set([...eligibleTeacherIds,
         ...registrars.map(r => r.personId)])];
       await notifyMany(tx, recipients.map(recipientPersonId => ({
         recipientPersonId, type: "guardian_grade_follow_up_requested",
