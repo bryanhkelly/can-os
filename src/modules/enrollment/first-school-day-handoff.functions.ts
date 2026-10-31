@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, asc } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { applications, programs, sites } from "@/db/schema";
+import { applications, programs, sites, academicCalendarDays, academicCalendars, schoolYears } from "@/db/schema";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { deriveFirstSchoolDayHandoff } from "@/domain/first-school-day-handoff";
 import { siteDate } from "@/domain/expected-attendance";
@@ -52,7 +52,26 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
       throw new AuthorizationError("accepted student at active onsite school");
 
     // Derive the calendar date from the Site, not the user's browser clock.
-    const date = siteDate(new Date(),app.timezone);
+    const today = siteDate(new Date(),app.timezone);
+    // Preview an actual published calendar day, never invent a weekday schedule.
+    const futureDays = await db.select({date:academicCalendarDays.calendarDate,
+      type:academicCalendarDays.type}).from(academicCalendarDays)
+      .innerJoin(academicCalendars,eq(academicCalendars.id,academicCalendarDays.academicCalendarId))
+      .innerJoin(schoolYears,eq(schoolYears.id,academicCalendars.schoolYearId))
+      .where(and(eq(academicCalendars.siteId,app.siteId),eq(academicCalendars.active,true),
+        eq(schoolYears.programId,app.programId),eq(schoolYears.status,"active"),
+        gte(academicCalendarDays.calendarDate,today)))
+      .orderBy(asc(academicCalendarDays.calendarDate)).limit(90);
+    const dates = [today,...new Set(futureDays.filter(day=>day.type==="instructional")
+      .map(day=>day.date))].filter((value,index,array)=>array.indexOf(value)===index);
+    let date = today;
+    for(const candidate of dates){
+      const projected=await loadExpectedOnsiteRosterForActor(actor,{
+        date:candidate,programId:app.programId,siteId:app.siteId,
+      });
+      if(projected.students.some(student=>student.studentProfileId===app.studentProfileId &&
+        student.programId===app.programId)){date=candidate;break;}
+    }
     const roster = await loadExpectedOnsiteRosterForActor(actor,{
       date,programId:app.programId,siteId:app.siteId,
     });
@@ -65,14 +84,15 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
     const supervision = matched?.sectionId
       ? await loadOnsiteSupervisionPlanForActor(actor,{date,siteId:app.siteId})
       : null;
+    const preview = date > today;
     return {
-      date,
+      date,preview,
       ...deriveFirstSchoolDayHandoff({
         programId:app.programId,
         studentProfileId:app.studentProfileId,
         configuration:programDay?.configuration ?? null,
         expectedDays:programDay?.expectedDays ?? 0,
-        students:roster.students,
+        students:preview?roster.students.map(student=>({...student,status:"unmarked"})):roster.students,
         blocks:supervision?.blocks ?? [],
         projectionTruncated:supervision?.projectionTruncated ?? false,
       }),
