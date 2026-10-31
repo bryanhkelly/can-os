@@ -58,6 +58,9 @@ export function currentChurchAuthorityEvidence(
     evidence.verifiedByPersonId !== approverPersonId &&
     evidence.expiresAt && evidence.expiresAt > now &&
     evidence.metadata.provenance === "can_steward_independently_reviewed" &&
+    evidence.metadata.screeningStatus === "passed" &&
+    evidence.metadata.privateObjectVerified === true &&
+    evidence.metadata.revokedAt == null &&
     evidence.metadata.churchRequestId === request.id &&
     evidence.metadata.churchSlug === request.churchSlug &&
     evidence.metadata.authorizedEmailNormalized === request.contactEmail);
