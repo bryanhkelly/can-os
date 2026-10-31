@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { readCommonCartridgeStaticLesson } from "@/modules/learning/common-cartridge-import.functions";
 
 /** Explicitly sandbox imported markup: never inject into the CAN application DOM. */
 export function CommonCartridgeStaticLesson({programId,sectionId,resourceId}:{
@@ -13,6 +12,7 @@ export function CommonCartridgeStaticLesson({programId,sectionId,resourceId}:{
    onClick={async()=>{
     setLoading(true);setError("");
     try{
+     const {readCommonCartridgeStaticLesson}=await import("@/modules/learning/common-cartridge-import.functions");
      const result=await readCommonCartridgeStaticLesson({data:{programId,sectionId,resourceId}});
      setHtml(result.html);
     }catch(cause){
