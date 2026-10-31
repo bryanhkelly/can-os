@@ -17,9 +17,10 @@ const expectedB=process.env.CAN_PUBLIC_SMOKE_NAME_B;
 if (![domain,first,second,unpublished,unknown,expectedA,expectedB].every(Boolean))
  throw new Error("Set CAN_PUBLIC_SMOKE_DOMAIN, TENANT_A, TENANT_B, UNPUBLISHED, UNKNOWN, NAME_A and NAME_B.");
 const slug=/^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$/;
-assert.match(domain,/^[a-z0-9.-]+$/);
+assert.equal(domain,"can-os.com","Current origin handler only supports the configured canonical can-os.com domain; never run acceptance against an unrelated domain");
 for(const name of [first,second,unpublished,unknown])assert.match(name,slug);
 assert.equal(new Set([first,second,unpublished,unknown]).size,4,"Use four distinct slugs");
+assert.notEqual(expectedA,expectedB,"Published tenants must have distinct school identities");
 const MAX_RESPONSE_BYTES=1_000_000;
 async function readLimited(response){
  const length=response.headers.get("content-length");
@@ -47,9 +48,9 @@ async function check(slug,path,expectedStatus,expectIdentity=null){
  const url=`https://${slug}.${domain}${path}`;
  const response=await fetch(url,{redirect:"manual",signal:AbortSignal.timeout(8000),headers:{Accept:"text/html"}});
  const type=response.headers.get("content-type")??"";
- const body=await readLimited(response);
  assert.equal(response.status,expectedStatus,`${url}: unexpected HTTP status`);
  assert.ok(!response.headers.get("location"),`${url}: redirects forbidden`);
+ const body=await readLimited(response);
  if(expectIdentity){
   assert.match(type,/text\/html/i);
   assert.match(response.headers.get("cache-control")??"",/no-store/i,`${url}: public tenant page must not be cached`);
@@ -61,6 +62,7 @@ async function check(slug,path,expectedStatus,expectIdentity=null){
   const other=expectIdentity===expectedA?expectedB:expectedA;
   assert.ok(!body.includes(`<h1>${other}</h1>`),`${url}: cross-tenant school heading leaked`);
   assert.ok(!body.includes("__tanstack"),`${url}: app shell leaked`);
+  assert.ok(!body.includes("window.__"),`${url}: platform hydration leaked`);
  }else{
   assert.ok(!body.includes("Powered by CAN OS"),`${url}: unpublished/unknown/private site disclosed`);
  }
