@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "courseCode": "CAN-ALG1",
+  "visibility": "teacher_only",
+  "units": [
+    {
+      "unitId": "algebra1-u01",
+      "reviewStatus": "draft",
+      "teacherOverview": "Week 4 assesses mastery after Weeks 1–3. On Day 4 score independent work; Day 5 corrections and alternate items support reassessment. Never disclose this teacher-only guide in student/guardian responses.",
+      "lessons": [
+        {
+          "lessonId": "u01-w04-d01",
+          "preparation": "Prepare accessible workspaces and independent scoring evidence for Day 1. Use original-equation checks, annotated misconceptions and individualized feedback.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: Simplify 4(3a−2)−5a.",
+              "answer": "12a−8−5a=7a−8."
+            },
+            {
+              "prompt": "Guided 2: Solve 4(3a−2)−5a=27.",
+              "answer": "7a−8=27; a=5."
+            },
+            {
+              "prompt": "Independent 1: Simplify 2(4y+3)−3y.",
+              "answer": "5y+6."
+            },
+            {
+              "prompt": "Independent 2: Solve 2(4y+3)−3y=31.",
+              "answer": "5y+6=31; y=5."
+            },
+            {
+              "prompt": "Independent 3: Explain why 5y+6 is not a solution.",
+              "answer": "It is an expression; a solution requires an equation and a value of y."
+            },
+            {
+              "prompt": "Exit: Solve 3(2z+1)−z=23 and check.",
+              "answer": "5z+3=23; z=4; 3(9)−4=23."
+            }
+          ],
+          "misconceptions": [
+            "Combining unlike terms or losing a distributive negative changes an expression.",
+            "An inequality division by a negative requires reversing the comparison direction.",
+            "A contextual count may require a whole-number restriction even when the algebra gives a fraction."
+          ],
+          "interventions": [
+            "Use color-coded like-term cards and a step/reason table; require an original-expression check.",
+            "For inequalities, test the boundary and one value on each side before accepting the solution set."
+          ],
+          "extensions": [
+            "Compare two valid methods and justify which makes the problem structure easiest to see."
+          ]
+        },
+        {
+          "lessonId": "u01-w04-d02",
+          "preparation": "Prepare accessible workspaces and independent scoring evidence for Day 2. Use original-equation checks, annotated misconceptions and individualized feedback.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: Classify 5(t+2)=5t+10.",
+              "answer": "Identity; infinitely many real solutions."
+            },
+            {
+              "prompt": "Guided 2: Classify 4(y+1)=4y+7.",
+              "answer": "Contradiction 4=7; no solution."
+            },
+            {
+              "prompt": "Independent 1: Classify 3(2m−1)=6m−3.",
+              "answer": "Identity, all real m."
+            },
+            {
+              "prompt": "Independent 2: Classify 2(n+4)=2n+5.",
+              "answer": "8=5 contradiction; no solution."
+            },
+            {
+              "prompt": "Independent 3: Solve 7p+2=4p+17.",
+              "answer": "3p=15, p=5."
+            },
+            {
+              "prompt": "Exit: Classify 6(q−2)=6q−12 and justify.",
+              "answer": "Identity; both sides are 6q−12 for every real q."
+            }
+          ],
+          "misconceptions": [
+            "Combining unlike terms or losing a distributive negative changes an expression.",
+            "An inequality division by a negative requires reversing the comparison direction.",
+            "A contextual count may require a whole-number restriction even when the algebra gives a fraction."
+          ],
+          "interventions": [
+            "Use color-coded like-term cards and a step/reason table; require an original-expression check.",
+            "For inequalities, test the boundary and one value on each side before accepting the solution set."
+          ],
+          "extensions": [
+            "Compare two valid methods and justify which makes the problem structure easiest to see."
+          ]
+        },
+        {
+          "lessonId": "u01-w04-d03",
+          "preparation": "Prepare accessible workspaces and independent scoring evidence for Day 3. Use original-equation checks, annotated misconceptions and individualized feedback.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: Solve −2t+5<13.",
+              "answer": "−2t<8, so t>−4."
+            },
+            {
+              "prompt": "Guided 2: Solve 5−4n≤−7.",
+              "answer": "−4n≤−12, so n≥3."
+            },
+            {
+              "prompt": "Independent 1: Solve −5y−2>18.",
+              "answer": "−5y>20, so y<−4."
+            },
+            {
+              "prompt": "Independent 2: Solve 2−3a≥−10.",
+              "answer": "−3a≥−12, so a≤4."
+            },
+            {
+              "prompt": "Independent 3: Explain why the inequality reverses after dividing by −3.",
+              "answer": "Multiplying or dividing by a negative reverses order on the number line."
+            },
+            {
+              "prompt": "Exit: Solve −4r+6≤22 and test r=−4.",
+              "answer": "−4r≤16, r≥−4; r=−4 gives 22≤22, included."
+            }
+          ],
+          "misconceptions": [
+            "Combining unlike terms or losing a distributive negative changes an expression.",
+            "An inequality division by a negative requires reversing the comparison direction.",
+            "A contextual count may require a whole-number restriction even when the algebra gives a fraction."
+          ],
+          "interventions": [
+            "Use color-coded like-term cards and a step/reason table; require an original-expression check.",
+            "For inequalities, test the boundary and one value on each side before accepting the solution set."
+          ],
+          "extensions": [
+            "Compare two valid methods and justify which makes the problem structure easiest to see."
+          ]
+        },
+        {
+          "lessonId": "u01-w04-d04",
+          "preparation": "Prepare accessible workspaces and independent scoring evidence for Day 4. Use original-equation checks, annotated misconceptions and individualized feedback.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: Review: solve 5(x−2)=2x+8.",
+              "answer": "5x−10=2x+8; x=6."
+            },
+            {
+              "prompt": "Guided 2: Review: solve −2a+1≤9.",
+              "answer": "−2a≤8; a≥−4."
+            },
+            {
+              "prompt": "Independent 1: Checkpoint A: simplify 4(2x−3)+x.",
+              "answer": "9x−12."
+            },
+            {
+              "prompt": "Independent 2: Checkpoint B: solve 3(2x−1)=4x+9.",
+              "answer": "6x−3=4x+9; x=6."
+            },
+            {
+              "prompt": "Independent 3: Checkpoint C: solve −3t+4≥16.",
+              "answer": "t≤−4."
+            },
+            {
+              "prompt": "Independent 4: Checkpoint D: A club has $100 for a $16 fee plus $7 per participant. Find the maximum participants.",
+              "answer": "16+7p≤100; p≤12; maximum 12."
+            },
+            {
+              "prompt": "Exit: Identify the assessment problem you need to revisit and name the reasoning step to check.",
+              "answer": "Teacher evaluates the specific named step and evidence of error correction; no single numeric response."
+            }
+          ],
+          "misconceptions": [
+            "Combining unlike terms or losing a distributive negative changes an expression.",
+            "An inequality division by a negative requires reversing the comparison direction.",
+            "A contextual count may require a whole-number restriction even when the algebra gives a fraction."
+          ],
+          "interventions": [
+            "Use color-coded like-term cards and a step/reason table; require an original-expression check.",
+            "For inequalities, test the boundary and one value on each side before accepting the solution set."
+          ],
+          "extensions": [
+            "Compare two valid methods and justify which makes the problem structure easiest to see."
+          ]
+        },
+        {
+          "lessonId": "u01-w04-d05",
+          "preparation": "Prepare accessible workspaces and independent scoring evidence for Day 5. Use original-equation checks, annotated misconceptions and individualized feedback.",
+          "workedAnswers": [
+            {
+              "prompt": "Guided 1: Correct: 3(x−2)=3x+2 implies x=8.",
+              "answer": "3x−6=3x+2 gives −6=2, contradiction, so no solution."
+            },
+            {
+              "prompt": "Guided 2: Correct: $20 fixed + $5 each, $62 budget allows 9 items.",
+              "answer": "20+5n≤62; n≤8.4, maximum 8 items."
+            },
+            {
+              "prompt": "Independent 1: Reassessment A: simplify 5(2a−1)−3a.",
+              "answer": "7a−5."
+            },
+            {
+              "prompt": "Independent 2: Reassessment B: solve 2(3x+1)=5x+9.",
+              "answer": "6x+2=5x+9, x=7."
+            },
+            {
+              "prompt": "Independent 3: Reassessment C: solve −2m+3<11.",
+              "answer": "m>−4."
+            },
+            {
+              "prompt": "Independent 4: Reassessment D: At least 38 riders, 9 seats per vehicle. Minimum vehicles?",
+              "answer": "9v≥38; minimum 5."
+            },
+            {
+              "prompt": "Exit: Write one original error you corrected and one substitution or boundary check proving your new answer.",
+              "answer": "Teacher checks that the correction names an invalid transformation and provides valid numerical evidence."
+            }
+          ],
+          "misconceptions": [
+            "Combining unlike terms or losing a distributive negative changes an expression.",
+            "An inequality division by a negative requires reversing the comparison direction.",
+            "A contextual count may require a whole-number restriction even when the algebra gives a fraction."
+          ],
+          "interventions": [
+            "Use color-coded like-term cards and a step/reason table; require an original-expression check.",
+            "For inequalities, test the boundary and one value on each side before accepting the solution set."
+          ],
+          "extensions": [
+            "Compare two valid methods and justify which makes the problem structure easiest to see."
+          ]
+        }
+      ],
+      "assessments": []
+    }
+  ]
+}
