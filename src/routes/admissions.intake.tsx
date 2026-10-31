@@ -158,6 +158,11 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
        {!student.householdId?" (new household required)":""}
       </option>)}
      </select>
+     <nav aria-label="Existing student directory pages" className="mt-2 flex gap-3 text-xs">
+      {(selected.studentPage??1)>1&&<Link to="/admissions/intake" search={{...selected,studentPage:(selected.studentPage??1)-1}} className="underline">Previous students</Link>}
+      <span>Student directory page {selected.studentPage??1}</span>
+      {data.existingStudentHasMore&&<Link to="/admissions/intake" search={{...selected,studentPage:(selected.studentPage??1)+1}} className="underline">Next students</Link>}
+     </nav>
      <span className="mt-1 block text-xs text-muted-foreground">
       Existing students reuse their identity and managing guardian. Existing households are preserved. Creating an inquiry does not activate enrollment.
      </span>
