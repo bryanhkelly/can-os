@@ -85,6 +85,7 @@ export const postgresFinanceStore: FinanceStore = {
       }
       const events = await tx.select({ provider: financeProviderEvents.provider, eventId: financeProviderEvents.eventId })
         .from(financeProviderEvents).where(eq(financeProviderEvents.invoiceId, invoice.id));
+      if (invoice.provider && invoice.provider !== event.provider) throw new Error("Processor identity conflict");
       const current = project(invoice, events.map(e => e.provider + ":" + e.eventId));
       const next = applyVerifiedEvent(current, event);
       const [inserted] = await tx.insert(financeProviderEvents).values({
@@ -96,6 +97,7 @@ export const postgresFinanceStore: FinanceStore = {
       await tx.update(financeInvoices).set({
         capturedCents: next.capturedCents, refundedCents: next.refundedCents,
         chargebackCents: next.chargebackCents, providerPaymentId: next.providerPaymentId ?? null,
+        provider: event.provider,
         updatedAt: new Date(),
       }).where(eq(financeInvoices.id, invoice.id));
       if (event.kind === "payment_succeeded" || event.kind === "refund_succeeded") {
