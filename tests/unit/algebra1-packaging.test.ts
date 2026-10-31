@@ -9,8 +9,8 @@ describe("CAN Algebra I packaging controls", () => {
   it("reports actual authored coverage and refuses to mark full-year ready", () => {
     const coverage = JSON.parse(run("--report"));
     expect(coverage).toMatchObject({
-      targetWeeks: 36, authoredWeeks: 2, authoredLessons: 10,
-      plannedLessons: 180, unwrittenLessons: 170,
+      targetWeeks: 36, authoredWeeks: 3, authoredLessons: 15,
+      plannedLessons: 180, unwrittenLessons: 165,
       creditStatus: "not_credit_ready", publisherAdoption: "not_authorized",
     });
   });
