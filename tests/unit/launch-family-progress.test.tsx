@@ -12,7 +12,7 @@ vi.mock("@/components/operations/FamilyInviteImporter", () => ({
 }));
 
 type Workspace = Awaited<ReturnType<typeof listFamilyInvitations>>;
-const batch = (programId:string, siteId:string) => ({
+const batch = (programId:string, siteId:string): Workspace["batches"][number] => ({
   id:programId+"-batch",programId,siteId,programName:"School",subject:"Welcome",
   introduction:"Hello",createdAt:"2026-10-31T00:00:00.000Z",
   status:"complete" as const,purpose:"interest" as const,outboxStatus:"processed" as const,
@@ -26,11 +26,24 @@ function view(workspace:Workspace|null,programId="a",siteId="site"){
 }
 describe("launch family outreach progress",()=>{
   it("uses saved program and site scoped invitation records without calling provider acceptance delivery",()=>{
-    const html=view({programs:[],batches:[batch("a","site"),batch("b","site")]} as Workspace);
+    const html=view({programs:[],batches:[batch("a","site"),batch("b","site")]});
     expect(html).toContain("Saved invitation batches");
     expect(html).toContain("Accepted by provider");
     expect(html).toContain("Provider acceptance is not confirmed inbox delivery");
     expect(html).toContain(">1</strong>Saved invitation batches");
+  });
+  it("isolates the selected site when a program has invitation batches at multiple sites",()=>{
+    const html=view({programs:[],batches:[batch("a","site"),batch("a","other-site")]});
+    expect(html).toContain(">1</strong>Saved invitation batches");
+    expect(html).toContain(">1</strong>Accepted by provider");
+  });
+  it("distinguishes failed batches and queued recipients from completed delivery",()=>{
+    const failed={...batch("a","site"),outboxStatus:"failed" as const,
+      recipients:[{...batch("a","site").recipients[0]!,status:"retrying" as const}]};
+    const html=view({programs:[],batches:[failed]});
+    expect(html).toContain(">1</strong>Queued or retrying");
+    expect(html).toContain(">0</strong>Accepted by provider");
+    expect(html).toContain("need delivery review");
   });
   it("does not treat unavailable invitation history as a successful send",()=>{
     const html=view(null);
