@@ -81,6 +81,7 @@ jobs:
         run: npm run db:migrate
       - name: Run connected admissions integration
         env:
+          DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
           TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
         run: npm run test:integration:admissions
       - name: Verify complete cross-role school transaction
@@ -91,6 +92,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run authenticated admissions browser acceptance
         env:
+          DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
           TEST_DATABASE_URL: ${{ secrets.CAN_ADMISSIONS_TEST_DATABASE_URL }}
         run: npm run test:e2e:admissions
       - name: Verify connected launch, admission, instruction, guardian, and operations browser journey
