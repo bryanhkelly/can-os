@@ -7,14 +7,15 @@ import {LoaderFailure} from "@/lib/loader-failure";
 import {RegistrarEnrollmentFormReview} from "@/components/enrollment/EnrollmentForm";
 import {FamilyReadinessOverviewCard} from "@/components/admissions/FamilyReadinessOverviewCard";
 import {familyRequirementKey,isEnrollmentDocumentCandidate} from "@/components/admissions/family-document-state";
-const loadFamilyReadiness=(selection:{siteId?:string;programId?:string}={})=>getFamilyReadiness({data:selection});
+const loadFamilyReadiness=(selection:{siteId?:string;programId?:string;page?:number}={})=>getFamilyReadiness({data:selection});
 export const Route=createFileRoute("/admissions/families")({
- validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string}=>({
+ validateSearch:(search:Record<string,unknown>):{siteId?:string;programId?:string;application?:string;page?:number}=>({
+  page:typeof search.page==="number"&&Number.isSafeInteger(search.page)&&search.page>0?search.page:1,
   siteId:typeof search.siteId==="string"?search.siteId:undefined,
   programId:typeof search.programId==="string"?search.programId:undefined,
   application:typeof search.application==="string"?search.application:undefined,
  }),
- loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
+ loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId,page:search.page}),
  loader:({deps})=>safeLoader(()=>loadFamilyReadiness(deps),{
   authMessage:"Sign in with an authorized registrar account to view family enrollment readiness.",
  })(),
@@ -128,6 +129,12 @@ function FamiliesView({apps}:{apps:Awaited<ReturnType<typeof loadFamilyReadiness
    </article>)}</div>
   </section>)}
   {!families.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No family enrollment cases found in your authorized programs.</p>}
+  <nav aria-label="Family enrollment pages" className="mt-5 flex items-center gap-4 text-sm">
+   {selection.page&&selection.page>1&&<Link to="/admissions/families" search={{...selection,page:selection.page-1}} className="underline">Previous page</Link>}
+   <span>Page {selection.page??1}</span>
+   {apps.length===40&&<Link to="/admissions/families" search={{...selection,page:(selection.page??1)+1}} className="underline">Next page</Link>}
+  </nav>
+
   </div>
  </main>;
 }
