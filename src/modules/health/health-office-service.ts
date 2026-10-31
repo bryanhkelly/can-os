@@ -1,6 +1,8 @@
 import { db } from "@/db/client";
 import {
 guardianRelationships,
+enrollments,
+programs,
 healthComplianceItems,
 healthOfficeVisits,
 healthProfiles,
@@ -15,6 +17,7 @@ assertSiteScope,
 type CommandContext,
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq } from "drizzle-orm";
 
@@ -325,15 +328,31 @@ export async function recordHealthOfficeVisit(
 
       if (!student) throw new Error("StudentProfile not found");
 
+      // Medical notifications require a CURRENT verified guardian and an
+      // active Program enrollment at this health-office Site. Do not notify
+      // an unverified applicant or someone whose child has transferred away.
       const guardians = await tx
         .select({ personId: guardianRelationships.guardianPersonId })
         .from(guardianRelationships)
-        .where(eq(guardianRelationships.studentPersonId, student.personId));
+        .innerJoin(enrollments, and(
+          eq(enrollments.studentProfileId, input.studentProfileId),
+          eq(enrollments.kind, "program"),
+          eq(enrollments.status, "active"),
+        ))
+        .innerJoin(programs, and(
+          eq(programs.id, enrollments.programId),
+          eq(programs.siteId, input.siteId),
+          eq(programs.status, "active"),
+        ))
+        .where(guardianRelationshipPredicate({
+          studentPersonId: student.personId,
+          access: "academic",
+        }));
 
       if (guardians.length > 0) {
         await notifyMany(
           tx,
-          guardians.map(({ personId }) => ({
+          [...new Set(guardians.map(row => row.personId))].map(personId => ({
             recipientPersonId: personId,
             type: "student_sent_home_ill",
             title: "Health office update",
