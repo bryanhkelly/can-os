@@ -40,6 +40,8 @@ export const renderAcademicCredential=createServerFn({method:"GET"})
   const context=await registrar();const {db,s}=await resources();
   const doc=await documentData(db,s,data.kind,data.credentialId);
   if(!context.scope.organizationIds?.includes(doc.issuerId))throw new AuthorizationError("credential issuer");
+  // Generating an official record is a privileged disclosure, even without email.
+  // Do not cache or share the resulting response outside the authorized registrar session.
   const pdf=academicDocumentPdf(doc);
   return {filename:`${data.kind}-${data.credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
  });
