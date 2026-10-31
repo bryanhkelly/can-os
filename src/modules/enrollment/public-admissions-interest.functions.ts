@@ -47,6 +47,7 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       consentAt: publicAdmissionsInterests.contactConsentAt,
       familyStartRequestId: publicAdmissionsInterests.familyStartRequestId,
       emailVerifiedAt: publicFamilyStartRequests.consumedAt,
+      applicationLinkExpiresAt: publicFamilyStartRequests.expiresAt,
       applicationStage: applications.stage,
       applicationSubmittedAt: applications.submittedAt,
       applicationId: publicAdmissionsInterests.applicationId,
@@ -78,6 +79,13 @@ export const listPublicAdmissionsInterests = createServerFn({ method: "GET" })
       convertedAt: row.convertedAt?.toISOString() ?? null,
       consentAt: row.consentAt?.toISOString() ?? null,
       emailVerifiedAt: row.emailVerifiedAt?.toISOString() ?? null,
+      applicationLinkExpiresAt: row.applicationLinkExpiresAt?.toISOString() ?? null,
+      canSendApplicationInvitation: authorized.get(row.programId) === true &&
+        Boolean(row.consentAt) && !row.applicationId &&
+        ["new","contacted"].includes(row.status) &&
+        (!row.familyStartRequestId ||
+          (!row.emailVerifiedAt && !!row.applicationLinkExpiresAt &&
+            row.applicationLinkExpiresAt.getTime() <= Date.now())),
       applicationSubmittedAt: row.applicationSubmittedAt?.toISOString() ?? null,
       admissionsAuthorized: authorized.get(row.programId) === true,
     }));
@@ -114,13 +122,23 @@ export const invitePublicAdmissionsInterestToApply = createServerFn({ method: "P
       throw new Error("This inquiry is no longer available for an application invitation");
     if (!interest.consentAt)
       throw new Error("The adult has not requested follow-up; an imported address is not consent.");
-    if (interest.familyStartRequestId)
-      return { requestId: interest.familyStartRequestId, created: false };
+    if (interest.familyStartRequestId) {
+      const [previous] = await db.select({
+        expiresAt: publicFamilyStartRequests.expiresAt,
+        consumedAt: publicFamilyStartRequests.consumedAt,
+      }).from(publicFamilyStartRequests)
+        .where(eq(publicFamilyStartRequests.id, interest.familyStartRequestId)).limit(1);
+      if (!previous) throw new Error("The previous family invitation is unavailable");
+      // A verified family should proceed to its application; unexpired
+      // challenges are never re-issued and an expired one may be replaced.
+      if (previous.consumedAt || previous.expiresAt.getTime() > Date.now())
+        return { requestId: interest.familyStartRequestId, created: false };
+    }
     const destination = await resolvePrivateFamilyStartDestination(db,interest.programId);
     if (destination.siteId!==interest.siteId || destination.organizationId!==interest.organizationId)
       throw new AuthorizationError("private family application destination");
     const outcome = await requestConsentedInterestFamilyStart(interest.id,
-      sendAccessLinkViaResend,{idempotencyKey:`consented-interest:${interest.id}`});
+      sendAccessLinkViaResend,{idempotencyKey:`consented-interest:${interest.id}:${Math.floor(Date.now() / (10 * 60 * 1000))}`});
     await db.transaction(async tx => {
       const [current] = await tx.select({id:publicAdmissionsInterests.id,
         status:publicAdmissionsInterests.status,contactedAt:publicAdmissionsInterests.contactedAt})
