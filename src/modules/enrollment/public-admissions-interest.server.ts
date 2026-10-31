@@ -2,10 +2,13 @@ import { createHmac } from "node:crypto";
 import { and, desc, eq, gt, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  programPublications, programs, publicAdmissionsInterests,
+  communicationThreads, programPublications, programs, publicAdmissionsInterests,
   sitePublications, sites,
 } from "@/db/schema";
-import { publishableAcademicProgram } from "@/domain/academic-program-publication";
+import { isAcademicMarketingType, publishableAcademicProgram } from "@/domain/academic-program-publication";
+import { normalizeAccessEmail } from "@/domain/access-tokens";
+import { familyInvitationBatchMetadataSchema } from "@/domain/family-invitations";
+import { invitedFamilyInterestInput, type InvitedFamilyInterestInput } from "@/domain/family-recruitment-interest";
 import { publicAdmissionsInterestInput, type PublicAdmissionsInterestInput } from "@/domain/public-admissions-interest";
 import { isPublicSiteSlug } from "@/domain/public-site-address";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -118,6 +121,8 @@ export async function recordPublicAdmissionsInterest(
       contactEmail: data.email,
       emailDigest,
       message: data.message,
+      source: "published_site",
+      contactConsentAt: new Date(),
       status: "new",
     }).onConflictDoNothing().returning({ id: publicAdmissionsInterests.id });
     if (!created) return; // Retry with the same form request ID.
@@ -140,6 +145,94 @@ export async function recordPublicAdmissionsInterest(
       scope: { siteId: matched.siteId, organizationId: matched.organizationId,
         programId: input.programId },
       after: { status: "new", source: "published_site" },
+      context: { anonymous: true },
+    });
+  });
+}
+
+/**
+ * A recipient of a pre-opening invitation voluntarily requests follow-up.
+ * Resolve the invitation's original Program and Site on the server; the
+ * anonymous form cannot select a different school or assert staff consent.
+ * This remains unverified contact data, never a Person or Application.
+ */
+export async function recordInvitedFamilyInterest(input: InvitedFamilyInterestInput): Promise<void> {
+  const data = invitedFamilyInterestInput.parse(input);
+  if (data.website.trim()) return;
+  const pepper = process.env.CAN_ACCESS_TOKEN_PEPPER;
+  if (!pepper || pepper.length < 32) throw new Error("Inquiry security is unavailable");
+  await db.transaction(async tx => {
+    const [batch] = await tx.select({
+      programId: communicationThreads.contextId,
+      metadata: communicationThreads.metadata,
+    }).from(communicationThreads).where(and(
+      eq(communicationThreads.id, data.invitationBatchId),
+      eq(communicationThreads.contextType, "program"),
+    )).for("share").limit(1);
+    const metadata = familyInvitationBatchMetadataSchema.safeParse(batch?.metadata);
+    if (!batch?.programId || !metadata.success ||
+      metadata.data.destination !== "preopening_interest") {
+      throw new Error("This family information invitation is unavailable");
+    }
+    const recipient = metadata.data.recipients.find(row => row.key === data.invitationRecipientKey);
+    if (!recipient || normalizeAccessEmail(recipient.email) !== normalizeAccessEmail(data.email)) {
+      throw new Error("This family information invitation is unavailable");
+    }
+    const [school] = await tx.select({
+      siteId: sites.id, organizationId: sites.organizationId,
+      programSiteId: programs.siteId, programOrganizationId: programs.organizationId,
+      type: programs.type, status: programs.status,
+    }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
+      .where(eq(programs.id, batch.programId))
+      .for("share", { of: [programs, sites] }).limit(1);
+    // Preserve a response to a valid pre-opening invitation when the Program
+    // has since opened; never use that historical invitation to open admissions.
+    if (!school || school.siteId !== metadata.data.siteId ||
+      school.programSiteId !== school.siteId ||
+      school.organizationId !== school.programOrganizationId ||
+      !isAcademicMarketingType(school.type) ||
+      !["draft", "launching", "ready", "active"].includes(school.status)) {
+      throw new Error("This family information invitation is unavailable");
+    }
+    const digest = createHmac("sha256", pepper)
+      .update(school.siteId).update(":").update(batch.programId)
+      .update(":").update(data.email).digest("hex");
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${data.invitationRecipientKey}))`);
+    const [prior] = await tx.select({ id: publicAdmissionsInterests.id })
+      .from(publicAdmissionsInterests).where(and(
+        eq(publicAdmissionsInterests.invitationBatchId, data.invitationBatchId),
+        eq(publicAdmissionsInterests.invitationRecipientKey, data.invitationRecipientKey),
+      )).limit(1);
+    if (prior) return;
+    const now = new Date();
+    const [created] = await tx.insert(publicAdmissionsInterests).values({
+      requestId: data.requestId,
+      siteId: school.siteId, programId: batch.programId,
+      contactFirstName: data.firstName, contactLastName: data.lastName,
+      contactEmail: data.email, emailDigest: digest, message: data.message,
+      source: "staff_invitation", contactConsentAt: now,
+      invitationBatchId: data.invitationBatchId,
+      invitationRecipientKey: data.invitationRecipientKey,
+      status: "new",
+    }).onConflictDoNothing().returning({ id: publicAdmissionsInterests.id });
+    if (!created) return;
+    await emitEvent(tx, {
+      eventType: EventTypes.PublicAdmissionsInterestReceived,
+      aggregateType: "public_admissions_interest", aggregateId: created.id,
+      siteId: school.siteId, organizationId: school.organizationId,
+      programId: batch.programId,
+      payload: { source: "staff_invitation", status: "new",
+        invitationBatchId: data.invitationBatchId, invitationRecipientKey: data.invitationRecipientKey },
+    });
+    await writeAudit(tx, {
+      action: "admissions.invited_interest.receive",
+      resourceType: "public_admissions_interest", resourceId: created.id,
+      actorPersonId: null,
+      scope: { siteId: school.siteId, organizationId: school.organizationId,
+        programId: batch.programId },
+      after: { status: "new", source: "staff_invitation",
+        invitationBatchId: data.invitationBatchId, invitationRecipientKey: data.invitationRecipientKey,
+        contactConsent: "affirmative" },
       context: { anonymous: true },
     });
   });
