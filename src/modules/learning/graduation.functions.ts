@@ -227,8 +227,11 @@ export const auditIssuedTranscript = createServerFn({method:"GET"})
  .handler(async ({data}) => {
    setResponseHeader("Cache-Control","private, no-store");
    const context=await registrar();const {db,s}=await resources();
+   const [candidate]=await db.select({issuerId:s.transcriptIssuances.issuingOrganizationId})
+     .from(s.transcriptIssuances).where(eq(s.transcriptIssuances.id,data.transcriptId)).limit(1);
+   if(!candidate)throw new AuthorizationError("Transcript not found");
+   issuerAuthorized(context,candidate.issuerId);
    const {transcript,requirementSet,evidence}=await transcriptAndRules(db,s,data.transcriptId,data.requirementSetId);
-   issuerAuthorized(context,transcript.issuingOrganizationId);
    return {studentProfileId:transcript.studentProfileId,audit:auditGraduationCredits(requirementSet.requirements as CreditRequirement[],evidence)};
  });
 
