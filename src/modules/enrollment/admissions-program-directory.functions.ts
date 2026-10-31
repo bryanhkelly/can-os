@@ -13,7 +13,7 @@ export const listAdmissionsPrograms=createServerFn({method:"GET"}).handler(async
  assertCapability(actor,"enrollment.decide");
  const ids=actor.scope.programIds??[],siteIds=actor.scope.siteIds??[];
  if(!ids.length||!siteIds.length)return [];
- return db.select({id:programs.id,name:programs.name,siteId:sites.id,siteName:sites.name})
+ return db.select({id:programs.id,name:programs.name,type:programs.type,status:programs.status,siteId:sites.id,siteName:sites.name})
   .from(programs).innerJoin(sites,eq(sites.id,programs.siteId))
   .where(and(inArray(programs.id,ids),inArray(sites.id,siteIds)))
   .orderBy(asc(programs.name));

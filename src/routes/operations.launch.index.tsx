@@ -6,6 +6,8 @@ import { OneHourSchoolLaunch } from "@/components/operations/OneHourSchoolLaunch
 import {LaunchAcademicYearStep} from "@/components/operations/LaunchAcademicYearStep";
 import {LaunchWebsiteStep} from "@/components/operations/LaunchWebsiteStep";
 import {resolveLaunchResume} from "@/domain/launch-resume";
+import {listAdmissionsPrograms} from "@/modules/enrollment/admissions-program-directory.functions";
+import {SchoolPreparationNavigation} from "@/components/operations/SchoolPreparationNavigation";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { useEffect, useState } from "react";
 import { programTypes, programTypeLabels, isExtendedLearningType } from "@/domain/program-offerings";
@@ -27,20 +29,22 @@ import {
 const grades = ["TK", "K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 
 export const Route = createFileRoute("/operations/launch/")({
-  loader: async () => {
+  loaderDeps:({search})=>({siteId:search.siteId,programId:search.programId}),
+  loader: async ({deps}) => {
     try {
       return {
         options: await listLaunchOptions(),
         launches: await listLaunches(),
+        preparationPrograms:await listAdmissionsPrograms().catch(()=>null),
         familyInvitations: await listFamilyInvitations().catch(() => null),
         admissions: await listAdmissionsIntake().catch(() => null),
-        enrollmentCounts: await getActiveEnrollmentCounts({data:{}}).catch(() => null),
+        enrollmentCounts: await getActiveEnrollmentCounts({data:deps}).catch(() => null),
         // A pending migration for extended programs must not prevent core school launch.
         extendedPlanning: await listExtendedSeasonPlanning().catch(() => null),
         authError: "",
       };
     } catch {
-      return { options: null, launches: null, familyInvitations: null, admissions: null, enrollmentCounts: null, extendedPlanning: null, authError: "Sign in with an authorized registrar account to manage program launches." };
+      return { options: null, launches: null, preparationPrograms:null, familyInvitations: null, admissions: null, enrollmentCounts: null, extendedPlanning: null, authError: "Sign in with an authorized registrar account to manage program launches." };
     }
   },
   component: LaunchWizardPage,
@@ -48,9 +52,10 @@ export const Route = createFileRoute("/operations/launch/")({
 
 function LaunchWizardPage() {
   const selection=Route.useSearch();
-  const { options, launches, familyInvitations, admissions, enrollmentCounts, extendedPlanning, authError }: {
+  const { options, launches, preparationPrograms, familyInvitations, admissions, enrollmentCounts, extendedPlanning, authError }: {
     options: Awaited<ReturnType<typeof listLaunchOptions>> | null;
     launches: Awaited<ReturnType<typeof listLaunches>> | null;
+    preparationPrograms:Awaited<ReturnType<typeof listAdmissionsPrograms>>|null;
     familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
     admissions: Awaited<ReturnType<typeof listAdmissionsIntake>> | null;
     enrollmentCounts: Awaited<ReturnType<typeof getActiveEnrollmentCounts>> | null;
@@ -238,7 +243,12 @@ function LaunchWizardPage() {
   }
 
   const currentLaunch=resolveLaunchResume(launches.launches,selection).launch;
-  const invitationSiteId = selection.siteId ?? currentLaunch?.siteId ?? undefined;
+  const schools=(preparationPrograms??[]).filter(program=>["draft","launching","ready","active"].includes(program.status));
+  const currentSchool=resolveLaunchResume(schools,selection).launch;
+  const currentProgram=currentSchool??currentLaunch;
+  const schoolSelection={siteId:selection.siteId??currentProgram?.siteId??undefined,programId:selection.programId??currentProgram?.id};
+  const hasSchoolPreparation=schools.length>0||launches.launches.length>0;
+  const invitationSiteId = schoolSelection.siteId;
   return (
     <WorkspaceShell width="wide" eyebrow="CAN OS · Program launch" title="Open Your School"
       subtitle="Set up your school, invite families, publish your school page, and see exactly what remains before opening."
@@ -248,9 +258,10 @@ function LaunchWizardPage() {
         {error && (
           <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
         )}
-        <OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
+        <SchoolPreparationNavigation schools={schools} selected={currentSchool} onSelect={school=>void router.navigate({to:"/operations/launch",search:{siteId:school.siteId,programId:school.id}})}/>
+        {currentSchool?.status!=="active"&&<OneHourSchoolLaunch key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} launches={launches.launches} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>}
         {currentLaunch&&!isExtendedLearningType(currentLaunch.type)&&<LaunchAcademicYearStep programId={currentLaunch.id}/>}
-        {currentLaunch&&<LaunchWebsiteStep programId={currentLaunch.id}/>}
+        {currentProgram&&<LaunchWebsiteStep programId={currentProgram.id}/>}
 
         <details className="mt-4 rounded-xl border bg-card p-4">
           <summary className="cursor-pointer text-sm font-semibold">Choose who helps prepare your school</summary>
@@ -261,31 +272,31 @@ function LaunchWizardPage() {
           </nav>
         </details>
 
-        {launches.launches.length>0&&admissions&&<section aria-label="Admissions progress" className="mt-5 rounded-xl border bg-card p-4">
+        {hasSchoolPreparation&&admissions&&<section aria-label="Admissions progress" className="mt-5 rounded-xl border bg-card p-4">
           <h2 className="text-sm font-semibold">Admissions progress</h2>
           <p className="mt-1 text-xs text-muted-foreground">Current application records for the selected school; invitation responses are tracked separately.</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!selection.programId||row.programId===selection.programId)&&(!selection.siteId||row.siteId===selection.siteId)).length}</strong>Applications recorded</p>
-            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!selection.programId||row.programId===selection.programId)&&(!selection.siteId||row.siteId===selection.siteId)&&row.stage==="accepted").length}</strong>Accepted applications</p>
-            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!selection.programId||row.programId===selection.programId)&&(!selection.siteId||row.siteId===selection.siteId)&&["inquiry","application","eligibility"].includes(row.stage)).length}</strong>Awaiting decision</p>
+            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!schoolSelection.programId||row.programId===schoolSelection.programId)&&(!schoolSelection.siteId||row.siteId===schoolSelection.siteId)).length}</strong>Applications recorded</p>
+            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!schoolSelection.programId||row.programId===schoolSelection.programId)&&(!schoolSelection.siteId||row.siteId===schoolSelection.siteId)&&row.stage==="accepted").length}</strong>Accepted applications</p>
+            <p className="rounded-lg border p-3 text-sm"><strong className="block text-2xl">{admissions.filter(row=>(!schoolSelection.programId||row.programId===schoolSelection.programId)&&(!schoolSelection.siteId||row.siteId===schoolSelection.siteId)&&["inquiry","application","eligibility"].includes(row.stage)).length}</strong>Awaiting decision</p>
           </div>
         </section>}
-        {launches.launches.length>0&&enrollmentCounts&&<section aria-label="Confirmed student enrollment" className="mt-3 rounded-xl border bg-card p-4">
+        {hasSchoolPreparation&&enrollmentCounts&&<section aria-label="Confirmed student enrollment" className="mt-3 rounded-xl border bg-card p-4">
           <h2 className="text-sm font-semibold">Confirmed enrollment</h2>
           <p className="mt-1 text-xs text-muted-foreground">Distinct students with active program enrollments, including those enrolled without an admissions application. Counts are across authorized programs when no program is selected.</p>
-          <p className="mt-3 text-sm"><strong className="mr-2 text-2xl">{enrollmentCounts.filter(row=>!selection.programId||row.programId===selection.programId).reduce((total,row)=>total+row.activeStudents,0)}</strong>Active program enrollments</p>
-          <Link to="/admissions" search={{siteId:selection.siteId,programId:selection.programId,application:undefined}} className="mt-2 inline-block text-sm font-semibold underline">Review enrollment records</Link>
+          <p className="mt-3 text-sm"><strong className="mr-2 text-2xl">{enrollmentCounts.filter(row=>!schoolSelection.programId||row.programId===schoolSelection.programId).reduce((total,row)=>total+row.activeStudents,0)}</strong>Active program enrollments</p>
+          <Link to="/admissions" search={{siteId:schoolSelection.siteId,programId:schoolSelection.programId,application:undefined}} className="mt-2 inline-block text-sm font-semibold underline">Review enrollment records</Link>
         </section>}
-        {launches.launches.length>0&&<nav aria-label="Family enrollment handoff" className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
+        {hasSchoolPreparation&&<nav aria-label="Family enrollment handoff" className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
           <span className="text-sm font-semibold">After inviting families</span>
-          <Link to="/admissions/intake" search={{siteId:selection.siteId,programId:selection.programId}}
+          <Link to="/admissions/intake" search={{siteId:schoolSelection.siteId,programId:schoolSelection.programId}}
             className="text-sm font-semibold underline">Review inquiries and applications</Link>
-          <Link to="/admissions" search={{siteId:selection.siteId,programId:selection.programId,application:undefined}}
+          <Link to="/admissions" search={{siteId:schoolSelection.siteId,programId:schoolSelection.programId,application:undefined}}
             className="text-sm font-semibold underline">Manage offers and enrollment</Link>
         </nav>}
-        {launches.launches.length>0&&<details open className="mt-5 rounded-xl border bg-card p-5">
+        {hasSchoolPreparation&&<details open className="mt-5 rounded-xl border bg-card p-5">
           <summary className="cursor-pointer text-sm font-semibold">Family invitations and outreach progress</summary>
-          <FamilyInviteImporter key={`${selection.siteId ?? ""}:${selection.programId ?? ""}`} workspace={familyInvitations} selectedProgramId={selection.programId} selectedSiteId={selection.siteId}/>
+          <FamilyInviteImporter key={`${schoolSelection.siteId ?? ""}:${schoolSelection.programId ?? ""}`} workspace={familyInvitations} selectedProgramId={schoolSelection.programId} selectedSiteId={schoolSelection.siteId}/>
         </details>}
 
         <details className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Advanced · Launch portfolio and detailed records</summary>
@@ -293,7 +304,7 @@ function LaunchWizardPage() {
         </details>
         <div className="mt-8 grid gap-6">
           {extendedPlanning ? <ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId} /> : <p role="status" className="rounded-lg border p-3 text-sm">Extended-learning planning is unavailable. Verify database migrations 0032–0033; school launches remain accessible.</p>}
-          <details id="new-school-launch" className="rounded-xl border bg-card p-5" open={launches.launches.length===0}>
+          <details id="new-school-launch" className="rounded-xl border bg-card p-5" open={!hasSchoolPreparation}>
             <summary className="cursor-pointer text-lg font-semibold">Launch a school · School Basics</summary>
             {created && <div role="status" className="mt-4 rounded-lg border p-3 text-sm">
               <p>Launch started. Program <code>{created.programId}</code> with Launch Journey{" "}
