@@ -5,7 +5,8 @@ import {curriculumAnnualAdoptions} from "@/db/schema/curriculum-year-adoptions";
 import {AuthorizationError} from "@/domain/command-context";
 import {hasInstitutionalProgramCapability} from "@/modules/identity/institutional-capability.server";
 import type {Actor} from "@/modules/identity/actors.server";
-import {writeAudit,emitEvent} from "@/platform/mutation";
+import {emitEvent} from "@/platform/mutation";
+import {recordAudit} from "@/modules/identity/actors.server";
 import {annualAdoptionEligible} from "@/domain/curriculum-year-policy";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -82,8 +83,8 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
    packId:input.packId,packVersionId:version.id,entitlementId:entitlement.id,createdByPersonId:actor.actorPersonId,
   }).returning({id:curriculumAnnualAdoptions.id});
   if(!row)throw new Error("Unable to create annual curriculum adoption.");
-  await writeAudit(tx,actor,{action:"curriculum.adoption.year_rollover",entityType:"curriculum_annual_adoption",
-   entityId:row.id,scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
+  await recordAudit(tx,actor,{action:"curriculum.adoption.year_rollover",resourceType:"curriculum_annual_adoption",
+   resourceId:row.id,scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
    after:{academicYearId:input.year.id,packId:input.packId,packVersionId:version.id,entitlementId:entitlement.id}});
   await emitEvent(tx,{eventType:"curriculum.adoption.year_rolled_over",aggregateType:"curriculum_annual_adoption",
    aggregateId:row.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,
@@ -118,8 +119,8 @@ export async function rollbackAnnualCurriculumAdoption(actor:Actor,input:{
    .where(and(eq(curriculumAnnualAdoptions.id,existing.id),eq(curriculumAnnualAdoptions.status,"active")))
    .returning({id:curriculumAnnualAdoptions.id});
   if(!changed)throw new Error("Concurrent annual adoption change; retry after refreshing.");
-  await writeAudit(tx,actor,{action:"curriculum.adoption.year_rollback",
-   entityType:"curriculum_annual_adoption",entityId:existing.id,
+  await recordAudit(tx,actor,{action:"curriculum.adoption.year_rollback",
+   resourceType:"curriculum_annual_adoption",resourceId:existing.id,
    scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
    before:{status:existing.status,packVersionId:existing.packVersionId},
    after:{status:"rolled_back",reason:input.reason.trim(),academicYearId:input.academicYearId}});
