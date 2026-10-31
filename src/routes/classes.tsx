@@ -1,3 +1,4 @@
+import { ClassDirectoryCards } from "@/components/learning/ClassDirectoryCards";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
@@ -36,12 +37,7 @@ function ClassesPage() {
   if (workspace) return <ClassWorkspace key={`${workspace.section.id}:${workspace.studentPersonId}`} data={workspace} tab={search.tab} lessonId={search.lesson}/>;
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Learning" title={directory.role === "guardian" ? "Your family's classes" : "My classes"}
     subtitle="Published learning, class updates and the teaching team, backed by your current relationships and enrollment.">
-    <div className="mt-7 grid gap-4 md:grid-cols-2">{directory.classes.map(section => <WorkspacePanel
-      key={`${section.id}:${section.studentPersonId}`} title={section.title} description={directory.role === "guardian" ? section.studentName ?? section.code : section.code}>
-      <Link to="/classes" search={{ section: section.id, student: directory.role === "guardian" ? section.studentPersonId ?? undefined : undefined }}
-        className="inline-block rounded-lg bg-foreground px-4 py-2 text-sm text-background">Open class</Link>
-    </WorkspacePanel>)}</div>
-    {!directory.classes.length && <p role="status" className="mt-7 rounded-xl border p-5 text-sm">No active classes are available in this membership.</p>}
+    <ClassDirectoryCards classes={directory.classes} role={directory.role} />
   </WorkspaceShell>;
 }
 
