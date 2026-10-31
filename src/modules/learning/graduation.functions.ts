@@ -60,7 +60,7 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
     .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.enrollments.schoolYearId))
     .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
     .where(and(eq(s.enrollments.studentProfileId,transcript.studentProfileId),
-      eq(s.enrollments.kind,"program"),inArray(s.enrollments.status,["active","graduated","completed"])));
+      eq(s.enrollments.kind,"program"),inArray(s.enrollments.status,["active","graduated"])));
   const institutional=enrollments.filter(row=>row.issuer===transcript.issuingOrganizationId)
     .sort((x,y)=>x.yearStarts.localeCompare(y.yearStarts));
   if(!institutional.length) throw new AuthorizationError("Institutional entry cohort not established");
@@ -81,7 +81,7 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
 }
 
 export const approveGraduationRequirements = createServerFn({method:"POST"})
- .validator((input:unknown) => z.object({issuerId:uuid,academicYear:z.string().min(4).max(40),version:z.string().min(1).max(40),cohortStart:z.string().regex(/^\\d{4}$/),cohortEnd:z.string().regex(/^\\d{4}$/),supersedesRequirementSetId:uuid.optional(),applicabilityReason:z.string().trim().min(12).max(1000),requirements:rules}).parse(input))
+ .validator((input:unknown) => z.object({issuerId:uuid,academicYear:z.string().min(4).max(40),version:z.string().min(1).max(40),cohortStart:z.string().regex(/^[0-9]{4}$/),cohortEnd:z.string().regex(/^[0-9]{4}$/),supersedesRequirementSetId:uuid.optional(),applicabilityReason:z.string().trim().min(12).max(1000),requirements:rules}).parse(input))
  .handler(async ({data}) => {
    const context = await registrar(); issuerAuthorized(context,data.issuerId);
    const checked = auditGraduationCredits(data.requirements,[]);
