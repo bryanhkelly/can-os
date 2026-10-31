@@ -67,3 +67,6 @@ For a separately provisioned **nonproduction** disabled-host fixture, optionally
 
 
 **Canonical domain safety:** The current domain routing and origin authorization accept only `*.can-os.com`. The external smoke script now fails before network access when `CAN_PUBLIC_SMOKE_DOMAIN` differs from `can-os.com`, and requires distinct published school names. Supporting another domain requires an explicit coordinated domain-routing change and independent Netlify DNS/TLS approval; it is not enabled by changing a smoke-test environment variable.
+
+
+**Certificate evidence in automated acceptance:** The smoke script now establishes separate verified Node TLS connections with SNI to both published tenant hosts before HTTP checks. It records each verified peer certificate's SHA-256 fingerprint, subject, SANs and validity interval in the exact-SHA acceptance artifact. An invalid or unavailable certificate fails acceptance; this is evidence of the checked origin's certificate, not proof of Netlify account ownership. The read-only smoke also checks GET denial on `/apply`, `/inquiry`, and internal POST-only handlers. A successful GET denial does not replace the separate approved synthetic-contact POST/email safety test.
