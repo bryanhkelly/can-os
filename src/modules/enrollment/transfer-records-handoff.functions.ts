@@ -8,6 +8,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { listDelegatedCANTranscriptPrograms } from "@/modules/learning/can-transcript-scope.server";
 import { emitEvent, notify, writeAudit } from "@/platform/mutation";
 
 const kind="transfer_academic_records_handoff";
@@ -17,9 +18,8 @@ async function authorizedRegistrar(){
  if(actor.role!=="registrar"||!actor.actorPersonId||actor.demoFacilitator)
    throw new AuthorizationError("verified school records registrar");
  assertCapability(actor,"enrollment:manage");
- if(!actor.scope.organizationIds?.length||!actor.scope.siteIds?.length||
-    !actor.scope.programIds?.length)
-   throw new AuthorizationError("institutional records scope");
+ if(!actor.scope.organizationIds?.length)
+   throw new AuthorizationError("institutional records organization grant");
  return actor;
 }
 
