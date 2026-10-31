@@ -48,6 +48,28 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
   const [requirementSet] = await db.select().from(s.graduationRequirementSets).where(eq(s.graduationRequirementSets.id,requirementSetId)).limit(1);
   if (!transcript || !requirementSet || transcript.issuingOrganizationId !== requirementSet.issuingOrganizationId)
     throw new AuthorizationError("matched transcript and approved requirements");
+  // A requirements version is applicable only if it is the sole approved
+  // version for the student's active institutional academic year. Fail closed
+  // on ambiguous enrollment years or competing approved versions.
+  const enrollments = await db.select({yearId:s.schoolYears.id, yearName:s.schoolYears.name,
+    yearKey:s.schoolYears.key, yearStarts:s.schoolYears.startsOn,
+    yearEnds:s.schoolYears.endsOn, issuer:s.programs.creditIssuingOrganizationId})
+    .from(s.enrollments)
+    .innerJoin(s.schoolYears,eq(s.schoolYears.id,s.enrollments.schoolYearId))
+    .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
+    .where(and(eq(s.enrollments.studentProfileId,transcript.studentProfileId),
+      eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
+  const matching = enrollments.filter(row=>row.issuer===transcript.issuingOrganizationId &&
+    [row.yearName,row.yearKey,`${row.yearStarts.slice(0,4)}-${row.yearEnds.slice(0,4)}`].includes(requirementSet.academicYear));
+  if(matching.length!==1 || enrollments.some(row=>row.issuer===transcript.issuingOrganizationId &&
+      row.yearId!==matching[0]?.yearId))
+    throw new AuthorizationError("No unambiguous applicable graduation academic-year policy for student");
+  const approved = await db.select({id:s.graduationRequirementSets.id})
+    .from(s.graduationRequirementSets).where(and(
+      eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId),
+      eq(s.graduationRequirementSets.academicYear,requirementSet.academicYear)));
+  if(approved.length!==1 || approved[0]?.id!==requirementSet.id)
+    throw new AuthorizationError("Graduation policy version is ambiguous; institutional review required");
   return { transcript, requirementSet, evidence: evidenceFromSnapshot(transcript.snapshot, transcript.issuingOrganizationId) };
 }
 
