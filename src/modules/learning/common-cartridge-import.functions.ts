@@ -362,3 +362,57 @@ export const finishCommonCartridgeStaticLessonImport=createServerFn({method:"POS
    return {importId:job.id,status:"mapped" as const,imported:1,resourceId:data.resourceId};
   });
  });
+
+/** Read a Section's imported static lesson without exposing an R2 URL.
+ * The caller must retain institutional publisher access to the same Program
+ * and Site; returned text must only be rendered inside a sandboxed iframe. */
+export const readCommonCartridgeStaticLesson=createServerFn({method:"GET"})
+ .validator((value:unknown)=>z.object({
+   programId:z.string().uuid(),sectionId:z.string().uuid(),resourceId:z.string().uuid(),
+ }).strict().parse(value))
+ .handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const {program}=await authorizeHtmlSection(data.programId,data.sectionId);
+  const [resource]=await db.select({id:curriculumResources.id,
+    metadata:curriculumResources.metadata,documentId:curriculumResources.documentId})
+    .from(curriculumResources).where(and(eq(curriculumResources.id,data.resourceId),
+      eq(curriculumResources.ownerOrganizationId,program.organizationId))).limit(1);
+  if(!resource||resource.metadata.sectionId!==data.sectionId||
+     resource.metadata.programId!==program.id||
+     resource.metadata.source!=="common_cartridge_static_html"||!resource.documentId)
+   throw new AuthorizationError("Section-scoped static lesson");
+  const [document]=await db.select({storageKey:documents.storageKey,
+    mimeType:documents.mimeType}).from(documents)
+    .where(eq(documents.id,resource.documentId)).limit(1);
+  if(!document?.storageKey||document.mimeType!=="text/html"||
+     !htmlKeyPattern.test(document.storageKey))
+   throw new Error("Imported lesson storage is unavailable.");
+  const response=await fetch(signPrivateObjectUrl({method:"GET",
+    key:document.storageKey,keyPattern:htmlKeyPattern,expiresSeconds:30}));
+  if(!response.ok)throw new Error("Unable to retrieve private lesson.");
+  const declared=Number(response.headers.get("content-length"));
+  if(!Number.isInteger(declared)||declared<1||declared>128*1024)
+   throw new Error("Stored lesson has invalid size.");
+  const reader=response.body?.getReader();
+  if(!reader)throw new Error("Stored lesson has no response body.");
+  const chunks:Uint8Array[]=[];
+  let total=0;
+  try{
+   while(true){
+    const {done,value}=await reader.read();
+    if(done)break;
+    total+=value.length;
+    if(total>128*1024)throw new Error("Stored lesson exceeds maximum size.");
+    chunks.push(value);
+   }
+  }finally{
+   await reader.cancel();
+   reader.releaseLock();
+  }
+  const bytes=Buffer.concat(chunks,total);
+  const digest=createHash("sha256").update(bytes).digest("hex");
+  if(total!==declared||digest!==resource.metadata.sanitizedSha256)
+   throw new Error("Stored lesson integrity verification failed.");
+  return {title:"Imported static lesson",html:bytes.toString("utf8"),
+    sha256:digest,rendering:"sandboxed-iframe-only" as const};
+ });
