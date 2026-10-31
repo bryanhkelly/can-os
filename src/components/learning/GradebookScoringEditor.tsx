@@ -10,7 +10,7 @@ export function GradebookScoringEditor({
  onScoreChange, onCommentChange, onRubricChange, onSaveDraft, onPostGrade, liveTotal,
 }:{
  assessment:Assessment;score:string;comment:string;rubricInputs:Record<string,string>;
- busy:boolean;sectionId:string;liveTotal:number;
+ busy:boolean;sectionId:string;liveTotal:number|null;
  onScoreChange:(score:string)=>void;onCommentChange:(comment:string)=>void;
  onRubricChange:(id:string,value:string)=>void;onSaveDraft:()=>void;onPostGrade:()=>void;
 }) {
