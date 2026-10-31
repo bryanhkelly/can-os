@@ -365,6 +365,13 @@
       "when": 1793407200000,
       "tag": "0051_church_onboarding_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1793410800000,
+      "tag": "0052_family_recruitment_relationship",
+      "breakpoints": true
     }
   ]
 }
