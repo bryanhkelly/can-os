@@ -493,14 +493,18 @@ export async function startFamilyApplication(
       // account were verified above; the child's guardian relationship remains
       // pending unless an existing verified relationship was explicitly reused.
       const [interest] = await tx.select({id:publicAdmissionsInterests.id,
-        status:publicAdmissionsInterests.status}).from(publicAdmissionsInterests)
+        status:publicAdmissionsInterests.status,source:publicAdmissionsInterests.source}).from(publicAdmissionsInterests)
         .where(and(
           eq(publicAdmissionsInterests.programId,program.id),
           eq(publicAdmissionsInterests.siteId,program.siteId),
           inArray(publicAdmissionsInterests.status,["new","contacted"]),
           isNull(publicAdmissionsInterests.applicationId),
+          isNotNull(publicAdmissionsInterests.contactConsentAt),
           sql`lower(btrim(${publicAdmissionsInterests.contactEmail})) = ${familyStart.email}`,
-        )).orderBy(desc(publicAdmissionsInterests.createdAt)).for("update").limit(1);
+        )).orderBy(
+          sql`CASE WHEN ${publicAdmissionsInterests.familyStartRequestId} = ${familyStart.id} THEN 0 ELSE 1 END`,
+          desc(publicAdmissionsInterests.createdAt),
+        ).for("update").limit(1);
       if (interest) {
         const now = new Date();
         await tx.update(publicAdmissionsInterests).set({applicationId:application.id,
@@ -510,7 +514,7 @@ export async function startFamilyApplication(
           origin:"authenticated_guardian_application",
           guardianVerification:reusedVerifiedStudent ? "verified" : "pending",
           contactPersonId:actorPersonId,studentIdentityReused:reusedVerifiedStudent,
-          source:"published_site",siteId:program.siteId,
+          source:interest.source,siteId:program.siteId,
           ...(originTransfer?{
             originTransferActionId:originTransfer.actionId,
             originTransferProgramId:originTransfer.programId,
