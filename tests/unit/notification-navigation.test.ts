@@ -111,6 +111,7 @@ describe("authorized notification destinations",()=>{
   });
   it("deep-links a field trip permission request to its workspace",async()=>{
     notification("field_trip","trip","field_trip_permission_requested");
+    state.rows.field_trips=[{id:"trip"}];
     expect((await getNotifications())[0]?.href).toBe("/guardian/field-trips");
   });
   it("withholds guardian approval destinations from other roles",async()=>{
