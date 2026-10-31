@@ -154,7 +154,11 @@ function GuardianAttendancePage() {
               <p className="rounded-lg bg-muted p-3 text-sm">Your excuse: {absence.excuse.reason}</p>
               <p className="mt-2 text-xs text-muted-foreground">{docCounts[absence.attendanceEventId] ?? 0} document(s) attached</p>
               {absence.excuse.status === "approved" && <p className="mt-2 text-sm">Approved — this day now counts as excused.</p>}
-              {absence.excuse.status === "rejected" && <p className="mt-2 text-sm">Rejected by the school.{absence.excuse.reviewNote ? ` Note: ${absence.excuse.reviewNote}` : ""}</p>}
+              {absence.excuse.status === "rejected" && <div className="mt-2 rounded-lg border p-3 text-sm">
+                <p className="font-semibold">The school rejected this excuse.</p>
+                {absence.excuse.reviewNote && <p className="mt-2 whitespace-pre-wrap">School note: {absence.excuse.reviewNote}</p>}
+                <p className="mt-2 text-muted-foreground">Review the reason with your school if this attendance mark still needs to be corrected. This reviewed excuse cannot be submitted again from this page.</p>
+              </div>}
               {absence.excuse.status === "submitted" && <div className="mt-2">
                 <p className="text-sm text-muted-foreground">Waiting for the school to review.</p>
                 <label className="mt-3 block text-sm font-semibold">
