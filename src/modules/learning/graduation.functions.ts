@@ -91,6 +91,19 @@ export const approveGraduationRequirements = createServerFn({method:"POST"})
    });
  });
 
+/** Return only institutions the authenticated registrar can administer. */
+export const listGraduationIssuers=createServerFn({method:"GET"})
+ .handler(async()=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   const context=await registrar();const {db,s}=await resources();
+   const {inArray}=await import("drizzle-orm");
+   const ids=context.scope.organizationIds??[];
+   if(!ids.length)return [];
+   return db.select({id:s.organizations.id,name:s.organizations.name})
+     .from(s.organizations).where(inArray(s.organizations.id,ids))
+     .orderBy(s.organizations.name);
+ });
+
 export const listGraduationRequirements = createServerFn({method:"GET"})
  .validator((input:unknown) => z.object({issuerId:uuid}).parse(input))
  .handler(async ({data}) => {
