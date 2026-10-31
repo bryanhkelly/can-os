@@ -161,6 +161,12 @@ export const getGuardianFamilyApplicationWorkspace = createServerFn({method:"GET
       originProgramId:row.originProgramId,
       originSchoolName:row.originSchoolName,
       destinationSchoolName:row.metadata.destinationSchoolName as string,
+      destinationFamilyStartRequestId:
+        typeof row.metadata.destinationFamilyStartRequestId==="string"?
+        row.metadata.destinationFamilyStartRequestId:null,
+      destinationFamilyStartProgramId:
+        typeof row.metadata.destinationFamilyStartProgramId==="string"?
+        row.metadata.destinationFamilyStartProgramId:null,
       originExited:row.status==="resolved"&&row.metadata.exitCompletedByRegistrar===true,
     }));
     const applicationYearIds=[...new Set(existing.map(row=>
