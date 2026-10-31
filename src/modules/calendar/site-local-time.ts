@@ -26,6 +26,9 @@ export function siteLocalTimeToIso(
   ambiguity: AmbiguousTimePolicy = "reject",
 ): string {
   if (!isValidTimeZone(timezone)) throw new Error("Invalid site timezone");
+  if (ambiguity !== "reject" && ambiguity !== "earlier" && ambiguity !== "later") {
+    throw new Error("Invalid ambiguous time policy");
+  }
   const localAsUtc = parseLocalClock(value);
   const offsets = new Set<number>();
   // Sampling both sides of a transition captures standard and daylight offsets,
