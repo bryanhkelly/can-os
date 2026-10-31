@@ -31,7 +31,7 @@ export function EvidenceDocumentLink({
         throw new Error("Allow pop-ups to open the private document");
       }
     } catch (cause) {
-      popup?.close();
+      try { popup?.close(); } catch { /* Preserve the authorization error. */ }
       setError(cause instanceof Error ? cause.message : "Unable to open private evidence");
     } finally { inFlight.current = false; setBusy(false); }
   }
