@@ -5,7 +5,7 @@ import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { academicDocumentPdf } from "@/domain/academic-document-pdf.server";
-import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential } from "@/domain/academic-credential-release";
+import { canAuthorizeAcademicCredentialRelease, canDownloadAuthorizedCredential, canRedeemTransferCredential } from "@/domain/academic-credential-release";
 import { writeAudit } from "@/platform/mutation";
 
 const uuid=z.string().uuid();
@@ -286,6 +286,45 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   if(!credentialId)throw new AuthorizationError("credential release target");
   const doc=await documentData(db,s,kind,credentialId);
   if(doc.issuerId!==release.issuingOrganizationId)throw new AuthorizationError("credential issuer mismatch");
+  if(kind!=="transcript"||release.releasePurpose!=="transfer")
+   throw new AuthorizationError("Only guardian transfer transcript access is supported");
+  const [student]=await db.select({personId:s.studentProfiles.personId})
+   .from(s.studentProfiles).where(eq(s.studentProfiles.id,doc.studentProfileId)).limit(1);
+  if(!student)throw new AuthorizationError("student identity");
+  const [relationship]=await db.select({id:s.guardianRelationships.id})
+   .from(s.guardianRelationships).where(and(
+    eq(s.guardianRelationships.studentPersonId,student.personId),
+    eq(s.guardianRelationships.guardianPersonId,context.actorPersonId),
+    eq(s.guardianRelationships.canManageEnrollment,true))).limit(1);
+  const [action]=await db.select().from(s.actions).where(and(
+   eq(s.actions.id,release.instructionReference),
+   eq(s.actions.type,"guardian_enrollment_change_request"),
+   eq(s.actions.subjectType,"student_profile"))).limit(1);
+  const [consent]=await db.select().from(s.consentRecords).where(and(
+   eq(s.consentRecords.id,release.consentEvidenceReference),
+   eq(s.consentRecords.subjectType,"student_profile"),
+   eq(s.consentRecords.consentType,"academic_records_transfer_release"))).limit(1);
+  const [program]=action?.programId?await db.select({issuerId:s.programs.creditIssuingOrganizationId})
+   .from(s.programs).where(eq(s.programs.id,action.programId)).limit(1):[];
+  const evidence=consent?.signatureEvidence;
+  if(!canRedeemTransferCredential({
+   consentActive:!!consent&&!consent.revokedAt&&evidence?.acknowledged===true,
+   consentMatchesStudent:consent?.subjectId===doc.studentProfileId&&
+    evidence?.studentPersonId===student.personId,
+   consentMatchesGuardian:consent?.signerPersonId===context.actorPersonId&&
+    evidence?.guardianPersonId===context.actorPersonId,
+   consentMatchesAction:evidence?.actionId===action?.id,
+   consentMatchesDestination:typeof action?.metadata.destinationSchoolName==="string"&&
+    evidence?.destinationSchoolName===action.metadata.destinationSchoolName,
+   consentMatchesProgram:evidence?.programId===action?.programId,
+   relationshipActive:!!relationship,
+   actionResolved:action?.status==="resolved"&&action?.metadata.kind==="transfer",
+   actionMatchesStudent:action?.subjectId===doc.studentProfileId,
+   actionMatchesGuardian:action?.metadata.requestedByGuardianPersonId===context.actorPersonId,
+   actionMatchesConsent:action?.metadata.recordsReleaseConsentId===consent?.id,
+   actionCompleted:action?.metadata.exitCompletedByRegistrar===true,
+   issuerMatches:program?.issuerId===doc.issuerId,
+  }))throw new AuthorizationError("Original transfer consent or guardian authority no longer valid");
   await writeAudit(db,context,{action:"academic_credential.release.download",entityType:"academic_credential_release_authorization",entityId:release.id,scope:{organizationId:release.issuingOrganizationId},after:{recipientPersonId:context.actorPersonId,credentialId}});
   const pdf=academicDocumentPdf(doc);
   return {filename:`${kind}-${credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
