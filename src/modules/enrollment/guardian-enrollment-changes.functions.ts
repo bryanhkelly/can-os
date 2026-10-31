@@ -107,7 +107,7 @@ export const requestGuardianEnrollmentChange=createServerFn({method:"POST"})
          destinationSchoolContactEmail:data.destinationSchoolContactEmail??null,
          studentPersonId:data.studentPersonId,programId:child.programId,
          guardianPersonId:actor.actorPersonId,
-         actionId:action.id,accountId:actor.accountId,sessionId:actor.sessionId,
+         actionId:action.id,
        },
      }).returning({id:s.consentRecords.id});
      if(!consent)throw new Error("Transfer records release authorization was not recorded");
