@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   attendanceEvents, attendanceExcuses, documents, enrollments, guardianRelationships,
-  people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
+  accountPersonGrants, accessAccounts, people, programs, sections, sectionTeachers, schoolYears, sites, studentProfiles, terms,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -353,7 +353,21 @@ export const loadExpectedFirstDayPreparationForActor=createServerOnlyFn(async(ac
   if(!program)throw new AuthorizationError("active onsite registrar Program");
   const matched=roster.find(row=>row.studentProfileId===data.studentProfileId &&
     row.programId===data.programId);
-  return {date:data.date,program:{id:program.id,name:program.name,
+  // A Section assignment is not proof that a currently authorized CAN teacher exists.
+  const qualifiedTeachers=matched?.sectionId?await db.select({personId:sectionTeachers.personId})
+    .from(sectionTeachers)
+    .innerJoin(people,eq(people.id,sectionTeachers.personId))
+    .innerJoin(accountPersonGrants,and(eq(accountPersonGrants.personId,sectionTeachers.personId),
+      eq(accountPersonGrants.role,"teacher"),eq(accountPersonGrants.organizationId,site.organizationId),
+      eq(accountPersonGrants.active,true),eq(accountPersonGrants.isSynthetic,false)))
+    .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+    .where(and(eq(sectionTeachers.sectionId,matched.sectionId),
+      eq(sectionTeachers.role,"teacher"),eq(people.active,true),
+      eq(accessAccounts.disabled,false),isNotNull(accessAccounts.emailVerifiedAt),
+      inArray(accountPersonGrants.programId,[data.programId])))
+    .limit(1):[];
+  return {qualifiedTeacherAssigned:qualifiedTeachers.length>0,
+    date:data.date,program:{id:program.id,name:program.name,
       configuration:coverage.get(program.id)?.configuration??"not_onsite",
       expectedDays:coverage.get(program.id)?.expectedDays??0,
       missingCalendarDates:coverage.get(program.id)?.daysWithoutCalendarConfiguration??0},
