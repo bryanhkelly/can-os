@@ -141,7 +141,7 @@ function MessagesPage() {
       .finally(() => setComposing(false));
   };
 
-  if (error && !threads.length) {
+  if (error && !threads.length && !thread) {
     return (
       <main className="min-h-screen bg-background px-6 py-10 text-foreground">
         <div className="mx-auto max-w-5xl">
@@ -257,10 +257,10 @@ function MessagesPage() {
           </section>
         )}
         {loading && <p className="mt-8 text-sm" role="status">Loading messages…</p>}
-        {!loading && threads.length === 0 && (
+        {!loading && threads.length === 0 && !thread && (
           <p className="mt-8 text-sm">No conversations yet.</p>
         )}
-        {!loading && threads.length > 0 && (
+        {!loading && (threads.length > 0 || Boolean(thread)) && (
           <div className="mt-8 grid gap-4 md:grid-cols-[300px_1fr]">
             <nav aria-label="Conversations" className="grid content-start gap-2">
               {threads.map((thread) => (
