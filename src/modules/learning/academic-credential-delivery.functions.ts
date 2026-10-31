@@ -137,6 +137,35 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
   return {filename:`${kind}-${credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
  });
 
+/** The authenticated recipient can discover only their own active releases. */
+export const listMyAcademicCredentialReleases=createServerFn({method:"GET"})
+ .handler(async()=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const context=await getCommandContext(getRequest());
+  if(!context.actorPersonId||!context.accountId||!context.grantId||context.demoFacilitator)
+   throw new AuthorizationError("authenticated recipient");
+  const {db,s}=await resources();
+  const now=new Date();
+  const {gt}=await import("drizzle-orm");
+  return db.select({id:s.academicCredentialReleaseAuthorizations.id,
+    transcriptId:s.academicCredentialReleaseAuthorizations.transcriptIssuanceId,
+    diplomaId:s.academicCredentialReleaseAuthorizations.diplomaIssuanceId,
+    purpose:s.academicCredentialReleaseAuthorizations.releasePurpose,
+    expiresAt:s.academicCredentialReleaseAuthorizations.expiresAt})
+   .from(s.academicCredentialReleaseAuthorizations)
+   .innerJoin(s.accessAccounts,eq(s.accessAccounts.id,context.accountId))
+   .innerJoin(s.accountPersonGrants,and(eq(s.accountPersonGrants.id,context.grantId),eq(s.accountPersonGrants.accountId,s.accessAccounts.id)))
+   .innerJoin(s.people,eq(s.people.id,s.academicCredentialReleaseAuthorizations.recipientPersonId))
+   .where(and(eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,context.actorPersonId),
+    isNull(s.academicCredentialReleaseAuthorizations.revokedAt),
+    gt(s.academicCredentialReleaseAuthorizations.expiresAt,now),
+    eq(s.accessAccounts.disabled,false),isNotNull(s.accessAccounts.emailVerifiedAt),
+    eq(s.accessAccounts.emailNormalized,s.academicCredentialReleaseAuthorizations.recipientEmail),
+    eq(s.accountPersonGrants.personId,context.actorPersonId),eq(s.accountPersonGrants.active,true),
+    eq(s.accountPersonGrants.isSynthetic,false),eq(s.people.active,true)))
+   .orderBy(desc(s.academicCredentialReleaseAuthorizations.authorizedAt)).limit(100);
+ });
+
 /** Official records must never be mailed as plaintext attachments. Release is
  * disabled until a verified records-request and authenticated download workflow
  * exist. This server guard protects even stale clients and direct POST calls. */
