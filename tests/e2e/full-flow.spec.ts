@@ -514,6 +514,12 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
           rowCount(sql, "select id from admission_offers where application_id = $1", [fixture.applicationId!]),
         )
         .toBe(1);
+      // Authorization must fail before the legitimate guardian accepts the
+      // offer, not only after enrollment has already completed.
+      await goto(unrelatedGuardian.page, offersUrl);
+      await expect(unrelatedGuardian.page.getByRole("button", { name: "Accept" })).toHaveCount(0);
+      await expect(unrelatedGuardian.page.getByRole("button", { name: "Sign and submit enrollment form" })).toHaveCount(0);
+
       await goto(guardian.page, offersUrl);
       await guardian.page.getByRole("button", { name: "Accept" }).click();
       await expect(guardian.page.getByText(/acceptance is recorded/i)).toBeVisible();
