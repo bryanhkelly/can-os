@@ -204,7 +204,11 @@ export const getApplicableGraduationPolicy=createServerFn({method:"GET"})
      .where(eq(s.graduationRequirementSets.issuingOrganizationId,transcript.issuingOrganizationId));
    const matches=[];
    for(const policy of policies){
-     try{await transcriptAndRules(db,s,transcript.id,policy.id);matches.push(policy);}catch{/* incompatible policy */}
+     try{await transcriptAndRules(db,s,transcript.id,policy.id);matches.push(policy);}
+     catch(error){
+       if(error instanceof AuthorizationError && error.message==="Selected graduation policy does not apply to student cohort")continue;
+       throw error;
+     }
    }
    if(matches.length!==1)throw new AuthorizationError("No unambiguous applicable policy");
    return {id:matches[0]!.id,academicYear:matches[0]!.academicYear,version:matches[0]!.version,
