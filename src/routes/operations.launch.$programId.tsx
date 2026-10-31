@@ -34,6 +34,7 @@ function Setup({data}:{data:Snapshot}){
  const [code,setCode]=useState(""),[title,setTitle]=useState("");
  const [createdSectionId,setCreatedSectionId]=useState<string|null>(null);
  const [teacherId,setTeacherId]=useState("");
+ const [scheduleId,setScheduleId]=useState("");
  const [courseCredits,setCourseCredits]=useState("");
  const [qualificationKeys,setQualificationKeys]=useState<string[]>([]);
  const [policyConfirmed,setPolicyConfirmed]=useState(false);
@@ -128,7 +129,7 @@ function Setup({data}:{data:Snapshot}){
    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={e=>{
     e.preventDefault();void run(async()=>{const result=await provisionLaunchSection({data:{
      programId:data.program.id,termId,courseTemplateVersionId:versionId,
-     code,title,...(teacherId?{teacherPersonId:teacherId}:{}),
+     code,title,teacherPersonId:teacherId,scheduleTemplateId:scheduleId,requireFirstLesson:true,
      ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}});setCreatedSectionId(result.sectionId);},"Class saved. Review its schedule and first-week readiness below.");
    }}>
     <label className="text-sm">Academic term<select required value={termId} onChange={e=>setTermId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
@@ -151,9 +152,12 @@ function Setup({data}:{data:Snapshot}){
       </div>}
       <p className="mt-1 text-xs text-muted-foreground">Adoption eligibility is currently program-scoped, not yet versioned by academic year. Annual adoption rollover is a separate release.</p>
     </div>}
+    <label className="text-sm sm:col-span-2">Instructional schedule<select required value={scheduleId} onChange={e=>setScheduleId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
+     <option value="">Choose a school-year schedule</option>{data.scheduleOptions.filter(option=>option.schoolYearId===selectedTerm?.schoolYearId).map(option=><option key={option.id} value={option.id}>{option.name}</option>)}
+    </select></label>
     <label className="text-sm">Class code<input value={code} required onChange={e=>setCode(e.target.value)} placeholder="BIO-101-A" className="mt-1 block w-full rounded border bg-background p-2"/></label>
     <label className="text-sm">Class title<input value={title} required onChange={e=>setTitle(e.target.value)} placeholder="Biology I" className="mt-1 block w-full rounded border bg-background p-2"/></label>
-    <label className="text-sm sm:col-span-2">Instructor (verified assignment)<select value={teacherId} disabled={!data.academicAuthority.teacherAssignment} onChange={e=>setTeacherId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50">
+    <label className="text-sm sm:col-span-2">Instructor (required for guided launch)<select required value={teacherId} disabled={!data.academicAuthority.teacherAssignment} onChange={e=>setTeacherId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50">
      <option value="">Assign later</option>{data.teachingStaff.map(t=><option value={t.personId} key={t.personId}>{t.first} {t.last}</option>)}
     </select></label>
     <label className="text-sm sm:col-span-2">Course credit units
@@ -162,10 +166,10 @@ function Setup({data}:{data:Snapshot}){
       className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50"/>
      <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units are shown as Not recorded on transcripts and must be resolved separately for graduation decisions.</span>
     </label>
-    <button type="submit" disabled={busy||!termId||!versionId||(Boolean(teacherId)&&!data.academicAuthority.teacherAssignment)||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Save classroom and instructor</button>
+    <button type="submit" disabled={busy||!termId||!versionId||!scheduleId||!teacherId||!selectedCourse?.recommendation.instructionReady||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Save classroom and instructor</button>
    </form>
   </section>
-  {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm"><strong>Classroom saved.</strong> Review the new class in Teaching assignments below for its pinned first lesson and any blockers. Complete the instructional schedule in the Section lifecycle workspace; a saved Section alone is not ready to teach.</div>}
+  {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm"><strong>Classroom saved.</strong> Review the new class in Teaching assignments below for its pinned first lesson and any blockers. The selected schedule and verified teacher are saved with the Section. Enrollment and first-week assessment readiness still require review.</div>}
   <div className="mt-6 rounded-lg border p-4 text-sm">
    After provisioning sections, <Link to="/operations/course-policies" search={{siteId:data.program.siteId??undefined,programId:data.program.id}} className="font-semibold underline">
     configure enrollment windows, prerequisites, seat capacity and credit limits →
