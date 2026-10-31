@@ -92,14 +92,30 @@ export const getGuardianHealthWorkspace = createServerFn({ method: "GET" })
         inArray(healthOfficeVisits.siteId, sites),
       )).orderBy(desc(healthOfficeVisits.checkedInAt)).limit(50) : Promise.resolve([]),
     ]);
-    return { children: children.map(child => ({
+    return { children: children.map(child => {
+      const profile = profiles.find(row => row.studentProfileId === child.studentProfileId);
+      const review = profile?.metadata.lastGuardianHealthReview as
+        { status?: string; reviewedAt?: string } | undefined;
+      // Never serialize restricted medical metadata (including another guardian's
+      // pending proposal or the registrar's identity) to the family browser.
+      const lastSchoolReview = review &&
+        (review.status === "approved" || review.status === "rejected") &&
+        typeof review.reviewedAt === "string"
+        ? { status: review.status, reviewedAt: review.reviewedAt }
+        : null;
+      return {
       studentPersonId: child.studentPersonId,
-      programId:child.programId,
-      awaitingSchoolHealthReview:!!profiles.find(row=>row.studentProfileId===child.studentProfileId)?.metadata.pendingGuardianUpdate,
-      approvedEmergencyContact:profiles.find(row=>row.studentProfileId===child.studentProfileId)?.metadata.approvedEmergencyContact as
-        {name:string;phone:string;relationship:string}|undefined,
+      programId: child.programId,
+      awaitingSchoolHealthReview: !!profile?.metadata.pendingGuardianUpdate,
+      lastSchoolReview,
+      approvedEmergencyContact: profile?.metadata.approvedEmergencyContact as
+        { name: string; phone: string; relationship: string } | undefined,
       studentName: [child.firstName, child.lastName].filter(Boolean).join(" "),
-      profile: profiles.find(row => row.studentProfileId === child.studentProfileId) ?? null,
+      profile: profile ? {
+        allergySummary: profile.allergySummary,
+        emergencySummary: profile.emergencySummary,
+        accommodationSummary: profile.accommodationSummary,
+      } : null,
       compliance: compliance.filter(row => row.studentProfileId === child.studentProfileId),
       medications: medications.filter(row => row.studentProfileId === child.studentProfileId),
       clearances: clearances.filter(row => row.studentProfileId === child.studentProfileId)
@@ -107,5 +123,5 @@ export const getGuardianHealthWorkspace = createServerFn({ method: "GET" })
           clearedAt: row.clearedAt?.toISOString() ?? null })),
       visits: visits.filter(row => row.studentProfileId === child.studentProfileId)
         .map(row => ({ reason: row.reason, sentHome: row.sentHome, date: row.checkedInAt.toISOString() })),
-    })) };
+    }; }) };
   });
