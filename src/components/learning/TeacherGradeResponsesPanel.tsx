@@ -81,7 +81,7 @@ export function TeacherGradeResponsesPanel({ selectedAction, onQuestionsChange }
     const next = {
       ...data,
       items: data.items.map(item => item.id === id
-        ? { ...item, status: "resolved", resolutionNote: answer } : item),
+        ? { ...item, status: "resolved" as const, resolutionNote: answer } : item),
     };
     setData(next);
     onQuestionsChange?.(next.items);
