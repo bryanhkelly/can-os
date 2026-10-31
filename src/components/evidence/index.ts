@@ -8,3 +8,5 @@ export { EvidenceDocumentLink } from "./EvidenceDocumentLink";
 export type { EvidenceDocumentLinkProps } from "./EvidenceDocumentLink";
 export { EvidenceDocumentSummary } from "./EvidenceDocumentSummary";
 export type { EvidenceDocumentSummaryProps } from "./EvidenceDocumentSummary";
+export { EvidenceUploadSection } from "./EvidenceUploadSection";
+export type { EvidenceUploadSectionProps } from "./EvidenceUploadSection";
