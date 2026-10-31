@@ -42,16 +42,7 @@ export type LaunchWizardData = {
 
 export function LaunchWizardPage({ selection, data }: { selection: {siteId?: string;programId?: string}; data: LaunchWizardData }) {
 
-  const { options, launches, preparationPrograms, familyInvitations, admissions, enrollmentCounts, extendedPlanning, authError }: {
-    options: Awaited<ReturnType<typeof listLaunchOptions>> | null;
-    launches: Awaited<ReturnType<typeof listLaunches>> | null;
-    preparationPrograms:Awaited<ReturnType<typeof listAdmissionsPrograms>>|null;
-    familyInvitations: Awaited<ReturnType<typeof listFamilyInvitations>> | null;
-    admissions: Awaited<ReturnType<typeof listAdmissionsIntake>> | null;
-    enrollmentCounts: Awaited<ReturnType<typeof getActiveEnrollmentCounts>> | null;
-    extendedPlanning: Awaited<ReturnType<typeof listExtendedSeasonPlanning>> | null;
-    authError: string;
-  } = data;
+  const { options, launches, preparationPrograms, familyInvitations, admissions, enrollmentCounts, extendedPlanning, authError } = data;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
