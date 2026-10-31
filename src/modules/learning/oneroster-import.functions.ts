@@ -3,7 +3,7 @@ import { and,eq,inArray,sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { curriculumImportJobs,curriculumInteropMappings,programs,sections } from "@/db/schema";
+import { curriculumImportJobs,curriculumInteropMappings,programs,sections,terms,schoolYears } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { previewOneRosterBundle } from "@/domain/oneroster-csv";
 import { planOneRosterReconciliation } from "@/domain/oneroster-reconciliation";
@@ -108,11 +108,26 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
      throw new Error("Map every external class exactly once to a distinct Section.");
    const sectionIds=data.classMappings.map(m=>m.sectionId);
    const canonical=await db.select({id:sections.id,code:sections.code,
-      title:sections.title,active:sections.active}).from(sections)
+      title:sections.title,active:sections.active,termId:sections.termId,
+      schoolYearKey:schoolYears.key,schoolYearId:schoolYears.id,
+      schoolYearStatus:schoolYears.status,termKey:terms.key}).from(sections)
+     .innerJoin(terms,eq(sections.termId,terms.id))
+     .innerJoin(schoolYears,eq(terms.schoolYearId,schoolYears.id))
      .where(and(inArray(sections.id,sectionIds),eq(sections.programId,program.id),
-       eq(sections.siteId,program.siteId)));
+       eq(sections.siteId,program.siteId),eq(schoolYears.organizationId,program.organizationId),
+       eq(schoolYears.siteId,program.siteId)));
    if(canonical.length!==sectionIds.length||canonical.some(s=>!s.active))
      throw new AuthorizationError("active Section owned by this Program and Site");
+   const byCanonicalId=new Map(canonical.map(s=>[s.id,s]));
+   for(const row of classes.rows){
+     const section=byCanonicalId.get(bySource.get(row.sourcedId)!);
+     if(!section||!row.schoolYear||row.schoolYear!==section.schoolYearKey)
+       throw new Error("External class school year must match the canonical Section year.");
+     if(!row.termSourcedIds||!row.termSourcedIds.split(",").map(s=>s.trim()).includes(section.termKey))
+       throw new Error("External class term must match the canonical Section term key.");
+     if(row.status?.toLowerCase()==="tobedeleted")
+       throw new Error("Withdrawn external classes cannot be mapped.");
+   }
    const digest=createHash("sha256").update(JSON.stringify(data.files)).digest("hex");
    return db.transaction(async tx=>{
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"oneroster-map:"+program.organizationId+":"+data.sourceSystem}))`);
@@ -124,13 +139,13 @@ export const applyOneRosterClassMappings=createServerFn({method:"POST"})
      if(!job||job.status==="rejected"||job.metadata.programId!==program.id)
        throw new Error("Validate this exact OneRoster bundle for the selected Program first.");
      const previous=await tx.select({externalIdentifier:curriculumInteropMappings.externalIdentifier,
-       entityId:curriculumInteropMappings.entityId,metadata:curriculumInteropMappings.metadata})
+       entityType:curriculumInteropMappings.entityType,entityId:curriculumInteropMappings.entityId,metadata:curriculumInteropMappings.metadata})
        .from(curriculumInteropMappings).where(and(
          eq(curriculumInteropMappings.organizationId,program.organizationId),
          eq(curriculumInteropMappings.format,"oneroster"),
          eq(curriculumInteropMappings.sourceSystem,data.sourceSystem),
          inArray(curriculumInteropMappings.externalIdentifier,sourceIds)));
-     for(const prior of previous)if(prior.entityId!==bySource.get(prior.externalIdentifier)||
+     for(const prior of previous)if(prior.entityType!=="section"||prior.entityId!==bySource.get(prior.externalIdentifier)||
           prior.metadata.programId!==program.id)
        throw new Error("Existing OneRoster sourcedId is bound to a different canonical Section.");
      const alreadyMapped=new Set(previous.map(p=>p.externalIdentifier));
