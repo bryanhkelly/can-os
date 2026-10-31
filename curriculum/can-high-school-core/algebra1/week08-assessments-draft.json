@@ -1,0 +1,89 @@
+{
+  "courseCode": "CAN-ALG1",
+  "unitId": "algebra1-u02",
+  "week": 8,
+  "readiness": "teacher_review_required",
+  "visibility": "publisher_draft",
+  "assessments": [
+    {
+      "key": "algebra1-u02-w08-formative",
+      "title": "Unit 2 synthesis formative check",
+      "pointsPossible": 20,
+      "status": "draft",
+      "formative": true,
+      "instructions": "Independently justify four five-point items. 1: Determine whether {(1,4),(2,4),(1,6)} is a function and explain. 2: Evaluate f(−2) for f(x)=x²+3x. 3: A van seats 15 passengers at $8 per passenger. State feasible domain and maximum revenue. 4: Find average rate between (2,10) and (6,26) when x is hours and y is miles.",
+      "rubricCriteria": [
+        {
+          "id": "mapping",
+          "label": "Function uniqueness reasoning",
+          "maxPoints": 5,
+          "description": "Classification with a valid mapping explanation."
+        },
+        {
+          "id": "evaluate",
+          "label": "Function substitution",
+          "maxPoints": 5,
+          "description": "Correct substitution and signed arithmetic."
+        },
+        {
+          "id": "context",
+          "label": "Discrete feasible domain",
+          "maxPoints": 5,
+          "description": "Valid whole-number domain and units."
+        },
+        {
+          "id": "rate",
+          "label": "Rate and units",
+          "maxPoints": 5,
+          "description": "Correct endpoint quotient and interpretation."
+        }
+      ]
+    },
+    {
+      "key": "algebra1-u02-w08-mastery",
+      "title": "Unit 2 cumulative mastery checkpoint",
+      "pointsPossible": 30,
+      "status": "draft",
+      "formative": false,
+      "instructions": "Six independent items, five points each. 1: Is {(−1,3),(0,3),(2,5)} a function? Justify. 2: Evaluate g(−3) for g(x)=2x²−x. 3: State real domain of h(x)=9/(x−6). 4: For table {(0,2),(2,10),(5,22)}, determine whether rate is constant. 5: A reservoir starts at 60 L and drains 4 L/minute. State time domain until empty and evaluate volume at t=7. 6: Explain why an average rate over an interval need not describe every subinterval.",
+      "rubricCriteria": [
+        {
+          "id": "unique",
+          "label": "Function classification",
+          "maxPoints": 5,
+          "description": "Valid input-output argument."
+        },
+        {
+          "id": "substitution",
+          "label": "Evaluation",
+          "maxPoints": 5,
+          "description": "Correct signed substitution."
+        },
+        {
+          "id": "algebraic",
+          "label": "Undefined-value domain restriction",
+          "maxPoints": 5,
+          "description": "Correct excluded input and explanation."
+        },
+        {
+          "id": "rates",
+          "label": "Interval comparison",
+          "maxPoints": 5,
+          "description": "Two calculated rates and consistency conclusion."
+        },
+        {
+          "id": "feasible",
+          "label": "Contextual time domain and evaluation",
+          "maxPoints": 5,
+          "description": "Correct domain, volume and units."
+        },
+        {
+          "id": "interpret",
+          "label": "Rate interpretation",
+          "maxPoints": 5,
+          "description": "Conceptually correct limitation with example or explanation."
+        }
+      ]
+    }
+  ]
+}
