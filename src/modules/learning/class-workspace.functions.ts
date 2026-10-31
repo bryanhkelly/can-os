@@ -131,6 +131,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
     const publisherRows=curriculumAccess.available?await db.select({
       id:s.curriculumResources.id,title:s.curriculumResources.title,
       kind:s.curriculumResources.kind,url:s.curriculumResources.url,
+      resourceId:s.curriculumResources.id,
       lessonId:s.curriculumResourceBindings.lessonId,
     }).from(s.curriculumAdoptions)
       .innerJoin(s.curriculumEntitlements,and(
