@@ -1,12 +1,12 @@
 import { db } from "@/db/client";
-import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,people } from "@/db/schema";
+import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
 import { isLocalDemoAccessEnabled, LOCAL_DEMO_ACCESS_CODE, LOCAL_DEMO_ACCOUNTS, LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
 import { listDemoFacilitatorGrants } from "./demo-facilitator.server";
 import { recordSessionSecurityEvent } from "./session-security-audit.server";
-import { and,eq,gt,isNull,lt,sql } from "drizzle-orm";
+import { and,eq,gt,inArray,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
 
@@ -65,7 +65,7 @@ export async function requestOneTimeAccess(rawEmail:string, sender:AccessEmailSe
  return genericResult;
 }
 /** A token is atomically consumed by its hash, allowing only one successful redemption. */
-export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string}> {
+export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string}> {
  if(!/^[A-Za-z0-9_-]{40,}$/.test(rawToken))throw new Error("Invalid or expired access link");
  const hash=hashAccessSecret(rawToken,secretPepper()),now=new Date();
  return db.transaction(async tx=>{
@@ -85,7 +85,18 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
     eq(accountPersonGrants.isSynthetic,false),eq(people.active,true)));
   const pending=await listPendingStaffInvitations(tx,account.id);
   const accepted=await acceptStaffInvitations(tx,account.id,pending,now);
-  const activeGrant=grants.find(g=>Object.hasOwn(roleCapabilities,g.role))??accepted[0];
+  // A newly accepted church-onboarding grant takes priority over an older
+  // membership so the first sign-in lands in that church's own setup workspace.
+  const onboarding = accepted.length ? await tx.select({
+    siteId: churchOnboardingRequests.siteId,
+    invitationGrantId: churchOnboardingRequests.invitationGrantId,
+  }).from(churchOnboardingRequests).where(and(
+    eq(churchOnboardingRequests.status, "approved"),
+    inArray(churchOnboardingRequests.invitationGrantId, accepted.map(invitation => invitation.id)),
+  )).limit(1) : [];
+  const onboardingInvitation = accepted.find(invitation =>
+    invitation.id === onboarding[0]?.invitationGrantId);
+  const activeGrant=onboardingInvitation??grants.find(g=>Object.hasOwn(roleCapabilities,g.role))??accepted[0];
   if(!activeGrant)throw new Error("No supported CAN OS membership");
   const secret=issueOpaqueSecret();
   const [session]=await tx.insert(accessSessions).values({
@@ -101,7 +112,9 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
    accountId:account.id,sessionId:session.id,grantId:activeGrant.id,
    role:activeGrant.role,method:"email_link",
   });
-  return {accountId:account.id,role:activeGrant.role,setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
+  return {accountId:account.id,role:activeGrant.role,
+   ...(onboardingInvitation && onboarding[0]?.siteId ? {launchSiteId:onboarding[0].siteId} : {}),
+   setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
 /** Local/test-only sign-in for the seeded synthetic demo accounts. */
