@@ -13,6 +13,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { enrollmentJourneyDefinitionKey } from "@/domain/enrollment-form";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { resolvePrivateFamilyStartDestination } from "./private-family-start.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
@@ -236,6 +237,13 @@ export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((
       !actor.scope.organizationIds?.includes(boundProgram.organizationId) ||
       (actor.scope.siteIds !== undefined && !actor.scope.siteIds.includes(boundProgram.siteId)))
      throw new AuthorizationError("public interest Program ownership changed");
+    // An inquiry may be recorded pre-opening, but converting it into a
+    // canonical Application/Student/Household requires current CAN academic
+    // admissions and school-of-record authorization.
+    const authorizedDestination = await resolvePrivateFamilyStartDestination(tx, data.programId);
+    if (authorizedDestination.siteId !== boundProgram.siteId ||
+        authorizedDestination.organizationId !== boundProgram.organizationId)
+      throw new AuthorizationError("authorized family admission destination");
     const [interest] = await tx.select({
       id:publicAdmissionsInterests.id,
       status:publicAdmissionsInterests.status,
