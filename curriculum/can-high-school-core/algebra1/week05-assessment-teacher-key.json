@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "courseCode": "CAN-ALG1",
+  "visibility": "teacher_only",
+  "units": [
+    {
+      "unitId": "algebra1-u02",
+      "reviewStatus": "draft",
+      "teacherOverview": "Separate formative feedback from mastery evidence; reteach mapping diagrams, signed substitution and contextual domain constraints before reassessment.",
+      "lessons": [],
+      "assessments": [
+        {
+          "assessmentKey": "algebra1-u02-w05-formative",
+          "workedAnswers": [
+            {
+              "prompt": "1",
+              "answer": "Not a function: input 1 maps to outputs 2 and 3."
+            },
+            {
+              "prompt": "2",
+              "answer": "f(−2)=3(−2)−5=−11."
+            },
+            {
+              "prompt": "3",
+              "answer": "All real x except −4, since x+4≠0."
+            },
+            {
+              "prompt": "4",
+              "answer": "n∈{0,1,…,16}; R(7)=9×7=$63."
+            }
+          ]
+        },
+        {
+          "assessmentKey": "algebra1-u02-w05-mastery",
+          "workedAnswers": [
+            {
+              "prompt": "1",
+              "answer": "Yes; each input has exactly one output. Shared output 4 is allowed."
+            },
+            {
+              "prompt": "2",
+              "answer": "h(−3)=9+6=15."
+            },
+            {
+              "prompt": "3",
+              "answer": "x−6≥0, so x≥6."
+            },
+            {
+              "prompt": "4",
+              "answer": "0≤t≤10 minutes; V(4)=30−12=18 liters."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
