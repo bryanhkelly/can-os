@@ -150,6 +150,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
    })(),
    transferNamedDestination:typeof metadata.originTransferDestinationSchoolName==="string"?
      metadata.originTransferDestinationSchoolName:null,
+   destinationTranscriptConsentRecorded:typeof metadata.destinationRecordsReleaseConsentId==="string",
    transferRecordsStatus:(()=>{
      if(typeof metadata.originTransferActionId!=="string")return null;
      const source=transferOrigins.find(item=>item.id===metadata.originTransferActionId);
