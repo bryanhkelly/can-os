@@ -1,3 +1,4 @@
+import { ClassAssessmentEvidence } from "@/components/learning/ClassAssessmentEvidence";
 import { ClassLearningProgress } from "@/components/learning/ClassLearningProgress";
 import { ClassTeachingTeam } from "@/components/learning/ClassTeachingTeam";
 import { PublishedLessonNavigation } from "@/components/learning/PublishedLessonNavigation";
@@ -161,22 +162,8 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       <WorkspacePanel title="About this class"><p className="whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p></WorkspacePanel>
       <ClassLearningProgress search={search} isTeacher={data.role==="teacher"}
        lessonCount={lessons.length} completedCount={completed.size} studentCount={data.roster.length} />
-      <WorkspacePanel title="Assessment evidence" description="Teacher-reviewed submissions are different from lesson completion. Scores shown here are not a mastery decision or course credit.">
-        <p className="text-sm">{assessmentEvidence.length} published class assessments
-          {data.role !== "teacher" && assessmentSummary ? ` · ${assessmentSummary.graded} graded · ${assessmentSummary.awaitingFeedback} awaiting feedback` : ""}</p>
-        {data.role !== "teacher" && assessmentEvidence.length>0 && <ul className="mt-3 divide-y text-sm">
-          {assessmentEvidence.map(item=><li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
-            <span>{item.title}</span>
-            <span className="text-muted-foreground">{item.score !== null && item.pointsPossible !== null
-              ? `Reviewed: ${item.score} / ${item.pointsPossible} points`
-              : item.status==="submitted"?"Submitted · awaiting teacher review"
-              : item.status==="draft"?"Response in progress"
-              : item.status==="returned"?"Returned for revision"
-              : "Not graded"}</span>
-          </li>)}
-        </ul>}
-        <div className="mt-3 text-sm">{classwork}</div>
-      </WorkspacePanel>
+      <ClassAssessmentEvidence items={assessmentEvidence} summary={assessmentSummary}
+       isTeacher={data.role==="teacher"} classwork={classwork} />
       {data.content?.blueprint && <WorkspacePanel title="Yearlong course roadmap"
         description="Curriculum planning progress, not a list of completed lessons or a credit-award decision. Planned weeks are not yet available for instruction.">
         <p className="text-sm">{data.content.blueprint.weeks.filter(week=>week.status!=="planned").length} of {data.content.blueprint.targetInstructionalWeeks} weeks authored · School review: {data.content.blueprint.reviewStatus.replaceAll("_"," ")}</p>
