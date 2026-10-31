@@ -63,7 +63,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         gte(academicCalendarDays.calendarDate,today)))
       .orderBy(asc(academicCalendarDays.calendarDate)).limit(90);
     const dates = [...new Set(futureDays.filter(day=>["instructional","special","makeup"].includes(day.type))
-      .map(day=>day.date))].filter((value,index,array)=>array.indexOf(value)===index);
+      .map(day=>day.date))];
     let date = today;
     for(const candidate of dates){
       const projected=await loadExpectedOnsiteRosterForActor(actor,{
