@@ -197,6 +197,29 @@ export function OneHourSchoolLaunch({ launches: allLaunches, selectedProgramId, 
     </p>}
 
     <p className="mt-4 text-sm text-muted-foreground" role="status">You can prepare your website and invite families while CAN reviews opening requirements. Invitations and setup do not activate enrollment or authorize a supervised school day.</p>
+    <section aria-label="Launch milestone overview" className="mt-5">
+      <h3 className="text-sm font-semibold">Your opening milestones</h3>
+      <p className="mt-1 text-xs text-muted-foreground">These are guidance labels, not independent approvals. CAN's saved requirements and authorization services make the final decisions.</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {([
+          ["Configuration completed", "Review saved school setup", guidance.tasks.some(task => task.state === "complete")],
+          ["CAN services authorized", "Independent CAN authorization required", guidance.tasks.filter(task => task.state === "needs_can").length === 0 && guidance.tasks.some(task => task.state === "complete")],
+          ["Safe to open", "Only canonical opening activation confirms this", launch.status === "active"],
+          ["Family outreach sent", "Review actual invitation delivery records", false],
+          ["First class ready", "Verify the real section and first-week prerequisites", false],
+        ] as const).map(([label,description,confirmed]) => <div key={label} className="rounded-xl border bg-background p-3">
+          <p className="text-sm font-semibold">{label}</p>
+          <p className="mt-1 text-xs">{confirmed ? "Progress recorded" : "Not confirmed here"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        </div>)}
+      </div>
+      <nav aria-label="Next school preparation actions" className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
+        <a href="#launch-academic-year" className="underline">Prepare recommended year</a>
+        <Link to="/operations/launch/$programId" params={{programId:launch.id}} search={{siteId:launch.siteId??undefined,programId:undefined}} className="underline">Review launch setup</Link>
+        <a href="#launch-website" className="underline">Prepare website</a>
+        <a href="#invite-families" className="underline">Review invitation progress</a>
+      </nav>
+    </section>
     {next ? <article className="mt-6 rounded-2xl border-2 border-primary/30 p-5" aria-label="Next launch task">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
