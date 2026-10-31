@@ -167,6 +167,10 @@ export const decideGraduation = createServerFn({method:"POST"})
      issuerAuthorized(context,transcript.issuingOrganizationId);
      const {sql}=await import("drizzle-orm");
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${transcript.studentProfileId + ":" + transcript.issuingOrganizationId + ":graduation"}))`);
+     const [latestTranscript]=await tx.select({id:s.transcriptIssuances.id}).from(s.transcriptIssuances)
+       .where(and(eq(s.transcriptIssuances.studentProfileId,transcript.studentProfileId),eq(s.transcriptIssuances.issuingOrganizationId,transcript.issuingOrganizationId)))
+       .orderBy(desc(s.transcriptIssuances.issuedAt),desc(s.transcriptIssuances.id)).limit(1);
+     if(latestTranscript?.id!==transcript.id) throw new AuthorizationError("Latest issued transcript required for graduation");
      const result=adjudicateGraduation({
        requirementSetId:requirementSet.id,transcriptIssuanceId:transcript.id,
        requirementIssuerId:requirementSet.issuingOrganizationId,transcriptIssuerId:transcript.issuingOrganizationId,
