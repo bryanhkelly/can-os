@@ -77,4 +77,12 @@ describe("OneRoster reconciliation is identity-untrusted", () => {
     expect(plan.rows.find(r => r.kind === "class")?.reasons)
       .toContain("EXTERNAL_SESSION_MISSING");
   });
+  it("never treats teacher or administrator rows as student enrollments", () => {
+    const teacherEnrollment = enrollments.replace(",student", ",teacher");
+    const bundle = previewOneRosterBundle({ users, classes, enrollments: teacherEnrollment });
+    const plan = planOneRosterReconciliation(bundle.previews, new Map([["class-1", "section-1"]]));
+    expect(plan.rows.find(row => row.kind === "enrollment")?.reasons)
+      .toContain("EXTERNAL_ENROLLMENT_ROLE_NOT_STUDENT");
+  });
+
 });
