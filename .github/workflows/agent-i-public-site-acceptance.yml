@@ -35,7 +35,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Tenant routing and reachability unit tests
-        run: npx vitest run tests/unit/public-host-reachability.test.ts tests/unit/public-site-host-routing.test.ts tests/unit/public-tenant-edge-origin-isolation.test.ts
+        run: npx vitest run tests/unit/public-host-reachability.test.ts tests/unit/public-site-host-routing.test.ts tests/unit/public-tenant-edge-origin-isolation.test.ts tests/unit/public-netlify-edge-function.test.ts
       - name: Generate TanStack route tree and build
         run: npm run build
       - name: Typecheck with generated routes
