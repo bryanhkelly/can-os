@@ -1,4 +1,4 @@
-import { EvidenceUploader, EvidenceWorkflow, EvidenceReviewForm, EvidenceDocumentSummary } from "@/components/evidence";
+import { EvidenceUploadSection, EvidenceWorkflow, EvidenceReviewForm, EvidenceDocumentSummary } from "@/components/evidence";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginExtendedEvidenceUploadFn, finishExtendedEvidenceUploadFn,
@@ -103,8 +103,9 @@ function EvidenceCard({ model, item, changed }: {
     {model.canReview && item.documentId && item.status === "pending" && <EvidenceReviewForm
       disabled={busy} onReview={review}/>}
     {model.canSubmit && <div className="mt-3 border-t pt-3">
-      <p>{item.documentId ? "Renew or correct this evidence" : "Upload evidence for CAN review"}</p>
-      <EvidenceUploader<UploadInput> disabled={!model.uploadsEnabled}
+
+      <EvidenceUploadSection<UploadInput> disabled={!model.uploadsEnabled}
+        heading={item.documentId ? "Renew or correct this evidence" : "Upload evidence for CAN review"}
         adapter={{begin: async input => beginExtendedEvidenceUploadFn({data:input}),
           finish: async input => finishExtendedEvidenceUploadFn({data:input})}}
         makeInput={(file,expiresAt)=>({seasonId:model.seasonId,category:item.category,
