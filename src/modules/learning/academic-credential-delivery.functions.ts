@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,isNotNull } from "drizzle-orm";
+import { and,desc,eq,isNotNull,isNull } from "drizzle-orm";
 import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -77,10 +77,11 @@ export const revokeAcademicCredentialRelease=createServerFn({method:"POST"})
   if(!row||!context.scope.organizationIds?.includes(row.issuingOrganizationId))
    throw new AuthorizationError("issuer authorization");
   await db.transaction(async tx=>{
-   await tx.update(s.academicCredentialReleaseAuthorizations)
+   const [changed]=await tx.update(s.academicCredentialReleaseAuthorizations)
     .set({revokedAt:new Date(),updatedAt:new Date()})
-    .where(eq(s.academicCredentialReleaseAuthorizations.id,row.id));
-   await writeAudit(tx,context,{action:"academic_credential.release.revoke",entityType:"academic_credential_release_authorization",entityId:row.id,scope:{organizationId:row.issuingOrganizationId}});
+    .where(and(eq(s.academicCredentialReleaseAuthorizations.id,row.id),isNull(s.academicCredentialReleaseAuthorizations.revokedAt)))
+    .returning({id:s.academicCredentialReleaseAuthorizations.id});
+   if(changed)await writeAudit(tx,context,{action:"academic_credential.release.revoke",entityType:"academic_credential_release_authorization",entityId:row.id,scope:{organizationId:row.issuingOrganizationId}});
   });
   return {revoked:true};
  });
