@@ -217,7 +217,7 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
     const [origin]=await tx.select({
       id:actions.id,type:actions.type,status:actions.status,
       subjectType:actions.subjectType,subjectId:actions.subjectId,
-      programId:actions.programId,metadata:actions.metadata,
+      programId:actions.programId,siteId:actions.siteId,metadata:actions.metadata,
     }).from(actions).where(eq(actions.id,app.metadata.originTransferActionId))
       .for("share").limit(1);
     if(!origin||origin.type!=="guardian_enrollment_change_request"||
@@ -226,10 +226,8 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
        origin.programId===app.programId||
        origin.metadata.kind!=="transfer"||
        origin.metadata.requestedByGuardianPersonId!==app.submittedByPersonId||
-       (typeof origin.metadata.destinationApplicationId==="string"&&
-        origin.metadata.destinationApplicationId!==app.id)||
-       (typeof origin.metadata.destinationProgramId==="string"&&
-        origin.metadata.destinationProgramId!==app.programId)||
+       origin.metadata.destinationApplicationId!==app.id||
+       origin.metadata.destinationProgramId!==app.programId||
        origin.status!=="resolved"||
        origin.metadata.exitCompletedByRegistrar!==true||
        origin.metadata.exitStatus!=="transferred")
@@ -257,6 +255,13 @@ export async function activateSyntheticOfferedEnrollment(context:AccessContext,o
     .from(programs).where(eq(programs.id,offer!.programId)).limit(1);
   if(!programSite||programSite.organizationId!==organizationId)
     throw new Error("Enrollment program must belong to the offer's organization");
+  if(transferOrigin){
+    const [sourceSite]=await tx.select({siteId:actions.siteId})
+      .from(actions).where(eq(actions.id,transferOrigin.id)).limit(1);
+    if(!programSite.siteId||!sourceSite?.siteId||
+       sourceSite.siteId===programSite.siteId)
+      throw new Error("A transfer destination must be an independently authorized school Site, not another Program at the originating school.");
+  }
   // Site-less virtual programs have no onsite roster to coordinate.
   if(programSite.siteId)await lockAttendanceConfigurationAtSite(tx,programSite.siteId);
   const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(eq(enrollments.studentProfileId,app.studentProfileId),eq(enrollments.programId,offer!.programId),eq(enrollments.schoolYearId,offer!.schoolYearId),eq(enrollments.status,"active"),eq(enrollments.kind,"program"))).limit(1);
