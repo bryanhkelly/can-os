@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import { DATABASE_URL, TEST_ACCESS_TOKEN_PEPPER, TEST_JOB_SECRET, baseURL } from "./tests/e2e/env";
 
 /**
@@ -39,6 +40,11 @@ if (!accessMailOutboxDir) {
   );
 }
 
+// Do not rely solely on the npm wrapper: direct Playwright launches must
+// verify the pinned FullFlow Neon branch before creating any fixture rows.
+execFileSync(process.execPath, ["scripts/verify-fullflow-neon-branch.mjs"], {
+  stdio: "inherit", env: process.env,
+});
 export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: "full-flow.spec.ts",
