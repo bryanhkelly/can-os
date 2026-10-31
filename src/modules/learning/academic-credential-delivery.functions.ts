@@ -44,41 +44,15 @@ export const renderAcademicCredential=createServerFn({method:"GET"})
   return {filename:`${data.kind}-${data.credentialId}.pdf`,base64:Buffer.from(pdf).toString("base64")};
  });
 
+/** Official records must never be mailed as plaintext attachments. Release is
+ * disabled until a verified records-request and authenticated download workflow
+ * exist. This server guard protects even stale clients and direct POST calls. */
 export const deliverAcademicCredential=createServerFn({method:"POST"})
  .validator((value:unknown)=>target.extend({recipientEmail:z.string().email().max(254),recipientName:z.string().trim().min(1).max(150)}).parse(value))
  .handler(async ({data})=>{
-  const context=await registrar();const {db,s}=await resources();
-  const doc=await documentData(db,s,data.kind,data.credentialId);
-  if(!context.scope.organizationIds?.includes(doc.issuerId))throw new AuthorizationError("credential issuer");
-  const pdf=academicDocumentPdf(doc);
-  const [delivery]=await db.insert(s.academicCredentialDeliveries).values({
-   issuingOrganizationId:doc.issuerId,transcriptIssuanceId:data.kind==="transcript"?data.credentialId:null,
-   diplomaIssuanceId:data.kind==="diploma"?data.credentialId:null,
-   recipientEmail:data.recipientEmail.toLowerCase(),recipientName:data.recipientName,
-   requestedByPersonId:context.actorPersonId!,
-  }).returning({id:s.academicCredentialDeliveries.id});
-  if(!delivery)throw new Error("Failed to create delivery request");
-  const apiKey=process.env.RESEND_API_KEY;
-  const from=process.env.CAN_NOTIFICATIONS_FROM_EMAIL??process.env.CAN_ACCESS_FROM_EMAIL;
-  let accepted=false;let providerMessageId:string|null=null;let lastError:string|null=null;
-  if(!apiKey||!from)lastError="Email transport is not configured";
-  else{
-   try{
-    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:`Bearer ${apiKey}`,"Content-Type":"application/json","Idempotency-Key":delivery.id},body:JSON.stringify({
-     from,to:[data.recipientEmail],subject:`Official ${data.kind} from ${doc.issuer}`,
-     text:`Dear ${data.recipientName},\n\nAttached is the official ${data.kind} issued by ${doc.issuer}.\nCredential ID: ${doc.identifier}\n\nThis message is confidential and intended for the named recipient.`,
-     attachments:[{filename:`${data.kind}-${doc.identifier}.pdf`,content:Buffer.from(pdf).toString("base64")}],
-    })});
-    const result=await response.json().catch(()=>({})) as {id?:string;message?:string};
-    accepted=response.ok&&Boolean(result.id);providerMessageId=accepted?result.id??null:null;
-    if(!accepted)lastError=`Email provider rejected delivery (${response.status})`;
-   }catch(error){lastError=error instanceof Error?error.message:"Email provider request failed";}
-  }
-  await db.transaction(async tx=>{
-   await tx.update(s.academicCredentialDeliveries).set({status:accepted?"accepted":"failed",providerMessageId,lastError,sentAt:accepted?new Date():null,updatedAt:new Date()}).where(eq(s.academicCredentialDeliveries.id,delivery.id));
-   await writeAudit(tx,{actorPersonId:context.actorPersonId!,action:"academic_credential.delivery",resourceType:"academic_credential_delivery",resourceId:delivery.id,scope:{organizationId:doc.issuerId},after:{kind:data.kind,credentialId:data.credentialId,status:accepted?"accepted":"failed",providerMessageId},context:{requestId:context.requestId??null}});
-  });
-  return {deliveryId:delivery.id,status:accepted?"accepted" as const:"failed" as const};
+  await registrar();
+  void data;
+  throw new AuthorizationError("Credential release is unavailable pending verified recipient authorization, release instructions, consent and secure access. No PDF was sent.");
  });
 
 export const listAcademicCredentialDeliveries=createServerFn({method:"GET"})
