@@ -34,7 +34,6 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
  const [courseCredits,setCourseCredits]=useState("");
  const [reviewTeacherId,setReviewTeacherId]=useState("");
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
- const [confirmedSectionId,setConfirmedSectionId]=useState<string|null>(null);
  const mutation=useWorkspaceMutation({mutationFn: (operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
  const busy=mutation.isSubmitting;
  async function run(operation:()=>Promise<unknown>,message:string){
@@ -116,7 +115,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
     e.preventDefault();void run(async()=>{const result=await provisionLaunchSection({data:{
      programId:data.program.id,termId,courseTemplateVersionId:versionId,
      code:code.trim()||(selectedCourse?selectedCourse.code+"-A":""),title:title.trim()||selectedCourse?.title||"",teacherPersonId:effectiveTeacherId,scheduleTemplateId:effectiveScheduleId,
-     ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}});setCreatedSectionId(result.sectionId);setConfirmedSectionId(null);},"Class command accepted. Verify the saved Section and first-week readiness below.");
+     ...(courseCredits.trim()?{credits:Number(courseCredits)}:{})}});setCreatedSectionId(result.sectionId);},"Class command accepted. Verify the saved Section and first-week readiness below.");
    }}>
     <label className="text-sm">Academic term<select required value={termId} onChange={e=>setTermId(e.target.value)} className="mt-1 block w-full rounded border bg-background p-2">
      <option value="">Choose term</option>{data.terms.map(t=><option key={t.id} value={t.id}>{data.years.find(y=>y.id===t.schoolYearId)?.name??"School year"} · {t.name} ({t.startsOn}–{t.endsOn})</option>)}
