@@ -14,7 +14,7 @@ export type SerializableResult =
  * Server-only factories. The authenticated identity always comes from the
  * verified request session, never from submitted input.
  *
- * Authorization beyond authentication is deliberately explicit: capability
+ * TanStack Start validates generic handlers with a conditional serializability\n * type that cannot prove an unresolved TResult is serializable. We disable\n * that framework-only check for these generic factories; the JSON result\n * constraint and Zod validator remain explicit. Do not return classes,\n * Dates, Maps, or other non-JSON transport values from these wrappers.\n *\n * Authorization beyond authentication is deliberately explicit: capability
  * and resource guards must remain in the domain service or handler.
  */
 function privateResponse() {
@@ -25,7 +25,7 @@ export function authenticatedQuery<TSchema extends z.ZodTypeAny, TResult extends
   schema: TSchema,
   handler: (context: AccessContext, input: z.output<TSchema>) => Promise<TResult>,
 ) {
-  return createServerFn({ method: "GET" })
+  return createServerFn({ method: "GET", strict: false })
     .validator((value: unknown): z.output<TSchema> => schema.parse(value))
     .handler(async ({ data }) => {
       privateResponse();
@@ -38,7 +38,7 @@ export function authenticatedCommand<TSchema extends z.ZodTypeAny, TResult exten
   schema: TSchema,
   handler: (context: AccessContext, input: z.output<TSchema>) => Promise<TResult>,
 ) {
-  return createServerFn({ method: "POST" })
+  return createServerFn({ method: "POST", strict: false })
     .validator((value: unknown): z.output<TSchema> => schema.parse(value))
     .handler(async ({ data }) => {
       privateResponse();
@@ -54,7 +54,7 @@ export function scopedQuery<TSchema extends z.ZodTypeAny, TResult extends Serial
   resourceGuard: (context: AccessContext, input: z.output<TSchema>) => Promise<void>,
   handler: (context: AccessContext, input: z.output<TSchema>) => Promise<TResult>,
 ) {
-  return createServerFn({ method: "GET" })
+  return createServerFn({ method: "GET", strict: false })
     .validator((value: unknown): z.output<TSchema> => schema.parse(value))
     .handler(async ({ data }) => {
       privateResponse();
@@ -72,7 +72,7 @@ export function institutionalDecision<TSchema extends z.ZodTypeAny, TResult exte
   resourceGuard: (context: AccessContext, input: z.output<TSchema>) => Promise<void>,
   decide: (context: AccessContext, input: z.output<TSchema>) => Promise<TResult>,
 ) {
-  return createServerFn({ method: "POST" })
+  return createServerFn({ method: "POST", strict: false })
     .validator((value: unknown): z.output<TSchema> => schema.parse(value))
     .handler(async ({ data }) => {
       privateResponse();
