@@ -30,5 +30,6 @@ describe("site-local time", () => {
   it("rejects invalid calendar values and timezone", () => {
     expect(() => siteLocalTimeToIso("2026-02-30T10:00", "UTC")).toThrow();
     expect(() => siteLocalTimeToIso("2026-06-01T10:00", "Mars/Base")).toThrow();
+    expect(() => siteLocalTimeToIso("2026-06-01T10:00", "UTC", "guess" as never)).toThrow(/policy/);
   });
 });
