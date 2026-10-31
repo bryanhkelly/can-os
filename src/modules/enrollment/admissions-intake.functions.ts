@@ -148,7 +148,9 @@ export const listAdmissionsIntake=createServerFn({method:"GET"})
    data.siteId?eq(programs.siteId,data.siteId):undefined,
    data.programId?eq(applications.programId,data.programId):undefined,
    data.search?or(ilike(people.legalFirstName,"%"+data.search+"%"),ilike(people.legalLastName,"%"+data.search+"%"),ilike(programs.name,"%"+data.search+"%"),z.string().uuid().safeParse(data.search).success?eq(applications.id,data.search):undefined):undefined))
-  .orderBy(desc(applications.updatedAt),desc(applications.id)).limit(data.pageSize).offset((data.page-1)*data.pageSize);
+  .orderBy(desc(applications.updatedAt),desc(applications.id)).limit(data.pageSize+1).offset((data.page-1)*data.pageSize);
+ const hasMore=rows.length>data.pageSize;
+ rows.splice(data.pageSize);
  const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  const sourceIds=[...new Set(rows.map(r=>
    typeof r.metadata.originTransferActionId==="string"?r.metadata.originTransferActionId:null
@@ -175,7 +177,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"})
  }).from(accountPersonGrants).where(and(
   inArray(accountPersonGrants.personId,contactIds),eq(accountPersonGrants.role,"guardian"),
   eq(accountPersonGrants.active,true))):[];
- return rows.map(r=>{
+ const items=rows.map(r=>{
   const {metadata,...rest}=r;
   const contactId=applicationGuardianContact(metadata,r.submittedByPersonId);
   const verified=relations.some(rel=>rel.guardianPersonId===contactId&&
@@ -216,6 +218,7 @@ export const listAdmissionsIntake=createServerFn({method:"GET"})
    disposition:metadata.admissionsDisposition==="waitlisted"?"waitlisted":metadata.admissionsDisposition==="offer_ready"?"ready_for_offer":null,
   };
  });
+ return {items,hasMore,nextPage:hasMore?data.page+1:null};
 });
 export const createAdmissionsInquiry=createServerFn({method:"POST"}).validator((v:unknown)=>applicant.parse(v))
  .handler(async({data})=>{
