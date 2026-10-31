@@ -101,9 +101,12 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
         lte(schoolYears.startsOn,data.date),gte(schoolYears.endsOn,data.date),
         lte(terms.startsOn,data.date),gte(terms.endsOn,data.date),
         inArray(sections.programId,actor.scope.programIds??[]),
-        ...(data.registrarFirstDay ? [eq(sections.programId,data.programId!),
-          eq(sections.id,data.sectionId!)] : [])))
+        ...(data.registrarFirstDay ? [eq(sections.programId,data.programId!)] : [])))
       .limit(251);
+    // Evaluate the whole authorized Program before narrowing the response to
+    // one Section. A shared adult or room double-booking must remain visible.
+    if(data.registrarFirstDay && !sectionsAtSite.some(row=>row.id===data.sectionId))
+      throw new AuthorizationError("original registrar Section not in authorized Program and Site");
     const projectionTruncated=sectionsAtSite.length>250;
     const onsiteSections=sectionsAtSite.slice(0,250);
     if(!onsiteSections.length){
