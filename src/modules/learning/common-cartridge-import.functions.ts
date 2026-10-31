@@ -382,6 +382,9 @@ export const readCommonCartridgeStaticLesson=createServerFn({method:"GET"})
   if(!program)throw new AuthorizationError("Active Program");
   const [overlay]=await db.select({id:curriculumOverlays.id})
    .from(curriculumOverlays).where(and(eq(curriculumOverlays.resourceId,data.resourceId),
+     eq(curriculumOverlays.organizationId,program.organizationId),
+     eq(curriculumOverlays.siteId,authorizedSection.siteId),
+     eq(curriculumOverlays.courseTemplateVersionId,authorizedSection.courseTemplateVersionId),
      eq(curriculumOverlays.sectionId,data.sectionId),eq(curriculumOverlays.programId,data.programId),
      eq(curriculumOverlays.status,"active"))).limit(1);
   if(!overlay)throw new AuthorizationError("Published class resource");
