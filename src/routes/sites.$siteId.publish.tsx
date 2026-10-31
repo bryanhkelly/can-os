@@ -4,7 +4,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
-import { getSitePublicationDraftView, reserveSitePublicationAddress, setSitePublicationStatus } from "@/modules/sites/site-publication.functions";
+import { getSitePublicationDraftView, reserveSitePublicationAddress, setSitePublicationStatus, verifySitePublicationReachability } from "@/modules/sites/site-publication.functions";
 import { AcademicProgramMarketingEditor } from "@/components/sites/AcademicProgramMarketingEditor";
 
 export const Route = createFileRoute("/sites/$siteId/publish")({
@@ -31,6 +31,8 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
   const [notice, setNotice] = useState("");
   const [reason, setReason] = useState("");
   const [contentReviewed, setContentReviewed] = useState(false);
+  const [reachability, setReachability] = useState<"live" | "unreachable" | "hosting_disabled" | "not_published" | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   async function reserve(event: FormEvent) {
     event.preventDefault();
@@ -56,7 +58,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       } });
       setNotice(result.changed
         ? (action === "publish"
-            ? "Catalog approved. Public hostname routing is not yet active."
+            ? (data.hostingConfigured
+                 ? "Catalog approved. Hosting is configured; verify DNS/TLS and public reachability before announcing the URL."
+                 : "Catalog approved. Hosting is disabled until the production hostname and routing configuration is enabled.")
             : "Site catalog unpublished and no longer publicly readable.")
         : "No change was needed. The site is already in that state.");
       setReason(""); setContentReviewed(false);
@@ -68,12 +72,23 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
     }
   }
 
+  async function verifyPublicWebsite() {
+    setVerifying(true); setError("");
+    try {
+      const result = await verifySitePublicationReachability({ data: { siteId: data.site.id } });
+      setReachability(result.status);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to check the public address");
+      setReachability("unreachable");
+    } finally { setVerifying(false); }
+  }
+
   const hasApprovedPublicContent = data.catalogPreview.length > 0 ||
     data.academicPrograms.some(program => program.marketing?.status === "published" &&
       !["paused", "closed"].includes(program.status));
   const candidate = isPublicSiteSlug(slug) ? publicSiteHost(slug) : null;
   return <WorkspaceShell eyebrow="CAN OS · Site publishing" title={data.site.name + " · public site"}
-    subtitle="Reserve an address and approve or withdraw the catalog. Public hostname routing is not yet active."
+    subtitle="Reserve and publish your school address. Public hosting depends on separate DNS, TLS and deployment configuration."
     breadcrumbs={<><Link to="/sites/$siteId" params={{ siteId: data.site.id }} className="underline">Site Today</Link><span>/</span><span>Public site</span></>}>
     {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-5 rounded-lg border p-3 text-sm">{notice}</p>}
@@ -85,6 +100,21 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         <p className="text-sm text-muted-foreground">Recorded status: {data.address.status}. {data.address.publishedAt
           ? "Approved " + new Date(data.address.publishedAt).toLocaleString()
           : "Not published"}. Address changes require separate approval.</p>
+        {data.address.status === "published" && <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" disabled={verifying || saving} onClick={() => void verifyPublicWebsite()}
+            className="rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">
+            {verifying ? "Checking HTTPS site…" : "Check live website"}
+          </button>
+          {reachability === "live" &&
+            <a href={"https://" + data.address.host + "/"} target="_blank" rel="noopener noreferrer"
+              className="text-sm font-semibold underline">Open verified live website</a>}
+          {reachability && <p role="status" className="text-sm">
+            {reachability === "live" ? "Public HTTPS website is reachable and serving CAN OS."
+             : reachability === "hosting_disabled" ? "Hosting is disabled in this deployment."
+             : reachability === "not_published" ? "Site publication is not approved."
+             : "Public HTTPS website cannot yet be verified. Check DNS, TLS, and deployment routing."}
+          </p>}
+        </div>}
       </div> : <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={reserve}>
         <label className="flex-1 text-sm">Subdomain
           <input aria-label="Public site subdomain" className="mt-1 block w-full rounded-lg border bg-background p-2"
@@ -108,13 +138,17 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           </p>
         </div>
         <span className="rounded-full border px-3 py-1 text-xs font-semibold">
-          {data.address?.status === "published" ? "Site approved · hosting disabled" : "Private draft"}
+          {data.address?.status === "published"
+            ? (data.hostingConfigured ? "Published · hosting configured (DNS not verified)" : "Published · hosting disabled")
+            : "Private draft"}
         </span>
       </div>
       {data.previewHtml ? <>
         <p className="mt-4 text-xs text-muted-foreground">
           Reserved address: <span className="font-mono">{data.address?.host}</span>.
-          The address is not an active public website.
+          {data.hostingConfigured && data.address?.status === "published"
+            ? "Hosting is enabled in the application; external DNS/TLS reachability must still be verified."
+            : "This is a private preview, not an active public website."}
         </p>
         <iframe title={`${data.site.name} private website draft preview`}
           srcDoc={data.previewHtml} sandbox="" referrerPolicy="no-referrer"
@@ -168,7 +202,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           <p className="mt-1 text-xs text-muted-foreground">
             {item.registrationOpen ? "CAN enrichment registration currently open" :
               "CAN enrichment registration window not open"}
-            {" · "}Public site hostname routing not yet active
+            {" · "}{data.hostingConfigured ? "Hosting configured (check live website)" : "Public hosting disabled"}
           </p>
         </article>)}
         {!data.catalogPreview.length && <p className="text-sm text-muted-foreground">

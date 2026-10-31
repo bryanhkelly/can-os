@@ -7,6 +7,7 @@ import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
+import { ensureStandardGradeScale } from "./standard-grade-scale.server";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,asc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -73,33 +74,11 @@ export const getSchoolYearStudio = createServerFn({method:"GET"}).handler(async 
   return {...program,...(targetOpeningDate?{targetOpeningDate}:{})};
  })};
 });
-export const createStudioGradeScale=createServerFn({method:"POST"})
- .validator((v:unknown)=>z.object({organizationId:uuid,name:z.string().trim().min(2).max(80)}).parse(v))
- .handler(async({data})=>{
-  const actor=await operator();
-  if(!actor.scope.organizationIds?.includes(data.organizationId))
-   throw new AuthorizationError("grading scale organization");
-  return db.transaction(async tx=>{
-   const [existing]=await tx.select({id:gradeScales.id}).from(gradeScales)
-    .where(and(eq(gradeScales.owningOrganizationId,data.organizationId),
-     eq(gradeScales.name,data.name),eq(gradeScales.version,1))).limit(1);
-   if(existing)return {gradeScaleId:existing.id};
-   const [scale]=await tx.insert(gradeScales).values({
-    owningOrganizationId:data.organizationId,name:data.name,version:1,active:true,
-    configuration:{entries:[
-     {label:"A",minPercent:90,maxPercent:100,gpaPoints:4,passing:true},
-     {label:"B",minPercent:80,maxPercent:89.99,gpaPoints:3,passing:true},
-     {label:"C",minPercent:70,maxPercent:79.99,gpaPoints:2,passing:true},
-     {label:"D",minPercent:60,maxPercent:69.99,gpaPoints:1,passing:true},
-     {label:"F",minPercent:0,maxPercent:59.99,gpaPoints:0,passing:false},
-    ]},
-   }).returning({id:gradeScales.id});
-   await writeAudit(tx,actor,{
-    action:"grade_scale.create",entityType:"grade_scale",entityId:scale!.id,
-    scope:{organizationId:data.organizationId},after:{name:data.name,version:1}});
-   return {gradeScaleId:scale!.id};
-  });
- });
+export const createStudioGradeScale = createServerFn({method:"POST"})
+ .validator((v:unknown)=>z.object({organizationId:uuid,name:z.string().trim().min(2).max(80)}).strict().parse(v))
+ .handler(async({data})=>({
+   gradeScaleId:await ensureStandardGradeScale(await operator(),data),
+ }));
 export const createStudioYear = createServerFn({method:"POST"})
  .validator((v:unknown)=>z.object({siteId:uuid,programId:uuid.optional(),gradeScaleId:uuid,
   key:z.string().min(2).max(40),name:z.string().min(3).max(100),startsOn:day,endsOn:day}).parse(v))

@@ -1470,6 +1470,35 @@
         "audit_events",
         "domain_events"
       ]
+    },
+    "/admissions/invite-families": {
+      "persona": "registrar",
+      "seeds": [
+        "public-family-admissions-v1.sql"
+      ],
+      "recordCounts": {
+        "programs": 1
+      },
+      "interactions": [
+        "select an authorized receiving-school Program",
+        "queue a verified-email family invitation batch",
+        "review recipient status and retry failed delivery"
+      ],
+      "downstreamRecords": [
+        "communication_threads",
+        "domain_events",
+        "public_family_start_requests"
+      ]
+    },
+    "/enrichment-review": {
+      "fixtureRequired": false,
+      "persona": "can_network_steward",
+      "rationale": "Independent restricted safety-evidence review requires genuine separate submitter and CAN reviewer credentials; no synthetic document can establish approval. The empty review queue must render without fabricated approvals.",
+      "interactions": [
+        "open the independent reviewer workspace",
+        "observe an empty review queue when no genuine current seasons are awaiting review"
+      ],
+      "downstreamRecords": []
     }
   }
 }

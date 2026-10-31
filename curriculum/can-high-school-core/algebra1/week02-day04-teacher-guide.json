@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "courseCode": "CAN-ALG1",
+  "visibility": "teacher_only",
+  "units": [
+    {
+      "unitId": "algebra1-u01",
+      "reviewStatus": "draft",
+      "teacherOverview": "Publisher-owned Week 2 Day 4 draft. Check student reasoning and keep worked answers restricted to teacher access.",
+      "lessons": [
+        {
+          "lessonId": "u01-w02-d04",
+          "preparation": "Prepare a timed 55-minute lesson, visible worked examples and optional nonvisual notation support. Protect this teacher guide from all student-facing payloads.",
+          "workedAnswers": [
+            {
+              "prompt": "Launch",
+              "answer": "18+9p=90; p=8 passes, not dollars. Passes must be nonnegative integers."
+            },
+            {
+              "prompt": "Guided 1",
+              "answer": "25+8s=81; s=7 sessions; 25+56=81."
+            },
+            {
+              "prompt": "Guided 2",
+              "answer": "32+7d=81; d=7 days."
+            },
+            {
+              "prompt": "Guided 3",
+              "answer": "10+6t≤51 gives t≤41/6; maximum 6 whole tickets."
+            },
+            {
+              "prompt": "A",
+              "answer": "15+20l=115; l=5 lessons."
+            },
+            {
+              "prompt": "B",
+              "answer": "140+12s=320; s=15 shirts."
+            },
+            {
+              "prompt": "C",
+              "answer": "Each bus has 24−5=19 student seats. 19b≥62; b≥62/19, so 4 buses."
+            },
+            {
+              "prompt": "D",
+              "answer": "18+7v=30+5v; 2v=12; v=6 visits, both $60."
+            },
+            {
+              "prompt": "E",
+              "answer": "At least 17 students in groups of at most 5 require ceil(17/5)=4 groups; a fractional group cannot be used."
+            },
+            {
+              "prompt": "Exit",
+              "answer": "16+6p=88; 6p=72; p=12 participants. $16 + $72 = $88."
+            }
+          ],
+          "misconceptions": [
+            "Applying an operation to only one side changes the solution set.",
+            "Discarding measurement units or integer constraints leads to incorrect contextual conclusions.",
+            "A correct final number alone does not justify an invalid intermediate step."
+          ],
+          "interventions": [
+            "Use a paired-column equality-preserving step chart.",
+            "Require an original-expression substitution check.",
+            "Offer a second worked contextual model with units labeled."
+          ],
+          "extensions": [
+            "Invent an equivalent equation and prove it has the same solution set.",
+            "Critique a realistic model where a real-number answer is not feasible."
+          ]
+        }
+      ],
+      "assessments": []
+    }
+  ]
+}
