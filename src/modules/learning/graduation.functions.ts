@@ -29,6 +29,10 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
   if (!Array.isArray(snapshot.rows) || !snapshot.rows.length) throw new Error("Issued transcript has no academic evidence");
   const rows = snapshot.rows as Array<SnapshotRow & {creditIssuingOrganizationId:string}>;
   if (rows.some(row => row.creditIssuingOrganizationId !== issuerId)) throw new AuthorizationError("transcript issuer mismatch");
+  // The canonical transcript issuer does not yet support cross-issuer transfer
+  // acceptance. Never treat caller-supplied snapshot flags as an authorization.
+  if (rows.some(row => row.isTransferCredit === true || row.acceptedByIssuer !== undefined || row.creditAcceptanceStatus !== undefined))
+    throw new AuthorizationError("Transfer credit requires canonical issuer-accepted ledger evidence");
   // Intermediate grading periods must not count twice. A W is zero earned credit.
   const terminal = rows.filter(row => row.terminalPeriod);
   const sections = new Map<string, typeof terminal[number]>();
