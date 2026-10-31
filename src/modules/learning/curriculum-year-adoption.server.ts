@@ -8,6 +8,7 @@ import type {Actor} from "@/modules/identity/actors.server";
 import {emitEvent} from "@/platform/mutation";
 import {recordAudit} from "@/modules/identity/actors.server";
 import {annualAdoptionEligible} from "@/domain/curriculum-year-policy";
+import {EventTypes} from "@/domain/event-types";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Year={id:string;startsAt:Date;endsAt:Date};
@@ -99,7 +100,7 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
   await recordAudit(tx,actor,{action:"curriculum.adoption.year_rollover",resourceType:"curriculum_annual_adoption",
    resourceId:row.id,scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
    after:{academicYearId:input.year.id,packId:input.packId,packVersionId:version.id,entitlementId:entitlement.id}});
-  await emitEvent(tx,{eventType:"curriculum.adoption.year_rolled_over",aggregateType:"curriculum_annual_adoption",
+  await emitEvent(tx,{eventType:EventTypes.CurriculumAnnualAdoptionRolledOver,aggregateType:"curriculum_annual_adoption",
    aggregateId:row.id,actorPersonId:actor.actorPersonId,organizationId:program.organizationId,
    siteId:program.siteId,programId:program.id,payload:{academicYearId:input.year.id,packVersionId:version.id}});
   return {adoptionId:row.id,created:true};
@@ -137,7 +138,7 @@ export async function rollbackAnnualCurriculumAdoption(actor:Actor,input:{
    scope:{organizationId:program.organizationId,siteId:program.siteId,programId:program.id},
    before:{status:existing.status,packVersionId:existing.packVersionId},
    after:{status:"rolled_back",reason:input.reason.trim(),academicYearId:input.academicYearId}});
-  await emitEvent(tx,{eventType:"curriculum.adoption.year_rolled_back",
+  await emitEvent(tx,{eventType:EventTypes.CurriculumAnnualAdoptionRolledBack,
    aggregateType:"curriculum_annual_adoption",aggregateId:existing.id,
    actorPersonId:actor.actorPersonId,organizationId:program.organizationId,
    siteId:program.siteId,programId:program.id,payload:{academicYearId:input.academicYearId}});
