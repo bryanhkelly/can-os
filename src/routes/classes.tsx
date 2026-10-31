@@ -1,3 +1,4 @@
+import { PublishedLessonNavigation } from "@/components/learning/PublishedLessonNavigation";
 import { selectPublishedLesson } from "@/components/learning/lesson-navigation";
 import { StudentNextStepsPanel } from "@/components/learning/StudentNextStepsPanel";
 import { ClassDirectoryCards } from "@/components/learning/ClassDirectoryCards";
@@ -199,19 +200,8 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {lessonId && !lesson && <p role="alert" className="rounded-xl border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
       {lesson ? <WorkspacePanel title={lesson.title} actions={<Link to="/classes" search={{ ...search, tab: "lessons" }} className="text-sm underline">All lessons</Link>}>
         {data.role === "student" && <LearningActivityTracker sectionId={data.section.id} lessonId={lesson.id} />}
-        <nav aria-label="Course lesson navigation" className="mb-5 space-y-3 rounded-lg border p-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-            <span>Lesson {lessonIndex+1} of {lessons.length}</span>
-            {data.role==="student"&&<span>{completed.size} of {lessons.length} lessons self-reported complete</span>}
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            {previousLesson?<Link to="/classes" search={{...search,tab:"lessons",lesson:previousLesson.id}} className="underline">← Previous: {previousLesson.title}</Link>:
-             <span className="text-muted-foreground">Beginning of course</span>}
-            {nextLesson?<Link to="/classes" search={{...search,tab:"lessons",lesson:nextLesson.id}} className="underline">Next: {nextLesson.title} →</Link>:
-             <span className="text-muted-foreground">End of published course</span>}
-          </div>
-          <p className="text-xs text-muted-foreground">Navigation never marks lessons complete or awards grades or academic credit.</p>
-        </nav>
+        <PublishedLessonNavigation search={search} lessonIndex={lessonIndex} lessonCount={lessons.length} completedCount={completed.size} isStudent={data.role==="student"} previousLesson={previousLesson} nextLesson={nextLesson} />
+
         {lesson.estimatedMinutes && <p className="mb-3 text-xs text-muted-foreground">Estimated lesson time: {lesson.estimatedMinutes} minutes</p>}
         {lesson.learningTargets?.length ? <section className="mb-5 rounded-lg border p-4">
           <h3 className="text-sm font-semibold">Learning targets</h3>
