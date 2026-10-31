@@ -135,15 +135,23 @@ export async function verifyChurchApplication(actor: AccessContext, input: {
   requestId: string; evidenceReference: string; verificationMethod: string;
 }) {
   const canOrganizationId = await requireCANSteward(actor);
+  const reference = input.evidenceReference.trim();
+  const allowedMethods = ["signed_authority", "denominational_confirmation", "independent_church_confirmation"];
+  if (!allowedMethods.includes(input.verificationMethod) || reference.length < 8 || reference.length > 500 || /[\u0000-\u001f\u007f]/.test(reference) || /^(?:javascript|data|file):/i.test(reference))
+    throw new Error("A valid independent authority evidence reference and method are required");
   return db.transaction(async tx => {
     const [request] = await tx.select().from(churchOnboardingRequests)
       .where(eq(churchOnboardingRequests.id, input.requestId)).for("update").limit(1);
     if (!request || request.status !== "submitted") throw new Error("Application is no longer awaiting verification");
+    const reused = await tx.select({ id: documents.id }).from(documents).where(and(
+      eq(documents.category, "church_onboarding_authority"), eq(documents.storageKey, reference),
+    )).limit(1);
+    if (reused.length) throw new Error("Evidence reference is already registered; obtain an application-specific independent record");
     const [document] = await tx.insert(documents).values({
       subjectType: "organization", subjectId: canOrganizationId,
       category: "church_onboarding_authority",
       fileName: "Independently reviewed church authority (" + input.verificationMethod + ")",
-      storageProvider: "external_verified_reference", storageKey: input.evidenceReference,
+      storageProvider: "external_verified_reference", storageKey: reference,
       sensitivityTier: "restricted",
       uploadedByPersonId: actor.actorPersonId!, verifiedByPersonId: actor.actorPersonId!,
       verifiedAt: new Date(),
@@ -175,6 +183,17 @@ export async function approveChurchApplication(actor: AccessContext, requestId: 
   if (!request || request.status !== "verified" || !request.authorityDocumentId ||
       !request.verifiedByPersonId || request.verifiedByPersonId === actor.actorPersonId)
     throw new AuthorizationError("separately verified church application and independent approver");
+
+  const [evidence] = await db.select({ id: documents.id, expiresAt: documents.expiresAt,
+    verifiedAt: documents.verifiedAt, verifiedByPersonId: documents.verifiedByPersonId,
+    metadata: documents.metadata, category: documents.category,
+  }).from(documents).where(eq(documents.id, request.authorityDocumentId)).limit(1);
+  if (!evidence || evidence.category !== "church_onboarding_authority" ||
+      !evidence.verifiedAt || evidence.verifiedByPersonId !== request.verifiedByPersonId ||
+      (evidence.expiresAt && evidence.expiresAt <= new Date()) ||
+      evidence.metadata.churchRequestId !== request.id ||
+      evidence.metadata.authorizedEmailNormalized !== request.contactEmail)
+    throw new AuthorizationError("current, application-bound independent authority evidence");
 
   // The callback updates the approved request INSIDE the canonical bootstrap
   // transaction, so a failed/declined approval rolls back all new grants/Sites.
