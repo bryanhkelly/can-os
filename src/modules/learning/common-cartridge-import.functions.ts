@@ -260,6 +260,7 @@ export const finishCommonCartridgeStaticLessonImport=createServerFn({method:"POS
    throw new Error("Private curriculum uploads are not enabled.");
   resolveR2Config();
   const {preview,lesson,digest,htmlBytes,htmlHash}=inspectHtmlInput(data);
+  if(htmlBytes.length<16)throw new Error("Static HTML lesson must contain at least 16 bytes.");
   if(data.htmlSha256!==htmlHash||!data.key.startsWith(`learning/cartridge-static/${data.resourceId}/`))
    throw new AuthorizationError("matching sanitized lesson upload");
   await verifyPrivateObject({key:data.key,keyPattern:htmlKeyPattern,
