@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { gradeResponseActionType } from "@/domain/grade-response-policy";
@@ -26,12 +27,30 @@ export const getTeacherGradeResponses = createServerFn({ method: "GET" }).handle
   if (!sectionIds.length) return { items: [], truncated: false };
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
   return db.transaction(async tx => {
+    const programEnrollment = alias(s.enrollments, "teacher_grade_response_program_enrollment");
     const rows = await tx.select({
       action: s.actions, studentName: sql<string>`concat(${s.people.legalFirstName}, ' ', ${s.people.legalLastName})`,
       assessmentId: s.assessments.id, assessmentTitle: s.assessments.title,
     }).from(s.actions)
       .innerJoin(s.submissions, eq(sql<string>`${s.submissions.id}::text`, sql<string>`${s.actions.metadata}->>'submissionId'`))
       .innerJoin(s.assessments, eq(s.assessments.id, s.submissions.assessmentId))
+      .innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
+      .innerJoin(s.terms, eq(s.terms.id, s.sections.termId))
+      // Do not let withdrawn students' old Actions crowd out current questions.
+      // Both a live Section seat and its same-year Program seat are required.
+      .innerJoin(s.enrollments, and(
+        eq(s.enrollments.studentProfileId, s.submissions.studentProfileId),
+        eq(s.enrollments.sectionId, s.sections.id),
+        eq(s.enrollments.programId, s.sections.programId),
+        eq(s.enrollments.schoolYearId, s.terms.schoolYearId),
+        eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active"),
+      ))
+      .innerJoin(programEnrollment, and(
+        eq(programEnrollment.studentProfileId, s.submissions.studentProfileId),
+        eq(programEnrollment.programId, s.sections.programId),
+        eq(programEnrollment.schoolYearId, s.terms.schoolYearId),
+        eq(programEnrollment.kind, "program"), eq(programEnrollment.status, "active"),
+      ))
       .innerJoin(s.studentProfiles, eq(s.studentProfiles.id, s.submissions.studentProfileId))
       .innerJoin(s.people, eq(s.people.id, s.studentProfiles.personId))
       .where(and(
