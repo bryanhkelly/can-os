@@ -106,6 +106,9 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
   const [program]=action?.programId?await db.select({issuerId:s.programs.creditIssuingOrganizationId})
    .from(s.programs).where(eq(s.programs.id,action.programId)).limit(1):[];
   const evidence=consent?.signatureEvidence;
+  // The existing school-transfer consent is destination-scoped. A guardian
+  // inbox is a handoff to the signer, not authenticated delivery to the
+  // destination institution; never represent it as institution receipt.
   const trustedInstructions=!!action&&action.metadata.kind==="transfer"&&
    action.metadata.exitCompletedByRegistrar===true&&
    action.metadata.recordsReleaseConsentId===consent?.id&&
@@ -143,9 +146,18 @@ export const authorizeAcademicCredentialRelease=createServerFn({method:"POST"})
      eq(s.guardianRelationships.guardianPersonId,data.recipientPersonId),
      eq(s.guardianRelationships.canManageEnrollment,true))).for("share").limit(1);
    if(!liveConsent||liveConsent.revokedAt||!liveGuardian||
+      liveConsent.signerPersonId!==data.recipientPersonId||
+      liveConsent.subjectId!==doc.studentProfileId||
+      liveAction?.subjectId!==doc.studentProfileId||
+      liveAction?.metadata.requestedByGuardianPersonId!==data.recipientPersonId||
       liveAction?.status!=="resolved"||liveAction.metadata.exitCompletedByRegistrar!==true||
       liveAction.metadata.recordsReleaseConsentId!==liveConsent.id||
-      liveConsent.signatureEvidence.actionId!==liveAction.id)
+      liveConsent.signatureEvidence.actionId!==liveAction.id||
+      liveConsent.signatureEvidence.acknowledged!==true||
+      liveConsent.signatureEvidence.guardianPersonId!==data.recipientPersonId||
+      liveConsent.signatureEvidence.studentPersonId!==student.personId||
+      liveConsent.signatureEvidence.programId!==liveAction.programId||
+      liveConsent.signatureEvidence.destinationSchoolName!==liveAction.metadata.destinationSchoolName)
     throw new AuthorizationError("Transfer release authority changed during review");
    const [existing]=await tx.select({
     id:s.academicCredentialReleaseAuthorizations.id,
