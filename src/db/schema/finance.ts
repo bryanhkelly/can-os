@@ -42,6 +42,7 @@ export const financePaymentAttempts = pgTable("finance_payment_attempts", {
   idempotencyKey: text("idempotency_key").notNull(),
   provider: text("provider").notNull(),
   providerIntentId: text("provider_intent_id"),
+  amountCents: integer("amount_cents").notNull(),
   status: text("status").$type<"pending" | "requires_configuration" | "failed" | "submitted">().notNull(),
   errorCode: text("error_code"),
   createdAt: createdAt(),
