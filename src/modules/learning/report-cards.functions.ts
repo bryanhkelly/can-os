@@ -949,9 +949,20 @@ export const getStudentTranscript = createServerFn({ method: "GET" })
     const { db, s } = await stores();
     const viewer = await resolveStudentViewer(db, s, data.studentPersonId);
     const rows = [...await finalizedGradeRows(db, s, viewer), ...await withdrawalTranscriptRows(db, s, viewer)];
+    // Issued snapshots remain part of this student's academic history after
+    // a school transfer, even if the original Section is no longer in the
+    // current receiving-school scope. Only the exact authenticated student or
+    // their verified academic guardian reaches this projection.
+    const priorIssuers=await db.selectDistinct({
+      id:s.transcriptIssuances.issuingOrganizationId,
+    }).from(s.transcriptIssuances).where(
+      eq(s.transcriptIssuances.studentProfileId,viewer.studentProfileId));
     return {
       rows,
-      issuances: await listIssuances(db, s, viewer.studentProfileId,[...new Set(rows.map(row=>row.creditIssuingOrganizationId))]),
+      issuances: await listIssuances(db,s,viewer.studentProfileId,[
+        ...new Set([...rows.map(row=>row.creditIssuingOrganizationId),
+          ...priorIssuers.map(issuer=>issuer.id)]),
+      ]),
     };
   });
 
