@@ -264,6 +264,27 @@ export const decideGraduation = createServerFn({method:"POST"})
    });
  });
 
+/** Registrar's persistent credential history for a selected official transcript. */
+export const listTranscriptDiplomas=createServerFn({method:"GET"})
+ .validator((input:unknown)=>z.object({transcriptId:uuid}).parse(input))
+ .handler(async ({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   const context=await registrar();const {db,s}=await resources();
+   const [transcript]=await db.select().from(s.transcriptIssuances)
+     .where(eq(s.transcriptIssuances.id,data.transcriptId)).limit(1);
+   if(!transcript)throw new AuthorizationError("Transcript not found");
+   issuerAuthorized(context,transcript.issuingOrganizationId);
+   return db.select({id:s.diplomaIssuances.id,issuedAt:s.diplomaIssuances.issuedAt,
+     revokedAt:s.diplomaIssuances.revokedAt,revocationReason:s.diplomaIssuances.revocationReason,
+     decision:s.graduationDecisions.decision})
+     .from(s.diplomaIssuances)
+     .innerJoin(s.graduationDecisions,eq(s.graduationDecisions.id,s.diplomaIssuances.graduationDecisionId))
+     .where(and(eq(s.graduationDecisions.transcriptIssuanceId,transcript.id),
+       eq(s.graduationDecisions.studentProfileId,transcript.studentProfileId),
+       eq(s.graduationDecisions.issuingOrganizationId,transcript.issuingOrganizationId)))
+     .orderBy(desc(s.diplomaIssuances.issuedAt),desc(s.diplomaIssuances.id));
+ });
+
 /** Institution-owned diploma status, never a release authorization. B must additionally authorize the recipient. */
 /** Revocation is append-only state: a revoked diploma is never reactivated. */
 export const revokeDiploma=createServerFn({method:"POST"})
