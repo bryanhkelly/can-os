@@ -6,3 +6,5 @@ export { EvidenceHistory } from "./EvidenceHistory";
 export { EvidenceWorkflow } from "./EvidenceWorkflow";
 export { EvidenceDocumentLink } from "./EvidenceDocumentLink";
 export type { EvidenceDocumentLinkProps } from "./EvidenceDocumentLink";
+export { EvidenceDocumentSummary } from "./EvidenceDocumentSummary";
+export type { EvidenceDocumentSummaryProps } from "./EvidenceDocumentSummary";
