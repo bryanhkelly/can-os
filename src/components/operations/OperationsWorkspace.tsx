@@ -1,3 +1,4 @@
+import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { EmptyState, QueryState, StatCard, StatusBadge, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { ArrowUpRight, ClipboardList, School, ShieldCheck } from "lucide-react";
 import { getLiveOperationsCommandCenter, getLiveFullFlowOperations } from "@/modules/operations/command-center.functions";
@@ -5,7 +6,7 @@ import { type listLaunches } from "@/modules/programs/launch.functions";
 import { GuidedSchoolJourney } from "@/components/operations/GuidedSchoolJourney";
 import { OutboxHealthPanel } from "@/components/operations/OutboxHealthPanel";
 import { isGuidedAcademicSchool } from "@/domain/guided-school-journey";
-import {useState} from "react";
+import {useRef,useState} from "react";
 import {Link,useRouter} from "@tanstack/react-router";
 import {getReleaseHealth} from "@/modules/operations/release-health.functions";
 import {getOperationsActions,updateOperationsAction,assignOperationsAction,setOperationsActionDeadline} from "@/modules/operations/action-workspace.functions";
@@ -38,56 +39,65 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   void router.navigate({href:"/operations"+(query.size?"?"+query.toString():"")});
  };
  const router=useRouter();
+ const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
+ const exitMutation=useWorkspaceMutation({mutationFn:(input:{actionId:string;resolutionNote:string})=>completeRegistrarEnrollmentExit({data:{actionId:input.actionId,confirmInstitutionalReview:true,resolutionNote:input.resolutionNote}}),invalidateRouter:()=>router.invalidate()});
  const [busy,setBusy]=useState<string|null>(null);
+ const actionInFlight=useRef(false);
+ async function submitAction(id:string, operation:()=>Promise<unknown>){
+  if(actionInFlight.current||exitMutation.isSubmitting)return false;
+  actionInFlight.current=true;
+  setBusy(id);
+  try{const submission=await mutation.submit(operation);
+   if(submission.status === "ignored")return false;
+   if(submission.refreshError)setError("Action saved, but refresh failed. Reopen the action; do not resubmit.");
+   return !submission.refreshError;}
+  finally{actionInFlight.current=false;setBusy(null);}
+ }
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const [dueDrafts,setDueDrafts]=useState<Record<string,string>>({});
- if(authError||!data||!health)return <WorkspaceShell width="wide" eyebrow="CAN OS · Operations" title="Needs You"
+ if(authError||!data)return <WorkspaceShell width="wide" eyebrow="CAN OS · Operations" title="Needs You"
   subtitle="Review actions and launch readiness for an authorized school and program.">
   <QueryState error={authError||"Operations data is unavailable. No operational changes were made."}/>
  </WorkspaceShell>;
  async function moveAction(id:string,status:"in_progress"|"waiting"|"resolved"){
-  setBusy(id);setError("");
-  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim()){setBusy(null);return;}await updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}});await router.invalidate();}
+  setError("");
+  try{const resolutionNote=status==="resolved"?window.prompt("Resolution note (required)"):undefined;if(status==="resolved"&&!resolutionNote?.trim())return;await submitAction(id,()=>updateOperationsAction({data:{id,status,resolutionNote:resolutionNote?.trim()}}));}
   catch(e){setError(e instanceof Error?e.message:"Unable to update action");}
-  finally{setBusy(null);}
  }
 
  async function completeEnrollmentExit(id:string,kind:"withdrawal"|"transfer"){
   const note=window.prompt("Record the institutional "+kind+" decision and academic records handoff (at least 20 characters):");
   if(!note?.trim()||note.trim().length<20)return;
   if(!window.confirm("Confirm the registrar verified this exit? Active Program and class memberships end immediately. The student login at this school may also be revoked."))return;
-  setBusy(id);setError("");setNotice("");
+  setError("");setNotice("");
   try{
-   const result=await completeRegistrarEnrollmentExit({data:{
-     actionId:id,confirmInstitutionalReview:true,resolutionNote:note.trim(),
-   }});
+   const submission=await exitMutation.submit({actionId:id,resolutionNote:note.trim()});
+   if(submission.status === "ignored")return;
+   const result=submission.value;
    setNotice(result.completed?"Official "+kind+" recorded. Enrollment and student access were updated.":"This request was already completed.");
-   try{await router.invalidate();}
-   catch{setError("The institutional change was saved, but the list could not refresh. Do not submit it again; reopen the Action.");}
+   if(submission.refreshError)setError("The institutional change was saved, but the list could not refresh. Do not submit it again; reopen the Action.");
   }catch(e){setError(e instanceof Error?e.message:"Unable to complete institutional enrollment change");}
-  finally{setBusy(null);}
  }
 
  async function assignAction(id:string,ownerPersonId:string|null,priority:"normal"|"high"|"urgent"){
-  setBusy(id);setError("");
-  try{await assignOperationsAction({data:{id,ownerPersonId,priority}});await router.invalidate();}
+  setError("");
+  try{await submitAction(id,()=>assignOperationsAction({data:{id,ownerPersonId,priority}}));}
   catch(e){setError(e instanceof Error?e.message:"Unable to assign action");}
-  finally{setBusy(null);}
  }
 
  async function changeDeadline(id:string,value:string){
    const reason=window.prompt("Reason for the deadline change (required)");
    if(!reason?.trim()||reason.trim().length<5)return;
-   setBusy(id);setError("");
+   setError("");
    try{
-     await setOperationsActionDeadline({data:{
+     const saved=await submitAction(id,()=>setOperationsActionDeadline({data:{
        id,dueAt:value?new Date(value).toISOString():null,reason:reason.trim(),
-     }});
+     }}));
+     if(!saved)return;
      setDueDrafts(prev=>{const next={...prev};delete next[id];return next;});
-     await router.invalidate();
+
    }catch(e){setError(e instanceof Error?e.message:"Unable to save deadline");}
-   finally{setBusy(null);}
  }
  function localDue(iso:string|null){
    if(!iso)return "";
@@ -121,7 +131,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     </label>
    </div>
   </section>
-  <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p>
+  {health ? <p className="mt-4 rounded-xl border p-3 text-xs text-muted-foreground">Release: {health.buildId} · Database compatibility: {health.schemaStatus.replace("_"," ")}. {health.details}</p> : <p className="mt-4 text-xs text-muted-foreground">Release health is temporarily unavailable; core operations remain accessible.</p>}
   <OutboxHealthPanel/>
   {error&&<WorkspaceNotice tone="danger" className="mt-4">No operational change was completed. {error}</WorkspaceNotice>}
   <AttentionQueue items={attentionItems}/>

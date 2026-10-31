@@ -1,5 +1,5 @@
-import { EvidenceUploader, EvidenceWorkflow, EvidenceReviewForm } from "@/components/evidence";
-import { useCallback, useEffect, useState } from "react";
+import { EvidenceUploadSection, EvidenceWorkflow, EvidenceReviewForm, EvidenceDocumentSummary } from "@/components/evidence";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginExtendedEvidenceUploadFn, finishExtendedEvidenceUploadFn,
   readExtendedEvidenceFn, reviewExtendedEvidenceFn, getExtendedEvidenceDownloadFn,
@@ -17,16 +17,30 @@ type UploadInput = {
 export function ExtendedSeasonEvidencePanel({ seasonId, onChange }: {
   seasonId: string; onChange?: () => Promise<void> | void;
 }) {
+  return <ExtendedSeasonEvidenceWorkspace key={seasonId} seasonId={seasonId} onChange={onChange} />;
+}
+
+function ExtendedSeasonEvidenceWorkspace({ seasonId, onChange }: {
+  seasonId: string; onChange?: () => Promise<void> | void;
+}) {
   const [model, setModel] = useState<Model | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const requestSequence = useRef(0);
   const load = useCallback(async () => {
+    const request = ++requestSequence.current;
     setLoading(true); setError("");
-    try { setModel(await readExtendedEvidenceFn({ data: { seasonId } })); }
-    catch (cause) { setModel(null); setError(cause instanceof Error ? cause.message : "Unable to read evidence"); }
-    finally { setLoading(false); }
+    try {
+      const result = await readExtendedEvidenceFn({ data: { seasonId } });
+      if (request === requestSequence.current) setModel(result);
+    } catch (cause) {
+      if (request === requestSequence.current) {
+        setModel(null);
+        setError(cause instanceof Error ? cause.message : "Unable to read evidence");
+      }
+    } finally { if (request === requestSequence.current) setLoading(false); }
   }, [seasonId]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); return () => { requestSequence.current++; }; }, [load]);
   async function changed() { await load(); await onChange?.(); }
   return <section className="mt-3 rounded-lg border bg-card p-4" aria-label="Extended-learning operational approvals">
     <h3 className="text-sm font-semibold">Independent operating approval</h3>
@@ -76,29 +90,21 @@ function EvidenceCard({ model, item, changed }: {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Review failed"); throw cause; }
     finally { setBusy(false); }
   }
-  async function download() {
-    if (!item.documentId) return;
-    setError("");
-    try {
-      const result = await getExtendedEvidenceDownloadFn({ data: {
-        seasonId: model.seasonId, documentId: item.documentId!,
-      } });
-      window.open(result.downloadUrl, "_blank", "noopener,noreferrer");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to open evidence"); }
-  }
   return <EvidenceWorkflow title={item.title} status={item.status} rejectionReason={item.rejectionReason}>
-    {item.documentId && <div className="mt-2">
-      <p>{item.fileName} · version {item.version} · expires {item.expiresAt ?
-        new Date(item.expiresAt).toLocaleDateString() : "unknown"}</p>
-      <button type="button" className="mt-1 underline" onClick={() => void download()}>
-        View private document
-      </button>
-    </div>}
+    {item.documentId && <EvidenceDocumentSummary
+      fileName={item.fileName} version={item.version}
+      expiresAt={item.expiresAt} downloadLabel="View private document"
+      onGetDownloadUrl={async () => {
+        const result = await getExtendedEvidenceDownloadFn({ data: {
+          seasonId: model.seasonId, documentId: item.documentId!,
+        } });
+        return result.downloadUrl;
+      }}/>}
     {model.canReview && item.documentId && item.status === "pending" && <EvidenceReviewForm
       disabled={busy} onReview={review}/>}
-    {model.canSubmit && <div className="mt-3 border-t pt-3">
-      <p>{item.documentId ? "Renew or correct this evidence" : "Upload evidence for CAN review"}</p>
-      <EvidenceUploader<UploadInput> disabled={!model.uploadsEnabled}
+    {model.canSubmit && <div>
+      <EvidenceUploadSection<UploadInput> disabled={!model.uploadsEnabled}
+        heading={item.documentId ? "Renew or correct this evidence" : "Upload evidence for CAN review"}
         adapter={{begin: async input => beginExtendedEvidenceUploadFn({data:input}),
           finish: async input => finishExtendedEvidenceUploadFn({data:input})}}
         makeInput={(file,expiresAt)=>({seasonId:model.seasonId,category:item.category,

@@ -1,5 +1,10 @@
+import { GradebookScoringEditor } from "@/components/learning/GradebookScoringEditor";
+import { GradebookAssessmentComposer } from "@/components/learning/GradebookAssessmentComposer";
+import { GradebookReviewedFeedback } from "@/components/learning/GradebookReviewedFeedback";
+import { GradebookAssessmentHeader } from "@/components/learning/GradebookAssessmentHeader";
+import { nextGradebookCell } from "@/components/learning/gradebook-grid-navigation";
+import { GradebookOverview } from "@/components/learning/GradebookOverview";
 import { GradebookReviewQueue } from "@/components/learning/GradebookReviewQueue";
-import { RubricScoreFields } from "@/components/learning/RubricScoreFields";
 import { MAX_ASSESSMENT_ATTEMPTS } from "@/domain/assessment-attempt-policy";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -14,9 +19,7 @@ import {
 } from "@/modules/learning/gradebook.functions";
 import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
-import { AssessmentScheduleEditor } from "@/components/learning/AssessmentScheduleEditor";
-import { AssessmentDraftEditor } from "@/components/learning/AssessmentDraftEditor";
-import { WorkspaceShell, WorkspacePanel, StatCard, StatusBadge } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
 import { liveRubricTotal } from "@/components/learning/live-rubric-total";
@@ -224,19 +227,17 @@ function TeacherGradebookPage() {
 
  const liveRubricScore = (assessment: Assessment) => liveRubricTotal(assessment.rubric, rubricInputs);
 
- /** Arrow-key movement across the grade grid. */
+ /** Arrow-key movement across the currently visible, authorized grade grid. */
  const onCellKeyDown = (event: React.KeyboardEvent, row: number, col: number) => {
-  const delta: Record<string, [number, number]> = {
-   ArrowUp: [-1, 0],
-   ArrowDown: [1, 0],
-   ArrowLeft: [0, -1],
-   ArrowRight: [0, 1],
-  };
-  const move = delta[event.key];
-  if (!move) return;
+  const next = nextGradebookCell(
+   event.key, row, col,
+   gradebook?.students.filter(item=>!search.student||item.studentProfileId===search.student).length??0,
+   gradebook?.assessments.filter(item=>!search.assessment||item.id===search.assessment).length??0,
+  );
+  if (!next) return;
   event.preventDefault();
   gridRef.current
-   ?.querySelector<HTMLElement>(`[data-cell="${row + move[0]}:${col + move[1]}"]`)
+   ?.querySelector<HTMLElement>(`[data-cell="${next.row}:${next.column}"]`)
    ?.focus();
  };
 
@@ -352,14 +353,7 @@ function TeacherGradebookPage() {
    {!loading && !error && sections.length === 0 && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">No currently authorized teaching sections. A delegation, assignment, qualification or school agreement may be missing, revoked or expired. Historical grades and issued transcripts are unchanged; contact your school administrator if you believe access should continue.</p>}
 
    {!loading && !error && gradebook?.connected && gradebook.section && <>
-    <div className="mt-6 grid gap-3 sm:grid-cols-3">
-     <StatCard label="Students" value={gradebook.students.length}/>
-     <StatCard label="Assessments" value={gradebook.assessments.length}/>
-     <StatCard label="Needs grading" value={gradebook.cells.filter(cell=>cell.status==="submitted").length}/>
-    </div>
-    {!reviewCell&&reviewQueue.length===0&&<WorkspacePanel title="All caught up">
-     <p className="text-sm text-muted-foreground">There are no submitted assignments awaiting grading in this section. New student submissions will appear here.</p>
-    </WorkspacePanel>}
+    <GradebookOverview studentCount={gradebook.students.length} assessmentCount={gradebook.assessments.length} submittedCount={gradebook.cells.filter(cell=>cell.status==="submitted").length} showQueueEmpty={!reviewCell&&reviewQueue.length===0} />
     {!reviewCell&&reviewQueue.length>0&&<WorkspacePanel title={`Submission queue · ${pendingReviewCount} awaiting grading`} description="Choose a student submission to review and grade.">
      <GradebookReviewQueue cells={reviewQueue} students={gradebook.students} assessments={gradebook.assessments} sectionId={selected} />
     </WorkspacePanel>}
@@ -373,128 +367,28 @@ function TeacherGradebookPage() {
      </div>}>
       <SubmissionEvidence key={reviewCell.submissionId} submissionId={reviewCell.submissionId}/>
       <AssignmentConversation key={`conversation-${reviewCell.submissionId}`} assessmentId={reviewAssessment.id} studentPersonId={reviewStudent.personId}/>
-      {reviewCell.status==="submitted"?<div className="grid gap-4">
-       <StatusBadge>Ready for grading</StatusBadge>
-       {reviewAssessment.rubric.length>0?<RubricScoreFields
-        criteria={reviewAssessment.rubric}
-        values={rubricInputs}
-        onChange={(id,value)=>setRubricInputs(current=>({...current,[id]:value}))}
-        total={liveRubricScore(reviewAssessment)}
-        pointsPossible={reviewAssessment.pointsPossible}
-       />:<label className="text-sm font-semibold">Score (0–{reviewAssessment.pointsPossible??"—"})
-        <input className="mt-2 block w-28 rounded-lg border bg-background p-2" type="number" min={0} max={Number(reviewAssessment.pointsPossible??0)} value={score} onChange={event=>setScore(event.target.value)}/>
-       </label>}
-       <label className="text-sm font-semibold">Feedback comment<textarea rows={4} maxLength={4000} value={comment} onChange={event=>setComment(event.target.value)} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-       <div className="flex flex-wrap gap-3">
-        <button type="button" disabled={busy} onClick={()=>submitGrade(reviewCell,reviewAssessment,true)}
-         className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Save grading draft</button>
-        <button type="button" disabled={busy} onClick={()=>submitGrade(reviewCell,reviewAssessment)}
-        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Post grade</button>
-        <Link to="/teacher/gradebook" search={{section:selected}} className="rounded-lg border px-4 py-2 text-sm">Close review</Link></div>
-      </div>:<div className="space-y-3 text-sm">
-       <p className="font-semibold">{reviewCell.status==="returned"?"Previous attempt score (awaiting revision)":"Score"}: {reviewCell.score??"—"} / {reviewAssessment.pointsPossible??"—"}</p>
-       {reviewAssessment.rubric.map(criterion=><p key={criterion.id}>{criterion.label}: {reviewCell.feedbackRubric.find(item=>item.id===criterion.id)?.points??"—"} / {criterion.maxPoints}</p>)}
-       <p className="whitespace-pre-wrap">{reviewCell.feedbackComment||"No feedback comment recorded."}</p>
-       {reviewCell.status==="graded"&&reviewAssessment.maxAttempts!==null&&reviewCell.attemptNumber>=reviewAssessment.maxAttempts
-        ?<p className="text-sm">The configured attempt limit has been reached. This submission cannot be returned for another attempt.</p>
-        :reviewCell.status==="graded"&&<button type="button" disabled={busy} onClick={()=>returnForRevision(reviewCell.submissionId)} className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">Return for revision</button>}
-      </div>}
+      {reviewCell.status==="submitted"?<GradebookScoringEditor
+        assessment={reviewAssessment} score={score} comment={comment} rubricInputs={rubricInputs}
+        busy={busy} sectionId={selected} liveTotal={liveRubricScore(reviewAssessment)}
+        onScoreChange={setScore} onCommentChange={setComment}
+        onRubricChange={(id,value)=>setRubricInputs(current=>({...current,[id]:value}))}
+        onSaveDraft={()=>void submitGrade(reviewCell,reviewAssessment,true)}
+        onPostGrade={()=>void submitGrade(reviewCell,reviewAssessment)} />
+      :<GradebookReviewedFeedback cell={reviewCell} assessment={reviewAssessment} busy={busy}
+       onReturnForRevision={()=>void returnForRevision(reviewCell.submissionId)} />}
      </WorkspacePanel>
     </div>}
-    <details className="mt-8 rounded-xl border bg-card p-5" open={search.lesson?true:undefined}>
-     <summary className="cursor-pointer text-lg font-semibold">Create an assessment</summary>
-     {search.lesson&&<p className="mt-2 text-sm text-muted-foreground">Creating {assignmentKind} from the selected publisher lesson. This activity belongs to your class, not the publisher's immutable course.</p>}
-     {search.lesson&&!gradebook.curriculumLessons.some(lesson=>lesson.id===search.lesson)&&
-      <p role="alert" className="mt-2 text-sm">This publisher lesson is unavailable in this class. Choose a listed lesson before creating the assessment.</p>}
-    <section className="mt-4" aria-label="New assessment">
-     <h2 className="text-lg font-semibold">New assessment</h2>
-     <div className="mt-4 grid gap-4 sm:grid-cols-3">
-      <label className="text-sm font-semibold">Title
-       <input className="mt-2 w-full rounded-lg border bg-background p-3" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} placeholder="e.g. Chapter 4 quiz" />
-      </label>
-      <label className="text-sm font-semibold">Points possible
-       <input className="mt-2 w-full rounded-lg border bg-background p-3" type="number" min={1} max={1000} value={points} onChange={event => setPoints(event.target.value)} />
-      </label>
-      <label className="text-sm font-semibold">Due date
-       <input className="mt-2 w-full rounded-lg border bg-background p-3" type="date" value={due} onChange={event => setDue(event.target.value)} />
-      </label>
-     </div>
-     <div className="mt-4 grid gap-4 sm:grid-cols-2">
-      <label className="text-sm font-semibold">Release date and time (optional)
-       <input type="datetime-local" value={releaseAt} onChange={event=>setReleaseAt(event.target.value)}
-        className="mt-2 w-full rounded-lg border bg-background p-3"/>
-      </label>
-      <label className="text-sm font-semibold">Close submissions (optional)
-       <input type="datetime-local" value={closeAt} onChange={event=>setCloseAt(event.target.value)}
-        className="mt-2 w-full rounded-lg border bg-background p-3"/>
-      </label>
-      <p className="text-xs text-muted-foreground sm:col-span-2">Times use your device timezone. Publishing without a release time opens work immediately. Work can be submitted after its due date until the close time; no close time leaves submissions open.</p>
-     </div>
-     <div className="mt-4 grid gap-4 sm:grid-cols-2">
-       <label className="text-sm font-semibold">Class activity type
-        <select aria-label="Class activity type" value={assignmentKind}
-          onChange={event=>setAssignmentKind(event.target.value as typeof assignmentKind)}
-          className="mt-2 w-full rounded-lg border bg-background p-3">
-          {(["homework","classwork","quiz","test","project","discussion"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
-        </select>
-       </label>
-       <label className="text-sm font-semibold">Publisher lesson (optional)
-        <select aria-label="Publisher lesson for assignment" value={curriculumLessonId}
-          onChange={event=>setCurriculumLessonId(event.target.value)}
-          className="mt-2 w-full rounded-lg border bg-background p-3">
-          <option value="">General class activity</option>
-          {gradebook.curriculumLessons.map(lesson=><option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
-        </select>
-       </label>
-     </div>
-     <label className="mt-4 block text-sm font-semibold">Maximum attempts (optional)
-      <input aria-label="Maximum assignment attempts" type="number" min={1} max={MAX_ASSESSMENT_ATTEMPTS} step={1}
-       value={maxAttempts} onChange={event=>setMaxAttempts(event.target.value)}
-       placeholder="No configured limit" className="mt-2 block w-48 rounded-lg border bg-background p-3"/>
-      <span className="mt-2 block text-xs font-normal text-muted-foreground">Includes the first submission. Each revision still requires a teacher to return the work.</span>
-     </label>
-     <label className="mt-4 block text-sm font-semibold">Student instructions
-      <textarea aria-label="Student assignment instructions" className="mt-2 w-full rounded-lg border bg-background p-3" rows={5} maxLength={20000}
-       value={instructions} onChange={event=>setInstructions(event.target.value)} placeholder="Directions, deliverables, submission requirements and allowed resources." />
-     </label>
-     <fieldset className="mt-4 rounded-lg border p-4">
-      <legend className="px-1 text-sm font-semibold">Scoring rubric (optional)</legend>
-      <p className="mb-3 text-xs text-muted-foreground">Add criteria for graded projects, tests, discussions or other work. Criterion points must sum to the assignment's points possible.</p>
-      {newRubric.map((criterion,index)=><div key={criterion.id} className="mb-3 grid gap-2 rounded-lg border p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
-       <label className="text-xs font-semibold">Criterion {index+1}
-        <input aria-label={"Criterion "+(index+1)+" name"} className="mt-1 w-full rounded border bg-background p-2"
-         value={criterion.label} maxLength={120} placeholder="e.g. Mathematical reasoning"
-         onChange={event=>setNewRubric(rows=>rows.map(row=>row.id===criterion.id?{...row,label:event.target.value}:row))}/>
-       </label>
-       <label className="text-xs font-semibold">Points
-        <input aria-label={"Criterion "+(index+1)+" points"} className="mt-1 w-full rounded border bg-background p-2"
-         type="number" min={0.01} step="0.01" max={1000} value={criterion.maxPoints}
-         onChange={event=>setNewRubric(rows=>rows.map(row=>row.id===criterion.id?{...row,maxPoints:event.target.value}:row))}/>
-       </label>
-       <button type="button" className="self-end rounded border px-3 py-2 text-xs" onClick={()=>setNewRubric(rows=>rows.filter(row=>row.id!==criterion.id))}>Remove</button>
-       <label className="text-xs font-semibold sm:col-span-3">Description (optional)
-        <textarea aria-label={"Criterion "+(index+1)+" description"} className="mt-1 w-full rounded border bg-background p-2"
-         rows={2} maxLength={1000} value={criterion.description}
-         onChange={event=>setNewRubric(rows=>rows.map(row=>row.id===criterion.id?{...row,description:event.target.value}:row))}/>
-       </label>
-      </div>)}
-      <button type="button" disabled={newRubric.length>=20} className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-       onClick={()=>setNewRubric(rows=>[...rows,{id:"criterion-"+(++rubricSequence.current),label:"",maxPoints:"",description:""}])}>Add rubric criterion</button>
-     </fieldset>
-     <p className="mt-2 text-xs text-muted-foreground">The assignment belongs to this teacher's class. Linking to a publisher lesson preserves the original curriculum.</p>
-     <p className="mt-3 text-xs text-muted-foreground">Due dates are planning information until you explicitly publish. Saving a draft never assigns work, even if it has a due date.</p>
-     <label className="mt-3 flex items-start gap-2 text-sm">
-       <input type="checkbox" checked={publishConfirmed} onChange={event=>setPublishConfirmed(event.target.checked)}
-        disabled={busy}/>
-       <span>I reviewed this assignment and understand Publish & assign makes it available to enrolled students now.</span>
-     </label>
-     <div className="mt-4 flex flex-wrap gap-3">
-       <button type="button" disabled={busy} onClick={()=>void submitAssessment(false)}
-        className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Save draft</button>
-       <button type="button" disabled={busy||!due||!publishConfirmed} onClick={()=>void submitAssessment(true)}
-        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Publish & assign</button>
-     </div>
-    </section></details>
+    <GradebookAssessmentComposer title={title} points={points} due={due}
+      releaseAt={releaseAt} closeAt={closeAt} assignmentKind={assignmentKind}
+      curriculumLessonId={curriculumLessonId} maxAttempts={maxAttempts} instructions={instructions}
+      newRubric={newRubric} publishConfirmed={publishConfirmed} busy={busy}
+      lessonContext={search.lesson} lessons={gradebook.curriculumLessons}
+      onTitleChange={setTitle} onPointsChange={setPoints} onDueChange={setDue}
+      onReleaseChange={setReleaseAt} onCloseChange={setCloseAt}
+      onKindChange={setAssignmentKind} onLessonChange={setCurriculumLessonId}
+      onAttemptsChange={setMaxAttempts} onInstructionsChange={setInstructions}
+      onRubricChange={setNewRubric} onPublishConfirmedChange={setPublishConfirmed}
+      onSubmit={publish=>void submitAssessment(publish)} />
 
     {gradebook.assessments.length === 0 && <p className="mt-8 text-sm">No assessments yet. Create one above to begin.</p>}
     {gradebook.assessments.length > 0 && <div ref={gridRef} className="mt-8 overflow-x-auto rounded-xl border bg-card">
@@ -502,35 +396,13 @@ function TeacherGradebookPage() {
       <thead>
        <tr className="border-b text-left">
         <th className="p-3 font-semibold">Student</th>
-        {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map(assessment => <th key={assessment.id} className="min-w-32 p-3 font-semibold">
-         <span className="block">{assessment.title}</span>
-         <span className="block text-xs font-normal text-muted-foreground">
-          {assessment.dueAt ? `Due ${new Date(assessment.dueAt).toLocaleDateString()}` : "No due date"} · {assessment.pointsPossible ?? "—"} pts
-          {assessment.rubric.length > 0 && ` · ${assessment.rubric.length} criteria`}
-          {" · "+assessment.kind}
-          {" · "+assessment.status}
-          {assessment.maxAttempts!==null&&" · "+assessment.maxAttempts+" maximum attempts"}
-          {assessment.availableAt&&" · Releases "+new Date(assessment.availableAt).toLocaleString()}
-          {assessment.closesAt?" · Closes "+new Date(assessment.closesAt).toLocaleString():" · No submission close time"}
-         </span>
-         {assessment.status==="draft"&&<AssessmentDraftEditor key={assessment.id+assessment.title+assessment.instructions}
-          assessment={assessment} onSaved={async()=>{setNotice("Assignment draft saved. Publish when ready to assign it to students.");await loadGradebook(selected);}}/>}
-         {assessment.status!=="closed"&&<AssessmentScheduleEditor
-          key={assessment.id+assessment.availableAt+assessment.closesAt} assessment={assessment}
-          onSaved={()=>loadGradebook(selected)}/>}
-         <label className="mt-2 block text-xs font-normal">New due date
-          <input aria-label={"Due date for "+assessment.title} type="date"
-           value={assessmentDueDates[assessment.id]??""}
-           onChange={event=>setAssessmentDueDates(current=>({...current,[assessment.id]:event.target.value}))}
-           className="mt-1 w-full rounded border bg-background p-1.5 text-xs"/>
-         </label>
-         <div className="mt-2 flex flex-wrap gap-1">
-          {assessment.status==="draft"&&<button disabled={busy} onClick={()=>changeAssessment(assessment.id,"publish")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Publish</button>}
-          {assessment.status==="published"&&<button disabled={busy} onClick={()=>changeAssessment(assessment.id,"close")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Close</button>}
-          {assessment.status==="closed"&&<button disabled={busy} onClick={()=>changeAssessment(assessment.id,"reopen")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Reopen</button>}
-          {assessment.status!=="draft"&&<button disabled={busy||!assessmentDueDates[assessment.id]} onClick={()=>changeAssessment(assessment.id,"reschedule")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Change deadline</button>}
-         </div>
-        </th>)}
+        {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map(assessment =>
+         <GradebookAssessmentHeader key={assessment.id} assessment={assessment} busy={busy}
+          dueDate={assessmentDueDates[assessment.id]??""}
+          onDueDateChange={value=>setAssessmentDueDates(current=>({...current,[assessment.id]:value}))}
+          onAction={action=>void changeAssessment(assessment.id,action)}
+          onDraftSaved={async()=>{setNotice("Assignment draft saved. Publish when ready to assign it to students.");await loadGradebook(selected);}}
+          onScheduleSaved={()=>loadGradebook(selected)}/>)}
        </tr>
       </thead>
       <tbody>

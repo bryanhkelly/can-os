@@ -1,3 +1,4 @@
+import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { SchoolYearCard } from "@/components/operations/SchoolYearCard";
 import { useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -25,11 +26,17 @@ export function SchoolYearStudioWorkspace({data,selection}:{data:Snapshot;select
  const [name,setName]=useState(suggestedYear.name);
  const [key,setKey]=useState(suggestedYear.key);
  const [start,setStart]=useState(suggestedYear.startsOn),[end,setEnd]=useState(suggestedYear.endsOn);
- const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [error,setError]=useState(""),[notice,setNotice]=useState("");
+ const mutation=useWorkspaceMutation({mutationFn:(operation:()=>Promise<unknown>)=>operation(),invalidateRouter:()=>router.invalidate()});
+ const busy=mutation.isSubmitting;
  async function run(operation:()=>Promise<unknown>){
-  setBusy(true);setError("");setNotice("");
-  try{await operation();await router.invalidate();setNotice("Saved to school records.");}
-  catch(e){setError(e instanceof Error?e.message:"Unable to save");}finally{setBusy(false);}
+  if(busy)return;
+  setError("");setNotice("");
+  try{const submission=await mutation.submit(operation);
+   if(submission.status === "ignored")return;
+   if(submission.refreshError){setError("Saved successfully, but refresh failed. Reopen this workspace; do not resubmit.");return;}
+   setNotice("Saved to school records.");}
+  catch(e){setError(e instanceof Error?e.message:"Unable to save");}
  }
  const scopedPrograms=data.programs.filter(p=>p.siteId===siteId);
  const site=data.sites.find(s=>s.id===siteId);

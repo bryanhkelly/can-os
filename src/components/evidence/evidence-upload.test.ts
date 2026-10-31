@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { File } from "node:buffer";
 import { submitEvidenceUpload, type PendingEvidenceUpload } from "./evidence-upload";
 type Input = { fileName: string; mimeType: "application/pdf"; size: number; expiresAt: string };
-const file = new File(["evidence"], "evidence.pdf", { type: "application/pdf" }) as unknown as globalThis.File;
+const file = new File(["evidence"], "evidence.pdf", { type: "application/pdf" });
 const makeInput = (selected: File, expiresAt: string): Input =>
   ({ fileName: selected.name, mimeType: "application/pdf", size: selected.size, expiresAt });
 afterEach(() => vi.unstubAllGlobals());
@@ -43,7 +42,7 @@ describe("private evidence upload retry contract", () => {
   it("rejects unsupported file types before requesting a signed URL", async () => {
     const begin = vi.fn(async () => ({ key: "k", uploadUrl: "/signed", uploadHeaders: {} }));
     const finish = vi.fn(async () => {});
-    const invalid = new File(["text"], "bad.txt", { type: "text/plain" }) as unknown as globalThis.File;
+    const invalid = new File(["text"], "bad.txt", { type: "text/plain" });
     await expect(submitEvidenceUpload({ begin, finish }, makeInput, invalid, "2027-05-01", null, () => {}))
       .rejects.toThrow("Only PDF");
     expect(begin).not.toHaveBeenCalled();

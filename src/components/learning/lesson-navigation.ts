@@ -11,6 +11,7 @@ export function selectPublishedLesson<T extends { id: string }>(
   const index = lesson ? lessons.findIndex((item) => item.id === lesson.id) : -1;
   return {
     lesson,
+    lessonIndex: index,
     previousLesson: index > 0 ? lessons[index - 1] : null,
     nextLesson: index >= 0 && index < lessons.length - 1 ? lessons[index + 1] : null,
   };

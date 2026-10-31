@@ -1,3 +1,8 @@
+import { encodeCommonCartridge } from "@/components/learning/common-cartridge-encoding";
+import { CommonCartridgeValidationSummary } from "@/components/learning/CommonCartridgeValidationSummary";
+import { OneRosterClassMappingFields } from "@/components/learning/OneRosterClassMappingFields";
+import { CurriculumPdfPicker } from "@/components/learning/CurriculumPdfPicker";
+import { CurriculumCourseOutline } from "@/components/learning/CurriculumCourseOutline";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
@@ -135,24 +140,7 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        <h3 className="font-serif text-2xl">{pack.name}</h3>
        <p className="text-sm text-muted-foreground">{pack.description}</p>
        <p className="text-sm">{pack.courses.length} published course versions</p>
-       <details className="text-sm"><summary className="cursor-pointer underline">Review included courses and outlines</summary>
-        <p className="mt-2 text-xs text-muted-foreground">Discovery previews show publisher-provided course structure, not lesson text, restricted teacher guides, or a guarantee of academic credit.</p>
-        <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto">{pack.courses.map(c=><li key={c.courseVersionId} className="rounded border p-3">
-          <p className="font-medium">{c.code}: {c.title} · {c.subject}</p>
-          <p className="mt-2 text-xs font-semibold">{c.recommendation.recommended?"Recommended first-class option":"Not yet recommended"}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{c.recommendation.explanation}</p>
-          <p className="mt-1 text-xs">Available · {c.recommendation.licensed?"Licensed":"License needed"} · {c.recommendation.adopted?"Adopted":"Adoption needed"} · {c.recommendation.instructionReady?"Instruction-ready":"Lesson needed"}</p>
-          {c.preview ? <details className="mt-2">
-            <summary className="cursor-pointer underline">{c.preview.moduleCount} units · {c.preview.lessonCount} lessons{c.preview.weeksPlanned ? ` · ${c.preview.weeksPlanned} planned instructional weeks` : ""}</summary>
-            {c.preview.syllabusSummary&&<p className="mt-2 whitespace-pre-wrap text-xs">{c.preview.syllabusSummary}{c.preview.syllabusSummary.length===240?"…":""}</p>}
-            <ol className="mt-2 list-inside list-decimal space-y-2">{c.preview.modules.map(module=><li key={module.id}>
-              <span className="font-medium">{module.title} · {module.lessonCount} lessons</span>
-              {module.lessonTitles.length>0&&<p className="ml-5 text-xs text-muted-foreground">{module.lessonTitles.join(" · ")}{module.lessonCount>module.lessonTitles.length?" …":""}</p>}
-            </li>)}</ol>
-            {c.preview.outlineTruncated&&<p className="mt-2 text-xs text-muted-foreground">Additional units omitted from this preview.</p>}
-          </details>:<p className="mt-2 text-xs text-muted-foreground">Publisher course outline not yet available for review.</p>}
-        </li>)}</ul>
-       </details>
+       <CurriculumCourseOutline courses={pack.courses} />
        {pack.entitlement && pack.entitlement!=="active"?
         <p role="status" className="text-sm text-muted-foreground">License status: {pack.entitlement}. Publisher review is required to restore this organization's entitlement. Accepting terms again cannot reactivate it.</p>:
         pack.entitlement!=="active"?<>
@@ -228,14 +216,9 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
      <button disabled={busy||!courseVersionId||(scope==="section"&&!sectionId)} className="justify-self-start rounded bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">Add supplement</button>
      <fieldset className="sm:col-span-2 space-y-3 rounded-lg border p-4">
       <legend className="px-2 text-sm font-semibold">Upload a private PDF</legend>
-      <p className="text-xs text-muted-foreground">Upload a PDF directly to CAN's private storage. It is visible only in the selected program, site or class and downloadable by authorized class members.</p>
-      <input key={pdfKey} type="file" accept=".pdf,application/pdf" disabled={busy||!data.pdfUpload.enabled}
-        onChange={e=>setPdfFile(e.currentTarget.files?.[0]??null)} className="block w-full text-sm" aria-label="Supplemental PDF"/>
-      <label className="flex items-start gap-2 text-xs">
-       <input type="checkbox" checked={rightsConfirmed} disabled={busy||!data.pdfUpload.enabled}
-        onChange={e=>setRightsConfirmed(e.currentTarget.checked)}/>
-       <span>I have permission to share this material with authorized learners. Uploading does not authorize AI training or public redistribution.</span>
-      </label>
+      <CurriculumPdfPicker enabled={data.pdfUpload.enabled} busy={busy} fileKey={pdfKey}
+       selectedFile={pdfFile} rightsConfirmed={rightsConfirmed}
+       onFileChange={setPdfFile} onRightsChange={setRightsConfirmed} />
       <button type="button" disabled={busy||!data.pdfUpload.enabled||!pdfFile||!rightsConfirmed||!courseVersionId||
           !title.trim()||(scope==="section"&&!sectionId)}
        className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
@@ -279,24 +262,16 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
        onClick={()=>void perform(async()=>{
         if(!cartridgeFile)throw new Error("Select a Common Cartridge file.");
-        if(cartridgeFile.size>2_000_000)throw new Error("Use a package of 2 MB or smaller for direct validation.");
-        const array=new Uint8Array(await cartridgeFile.arrayBuffer());
-        let binary="";
-        for(let offset=0;offset<array.length;offset+=32768)binary+=String.fromCharCode(...array.subarray(offset,offset+32768));
+        const base64=await encodeCommonCartridge(cartridgeFile);
         const result=await validateCommonCartridgeImport({data:{
-          programId:market.program.id,fileName:cartridgeFile.name,base64:btoa(binary),
+          programId:market.program.id,fileName:cartridgeFile.name,base64,
         }});
         setCartridgeReport(result);
        },"Cartridge manifest validated and audit-staged. Review the notices before publishing any content.")}>
        Validate cartridge
      </button>
-     {cartridgeReport&&<div className="space-y-2 rounded-lg border p-4 text-sm" role="status">
-       <p><strong>Validated source:</strong> {cartridgeReport.preview.profile.replaceAll("_"," ")} · {cartridgeReport.preview.resources.length} resources · {cartridgeReport.preview.outline.length} top-level units</p>
-       <p><strong>Publication:</strong> Source inspection is separate from publishing. Only explicitly selected external web links can be attached to an existing Section. Embedded lessons, QTI and LTI are not converted.</p>
-       <ul className="list-disc pl-5">{cartridgeReport.preview.notices.map((n,i)=><li key={i}>{n}</li>)}</ul>
-       {!cartridgeReport.preview.notices.length&&<p>No unresolved resource references were detected in the manifest.</p>}
-     </div>}
-     {cartridgeReport&&cartridgeWebLinks.length>0&&<section className="space-y-3 rounded border p-4" aria-label="Import supported Common Cartridge web links">
+     {cartridgeReport&&<CommonCartridgeValidationSummary report={cartridgeReport} />}
+      {cartridgeReport&&cartridgeWebLinks.length>0&&<section className="space-y-3 rounded border p-4" aria-label="Import supported Common Cartridge web links">
        <h3 className="font-semibold">Add supported web links to a class</h3>
        <p className="text-xs text-muted-foreground">Select the original external links you reviewed. Their URLs and source identifiers are preserved in canonical curriculum resources; this does not import a course or lesson package.</p>
        <label className="block text-sm">Destination class
@@ -318,12 +293,10 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
         disabled={busy||!cartridgeFile||!cartridgeSection||!cartridgeRights||!cartridgeLinks.length}
         onClick={()=>void perform(async()=>{
          if(!cartridgeFile)throw new Error("Select the validated source package.");
-         const array=new Uint8Array(await cartridgeFile.arrayBuffer());
-         let binary="";
-         for(let offset=0;offset<array.length;offset+=32768)binary+=String.fromCharCode(...array.subarray(offset,offset+32768));
+         const base64=await encodeCommonCartridge(cartridgeFile);
          await importCommonCartridgeSectionLinks({data:{
            programId:market.program.id,sectionId:cartridgeSection,fileName:cartridgeFile.name,
-           base64:btoa(binary),linkIdentifiers:cartridgeLinks,rightsConfirmed:true,
+           base64,linkIdentifiers:cartridgeLinks,rightsConfirmed:true,
          }});
         },"Selected web links added to the class as canonical curriculum resources.")}>Add selected links to class</button>
       </section>}
@@ -376,25 +349,14 @@ function MarketView({data}:{data:{programs:Awaited<ReturnType<typeof getCurricul
        if(!result.report.valid)throw new Error("The OneRoster CSV contains validation errors.");
        setRosterValidated(true);
       },"OneRoster classes validated. Choose the corresponding CAN classes.")}>Validate class CSV</button>
-     {rosterValidated&&<div className="space-y-3 rounded border p-3">
-       <p className="text-sm font-medium">Match all {rosterClasses.length} external classes to the existing classes below.</p>
-       {rosterClasses.map(row=><label key={row.sourcedId} className="block text-sm">
-         {row.title} ({row.sourcedId})
-         <select value={rosterMap[row.sourcedId]??""} className="mt-1 block w-full rounded border bg-background p-2"
-          onChange={e=>setRosterMap(old=>({...old,[row.sourcedId]:e.target.value}))}>
-           <option value="">Select CAN class</option>
-           {market.sections.map(section=><option key={section.id} value={section.id}>{section.code} · {section.title}</option>)}
-         </select>
-       </label>)}
-       <button type="button" className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
-        disabled={busy||!rosterClasses.length||rosterClasses.some(row=>!rosterMap[row.sourcedId])||
-          new Set(rosterClasses.map(row=>rosterMap[row.sourcedId])).size!==rosterClasses.length}
-        onClick={()=>void perform(async()=>{
-         await applyOneRosterClassMappings({data:{programId:market.program.id,
-           sourceSystem:rosterSource,files:{classes:rosterCsv},
-           classMappings:rosterClasses.map(row=>({sourcedId:row.sourcedId,sectionId:rosterMap[row.sourcedId]!}))}});
-        },"External OneRoster class identities reconciled to canonical CAN Sections.")}>Save class mappings</button>
-     </div>}
+     {rosterValidated&&<OneRosterClassMappingFields rows={rosterClasses} sections={market.sections}
+      mappings={rosterMap} busy={busy}
+      onMappingChange={(sourcedId,sectionId)=>setRosterMap(old=>({...old,[sourcedId]:sectionId}))}
+      onSave={()=>void perform(async()=>{
+       await applyOneRosterClassMappings({data:{programId:market.program.id,
+        sourceSystem:rosterSource,files:{classes:rosterCsv},
+        classMappings:rosterClasses.map(row=>({sourcedId:row.sourcedId,sectionId:rosterMap[row.sourcedId]!}))}});
+      },"External OneRoster class identities reconciled to canonical CAN Sections.")} />}
      <p className="text-xs text-muted-foreground">This scoped class-reconciliation workflow is not a student roster import or OneRoster certification.</p>
     </section>}
   </>}

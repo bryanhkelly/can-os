@@ -5,7 +5,7 @@ export function countAdmissionsStages<T extends {stage:string}>(records: readonl
 }
 export function AdmissionsPipelineSummary({counts}:{counts:readonly AdmissionsStageCount[]}) {
  return <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Admissions stage counts">
-  {counts.map(({stage,count})=><div key={stage} className="rounded-lg border p-3">
+  {ADMISSIONS_STAGES.map(stage=>({stage,count:counts.find(row=>row.stage===stage)?.count??0})).map(({stage,count})=><div key={stage} className="rounded-lg border p-3">
    <p className="text-xs capitalize text-muted-foreground">{stage}</p>
    <p className="font-serif text-2xl">{count}</p>
   </div>)}

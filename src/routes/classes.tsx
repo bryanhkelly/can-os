@@ -1,3 +1,13 @@
+import { PublishedLessonContent } from "@/components/learning/PublishedLessonContent";
+import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
+import { ClassAnnouncementFeed } from "@/components/learning/ClassAnnouncementFeed";
+import { ClassAnnouncementComposer } from "@/components/learning/ClassAnnouncementComposer";
+import { ClassCourseRoadmap } from "@/components/learning/ClassCourseRoadmap";
+import { ClassRosterPanel } from "@/components/learning/ClassRosterPanel";
+import { ClassAssessmentEvidence } from "@/components/learning/ClassAssessmentEvidence";
+import { ClassLearningProgress } from "@/components/learning/ClassLearningProgress";
+import { ClassTeachingTeam } from "@/components/learning/ClassTeachingTeam";
+import { PublishedLessonNavigation } from "@/components/learning/PublishedLessonNavigation";
 import { selectPublishedLesson } from "@/components/learning/lesson-navigation";
 import { StudentNextStepsPanel } from "@/components/learning/StudentNextStepsPanel";
 import { ClassDirectoryCards } from "@/components/learning/ClassDirectoryCards";
@@ -70,7 +80,7 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
   // The student home can link directly to a real published lesson without
   // predicting the publisher's IDs. Empty shell lessons are not first-day
   // instruction, even if they precede the first authored lesson.
-  const { lesson, previousLesson, nextLesson } = selectPublishedLesson(lessons, lessonId);
+  const { lesson, lessonIndex, previousLesson, nextLesson } = selectPublishedLesson(lessons, lessonId);
   const relatedWork = lesson ? assessmentEvidence.filter(item => item.curriculumLessonId === lesson.id) : [];
 
   const completed = new Set(data.progress.filter(item => item.completedAt && lessons.some(lesson=>lesson.id===item.lessonId)).map(item => item.lessonId));
@@ -156,40 +166,12 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
     {tab === "overview" && <div className="grid gap-5">
       {data.role !== "teacher" && <StudentNextStepsPanel nextSteps={nextSteps} search={search} />}
       <WorkspacePanel title="About this class"><p className="whitespace-pre-wrap text-sm leading-7">{data.section.description || "No class description has been published."}</p></WorkspacePanel>
-      <WorkspacePanel title="Learning progress" description="Student-reported lesson completion is not a grade, mastery score or attendance record.">
-        <p className="text-sm">{data.role === "teacher" ? `${lessons.length} published lessons · ${data.roster.length} enrolled students` : `${completed.size} / ${lessons.length} published lessons marked complete`}</p>
-        <Link to="/classes" search={{ ...search, tab: "lessons" }} className="mt-3 inline-block text-sm underline">Open lessons</Link>
-      </WorkspacePanel>
-      <WorkspacePanel title="Assessment evidence" description="Teacher-reviewed submissions are different from lesson completion. Scores shown here are not a mastery decision or course credit.">
-        <p className="text-sm">{assessmentEvidence.length} published class assessments
-          {data.role !== "teacher" && assessmentSummary ? ` · ${assessmentSummary.graded} graded · ${assessmentSummary.awaitingFeedback} awaiting feedback` : ""}</p>
-        {data.role !== "teacher" && assessmentEvidence.length>0 && <ul className="mt-3 divide-y text-sm">
-          {assessmentEvidence.map(item=><li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
-            <span>{item.title}</span>
-            <span className="text-muted-foreground">{item.score !== null && item.pointsPossible !== null
-              ? `Reviewed: ${item.score} / ${item.pointsPossible} points`
-              : item.status==="submitted"?"Submitted · awaiting teacher review"
-              : item.status==="draft"?"Response in progress"
-              : item.status==="returned"?"Returned for revision"
-              : "Not graded"}</span>
-          </li>)}
-        </ul>}
-        <div className="mt-3 text-sm">{classwork}</div>
-      </WorkspacePanel>
-      {data.content?.blueprint && <WorkspacePanel title="Yearlong course roadmap"
-        description="Curriculum planning progress, not a list of completed lessons or a credit-award decision. Planned weeks are not yet available for instruction.">
-        <p className="text-sm">{data.content.blueprint.weeks.filter(week=>week.status!=="planned").length} of {data.content.blueprint.targetInstructionalWeeks} weeks authored · School review: {data.content.blueprint.reviewStatus.replaceAll("_"," ")}</p>
-        {data.content.blueprint.creditStatus!=="credit_ready" && <p className="mt-2 text-sm text-muted-foreground">This course remains in curriculum development and is not certified as credit-ready.</p>}
-        <details className="mt-3"><summary className="cursor-pointer text-sm underline">Explore the proposed weekly sequence</summary>
-          <ol className="mt-3 max-h-80 space-y-2 overflow-y-auto text-sm">{data.content.blueprint.weeks.map(week=><li key={week.week} className="flex flex-wrap justify-between gap-2 border-b py-2">
-            <span>Week {week.week}: {week.title}</span>
-            <span className="text-muted-foreground">{week.status==="planned"?"Planning only":week.status==="authored"?"Authored; teacher review pending":week.status}</span>
-          </li>)}</ol>
-        </details>
-      </WorkspacePanel>}
-      <WorkspacePanel title="Teaching team"><ul className="space-y-2 text-sm">{data.teachers.map(teacher => <li key={teacher.personId}><Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link></li>)}</ul>
-        {!data.teachers.length && <p className="text-sm text-muted-foreground">No teaching team is assigned.</p>}
-      </WorkspacePanel>
+      <ClassLearningProgress search={search} isTeacher={data.role==="teacher"}
+       lessonCount={lessons.length} completedCount={completed.size} studentCount={data.roster.length} />
+      <ClassAssessmentEvidence items={assessmentEvidence} summary={assessmentSummary}
+       isTeacher={data.role==="teacher"} classwork={classwork} />
+      {data.content?.blueprint && <ClassCourseRoadmap blueprint={data.content.blueprint} />}
+      <ClassTeachingTeam teachers={data.teachers} />
     </div>}
     {data.curriculumAccess?.available===false&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">
       {data.curriculumAccess.reason} Your assignments and academic records remain available in their usual workspaces.
@@ -199,43 +181,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {lessonId && !lesson && <p role="alert" className="rounded-xl border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
       {lesson ? <WorkspacePanel title={lesson.title} actions={<Link to="/classes" search={{ ...search, tab: "lessons" }} className="text-sm underline">All lessons</Link>}>
         {data.role === "student" && <LearningActivityTracker sectionId={data.section.id} lessonId={lesson.id} />}
-        <nav aria-label="Course lesson navigation" className="mb-5 space-y-3 rounded-lg border p-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-            <span>Lesson {lessonIndex+1} of {lessons.length}</span>
-            {data.role==="student"&&<span>{completed.size} of {lessons.length} lessons self-reported complete</span>}
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            {previousLesson?<Link to="/classes" search={{...search,tab:"lessons",lesson:previousLesson.id}} className="underline">← Previous: {previousLesson.title}</Link>:
-             <span className="text-muted-foreground">Beginning of course</span>}
-            {nextLesson?<Link to="/classes" search={{...search,tab:"lessons",lesson:nextLesson.id}} className="underline">Next: {nextLesson.title} →</Link>:
-             <span className="text-muted-foreground">End of published course</span>}
-          </div>
-          <p className="text-xs text-muted-foreground">Navigation never marks lessons complete or awards grades or academic credit.</p>
-        </nav>
-        {lesson.estimatedMinutes && <p className="mb-3 text-xs text-muted-foreground">Estimated lesson time: {lesson.estimatedMinutes} minutes</p>}
-        {lesson.learningTargets?.length ? <section className="mb-5 rounded-lg border p-4">
-          <h3 className="text-sm font-semibold">Learning targets</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{lesson.learningTargets.map(target=><li key={target}>{target}</li>)}</ul>
-        </section> : null}
-        {lesson.body.trim() && <section className="mb-5" aria-label="Publisher lesson reading" data-learning-content>
-          <h3 className="mb-3 text-sm font-semibold">Lesson reading</h3>
-          <div className="whitespace-pre-wrap text-sm leading-8">{lesson.body}</div>
-        </section>}
-        {lesson.activities?.length ? <section aria-label="Lesson activities" data-learning-content className="mb-5">
-          <h3 className="mb-3 text-sm font-semibold">Learning activities</h3>
-          <ol className="space-y-5">
-          {lesson.activities.map((activity,index)=><li key={activity.id} className="rounded-lg border p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-semibold">{index+1}. {activity.title}</h3>
-              <span className="text-xs text-muted-foreground">{activity.estimatedMinutes ? `${activity.estimatedMinutes} min · ` : ""}{activity.kind.replaceAll("_"," ")}</span>
-            </div>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-7">{activity.instructions}</p>
-            {activity.evidence==="teacher_review" && <p className="mt-3 text-xs text-muted-foreground">Discuss or submit this evidence for teacher review. Opening this step does not grant a grade.</p>}
-          </li>)}
-          </ol>
-        </section> : null}
-        {!lesson.body.trim() && !lesson.activities?.length && <p className="text-sm text-muted-foreground">No lesson text or activities provided.</p>}
-        {lesson.standards?.length ? <p className="mt-4 text-xs text-muted-foreground">Learning standards: {lesson.standards.join(", ")}</p> : null}
+        <PublishedLessonNavigation search={search} lessonIndex={lessonIndex} lessonCount={lessons.length} completedCount={completed.size} isStudent={data.role==="student"} previousLesson={previousLesson} nextLesson={nextLesson} />
+
+        <PublishedLessonContent lesson={lesson} />
         {lesson.resources.length > 0 && <div className="mt-5" data-learning-content>{resources(lesson.resources)}</div>}
         {supplements.some(item=>item.lessonId===lesson.id) && <div className="mt-5 space-y-2">
           <h3 className="font-semibold">Publisher, school and teacher resources</h3>
@@ -342,39 +290,17 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {!data.content&&<p className="rounded border p-4 text-sm">No published curriculum is available to plan this class.</p>}
     </div> : <p role="alert" className="rounded border p-4 text-sm">Teacher planning is available only to the assigned teaching team.</p>)}
     {tab === "files" && <WorkspacePanel title="Class files and resources" description="Links and verified private documents from the published course version.">
-      {data.role==="teacher" && <form className="mb-5 grid gap-3 rounded-lg border p-4"
-        onSubmit={event=>{event.preventDefault();void run(async()=>{
+      {data.role==="teacher" && <ClassSupplementForm title={resourceTitle} url={resourceUrl}
+        kind={resourceKind} lessonId={resourceLesson} lessons={lessons} busy={busy}
+        onTitleChange={setResourceTitle} onUrlChange={setResourceUrl}
+        onKindChange={setResourceKind} onLessonChange={setResourceLesson}
+        onSubmit={()=>void run(async()=>{
           await addClassSupplement({data:{
             sectionId:data.section.id,title:resourceTitle.trim(),url:resourceUrl.trim(),
             kind:resourceKind,...(resourceLesson?{lessonId:resourceLesson}:{})
           }});
           setResourceTitle("");setResourceUrl("");setResourceLesson("");
-        },"Class resource added without changing the publisher's curriculum.");}}>
-        <h3 className="text-sm font-semibold">Add a teacher supplement</h3>
-        <p className="text-xs text-muted-foreground">Share an HTTPS resource with this class, or connect it to a particular published lesson. Publisher content stays unchanged.</p>
-        <label className="text-sm">Title<input aria-label="Resource title" required minLength={3} maxLength={200} value={resourceTitle}
-          onChange={event=>setResourceTitle(event.target.value)} className="mt-1 w-full rounded border p-2"/></label>
-        <label className="text-sm">External HTTPS resource URL<input aria-label="Resource URL" required type="url" value={resourceUrl}
-          onChange={event=>setResourceUrl(event.target.value)} className="mt-1 w-full rounded border p-2"/></label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="text-sm">Resource type
-            <select aria-label="Resource type" value={resourceKind}
-              onChange={event=>setResourceKind(event.target.value as typeof resourceKind)}
-              className="mt-1 w-full rounded border p-2">
-              {(["link","video","pdf","image","audio","document"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
-            </select>
-          </label>
-          <label className="text-sm">Publisher lesson (optional)
-            <select aria-label="Publisher lesson" value={resourceLesson}
-              onChange={event=>setResourceLesson(event.target.value)}
-              className="mt-1 w-full rounded border p-2">
-              <option value="">Classwide resource</option>
-              {lessons.map(lesson=><option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
-            </select>
-          </label>
-        </div>
-        <button type="submit" disabled={busy} className="justify-self-start rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50">Add resource</button>
-      </form>}
+        },"Class resource added without changing the publisher's curriculum.")} />}
       {data.content && resources(classResources(data.content))}
       {supplements.length>0 && <section className="mt-5 space-y-2"><h3 className="font-semibold">Publisher, school and teacher resources</h3>
         <ul className="space-y-2">{supplements.map(item=><li key={item.id} className="rounded border p-3 text-sm">
@@ -388,14 +314,9 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       {(!data.content || !classResources(data.content).length) && !supplements.length && <p className="text-sm text-muted-foreground">No resources have been published.</p>}
     </WorkspacePanel>}
     {tab === "syllabus" && <WorkspacePanel title="Syllabus"><p className="whitespace-pre-wrap text-sm leading-8">{data.content?.syllabus || "No syllabus has been published."}</p></WorkspacePanel>}
-    {tab === "people" && (data.role === "teacher" ? <WorkspacePanel title="Class roster" description="Only current section enrollments appear. Completion is student-reported, not mastery.">
-      <ul className="divide-y">{data.roster.map(student => <li key={student.profileId} className="flex flex-wrap items-center justify-between gap-3 py-4">
-        <Link to="/staff/students/$personId" params={{ personId: student.personId }} className="text-sm font-semibold underline">{student.name}</Link>
-        <span className="text-sm text-muted-foreground">{student.completedLessons} / {lessons.length} lessons marked complete</span>
-        <Link to="/teacher/gradebook" search={{ section: data.section.id, student: student.profileId }} className="text-sm underline">Review classwork</Link>
-      </li>)}</ul>
-      {!data.roster.length && <p className="text-sm">No students are enrolled in this class.</p>}
-    </WorkspacePanel> : <p role="alert" className="text-sm">Class rosters are available only to the assigned teaching team.</p>)}
+    {tab === "people" && (data.role === "teacher"
+      ? <ClassRosterPanel students={data.roster} lessonCount={lessons.length} sectionId={data.section.id} />
+      : <p role="alert" className="text-sm">Class rosters are available only to the assigned teaching team.</p>)}
     {tab === "teacher-guide" && (data.role === "teacher" ? (
       <div className="grid gap-5">
         {!teacherGuides && <WorkspacePanel title="Teacher guide not published">
@@ -438,22 +359,16 @@ export function ClassWorkspace({ data, tab = "overview", lessonId }: { data: Wor
       </div>
     ) : <p role="alert" className="rounded-lg border p-4 text-sm">Teacher-only materials are unavailable to this account.</p>)}
     {tab === "announcements" && <div className="grid gap-5">
-      {data.role === "teacher" && <WorkspacePanel title="Post a class announcement" description="Visible to enrolled students and academically authorized guardians.">
-        <form className="grid gap-3" onSubmit={event => { event.preventDefault(); announcementId.current ??= crypto.randomUUID();
-          void run(async () => {
-            await publishClassAnnouncement({ data: { id: announcementId.current!, sectionId: data.section.id, title, body } });
-            setTitle(""); setBody(""); announcementId.current = null;
-          }, "Class announcement published.");
-        }}>
-          <label className="text-sm">Title<input maxLength={160} disabled={busy} value={title} onChange={event => { setTitle(event.target.value); announcementId.current = null; }} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-          <label className="text-sm">Announcement<textarea maxLength={5000} rows={4} disabled={busy} value={body} onChange={event => { setBody(event.target.value); announcementId.current = null; }} className="mt-2 block w-full rounded-lg border bg-background p-3"/></label>
-          <button disabled={busy || title.trim().length < 3 || !body.trim()} className="justify-self-start rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50">{busy ? "Publishing..." : "Publish announcement"}</button>
-        </form>
-      </WorkspacePanel>}
-      {data.announcements.slice().reverse().map(item => <WorkspacePanel key={item.id} title={item.title} description={new Date(item.createdAt).toLocaleString()}>
-        <p className="whitespace-pre-wrap text-sm leading-7">{item.body}</p>
-      </WorkspacePanel>)}
-      {!data.announcements.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">No class announcements yet.</p>}
+      {data.role === "teacher" && <ClassAnnouncementComposer title={title} body={body} busy={busy}
+        onTitleChange={value=>{setTitle(value);announcementId.current=null;}}
+        onBodyChange={value=>{setBody(value);announcementId.current=null;}}
+        onSubmit={()=>{announcementId.current??=crypto.randomUUID();
+          void run(async()=>{
+            await publishClassAnnouncement({data:{id:announcementId.current!,sectionId:data.section.id,title,body}});
+            setTitle("");setBody("");announcementId.current=null;
+          },"Class announcement published.");
+        }} />}
+      <ClassAnnouncementFeed announcements={data.announcements} />
     </div>}
   </WorkspaceShell>;
 }
