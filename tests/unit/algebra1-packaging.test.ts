@@ -13,8 +13,8 @@ describe("CAN Algebra I packaging controls", () => {
   it("reports actual authored coverage and refuses to mark full-year ready", () => {
     const coverage = JSON.parse(run("--report"));
     expect(coverage).toMatchObject({
-      targetWeeks: 36, authoredWeeks: 7, authoredLessons: 35,
-      plannedLessons: 180, unwrittenLessons: 145,
+      targetWeeks: 36, authoredWeeks: 8, authoredLessons: 40,
+      plannedLessons: 180, unwrittenLessons: 140,
       creditStatus: "not_credit_ready", publisherAdoption: "not_authorized",
     });
   });
@@ -43,8 +43,8 @@ describe("CAN Algebra I packaging controls", () => {
       curriculumDraftContent.parse(parsed);
       assertPublishableCurriculum(parsed);
       expect(parsed.modules.map(m=>m.id)).toEqual(["algebra1-u01","algebra1-u02"]);
-      expect(parsed.modules.map(m=>m.lessons.length)).toEqual([20,15]);
-      expect(new Set(parsed.modules.flatMap(m=>m.lessons.map(l=>l.id))).size).toBe(35);
+      expect(parsed.modules.map(m=>m.lessons.length)).toEqual([20,20]);
+      expect(new Set(parsed.modules.flatMap(m=>m.lessons.map(l=>l.id))).size).toBe(40);
       expect(raw).not.toContain("teacherGuides");
       expect(raw).not.toContain("workedAnswers");
       expect(raw).not.toContain("answerGuide");
