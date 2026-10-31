@@ -13,7 +13,8 @@ export function resolveGraduationPolicy<T extends ApplicablePolicy>(policies: re
  const replaced=new Set(policies.map(p=>p.supersedesRequirementSetId).filter((v):v is string=>Boolean(v)));
  for(const p of policies) {
   if(p.supersedesRequirementSetId && !ids.has(p.supersedesRequirementSetId)) throw new Error("Graduation policy supersession chain is incomplete");
-  if(p.cohortStart && p.cohortEnd && p.cohortStart>p.cohortEnd) throw new Error("Invalid graduation policy cohort range");
+  if((p.cohortStart===null)!==(p.cohortEnd===null)) throw new Error("Partially classified graduation policy cohort range");
+  if(p.cohortStart!==null && p.cohortEnd!==null && (!/^[0-9]{4}$/.test(p.cohortStart) || !/^[0-9]{4}$/.test(p.cohortEnd) || p.cohortStart>p.cohortEnd)) throw new Error("Invalid graduation policy cohort range");
  }
  for(const p of policies){
   const traversed=new Set<string>();
