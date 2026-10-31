@@ -124,6 +124,7 @@ describe("family and student profiles", () => {
     const children: ComponentProps<typeof FamilyHomeView>["children"] = [{
       studentPersonId: "child-person", studentProfileId: "child-profile", displayName: "Jordan", lastName: "Sample",
       sectionCount: 2, awaitingSections: false, missingCount: 3, unexcusedAbsences: 0, nextDueAt: null, status: "needs_attention",
+      workToReview:[],workNeedsAttentionCount:0,
     }];
     const html = renderToStaticMarkup(<FamilyHomeView children={children} needs={[]} loading={false} error=""/>);
     expect(html).toContain("3 assignment(s) need follow-through.");
@@ -140,12 +141,13 @@ describe("family and student profiles", () => {
   it("links a selected action to its owning workspace instead of dead-ending", () => {
     const html = renderToStaticMarkup(<FamilyHomeView children={[]} needs={[consentNeed]} loading={false} error="" action="consent-1"/>);
     expect(html).toContain('href="/guardian/group-permissions?action=consent-1"');
-    expect(html).toContain("Open the owning workspace");
+    expect(html).toContain("Review permission");
   });
   it("falls back to the action detail page for a selected action without a known workspace", () => {
     const html = renderToStaticMarkup(<FamilyHomeView children={[]} loading={false} error="" action="other-1"
       needs={[{ ...consentNeed, id: "other-1", type: "unknown_follow_up", href: "/guardian?action=other-1" }]}/>);
-    expect(html).toContain('href="/actions/other-1"');
+    expect(html).toContain("This action is unavailable in your current family workspace.");
+    expect(html).not.toContain('href="/actions/other-1"');
   });
   const profile: ComponentProps<typeof Student360View>["profile"] = {
     viewerRole: "registrar",
