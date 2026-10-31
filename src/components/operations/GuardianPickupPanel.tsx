@@ -180,7 +180,7 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
               </label>
               <button type="button" disabled={!!busy || activeHold}
                 className="mt-3 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                onClick={() => void run(key + ":hold", `Disputed custody reported for ${student.studentName}; all release is paused.`, () => createPickupCustodyHold({ data: {
+                onClick={() => window.confirm("Pause every pickup release for this child until an authorized site leader resolves the custody hold?") && void run(key + ":hold", `Disputed custody reported for ${student.studentName}; all release is paused.`, () => createPickupCustodyHold({ data: {
                   studentProfileId: student.studentProfileId,
                   programId: student.programId,
                   householdId: student.householdId,
