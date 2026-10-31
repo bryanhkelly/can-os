@@ -17,6 +17,8 @@ import { Route as TeacherGroups } from "@/routes/teacher.study-groups";
 import { readinessFromSnapshot } from "@/domain/program-readiness";
 
 const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,data:null as unknown}));
+// Static presentation tests never open a database connection.
+vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@tanstack/react-router",()=>({
   createFileRoute:()=> (options:object)=>({
     options,useSearch:()=>state.search,useLoaderData:()=>state.data,
