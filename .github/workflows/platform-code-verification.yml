@@ -1,0 +1,50 @@
+name: Platform and FullFlow Code Verification
+
+on:
+  pull_request:
+    branches: [FullFlow]
+  push:
+    branches: [refactor/platform-foundations]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-verification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: TypeScript, build, unit and design system
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Generate TanStack route types and build application
+        run: npm run build
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Design-system checks
+        run: npm run lint
+      - name: Record verification evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Code verification"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "- Connected FullFlow acceptance is separate and requires isolated Neon credentials."
+            echo "- No production authorization or compliance certification is implied."
+          } >> "${GITHUB_STEP_SUMMARY}"

@@ -16,6 +16,10 @@ describe("safeLoader", () => {
       expect(permission.kind).toBe("authorization");
     }
   });
+  it("recognizes the existing missing-session authorization marker", () => {
+    expect(classifyLoaderError(new AuthorizationError("authenticated session")).kind).toBe("authentication");
+    expect(classifyLoaderError(new AuthorizationError("grades")).kind).toBe("authorization");
+  });
   it("does not infer authorization from a misleading message", () => {
     expect(classifyLoaderError(new Error("not authorized by downstream API")).kind).toBe("unexpected");
   });
