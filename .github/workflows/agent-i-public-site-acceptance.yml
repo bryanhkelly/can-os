@@ -1,0 +1,62 @@
+name: Agent I public tenant hosting checks
+on:
+  pull_request:
+    branches: [FullFlow]
+    paths:
+      - 'src/domain/public-site-**'
+      - 'src/modules/sites/public-host-reachability.ts'
+      - 'src/modules/sites/site-publication.functions.ts'
+      - 'src/modules/programs/launch-website.functions.ts'
+      - 'src/components/operations/LaunchWebsiteStep.tsx'
+      - 'netlify/edge-functions/site-host-gate.ts'
+      - 'tests/unit/public-**'
+      - 'scripts/smoke-public-tenant-hosting.mjs'
+      - '.github/workflows/agent-i-public-site-acceptance.yml'
+  workflow_dispatch:
+    inputs:
+      deployed_acceptance:
+        description: 'Run deployed read-only acceptance against preapproved hosts (requires seven configured vars)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Tenant routing and reachability unit tests
+        run: npx vitest run tests/unit/public-host-reachability.test.ts tests/unit/public-site-host-routing.test.ts tests/unit/public-tenant-edge-origin-isolation.test.ts
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+
+  deployed-read-only:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployed_acceptance }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CAN_PUBLIC_SMOKE_DOMAIN: ${{ vars.CAN_PUBLIC_SMOKE_DOMAIN }}
+      CAN_PUBLIC_SMOKE_TENANT_A: ${{ vars.CAN_PUBLIC_SMOKE_TENANT_A }}
+      CAN_PUBLIC_SMOKE_TENANT_B: ${{ vars.CAN_PUBLIC_SMOKE_TENANT_B }}
+      CAN_PUBLIC_SMOKE_UNPUBLISHED: ${{ vars.CAN_PUBLIC_SMOKE_UNPUBLISHED }}
+      CAN_PUBLIC_SMOKE_UNKNOWN: ${{ vars.CAN_PUBLIC_SMOKE_UNKNOWN }}
+      CAN_PUBLIC_SMOKE_NAME_A: ${{ vars.CAN_PUBLIC_SMOKE_NAME_A }}
+      CAN_PUBLIC_SMOKE_NAME_B: ${{ vars.CAN_PUBLIC_SMOKE_NAME_B }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read-only two-tenant HTTPS acceptance
+        run: node scripts/smoke-public-tenant-hosting.mjs
