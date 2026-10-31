@@ -344,6 +344,13 @@
       "when": 1793298762009,
       "tag": "0048_many_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1793400000000,
+      "tag": "0049_field_trip_decline",
+      "breakpoints": true
     }
   ]
 }
