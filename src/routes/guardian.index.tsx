@@ -24,13 +24,18 @@ function FamilyHomePage() {
  const [needs, setNeeds] = useState<NeedItem[]>([]);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState("");
+ const [needsWarning, setNeedsWarning] = useState("");
 
  useEffect(() => {
   let active = true;
-  Promise.all([getFamilyHome(), getGuardianNeedsYou()]).then(([home, needsYou]) => {
+  Promise.all([getFamilyHome(), getGuardianNeedsYou().then(
+   result => ({items:result.items,unavailable:false}),
+   () => ({items:[] as NeedItem[],unavailable:true}),
+  )]).then(([home, needsYou]) => {
    if (!active) return;
    setChildren(home.children);
    setNeeds(needsYou.items);
+   setNeedsWarning(needsYou.unavailable ? "Your attention list is temporarily unavailable. You can still review each child, attendance and enrollment." : "");
    setLoading(false);
   }).catch(() => {
    if (active) { setError("Sign in with an authorized guardian account to view your family home."); setLoading(false); }
@@ -38,11 +43,11 @@ function FamilyHomePage() {
   return () => { active = false; };
  }, []);
 
- return <FamilyHomeView children={children} needs={needs} loading={loading} error={error} action={action} student={student}/>;
+ return <FamilyHomeView children={children} needs={needs} loading={loading} error={error} needsWarning={needsWarning} action={action} student={student}/>;
 }
 
-export function FamilyHomeView({children,needs,loading,error,action,student}:{
- children:Child[];needs:NeedItem[];loading:boolean;error:string;action?:string;student?:string;
+export function FamilyHomeView({children,needs,loading,error,needsWarning,action,student}:{
+ children:Child[];needs:NeedItem[];loading:boolean;error:string;needsWarning?:string;action?:string;student?:string;
 }){
  const prioritized=prioritizeFamilyNeeds(needs,Date.now());
  const selectedChild=children.find(child=>child.studentPersonId===student);
@@ -81,16 +86,17 @@ export function FamilyHomeView({children,needs,loading,error,action,student}:{
    {student&&!selectedChild&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
     <StatCard label={selectedChild?"Selected child":"Your children"} value={visibleChildren.length}/>
-    <StatCard label="Needs your attention" value={needs.length}/>
+    <StatCard label="Needs your attention" value={needsWarning?"Unavailable":needs.length}/>
     <StatCard label="Missing assignments" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
    <div className="mt-6">
-    <AttentionQueue
+    {needsWarning && <p role="status" className="mb-3 rounded-xl border p-4 text-sm">{needsWarning}</p>}
+    {!needsWarning && <AttentionQueue
      items={buildGuardianAttention(prioritized.filter(item=>!action||item.kind==="action"&&item.id===action))}
      empty={action?"The selected action is not available in your current family workspace.":"You are all caught up. Nothing needs your attention right now."}
-    />
+    />}
     {action&&<Link to="/guardian" className="mt-4 inline-block text-sm underline">View all family needs</Link>}
-    {action&&!needs.some(item=>item.kind==="action"&&item.id===action)&&!loading&&<p role="alert" className="mt-4 rounded-xl border p-4">This action is unavailable in your current family workspace.</p>}
+    {action&&!needsWarning&&!needs.some(item=>item.kind==="action"&&item.id===action)&&!loading&&<p role="alert" className="mt-4 rounded-xl border p-4">This action is unavailable in your current family workspace.</p>}
    </div>
 
    <section aria-label="Your children" className="mt-12">
