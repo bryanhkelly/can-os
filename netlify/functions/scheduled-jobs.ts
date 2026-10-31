@@ -19,7 +19,8 @@ export default async () => {
   if (!response.ok) {
     throw new Error(`scheduled-jobs: /api/jobs responded ${response.status}`);
   }
-  console.log("scheduled-jobs:", await response.text());
+  // Timestamped successful completion is monitorable independently of scheduler invocation.
+  console.info("scheduled-jobs: completed", new Date().toISOString(), await response.text());
 };
 
 export const config = { schedule: "*/5 * * * *" };
