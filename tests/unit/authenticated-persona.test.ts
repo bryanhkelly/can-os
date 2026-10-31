@@ -11,6 +11,15 @@ import {
 import { TEST_ACCESS_TOKEN_PEPPER, baseURL } from "../e2e/env";
 import type { Sql } from "../e2e/fixture";
 
+function mockedPage(id?:string) {
+  return {
+    ...(id ? {id} : {}),
+    route:vi.fn().mockResolvedValue(undefined),
+    goto:vi.fn().mockResolvedValue(undefined),
+    unroute:vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe("authenticated browser persona primitives", () => {
   it("creates opaque secrets accepted by the access-token contract", () => {
     const first = newSessionSecret();
@@ -42,9 +51,10 @@ describe("authenticated browser persona primitives", () => {
   });
 
   it("opens an isolated page with a host-only, secure, HTTP-only session cookie", async () => {
+    const page = mockedPage("page");
     const context = {
-      addCookies: vi.fn().mockResolvedValue(undefined),
-      newPage: vi.fn().mockResolvedValue({ id: "page" } as unknown as Page),
+      newPage: vi.fn().mockResolvedValue(page),
+      close: vi.fn().mockResolvedValue(undefined),
     };
     const browser = {
       newContext: vi.fn().mockResolvedValue(context as unknown as BrowserContext),
@@ -53,25 +63,25 @@ describe("authenticated browser persona primitives", () => {
     const result = await openAuthenticatedPage(browser as unknown as Browser, "opaque-secret");
 
     expect(browser.newContext).toHaveBeenCalledWith({ baseURL });
-    expect(context.addCookies).toHaveBeenCalledWith([{
-      name: accessSessionCookie,
-      value: "opaque-secret",
-      url: baseURL,
-      path: "/",
-      httpOnly: true,
-      secure: true,
-      sameSite: "Lax",
-    }]);
-    const cookie = context.addCookies.mock.calls[0]?.[0][0] as Record<string, unknown>;
-    expect(cookie).not.toHaveProperty("domain");
-    expect(result.page).toEqual({ id: "page" });
+    const cookieUrl = new URL("/__can_e2e_session__", baseURL).toString();
+    expect(page.route).toHaveBeenCalledWith(cookieUrl, expect.any(Function));
+    const fulfill=vi.fn().mockResolvedValue(undefined);
+    const handler=page.route.mock.calls[0]![1] as (route:{fulfill:(data:unknown)=>Promise<void>})=>Promise<void>;
+    await handler({fulfill});
+    const response=fulfill.mock.calls[0]![0] as {headers:Record<string,string>};
+    expect(response.headers["Set-Cookie"]).toBe(
+      `${accessSessionCookie}=opaque-secret; Path=/; Secure; HttpOnly; SameSite=Lax`);
+    expect(response.headers["Set-Cookie"]).not.toContain("Domain=");
+    expect(page.goto).toHaveBeenCalledWith(cookieUrl);
+    expect(page.unroute).toHaveBeenCalledWith(cookieUrl);
+    expect(result.page).toBe(page);
     expect(result.context).toBe(context);
   });
 
   it("supports the suite-specific application origin without changing cookie flags", async () => {
     const context = {
-      addCookies: vi.fn().mockResolvedValue(undefined),
-      newPage: vi.fn().mockResolvedValue({} as Page),
+      newPage: vi.fn().mockResolvedValue(mockedPage()),
+      close: vi.fn().mockResolvedValue(undefined),
     };
     const browser = { newContext: vi.fn().mockResolvedValue(context as unknown as BrowserContext) };
     const origin = "http://localhost:3188";
@@ -79,18 +89,16 @@ describe("authenticated browser persona primitives", () => {
     await openAuthenticatedPage(browser as unknown as Browser, "opaque-secret", origin);
 
     expect(browser.newContext).toHaveBeenCalledWith({ baseURL: origin });
-    expect(context.addCookies).toHaveBeenCalledWith([expect.objectContaining({
-      url: origin,
-      httpOnly: true,
-      secure: true,
-      sameSite: "Lax",
-    })]);
+    const page=await context.newPage.mock.results[0]!.value;
+    expect(page.route).toHaveBeenCalledWith(new URL("/__can_e2e_session__",origin).toString(),expect.any(Function));
+    expect(page.goto).toHaveBeenCalledWith(new URL("/__can_e2e_session__",origin).toString());
   });
 
   it("closes a new context when its cookie or page setup fails", async () => {
     const context = {
-      addCookies: vi.fn().mockRejectedValue(new Error("cookie rejected")),
-      newPage: vi.fn(),
+      newPage: vi.fn().mockResolvedValue({
+        ...mockedPage(),route:vi.fn().mockRejectedValue(new Error("cookie rejected")),
+      }),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const browser = {
@@ -102,13 +110,12 @@ describe("authenticated browser persona primitives", () => {
       "opaque-secret",
     )).rejects.toThrow("cookie rejected");
     expect(context.close).toHaveBeenCalledTimes(1);
-    expect(context.newPage).not.toHaveBeenCalled();
+    expect(context.newPage).toHaveBeenCalledTimes(1);
   });
 
   it("closes a scoped persona after the callback succeeds", async () => {
-    const page = { id: "page" } as unknown as Page;
+    const page = mockedPage("page");
     const context = {
-      addCookies: vi.fn().mockResolvedValue(undefined),
       newPage: vi.fn().mockResolvedValue(page),
       close: vi.fn().mockResolvedValue(undefined),
     };
@@ -128,8 +135,7 @@ describe("authenticated browser persona primitives", () => {
 
   it("closes a scoped persona when the callback fails", async () => {
     const context = {
-      addCookies: vi.fn().mockResolvedValue(undefined),
-      newPage: vi.fn().mockResolvedValue({} as Page),
+      newPage: vi.fn().mockResolvedValue(mockedPage()),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const browser = {
@@ -147,13 +153,11 @@ describe("authenticated browser persona primitives", () => {
 
   it("returns named personas and closes every context after the group scope", async () => {
     const guardianContext = {
-      addCookies: vi.fn().mockResolvedValue(undefined),
-      newPage: vi.fn().mockResolvedValue({ id: "guardian" } as unknown as Page),
+      newPage: vi.fn().mockResolvedValue(mockedPage("guardian")),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const registrarContext = {
-      addCookies: vi.fn().mockResolvedValue(undefined),
-      newPage: vi.fn().mockResolvedValue({ id: "registrar" } as unknown as Page),
+      newPage: vi.fn().mockResolvedValue(mockedPage("registrar")),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const browser = {
@@ -168,16 +172,15 @@ describe("authenticated browser persona primitives", () => {
       async opened => opened,
     );
 
-    expect(personas.guardian.page).toEqual({ id: "guardian" });
-    expect(personas.registrar.page).toEqual({ id: "registrar" });
+    expect(personas.guardian.page).toMatchObject({ id: "guardian" });
+    expect(personas.registrar.page).toMatchObject({ id: "registrar" });
     expect(guardianContext.close).toHaveBeenCalledTimes(1);
     expect(registrarContext.close).toHaveBeenCalledTimes(1);
   });
 
   it("closes already-opened personas when a later context setup fails", async () => {
     const guardianContext = {
-      addCookies: vi.fn().mockResolvedValue(undefined),
-      newPage: vi.fn().mockResolvedValue({} as Page),
+      newPage: vi.fn().mockResolvedValue(mockedPage()),
       close: vi.fn().mockResolvedValue(undefined),
     };
     const browser = {
