@@ -64,6 +64,7 @@ export const getGuardianHealthWorkspace = createServerFn({ method: "GET" })
         allergySummary: healthProfiles.allergySummary,
         emergencySummary: healthProfiles.emergencySummary,
         accommodationSummary: healthProfiles.accommodationSummary,
+        metadata: healthProfiles.metadata,
       }).from(healthProfiles).where(inArray(healthProfiles.studentProfileId, profileIds)),
       db.select({
         studentProfileId: healthComplianceItems.studentProfileId,
@@ -93,6 +94,10 @@ export const getGuardianHealthWorkspace = createServerFn({ method: "GET" })
     ]);
     return { children: children.map(child => ({
       studentPersonId: child.studentPersonId,
+      programId:child.programId,
+      awaitingSchoolHealthReview:!!profiles.find(row=>row.studentProfileId===child.studentProfileId)?.metadata.pendingGuardianUpdate,
+      approvedEmergencyContact:profiles.find(row=>row.studentProfileId===child.studentProfileId)?.metadata.approvedEmergencyContact as
+        {name:string;phone:string;relationship:string}|undefined,
       studentName: [child.firstName, child.lastName].filter(Boolean).join(" "),
       profile: profiles.find(row => row.studentProfileId === child.studentProfileId) ?? null,
       compliance: compliance.filter(row => row.studentProfileId === child.studentProfileId),
