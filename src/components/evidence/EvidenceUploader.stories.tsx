@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within, fn, fireEvent } from "storybook/test";
 import { EvidenceUploader } from "./EvidenceUploader";
 type Upload = { fileName: string; mimeType: "application/pdf" | "image/jpeg" | "image/png";
