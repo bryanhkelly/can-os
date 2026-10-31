@@ -51,10 +51,10 @@ function assertFamilyInvitationRegistrar(context: AccessContext, programId?: str
 }
 
 /** Outreach before authorization is informational only: never create a guardian or Application. */
-async function resolvePreopeningInterestDestination(tx: typeof db, programId: string) {
+async function resolvePreopeningInterestDestination(tx: Pick<typeof db, "select">, programId: string) {
   const [school] = await tx.select({
     programId: programs.id, programName: programs.name,
-    organizationId: programs.organizationId, programSiteId: programs.siteId,
+    organizationId: programs.organizationId, programOrganizationId: programs.organizationId, programSiteId: programs.siteId,
     siteId: sites.id, siteOrganizationId: sites.organizationId,
     slug: sites.slug, type: programs.type, status: programs.status,
   }).from(programs).innerJoin(sites, eq(sites.id, programs.siteId))
@@ -89,7 +89,7 @@ export async function sendFamilyInvitationBatch(
     // Serializes cross-batch dedupe until the canonical recipient requests exist.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"family-invitation:" + data.programId}))`);
     const destination = data.purpose === "interest"
-      ? await resolvePreopeningInterestDestination(tx as typeof db, data.programId)
+      ? await resolvePreopeningInterestDestination(tx, data.programId)
       : await resolvePrivateFamilyStartDestination(tx, data.programId);
     assertOrganizationScope(context, destination.organizationId);
     assertSiteScope(context, destination.siteId);
@@ -259,7 +259,7 @@ export async function requestFamilyInvitationRetry(
     // Retry must not revive pre-opening marketing after the school opens or
     // release a formal application when current institutional authority is gone.
     if (metadata.destination === "preopening_interest") {
-      await resolvePreopeningInterestDestination(tx as typeof db, thread.contextId);
+      await resolvePreopeningInterestDestination(tx, thread.contextId);
     } else if (metadata.destination === "private_platform") {
       await resolvePrivateFamilyStartDestination(tx, thread.contextId);
     }
