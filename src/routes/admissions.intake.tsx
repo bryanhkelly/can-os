@@ -185,17 +185,19 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
         "Pending — may review and issue an offer; activation must wait":"Requires review before placement"}.</p>
       {r.transferNamedDestination&&<p className="mt-1">Family's named receiving school: {r.transferNamedDestination}.
         Confirm that this application is for the intended destination.</p>}
-      <p className="mt-1">Origin academic records: <strong>{r.transferRecordsStatus==="completed"?
-        "Handoff recorded by originating records office":
+      <p className="mt-1">Origin academic records: <strong>{r.transferRecordsStatus==="available_in_can"?
+        "Official transcript released inside CAN — available below":
+        r.transferRecordsStatus==="released_externally"?
+        "External secure delivery attested — no automatic CAN transcript access":
         r.transferRecordsStatus==="pending_release"?
         "Secure transcript handoff pending":
         r.transferRecordsStatus==="requires_review"?
         "Origin record authorization requires review":
         "Not yet started"}</strong>.</p>
       <p className="mt-1 text-xs text-muted-foreground">An institutional records handoff is separate from receiving-school admission. This school must independently decide admission, confirm seat capacity, obtain guardian acceptance and activate a real Section.</p>
-      {r.transferRecordsStatus==="completed"&&<ReceivingTransferTranscript
+      {r.transferRecordsStatus==="available_in_can"&&<ReceivingTransferTranscript
         applicationId={r.id} consentRequested={r.destinationTranscriptConsentRecorded}/>}
-      {r.transferRecordsStatus==="completed"&&!r.destinationTranscriptConsentRecorded&&
+      {r.transferRecordsStatus==="available_in_can"&&!r.destinationTranscriptConsentRecorded&&
         <p role="status" className="mt-2 font-medium">
           This application predates specific receiving-school transcript consent.
           Request authorization from the verified guardian before accessing the official record.
