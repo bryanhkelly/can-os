@@ -146,6 +146,10 @@ export async function verifyChurchApplication(actor: AccessContext, input: {
 }) {
   const canOrganizationId = await requireCANSteward(actor);
   const reference = validateChurchEvidenceReference(input.evidenceReference, input.verificationMethod);
+  // A syntactically valid vault reference is not proof that private bytes exist.
+  // Until applicant-bound object verification and quarantine are wired, fail closed.
+  if (process.env.CAN_CHURCH_EVIDENCE_INTAKE_ENABLED !== "true")
+    throw new Error("Church evidence verification is unavailable until secure intake is configured");
   return db.transaction(async tx => {
     const [request] = await tx.select().from(churchOnboardingRequests)
       .where(eq(churchOnboardingRequests.id, input.requestId)).for("update").limit(1);
