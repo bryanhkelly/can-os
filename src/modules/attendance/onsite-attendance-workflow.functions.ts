@@ -325,6 +325,47 @@ export const loadExpectedOnsiteRosterForActor=createServerOnlyFn(async (actor:Ac
 
 /** Same canonical enrollment/calendar resolver as today's roster. No attendance
  * events are read or projected as observations for a preparation date. */
+/** Read-only student-specific future day. This does not load attendance events. */
+export const loadExpectedFirstDayPreparationForActor=createServerOnlyFn(async(actor:AccessContext,data:{
+  date:string;programId:string;siteId:string;studentProfileId:string;
+})=>{
+  if(actor.role!=="registrar" || !actor.actorPersonId || actor.demoFacilitator)
+    throw new AuthorizationError("verified registrar future first-day preparation");
+  assertCapability(actor,"enrollment.activate");
+  if(!actor.scope.organizationIds?.length ||
+    !actor.scope.siteIds?.includes(data.siteId) ||
+    !actor.scope.programIds?.includes(data.programId))
+    throw new AuthorizationError("original registrar Site and Program grant");
+  if(!dateField.safeParse(data.date).success || !uuid.safeParse(data.studentProfileId).success ||
+    !uuid.safeParse(data.programId).success || !uuid.safeParse(data.siteId).success)
+    throw new AuthorizationError("valid scoped school-day preparation identifiers");
+  const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,
+    timezone:sites.timezone}).from(sites).where(eq(sites.id,data.siteId)).limit(1);
+  if(!site || !actor.scope.organizationIds.includes(site.organizationId))
+    throw new AuthorizationError("original registrar organization and Site");
+  const today=siteDate(new Date(),site.timezone);
+  if(data.date<today)throw new AuthorizationError("future first-day date cannot be in the past");
+  const {roster,sectionMemberships,unplacedStudents,coverage,programsAtSite}=
+    await resolveExpectedRoster(actor,data.date,data.programId,data.studentProfileId,data.siteId,true);
+  const program=programsAtSite.find(row=>row.id===data.programId &&
+    row.siteId===data.siteId && row.organizationId===site.organizationId);
+  if(!program)throw new AuthorizationError("active onsite registrar Program");
+  const matched=roster.find(row=>row.studentProfileId===data.studentProfileId &&
+    row.programId===data.programId);
+  return {date:data.date,program:{id:program.id,name:program.name,
+      configuration:coverage.get(program.id)?.configuration??"not_onsite",
+      expectedDays:coverage.get(program.id)?.expectedDays??0,
+      missingCalendarDates:coverage.get(program.id)?.daysWithoutCalendarConfiguration??0},
+    student:matched?{studentProfileId:matched.studentProfileId,programId:matched.programId,
+      studentName:matched.studentName,sectionId:matched.sectionId,
+      sectionTitle:matched.sectionTitle,status:"unmarked" as const}:null,
+    sectionMemberships:sectionMemberships.filter(row=>row.studentProfileId===data.studentProfileId &&
+      row.programId===data.programId),
+    unplaced:unplacedStudents.some(row=>row.studentProfileId===data.studentProfileId &&
+      row.programId===data.programId),
+  };
+});
+
 export const loadExpectedSchoolDayPreparation=createServerOnlyFn(async(actor:AccessContext,data:{date:string})=>{
   const [site]=await db.select({id:sites.id,organizationId:sites.organizationId,timezone:sites.timezone,name:sites.name})
     .from(sites).where(eq(sites.id,actor.grantSiteId!)).limit(1);
