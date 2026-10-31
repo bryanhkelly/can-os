@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export type EvidenceDecision = "approve" | "reject";
 
@@ -17,10 +18,12 @@ export function EvidenceReviewForm({
 }: EvidenceReviewFormProps) {
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState(false);
+  const inFlight = useRef(false);
   const [error, setError] = useState("");
   const busy = disabled || pending;
   async function submit(decision: EvidenceDecision) {
-    if (busy || reason.trim().length < 10) return;
+    if (inFlight.current || disabled || reason.trim().length < 10 || reason.trim().length > 2000) return;
+    inFlight.current = true;
     setPending(true);
     setError("");
     try {
@@ -29,6 +32,7 @@ export function EvidenceReviewForm({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Evidence review was not recorded");
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   }
@@ -39,10 +43,10 @@ export function EvidenceReviewForm({
         onChange={event => setReason(event.target.value)} />
     </label>
     <div className="mt-2 flex flex-wrap gap-2">
-      <button type="button" className="rounded border px-3 py-2 disabled:opacity-50"
-        disabled={busy || reason.trim().length < 10} onClick={() => void submit("approve")}>
+      <Button type="button" variant="outline" size="sm"
+        disabled={busy || reason.trim().length < 10 || reason.trim().length > 2000} onClick={() => void submit("approve")}>
         {pending ? "Recording review…" : approveLabel}
-      </button>
+      </Button>
       <button type="button" className="rounded border px-3 py-2 disabled:opacity-50"
         disabled={busy || reason.trim().length < 10} onClick={() => void submit("reject")}>
         {rejectLabel}
