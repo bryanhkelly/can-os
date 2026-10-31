@@ -15,7 +15,7 @@ export const UnauthorizedDocument: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Open private document" }));
-    await expect(canvas.findByRole("alert")).resolves.toHaveTextContent("Not authorized");
+    await expect(await canvas.findByRole("alert")).toHaveTextContent("Not authorized");
     await expect(args.onGetDownloadUrl).toHaveBeenCalledTimes(1);
     await expect(canvas.getByRole("button", { name: "Open private document" })).toBeEnabled();
   },
