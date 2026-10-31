@@ -122,3 +122,11 @@ describe("scheduled-block coverage gap Actions", () => {
   });
 
 });
+
+it("scopes duty retry identity to the actual responding adult",async()=>{
+  state.rows=[[]];
+  await respondToOnsiteDuty({data:{date:date(),sectionId,periodId:periodA,response:"accepted",confirmed:true}});
+  const query=new PgDialect().sqlToQuery(state.predicates[0] as Parameters<PgDialect["sqlToQuery"]>[0]);
+  expect(query.sql).toContain('"actions"."owner_person_id"');
+  expect(query.params).toContain(state.actor!.actorPersonId);
+});

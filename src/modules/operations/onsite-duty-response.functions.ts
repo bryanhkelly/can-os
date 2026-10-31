@@ -8,7 +8,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertOnsiteAttendanceScope } from "@/domain/onsite-attendance-access";
 import {
-  isOnsiteDutySubstitution, selectAuthorizedOnsiteDuty, resolveOnsiteDutyRetry,
+  isOnsiteDutySubstitution, selectAuthorizedOnsiteDuty, resolveOnsiteDutyRetry, summarizeNamedDutyResponses,
 } from "@/domain/onsite-duty-policy";
 import { siteDate } from "@/domain/expected-attendance";
 import { EventTypes } from "@/domain/event-types";
@@ -103,12 +103,12 @@ export const loadOnsiteDutyResponsesForActor=createServerOnlyFn(async (actor:Acc
         ? canAcceptSections.get(block.sectionId) === true
         : actor.role === "site_leader"
         ? canAcceptPrograms.get(block.programId) === true : true;
-      const record=!truncated&&block.verifiedSiteStaffGrant
-        ? rows.find(row=>row.sectionId===block.sectionId&&
-          row.metadata.periodId===block.periodId&&
-          row.metadata.planToken===block.planToken&&
-          (row.metadata.response==="accepted"||row.metadata.response==="cannot_cover"))
-        :undefined;
+      const exactRecords=!truncated&&block.verifiedSiteStaffGrant?rows.filter(row=>
+        row.sectionId===block.sectionId&&row.metadata.periodId===block.periodId&&row.metadata.planToken===block.planToken):[];
+      const duty=summarizeNamedDutyResponses({primaryPersonId:block.facilitatorPersonId,
+        backupPersonId:block.backupPersonId,requiresBackup:block.requiresSectionDelegation===true,
+        actorPersonId:actor.actorPersonId},exactRecords);
+      const record=exactRecords.find(row=>row.ownerPersonId===actor.actorPersonId);
       const substitution=!truncated&&rows.some(row=>
         isOnsiteDutySubstitution(block,row));
       return {
@@ -120,10 +120,8 @@ export const loadOnsiteDutyResponsesForActor=createServerOnlyFn(async (actor:Acc
             ? canAcceptSections.get(block.sectionId) === true
             : actor.role === "site_leader"
             ? canAcceptPrograms.get(block.programId) === true : true),
-        status:record?.metadata.response==="accepted"
-          ? currentlyAuthorized ? "accepted" as const : "stale_after_delegation" as const
-          :record?.metadata.response==="cannot_cover"?"cannot_cover" as const:
-          "not_reported" as const,
+        ...duty,
+        status:duty.status==="accepted"&&!currentlyAuthorized?"stale_after_delegation" as const:duty.status,
         respondedAt:record?.createdAt.toISOString()??null,
         isOwnResponse:record?.ownerPersonId===actor.actorPersonId,
       };
@@ -212,7 +210,7 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
       const [prior]=await tx.select({id:actions.id,metadata:actions.metadata})
         .from(actions).where(and(eq(actions.type,dutyType),eq(actions.siteId,site.id),
           eq(actions.sectionId,data.sectionId),eq(actions.subjectType,"section"),
-          eq(actions.subjectId,data.sectionId),
+          eq(actions.subjectId,data.sectionId),eq(actions.ownerPersonId,actor.actorPersonId!),
           sql`${actions.metadata}->>'date' = ${data.date}`,
           sql`${actions.metadata}->>'periodId' = ${data.periodId}`,
           sql`${actions.metadata}->>'planToken' = ${block.planToken}`))
@@ -231,7 +229,7 @@ export const respondToOnsiteDuty = createServerFn({method:"POST"})
         programId:block.programId,sectionId:data.sectionId,
         ownerPersonId:actor.actorPersonId,resolvedAt:new Date(),
         metadata:{
-          date:data.date,periodId:data.periodId,planToken:block.planToken,
+          date:data.date,periodId:data.periodId,planToken:block.planToken,dutyRole:block.ownDutyRole??"primary",
           response:data.response,
           ...(data.reason?{reason:data.reason}:{}),
           scope:"staff_availability_only",

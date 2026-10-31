@@ -7,6 +7,7 @@ export type DutyAssignmentCandidate = {
   programId:string;
   canRespond:boolean;
   canAccept:boolean;
+  ownDutyRole?:"primary"|"backup"|null;
   planToken:string;
   /** Independently church-hosted blocks additionally require current named
    * facilitator safety evidence before an affirmative response. */
@@ -42,9 +43,9 @@ export function isOnsiteDutySubstitution(current:{
   sectionId:string;periodId:string|null;planToken:string;facilitatorPersonId:string|null;
 },prior:{
   sectionId:string|null;ownerPersonId:string|null;
-  metadata:{periodId?:unknown;planToken?:unknown};
+  metadata:{periodId?:unknown;planToken?:unknown;dutyRole?:unknown};
 }):boolean{
-  return prior.sectionId===current.sectionId&&prior.metadata.periodId===current.periodId&&
+  return prior.metadata.dutyRole!=="backup"&&prior.sectionId===current.sectionId&&prior.metadata.periodId===current.periodId&&
     prior.metadata.planToken!==current.planToken&&!!prior.ownerPersonId&&
     prior.ownerPersonId!==current.facilitatorPersonId;
 }
@@ -60,4 +61,23 @@ export function resolveOnsiteDutyRetry(
      (previous.reason??null)!==(requested.reason??null))
     throw new AuthorizationError("duty already answered; contact the site leader");
   return {responseId:previous.id,created:false,response:requested.response};
+}
+
+/** Availability belongs to each named adult. One adult's response cannot
+ * acknowledge the other adult's duty. Callers supply exact-block records. */
+export function summarizeNamedDutyResponses(input:{
+  primaryPersonId:string|null;backupPersonId:string|null;requiresBackup:boolean;actorPersonId:string|null;
+},records:readonly {ownerPersonId:string|null;metadata:{response?:unknown}}[]){
+  const response=(personId:string|null)=>{
+    const record=personId?records.find(row=>row.ownerPersonId===personId):undefined;
+    return record?.metadata.response==="accepted"?"accepted" as const:
+      record?.metadata.response==="cannot_cover"?"cannot_cover" as const:"not_reported" as const;
+  };
+  const primaryStatus=response(input.primaryPersonId);
+  const backupStatus=input.requiresBackup?response(input.backupPersonId):null;
+  const status=primaryStatus==="cannot_cover"||backupStatus==="cannot_cover"?"cannot_cover" as const:
+    primaryStatus==="accepted"&&(!input.requiresBackup||backupStatus==="accepted")?"accepted" as const:"not_reported" as const;
+  const ownStatus=input.actorPersonId===input.primaryPersonId?primaryStatus:
+    input.actorPersonId===input.backupPersonId?backupStatus??"not_reported" as const:"not_reported" as const;
+  return {status,ownStatus,primaryStatus,backupStatus};
 }

@@ -34,6 +34,8 @@ export type OnsiteSupervisionPlanBlock=Omit<SupervisionSummary["blocks"][number]
   canCheckIn:boolean;
   canRespond:boolean;
   canAccept:boolean;
+  ownDutyRole?:"primary"|"backup"|null;
+  backupFacilitatorName?:string|null;
 };
 export type OnsiteSupervisionPlan=Omit<SupervisionSummary,"blocks">&{
   date:string;
@@ -374,6 +376,10 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
       ...block,
       facilitatorPersonId:assignedPersonId,
       backupPersonId:_backupPersonId??null,
+      ownDutyRole:assignedPersonId===actor.actorPersonId?"primary" as const:
+        _backupPersonId===actor.actorPersonId?"backup" as const:null,
+      backupFacilitatorName:_backupPersonId&&block.namedBackupVerified&&peopleById.has(_backupPersonId)
+        ? peopleById.get(_backupPersonId)!.firstName+" "+peopleById.get(_backupPersonId)!.lastName:null,
       // An acknowledgment is valid only for this exact assignment/time
       // fingerprint. Changes to the scheduled duty invalidate older records.
       planToken:createHash("sha256").update(JSON.stringify([
@@ -396,7 +402,8 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
       // Derived ONLY from the verified, original site grant and current active
       // instruction plan. Never accept a browser-supplied facilitator ID.
       canRespond:completeProjection && data.date===today &&
-        assignedPersonId===actor.actorPersonId && block.verifiedSiteStaffGrant &&
+        (assignedPersonId===actor.actorPersonId ||
+          _backupPersonId===actor.actorPersonId&&block.namedBackupVerified===true) && block.verifiedSiteStaffGrant &&
         block.instructionalDayConfirmed===true &&
         block.periodId!==null && block.startsAtLocal!==null && block.endsAtLocal!==null,
       // A qualified adult may acknowledge their own availability while
@@ -405,7 +412,8 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
       // Missing adult credentials, authorization, calendar or double-booking
       // still block an affirmative response.
       canAccept:completeProjection && data.date===today &&
-        assignedPersonId===actor.actorPersonId &&
+        (assignedPersonId===actor.actorPersonId ||
+          _backupPersonId===actor.actorPersonId&&block.namedBackupVerified===true) &&
         block.instructionalDayConfirmed===true &&
         block.periodId!==null &&
         block.gaps.every(gap=>[

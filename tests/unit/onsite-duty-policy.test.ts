@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isOnsiteDutySubstitution, resolveOnsiteDutyRetry, selectAuthorizedOnsiteDuty,
-  type DutyAssignmentCandidate,
+  type DutyAssignmentCandidate, summarizeNamedDutyResponses,
 } from "@/domain/onsite-duty-policy";
 
 const block:DutyAssignmentCandidate={
@@ -75,5 +75,20 @@ describe("Hybrid onsite assigned-duty authorization",()=>{
     expect(()=>resolveOnsiteDutyRetry({
       id:"response-a",response:"cannot_cover",reason:"unavailable",
     },{response:"cannot_cover",reason:"other"})).toThrow();
+  });
+});
+
+describe("independent named adult duty responses",()=>{
+  const block={primaryPersonId:"primary",backupPersonId:"backup",requiresBackup:true,actorPersonId:"backup"};
+  const accepted=(ownerPersonId:string)=>({ownerPersonId,metadata:{response:"accepted"}});
+  it("does not let the primary acceptance acknowledge the backup",()=>{
+    expect(summarizeNamedDutyResponses(block,[accepted("primary")])).toMatchObject({status:"not_reported",ownStatus:"not_reported",primaryStatus:"accepted",backupStatus:"not_reported"});
+  });
+  it("requires both acceptances and shows the backup's own response",()=>{
+    expect(summarizeNamedDutyResponses(block,[accepted("primary"),accepted("backup")])).toMatchObject({status:"accepted",ownStatus:"accepted"});
+  });
+  it("preserves either adult's coverage denial and ignores unrelated responses",()=>{
+    expect(summarizeNamedDutyResponses(block,[accepted("other"),{ownerPersonId:"backup",metadata:{response:"cannot_cover"}}])).toMatchObject({status:"cannot_cover",ownStatus:"cannot_cover"});
+    expect(summarizeNamedDutyResponses({...block,backupPersonId:null},[accepted("primary")]).status).toBe("not_reported");
   });
 });

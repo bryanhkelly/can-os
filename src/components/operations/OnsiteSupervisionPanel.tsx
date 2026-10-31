@@ -153,6 +153,7 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
               ? "Assigned facilitator: "+block.facilitatorName
               : "Facilitator assignment not verified"}
           </p>
+          <p className="mt-1 text-sm">Named backup: {block.backupFacilitatorName??"Not currently verified"}</p>
           {block.roomLabel&&block.roomPlanVerified&&
             <p className="mt-1 text-xs">Reviewed planned room: {block.roomLabel}.
               This is not an inspection or physical check-in.</p>}
@@ -185,12 +186,13 @@ export function OnsiteSupervisionPanel({ date }: { date:string }) {
               </button>}
             </div>}
           {duty&&<p className="mt-2 text-xs font-semibold" role="status">
-            Duty response: {duty.status==="accepted"?"Assigned adult reports availability":
+            Duty response: {duty.status==="accepted"?"All required named adults report availability":
               duty.status==="cannot_cover"?"Coverage gap reported":
               duty.status==="stale_after_delegation"?"Previous acceptance is stale: named delegation or operating agreement is no longer effective":
-              "Awaiting assigned adult's response"}
+              "Awaiting required named adult responses"}
           </p>}
-          {duty?.canRespond&&duty.status==="not_reported"&&block.periodId&&<>
+          {duty?.canRespond&&<p className="mt-1 text-xs">Your {block.ownDutyRole??"assigned"} duty response: {duty.ownStatus.replaceAll("_"," ")}</p>}
+          {duty?.canRespond&&duty.ownStatus==="not_reported"&&block.periodId&&<>
             <div className="mt-3 flex flex-wrap gap-2">
               {duty.canAccept&&<button type="button" disabled={!!dutyBusy}
                 onClick={()=>void answerDuty(block.sectionId,block.periodId!,"accepted")}
