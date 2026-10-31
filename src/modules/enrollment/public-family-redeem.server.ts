@@ -6,7 +6,7 @@ import {
 import { hashAccessSecret, issueOpaqueSecret, sessionCookieHeader } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { uniqueAccountPersonId } from "@/domain/verified-family-person";
-import { resolvePublishedFamilyStartDestination } from "./public-family-start.server";
+import { resolveRedeemedFamilyStartDestination } from "./private-family-start.server";
 import { recordSessionSecurityEvent } from "@/modules/identity/session-security-audit.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -44,10 +44,9 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
       siteId:publicFamilyStartRequests.siteId,
     });
   if(!intent)throw new AuthorizationError("valid unexpired single-use family link");
-  // Reuse the same published academic destination and current service gate as
-  // link issuance. It holds Site/Program publication and Program status stable
-  // for this transaction before any account, Person, grant or session is made.
-  const school=await resolvePublishedFamilyStartDestination(tx,intent.programId);
+  // Recheck the original server-recorded entry channel and current authority
+  // before creating any account, Person, grant or session.
+  const school=await resolveRedeemedFamilyStartDestination(tx,intent);
   if(school.siteId!==intent.siteId)
     throw new AuthorizationError("school application opening changed");
 
@@ -128,4 +127,3 @@ export async function redeemPublicFamilyStart(rawToken:string):Promise<{
     programId:intent.programId,requestId:intent.id};
  });
 }
-

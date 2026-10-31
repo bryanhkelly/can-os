@@ -29,12 +29,11 @@ import {
   type FamilyInvitationSendInput,
   type FamilyInvitationWorkspace,
 } from "@/domain/family-invitations";
-import { publicSiteHost } from "@/domain/public-site-address";
 import { sendAccessLinkViaResend } from "@/modules/identity/resend-access-mail.server";
 import {
   requestPublicFamilyStart,
-  resolvePublishedFamilyStartDestination,
 } from "./public-family-start.server";
+import { requestInvitedFamilyStart, resolvePrivateFamilyStartDestination } from "./private-family-start.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 function assertFamilyInvitationRegistrar(context: AccessContext, programId?: string): void {
@@ -69,7 +68,7 @@ export async function sendFamilyInvitationBatch(
   return db.transaction(async tx => {
     // Serializes cross-batch dedupe until the canonical recipient requests exist.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"family-invitation:" + data.programId}))`);
-    const destination = await resolvePublishedFamilyStartDestination(tx, data.programId);
+    const destination = await resolvePrivateFamilyStartDestination(tx, data.programId);
     assertOrganizationScope(context, destination.organizationId);
     assertSiteScope(context, destination.siteId);
     assertProgramScope(context, destination.programId);
@@ -132,6 +131,8 @@ export async function sendFamilyInvitationBatch(
       version: 1,
       batchRequestId: data.requestId,
       siteSlug: destination.slug,
+      destination: "private_platform",
+      siteId: destination.siteId,
       introduction: data.introduction,
       status: "queued",
       recipients: contacts.map(contact => ({
@@ -292,7 +293,7 @@ export async function listFamilyInvitationWorkspace(
       assertSiteScope(context, candidate.siteId);
       scopedPrograms.push(candidate);
       if (!["draft", "launching", "ready", "active"].includes(candidate.status)) continue;
-      const destination = await resolvePublishedFamilyStartDestination(db, candidate.id);
+      const destination = await resolvePrivateFamilyStartDestination(db, candidate.id);
       eligible.push(destination);
     } catch (error) {
       if (error instanceof AuthorizationError ||
@@ -302,7 +303,7 @@ export async function listFamilyInvitationWorkspace(
   }
   if (!scopedPrograms.length) return { programs: [], batches: [] };
 
-  // Sending requires a currently published destination; historical evidence does not.
+  // Sending requires current academic admissions authority; history remains visible.
   const scopedProgramIds = scopedPrograms.map(program => program.id);
   const batchRows = await db.select({
     id: communicationThreads.id,
@@ -351,7 +352,8 @@ export async function listFamilyInvitationWorkspace(
       id: program.programId,
       name: program.programName,
       siteId: program.siteId,
-      publishedSiteUrl: `https://${publicSiteHost(program.slug)}`,
+      publishedSiteUrl: "",
+      privateApplicationUrl: `/guardian/apply?programId=${encodeURIComponent(program.programId)}`,
     })),
     batches: parsedBatches.map(batch => {
       const programName = programsById.get(batch.programId)?.name ?? "Program";
@@ -465,7 +467,13 @@ export async function handleFamilyInvitationBatch(eventId: string): Promise<void
 
   const failures = await processFamilyInvitationRecipients(
     metadata.recipients,
-    recipient => requestPublicFamilyStart(metadata.siteSlug, {
+    recipient => metadata.destination === "private_platform"
+      ? requestInvitedFamilyStart(thread.id, recipient.key, sendAccessLinkViaResend, {
+        idempotencyKey: `${thread.id}:${recipient.key}`,
+        subject: thread.subject,
+        introduction: metadata.introduction,
+      })
+      : requestPublicFamilyStart(metadata.siteSlug, {
       requestId: recipient.key,
       programId: thread.contextId!,
       firstName: recipient.firstName || "Family",
@@ -515,4 +523,3 @@ export async function handleFamilyInvitationBatch(eventId: string): Promise<void
     });
   });
 }
-

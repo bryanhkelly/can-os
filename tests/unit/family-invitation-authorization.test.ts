@@ -17,6 +17,10 @@ vi.mock("@/modules/enrollment/public-family-start.server", () => ({
   requestPublicFamilyStart: vi.fn(),
   resolvePublishedFamilyStartDestination: state.resolveDestination,
 }));
+vi.mock("@/modules/enrollment/private-family-start.server", () => ({
+  requestInvitedFamilyStart: vi.fn(),
+  resolvePrivateFamilyStartDestination: state.resolveDestination,
+}));
 vi.mock("@/platform/mutation", () => ({ emitEvent: vi.fn(), writeAudit: vi.fn() }));
 
 import {

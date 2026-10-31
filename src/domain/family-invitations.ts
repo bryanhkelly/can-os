@@ -34,6 +34,9 @@ export type FamilyInvitationBatchMetadata = {
   version: 1;
   batchRequestId: string;
   siteSlug: string;
+  /** Absent on legacy published-website invitations. */
+  destination?: "private_platform";
+  siteId?: string;
   introduction: string;
   status: "queued" | "retrying" | "complete";
   recipients: FamilyInvitationRecipient[];
@@ -56,10 +59,13 @@ export const familyInvitationBatchMetadataSchema: z.ZodType<FamilyInvitationBatc
   version: z.literal(1),
   batchRequestId: z.string().uuid(),
   siteSlug: z.string().min(1),
+  destination: z.literal("private_platform").optional(),
+  siteId: z.string().uuid().optional(),
   introduction: z.string().min(1).max(2_000),
   status: z.enum(["queued", "retrying", "complete"]),
   recipients: z.array(recipientSchema).min(1).max(FAMILY_INVITATION_MAX_RECIPIENTS),
-}).strict();
+}).strict().refine(value=>value.destination!=="private_platform"||Boolean(value.siteId),
+  "Private invitations must retain their original Site");
 
 export function parseFamilyInvitationRecipients(rawContacts: string) {
   const parsed = parseFamilyContacts(rawContacts);
@@ -167,6 +173,7 @@ export type FamilyInvitationWorkspace = {
     name: string;
     siteId: string;
     publishedSiteUrl: string;
+    privateApplicationUrl?: string;
   }>;
   batches: Array<{
     id: string;
@@ -188,4 +195,3 @@ export type FamilyInvitationWorkspace = {
     }>;
   }>;
 };
-

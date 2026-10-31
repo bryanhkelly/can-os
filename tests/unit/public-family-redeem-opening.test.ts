@@ -11,7 +11,7 @@ vi.mock("@/domain/access-tokens", () => ({
   hashAccessSecret: vi.fn(()=> "digest"), issueOpaqueSecret: vi.fn(), sessionCookieHeader: vi.fn(),
 }));
 vi.mock("@/domain/verified-family-person", () => ({ uniqueAccountPersonId: vi.fn() }));
-vi.mock("@/modules/enrollment/public-family-start.server", () => ({ resolvePublishedFamilyStartDestination: state.resolve }));
+vi.mock("@/modules/enrollment/private-family-start.server", () => ({ resolveRedeemedFamilyStartDestination: state.resolve }));
 vi.mock("@/modules/identity/session-security-audit.server", () => ({ recordSessionSecurityEvent: vi.fn() }));
 vi.mock("@/platform/mutation", () => ({ emitEvent: vi.fn(), writeAudit: vi.fn() }));
 vi.mock("@/domain/event-types", () => ({ EventTypes: {} }));
@@ -42,10 +42,11 @@ describe("family-link redemption rechecks the canonical opening", () => {
     expect(state.resolve).not.toHaveBeenCalled();
     expect(state.insert).not.toHaveBeenCalled();
   });
-  it("uses the transaction's current published destination before identity writes", async () => {
+  it("uses the transaction's original entry destination before identity writes", async () => {
     state.resolve.mockRejectedValue(new Error("School applications not open"));
     await expect(redeemPublicFamilyStart(token)).rejects.toThrow("not open");
-    expect(state.resolve).toHaveBeenCalledWith(expect.objectContaining({insert:state.insert}),"program");
+    expect(state.resolve).toHaveBeenCalledWith(expect.objectContaining({insert:state.insert}),
+      expect.objectContaining({id:"request",programId:"program",siteId:"site",email:"adult@example.test"}));
     expect(state.insert).not.toHaveBeenCalled();
   });
   it("denies a link whose original Site no longer matches the Program", async () => {
@@ -59,4 +60,3 @@ describe("family-link redemption rechecks the canonical opening", () => {
     expect(state.insert).not.toHaveBeenCalled();
   });
 });
-

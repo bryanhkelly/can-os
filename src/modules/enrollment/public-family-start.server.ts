@@ -17,6 +17,12 @@ type Reader=Pick<typeof db,"select">;
 export type PublishedFamilyStartDestination={
  siteId:string;organizationId:string;programId:string;programName:string;slug:string;
 };
+export type FamilyStartTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type FamilyStartPreparation = {
+ school: Omit<PublishedFamilyStartDestination,"slug">;
+ contact: {firstName:string;lastName:string;email:string;programId:string};
+ evidence: {source:"published_site"|"staff_invitation";invitationBatchId?:string;recipientKey?:string};
+};
 
 /** Resolve the same published, active, independently authorized application
  * destination for public requests and authorized outreach batches. */
@@ -63,7 +69,18 @@ export async function requestPublicFamilyStart(
  if(!isPublicSiteSlug(slug))throw new Error("Unknown school Site");
  const data=publicFamilyStartInput.parse(input);
  if(data.website.trim())return {requestId:data.requestId,created:false};
- const email=verifiedFamilyStartEmail(data);
+ return requestVerifiedFamilyStart(async tx=>({
+  school:await resolvePublishedFamilyStartDestination(tx,data.programId,slug),
+  contact:{...data,email:verifiedFamilyStartEmail(data)},evidence:{source:"published_site"},
+ }),sender,options);
+}
+
+/** Shared email challenge, cooldown and evidence path for public and explicitly
+ * authorized private invitations. The preparation runs in the same transaction. */
+export async function requestVerifiedFamilyStart(
+ prepare:(tx:FamilyStartTransaction)=>Promise<FamilyStartPreparation>,
+ sender:AccessEmailSender=sendAccessLinkViaResend, options:FamilyStartEmailOptions={},
+):Promise<{requestId:string;created:boolean}>{
  const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
  const configuredOrigin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
  if(!pepper || pepper.length<32 || !configuredOrigin)throw new Error("Family email security unavailable");
@@ -72,19 +89,20 @@ export async function requestPublicFamilyStart(
   throw new Error("The family verification host must be a separate HTTPS platform origin");
  const token=issueOpaqueSecret(),tokenHash=hashAccessSecret(token,pepper);
  const outcome=await db.transaction(async tx=>{
-  const school=await resolvePublishedFamilyStartDestination(tx,data.programId,slug);
+  const {school,contact,evidence}=await prepare(tx);
+  const email=contact.email;
   // Prevent parallel requests from multiplying messages to the same email.
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${email + ":" + data.programId}))`);
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${email + ":" + school.programId}))`);
   const [recent]=await tx.select({id:publicFamilyStartRequests.id})
     .from(publicFamilyStartRequests).where(and(
-      eq(publicFamilyStartRequests.programId,data.programId),
+      eq(publicFamilyStartRequests.programId,school.programId),
       eq(publicFamilyStartRequests.emailNormalized,email),
       gt(publicFamilyStartRequests.createdAt,new Date(Date.now()-COOLDOWN_MS)),
     )).limit(1);
-  if(recent)return {requestId:recent.id,created:false};
+  if(recent)return {requestId:recent.id,created:false,email};
   const [entry]=await tx.insert(publicFamilyStartRequests).values({
-    siteId:school.siteId,programId:data.programId,emailNormalized:email,
-    adultFirstName:data.firstName,adultLastName:data.lastName,
+    siteId:school.siteId,programId:school.programId,emailNormalized:email,
+    adultFirstName:contact.firstName,adultLastName:contact.lastName,
     tokenHash,expiresAt:new Date(Date.now()+LIFETIME_MS),
   }).returning({id:publicFamilyStartRequests.id});
   if(!entry)throw new Error("Unable to prepare family verification");
@@ -92,20 +110,19 @@ export async function requestPublicFamilyStart(
   await emitEvent(tx,{eventType:EventTypes.PublicFamilyStartRequested,
     aggregateType:"public_family_start_request",aggregateId:entry.id,
     siteId:school.siteId,organizationId:school.organizationId,programId:school.programId,
-    payload:{status:"pending_email_verification"}});
+    payload:{status:"pending_email_verification",...evidence}});
   await writeAudit(tx,{action:"family.public_start.request",resourceType:"public_family_start_request",
     resourceId:entry.id,actorPersonId:null,
     scope:{siteId:school.siteId,programId:school.programId,organizationId:school.organizationId},
-    after:{status:"pending_email_verification"},context:{anonymous:true}});
-  return {requestId:entry.id,created:true};
+    after:{status:"pending_email_verification",...evidence},context:{anonymous:evidence.source==="published_site"}});
+  return {requestId:entry.id,created:true,email};
  });
- if(!outcome.created)return outcome;
+ if(!outcome.created)return {requestId:outcome.requestId,created:false};
  await sender({
-  to:email,accessUrl:origin.origin+"/family/join#token="+encodeURIComponent(token),
+  to:outcome.email,accessUrl:origin.origin+"/family/join#token="+encodeURIComponent(token),
   ...(options.idempotencyKey?{idempotencyKey:options.idempotencyKey}:{}),
   ...(options.subject?{subject:options.subject}:{}),
   ...(options.introduction?{introduction:options.introduction}:{}),
  });
- return outcome;
+ return {requestId:outcome.requestId,created:true};
 }
-

@@ -118,10 +118,10 @@ export function FamilyInviteImporter({
   return <section className="mt-7 rounded-2xl border bg-card p-5 sm:p-7" aria-label="Invite families">
     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Family outreach · Verified application links</p>
     <h2 className="mt-2 font-serif text-2xl">Invite families</h2>
-    <p className="mt-2 text-sm text-muted-foreground">Paste up to {FAMILY_INVITATION_MAX_RECIPIENTS} addresses, review the recipients and message, then queue secure links directly to the published school application. Existing family identities are reused only after the recipient verifies their email and the existing account resolves to one Person.</p>
+    <p className="mt-2 text-sm text-muted-foreground">Paste up to {FAMILY_INVITATION_MAX_RECIPIENTS} addresses, review the recipients and message, then queue secure email-verification links to the school application. A public website is not required. Existing family identities are reused only after the recipient verifies their email and the existing account resolves to one Person.</p>
 
-    {!programs.length ? <p role="status" className="mt-5 rounded-lg border p-4 text-sm">No invitation-eligible application is available for this selection. Publish the Site and Program and obtain authorization for admissions and school-of-record services. Program activation is not required for recruitment.</p> : <>
-      <label className="mt-5 block text-sm font-semibold">Published school application
+    {!programs.length ? <p role="status" className="mt-5 rounded-lg border p-4 text-sm">No invitation-eligible application is available for this selection. The canonical family application requires an active academic Program with current admissions and school-of-record authorization. Complete those requirements in Launch Mode; website publication is separate.</p> : <>
+      <label className="mt-5 block text-sm font-semibold">School application
         <select value={selectedProgram?.id ?? ""} onChange={event => {
           const program = programs.find(item => item.id === event.target.value);
           setProgramId(event.target.value);
@@ -132,7 +132,7 @@ export function FamilyInviteImporter({
           {programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
         </select>
       </label>
-      {selectedProgram && <p className="mt-2 text-xs text-muted-foreground">Destination: <a href={selectedProgram.publishedSiteUrl} target="_blank" rel="noreferrer" className="underline">published school page</a>. Email recipients go directly to its verified application.</p>}
+      {selectedProgram && <p className="mt-2 text-xs text-muted-foreground">After email verification: <a href={selectedProgram.privateApplicationUrl ?? selectedProgram.publishedSiteUrl} target="_blank" rel="noreferrer" className="underline">{selectedProgram.name} family application</a>. Each recipient receives their own single-use verification link.</p>}
 
       <label className="mt-5 block text-sm font-semibold">Paste families
         <textarea value={raw} onChange={event => { setRaw(event.target.value); changed(); }}
@@ -215,5 +215,3 @@ export function FamilyInviteImporter({
     </div>}
   </section>;
 }
-
-
