@@ -33,6 +33,8 @@ function evidenceFromSnapshot(snapshot: Record<string, unknown>, issuerId: strin
   // acceptance. Never treat caller-supplied snapshot flags as an authorization.
   if (rows.some(row => row.isTransferCredit === true || row.acceptedByIssuer !== undefined || row.creditAcceptanceStatus !== undefined))
     throw new AuthorizationError("Transfer credit requires canonical issuer-accepted ledger evidence");
+  if (rows.some(row => !row || typeof row !== "object" || typeof row.sectionId !== "string" || typeof row.subject !== "string" || typeof row.terminalPeriod !== "boolean" || (row.creditsEarned !== null && (typeof row.creditsEarned !== "number" || !Number.isFinite(row.creditsEarned))) || (row.letterGrade !== null && typeof row.letterGrade !== "string")))
+    throw new AuthorizationError("Malformed transcript credit evidence");
   // Intermediate grading periods must not count twice. A W is zero earned credit.
   const terminal = rows.filter(row => row.terminalPeriod);
   const sections = new Map<string, typeof terminal[number]>();
