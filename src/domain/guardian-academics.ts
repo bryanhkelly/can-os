@@ -30,6 +30,11 @@ export function priorReturnedGuardianFeedback<T extends {
   .sort((a,b)=>(b.attemptNumber??0)-(a.attemptNumber??0))[0];
 }
 
+/** One definition of student work requiring action across guardian academics and family home. */
+export function guardianWorkNeedsAction(status: string): boolean {
+ return status === "assigned" || status === "returned" || status === "draft";
+}
+
 /** A returned attempt may need revision, but is not the same as never submitted. */
 export function guardianAssignmentSummary(
  assignments: readonly {status:string;dueAt:string|null;score:string|null}[],
@@ -37,8 +42,7 @@ export function guardianAssignmentSummary(
 ) {
  // A draft created after a teacher returned an earlier attempt still
  // requires the learner to finish and resubmit; it is not completed work.
- const needsAction=assignments.filter(item=>
-  item.status==="assigned"||item.status==="returned"||item.status==="draft");
+ const needsAction=assignments.filter(item=>guardianWorkNeedsAction(item.status));
  return {
   needsAction:needsAction.length,
   overdue:needsAction.filter(item=>item.dueAt!==null && !Number.isNaN(Date.parse(item.dueAt)) && Date.parse(item.dueAt)<now.getTime()).length,
