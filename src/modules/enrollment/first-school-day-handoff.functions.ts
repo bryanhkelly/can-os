@@ -62,7 +62,7 @@ export const getFirstSchoolDayHandoff = createServerFn({ method:"GET" })
         eq(schoolYears.programId,app.programId),eq(schoolYears.status,"active"),
         gte(academicCalendarDays.calendarDate,today)))
       .orderBy(asc(academicCalendarDays.calendarDate)).limit(90);
-    const dates = [today,...new Set(futureDays.filter(day=>["instructional","special","makeup"].includes(day.type))
+    const dates = [...new Set(futureDays.filter(day=>["instructional","special","makeup"].includes(day.type))
       .map(day=>day.date))].filter((value,index,array)=>array.indexOf(value)===index);
     let date = today;
     for(const candidate of dates){
