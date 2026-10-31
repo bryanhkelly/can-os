@@ -205,3 +205,25 @@ This ledger is a **test plan**, not a claim that any gate passed. All IDs below 
 5. Any missing `CAN_FULLFLOW_TEST_DATABASE_URL`, unsafe endpoint, incomplete migrations, failed child-safety denial, skipped browser step, or unavailable admissions acceptance is **HOLD**, not a product regression by inference and not a PASS.
 
 **Frozen-baseline audit (2026-10-31):** Source inspection confirms the integration test, browser spec and serialized workflow exist. No connected test, migration, CI job or browser session was executed during this audit. No database was accessed or modified. The missing admissions test secret described above remains an unverified environment blocker pending coordinator configuration. CI run IDs for a definitive integrated release: **none**.
+
+### Agent C implementation coverage versus unverified release gates
+
+The browser spec now checks a separately authenticated unrelated guardian at three
+different points: **before** offer acceptance (no acceptance or enrollment-form
+signature), **after** grading (no grade, follow-up action or report-card
+disclosure), and **after reload** (no reappearance of graded academic data).
+The registrar's active enrollment must retain the application student
+`personId` and the same `programId` even when the student has multiple
+placement/enrollment rows. These are source-level assertions, **not recorded
+passing test results**.
+
+The browser spec does **not** yet exercise the church-hosted onsite attendance
+and pickup experience. That remains a separately required Journey C acceptance
+suite, whose negative custody and supervision cases must be verified on the
+same final integrated SHA. Never substitute a passing academic browser journey
+for those safeguarding results.
+
+A workflow that passes only its connected job does **not** prove admissions
+Neon acceptance, deployment operational readiness, or static/schema integrity.
+The coordinator must record independent run IDs and verify every required
+gate; an unavailable secret, skipped job or absent run is a release **HOLD**.
