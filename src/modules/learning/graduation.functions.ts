@@ -233,8 +233,11 @@ export const decideGraduation = createServerFn({method:"POST"})
  .handler(async ({data}) => {
    const context=await registrar();const {db,s}=await resources();
    return db.transaction(async tx => {
+     const [candidate]=await tx.select({issuerId:s.transcriptIssuances.issuingOrganizationId})
+       .from(s.transcriptIssuances).where(eq(s.transcriptIssuances.id,data.transcriptId)).limit(1);
+     if(!candidate)throw new AuthorizationError("Transcript not found");
+     issuerAuthorized(context,candidate.issuerId);
      const {transcript,requirementSet,evidence}=await transcriptAndRules(tx,s,data.transcriptId,data.requirementSetId);
-     issuerAuthorized(context,transcript.issuingOrganizationId);
      const {sql}=await import("drizzle-orm");
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${transcript.studentProfileId + ":" + transcript.issuingOrganizationId + ":graduation"}))`);
      if(data.decision==="approved") {
