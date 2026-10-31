@@ -148,7 +148,7 @@ export function LaunchAcademicSetupWorkspace({data}:{data:Snapshot}){
       className="mt-1 block w-full rounded border bg-background p-2 disabled:opacity-50"/>
      <span className="mt-1 block text-xs text-muted-foreground">Enter reviewed course credits. Missing units are shown as Not recorded on transcripts and must be resolved separately for graduation decisions.</span>
     </label>
-    <button type="submit" disabled={busy||!termId||!versionId||!effectiveScheduleId||!effectiveTeacherId||!selectedCourse?.recommendation.recommended||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Save classroom and instructor</button>
+    <button type="submit" disabled={busy||!termId||!versionId||!effectiveScheduleId||!effectiveTeacherId||(!selectedCourse?.recommendation.recommended||!selectedCourse?.recommendation.instructionReady)||!data.academicAuthority.teacherAssignment||(Boolean(courseCredits.trim())&&!data.academicAuthority.creditConfiguration)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Save classroom and instructor</button>
    </form>
   </section>
   {createdSectionId&&<div role="status" className="mt-4 rounded-lg border p-4 text-sm">
