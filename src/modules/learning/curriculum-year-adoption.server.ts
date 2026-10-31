@@ -1,6 +1,6 @@
 import {and,eq} from "drizzle-orm";
 import {db} from "@/db/client";
-import {programs,curriculumEntitlements,curriculumPackVersions} from "@/db/schema";
+import {programs,schoolYears,curriculumEntitlements,curriculumPackVersions} from "@/db/schema";
 import {curriculumAnnualAdoptions} from "@/db/schema/curriculum-year-adoptions";
 import {AuthorizationError} from "@/domain/command-context";
 import {hasInstitutionalProgramCapability} from "@/modules/identity/institutional-capability.server";
@@ -11,6 +11,17 @@ import {annualAdoptionEligible} from "@/domain/curriculum-year-policy";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Year={id:string;startsAt:Date;endsAt:Date};
+async function canonicalYear(query:Pick<Tx,"select">,program:{id:string;organizationId:string;siteId:string|null},yearId:string):Promise<Year>{
+ if(!program.siteId)throw new AuthorizationError("program site");
+ const [year]=await query.select().from(schoolYears).where(and(eq(schoolYears.id,yearId),
+  eq(schoolYears.organizationId,program.organizationId),eq(schoolYears.siteId,program.siteId))).limit(1);
+ if(!year||(year.programId!==null&&year.programId!==program.id))
+  throw new AuthorizationError("canonical school year");
+ const startsAt=new Date(year.startsOn+"T00:00:00Z");
+ const endsAt=new Date(year.endsOn+"T00:00:00Z");
+ if(startsAt>endsAt)throw new Error("Invalid school year");
+ return {id:year.id,startsAt,endsAt};
+}
 /** Caller must resolve the canonical academic year server-side; never infer it from a previous adoption. */
 export async function readAnnualAdoptionEligibility(actor:Actor, input:{
  programId:string;year:Year;packId:string;now?:Date;
@@ -18,6 +29,7 @@ export async function readAnnualAdoptionEligibility(actor:Actor, input:{
  const [program]=await executor.select().from(programs).where(eq(programs.id,input.programId)).limit(1);
  if(!program || !await hasInstitutionalProgramCapability(actor,program,"curriculum.adopt",executor))
   throw new AuthorizationError("institutional curriculum adoption grant and program scope");
+ const resolvedYear=await canonicalYear(executor,program,input.year.id);
  const [adoption]=await executor.select().from(curriculumAnnualAdoptions).where(and(
   eq(curriculumAnnualAdoptions.programId,program.id),eq(curriculumAnnualAdoptions.academicYearId,input.year.id),
   eq(curriculumAnnualAdoptions.packId,input.packId))).limit(1);
@@ -35,7 +47,7 @@ export async function readAnnualAdoptionEligibility(actor:Actor, input:{
   adoption,license:{organizationId:license.organizationId,packId:license.packId,
    publisherOrganizationId:"",status:license.status,startsAt:date(metadata.licenseStartsAt),
    endsAt:date(metadata.licenseEndsAt),withdrawnAt:date(metadata.withdrawnAt)},
-  year:input.year,now:input.now??new Date(),packVersionPublished:version?.status==="published",
+  year:resolvedYear,now:input.now??new Date(),packVersionPublished:version?.status==="published",
  });
  return {eligible,reason:eligible?"active" as const:"invalid_or_expired" as const,versionId:adoption.packVersionId};
 }
@@ -47,6 +59,7 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
   const [program]=await tx.select().from(programs).where(eq(programs.id,input.programId)).limit(1);
   if(!program||!await hasInstitutionalProgramCapability(actor,program,"curriculum.adopt",tx))
    throw new AuthorizationError("institutional curriculum adoption grant and program scope");
+  const resolvedYear=await canonicalYear(tx,program,input.year.id);
   const [entitlement]=await tx.select().from(curriculumEntitlements).where(and(
    eq(curriculumEntitlements.organizationId,program.organizationId),eq(curriculumEntitlements.packId,input.packId))).limit(1);
   const [version]=await tx.select().from(curriculumPackVersions).where(and(
@@ -75,7 +88,7 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
    license:{organizationId:entitlement.organizationId,packId:entitlement.packId,
     publisherOrganizationId:"",status:entitlement.status,startsAt:parse(metadata.licenseStartsAt),
     endsAt:parse(metadata.licenseEndsAt),withdrawnAt:parse(metadata.withdrawnAt)},
-   year:input.year,now:input.now??new Date(),packVersionPublished:true,
+   year:resolvedYear,now:input.now??new Date(),packVersionPublished:true,
   }))throw new AuthorizationError("publisher license must cover the entire target school year");
   const [row]=await tx.insert(curriculumAnnualAdoptions).values({
    organizationId:program.organizationId,programId:program.id,siteId:program.siteId,
