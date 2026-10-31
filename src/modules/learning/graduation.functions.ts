@@ -59,6 +59,7 @@ async function transcriptAndRules(db: Pick<Awaited<ReturnType<typeof resources>>
     .innerJoin(s.programs,eq(s.programs.id,s.enrollments.programId))
     .where(and(eq(s.enrollments.studentProfileId,transcript.studentProfileId),
       eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active")));
+  if(enrollments.some(row=>row.issuer===null)) throw new AuthorizationError("Graduation requires an explicit institutional credit issuer");
   const matching = enrollments.filter(row=>row.issuer===transcript.issuingOrganizationId &&
     [row.yearName,row.yearKey,`${row.yearStarts.slice(0,4)}-${row.yearEnds.slice(0,4)}`].includes(requirementSet.academicYear));
   if(new Set(matching.map(row=>row.yearId)).size!==1 || !matching.length || enrollments.some(row=>row.issuer===transcript.issuingOrganizationId &&
