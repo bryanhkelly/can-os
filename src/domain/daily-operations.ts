@@ -261,19 +261,23 @@ export function buildGuardianAttention(items: readonly {
 }[]): DailyAttentionItem[] {
   return items.map(item => {
     const workspace = familyActionWorkspaceLink(item);
+    // Guardian-owned permissions must open their actual decision screen.
+    // The generic /actions/:id detail route is staff-only.
+    const guardianWorkspace = workspace?.startsWith("/guardian/") ? workspace : null;
     return {
       id: `${item.kind}:${item.id}`,
       category: item.kind === "excuse" ? "family" :
         item.type?.includes("grade") || item.type?.includes("assignment") ? "academic" : "family",
       title: item.title,
       detail: item.detail ?? "",
-      href: item.href,
+      href: guardianWorkspace ?? item.href,
       nextStep: item.kind === "excuse" ? "Submit excuse" : item.kind === "schoolwork" ? "Review assignment" :
-        item.kind === "course_approval" ? "Review class request" : item.kind === "action" ? "Review action" : "View update",
+        item.kind === "course_approval" ? "Review class request" :
+        guardianWorkspace ? "Review permission" : item.kind === "action" ? "Review action" : "View update",
       ownerName: "You",
       dueAt: item.dueAt ?? null,
       priority: item.priority === "urgent" ? "critical" : item.priority === "high" ? "high" : "normal",
-      ...(workspace ? { secondaryHref: workspace, secondaryLabel: "Open the owning workspace" } : {}),
+      // Do not offer an inaccessible staff-only Action detail as a second CTA.
     };
   });
 }
