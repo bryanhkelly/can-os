@@ -46,22 +46,6 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Temporary diagnostic: recover a canonical schema snapshot to repair
-      # the missing Drizzle metadata without fabricating a snapshot by hand.
-      - name: Emit generated Drizzle snapshot for repair
-        run: |
-          timeout 90 npm run db:generate || true
-          node --input-type=module <<'NODE'
-          import {readdirSync, readFileSync} from "node:fs";
-          const names=readdirSync("drizzle/meta").filter(n=>/^\d{4}_snapshot\.json$/.test(n)).sort();
-          const latest=names.at(-1);
-          if(!latest || Number(latest.slice(0,4))<=50) throw new Error("No new schema snapshot generated");
-          const value=JSON.stringify(JSON.parse(readFileSync("drizzle/meta/"+latest,"utf8")));
-          console.log("CAN_SNAPSHOT_START:"+latest+":"+value.length);
-          for(let i=0;i<value.length;i+=2000) console.log("CAN_SCHEMA_CHUNK:"+value.slice(i,i+2000));
-          console.log("CAN_SNAPSHOT_END");
-          NODE
-
       - name: Test
         run: npm test
 
