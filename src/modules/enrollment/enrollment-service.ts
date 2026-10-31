@@ -432,6 +432,12 @@ export async function startFamilyApplication(
           guardianVerification:reusedVerifiedStudent ? "verified" : "pending",
           contactPersonId:actorPersonId,studentIdentityReused:reusedVerifiedStudent,
           source:"published_site",siteId:program.siteId,
+          ...(originTransfer?{
+            originTransferActionId:originTransfer.actionId,
+            originTransferProgramId:originTransfer.programId,
+            originTransferSiteId:originTransfer.siteId,
+            originTransferDestinationSchoolName:originTransfer.destinationSchoolName,
+          }:{}),
           ...(input.schoolYearId ? {schoolYearId:input.schoolYearId} : {}),
           publicFamilyStartRequestId:familyStart.id,publicInterestId:interest.id,
         }}).where(eq(applications.id,application.id));
