@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and,desc,eq,inArray,isNotNull,isNull } from "drizzle-orm";
+import { and,desc,eq,gt,inArray,isNotNull,isNull } from "drizzle-orm";
 import { z } from "zod";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -203,6 +203,8 @@ export const downloadAuthorizedAcademicCredential=createServerFn({method:"POST"}
    .from(s.academicCredentialReleaseAuthorizations)
    .where(and(eq(s.academicCredentialReleaseAuthorizations.id,release.id),
     eq(s.academicCredentialReleaseAuthorizations.recipientPersonId,context.actorPersonId),
+    eq(s.academicCredentialReleaseAuthorizations.recipientEmail,release.recipientEmail),
+    gt(s.academicCredentialReleaseAuthorizations.expiresAt,new Date()),
     isNull(s.academicCredentialReleaseAuthorizations.revokedAt)))
    .limit(1);
   if(!stillActive||release.expiresAt<=new Date())
@@ -226,7 +228,6 @@ export const listMyAcademicCredentialReleases=createServerFn({method:"GET"})
    throw new AuthorizationError("authenticated recipient");
   const {db,s}=await resources();
   const now=new Date();
-  const {gt}=await import("drizzle-orm");
   return db.select({id:s.academicCredentialReleaseAuthorizations.id,
     transcriptId:s.academicCredentialReleaseAuthorizations.transcriptIssuanceId,
     diplomaId:s.academicCredentialReleaseAuthorizations.diplomaIssuanceId,
