@@ -1,3 +1,4 @@
+import { GradebookReviewedFeedback } from "@/components/learning/GradebookReviewedFeedback";
 import { GradebookReviewActions } from "@/components/learning/GradebookReviewActions";
 import { GradebookAssessmentHeader } from "@/components/learning/GradebookAssessmentHeader";
 import { nextGradebookCell } from "@/components/learning/gradebook-grid-navigation";
@@ -381,15 +382,8 @@ function TeacherGradebookPage() {
        <GradebookReviewActions busy={busy} sectionId={selected}
         onSaveDraft={()=>void submitGrade(reviewCell,reviewAssessment,true)}
         onPostGrade={()=>void submitGrade(reviewCell,reviewAssessment)} />
-      </div>:<div className="space-y-3 text-sm">
-       <p className="font-semibold">{reviewCell.status==="returned"?"Previous attempt score (awaiting revision)":"Score"}: {reviewCell.score??"—"} / {reviewAssessment.pointsPossible??"—"}</p>
-       {reviewAssessment.rubric.map(criterion=><p key={criterion.id}>{criterion.label}: {reviewCell.feedbackRubric.find(item=>item.id===criterion.id)?.points??"—"} / {criterion.maxPoints}</p>)}
-       <p className="whitespace-pre-wrap">{reviewCell.feedbackComment||"No feedback comment recorded."}</p>
-       {reviewCell.status==="graded"&&reviewAssessment.maxAttempts!==null&&reviewCell.attemptNumber>=reviewAssessment.maxAttempts
-        ?<p className="text-sm">The configured attempt limit has been reached. This submission cannot be returned for another attempt.</p>
-        :reviewCell.status==="graded"&&<button type="button" disabled={busy} onClick={()=>returnForRevision(reviewCell.submissionId)} className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">Return for revision</button>}
-      </div>}
-     </WorkspacePanel>
+      </div>:<GradebookReviewedFeedback cell={reviewCell} assessment={reviewAssessment} busy={busy}
+       onReturnForRevision={()=>void returnForRevision(reviewCell.submissionId)} />}     </WorkspacePanel>
     </div>}
     <details className="mt-8 rounded-xl border bg-card p-5" open={search.lesson?true:undefined}>
      <summary className="cursor-pointer text-lg font-semibold">Create an assessment</summary>
