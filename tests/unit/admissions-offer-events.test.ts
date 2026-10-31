@@ -61,7 +61,6 @@ const pool = { capacity: 2 };
 const year = { programId: "program", organizationId: "organization", siteId: null };
 const program = { organizationId: "organization", siteId: null, status: "active" };
 const journey = { id: "journey", status: "ready" };
-const programSite = { siteId: "f1000000-0000-4000-8000-000000000001", organizationId: "organization" };
 const offer = { id: "offer", programId: "program", schoolYearId: "year", applicationId: "application", status: "issued", expiresAt: null };
 const input = { applicationId: "application", schoolYearId: "year", idempotencyKey: "key", expiresAt: new Date("2099-01-01T00:00:00Z") };
 
@@ -236,7 +235,7 @@ describe("transactional admissions events", () => {
   it("allows activating a live (non-synthetic) accepted application", async () => {
     selectRows([offer], [pool], [year], [{ ...offer, status: "accepted", respondedAt: new Date("2026-10-01T00:00:00Z"),respondedByPersonId:"guardian-person" }],
       [{ ...application, metadata: { synthetic: false }, stage: "accepted" }], [{personId:"student-person"}],
-      [{id:"relationship",canManageEnrollment:true,metadata:{verification:"verified"}}], [programSite], [], [journey], [], [], [], [{personId:"student-person"}]);
+      [{id:"relationship",canManageEnrollment:true,metadata:{verification:"verified"}}], [], [journey], [], [], [], [{personId:"student-person"}]);
     await expect(activateSyntheticOfferedEnrollment(registrarContext, "offer")).resolves.toBe("created");
     expect(values).toHaveBeenCalledWith(expect.objectContaining({
       eventType: "EnrollmentActivated", aggregateId: "created",
@@ -316,8 +315,7 @@ describe("transactional admissions events", () => {
 
   it("emits activation and audits the Journey transition", async () => {
     selectRows([offer], [pool], [year], [{ ...offer, status: "accepted", respondedAt: new Date("2026-10-01T00:00:00Z"),respondedByPersonId:"guardian-person" }],
-      [{ ...application, stage: "accepted" }], [{personId:"student-person"}],[{id:"relationship",canManageEnrollment:true,metadata:{verification:"verified"}}],
-      [programSite], [], [journey], [], [], [], [{personId:"student-person"}]);
+      [{ ...application, stage: "accepted" }], [{personId:"student-person"}],[{id:"relationship",canManageEnrollment:true,metadata:{verification:"verified"}}], [], [journey], [], [], [], [{personId:"student-person"}]);
     await expect(activateSyntheticOfferedEnrollment(registrarContext, "offer")).resolves.toBe("created");
     expect(values).toHaveBeenCalledWith(expect.objectContaining({
       eventType: "EnrollmentActivated", aggregateId: "created",
@@ -330,8 +328,7 @@ describe("transactional admissions events", () => {
 
   it("keeps activation retries idempotent after the Journey becomes active", async () => {
     selectRows([offer], [pool], [year], [{ ...offer, status: "accepted", respondedAt: new Date("2026-10-01T00:00:00Z"),respondedByPersonId:"guardian-person" }],
-      [{ ...application, stage: "accepted" }], [{personId:"student-person"}],[{id:"relationship",canManageEnrollment:true,metadata:{verification:"verified"}}],
-      [programSite], [{ id: "existing" }]);
+      [{ ...application, stage: "accepted" }], [{personId:"student-person"}],[{id:"relationship",canManageEnrollment:true,metadata:{verification:"verified"}}], [{ id: "existing" }]);
     await expect(activateSyntheticOfferedEnrollment(registrarContext, "offer")).resolves.toBe("existing");
     expect(values).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
