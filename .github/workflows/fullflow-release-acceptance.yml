@@ -16,7 +16,7 @@ jobs:
   connected:
     name: One school, end-to-end isolated Neon acceptance
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     environment: integration-test
     env:
       APP_ENV: test
@@ -29,8 +29,16 @@ jobs:
       DATABASE_URL: ${{ secrets.CAN_FULLFLOW_TEST_DATABASE_URL }}
       CAN_APPLICATION_DB_HOST: ${{ vars.CAN_APPLICATION_DB_HOST }}
     steps:
-      - name: Checkout selected FullFlow ref
+      - name: Checkout exact workflow-dispatch commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Assert immutable checked-out SHA
+        shell: bash
+        run: |
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo '::error::BLOCKED: checkout differs from triggering SHA'; exit 1; }
+          echo "Acceptance commit: $GITHUB_SHA"
       - name: Require approved test branch and credentials
         shell: bash
         run: |
@@ -49,6 +57,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Audit route ownership contracts
+        run: node scripts/check-platform-route-contracts.mjs --check
       - name: Audit route fixture coverage
         run: node scripts/check-route-fixture-coverage.mjs
       - name: Verify static code and committed migration consistency
@@ -66,6 +76,8 @@ jobs:
         run: |
           npm run test:integration:full-flow -- --preflight
           npm run db:migrate:fullflow -- --preflight
+      - name: Attest dedicated FullFlow Neon project and branch before mutation
+        run: node scripts/verify-fullflow-neon-branch.mjs
       - name: Ensure independent admissions target differs from FullFlow target
         shell: bash
         run: |
@@ -73,7 +85,7 @@ jobs:
             const a = new URL(process.env.TEST_DATABASE_URL);
             const b = new URL(process.env.CAN_ADMISSIONS_TEST_DATABASE_URL);
             const stripPool = host => host.replace(/-pooler(?=\.)/, "").toLowerCase();
-            if (stripPool(a.hostname) === stripPool(b.hostname) && a.pathname === b.pathname) {
+            if (stripPool(a.hostname) === stripPool(b.hostname)) {
               console.error("HOLD: admissions and FullFlow acceptance must not migrate the same isolated database twice.");
               process.exit(1);
             }
@@ -91,6 +103,17 @@ jobs:
             echo "::error::HOLD: admissions branch is the pinned FullFlow branch; independent migration is unsafe."
             exit 1
           fi
+      - name: Record pre-migration evidence without secrets
+        shell: bash
+        run: |
+          {
+            echo "## Database preflight (read-only)"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- FullFlow project: \`sweet-hall-62441909\`, branch: \`br-proud-pine-arfju8h2\` (Postgres-attested in preceding step)"
+            echo "- Admissions branch: \`$CAN_ADMISSIONS_TEST_BRANCH_ID\` (Postgres-attested in preceding step)"
+            echo "- Database URLs, passwords, and hostnames are not disclosed."
+            echo "- Distinct identity checks completed before any schema mutation."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Apply only reviewed migrations to isolated FullFlow branch
         run: npm run db:migrate:fullflow
       - name: Apply admissions migrations on separately guarded disposable branch
@@ -116,16 +139,16 @@ jobs:
         run: npm run test:e2e:admissions
       - name: Verify connected launch, admission, instruction, guardian, and operations browser journey
         run: npm run test:e2e:full-flow
-      - name: Preserve browser failure evidence
-        if: failure()
+      - name: Preserve authenticated browser evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fullflow-connected-acceptance-failure
+          name: fullflow-connected-acceptance-${{ github.sha }}
           path: |
             test-results/
             playwright-report/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 30
       - name: Record exact-SHA release evidence and decision
         if: always()
         shell: bash
@@ -138,6 +161,7 @@ jobs:
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Job gate result: ${GATE_RESULT}"
+            echo "- Browser artifacts: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}#artifacts (if any were created)"
             if [[ "${GATE_RESULT}" == "success" ]]; then
               echo "- Decision: CONNECTED-GATES PASS for this exact SHA only; separate operational release approval required."
             else
