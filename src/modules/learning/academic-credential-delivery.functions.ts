@@ -256,13 +256,13 @@ export const listAcademicCredentialReleaseAccessHistory=createServerFn({method:"
    .where(and(eq(s.academicCredentialReleaseAuthorizations.id,data.authorizationId),
     inArray(s.academicCredentialReleaseAuthorizations.issuingOrganizationId,context.scope.organizationIds??[]))).limit(1);
   if(!release)throw new AuthorizationError("issuer authorization");
-  return db.select({id:s.auditEvents.id,createdAt:s.auditEvents.createdAt,
+  return db.select({id:s.auditEvents.id,occurredAt:s.auditEvents.occurredAt,
    actorPersonId:s.auditEvents.actorPersonId,action:s.auditEvents.action})
    .from(s.auditEvents).where(and(
-    eq(s.auditEvents.entityType,"academic_credential_release_authorization"),
-    eq(s.auditEvents.entityId,data.authorizationId),
+    eq(s.auditEvents.resourceType,"academic_credential_release_authorization"),
+    eq(s.auditEvents.resourceId,data.authorizationId),
     eq(s.auditEvents.action,"academic_credential.release.download")))
-   .orderBy(desc(s.auditEvents.createdAt)).limit(100);
+   .orderBy(desc(s.auditEvents.occurredAt)).limit(100);
  });
 
 export const revokeAcademicCredentialRelease=createServerFn({method:"POST"})
