@@ -184,7 +184,10 @@ export const getGradebook = createServerFn({ method: "GET" })
    .orderBy(asc(s.assessments.dueAt));
 
   const assessmentIds = assessmentRows.map(row => row.id);
-  const submissionRows = assessmentIds.length
+  const activeStudentIds = new Set(studentRows.map(row => row.studentProfileId));
+  // Scope the database read itself to the live roster. Filtering only the
+  // response would still load withdrawn pupils' private submissions.
+  const submissionRows = assessmentIds.length && activeStudentIds.size
    ? await db.select({
     id: s.submissions.id,
     assessmentId: s.submissions.assessmentId,
@@ -198,14 +201,14 @@ export const getGradebook = createServerFn({ method: "GET" })
     gradedAt: s.submissions.gradedAt,
    })
     .from(s.submissions)
-    .where(inArray(s.submissions.assessmentId, assessmentIds))
+    .where(and(inArray(s.submissions.assessmentId, assessmentIds),
+     inArray(s.submissions.studentProfileId, [...activeStudentIds])))
     .orderBy(desc(s.submissions.attemptNumber))
    : [];
 
   // The gradebook grid must not return submissions for withdrawn pupils
   // even when their old Section enrollment and assessment history remain.
   // Apply the same live Program + Section membership as the student roster.
-  const activeStudentIds = new Set(studentRows.map(row => row.studentProfileId));
   const latest = new Map<string, (typeof submissionRows)[number]>();
   for (const row of submissionRows) {
    if (!activeStudentIds.has(row.studentProfileId)) continue;
