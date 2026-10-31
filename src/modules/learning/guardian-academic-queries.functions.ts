@@ -6,6 +6,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { guardianFeedbackReleased, latestGuardianAttempts, priorReturnedGuardianFeedback, releasedGuardianAttempts } from "@/domain/guardian-academics";
+import { assessmentAvailability } from "@/domain/assessment-availability";
 import { z } from "zod";
 import { readRubric } from "./rubric";
 
@@ -73,6 +74,9 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
    instructions: s.assessments.instructions,
    metadata: s.assessments.metadata,
    dueAt: s.assessments.dueAt,
+   assessmentStatus: s.assessments.status,
+   availableAt: s.assessments.availableAt,
+   closesAt: s.assessments.closesAt,
    pointsPossible: s.assessments.pointsPossible,
    submissionStatus: s.submissions.status,
    submissionId: s.submissions.id,
@@ -95,6 +99,9 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
   return { assignments: latestGuardianAttempts(rows).map(row => {
    const released = guardianFeedbackReleased(row.submissionStatus);
    const previous=priorReturnedGuardianFeedback(rows,row);
+   const availability=assessmentAvailability({
+    status:row.assessmentStatus,availableAt:row.availableAt,closesAt:row.closesAt,
+   });
    return {
     assessmentId: row.assessmentId,
     sectionId: row.sectionId,
@@ -106,6 +113,7 @@ export const getGuardianAssignments = createServerFn({ method: "GET" })
     timeliness: row.timeliness,
     dueAt: row.dueAt?.toISOString() ?? null,
     status: row.submissionStatus ?? "assigned",
+    workAvailabilityReason: availability.reason,
     submittedAt: row.submittedAt?.toISOString() ?? null,
     gradedAt: released ? row.gradedAt?.toISOString() ?? null : null,
     score: released ? row.score : null,
