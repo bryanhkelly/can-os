@@ -21,15 +21,24 @@ async function registrar() {
   return actor;
 }
 const uuid = z.string().uuid();
+function canPlaceInProgram(actor:Awaited<ReturnType<typeof registrar>>,
+ program:{id:string;organizationId:string;siteId:string|null}){
+ return !!actor.scope.organizationIds?.includes(program.organizationId) &&
+  (actor.scope.programIds===undefined||actor.scope.programIds.includes(program.id)) &&
+  (actor.scope.siteIds===undefined||
+   (!!program.siteId&&actor.scope.siteIds.includes(program.siteId)));
+}
 
 export const listEnrollmentPlacements = createServerFn({ method: "GET" })
  .validator((v: unknown) => z.object({ applicationId: uuid }).parse(v))
  .handler(async ({ data }) => {
    const actor = await registrar();
    const [app] = await db.select({ programId: applications.programId,
-     studentProfileId: applications.studentProfileId })
-     .from(applications).where(eq(applications.id, data.applicationId)).limit(1);
-   if (!app || !actor.scope.programIds?.includes(app.programId))
+     studentProfileId: applications.studentProfileId,
+     organizationId:programs.organizationId,siteId:programs.siteId })
+     .from(applications).innerJoin(programs,eq(programs.id,applications.programId))
+     .where(eq(applications.id, data.applicationId)).limit(1);
+   if (!app || !canPlaceInProgram(actor,{id:app.programId,organizationId:app.organizationId,siteId:app.siteId}))
      throw new AuthorizationError("application placement");
    const active = await db.select({ schoolYearId: enrollments.schoolYearId })
      .from(enrollments).where(and(eq(enrollments.studentProfileId, app.studentProfileId),
@@ -81,8 +90,8 @@ export const listEnrollmentPlacements = createServerFn({ method: "GET" })
      .where(and(eq(enrollments.studentProfileId, app.studentProfileId),
        eq(enrollments.kind, "section"), eq(enrollments.status, "active")));
    const assigned = new Set(enrolled.map(e => e.sectionId));
-   return { active: active.length>0, sections: rows.filter(s => !s.siteId ||
-      actor.scope.siteIds?.includes(s.siteId)).map(s => ({
+   return { active: active.length>0, sections: rows.filter(s => actor.scope.siteIds===undefined ||
+      (!!s.siteId&&actor.scope.siteIds.includes(s.siteId))).map(s => ({
      id: s.id, title: s.title, code: s.code, enrolled: assigned.has(s.id),
      staffed: staffedIds.has(s.id),
      curriculumReady:s.curriculumStatus==="published" && hasAccessibleFirstLesson(s.curriculum),
@@ -102,9 +111,10 @@ export const placeEnrolledStudent = createServerFn({ method: "POST" })
    const actor = await registrar();
    return db.transaction(async tx => {
      const [app] = await tx.select({ studentProfileId: applications.studentProfileId,
-       programId: applications.programId }).from(applications)
+       programId: applications.programId,organizationId:programs.organizationId,siteId:programs.siteId })
+       .from(applications).innerJoin(programs,eq(programs.id,applications.programId))
        .where(eq(applications.id, data.applicationId)).limit(1);
-     if (!app || !actor.scope.programIds?.includes(app.programId))
+     if (!app || !canPlaceInProgram(actor,{id:app.programId,organizationId:app.organizationId,siteId:app.siteId}))
        throw new AuthorizationError("placement program scope");
      const [section] = await tx.select({ id: sections.id, programId: sections.programId,
        schoolYearId: terms.schoolYearId, siteId: sections.siteId,
@@ -113,7 +123,8 @@ export const placeEnrolledStudent = createServerFn({ method: "POST" })
        .innerJoin(programs, eq(programs.id, sections.programId))
        .where(and(eq(sections.id, data.sectionId), eq(sections.active, true))).limit(1);
      if (!section || section.programId !== app.programId ||
-       (section.siteId && !actor.scope.siteIds?.includes(section.siteId)))
+       (actor.scope.siteIds!==undefined &&
+        (!section.siteId||!actor.scope.siteIds.includes(section.siteId))))
        throw new AuthorizationError("section placement scope");
      return activateSectionEnrollment(tx,{studentProfileId:app.studentProfileId,
        sectionId:section.id,actor,source:"registrar_placement",applicationId:data.applicationId});
