@@ -43,11 +43,13 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
  const exitMutation=useWorkspaceMutation({mutationFn:(actionId:string)=>completeRegistrarEnrollmentExit({data:{actionId,confirmInstitutionalReview:true,resolutionNote:exitNoteRef.current}})});
  const exitNoteRef=useRef("");
  const [busy,setBusy]=useState<string|null>(null);
+ const actionInFlight=useRef(false);
  async function submitAction(id:string, operation:()=>Promise<unknown>){
-  if(mutation.isPending||exitMutation.isPending)return false;
+  if(actionInFlight.current||exitMutation.isPending)return false;
+  actionInFlight.current=true;
   setBusy(id);
-  try{const result=await mutation.submit(operation);return result!==undefined;}
-  finally{setBusy(null);}
+  try{await mutation.submit(operation);return true;}
+  finally{actionInFlight.current=false;setBusy(null);}
  }
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
