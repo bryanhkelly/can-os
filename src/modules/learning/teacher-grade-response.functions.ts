@@ -31,6 +31,9 @@ export const getTeacherGradeResponses = createServerFn({ method: "GET" }).handle
     const rows = await tx.select({
       action: s.actions, studentName: sql<string>`concat(${s.people.legalFirstName}, ' ', ${s.people.legalLastName})`,
       assessmentId: s.assessments.id, assessmentTitle: s.assessments.title,
+      submissionId: s.submissions.id, attemptNumber: s.submissions.attemptNumber,
+      score: s.submissions.score, feedback: s.submissions.feedback,
+      pointsPossible: s.assessments.pointsPossible,
     }).from(s.actions)
       .innerJoin(s.submissions, eq(sql<string>`${s.submissions.id}::text`, sql<string>`${s.actions.metadata}->>'submissionId'`))
       .innerJoin(s.assessments, eq(s.assessments.id, s.submissions.assessmentId))
@@ -77,6 +80,11 @@ export const getTeacherGradeResponses = createServerFn({ method: "GET" }).handle
         id: row.action.id, sectionId: row.action.sectionId!,
         studentProfileId: row.action.subjectId, studentName: row.studentName,
         assessmentId: row.assessmentId, assessmentTitle: row.assessmentTitle,
+        submissionId: row.submissionId, attemptNumber: row.attemptNumber,
+        // This is the exact already-released attempt named by the guardian's
+        // Action, not a newer draft or revision from the live gradebook.
+        score: row.score, pointsPossible: row.pointsPossible,
+        teacherFeedback: typeof row.feedback?.comment === "string" ? row.feedback.comment : "",
         message: typeof row.action.metadata.requestMessage === "string" ? row.action.metadata.requestMessage : "",
         status: row.action.status, resolutionNote: row.action.resolutionNote,
       });
