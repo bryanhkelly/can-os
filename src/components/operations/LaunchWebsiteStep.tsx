@@ -12,7 +12,7 @@ function WebsiteStep({programId}:{programId:string}){
  const [retry,setRetry]=useState(0);
  useEffect(()=>{let current=true;
   void getLaunchWebsitePreparation({data:{programId}}).then(result=>{if(current){setData(result);setError("");}})
-   .catch(()=>{if(current)setError("The private website preview could not be loaded. Check your school access and retry.");});
+   .catch(()=>{if(current){setData(null);setError("The private website preview could not be loaded. Check your school access and retry.");}});
   return()=>{current=false;};
  },[programId,retry]);
  return <section id="launch-website" aria-label="Prepare your school website" className="mt-5 rounded-xl border bg-card p-5">
@@ -20,7 +20,7 @@ function WebsiteStep({programId}:{programId:string}){
   <h2 className="mt-1 font-serif text-2xl">Your school website</h2>
   {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
   {data?<LaunchWebsitePreview data={data}/>:!error&&<p role="status" className="mt-3 text-sm">Preparing a private preview from the school's saved records…</p>}
-  <button type="button" onClick={()=>setRetry(value=>value+1)} className="mt-3 rounded border px-3 py-2 text-sm">Refresh preview after editing</button>
+  <button type="button" onClick={()=>{setData(null);setError("");setRetry(value=>value+1);}} className="mt-3 rounded border px-3 py-2 text-sm">Refresh verified website status</button>
  </section>;
 }
 export function LaunchWebsitePreview({data}:{data:Website}){
