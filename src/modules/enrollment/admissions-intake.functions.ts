@@ -158,7 +158,9 @@ export const listAdmissionsIntakePage=createServerFn({method:"GET"})
   const items=rows.slice(0,data.pageSize);
   return {items,nextCursor:rows.length>data.pageSize?items[items.length-1]?.id??null:null};
  });
-export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()=>{
+export const listAdmissionsIntake=createServerFn({method:"GET"})
+ .validator((value:unknown)=>admissionsPageInput.omit({cursor:true}).extend({page:z.coerce.number().int().min(1).max(10000).default(1)}).parse(value??{}))
+ .handler(async({data})=>{
  const actor=await registrar();
  const rows=await db.select({id:applications.id,stage:applications.stage,metadata:applications.metadata,
   createdAt:applications.createdAt,updatedAt:applications.updatedAt,programId:applications.programId,
@@ -172,8 +174,11 @@ export const listAdmissionsIntake=createServerFn({method:"GET"}).handler(async()
   .innerJoin(people,eq(people.id,studentProfiles.personId))
   .where(and(inArray(programs.organizationId,actor.scope.organizationIds??[]),
    ...(actor.scope.programIds ? [inArray(applications.programId,actor.scope.programIds)] : []),
-   ...(actor.scope.siteIds ? [inArray(programs.siteId,actor.scope.siteIds)] : [])))
-  .orderBy(desc(applications.updatedAt)).limit(300);
+   ...(actor.scope.siteIds ? [inArray(programs.siteId,actor.scope.siteIds)] : []),
+   data.siteId?eq(programs.siteId,data.siteId):undefined,
+   data.programId?eq(applications.programId,data.programId):undefined,
+   data.search?or(ilike(people.legalFirstName,"%"+data.search+"%"),ilike(people.legalLastName,"%"+data.search+"%"),ilike(programs.name,"%"+data.search+"%"),z.string().uuid().safeParse(data.search).success?eq(applications.id,data.search):undefined):undefined))
+  .orderBy(desc(applications.updatedAt),desc(applications.id)).limit(data.pageSize).offset((data.page-1)*data.pageSize);
  const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  const sourceIds=[...new Set(rows.map(r=>
    typeof r.metadata.originTransferActionId==="string"?r.metadata.originTransferActionId:null
