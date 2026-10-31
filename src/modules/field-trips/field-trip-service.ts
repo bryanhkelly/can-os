@@ -762,7 +762,7 @@ export async function getFieldTripSafetyPacket(
     assertProgramScope(context, chaperone.programId);
 
     const participantRows = await tx
-      .select({
+      .selectDistinct({
         participantId: fieldTripParticipants.id,
         studentProfileId: fieldTripParticipants.studentProfileId,
         studentPersonId: studentProfiles.personId,
@@ -790,12 +790,22 @@ export async function getFieldTripSafetyPacket(
         guardianPersonId:consentRecords.signerPersonId,
         studentPersonId:studentProfiles.personId,access:"enrollment",
       }))
+      .innerJoin(enrollments,and(
+        eq(enrollments.studentProfileId,studentProfiles.id),
+        eq(enrollments.kind,"program"),
+        eq(enrollments.status,"active"),
+      ))
+      .innerJoin(programs,and(
+        eq(programs.id,enrollments.programId),
+        eq(programs.siteId,chaperone.siteId),
+      ))
       .leftJoin(
         healthProfiles,
         eq(healthProfiles.studentProfileId, fieldTripParticipants.studentProfileId),
       )
       .where(and(eq(fieldTripParticipants.fieldTripId, fieldTripId),
-        eq(fieldTripParticipants.status,"permission_complete")));
+        eq(fieldTripParticipants.status,"permission_complete"),
+        chaperone.programId?eq(enrollments.programId,chaperone.programId):undefined));
 
     const students = [];
     for (const row of participantRows) {
