@@ -1,4 +1,4 @@
-import {and,eq} from "drizzle-orm";
+import {and,eq,sql} from "drizzle-orm";
 import {db} from "@/db/client";
 import {programs,schoolYears,curriculumEntitlements,curriculumPackVersions} from "@/db/schema";
 import {curriculumAnnualAdoptions} from "@/db/schema/curriculum-year-adoptions";
@@ -67,6 +67,7 @@ export async function rolloverCurriculumAdoption(actor:Actor,input:{
    eq(curriculumPackVersions.id,input.versionId),eq(curriculumPackVersions.packId,input.packId),
    eq(curriculumPackVersions.status,"published"))).limit(1);
   if(!entitlement||!version)throw new AuthorizationError("licensed published curriculum release");
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${program.id + ":" + input.academicYearId + ":" + input.packId}))`);
   const [existing]=await tx.select().from(curriculumAnnualAdoptions).where(and(
    eq(curriculumAnnualAdoptions.programId,program.id),eq(curriculumAnnualAdoptions.academicYearId,input.academicYearId),
    eq(curriculumAnnualAdoptions.packId,input.packId))).limit(1);
