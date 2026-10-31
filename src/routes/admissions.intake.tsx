@@ -7,6 +7,7 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {WorkspaceShell} from "@/components/workspace";
 import { PublicInterestInbox } from "@/components/admissions/PublicInterestInbox";
+import { AdmissionsDecisionActions } from "@/components/admissions/AdmissionsDecisionActions";
 import { AdmissionsPageNavigation } from "@/components/admissions/AdmissionsPageNavigation";
 import { AdmissionsPipelineSummary,countAdmissionsStages } from "@/components/admissions/AdmissionsPipelineSummary";
 import {getReceivingSchoolTransferTranscript} from "@/modules/enrollment/transfer-records-handoff.functions";
@@ -257,15 +258,8 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
         search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
         className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background">Issue enrollment offer →</Link>}
     </div>
-    <div className="mt-4 flex flex-wrap gap-2">
-     {(r.stage==="inquiry"?[["application","Start application"],["decline","Decline"],["withdraw","Withdraw"]]:
-       r.stage==="application"?[["eligibility","Begin eligibility review"],["decline","Decline"],["withdraw","Withdraw"]]:
-       r.stage==="eligibility"?(r.disposition==="waitlisted"?[["restore","Restore to review"],["decline","Decline"],["withdraw","Withdraw"]]:
-        r.disposition==="ready_for_offer"?[["waitlist","Waitlist"],["decline","Decline"],["withdraw","Withdraw"]]:
-        [["accept","Approve for offer"],["waitlist","Waitlist"],["decline","Decline"],["withdraw","Withdraw"]]):[]).map(([decision,label])=>
-       <button key={decision} disabled={busy} onClick={()=>perform(()=>transitionAdmissionsStage({data:{applicationId:r.id,decision:decision as "application"|"eligibility"|"accept"|"decline"|"withdraw"|"waitlist"|"restore"}}),label+" saved.")}
-        className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">{label}</button>)}
-    </div>
+    <AdmissionsDecisionActions stage={r.stage} disposition={r.disposition} busy={busy}
+     onDecision={(decision,label)=>void perform(()=>transitionAdmissionsStage({data:{applicationId:r.id,decision}}),label+" saved.")}/>
     <Link to="/admissions" search={{siteId:r.siteId??undefined,programId:r.programId,application:r.id}}
       className="mt-3 inline-block text-xs underline">Review this application's offers and enrollment →</Link>
     <p className="mt-2 text-xs text-muted-foreground">Withdraw unaccepted offers before waitlisting, declining or withdrawing an application.
