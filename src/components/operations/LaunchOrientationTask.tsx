@@ -3,6 +3,17 @@ import { dateTimeInputInTimezone, dateTimeInputValue } from "@/modules/calendar/
 import type { listLaunches } from "@/modules/programs/launch.functions";
 type Launch = Awaited<ReturnType<typeof listLaunches>>["launches"][number];
 
+function unambiguousInstant(local: string, timezone: string): string {
+  const iso = dateTimeInputInTimezone(local, timezone);
+  const instant = Date.parse(iso);
+  for (const offset of [-3_600_000, 3_600_000]) {
+    if (dateTimeInputValue(new Date(instant + offset).toISOString(), timezone) === local) {
+      throw new Error("This local time occurs twice in the Site timezone; choose an unambiguous time");
+    }
+  }
+  return iso;
+}
+
 export function LaunchOrientationTask({ launch, busy, save }: {
   launch: Launch;
   busy: boolean;
@@ -12,10 +23,11 @@ export function LaunchOrientationTask({ launch, busy, save }: {
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const timezone = launch.siteTimezone ?? "America/Los_Angeles";
+  const [timeError, setTimeError] = useState("");
   function useRecommendation() {
     const start = new Date(Date.now() + 7 * 24 * 60 * 60_000);
     const siteDay = dateTimeInputValue(start.toISOString(), timezone).slice(0, 10);
-    const suggestedStart = dateTimeInputInTimezone(`${siteDay}T18:00`, timezone);
+    const suggestedStart = unambiguousInstant(`${siteDay}T18:00`, timezone);
     const end = new Date(Date.parse(suggestedStart) + 45 * 60_000);
     setStartsAt(`${siteDay}T18:00`);
     setEndsAt(dateTimeInputValue(end.toISOString(), timezone));
@@ -23,12 +35,15 @@ export function LaunchOrientationTask({ launch, busy, save }: {
   return <form className="mt-4 rounded-xl border bg-background p-4" onSubmit={event => {
     event.preventDefault();
     if (!startsAt || !endsAt) return;
-    void save({
-      title,
-      startsAt: dateTimeInputInTimezone(startsAt, timezone),
-      endsAt: dateTimeInputInTimezone(endsAt, timezone),
-      timezone,
-    });
+    try {
+      const startIso = unambiguousInstant(startsAt, timezone);
+      const endIso = unambiguousInstant(endsAt, timezone);
+      if (Date.parse(endIso) <= Date.parse(startIso)) throw new Error("Orientation must end after it starts");
+      setTimeError("");
+      void save({ title, startsAt: startIso, endsAt: endIso, timezone });
+    } catch (error) {
+      setTimeError(error instanceof Error ? error.message : "Invalid orientation time");
+    }
   }}>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm font-semibold">Schedule the canonical orientation event</p>
@@ -39,6 +54,7 @@ export function LaunchOrientationTask({ launch, busy, save }: {
     <p className="mt-2 text-xs text-muted-foreground">
       The suggestion only fills this form. Saving uses the existing orientation command and the Site timezone ({timezone}).
     </p>
+    {timeError && <p role="alert" className="mt-3 text-sm">{timeError}</p>}
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
       <label className="text-sm sm:col-span-2">Title
         <input required value={title} onChange={event => setTitle(event.target.value)}
