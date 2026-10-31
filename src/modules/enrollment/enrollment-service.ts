@@ -4,6 +4,7 @@ accessAccounts,
 admissionSeatPools,
 actions,
 applications,
+consentRecords,
 enrollments,
 guardianRelationships,
 householdMemberships,
@@ -58,6 +59,7 @@ export async function startFamilyApplication(
     /** Existing guardian-requested origin transfer; not destination admission authority. */
     originTransferActionId?: string;
     confirmedTransferDestination?: true;
+    destinationRecordsReleaseAuthorized?: true;
     familyStartRequestId?: string;
     source?: "family_account" | "published_site";
     student: {
@@ -107,8 +109,9 @@ export async function startFamilyApplication(
     // never authorizes entry into a destination school on its own.
     let originTransfer: {actionId:string;programId:string;siteId:string|null;destinationSchoolName:string;metadata:Record<string,unknown>}|null=null;
     if(input.originTransferActionId){
-      if(input.confirmedTransferDestination!==true)
-        throw new AuthorizationError("Guardian confirmation of receiving-school destination is required");
+      if(input.confirmedTransferDestination!==true||
+         input.destinationRecordsReleaseAuthorized!==true)
+        throw new AuthorizationError("Guardian must explicitly authorize academic-record release to this receiving school");
       if(!input.existingStudentProfileId)
         throw new AuthorizationError("Transfer requires a verified existing student");
       const [origin]=await tx.select({
